@@ -44,6 +44,7 @@ export interface FixtureConfigOverrides {
   dockingFee?: number;
   hookOnEvents?: readonly string[];
   boardSize?: number;
+  maxCratesPerJob?: number;
 }
 
 export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef {
@@ -118,6 +119,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
+      maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
     },
     narrator: {
       quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,

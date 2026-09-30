@@ -1900,6 +1900,11 @@
             "reofferSeconds": {
               "type": "number",
               "minimum": 0
+            },
+            "maxCratesPerJob": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1908,7 +1913,8 @@
             "boardSize",
             "dockingFee",
             "haulEstimateSeconds",
-            "reofferSeconds"
+            "reofferSeconds",
+            "maxCratesPerJob"
           ],
           "additionalProperties": false
         },

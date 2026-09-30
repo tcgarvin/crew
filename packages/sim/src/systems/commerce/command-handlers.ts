@@ -24,6 +24,7 @@ import type {
   DecisionId,
   EntityId,
   ItemDefId,
+  ItemId,
   JobId,
   TempRef,
 } from "../../core/types/ids";
@@ -37,6 +38,7 @@ import {
   cargoClassOf,
   cargoStowageZoneKey,
   checkPriceBand,
+  clampCargoToMaxCrates,
   issuerLabel,
   normaliseIssuer,
   spawnCargoItem,
@@ -93,6 +95,13 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     // Validated by `checkPriceBand` above: every cargo line shares one `CargoClass`.
     const cargoClass = cargoClassOf(ctx, draft.cargo) ?? "general";
     const issuerPerson = normaliseIssuer(draft.issuer);
+    // Owner feedback 2026-09-30: freight now spawns as individual crates on acceptance
+    // (`acceptJob`), so a haul stays short by capping units here, at offer time.
+    const { cargo, pay } = clampCargoToMaxCrates(
+      draft.cargo,
+      draft.pay,
+      ctx.config.commerce.maxCratesPerJob,
+    );
     const job: Job = {
       id: jobId,
       origin: command.source === "narrator" ? "narrator" : "portBoard",
@@ -103,9 +112,9 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       description: draft.description,
       fromPortId: draft.fromPortId,
       toPortId: draft.toPortId,
-      cargo: [...draft.cargo],
+      cargo,
       cargoClass,
-      pay: draft.pay,
+      pay,
       status: "offered",
       offeredTick: ctx.tick,
       expiresAtTick: ctx.tick + configTicks(ctx.config, ctx.config.commerce.jobOfferTtlSeconds),
@@ -347,7 +356,10 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
               `spawnAtBoundary: unique item "${def.id}" must spawn with count 1`,
             );
           }
-        } else if (spawn.count > def.maxStack) {
+        } else if (location.kind === "portStore" && spawn.count > def.maxStack) {
+          // A job-manifest spawn no longer becomes one stack of `count` (see `apply` below: it
+          // spawns `count` individual unit crates), so `maxStack` does not bound it; only the
+          // `maxSpawnsPerCommand` check below does.
           return reject(
             "outOfBounds",
             `spawnAtBoundary: count ${spawn.count} exceeds maxStack ${def.maxStack}`,
@@ -408,18 +420,30 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
         const def = ctx.defs.item(spawn.itemDefId);
         let id: EntityId;
         if (job !== undefined) {
-          const itemId = spawnCargoItem(
-            ctx,
-            job,
-            def,
-            spawn.count,
-            def.stacking,
-            physicalLocation,
-            stowageZoneKey,
-            cause,
-          );
-          job.cargoItemIds.push(itemId);
-          id = itemId;
+          // Owner feedback 2026-09-30: a narrator manifest spawn is `spawn.count` individual
+          // crates, not one stack, so loading reads one unit at a time (see `jobs.ts` `acceptJob`,
+          // which spawns the same way for the deterministic job source's manifests).
+          const ids: ItemId[] = [];
+          for (let i = 0; i < spawn.count; i++) {
+            ids.push(
+              spawnCargoItem(
+                ctx,
+                job,
+                def,
+                1,
+                def.stacking,
+                physicalLocation,
+                stowageZoneKey,
+                cause,
+              ),
+            );
+          }
+          job.cargoItemIds.push(...ids);
+          const [firstId] = ids;
+          if (firstId === undefined) {
+            throw new Error("spawnAtBoundary: validated count >= 1 produced no items");
+          }
+          id = firstId;
         } else {
           const newId = allocateId(state, "item");
           const item: Item =

@@ -23,12 +23,24 @@ const INJECT_FAULT_AT = TICK_RATE * 30;
 type Policy = (world: World) => "left" | "right";
 const autoAccept: Policy = () => "left";
 
+interface HaulClaim {
+  readonly tick: number;
+  readonly actorId: ActorId;
+  readonly jobId: string;
+}
+
 interface RunLog {
   readonly events: SimEvent[];
   readonly labels: Map<ActorId, Set<string>>;
   decisions: number;
   readonly hooks: string[];
   readonly stages: Set<string>;
+  /**
+   * `taskClaimed` resolved against the claimed task's `cargoToLoad` job, captured the same tick
+   * it fires: tasks are garbage-collected once their problem no longer needs them (`derivation.ts`),
+   * so looking this up after the run is over finds nothing (item 4's haul-claim check needs it).
+   */
+  readonly loadClaims: HaulClaim[];
 }
 
 function runFullSim(seed: number, ticks: number, policy: Policy): { world: World; log: RunLog } {
@@ -41,6 +53,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     decisions: 0,
     hooks: [],
     stages: new Set([world.state.travel.stage]),
+    loadClaims: [],
   };
   let n = 0;
   const send = (command: Omit<Command, "id">) => {
@@ -73,6 +86,18 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     const result = kernel.advance(world, 1);
     log.events.push(...result.events);
     log.stages.add(world.state.travel.stage);
+    for (const e of result.events) {
+      if (e.type !== "taskClaimed") continue;
+      const task = world.state.work.tasks[e.payload.taskId];
+      if (task?.type !== "haul") continue;
+      const problem = world.state.work.problems[task.problemId];
+      if (problem?.kind !== "cargoToLoad") continue;
+      log.loadClaims.push({
+        tick: e.tick,
+        actorId: e.subjectIds[0] as ActorId,
+        jobId: problem.payload.jobId,
+      });
+    }
     const violations = [
       ...checkInvariants(world.state),
       ...spatialViolations(world),
@@ -173,4 +198,45 @@ describe("full sim: real content, every system, auto-accept (Integration 2)", ()
     }
     expect(checkInvariants(world.state)).toEqual([]);
   }, 30_000);
+
+  it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
+    // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
+    // began, so the pilot did not start walking to the console until every crate was aboard —
+    // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. `travel.ts`
+    // now raises `stationToStaff` as soon as a course is planned, so the pilot (idle, with
+    // nothing else essential to do) walks there while the crew is still loading; by the time
+    // `preparingDeparture` starts the console should already be staffed.
+    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+    const stageChanges = log.events.filter(
+      (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
+        e.type === "travelStageChanged",
+    );
+    const prepStarts = stageChanges.filter((e) => e.payload.to === "preparingDeparture");
+    expect(prepStarts.length).toBeGreaterThanOrEqual(1);
+    const prepSeconds = world.config.values.travel.prepareDepartureSeconds;
+    const tickRate = world.config.values.time.tickRate;
+    for (const start of prepStarts) {
+      const next = stageChanges.find(
+        (e) => e.tick > start.tick && e.payload.from === "preparingDeparture",
+      );
+      expect(next).toBeDefined();
+      const elapsedSeconds = ((next?.tick ?? start.tick) - start.tick) / tickRate;
+      // The fixed prep time plus a small (≤ 2 s) allowance, not the extra walk the bug added.
+      expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
+    }
+  });
+
+  it("hauls a multi-crate job with more than one actor", () => {
+    // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`),
+    // a job with several units should give several idle cargo-skilled crew independent haul
+    // tasks to claim, not one actor working through the whole stack alone.
+    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+    const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 3);
+    expect(bigJob).toBeDefined();
+    if (bigJob === undefined) return;
+    const haulers = new Set(
+      log.loadClaims.filter((c) => c.jobId === bigJob.id).map((c) => c.actorId),
+    );
+    expect(haulers.size).toBeGreaterThanOrEqual(2);
+  });
 });

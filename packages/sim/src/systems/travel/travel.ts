@@ -283,6 +283,26 @@ function advanceTravel(ctx: StepCtx): void {
     // Integration 2: a course set while freight was still moving waits here, docked with the
     // ramp open, until the last crate is aboard (or ashore), then departure prep begins.
     const planned = travel.plannedDestinationId;
+    if (planned !== undefined) {
+      // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
+      // began (below), so the pilot did not start walking to the console until every crate was
+      // aboard — a `preparingDeparture` stage that then sat stalled on `!staffed` for as long as
+      // the walk takes. Raising it as soon as a course is planned lets the pilot head there while
+      // loading still runs; the `essentialOperation` urgency already outranks the haul's
+      // `routineObligation`, so this does not starve the hauling crew.
+      //
+      // `resolved` is deliberately gated on cargo also being done, not just on `isStaffed(ctx)`:
+      // resolving the instant the pilot arrives would complete their `staffStation` task and end
+      // the `hold` (SD §14.4 completion is checked against truth), freeing them to wander back to
+      // hauling — then the ship goes unstaffed again and someone has to walk back, repeatedly,
+      // until the loading crew runs out of crates to distract them with. Keeping the problem open
+      // (so the claim and the hold persist) until the ship is actually ready to leave means a
+      // pilot who gets there early just stays there.
+      const console_ = bridgeConsole(ctx);
+      if (console_ !== undefined) {
+        updateStaffingProblem(ctx, console_.id, isStaffed(ctx) && !hasOpenCargoWork(ctx));
+      }
+    }
     if (planned !== undefined && !hasOpenCargoWork(ctx)) beginDeparture(ctx, planned);
     return;
   }

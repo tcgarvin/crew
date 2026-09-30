@@ -65,8 +65,35 @@ export function cargoClassOf(
   return classes.size === 1 ? [...classes][0] : undefined;
 }
 
-function totalUnits(cargo: readonly CargoLine[]): number {
+/** Total cargo units across all lines (a stack of two crates counts as two). */
+export function totalCargoUnits(cargo: readonly CargoLine[]): number {
   return cargo.reduce((sum, line) => sum + line.count, 0);
+}
+
+/**
+ * Owner feedback (2026-09-30): freight now spawns as one item per unit (see `acceptJob` below),
+ * so an uncapped job could mean hauling a dozen individual crates one at a time. Trims cargo to
+ * at most `config.commerce.maxCratesPerJob` units, dropping from the last line(s) first, and
+ * scales `pay` down by the same ratio — price bands are linear in units, so a proportional cut
+ * stays inside the band the original pay was chosen from.
+ */
+export function clampCargoToMaxCrates(
+  cargo: readonly CargoLine[],
+  pay: number,
+  maxCrates: number,
+): { cargo: CargoLine[]; pay: number } {
+  const units = totalCargoUnits(cargo);
+  if (units <= maxCrates || units === 0) return { cargo: [...cargo], pay };
+  let remaining = maxCrates;
+  const clamped: CargoLine[] = [];
+  for (const line of cargo) {
+    if (remaining <= 0) break;
+    const count = Math.min(line.count, remaining);
+    clamped.push({ ...line, count });
+    remaining -= count;
+  }
+  const scaledPay = Math.max(0, Math.round((pay * maxCrates) / units));
+  return { cargo: clamped, pay: scaledPay };
 }
 
 /**
@@ -91,7 +118,7 @@ export function checkPriceBand(
   if (cargoClass === undefined) return "cargo lines must share one cargo class";
   const band = ctx.config.commerce.priceBands[cargoClass];
   if (band === undefined) return `no price band for cargo class "${cargoClass}"`;
-  const units = totalUnits(cargo);
+  const units = totalCargoUnits(cargo);
   const min = Math.round(band.min * distance * units);
   const max = Math.round(band.max * distance * units);
   if (pay < min || pay > max) return `pay ${pay} outside price band [${min}, ${max}]`;
@@ -101,17 +128,6 @@ export function checkPriceBand(
 // ---------------------------------------------------------------------------------------------
 // Accept: spawn manifest, raise cargoToLoad
 // ---------------------------------------------------------------------------------------------
-
-function itemSpawnChunks(
-  maxStack: number,
-  stacking: "unique" | "stackable",
-  count: number,
-): number[] {
-  const chunk = stacking === "unique" ? 1 : maxStack;
-  const out: number[] = [];
-  for (let left = count; left > 0; left -= chunk) out.push(Math.min(chunk, left));
-  return out;
-}
 
 function warehouseStoreKey(port: PortDef): ExternalStoreDef["key"] {
   return (
@@ -173,7 +189,12 @@ export function spawnCargoItem(
   return id;
 }
 
-/** Spawn a job's whole manifest into the origin port's store on acceptance. */
+/**
+ * Spawn a job's whole manifest into the origin port's store on acceptance, one item per cargo
+ * unit (owner feedback 2026-09-30: loading must read as one crate at a time, not one stack of N
+ * appearing all at once). Item defs may still be `"stackable"` for other purposes (e.g. rations in
+ * ship's stores); a job's own manifest items are simply spawned with `count: 1` each here.
+ */
 export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
   const fromPort = ctx.defs.port(job.fromPortId);
   const location = portStoreLocation(fromPort);
@@ -181,8 +202,8 @@ export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
   const spawnedIds: ItemId[] = [];
   for (const line of job.cargo) {
     const def = ctx.defs.item(line.itemDefId);
-    for (const count of itemSpawnChunks(def.maxStack, def.stacking, line.count)) {
-      spawnedIds.push(spawnCargoItem(ctx, job, def, count, def.stacking, location, stowageZoneKey));
+    for (let i = 0; i < line.count; i++) {
+      spawnedIds.push(spawnCargoItem(ctx, job, def, 1, def.stacking, location, stowageZoneKey));
     }
   }
   return spawnedIds;

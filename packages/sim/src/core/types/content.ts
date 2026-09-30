@@ -610,6 +610,12 @@ export interface ConfigDef {
      * waits this long before offering another there.
      */
     readonly reofferSeconds: Seconds;
+    /**
+     * Cap on total cargo units per job, clamped at offer time so a haul made of individually
+     * spawned crates (one item per unit, see `jobs.ts` `acceptJob`) stays a short trip rather than
+     * a long single-actor slog.
+     */
+    readonly maxCratesPerJob: number;
   };
   readonly narrator: {
     /** Quiet-too-long hook fires after this many seconds without a narrative event. */

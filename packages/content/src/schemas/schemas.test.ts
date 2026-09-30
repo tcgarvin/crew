@@ -225,6 +225,7 @@ const config = {
     dockingFee: 0,
     haulEstimateSeconds: 5,
     reofferSeconds: 60,
+    maxCratesPerJob: 6,
   },
   narrator: {
     quietTooLongSeconds: 180,

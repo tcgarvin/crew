@@ -89,6 +89,7 @@ export const configDefSchema = z.strictObject({
     dockingFee: z.number().int().min(0),
     haulEstimateSeconds: nonNegative,
     reofferSeconds: nonNegative,
+    maxCratesPerJob: positiveInt,
   }),
   narrator: z.strictObject({
     quietTooLongSeconds: positive,

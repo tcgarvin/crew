@@ -410,6 +410,11 @@ function takeItem(ctx: StepCtx, actor: Actor, item: Item, split: boolean): ItemI
       count: 1,
       reserved: 0,
       location: { kind: "carriedBy", actorId: actor.id },
+      // The split-off unit is still freight for the same job (see `ItemBase.jobId`); dropping it
+      // here would un-attribute the crate mid-haul (jobs.ts `deliveryComplete`/`raiseUnloadProblems`
+      // key off `job.cargoItemIds`, which already names this new id, not `jobId` on the item, but
+      // other freight-aware code — inspection, the crate renderer — reads `item.jobId`).
+      ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
     };
     return id;
   }

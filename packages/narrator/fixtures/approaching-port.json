@@ -121,7 +121,8 @@
         "boardSize": 3,
         "dockingFee": 150,
         "haulEstimateSeconds": 5,
-        "reofferSeconds": 20
+        "reofferSeconds": 20,
+        "maxCratesPerJob": 6
       },
       "narrator": {
         "quietTooLongSeconds": 40,

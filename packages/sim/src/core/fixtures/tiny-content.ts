@@ -97,6 +97,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       dockingFee: 0,
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
+      maxCratesPerJob: 6,
     },
     narrator: {
       quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,

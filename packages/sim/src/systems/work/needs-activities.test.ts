@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TINY } from "../../core/fixtures/tiny-content";
+import type { JobId } from "../../core/types/ids";
 import type { StackItem } from "../../core/types/ship";
 import { GALLEY_TILE, JON, MARA, crewWorld, itemAt, place } from "./fixtures/crew-deck";
 import { eventsOf, run } from "./fixtures/run";
@@ -38,6 +39,30 @@ describe("eating", () => {
     );
     expect(started).toBeDefined();
     expect((ate[0]?.tick ?? 0) - (started?.tick ?? 0)).toBeGreaterThanOrEqual(10 * 20 - 1);
+  });
+
+  it("splitting one unit off a stack for hauling keeps the stack's jobId", () => {
+    const tw = crewWorld();
+    const { world } = tw;
+    const mara = world.state.actors[MARA];
+    if (mara === undefined) throw new Error("no mara");
+    place(world, MARA, { x: 1, y: 5 });
+    place(world, JON, { x: 11, y: 6 });
+    mara.needs.hunger = 0.6;
+    const stackId = itemAt(world, TINY.rations);
+    const stack = world.state.items[stackId] as StackItem;
+    stack.jobId = "job:test-split" as JobId;
+
+    run(tw, 20 * 60, (w) =>
+      Object.values(w.state.items).some(
+        (i) => i.id !== stackId && i.location.kind === "carriedBy" && i.location.actorId === MARA,
+      ),
+    );
+    const split = Object.values(world.state.items).find(
+      (i) => i.id !== stackId && i.location.kind === "carriedBy" && i.location.actorId === MARA,
+    );
+    expect(split).toBeDefined();
+    expect(split?.jobId).toBe("job:test-split");
   });
 });
 
