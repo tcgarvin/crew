@@ -229,6 +229,7 @@ export function exampleWorldState(): WorldState {
         ],
         failure: { accumulatedHazard: 0.12, threshold: 0.8 },
         lastMaintainedTick: 0,
+        maintenanceProgress: 0,
         roleState: { role: "none" },
       },
     },

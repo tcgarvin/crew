@@ -32,7 +32,7 @@
  * them from `AgentView.self.needs` and known amenities (SD §11.3: needs create candidates, not a
  * second planning system). W0 decision.
  */
-import type { LocationRef, Seconds, Tick, TileCoord } from "./common";
+import type { DeepReadonly, LocationRef, Seconds, Tick, TileCoord } from "./common";
 import type {
   ConfigDef,
   ContentBundle,
@@ -53,6 +53,7 @@ import type {
   ProblemId,
   TaskId,
 } from "./ids";
+import type { WorldState } from "./state";
 
 // ---------------------------------------------------------------------------------------------
 // Urgency (SD §15.2)
@@ -220,11 +221,20 @@ export type TaskSpec = Omit<
   "id" | "problemId" | "createdTick" | "revision" | "status" | "blockage" | "claimState"
 >;
 
-/** Read-only inputs a derivation rule may use. Truth is fine here: derivation is not planning. */
+/**
+ * Read-only inputs a derivation rule may use. Truth is fine here: derivation is not planning.
+ * W5 addition: `state`, so a rule can resolve its problem's machine/item instance (deck,
+ * placement, existing faults) to size a task's `interactionTiles`, tools and duration — content
+ * alone is not enough once the problem is about a specific instance. `DeepReadonly<WorldState>`
+ * (not `ReadonlyWorldState` from `pipeline.ts`) to avoid a `work.ts` <-> `pipeline.ts` value
+ * import cycle; both are `import type`-only so this is safe either way, but this keeps the
+ * dependency direction the same as the rest of this file.
+ */
 export interface DerivationCtx {
   content: ContentBundle;
   config: ConfigDef;
   tick: Tick;
+  state: DeepReadonly<WorldState>;
 }
 
 export type DeriveTasks<K extends ProblemKind> = (

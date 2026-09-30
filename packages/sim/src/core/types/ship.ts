@@ -136,6 +136,12 @@ export interface Machine {
   failure: { accumulatedHazard: number; threshold: number };
   /** Tick of the last completed inspection; drives `maintenanceDue`. */
   lastMaintainedTick: Tick;
+  /**
+   * W5 addition: progress in [0, 1] on the current `maintain` task's inspection step
+   * (`MaintenanceDef.inspect`), so a second worker resumes it (SD §14.4). Reset to 0 on
+   * completion.
+   */
+  maintenanceProgress: number;
   roleState: MachineRoleState;
 }
 

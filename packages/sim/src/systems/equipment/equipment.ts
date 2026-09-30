@@ -1,0 +1,270 @@
+/**
+ * Equipment tick (SD §9.1–9.2, phase "equipment", every tick): heat, wear, hazard/fault draws,
+ * scheduled-fault firing and maintenance-due detection for every machine.
+ *
+ * Ownership split with `systems/power`: power (phase "topology", earlier in the tick) sets a
+ * consumer's `actualMode`/`output` from power availability alone. This system runs after it and
+ * may only *further* restrict a machine toward `"off"` (temperature at/above failure point, or an
+ * `inoperable` fault) — it never turns back on what power turned off, and for non-consumers
+ * (generators, batteries, `"none"`) it is the only system that ever sets `actualMode`, from
+ * `desiredMode` each tick so a cleared fault/cooled machine resumes automatically.
+ *
+ * // W5 decision: `Machine.failure` is one hazard counter with one sampled threshold (as W2 built
+ * it in `core/world.ts`), not "a threshold per fault" as sketched in the original brief — the
+ * shipped type only has room for one. When the counter crosses the threshold this system draws
+ * *which* fault fires (weighted by `FaultDef.weight`, excluding faults already present) from the
+ * `failures` stream, satisfying D6 (kernel samples fault timing) without a breaking type change.
+ *
+ * // W5 decision: `MachineHeatDef.coolPerSecond` is nominally a flat passive-cooling rate (W0
+ * decision in `content.ts`: "cooling loops (SD §9.4) are deferred"). This system still honours a
+ * *coolant pump*, but as a simple multiplier, not a loop/pipe simulation: if any other machine
+ * tagged `"cooling"` shares this machine's power domain, cooling only applies at full rate while
+ * at least one of them is `actualMode: "on"`; otherwise it falls to `COOLANT_OFFLINE_COOLING_FRACTION`.
+ * A machine with no `"cooling"`-tagged machine on its domain is unaffected (no pump, no penalty).
+ *
+ * // W5 decision (schema gap, report to W10): there is no `MachineDef` field for a symptom
+ * diagnosis's duration/skill (`RepairRecipe` only covers repair, and `MaintenanceDef.inspect` is
+ * for routine maintenance, not fault diagnosis). `DIAGNOSE_SECONDS`/`DIAGNOSE_SKILL` below are
+ * hardcoded pending a content schema addition (e.g. `MachineDef.diagnose: RecipeStep`).
+ *
+ * // W5 decision (schema gap, report to W10): there is no config/content field for how much
+ * `condition` a completed repair restores. `REPAIR_CONDITION_RESTORE` below is hardcoded pending
+ * a `ConfigDef.equipment.repairConditionRestore` addition; adding it now would require also
+ * updating `packages/content`'s (W10-owned) Zod schema, out of scope here.
+ */
+import { ticksToSeconds } from "../../core/clock";
+import { allocateId } from "../../core/ids";
+import type { KernelRegistry } from "../../core/registry";
+import type { MachineDef } from "../../core/types/content";
+import type { EventDraft } from "../../core/types/events";
+import type { CommandId, LocalKey } from "../../core/types/ids";
+import type { StepCtx, System } from "../../core/types/pipeline";
+import type { Machine } from "../../core/types/ship";
+import { domainKeyOf } from "../power/power";
+import { raiseProblem, resolveProblem } from "./problems";
+import { clamp } from "./util";
+
+/** W5 decision: see module doc — pending `MachineDef` field for diagnosis. */
+export const DIAGNOSE_SECONDS = 20;
+export const DIAGNOSE_SKILL = { skill: "engineering", min: 1 } as const;
+/** W5 decision: see module doc — pending `ConfigDef.equipment.repairConditionRestore`. */
+export const REPAIR_CONDITION_RESTORE = 0.5;
+/** W5 decision: see module doc — residual cooling fraction while a domain's coolant pump is down. */
+const COOLANT_OFFLINE_COOLING_FRACTION = 0.2;
+
+function coolantAvailable(ctx: StepCtx, machine: Machine): boolean {
+  const domainKey = domainKeyOf(ctx, machine);
+  if (domainKey === undefined) return true;
+  const coolants = Object.values(ctx.state.machines).filter((m) => {
+    if (m.id === machine.id) return false;
+    if (domainKeyOf(ctx, m) !== domainKey) return false;
+    return ctx.defs.machine(m.defId).tags.includes("cooling");
+  });
+  if (coolants.length === 0) return true;
+  return coolants.some((m) => m.actualMode === "on");
+}
+
+/**
+ * Add `faultKey` to `machine` (no-op if already present, per the ship.ts W0 decision that a
+ * machine holds at most one fault per key), raise its `machineSymptom` problem and emit
+ * `faultOccurred`. The one path both natural hazard draws and fired `scheduleFault`/scenario
+ * faults should go through.
+ */
+export function applyFault(
+  ctx: StepCtx,
+  machine: Machine,
+  def: MachineDef,
+  faultKey: LocalKey,
+  causeCommandId?: CommandId,
+): void {
+  if (machine.faults.some((f) => f.faultKey === faultKey)) return;
+  const faultDef = def.faults.find((f) => f.key === faultKey);
+  if (faultDef === undefined) return;
+  machine.faults.push({
+    faultKey,
+    sinceTick: ctx.tick,
+    diagnosed: false,
+    repairStepIndex: 0,
+    repairStepProgress: 0,
+    ...(causeCommandId !== undefined ? { causeCommandId } : {}),
+  });
+  ctx.dirty.power = true;
+  ctx.emit({
+    type: "faultOccurred",
+    subjectIds: [machine.id],
+    causeIds: causeCommandId !== undefined ? [causeCommandId] : [],
+    source: "sim",
+    locationRef: { kind: "machine", machineId: machine.id },
+    payload: { machineId: machine.id, faultKey },
+  });
+  const { event } = raiseProblem(ctx.state, ctx.tick, {
+    kind: "machineSymptom",
+    payload: { machineId: machine.id, symptomKey: faultDef.symptom.key },
+    dedupeKey: `machineSymptom:${machine.id}:${faultKey}`,
+    // W5 decision: no `MachineTag` for "has a sensor" and no bridge-console monitored list exist
+    // in the content schema, so V1 symptoms are always `discovered` (perception must write the
+    // actor a `problem` fact before it is visible). Report to W10 if that tag is wanted later.
+    visibility: "discovered",
+    baseUrgency: "essentialOperation",
+    location: { kind: "machine", machineId: machine.id },
+  });
+  if (event !== undefined) ctx.emit(event);
+}
+
+function fireScheduledFaults(ctx: StepCtx, machine: Machine, def: MachineDef): void {
+  if (machine.scheduledFaults.length === 0) return;
+  const due = machine.scheduledFaults.filter((sf) => sf.fireAtTick <= ctx.tick);
+  if (due.length === 0) return;
+  machine.scheduledFaults = machine.scheduledFaults.filter((sf) => sf.fireAtTick > ctx.tick);
+  for (const sf of due) applyFault(ctx, machine, def, sf.faultKey, sf.causeCommandId);
+}
+
+function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
+  const def = ctx.defs.machine(machine.defId);
+  fireScheduledFaults(ctx, machine, def);
+
+  let inoperableFromFault = false;
+  let faultOutputFactor = 1;
+  let faultExtraHeat = 0;
+  for (const fault of machine.faults) {
+    const faultDef = def.faults.find((f) => f.key === fault.faultKey);
+    if (faultDef === undefined) continue;
+    if (faultDef.effect.kind === "inoperable") inoperableFromFault = true;
+    else if (faultDef.effect.kind === "derate") faultOutputFactor *= faultDef.effect.outputFactor;
+    else if (faultDef.effect.kind === "overheat")
+      faultExtraHeat += faultDef.effect.extraRisePerSecond;
+  }
+
+  // Heat: rise while genuinely operating (power on and not inoperable), fall toward ambient
+  // otherwise, gated by coolant-pump availability (see module doc).
+  const poweredOn = machine.actualMode === "on";
+  const generatingHeat = poweredOn && !inoperableFromFault;
+  const modeFactor =
+    def.power.role === "consumer" && def.power.drawKw > 0
+      ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
+      : 1;
+  const riseRate = generatingHeat ? def.heat.risePerSecond * modeFactor + faultExtraHeat : 0;
+  const coolRate =
+    def.heat.coolPerSecond *
+    (coolantAvailable(ctx, machine) ? 1 : COOLANT_OFFLINE_COOLING_FRACTION);
+  const newTemp = clamp(machine.temperature + (riseRate - coolRate) * dtSeconds, 0, 1.5);
+  machine.temperature = newTemp;
+
+  if (newTemp > 1) {
+    machine.integrity = clamp(
+      machine.integrity - ctx.config.equipment.overheatDamagePerSecond * dtSeconds,
+      0,
+      1,
+    );
+  }
+
+  let heatFactor = 1;
+  if (newTemp >= 1) heatFactor = 0;
+  else if (newTemp > def.heat.derateAbove) heatFactor = (1 - newTemp) / (1 - def.heat.derateAbove);
+
+  // Mode: power already set the baseline this tick; equipment may only push further toward off.
+  const blocked = inoperableFromFault || newTemp >= 1;
+  const wasMode = machine.actualMode;
+  if (def.power.role === "consumer") {
+    if (blocked) machine.actualMode = "off";
+  } else {
+    machine.actualMode = blocked ? "off" : machine.desiredMode;
+  }
+  if (machine.actualMode !== wasMode) {
+    ctx.emit({
+      type: "machineModeChanged",
+      subjectIds: [machine.id],
+      causeIds: [],
+      source: "sim",
+      locationRef: { kind: "machine", machineId: machine.id },
+      payload: { machineId: machine.id, from: wasMode, to: machine.actualMode },
+    });
+  }
+
+  const finalOn = machine.actualMode === "on";
+  const powerFraction =
+    def.power.role === "consumer" && def.power.drawKw > 0
+      ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
+      : 1;
+  const oldOutput = machine.output;
+  const newOutput = finalOn ? clamp(powerFraction * heatFactor * faultOutputFactor, 0, 1) : 0;
+  machine.output = newOutput;
+  if (oldOutput >= 1 && newOutput < 1) {
+    const cause =
+      powerFraction <= heatFactor && powerFraction <= faultOutputFactor
+        ? "power"
+        : heatFactor <= faultOutputFactor
+          ? "heat"
+          : "fault";
+    ctx.emit({
+      type: "machineDerated",
+      subjectIds: [machine.id],
+      causeIds: [],
+      source: "sim",
+      locationRef: { kind: "machine", machineId: machine.id },
+      payload: { machineId: machine.id, output: newOutput, cause },
+    });
+  }
+
+  // Wear and hazard accumulate only while truly operating.
+  if (finalOn) {
+    machine.condition = clamp(machine.condition - def.failure.wearPerSecond * dtSeconds, 0, 1);
+    const heatHazardFactor = 1 + (def.failure.heatFactor - 1) * clamp(newTemp, 0, 1);
+    const wearFactor = 1 - machine.condition;
+    const hazardRate =
+      def.failure.baseHazardPerSecond *
+      ctx.config.equipment.hazardScale *
+      heatHazardFactor *
+      (1 + wearFactor);
+    machine.failure.accumulatedHazard += hazardRate * dtSeconds;
+  }
+
+  if (machine.failure.accumulatedHazard >= machine.failure.threshold) {
+    const candidates = def.faults.filter(
+      (f) => !machine.faults.some((mf) => mf.faultKey === f.key),
+    );
+    if (candidates.length > 0) {
+      const chosen = ctx.rng.weighted(
+        "failures",
+        candidates.map((f) => ({ item: f, weight: f.weight })),
+      );
+      applyFault(ctx, machine, def, chosen.key);
+    }
+    machine.failure.accumulatedHazard = 0;
+    machine.failure.threshold = -Math.log(1 - ctx.rng.float("failures"));
+  }
+
+  // Maintenance due.
+  if (def.maintenance !== undefined) {
+    const dedupeKey = `maintenanceDue:${machine.id}`;
+    if (machine.condition < ctx.config.equipment.maintenanceConditionBelow) {
+      const { event } = raiseProblem(ctx.state, ctx.tick, {
+        kind: "maintenanceDue",
+        payload: { machineId: machine.id },
+        dedupeKey,
+        visibility: "public",
+        baseUrgency: "routineObligation",
+        location: { kind: "machine", machineId: machine.id },
+      });
+      if (event !== undefined) ctx.emit(event);
+    } else {
+      const event = resolveProblem(ctx.state, dedupeKey);
+      if (event !== undefined) ctx.emit(event);
+    }
+  }
+}
+
+export const equipmentSystem: System = {
+  name: "equipment.tick",
+  phase: "equipment",
+  run(ctx) {
+    const dtSeconds = ticksToSeconds(ctx.elapsedTicks, ctx.config.time.tickRate);
+    for (const machine of Object.values(ctx.state.machines)) {
+      tickMachine(ctx, machine, dtSeconds);
+    }
+  },
+};
+
+export function registerEquipmentSystem(registry: KernelRegistry): void {
+  registry.registerSystem(equipmentSystem);
+}

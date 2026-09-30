@@ -111,6 +111,7 @@ function instantiateDeck(state: WorldState, deck: DeckDef, content: ContentBundl
       scheduledFaults: [],
       failure: { accumulatedHazard: 0, threshold: -Math.log(1 - rng.float("failures")) },
       lastMaintainedTick: 0,
+      maintenanceProgress: 0,
       roleState:
         def.power.role === "battery"
           ? { role: "battery", storedKj: def.power.capacityKj }
