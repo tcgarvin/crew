@@ -571,6 +571,11 @@ export interface ConfigDef {
     readonly dockSeconds: Seconds;
     /** Route progress per second at full engine output, in the same units as `PortDef.routes.distance`. */
     readonly nominalSpeed: number;
+    /**
+     * W6 addition: `TaskDerivationTable` planner-ranking estimate (SD §15.3) for a `staffStation`
+     * task; staffing has no accumulated work, so this defaults to 0 (present-or-not).
+     */
+    readonly staffEstimateSeconds?: Seconds;
   };
   readonly commerce: {
     /** Credits per unit distance per cargo unit, inclusive band. Narrator `offerJob` pay must fit. */
@@ -580,6 +585,13 @@ export interface ConfigDef {
     readonly jobOfferTtlSeconds: Seconds;
     /** Jobs kept on each port board by the deterministic job source. */
     readonly boardSize: number;
+    /**
+     * W6 addition: flat integer credits charged on arrival at a port (SD §17.3 "simple running
+     * costs"), so money can go down even on an uneventful loop. Optional: absent/0 = no fee.
+     */
+    readonly dockingFee?: number;
+    /** W6 addition: `TaskDerivationTable` planner-ranking estimate for a `haul` task (SD §15.3). */
+    readonly haulEstimateSeconds?: Seconds;
   };
   readonly narrator: {
     /** Quiet-too-long hook fires after this many seconds without a narrative event. */
@@ -593,6 +605,12 @@ export interface ConfigDef {
     readonly spawnBudget: number;
     readonly faultBudget: number;
     readonly budgetRefillSeconds: Seconds;
+    /**
+     * W6 addition: `SimEvent["type"]` names (kept as plain strings so `content.ts` need not
+     * depend on `core/types/events`) that raise the `notableEvent` hook when committed. Optional:
+     * absent/empty = the hook relies solely on `NarratorState.lastNarrativeEvent` being set.
+     */
+    readonly hookOnEvents?: readonly string[];
   };
   readonly host: {
     /** D14: max sim-seconds the worker may run ahead of the viewer. */
@@ -614,6 +632,18 @@ export interface ConfigDef {
       readonly key: LocalKey;
       readonly workWindows: readonly (readonly [Seconds, Seconds])[];
     }[];
+  };
+  /**
+   * W4a addition: ambient chat (PLAN §6 W4a item 5). Optional until the content schema (W10)
+   * carries it; absent = the work system's documented fallbacks in `systems/work/ambient.ts`.
+   */
+  readonly social?: {
+    /** Max tile distance between two crew for an ambient conversation. */
+    readonly chatRadiusTiles: number;
+    /** Min seconds between two conversations involving the same person. */
+    readonly chatCooldownSeconds: Seconds;
+    /** Templates with `{a}` (speaker) and `{b}` (listener) placeholders. */
+    readonly templateLines: readonly string[];
   };
   readonly events: {
     readonly tickerMaxEntries: number;

@@ -1,0 +1,240 @@
+/**
+ * Job lifecycle (SD §17.3, PLAN §6 W6 item 3): `offered -> accepted -> inTransit -> delivered ->
+ * paid | declined | expired | failed`. Accepting spawns the manifest into the origin port's
+ * store and raises `cargoToLoad` problems; a per-tick sweep here pays a job exactly once
+ * (`Job.paymentTransactionId` guard) once every line is confirmed in the destination store.
+ */
+import type { ApplyCtx } from "../../core/commands";
+import { allocateId } from "../../core/ids";
+import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
+import type { ItemId, PortDefId, ProblemId, TransactionId } from "../../core/types/ids";
+import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
+import type { Item } from "../../core/types/ship";
+import type { CargoLine, Job } from "../../core/types/travel";
+import { portStoreLocation } from "../travel/travel";
+
+// ---------------------------------------------------------------------------------------------
+// Price bands (D6)
+// ---------------------------------------------------------------------------------------------
+
+export function routeDistance(port: PortDef, toPortId: PortDefId): number | undefined {
+  return port.routes.find((r) => r.toPortId === toPortId)?.distance;
+}
+
+/** Every cargo line must share one `CargoClass` (the band is keyed by class, not per-item). */
+export function cargoClassOf(
+  ctx: Pick<StepCtx, "content">,
+  cargo: readonly CargoLine[],
+): CargoClass | undefined {
+  const classes = new Set(
+    cargo
+      .map((line) => ctx.content.items[line.itemDefId]?.cargoClass)
+      .filter((c) => c !== undefined),
+  );
+  return classes.size === 1 ? [...classes][0] : undefined;
+}
+
+function totalUnits(cargo: readonly CargoLine[]): number {
+  return cargo.reduce((sum, line) => sum + line.count, 0);
+}
+
+/**
+ * D6: `pay` must fall within `priceBands[cargoClass].{min,max}` per unit per distance unit,
+ * inclusive, scaled by total cargo units and route distance. Returns a reason string on failure.
+ */
+export function checkPriceBand(
+  ctx: Pick<StepCtx, "content" | "config">,
+  fromPortId: PortDefId,
+  toPortId: PortDefId,
+  cargo: readonly CargoLine[],
+  pay: number,
+): string | null {
+  if (!Number.isInteger(pay) || pay < 0) return "pay must be a nonnegative integer";
+  if (cargo.length === 0) return "cargo must have at least one line";
+  const fromPort = ctx.content.ports[fromPortId];
+  if (fromPort === undefined) return `unknown port "${fromPortId}"`;
+  if (ctx.content.ports[toPortId] === undefined) return `unknown port "${toPortId}"`;
+  const distance = routeDistance(fromPort, toPortId);
+  if (distance === undefined) return `no route from "${fromPortId}" to "${toPortId}"`;
+  const cargoClass = cargoClassOf(ctx, cargo);
+  if (cargoClass === undefined) return "cargo lines must share one cargo class";
+  const band = ctx.config.commerce.priceBands[cargoClass];
+  if (band === undefined) return `no price band for cargo class "${cargoClass}"`;
+  const units = totalUnits(cargo);
+  const min = Math.round(band.min * distance * units);
+  const max = Math.round(band.max * distance * units);
+  if (pay < min || pay > max) return `pay ${pay} outside price band [${min}, ${max}]`;
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Accept: spawn manifest, raise cargoToLoad
+// ---------------------------------------------------------------------------------------------
+
+function itemSpawnChunks(
+  maxStack: number,
+  stacking: "unique" | "stackable",
+  count: number,
+): number[] {
+  const chunk = stacking === "unique" ? 1 : maxStack;
+  const out: number[] = [];
+  for (let left = count; left > 0; left -= chunk) out.push(Math.min(chunk, left));
+  return out;
+}
+
+function warehouseStoreKey(port: PortDef): ExternalStoreDef["key"] {
+  return (
+    (port.externalStores.find((s) => s.kind === "warehouse") ?? port.externalStores[0])?.key ?? ""
+  );
+}
+
+/** V1's single ship deck (see `travel.ts` `theDeckId`); a `cargoStowage`-tagged zone on it. */
+function cargoStowageZoneKey(ctx: Pick<StepCtx, "content">): string | undefined {
+  const [deck] = Object.values(ctx.content.decks);
+  return deck?.zones.find((z) => z.tags.includes("cargoStowage"))?.key;
+}
+
+/**
+ * Spawn a job's manifest into the origin port's store and open one `cargoToLoad` problem per
+ * item (owner: commerce). Uses the same allocate-and-insert pattern as `scenarioSpawn`'s
+ * `apply()` (the "kernel spawn path"): there is no separate boundary-spawn command for commerce
+ * to call into, so it performs the insert directly with `allocateId`.
+ */
+export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
+  const fromPort = ctx.defs.port(job.fromPortId);
+  const location = portStoreLocation(fromPort);
+  const stowageZoneKey = cargoStowageZoneKey(ctx) ?? "cargoHold";
+  const spawnedIds: ItemId[] = [];
+  for (const line of job.cargo) {
+    const def = ctx.defs.item(line.itemDefId);
+    for (const count of itemSpawnChunks(def.maxStack, def.stacking, line.count)) {
+      const id = allocateId(ctx.state, "item");
+      const item: Item =
+        def.stacking === "unique"
+          ? { id, defId: def.id, stacking: "unique", location, condition: 1, jobId: job.id }
+          : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, jobId: job.id };
+      ctx.state.items[id] = item;
+      ctx.caches.dirty.inventory = true;
+      spawnedIds.push(id);
+      ctx.emit({
+        type: "entitySpawned",
+        subjectIds: [id],
+        causeIds: [],
+        source: "system",
+        payload: { entityId: id, defId: def.id },
+      });
+      const problemId = allocateId(ctx.state, "problem") as ProblemId;
+      ctx.state.work.problems[problemId] = {
+        id: problemId,
+        kind: "cargoToLoad",
+        payload: { jobId: job.id, itemId: id, stowageZoneKey },
+        owner: "commerce",
+        visibility: "public",
+        dedupeKey: `cargoToLoad:${job.id}:${id}`,
+        status: "open",
+        createdTick: ctx.tick,
+        revision: 1,
+        baseUrgency: "routineObligation",
+        location: { kind: "port", portId: job.fromPortId },
+      };
+    }
+  }
+  return spawnedIds;
+}
+
+/**
+ * Raise one `cargoToUnload` problem per manifest item (owner: commerce), called on arrival at
+ * the job's destination (see `jobSource.ts`/travel `arrived` handling). Deduped like `acceptJob`.
+ */
+export function raiseUnloadProblems(ctx: ApplyCtx, job: Job): void {
+  const toPort = ctx.defs.port(job.toPortId);
+  const storeKey = warehouseStoreKey(toPort);
+  for (const itemId of job.cargoItemIds) {
+    const dedupeKey = `cargoToUnload:${job.id}:${itemId}`;
+    if (Object.values(ctx.state.work.problems).some((p) => p.dedupeKey === dedupeKey)) continue;
+    const problemId = allocateId(ctx.state, "problem") as ProblemId;
+    ctx.state.work.problems[problemId] = {
+      id: problemId,
+      kind: "cargoToUnload",
+      payload: { jobId: job.id, itemId, portId: job.toPortId, storeKey },
+      owner: "commerce",
+      visibility: "public",
+      dedupeKey,
+      status: "open",
+      createdTick: ctx.tick,
+      revision: 1,
+      baseUrgency: "routineObligation",
+      location: { kind: "port", portId: job.toPortId },
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Delivery and payment
+// ---------------------------------------------------------------------------------------------
+
+/** Pure: every manifest item is physically in an external store at the job's destination port. */
+export function deliveryComplete(
+  state: Pick<ReadonlyWorldState, "items">,
+  job: Pick<Job, "cargoItemIds" | "toPortId">,
+): boolean {
+  if (job.cargoItemIds.length === 0) return false;
+  return job.cargoItemIds.every((itemId) => {
+    const item = state.items[itemId];
+    return (
+      item !== undefined &&
+      item.location.kind === "inExternalStore" &&
+      item.location.portId === job.toPortId
+    );
+  });
+}
+
+/** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
+export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
+  if (job.status === "paid" || job.paymentTransactionId !== undefined) return;
+  if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") return;
+  if (!deliveryComplete(ctx.state, job)) return;
+  job.status = "delivered";
+  const txId: TransactionId = allocateId(ctx.state, "transaction");
+  ctx.state.money.balance += job.pay;
+  ctx.state.money.transactions[txId] = {
+    id: txId,
+    tick: ctx.tick,
+    amount: job.pay,
+    reason: "jobPayment",
+    jobId: job.id,
+  };
+  job.paymentTransactionId = txId;
+  job.status = "paid";
+  ctx.emit({
+    type: "contractCompleted",
+    subjectIds: [job.id],
+    causeIds: [],
+    source: "sim",
+    payload: { jobId: job.id },
+  });
+  ctx.emit({
+    type: "paymentMade",
+    subjectIds: [job.id],
+    causeIds: [],
+    source: "sim",
+    payload: { transactionId: txId, amount: job.pay, jobId: job.id },
+  });
+  ctx.state.narrator.lastNarrativeEvent = { tick: ctx.tick, type: "contractCompleted" };
+}
+
+/** Expire stale offers (`config.commerce.jobOfferTtlSeconds`). */
+export function expireStaleOffers(ctx: ApplyCtx): void {
+  for (const job of Object.values(ctx.state.jobs)) {
+    if (job.status === "offered" && ctx.tick > job.expiresAtTick) {
+      job.status = "expired";
+      ctx.emit({
+        type: "jobExpired",
+        subjectIds: [job.id],
+        causeIds: [],
+        source: "sim",
+        payload: { jobId: job.id },
+      });
+    }
+  }
+}
