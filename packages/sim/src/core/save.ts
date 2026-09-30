@@ -6,7 +6,7 @@ import { emptyCaches, rebuildCaches } from "./caches";
 import { checkInvariants } from "./invariants";
 import type { KernelRegistry } from "./registry";
 import type { ContentBundle } from "./types/content";
-import type { World } from "./types/kernel";
+import type { RestoredWorld, World } from "./types/kernel";
 import { type MigrationRegistry, SIM_VERSION, type SaveEnvelope } from "./types/save";
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
 
@@ -78,20 +78,26 @@ export interface RestoreOptions {
 
 /**
  * Migrate, validate and rebuild caches. Throws `SaveCompatibilityError` on an unsupported schema
- * version, a content hash mismatch, or a state that fails the invariants.
+ * version or a state that fails the invariants.
+ *
+ * Integration 2: a content hash mismatch is no longer fatal — content tuning between deploys
+ * would otherwise wipe every save. The world is restored against the loaded content (the schema
+ * version still guards structural compatibility, and the invariants check the result) and the
+ * mismatch is reported in `warnings`.
  */
 export function restore(
   envelope: SaveEnvelope,
   content: ContentBundle,
   registry: KernelRegistry,
   options: RestoreOptions = {},
-): World {
+): RestoredWorld {
   if (typeof envelope !== "object" || envelope === null || typeof envelope.state !== "object") {
     throw new SaveCompatibilityError("Not a save envelope");
   }
+  const warnings: string[] = [];
   if (envelope.contentHash !== content.hash) {
-    throw new SaveCompatibilityError(
-      `Save was made with content ${envelope.contentHash}, but content ${content.hash} is loaded`,
+    warnings.push(
+      `Save was made with content ${envelope.contentHash}, but content ${content.hash} is loaded; restored against the loaded content`,
     );
   }
   const migrated = migrateState(
@@ -116,5 +122,5 @@ export function restore(
     config: { values: deepCopy(envelope.config), hash: envelope.configHash },
   };
   rebuildCaches(world, registry);
-  return world;
+  return { ...world, warnings };
 }

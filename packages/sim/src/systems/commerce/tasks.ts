@@ -14,8 +14,8 @@ function firstDeck(content: ContentBundle) {
 }
 
 // W6 decision: haul tasks carry no skill/tool requirement in V1 (any crew member can carry a
-// crate); `estimatedWorkSeconds` uses the W6-added `config.commerce.haulEstimateSeconds`,
-// defaulting to 5s (a short, uniform placeholder — actual haul time is walking + pick/drop, not
+// crate); `estimatedWorkSeconds` uses the W6-added `config.commerce.haulEstimateSeconds`
+// (a short, uniform placeholder — actual haul time is walking + pick/drop, not
 // modelled by the derivation table).
 export const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
   const deck = firstDeck(ctx.content);
@@ -37,7 +37,7 @@ export const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
       itemId: problem.payload.itemId,
       zoneKey: problem.payload.stowageZoneKey,
     },
-    estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds ?? 5,
+    estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds,
   };
   return [spec];
 };
@@ -63,7 +63,7 @@ export const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) 
       portId: problem.payload.portId,
       storeKey: problem.payload.storeKey,
     },
-    estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds ?? 5,
+    estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds,
   };
   return [spec];
 };

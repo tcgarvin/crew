@@ -31,6 +31,14 @@ export interface World {
   readonly config: EffectiveConfig;
 }
 
+/**
+ * What `restore` returns: the world plus non-fatal compatibility notes (Integration 2 addition;
+ * e.g. the save was made with different content). A `RestoredWorld` is a `World`.
+ */
+export interface RestoredWorld extends World {
+  readonly warnings: readonly string[];
+}
+
 /** Why `advance()` stopped before running every requested tick. */
 export type AdvanceHalt =
   | { readonly kind: "completed" }
@@ -71,6 +79,9 @@ export interface Kernel {
   getAgentView(world: World, actorId: ActorId): AgentView;
   getRenderFrame(world: World): RenderFrame;
   serialize(world: World): SaveEnvelope;
-  /** Migrate, validate and rebuild caches. Throws on unsupported schema or content hash mismatch. */
-  restore(envelope: SaveEnvelope, content: ContentBundle): World;
+  /**
+   * Migrate, validate and rebuild caches. Throws on an unsupported schema version or invalid
+   * state; a content hash mismatch restores anyway and is reported in `warnings`.
+   */
+  restore(envelope: SaveEnvelope, content: ContentBundle): RestoredWorld;
 }

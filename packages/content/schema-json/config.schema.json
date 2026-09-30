@@ -129,6 +129,81 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "initialRange": {
+          "type": "object",
+          "properties": {
+            "hunger": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "fatigue": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "comfort": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "social": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["hunger", "fatigue", "comfort", "social"],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -143,7 +218,8 @@
         "seekThreshold",
         "mealSeconds",
         "sleepMinSeconds",
-        "wakeBelow"
+        "wakeBelow",
+        "initialRange"
       ],
       "additionalProperties": false
     },
@@ -289,6 +365,10 @@
         "nominalSpeed": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "staffEstimateSeconds": {
+          "type": "number",
+          "minimum": 0
         }
       },
       "required": [
@@ -297,7 +377,8 @@
         "departSeconds",
         "approachSeconds",
         "dockSeconds",
-        "nominalSpeed"
+        "nominalSpeed",
+        "staffEstimateSeconds"
       ],
       "additionalProperties": false
     },
@@ -379,9 +460,29 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "dockingFee": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "haulEstimateSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reofferSeconds": {
+          "type": "number",
+          "minimum": 0
         }
       },
-      "required": ["priceBands", "jobOfferTtlSeconds", "boardSize"],
+      "required": [
+        "priceBands",
+        "jobOfferTtlSeconds",
+        "boardSize",
+        "dockingFee",
+        "haulEstimateSeconds",
+        "reofferSeconds"
+      ],
       "additionalProperties": false
     },
     "narrator": {
@@ -417,6 +518,13 @@
         "budgetRefillSeconds": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "hookOnEvents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "required": [
@@ -426,7 +534,8 @@
         "maxFaultWindowSeconds",
         "spawnBudget",
         "faultBudget",
-        "budgetRefillSeconds"
+        "budgetRefillSeconds",
+        "hookOnEvents"
       ],
       "additionalProperties": false
     },
@@ -514,6 +623,29 @@
       "required": ["cycleSeconds", "shifts"],
       "additionalProperties": false
     },
+    "social": {
+      "type": "object",
+      "properties": {
+        "chatRadiusTiles": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "chatCooldownSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "templateLines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["chatRadiusTiles", "chatCooldownSeconds", "templateLines"],
+      "additionalProperties": false
+    },
     "events": {
       "type": "object",
       "properties": {
@@ -546,6 +678,7 @@
     "narrator",
     "host",
     "shifts",
+    "social",
     "events"
   ],
   "additionalProperties": false

@@ -237,7 +237,6 @@ export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
     source: "sim",
     payload: { transactionId: txId, amount: job.pay, jobId: job.id },
   });
-  ctx.state.narrator.lastNarrativeEvent = { tick: ctx.tick, type: "contractCompleted" };
 }
 
 /** Expire stale offers (`config.commerce.jobOfferTtlSeconds`). */
@@ -245,6 +244,7 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
   for (const job of Object.values(ctx.state.jobs)) {
     if (job.status === "offered" && ctx.tick > job.expiresAtTick) {
       job.status = "expired";
+      job.closedTick = ctx.tick;
       ctx.emit({
         type: "jobExpired",
         subjectIds: [job.id],

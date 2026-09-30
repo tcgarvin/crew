@@ -82,6 +82,11 @@ export interface Job {
   /** Spawned freight, once accepted. */
   cargoItemIds: ItemId[];
   paymentTransactionId?: TransactionId;
+  /**
+   * Integration 2 addition: tick the offer was declined or expired. Drives the job source's
+   * re-offer cooldown (`config.commerce.reofferSeconds`).
+   */
+  closedTick?: Tick;
   /** Command that created it (narrator audit). */
   causeCommandId?: CommandId;
 }

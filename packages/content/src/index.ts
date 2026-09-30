@@ -4,3 +4,4 @@
  */
 export * from "./loader";
 export * from "./schemas/index";
+export * from "./templates";

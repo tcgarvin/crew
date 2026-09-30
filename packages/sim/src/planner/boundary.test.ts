@@ -66,6 +66,12 @@ const config: PlannerConfig = {
     mealSeconds: 10,
     sleepMinSeconds: 60,
     wakeBelow: 0.1,
+    initialRange: {
+      hunger: { min: 0, max: 0 },
+      fatigue: { min: 0, max: 0 },
+      comfort: { min: 0, max: 0 },
+      social: { min: 0, max: 0 },
+    },
   },
 };
 

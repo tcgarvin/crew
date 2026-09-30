@@ -1,7 +1,7 @@
 /**
  * The commerce system (PLAN §6 W6 items 3–5): one per-tick pass that
- *  1. runs the deterministic job source (fills the board while docked),
- *  2. raises the `jobBoard` hook if the board is still empty,
+ *  1. runs the deterministic job source (one offer at a time while docked),
+ *  2. raises the `jobBoard` hook if the source was free to offer but had nothing to offer,
  *  3. moves accepted jobs to `inTransit` once the ship leaves dock, raises `cargoToUnload`
  *     problems on arrival at the destination, and pays a delivered job exactly once,
  *  4. expires stale offers.
@@ -35,17 +35,8 @@ export const commerceSystem: System = {
   name: "commerce.jobs",
   phase: "equipment",
   run(ctx) {
-    runJobSource(ctx);
+    const outcome = runJobSource(ctx);
     sweepJobs(ctx);
-    const hasOffers = Object.values(ctx.state.jobs).some(
-      (j) =>
-        j.status === "offered" &&
-        ctx.state.travel.stage === "docked" &&
-        j.fromPortId === ctx.state.travel.portId,
-    );
-    const hasQueuedJobDecision = ctx.state.decisions.queue.some(
-      (id) => ctx.state.decisions.records[id]?.jobId !== undefined,
-    );
-    raiseJobBoardHookIfNeeded(ctx, hasOffers, hasQueuedJobDecision);
+    raiseJobBoardHookIfNeeded(ctx, outcome === "nothing");
   },
 };

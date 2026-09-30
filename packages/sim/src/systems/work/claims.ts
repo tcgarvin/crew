@@ -123,17 +123,27 @@ export function isCompletionMet(
  */
 export function completeTask(ctx: StepCtx, task: Task): void {
   if (task.status === "completed") return;
+  const workers: ActorId[] = [];
   for (const claim of Object.values(ctx.state.work.claims)) {
-    if (claim.taskId === task.id) dropClaim(ctx, task, claim.id);
+    if (claim.taskId !== task.id) continue;
+    workers.push(claim.ownerActorId);
+    dropClaim(ctx, task, claim.id);
   }
   task.status = "completed";
   task.claimState = { kind: "unclaimed" };
+  const completion = task.completion;
+  const haul =
+    completion.kind === "itemInZone"
+      ? { itemId: completion.itemId, to: "ship" as const }
+      : completion.kind === "itemInStore"
+        ? { itemId: completion.itemId, to: "port" as const }
+        : undefined;
   ctx.emit({
     type: "taskCompleted",
-    subjectIds: [task.id, task.problemId],
+    subjectIds: [task.id, task.problemId, ...workers],
     causeIds: [],
     source: "sim",
-    payload: { taskId: task.id },
+    payload: { taskId: task.id, ...(haul === undefined ? {} : { haul }) },
   });
   const problem = ctx.state.work.problems[task.problemId];
   const custody = task.completion.kind === "itemInZone" || task.completion.kind === "itemInStore";

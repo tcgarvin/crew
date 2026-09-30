@@ -1,37 +1,34 @@
-import type { Decision } from "@crew/sim";
+import type { DecisionCardText } from "@crew/content";
 
 export interface DecisionModalProps {
-  readonly decision: Decision;
+  /** Template text immediately; the narrator's prose replaces it if and when it arrives. */
+  readonly card: DecisionCardText;
   readonly onChoose: (side: "left" | "right") => void;
   readonly onInspect: () => void;
 }
 
-function textOf(ref: { readonly prose?: string; readonly key: string }): string {
-  return ref.prose ?? ref.key;
-}
-
 /** Full-screen binary card (GDD §22): title, situation prose, two big buttons. */
-export function DecisionModal({ decision, onChoose, onInspect }: DecisionModalProps) {
+export function DecisionModal({ card, onChoose, onInspect }: DecisionModalProps) {
   return (
     // biome-ignore lint/a11y/useSemanticElements: a native <dialog> needs showModal()/open-state wiring beyond W7's scope; role="dialog" is the documented fallback.
     <div className="decision-modal" role="dialog" aria-modal="true">
       <div className="decision-card">
-        <h1 className="decision-title">A decision is needed</h1>
-        <p className="decision-prose">{textOf(decision.prompt)}</p>
+        <h1 className="decision-title">{card.title}</h1>
+        <p className="decision-prose">{card.situation}</p>
         <div className="decision-options">
           <button
             type="button"
             className="decision-option decision-option-left"
             onClick={() => onChoose("left")}
           >
-            {textOf(decision.left.label)}
+            {card.leftLabel}
           </button>
           <button
             type="button"
             className="decision-option decision-option-right"
             onClick={() => onChoose("right")}
           >
-            {textOf(decision.right.label)}
+            {card.rightLabel}
           </button>
         </div>
         <button type="button" className="decision-inspect" onClick={onInspect}>
@@ -50,7 +47,7 @@ export interface DecisionPillProps {
 export function DecisionPill({ onClick }: DecisionPillProps) {
   return (
     <button type="button" className="decision-pill" onClick={onClick}>
-      Decision waiting
+      Decision waiting — tap to decide
     </button>
   );
 }

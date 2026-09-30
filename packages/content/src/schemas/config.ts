@@ -11,6 +11,9 @@ import {
 } from "./primitives";
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
+const unitRange = z
+  .strictObject({ min: unitInterval, max: unitInterval })
+  .refine((r) => r.min <= r.max, { message: "min must be <= max" });
 
 export const configDefSchema = z.strictObject({
   time: z.strictObject({ tickRate: positiveInt }),
@@ -41,6 +44,12 @@ export const configDefSchema = z.strictObject({
     mealSeconds: positive,
     sleepMinSeconds: positive,
     wakeBelow: unitInterval,
+    initialRange: z.strictObject({
+      hunger: unitRange,
+      fatigue: unitRange,
+      comfort: unitRange,
+      social: unitRange,
+    }),
   }),
   work: z.strictObject({
     reconsiderEveryTicks: positiveInt,
@@ -71,11 +80,15 @@ export const configDefSchema = z.strictObject({
     approachSeconds: positive,
     dockSeconds: positive,
     nominalSpeed: positive,
+    staffEstimateSeconds: nonNegative,
   }),
   commerce: z.strictObject({
     priceBands: z.strictObject({ general: band, fragile: band, perishable: band, hazardous: band }),
     jobOfferTtlSeconds: positive,
     boardSize: positiveInt,
+    dockingFee: z.number().int().min(0),
+    haulEstimateSeconds: nonNegative,
+    reofferSeconds: nonNegative,
   }),
   narrator: z.strictObject({
     quietTooLongSeconds: positive,
@@ -85,6 +98,7 @@ export const configDefSchema = z.strictObject({
     spawnBudget: z.number().int().min(0),
     faultBudget: z.number().int().min(0),
     budgetRefillSeconds: positive,
+    hookOnEvents: z.array(z.string().min(1)),
   }),
   host: z.strictObject({
     runAheadCapSeconds: nonNegative,
@@ -104,6 +118,11 @@ export const configDefSchema = z.strictObject({
         }),
       )
       .min(1),
+  }),
+  social: z.strictObject({
+    chatRadiusTiles: positive,
+    chatCooldownSeconds: nonNegative,
+    templateLines: z.array(z.string().min(1)).min(1),
   }),
   events: z.strictObject({ tickerMaxEntries: positiveInt, traceRingSize: positiveInt }),
 }) satisfies z.ZodType<ConfigDef>;

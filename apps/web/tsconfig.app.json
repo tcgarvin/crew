@@ -7,10 +7,13 @@
     "outDir": "./dist-tsc",
     "rootDir": "."
   },
-  "include": ["src", "api"],
+  "include": ["src"],
   "references": [
-    { "path": "../../packages/sim" },
-    { "path": "../../packages/content" },
-    { "path": "../../packages/server" }
+    {
+      "path": "../../packages/sim"
+    },
+    {
+      "path": "../../packages/content"
+    }
   ]
 }

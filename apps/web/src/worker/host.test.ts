@@ -6,6 +6,7 @@ import type {
   EnqueueResult,
   FromWorker,
   Kernel,
+  RestoredWorld,
   ScenarioDefId,
   World,
   WorldState,
@@ -107,7 +108,8 @@ function makeFakeKernel(hookAtTick: number) {
         caches: {} as World["caches"],
         content: {} as ContentBundle,
         config: { values: envelope.config, hash: envelope.configHash },
-      }) as World,
+        warnings: [],
+      }) as RestoredWorld,
   };
   return { kernel, hooksRaised };
 }
@@ -146,7 +148,6 @@ describe("createHost run-ahead accumulator", () => {
       content: {} as ContentBundle,
       config: CONFIG,
       postMessage: (m) => messages.push(m),
-      narrator: async () => ({ commands: [] }),
       clock,
       loopIntervalMs: 50,
       runAheadCapSeconds: 60,
@@ -178,7 +179,6 @@ describe("createHost run-ahead accumulator", () => {
       content: {} as ContentBundle,
       config: CONFIG,
       postMessage: (m) => messages.push(m),
-      narrator: async () => ({ commands: [] }),
       clock,
       loopIntervalMs: 50,
       runAheadCapSeconds: 1, // 20 ticks
@@ -214,7 +214,6 @@ describe("createHost run-ahead accumulator", () => {
       content: {} as ContentBundle,
       config: CONFIG,
       postMessage: (m) => messages.push(m),
-      narrator: async () => ({ commands: [] }),
       clock,
       loopIntervalMs: 50,
       runAheadCapSeconds: 1, // 20 ticks
@@ -240,24 +239,16 @@ describe("createHost run-ahead accumulator", () => {
 });
 
 describe("createHost hook halt", () => {
-  it("stops advancing at a hook, posts hookRaised, then resumes once the narrator resolves and acknowledgeHook is enqueued", async () => {
+  it("stops advancing at a hook, posts hookRaised, and resumes once acknowledgeHook arrives as a command", () => {
     const { kernel } = makeFakeKernel(5);
     const messages: FromWorker[] = [];
     const { clock, advance } = makeFakeClock();
-    let resolveNarrator: (() => void) | undefined;
-    const narratorCalls: number[] = [];
 
     const host = createHost({
       kernel,
       content: {} as ContentBundle,
       config: CONFIG,
       postMessage: (m) => messages.push(m),
-      narrator: (hook) => {
-        narratorCalls.push(hook.tick);
-        return new Promise<{ commands: Command[] }>((resolve) => {
-          resolveNarrator = () => resolve({ commands: [] });
-        });
-      },
       clock,
       loopIntervalMs: 50,
       runAheadCapSeconds: 60,
@@ -275,31 +266,36 @@ describe("createHost hook halt", () => {
     );
     expect(hookMessages).toHaveLength(1);
     expect(hookMessages[0]?.tick).toBe(5);
-    expect(narratorCalls).toEqual([5]);
 
-    const frames = messages.filter(
-      (m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame",
-    );
-    expect(Math.max(...frames.map((f) => f.frame.tick))).toBe(5);
-
-    // While halted, further real time must not advance the sim.
-    for (let i = 0; i < 20; i++) advance(50);
-    expect(
+    const maxFrameTick = () =>
       Math.max(
         ...messages
           .filter((m) => m.type === "frame")
           .map((m) => (m as { frame: { tick: number } }).frame.tick),
-      ),
-    ).toBe(5);
+      );
+    expect(maxFrameTick()).toBe(5);
 
-    resolveNarrator?.();
-    await Promise.resolve();
-    await Promise.resolve();
+    // While halted, further real time must not advance the sim, nor re-announce the hook.
+    for (let i = 0; i < 20; i++) advance(50);
+    expect(maxFrameTick()).toBe(5);
+    expect(messages.filter((m) => m.type === "hookRaised")).toHaveLength(1);
+
+    // The main thread answers with the narrator's commands and then the acknowledgement.
+    const hookId = hookMessages[0]?.hook.id;
+    host.handleMessage({
+      type: "command",
+      requestId: "r1",
+      command: {
+        id: "cmd:system:ack:1",
+        source: "system",
+        kind: "acknowledgeHook",
+        payload: { hookId },
+        targetTick: 6,
+      } as Command,
+    });
+    expect(messages.some((m) => m.type === "commandResult" && m.requestId === "r1")).toBe(true);
 
     for (let i = 0; i < 10; i++) advance(50);
-    const framesAfter = messages.filter(
-      (m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame",
-    );
-    expect(Math.max(...framesAfter.map((f) => f.frame.tick))).toBeGreaterThan(5);
+    expect(maxFrameTick()).toBeGreaterThan(5);
   });
 });

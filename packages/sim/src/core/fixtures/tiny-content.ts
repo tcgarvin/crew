@@ -51,6 +51,12 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       mealSeconds: 10,
       sleepMinSeconds: 60,
       wakeBelow: 0.1,
+      initialRange: {
+        hunger: { min: 0, max: 0 },
+        fatigue: { min: 0, max: 0 },
+        comfort: { min: 0, max: 0 },
+        social: { min: 0, max: 0 },
+      },
     },
     work: {
       reconsiderEveryTicks: 10,
@@ -77,6 +83,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       approachSeconds: 3,
       dockSeconds: 3,
       nominalSpeed: 1,
+      staffEstimateSeconds: 0,
     },
     commerce: {
       priceBands: {
@@ -87,6 +94,9 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       },
       jobOfferTtlSeconds: 120,
       boardSize: 3,
+      dockingFee: 0,
+      haulEstimateSeconds: 5,
+      reofferSeconds: 60,
     },
     narrator: {
       quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
@@ -96,6 +106,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       spawnBudget: 3,
       faultBudget: 2,
       budgetRefillSeconds: 600,
+      hookOnEvents: [],
     },
     host: {
       runAheadCapSeconds: 60,
@@ -106,6 +117,11 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       frameEveryTicks: 2,
     },
     shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+    social: {
+      chatRadiusTiles: 2,
+      chatCooldownSeconds: 45,
+      templateLines: ["{a} joked about the food", "{a} and {b} swapped gossip from the last port"],
+    },
     events: { tickerMaxEntries: 20, traceRingSize: 100 },
   };
 }

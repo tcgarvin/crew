@@ -66,16 +66,23 @@ describe("serialize / restore", () => {
     expect(restored.state.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
-  it("rejects a save from a newer schema, a gap, or other content", () => {
+  it("rejects a save from a newer schema or with a migration gap", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);
     expect(() =>
       restore({ ...envelope, schemaVersion: SCHEMA_VERSION + 1 }, world.content, registry),
     ).toThrow(/newer than this build supports/);
     expect(() => migrateState({}, SCHEMA_VERSION - 1, {})).toThrow(SaveCompatibilityError);
-    expect(() => restore(envelope, { ...tinyContent(), hash: "other" }, registry)).toThrow(
-      /content/,
-    );
+  });
+
+  it("restores a save made with other content, with a warning", () => {
+    const { world, registry } = tinyTestWorld();
+    const envelope = serialize(world);
+    const restored = restore(envelope, { ...tinyContent(), hash: "other" }, registry);
+    expect(restored.state).toStrictEqual(world.state);
+    expect(restored.warnings).toHaveLength(1);
+    expect(restored.warnings[0]).toMatch(/content/);
+    expect(restore(envelope, world.content, registry).warnings).toEqual([]);
   });
 
   it("rejects a corrupt state", () => {

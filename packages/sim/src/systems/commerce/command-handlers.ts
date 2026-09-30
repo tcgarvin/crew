@@ -97,9 +97,15 @@ export const offerJob: CommandHandler<"offerJob", null> = {
           key: "job.offer",
           params: { issuer: job.issuer, pay: job.pay, from: job.fromPortId, to: job.toPortId },
         },
+        // Integration 2: accepting also sets course for the job's destination. `setCourse`
+        // applies after `acceptContract` in the same resolution, sees the freshly raised
+        // `cargoToLoad` problems and holds departure until the freight is aboard.
         left: {
           label: { key: "job.offer.accept", params: {} },
-          commands: [{ kind: "acceptContract", payload: { jobId } }],
+          commands: [
+            { kind: "acceptContract", payload: { jobId } },
+            { kind: "setCourse", payload: { destinationPortId: job.toPortId } },
+          ],
         },
         right: {
           label: { key: "job.offer.decline", params: {} },
@@ -147,7 +153,6 @@ export const acceptContract: CommandHandler<"acceptContract", null> = {
       source: command.source,
       payload: { jobId: job.id },
     });
-    ctx.state.narrator.lastNarrativeEvent = { tick: ctx.tick, type: "jobAccepted" };
     return NO_TEMP_REFS;
   },
 };
@@ -172,6 +177,7 @@ export const declineJob: CommandHandler<"declineJob", null> = {
     const job = ctx.state.jobs[command.payload.jobId];
     if (job === undefined) throw new Error("validated job vanished");
     job.status = "declined";
+    job.closedTick = ctx.tick;
     ctx.emit({
       type: "jobDeclined",
       subjectIds: [job.id],

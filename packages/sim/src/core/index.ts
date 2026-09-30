@@ -7,6 +7,8 @@ export {
   actionLabel,
   describeEvent,
   getRenderFrame,
+  isTickerEvent,
+  tickerLine,
 } from "./render";
 export { configTicks, secondsToTicks, ticksToSeconds } from "./clock";
 export {

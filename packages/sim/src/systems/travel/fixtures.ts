@@ -71,6 +71,12 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       mealSeconds: 10,
       sleepMinSeconds: 60,
       wakeBelow: 0.1,
+      initialRange: {
+        hunger: { min: 0, max: 0 },
+        fatigue: { min: 0, max: 0 },
+        comfort: { min: 0, max: 0 },
+        social: { min: 0, max: 0 },
+      },
     },
     work: {
       reconsiderEveryTicks: 10,
@@ -98,6 +104,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       approachSeconds: 1,
       dockSeconds: 1,
       nominalSpeed: 5,
+      staffEstimateSeconds: 0,
     },
     commerce: {
       priceBands: {
@@ -110,6 +117,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       boardSize: overrides.boardSize ?? 2,
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
+      reofferSeconds: 60,
     },
     narrator: {
       quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
@@ -130,6 +138,11 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       frameEveryTicks: 2,
     },
     shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 600]] }] },
+    social: {
+      chatRadiusTiles: 2,
+      chatCooldownSeconds: 45,
+      templateLines: ["{a} joked about the food", "{a} and {b} swapped gossip from the last port"],
+    },
     events: { tickerMaxEntries: 20, traceRingSize: 100 },
   };
 }

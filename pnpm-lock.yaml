@@ -14,9 +14,15 @@ importers:
       '@playwright/test':
         specifier: ^1.49.1
         version: 1.63.0
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.4
       dependency-cruiser:
         specifier: ^16.10.0
         version: 16.10.4
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -57,15 +63,9 @@ importers:
       '@crew/content':
         specifier: workspace:*
         version: link:../../packages/content
-      '@crew/server':
-        specifier: workspace:*
-        version: link:../../packages/server
       '@crew/sim':
         specifier: workspace:*
         version: link:../../packages/sim
-      hono:
-        specifier: ^4.6.16
-        version: 4.13.12
       react:
         specifier: ^19.0.0
         version: 19.3.0
@@ -147,6 +147,9 @@ importers:
       '@crew/sim':
         specifier: workspace:*
         version: link:../sim
+      '@hono/node-server':
+        specifier: ^1.13.7
+        version: 1.19.17(hono@4.13.12)
       '@neondatabase/serverless':
         specifier: ^1.0.0
         version: 1.1.0
@@ -160,9 +163,6 @@ importers:
         specifier: ^4.0.0
         version: 4.6.5
     devDependencies:
-      '@hono/node-server':
-        specifier: ^1.13.7
-        version: 1.19.17(hono@4.13.12)
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.4

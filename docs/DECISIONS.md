@@ -74,3 +74,50 @@ model is configurable (`CREW_NARRATOR_MODEL`), key is `OPENROUTER_API_KEY`. No d
 Anthropic SDK dependency. Vercel is managed through the Vercel connector (MCP), not the CLI,
 where possible; Neon is attached from the dashboard because the connector token cannot manage
 Marketplace integrations. Vercel project: `crew` in team `tims-projects-6bc94f1b`.
+
+## 2026-09-30 — Integration 2
+
+Made while wiring every system into the deployed build. Each is small and reversible; the owner
+should confirm or overrule.
+
+**D16. One job offer at a time; accepting sets course.** The deterministic job source used to
+refill the board whenever fewer than `boardSize` offers were open, and every offer surfaces a
+decision, so a host that answers decisions at once saw a new offer (and on accept a new manifest)
+every tick. Now it offers one job at a time and stays quiet while an offer or job decision is
+open, while an accepted job has not left port, for `commerce.reofferSeconds` after a decline or
+expiry, and while a course is planned. The "Take the job" side also carries `setCourse` to the
+job's destination. `setCourse` with freight still moving plans the course and stays docked with
+the ramp open; the travel system departs when the last `cargoToLoad`/`cargoToUnload` problem is
+resolved. `boardSize` is currently unused. `jobBoard` hook fires only when the source is free to
+offer but has nothing to offer.
+
+**D17. Crew start with needs drawn from `config.needs.initialRange`** (the `setup` stream), so
+the first minutes have motion.
+
+**D18. Sensor-channel symptoms are public.** A fault whose symptom channel is `sensor` (e.g. the
+engine's stall warning) is visible to everyone at once, like a panel alarm; audible and visual
+symptoms still need someone in the compartment. Faults injected by the scenario path now also get
+their symptom problem (the equipment tick opens one for any undiagnosed fault without one).
+
+**D19. Engine and generator no longer overheat in normal running.** Cooling is a flat rate, so
+any machine whose rise beat its cooling would reach 1.0 and stop. The engine now cools 0.025/s
+against a 0.02/s rise, the generator 0.02/s against 0.015/s. Heat now comes from faults
+(`overheat` effects) and a coolant pump that is down (cooling ×0.2).
+
+**D20. A save made with other content still loads.** `restore` no longer throws on a content hash
+mismatch; it reports it in `warnings` and restores against the loaded content, so tuning content
+does not wipe saves. A schema version mismatch without a migration still fails.
+
+**D21. `notableEvent` sees every narrative event.** Phase 8 records the last `narrative` event of
+each tick (preferring one listed in `narrator.hookOnEvents`), and travel raises the hook from it
+the next tick. Default `hookOnEvents`: `driftingChanged`, `contractCompleted`.
+
+**D22. The narrator is called from the main thread.** The worker halts at a hook and posts
+`hookRaised`; the main thread (which holds the anonymous token) POSTs the snapshot, forwards the
+returned commands at hook tick + 1 and always sends `acknowledgeHook`, on failure too, with a
+"narrator unavailable" toast. Card prose is kept on the main thread keyed by decision ID; the
+modal shows template text (`@crew/content` `templateCard`) until prose arrives. Default server
+narrator model: `anthropic/claude-sonnet-4.6` when `CREW_NARRATOR_MODEL` is unset.
+
+**D23. The API ships as a bundled Build Output API function** (`scripts/vercel-output.mjs`), not
+a zero-config `api/` file: see `docs/DEPLOYMENT.md` "The Vercel function".

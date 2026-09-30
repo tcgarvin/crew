@@ -97,18 +97,49 @@ export function applyFault(
     locationRef: { kind: "machine", machineId: machine.id },
     payload: { machineId: machine.id, faultKey },
   });
+  raiseSymptomProblem(ctx, machine, faultDef);
+}
+
+/**
+ * Open the `machineSymptom` problem for an undiagnosed fault.
+ *
+ * W5 decision (revised in Integration 2): symptoms are `discovered` (perception must write the
+ * actor a `problem` fact before it is visible) except `sensor`-channel symptoms, which show on
+ * the ship's panels and are `public` — the symptom channel is the "has a sensor" marker W5 was
+ * missing.
+ */
+function raiseSymptomProblem(
+  ctx: StepCtx,
+  machine: Machine,
+  faultDef: MachineDef["faults"][number],
+): void {
   const { event } = raiseProblem(ctx.state, ctx.tick, {
     kind: "machineSymptom",
     payload: { machineId: machine.id, symptomKey: faultDef.symptom.key },
-    dedupeKey: `machineSymptom:${machine.id}:${faultKey}`,
-    // W5 decision: no `MachineTag` for "has a sensor" and no bridge-console monitored list exist
-    // in the content schema, so V1 symptoms are always `discovered` (perception must write the
-    // actor a `problem` fact before it is visible). Report to W10 if that tag is wanted later.
-    visibility: "discovered",
+    dedupeKey: `machineSymptom:${machine.id}:${faultDef.key}`,
+    visibility: faultDef.symptom.channel === "sensor" ? "public" : "discovered",
     baseUrgency: "essentialOperation",
     location: { kind: "machine", machineId: machine.id },
   });
   if (event !== undefined) ctx.emit(event);
+}
+
+/**
+ * Integration 2: a fault that arrived without going through `applyFault` (core's
+ * `scenarioInjectFault`, a scenario's `initialFaults`) still needs its symptom problem, or nobody
+ * would ever look at it. Undiagnosed faults with no open symptom problem get one here.
+ */
+function ensureSymptomProblems(ctx: StepCtx, machine: Machine, def: MachineDef): void {
+  for (const fault of machine.faults) {
+    if (fault.diagnosed) continue;
+    const dedupeKey = `machineSymptom:${machine.id}:${fault.faultKey}`;
+    const open = Object.values(ctx.state.work.problems).some(
+      (p) => p.dedupeKey === dedupeKey && p.status === "open",
+    );
+    if (open) continue;
+    const faultDef = def.faults.find((f) => f.key === fault.faultKey);
+    if (faultDef !== undefined) raiseSymptomProblem(ctx, machine, faultDef);
+  }
 }
 
 function fireScheduledFaults(ctx: StepCtx, machine: Machine, def: MachineDef): void {
@@ -122,6 +153,7 @@ function fireScheduledFaults(ctx: StepCtx, machine: Machine, def: MachineDef): v
 function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
   const def = ctx.defs.machine(machine.defId);
   fireScheduledFaults(ctx, machine, def);
+  ensureSymptomProblems(ctx, machine, def);
 
   let inoperableFromFault = false;
   let faultOutputFactor = 1;

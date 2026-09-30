@@ -1,3 +1,4 @@
+import { type DecisionCardText, templateCard } from "@crew/content";
 import type {
   ActorId,
   AgentViewSnapshot,
@@ -7,25 +8,51 @@ import type {
   FromWorker,
   Machine,
   MachineId,
+  NarratorHook,
   RenderFrame,
+  SaveEnvelope,
+  SimEvent,
+  Tick,
   TickerEntry,
 } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createSimConnection } from "./host/connection";
+import { type SimConnection, createSimConnection } from "./host/connection";
+import {
+  type NarratorOutcome,
+  appendRecentEvents,
+  callNarrator,
+  hookAnswer,
+} from "./host/narrator";
 import { FramePlayback, runPlaybackLoop } from "./host/playback";
-import { clearLocalSave, readLocalSave, writeLocalSave } from "./host/saves";
+import {
+  ServerSaves,
+  clearLocalSave,
+  forgetServerGame,
+  newerSave,
+  openServerGame,
+  readLocalSave,
+  writeLocalSave,
+} from "./host/saves";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Inspector, type InspectorData } from "./ui/Inspector";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
 import { Ticker } from "./ui/Ticker";
+import { Toast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
+import { TravelBar } from "./ui/TravelBar";
 import { loadWebContent } from "./worker/content";
 
 type HealthState = "checking" | "ok" | "error";
 
 const TICKER_LIMIT = 6;
+/** Wall-clock cadence of routine server saves (PLAN §3: "Neon every ~60 s"). */
+const REMOTE_SAVE_EVERY_MS = 60_000;
+/** How long startup waits for the server before loading the local save on its own. */
+const SERVER_OPEN_GRACE_MS = 3_000;
+const TOAST_MS = 4_000;
+const NARRATOR_UNAVAILABLE = "Narrator unavailable — carrying on";
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -36,12 +63,17 @@ function nextRequestId(): string {
 let commandCounter = 0;
 function nextCommandId(): CommandId {
   commandCounter += 1;
-  return `cmd:player:${commandCounter}` as CommandId;
+  return `cmd:player:${Date.now().toString(36)}:${commandCounter}` as CommandId;
+}
+
+interface PendingHook {
+  readonly hookId: NarratorHook["id"];
+  readonly tick: Tick;
 }
 
 export function App() {
-  // Loaded once, synchronously: same authored bundle the worker validates and loads (task item
-  // 4). Only used here for the static deck layout and the tick rate the playback loop paces to.
+  // Loaded once, synchronously: same authored bundle the worker validates and loads. Used here
+  // for the static deck layout, card templates, names and the tick rate playback paces to.
   const { bundle, config, scenarioId } = useMemo(() => loadWebContent(), []);
   const tickRate = config.values.time.tickRate;
   const saveEveryTicks = tickRate * 15;
@@ -55,10 +87,14 @@ export function App() {
   }, [bundle, scenarioId]);
   const layout = useMemo(() => buildDeckLayout(deck, bundle), [deck, bundle]);
 
-  const connectionRef = useRef<ReturnType<typeof createSimConnection> | undefined>(undefined);
+  const connectionRef = useRef<SimConnection | undefined>(undefined);
   const playbackRef = useRef(new FramePlayback(tickRate));
   const pendingRequests = useRef(new Map<string, (message: FromWorker) => void>());
   const lastSaveTickRef = useRef(0);
+  const serverRef = useRef<ServerSaves | undefined>(undefined);
+  const recentEventsRef = useRef<SimEvent[]>([]);
+  const staleRef = useRef(false);
+  const pausedRef = useRef(false);
 
   const [frame, setFrame] = useState<RenderFrame>();
   const [speed, setSpeedState] = useState(1);
@@ -67,10 +103,20 @@ export function App() {
   const [ticker, setTicker] = useState<TickerEntry[]>([]);
   const [selection, setSelection] = useState<Selection>();
   const [inspectorData, setInspectorData] = useState<InspectorData>();
-  const [thinking, setThinking] = useState(false);
+  const [pendingHook, setPendingHook] = useState<PendingHook>();
   const [decision, setDecision] = useState<Decision>();
   const [decisionHidden, setDecisionHidden] = useState(false);
+  const [prose, setProse] = useState<Readonly<Record<string, DecisionCardText>>>({});
   const [health, setHealth] = useState<HealthState>("checking");
+  const [toast, setToast] = useState<string>();
+  const [stale, setStale] = useState(false);
+
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(undefined), TOAST_MS);
+  }, []);
 
   // -------------------------------------------------------------- API health dot
   useEffect(() => {
@@ -93,6 +139,76 @@ export function App() {
     const connection = createSimConnection();
     connectionRef.current = connection;
     const playback = playbackRef.current;
+    let disposed = false;
+
+    /** Ask the worker for a save envelope (the current, possibly run-ahead, state). */
+    function requestEnvelope(): Promise<SaveEnvelope> {
+      return new Promise((resolve, reject) => {
+        const requestId = nextRequestId();
+        pendingRequests.current.set(requestId, (msg) => {
+          if (msg.type === "saveBlob") resolve(msg.envelope);
+          else reject(new Error(msg.type === "error" ? msg.message : `unexpected ${msg.type}`));
+        });
+        connection.send({ type: "requestSave", requestId });
+      });
+    }
+
+    /** Local save always (unless another tab owns the game); server save when asked. */
+    function save(remote: "none" | "routine" | "milestone"): void {
+      if (staleRef.current) return;
+      requestEnvelope()
+        .then((envelope) => {
+          if (staleRef.current) return;
+          void writeLocalSave(envelope);
+          if (remote !== "none") serverRef.current?.write(envelope, remote === "milestone");
+        })
+        .catch((error: unknown) => {
+          console.warn("[saves] could not get a save from the worker", error);
+        });
+    }
+
+    function send(command: Command): void {
+      connection.send({ type: "command", requestId: nextRequestId(), command });
+    }
+
+    /** D5: call the narrator for a hook, apply its answer, and always acknowledge. */
+    async function answerHook(hook: NarratorHook, tick: Tick): Promise<void> {
+      setPendingHook({ hookId: hook.id, tick });
+      let envelope: SaveEnvelope | undefined;
+      try {
+        envelope = await requestEnvelope();
+      } catch (error) {
+        console.warn("[narrator] no snapshot for the hook", error);
+      }
+      const server = serverRef.current;
+      let outcome: NarratorOutcome | undefined;
+      if (server !== undefined && envelope !== undefined) {
+        outcome = await callNarrator({
+          gameId: server.gameId,
+          token: server.token,
+          hook,
+          snapshot: envelope,
+          recentEvents: recentEventsRef.current.slice(),
+        });
+      }
+      if (disposed) return;
+      if (outcome?.ok) {
+        recentEventsRef.current.length = 0;
+        const card = outcome.reply.card;
+        if (card !== undefined) setProse((prev) => ({ ...prev, [card.decisionId]: card }));
+        for (const command of hookAnswer(hook, tick, outcome.reply)) send(command);
+      } else {
+        if (outcome !== undefined) console.warn(`[narrator] ${outcome.reason}`);
+        showToast(NARRATOR_UNAVAILABLE);
+        for (const command of hookAnswer(hook, tick, undefined)) send(command);
+        // The narrator route stores the snapshot itself; without it, keep a milestone anyway.
+        if (envelope !== undefined && !staleRef.current) {
+          void writeLocalSave(envelope);
+          serverRef.current?.write(envelope, true);
+        }
+      }
+      setPendingHook(undefined);
+    }
 
     const unsubscribe = connection.subscribe((message) => {
       const requestId = "requestId" in message ? message.requestId : undefined;
@@ -104,10 +220,6 @@ export function App() {
       switch (message.type) {
         case "frame": {
           playback.push(message.frame);
-          // A frame only arrives once the kernel is running again, so this also covers the
-          // quiet-too-long hook (and any other hook) resolving with no decision surfaced: the
-          // overlay clears as soon as the sim resumes producing frames.
-          setThinking(false);
           if (message.frame.tickerEvents.length > 0) {
             setTicker((prev) =>
               [...message.frame.tickerEvents].reverse().concat(prev).slice(0, TICKER_LIMIT),
@@ -115,8 +227,14 @@ export function App() {
           }
           if (message.frame.tick - lastSaveTickRef.current >= saveEveryTicks) {
             lastSaveTickRef.current = message.frame.tick;
-            requestSave(connection);
+            save("none");
           }
+          return;
+        }
+        case "events": {
+          appendRecentEvents(recentEventsRef.current, message.events);
+          if (message.events.some((e) => e.type === "arrived")) save("milestone");
+          else if (message.events.some((e) => e.type === "decisionResolved")) save("routine");
           return;
         }
         case "runAheadStatus":
@@ -127,20 +245,22 @@ export function App() {
           });
           return;
         case "hookRaised":
-          setThinking(true);
+          void answerHook(message.hook, message.tick);
           return;
         case "decisionPending":
-          setThinking(false);
           setDecision(message.decision);
           setDecisionHidden(false);
-          // Save on every decision (task brief).
-          requestSave(connection);
+          save("none");
+          return;
+        case "commandResult":
+          if (message.result.status === "rejected") {
+            console.warn("[sim worker] command rejected", message.result.rejection);
+          }
           return;
         case "error":
           // Requests correlated by `requestId` are handled above; an uncorrelated error is the
-          // worker's own recovery, currently just "the save was incompatible" (host.ts's `load`
-          // handler already started a new game) — clear the stale save so the next reload
-          // doesn't retry it.
+          // worker's own recovery ("the save was incompatible, started a new game") — clear the
+          // stale local save so the next reload doesn't retry it.
           console.warn("[sim worker]", message.message);
           void clearLocalSave();
           return;
@@ -149,48 +269,62 @@ export function App() {
       }
     });
 
-    function requestSave(conn: ReturnType<typeof createSimConnection>): void {
-      const requestId = nextRequestId();
-      pendingRequests.current.set(requestId, (msg) => {
-        if (msg.type === "saveBlob") void writeLocalSave(msg.envelope);
-      });
-      conn.send({ type: "requestSave", requestId });
-    }
-
     const loop = runPlaybackLoop(
       playback,
       (step) => setFrame(step.frame),
       (viewTick) => connection.send({ type: "viewProgress", viewTick }),
     );
 
-    void readLocalSave().then((save) => {
-      if (save) {
-        connection.send({ type: "load", source: { kind: "save", envelope: save } });
-      } else {
-        connection.send({
-          type: "load",
-          source: {
-            kind: "scenario",
-            scenarioId,
-            seed: Math.floor(Math.random() * 1_000_000),
-          },
-        });
-      }
+    // Startup: open the server game (bounded wait) and load the newer of local and server saves.
+    const serverOpen = openServerGame().then((opened) => {
+      if (opened === undefined || disposed) return undefined;
+      serverRef.current = new ServerSaves(opened.session, {
+        onStale: () => {
+          staleRef.current = true;
+          setStale(true);
+        },
+      });
+      return opened;
     });
+    const grace = new Promise<undefined>((resolve) =>
+      setTimeout(() => resolve(undefined), SERVER_OPEN_GRACE_MS),
+    );
+    void Promise.all([readLocalSave(), Promise.race([serverOpen, grace])]).then(
+      ([local, opened]) => {
+        if (disposed) return;
+        const chosen = newerSave(local, opened?.headSave);
+        if (chosen) {
+          connection.send({ type: "load", source: { kind: "save", envelope: chosen } });
+        } else {
+          connection.send({
+            type: "load",
+            source: { kind: "scenario", scenarioId, seed: Math.floor(Math.random() * 1_000_000) },
+          });
+        }
+      },
+    );
+
+    // Routine server saves on a wall-clock cadence while the game is running and visible.
+    const remoteTimer = setInterval(() => {
+      if (pausedRef.current || document.visibilityState === "hidden") return;
+      if (serverRef.current !== undefined) save("routine");
+    }, REMOTE_SAVE_EVERY_MS);
 
     return () => {
+      disposed = true;
+      clearInterval(remoteTimer);
       loop.stop();
       unsubscribe();
       connection.dispose();
     };
-    // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once via `useMemo(() =>
-    // loadWebContent(), [])` above, so they never change across this component's lifetime.
-  }, [scenarioId, saveEveryTicks]);
+    // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once, so they never change.
+  }, [scenarioId, saveEveryTicks, showToast]);
 
   // -------------------------------------------------------------- speed / pause
   const onSetSpeed = useCallback((next: number) => {
     setSpeedState(next);
     setPausedState(false);
+    pausedRef.current = false;
     playbackRef.current.setSpeed(next);
     connectionRef.current?.setUserPaused(false);
     connectionRef.current?.send({ type: "setSpeed", speed: next });
@@ -200,6 +334,7 @@ export function App() {
   const onTogglePause = useCallback(() => {
     setPausedState((prev) => {
       const next = !prev;
+      pausedRef.current = next;
       connectionRef.current?.setUserPaused(next);
       connectionRef.current?.send({ type: next ? "pause" : "resume" });
       return next;
@@ -217,12 +352,17 @@ export function App() {
       setInspectorData({ kind: "loading" });
       const connection = connectionRef.current;
       if (!connection) return;
-      const viewTick = runAhead.viewTick || frame?.tick || 0;
+      const viewTick = frame?.tick ?? runAhead.viewTick;
       const requestId = nextRequestId();
       if (next.kind === "actor") {
+        const label = frame?.actors.find((a) => a.id === next.id)?.actionLabel;
         pendingRequests.current.set(requestId, (msg) => {
           if (msg.type === "agentViewResult") {
-            setInspectorData({ kind: "actor", view: msg.view as AgentViewSnapshot });
+            setInspectorData({
+              kind: "actor",
+              view: msg.view as AgentViewSnapshot,
+              ...(label === undefined ? {} : { label }),
+            });
           } else if (msg.type === "error") {
             setInspectorData(undefined);
           }
@@ -237,8 +377,16 @@ export function App() {
         pendingRequests.current.set(requestId, (msg) => {
           if (msg.type === "snapshot") {
             const machine = msg.state.machines[next.id as MachineId] as Machine | undefined;
-            if (machine) setInspectorData({ kind: "machine", machine });
-            else setInspectorData(undefined);
+            const name = machine === undefined ? undefined : bundle.machines[machine.defId]?.name;
+            if (machine) {
+              setInspectorData({
+                kind: "machine",
+                machine,
+                ...(name === undefined ? {} : { name }),
+              });
+            } else {
+              setInspectorData(undefined);
+            }
           } else if (msg.type === "error") {
             setInspectorData(undefined);
           }
@@ -246,7 +394,7 @@ export function App() {
         connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
       }
     },
-    [frame, runAhead.viewTick],
+    [frame, runAhead.viewTick, bundle],
   );
 
   const onCloseInspector = useCallback(() => {
@@ -259,19 +407,27 @@ export function App() {
     (side: "left" | "right") => {
       const connection = connectionRef.current;
       if (!connection || !decision) return;
-      const requestId = nextRequestId();
       const command: Command = {
         id: nextCommandId(),
         source: "player",
         kind: "resolveDecision",
         payload: { decisionId: decision.id, side },
       };
-      connection.send({ type: "command", requestId, command });
+      connection.send({ type: "command", requestId: nextRequestId(), command });
       setDecision(undefined);
       setDecisionHidden(false);
     },
     [decision],
   );
+
+  const viewTick = frame?.tick ?? 0;
+  // D14: the worker may be ahead of the viewer; show hook/decision UI once playback reaches it.
+  const thinking = pendingHook !== undefined && viewTick >= pendingHook.tick;
+  const decisionDue = decision !== undefined && viewTick >= decision.createdTick;
+  const card = useMemo(() => {
+    if (decision === undefined) return undefined;
+    return prose[decision.id] ?? templateCard(decision, bundle);
+  }, [decision, prose, bundle]);
 
   const money = frame?.money ?? 0;
   const travelState = frame?.travel.state ?? "docked";
@@ -284,31 +440,39 @@ export function App() {
         paused={paused}
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
-        simTick={frame?.tick ?? 0}
+        simTick={viewTick}
         tickRate={tickRate}
         money={money}
         travelState={travelState}
         runAheadBufferedSeconds={runAheadSeconds}
         health={health}
       />
+      <TravelBar stage={travelState} progress={frame?.travel.progress ?? 0} />
+      {stale && (
+        <div className="stale-banner" role="alert">
+          This game is open in another tab — this tab is no longer saving.
+        </div>
+      )}
       <div className="main-area">
         <DeckCanvas layout={layout} frame={frame} selected={selection} onSelect={onSelect} />
         <Ticker entries={ticker} />
       </div>
       <Inspector data={inspectorData} onClose={onCloseInspector} />
       {thinking && <NarratorOverlay />}
-      {decision && !decisionHidden && !thinking && (
+      {card && decisionDue && !decisionHidden && !thinking && (
         <DecisionModal
-          decision={decision}
+          card={card}
           onChoose={onChooseDecision}
           onInspect={() => setDecisionHidden(true)}
         />
       )}
-      {decision && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
+      {decisionDue && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
+      <Toast message={toast} />
       <button
         type="button"
         className="new-game-button"
         onClick={() => {
+          forgetServerGame();
           void clearLocalSave().then(() => window.location.reload());
         }}
       >

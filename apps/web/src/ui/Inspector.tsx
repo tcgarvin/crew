@@ -1,8 +1,8 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
 
 export type InspectorData =
-  | { readonly kind: "actor"; readonly view: AgentViewSnapshot }
-  | { readonly kind: "machine"; readonly machine: Machine }
+  | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
+  | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
   | { readonly kind: "loading" };
 
 export interface InspectorProps {
@@ -32,14 +32,14 @@ export function Inspector({ data, onClose }: InspectorProps) {
           ×
         </button>
         {data.kind === "loading" && <p>Loading…</p>}
-        {data.kind === "actor" && <ActorInspector view={data.view} />}
-        {data.kind === "machine" && <MachineInspector machine={data.machine} />}
+        {data.kind === "actor" && <ActorInspector view={data.view} label={data.label} />}
+        {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
       </aside>
     </div>
   );
 }
 
-function ActorInspector({ view }: { view: AgentViewSnapshot }) {
+function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: string | undefined }) {
   const self = view.self;
   return (
     <div>
@@ -47,7 +47,7 @@ function ActorInspector({ view }: { view: AgentViewSnapshot }) {
       <p className="inspector-subtitle">{self.roleTags.join(", ") || "crew"}</p>
       <dl className="inspector-grid">
         <dt>Activity</dt>
-        <dd>{self.activity.kind}</dd>
+        <dd>{label ?? self.activity.kind}</dd>
         <dt>Hunger</dt>
         <dd>{Math.round(self.needs.hunger * 100)}%</dd>
         <dt>Fatigue</dt>
@@ -78,10 +78,10 @@ function ActorInspector({ view }: { view: AgentViewSnapshot }) {
   );
 }
 
-function MachineInspector({ machine }: { machine: Machine }) {
+function MachineInspector({ machine, name }: { machine: Machine; name?: string | undefined }) {
   return (
     <div>
-      <h2>{machine.defId}</h2>
+      <h2>{name ?? machine.defId}</h2>
       <dl className="inspector-grid">
         <dt>Mode</dt>
         <dd>{machine.actualMode}</dd>

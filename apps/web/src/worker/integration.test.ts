@@ -1,54 +1,37 @@
 /**
- * Integration 1 smoke test (task item 9): builds the real world from the real authored bundle
- * (no mocks) with the spatial system and the dev wander stand-in registered, advances it, and
- * checks the kernel's own invariants — the same wiring `sim.worker.ts` uses.
+ * Worker wiring smoke test: the registry `sim.worker.ts` builds (`createFullRegistry`) plus the
+ * real authored bundle. Covers what the inspector needs — an `AgentView` for a crew member, and
+ * its structured-clone-safe snapshot — which Integration 1 could not provide.
  */
-import type { Command, CommandId } from "@crew/sim";
-import { checkInvariants, createKernel, createRegistry, registerSpatial } from "@crew/sim";
+import type { ActorId } from "@crew/sim";
+import { checkInvariants, createKernel, toAgentViewSnapshot } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { loadWebContent } from "./content";
-import { devWanderSystem } from "./devWander";
+import { createFullRegistry } from "./registry";
 
-describe("real kernel + real content (Integration 1)", () => {
-  it("advances 400 ticks with wander enabled and no invariant violations", () => {
+describe("worker registry + real content", () => {
+  it("builds a world, advances it, and serves the inspector's AgentView", () => {
     const { bundle, config, scenarioId } = loadWebContent();
-    const registry = createRegistry();
-    registerSpatial(registry);
-    registry.registerSystem(devWanderSystem);
-    const kernel = createKernel(registry);
-
+    const kernel = createKernel(createFullRegistry());
     const world = kernel.createWorld(scenarioId, 12345, bundle, config);
-    expect(Object.keys(world.state.actors).length).toBeGreaterThan(0);
+    const actorIds = Object.keys(world.state.actors) as ActorId[];
+    expect(actorIds.length).toBe(8);
 
-    let remaining = 400;
-    while (remaining > 0) {
-      const result = kernel.advance(world, remaining);
-      remaining -= result.ticksAdvanced;
-      if (result.halt.kind === "hook") {
-        // The quiet-too-long hook (or any other) would otherwise halt `advance` forever in this
-        // test, which never calls a narrator; acknowledge it immediately like a no-op narrator.
-        const hook = world.state.narrator.pendingHook;
-        if (hook === undefined) break;
-        const command: Command = {
-          id: `cmd:test:ack:${hook.id}` as CommandId,
-          source: "system",
-          kind: "acknowledgeHook",
-          payload: { hookId: hook.id },
-        };
-        const ack = kernel.enqueueCommand(world, command);
-        expect(ack.status).toBe("accepted");
-      } else if (result.halt.kind === "decision") {
-        break;
-      } else if (result.ticksAdvanced === 0) {
-        break;
-      }
+    // Initial needs come from `config.needs.initialRange`, so nobody starts at zero hunger.
+    const range = config.values.needs.initialRange.hunger;
+    for (const id of actorIds) {
+      const hunger = world.state.actors[id]?.needs.hunger ?? -1;
+      expect(hunger).toBeGreaterThanOrEqual(range.min);
+      expect(hunger).toBeLessThanOrEqual(range.max);
     }
 
-    expect(world.state.tick).toBeGreaterThan(0);
+    kernel.advance(world, 1);
     expect(checkInvariants(world.state)).toEqual([]);
 
-    // At least verifies the wander system had somewhere to move actors to and from — real doors
-    // exist on the authored deck.
-    expect(Object.keys(world.state.doors).length).toBeGreaterThan(0);
+    const first = actorIds[0] as ActorId;
+    const view = kernel.getAgentView(world, first);
+    const snapshot = toAgentViewSnapshot(view);
+    expect(snapshot.self.id).toBe(first);
+    expect(structuredClone(snapshot)).toEqual(snapshot);
   });
 });

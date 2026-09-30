@@ -100,29 +100,200 @@ function renderActor(
 }
 
 function humanize(type: string): string {
-  const words = type.replace(/([A-Z])/g, " $1").toLowerCase();
+  const words = type
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** Generic one-line ticker text: the event type plus its named subjects. */
+/**
+ * Trace-level events the ticker still shows (Integration 2): they are what makes the crew's day
+ * readable. Everything `notable`+ is shown too, except the bookkeeping types in `TICKER_HIDDEN`.
+ */
+const TICKER_TRACE_TYPES: ReadonlySet<SimEvent["type"]> = new Set([
+  "needThresholdCrossed",
+  "faultOccurred",
+  "taskCompleted",
+  "travelStageChanged",
+  "fellAsleep",
+]);
+
+/** Notable events whose information another ticker line already carries. */
+const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
+  "problemRaised",
+  "problemResolved",
+  "decisionPending",
+  "commandRejected",
+  "invariantViolated",
+]);
+
+/** Should `event` reach the ticker at all? (`describeEvent` may still drop it with `null`.) */
+export function isTickerEvent(event: SimEvent): boolean {
+  if (TICKER_HIDDEN.has(event.type)) return false;
+  return event.significance !== "trace" || TICKER_TRACE_TYPES.has(event.type);
+}
+
+const NEED_WORDS: Readonly<Record<string, readonly [string, string]>> = {
+  hunger: ["is getting hungry", "is starving"],
+  fatigue: ["is getting tired", "is exhausted"],
+  comfort: ["could use a rest", "is aching for a rest"],
+  social: ["wants company", "is desperately lonely"],
+};
+
+const STAGE_LINES: Readonly<Record<string, string>> = {
+  preparingDeparture: "Preparing to depart",
+  undocking: "Undocking",
+  transit: "Under way",
+  approaching: "On approach",
+  docking: "Docking",
+};
+
+type Names = {
+  actor(id: string): string | undefined;
+  machine(id: string): string | undefined;
+  port(id: string): string;
+  item(id: string): string;
+  faultName(machineId: string, faultKey: string): string;
+  symptomName(machineId: string, symptomKey: string): string;
+  job(id: string): { issuer: string; to: string } | undefined;
+};
+
+function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
+  const machineDef = (id: string) => {
+    const machine = state.machines[id as Machine["id"]];
+    return machine === undefined ? undefined : content.machines[machine.defId];
+  };
+  return {
+    actor: (id) => state.actors[id as Actor["id"]]?.name,
+    machine: (id) => machineDef(id)?.name,
+    port: (id) => content.ports[id as keyof ContentBundle["ports"]]?.name ?? id,
+    item: (id) => {
+      const item = state.items[id as keyof ReadonlyWorldState["items"]];
+      const def =
+        item === undefined
+          ? undefined
+          : (content.items[item.defId] ?? state.defs.dynamic.items[item.defId]);
+      const name = def?.name.toLowerCase() ?? "cargo";
+      return item?.stacking === "stack" && item.count > 1 ? `${item.count}× ${name}` : name;
+    },
+    faultName: (machineId, faultKey) =>
+      machineDef(machineId)
+        ?.faults.find((f) => f.key === faultKey)
+        ?.name.toLowerCase() ?? humanize(faultKey).toLowerCase(),
+    // Symptoms have no display name in content (`{key, channel}`); the key reads well enough.
+    symptomName: (_machineId, symptomKey) => humanize(symptomKey).toLowerCase(),
+    job: (id) => {
+      const job = state.jobs[id as keyof ReadonlyWorldState["jobs"]];
+      if (job === undefined) return undefined;
+      return {
+        issuer: job.issuer,
+        to: content.ports[job.toPortId]?.name ?? job.toPortId,
+      };
+    },
+  };
+}
+
+function subjectNames(event: SimEvent, n: Names): string[] {
+  return event.subjectIds
+    .map((id) => n.actor(id) ?? n.machine(id) ?? null)
+    .filter((name): name is string => name !== null);
+}
+
+/** Specific ticker line, or `null` when the event is not worth a line. */
+function specificLine(event: SimEvent, n: Names): string | null | undefined {
+  const who = n.actor(event.subjectIds[0] ?? "") ?? "Someone";
+  switch (event.type) {
+    case "conversation":
+      return event.payload.line;
+    case "needThresholdCrossed": {
+      if (!event.payload.rising) return null;
+      const words = NEED_WORDS[event.payload.need];
+      if (words === undefined) return null;
+      return `${who} ${event.significance === "notable" ? words[1] : words[0]}`;
+    }
+    case "fellAsleep":
+      return `${who} fell asleep`;
+    case "faultOccurred":
+      return `${n.machine(event.payload.machineId) ?? "A machine"}: ${n.faultName(event.payload.machineId, event.payload.faultKey)}`;
+    case "faultObserved":
+      return `${who} noticed ${n.symptomName(event.payload.machineId, event.payload.symptomKey)} from the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}`;
+    case "faultDiagnosed":
+      return `Diagnosed the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}: ${n.faultName(event.payload.machineId, event.payload.faultKey)}`;
+    case "faultRepaired":
+      return `${n.machine(event.payload.machineId) ?? "Machine"} repaired`;
+    case "machineDerated": {
+      const name = n.machine(event.payload.machineId) ?? "A machine";
+      const pct = Math.round(event.payload.output * 100);
+      return pct <= 0
+        ? `${name} down (${event.payload.cause})`
+        : `${name} at ${pct}% (${event.payload.cause})`;
+    }
+    case "breakerTripped":
+      return "A breaker tripped";
+    case "taskCompleted": {
+      const haul = event.payload.haul;
+      if (haul === undefined) return null;
+      const worker = n.actor(event.subjectIds[2] ?? "") ?? "The crew";
+      return haul.to === "ship"
+        ? `${worker} stowed ${n.item(haul.itemId)} aboard`
+        : `${worker} carried ${n.item(haul.itemId)} ashore`;
+    }
+    case "travelStageChanged":
+      return STAGE_LINES[event.payload.to] ?? null;
+    case "departed":
+      return `Left ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`;
+    case "arrived":
+      return `Docked at ${n.port(event.payload.portId)}`;
+    case "driftingChanged":
+      return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
+    case "jobOffered": {
+      const job = n.job(event.payload.jobId);
+      return job === undefined ? "A job is on offer" : `${job.issuer} has freight for ${job.to}`;
+    }
+    case "jobAccepted": {
+      const job = n.job(event.payload.jobId);
+      return job === undefined ? "Took the job" : `Took the job for ${job.issuer}`;
+    }
+    case "jobDeclined":
+      return "Passed on the job";
+    case "contractCompleted": {
+      const job = n.job(event.payload.jobId);
+      return job === undefined ? "Delivery complete" : `Delivered for ${job.issuer}`;
+    }
+    case "paymentMade":
+      return `Paid ${event.payload.amount} cr`;
+    case "decisionResolved":
+      return null;
+    default:
+      return undefined;
+  }
+}
+
+/** One-line ticker text for an event: a specific human line where one exists, else generic. */
 export function describeEvent(
   event: SimEvent,
   state: ReadonlyWorldState,
   content: ContentBundle,
 ): string {
-  // W4a: a conversation carries its own rendered line.
-  if (event.type === "conversation") return event.payload.line;
-  const names = event.subjectIds
-    .map((id) => {
-      const actor = state.actors[id as Actor["id"]];
-      if (actor !== undefined) return actor.name;
-      const machine = state.machines[id as Machine["id"]];
-      if (machine !== undefined) return content.machines[machine.defId]?.name ?? id;
-      return null;
-    })
-    .filter((name): name is string => name !== null);
+  const n = namer(state, content);
+  const line = specificLine(event, n);
+  if (typeof line === "string") return line;
+  const names = subjectNames(event, n);
   const head = humanize(event.type);
   return names.length === 0 ? head : `${head}: ${names.join(", ")}`;
+}
+
+/** Ticker text, or `null` for an event the ticker should skip. */
+export function tickerLine(
+  event: SimEvent,
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+): string | null {
+  if (!isTickerEvent(event)) return null;
+  const line = specificLine(event, namer(state, content));
+  if (line === null) return null;
+  return describeEvent(event, state, content);
 }
 
 export function getRenderFrame(world: World): RenderFrame {
@@ -148,11 +319,13 @@ export function getRenderFrame(world: World): RenderFrame {
           ? travel.routeProgress / travel.routeDistance
           : 0
         : travel.stageProgress;
-  const tickerEvents: TickerEntry[] = world.caches.diagnostics.lastEvents.map((event) => ({
-    tick: event.tick,
-    text: describeEvent(event, state, content),
-    significance: event.significance,
-  }));
+  const tickerEvents: TickerEntry[] = [];
+  for (const event of world.caches.diagnostics.lastEvents) {
+    const text = tickerLine(event, state, content);
+    if (text !== null) {
+      tickerEvents.push({ tick: event.tick, text, significance: event.significance });
+    }
+  }
   return {
     tick: state.tick,
     actors,

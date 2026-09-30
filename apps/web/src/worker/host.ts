@@ -1,29 +1,30 @@
 /**
  * Worker host: owns the kernel and the run-ahead loop (D14, PLAN §6 W7).
  *
- * Depends only on the `Kernel` interface plus a `Narrator` callback (how the "call the server"
- * step is performed) — never on a concrete kernel implementation, so `sim.worker.ts` is the only
- * file that wires one in (see its header comment). Runnable outside a worker (e.g. in a Vitest
+ * Depends only on the `Kernel` interface — never on a concrete kernel implementation, so
+ * `sim.worker.ts` is the only file that wires one in. Runnable outside a worker (e.g. in a Vitest
  * test) since `postMessage`/timers/clock are injected.
+ *
+ * Hooks and decisions (Integration 2): the host halts, posts `hookRaised` / `decisionPending`,
+ * and waits. The main thread calls the narrator (it holds the auth token and the network) and
+ * answers with ordinary `command` messages — the narrator's commands and then `acknowledgeHook`,
+ * or `resolveDecision` for a decision. While halted the loop probes `advance(world, 0)`, which
+ * reports whether the halt still holds (a queued acknowledgement or resolution lifts it), so any
+ * way of answering resumes the sim.
  */
 import type {
-  Command,
-  CommandId,
   ContentBundle,
   EffectiveConfig,
   EnqueueResult,
   FromWorker,
   Kernel,
-  NarratorHook,
   SaveEnvelope,
   ScenarioDefId,
   Tick,
   ToWorker,
   World,
 } from "@crew/sim";
-
-/** What the host does when a hook is raised: the real one calls the server; the mock fakes it. */
-export type Narrator = (hook: NarratorHook) => Promise<{ readonly commands: readonly Command[] }>;
+import { toAgentViewSnapshot } from "@crew/sim";
 
 export interface HostClock {
   now(): number;
@@ -42,7 +43,6 @@ export interface HostDeps {
   readonly content: ContentBundle;
   readonly config: EffectiveConfig;
   readonly postMessage: (message: FromWorker) => void;
-  readonly narrator: Narrator;
   /** Real-time loop tick, ms. Default 50 (20 Hz), matching `tickRate`. */
   readonly loopIntervalMs?: number;
   /** Sim-seconds of run-ahead allowed beyond the viewer (D14). Default 60. */
@@ -55,12 +55,6 @@ export interface HostDeps {
 interface RingEntry {
   readonly tick: Tick;
   readonly envelope: SaveEnvelope;
-}
-
-let commandCounter = 0;
-function nextHostCommandId(): CommandId {
-  commandCounter += 1;
-  return `cmd:system:host:${commandCounter}` as CommandId;
 }
 
 export interface Host {
@@ -145,9 +139,7 @@ export function createHost(deps: HostDeps): Host {
     haltedFor = kind;
     if (kind === "hook") {
       const hook = world.state.narrator.pendingHook;
-      if (!hook) return;
-      deps.postMessage({ type: "hookRaised", hook, tick: world.state.tick });
-      void resolveHook(hook.id, hook);
+      if (hook) deps.postMessage({ type: "hookRaised", hook, tick: world.state.tick });
     } else {
       const decisionId = world.state.decisions.queue[0];
       const decision = decisionId ? world.state.decisions.records[decisionId] : undefined;
@@ -157,39 +149,19 @@ export function createHost(deps: HostDeps): Host {
     }
   }
 
-  async function resolveHook(hookId: NarratorHook["id"], hook: NarratorHook): Promise<void> {
-    const response = await deps.narrator(hook);
-    if (!world) return;
-    // `enqueueCommand` rejects a `targetTick` at or before the current committed tick
-    // (`core/commands.ts`'s `earliest = state.tick + 1`) — the world is halted on this exact
-    // tick, so `tick + 1` is the earliest tick a command can land on, not `tick` itself. Passing
-    // `tick` here silently rejected every `acknowledgeHook`, leaving the world (and the narrator
-    // overlay) halted forever; this was masked by the mock kernel's looser `enqueueCommand`.
-    const targetTick = world.state.tick + 1;
-    for (const draft of response.commands) {
-      deps.kernel.enqueueCommand(world, {
-        ...draft,
-        id: nextHostCommandId(),
-        targetTick,
-      } as Command);
+  /** Still halted? A queued `acknowledgeHook`/`resolveDecision` for the next tick lifts it. */
+  function haltStillHolds(): boolean {
+    if (!world || !haltedFor) return false;
+    const probe = deps.kernel.advance(world, 0);
+    if (probe.halt.kind === "completed") {
+      haltedFor = undefined;
+      return false;
     }
-    const ack = deps.kernel.enqueueCommand(world, {
-      id: nextHostCommandId(),
-      source: "system",
-      kind: "acknowledgeHook",
-      payload: { hookId },
-      targetTick,
-    } as Command);
-    if (ack.status === "rejected") {
-      // Should not happen given the above, but surface it rather than hang silently if it ever
-      // does (e.g. a future change narrows `AUTHORITY` for "system").
-      deps.postMessage({
-        type: "error",
-        message: `acknowledgeHook rejected: ${ack.rejection.code} (${ack.rejection.reason})`,
-      });
+    if (probe.halt.kind !== haltedFor) {
+      // e.g. the hook was answered and the narrator surfaced a decision: announce it.
+      handleHalt(probe.halt.kind);
     }
-    haltedFor = undefined;
-    // A decision may now be queued (from the narrator's `surfaceDecision`); let the loop notice.
+    return true;
   }
 
   function loop(): void {
@@ -203,7 +175,7 @@ export function createHost(deps: HostDeps): Host {
     accumulatorMs += elapsedMs * speed;
     const msPerTick = 1000 / tickRate;
 
-    if (haltedFor) {
+    if (haltStillHolds()) {
       // Waiting on the narrator/player; don't spend accumulated time we can't use.
       accumulatorMs = 0;
       emitRunAheadStatus();
@@ -256,7 +228,9 @@ export function createHost(deps: HostDeps): Host {
           );
         } else {
           try {
-            world = deps.kernel.restore(message.source.envelope, deps.content);
+            const restored = deps.kernel.restore(message.source.envelope, deps.content);
+            for (const warning of restored.warnings) console.warn(`[host] ${warning}`);
+            world = restored;
           } catch (error) {
             // Schema/content-hash mismatch (or any other restore failure, PLAN §3 "Saves"):
             // discard the save and start a new game rather than leaving the world undefined.
@@ -346,20 +320,11 @@ export function createHost(deps: HostDeps): Host {
             requestId: message.requestId,
             actorId: message.actorId,
             tick: entry.tick,
-            view: {
-              tick: view.tick,
-              self: view.self,
-              facts: view.facts(),
-              problems: view.knownProblems(),
-              tasks: view.knownTasks(),
-              roster: view.roster(),
-            },
+            view: toAgentViewSnapshot(view),
           });
         } catch (error) {
-          // Integration 1: the registry has no `AgentViewBuilder` registered until W4a's planner
-          // lands (`registerSpatial` doesn't set one), so this currently always lands here — see
-          // the Integration 1 report. Caught so a click on a crew member fails cleanly (the
-          // Inspector clears) instead of throwing out of the worker's `onmessage` handler.
+          // Caught so a failed view (e.g. an actor that did not exist at that tick) clears the
+          // Inspector instead of throwing out of the worker's `onmessage` handler.
           const reason = error instanceof Error ? error.message : String(error);
           deps.postMessage({ type: "error", requestId: message.requestId, message: reason });
         }

@@ -680,7 +680,7 @@
     {
       "key": "spawn_second_engineer",
       "tile": {
-        "x": 26,
+        "x": 28,
         "y": 7
       },
       "tags": ["crew"]

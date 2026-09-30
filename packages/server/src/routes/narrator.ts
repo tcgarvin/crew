@@ -120,7 +120,7 @@ export function registerNarratorRoutes(
         openRouterApiKey: env.openRouterApiKey,
         gameId,
         notes: game.narrativeNotes,
-        ...(env.narratorModel === undefined ? {} : { model: env.narratorModel }),
+        model: env.narratorModel,
       });
       const latencyMs = Date.now() - startedAt;
 

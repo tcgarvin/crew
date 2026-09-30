@@ -5,14 +5,15 @@ import { emptyCaches, rebuildCaches } from "./caches";
  */
 import { type ApplyCtx, applyCommandNow } from "./commands";
 import { createDefLookup } from "./defs";
-import { createEventBuffer, isNotableOrAbove } from "./events";
+import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
 import { runStep } from "./pipeline";
 import type { KernelRegistry } from "./registry";
+import { isTickerEvent } from "./render";
 import { createRngApi, seedAllStreams } from "./rng";
 import type { Command, ScenarioSpawn } from "./types/commands";
 import type { PhysicalLocation, TileCoord } from "./types/common";
-import type { ContentBundle, DeckDef, ScenarioDef } from "./types/content";
+import type { ConfigDef, ContentBundle, DeckDef, ScenarioDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type {
   CommandId,
@@ -230,6 +231,26 @@ function scenarioSetupCommands(
   return commands;
 }
 
+/**
+ * Integration 2: spawned crew start with needs drawn from `config.needs.initialRange` on the
+ * `setup` stream (in actor-key order), so the first minutes have motion rather than everyone
+ * idling at zero deficit. A degenerate range (min = max) consumes no draw.
+ */
+function seedInitialNeeds(
+  state: WorldState,
+  ranges: ConfigDef["needs"]["initialRange"],
+  rng: RngApi,
+): void {
+  const keys = ["hunger", "fatigue", "comfort", "social"] as const;
+  for (const actor of Object.values(state.actors)) {
+    if (!actor.crew) continue;
+    for (const key of keys) {
+      const { min, max } = ranges[key];
+      actor.needs[key] = max > min ? min + (max - min) * rng.float("setup") : min;
+    }
+  }
+}
+
 export function createWorld(
   registry: KernelRegistry,
   scenarioId: ScenarioDefId,
@@ -284,6 +305,7 @@ export function createWorld(
   for (const command of scenarioSetupCommands(scenario, deck, content, state)) {
     applyCommandNow(registry, ctx, command);
   }
+  seedInitialNeeds(state, values.needs.initialRange, rng);
   rebuildCaches(world, registry);
   return world;
 }
@@ -330,7 +352,7 @@ function haltAfterStep(state: WorldState): AdvanceHalt | null {
 /**
  * Run up to `ticks` steps. Returns immediately while halted; otherwise stops after the tick that
  * raises a hook or leaves a decision pending. W2 decision: `caches.diagnostics.lastEvents` gets
- * this call's `notable`+ events (even an empty set when halted) (bounded by `config.events.tickerMaxEntries`) for the render ticker.
+ * this call's ticker events (`isTickerEvent`: `notable`+ plus a few readable trace types; even an empty set when halted) (bounded by `config.events.tickerMaxEntries`) for the render ticker.
  */
 export function advance(world: World, registry: KernelRegistry, ticks: number): AdvanceResult {
   if (!Number.isInteger(ticks) || ticks < 0) {
@@ -344,7 +366,7 @@ export function advance(world: World, registry: KernelRegistry, ticks: number): 
     ticksAdvanced += 1;
     halt = haltAfterStep(world.state) ?? COMPLETED;
   }
-  const notable = events.filter(isNotableOrAbove);
+  const notable = events.filter(isTickerEvent);
   const cap = world.config.values.events.tickerMaxEntries;
   world.caches.diagnostics.lastEvents = notable.slice(Math.max(0, notable.length - cap));
   return { events, ticksAdvanced, halt };

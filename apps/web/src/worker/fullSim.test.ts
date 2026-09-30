@@ -1,0 +1,176 @@
+/**
+ * Integration 2 headless run: the real authored bundle, every V1 system in the worker's order
+ * (`createFullRegistry`), an auto-accept decision policy and a null narrator, for five
+ * sim-minutes. Checks the freight loop and the crew's day actually happen, not just that nothing
+ * throws.
+ */
+import type { ActorId, Command, CommandId, MachineId, SimEvent, World } from "@crew/sim";
+import {
+  actionLabel,
+  checkInvariants,
+  createKernel,
+  spatialViolations,
+  workViolations,
+} from "@crew/sim";
+import { describe, expect, it } from "vitest";
+import { loadWebContent } from "./content";
+import { createFullRegistry } from "./registry";
+
+const TICK_RATE = 20;
+const FIVE_MINUTES = TICK_RATE * 300;
+const INJECT_FAULT_AT = TICK_RATE * 30;
+
+type Policy = (world: World) => "left" | "right";
+const autoAccept: Policy = () => "left";
+
+interface RunLog {
+  readonly events: SimEvent[];
+  readonly labels: Map<ActorId, Set<string>>;
+  decisions: number;
+  readonly hooks: string[];
+  readonly stages: Set<string>;
+}
+
+function runFullSim(seed: number, ticks: number, policy: Policy): { world: World; log: RunLog } {
+  const { bundle, config, scenarioId } = loadWebContent();
+  const kernel = createKernel(createFullRegistry());
+  const world = kernel.createWorld(scenarioId, seed, bundle, config);
+  const log: RunLog = {
+    events: [],
+    labels: new Map(),
+    decisions: 0,
+    hooks: [],
+    stages: new Set([world.state.travel.stage]),
+  };
+  let n = 0;
+  const send = (command: Omit<Command, "id">) => {
+    n += 1;
+    const result = kernel.enqueueCommand(world, {
+      ...command,
+      id: `cmd:test:${n}` as CommandId,
+    } as Command);
+    if (result.status !== "accepted") {
+      throw new Error(`${command.kind} rejected: ${JSON.stringify(result)}`);
+    }
+  };
+
+  let faultInjected = false;
+  while (world.state.tick < ticks) {
+    if (!faultInjected && world.state.tick >= INJECT_FAULT_AT) {
+      faultInjected = true;
+      const pump = Object.values(world.state.machines).find(
+        (m) => m.defId === "machine.coolant_pump",
+      );
+      if (pump === undefined) throw new Error("no machine with faults in the bundle");
+      const faultKey = world.content.machines[pump.defId]?.faults[0]?.key;
+      if (faultKey === undefined) throw new Error("unreachable");
+      send({
+        source: "scenario",
+        kind: "scenarioInjectFault",
+        payload: { machineId: pump.id as MachineId, faultKey },
+      });
+    }
+    const result = kernel.advance(world, 1);
+    log.events.push(...result.events);
+    log.stages.add(world.state.travel.stage);
+    const violations = [
+      ...checkInvariants(world.state),
+      ...spatialViolations(world),
+      ...workViolations(world),
+    ];
+    if (violations.length > 0) {
+      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
+    }
+    for (const actor of Object.values(world.state.actors)) {
+      if (!actor.crew) continue;
+      const set = log.labels.get(actor.id) ?? new Set<string>();
+      set.add(actionLabel(actor, world.state, world.content));
+      log.labels.set(actor.id, set);
+    }
+    if (result.halt.kind === "hook") {
+      const hook = world.state.narrator.pendingHook;
+      if (hook === undefined) throw new Error("hook halt without a pending hook");
+      log.hooks.push(hook.kind);
+      send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
+    } else if (result.halt.kind === "decision") {
+      const head = world.state.decisions.queue[0];
+      if (head === undefined) throw new Error("decision halt without a queued decision");
+      log.decisions += 1;
+      send({
+        source: "player",
+        kind: "resolveDecision",
+        payload: { decisionId: head, side: policy(world) },
+      });
+    }
+  }
+  return { world, log };
+}
+
+const count = (log: RunLog, type: SimEvent["type"]) =>
+  log.events.filter((e) => e.type === type).length;
+
+describe("full sim: real content, every system, auto-accept (Integration 2)", () => {
+  it("runs the freight loop and the crew's day for five sim-minutes", () => {
+    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+    if (process.env.FULLSIM_DEBUG) {
+      for (const e of log.events) {
+        if (e.significance === "trace") continue;
+        console.log(
+          e.tick,
+          e.type,
+          JSON.stringify(e.payload).slice(0, 140),
+          e.subjectIds.join(","),
+        );
+      }
+      console.log("hooks", log.hooks, "decisions", log.decisions, "stages", [...log.stages]);
+      for (const [id, l] of log.labels) console.log(id, [...l].join(" | "));
+      console.log(
+        JSON.stringify(world.state.travel),
+        JSON.stringify(Object.values(world.state.jobs)),
+      );
+      console.log(
+        Object.values(world.state.work.problems)
+          .map((p) => `${p.kind}:${p.status}:${p.visibility}:${JSON.stringify(p.payload)}`)
+          .join("\n"),
+      );
+      console.log(
+        Object.values(world.state.work.tasks)
+          .map(
+            (t) =>
+              `${t.type}:${JSON.stringify(t.claimState)}:${JSON.stringify(t.blockage ?? null)}`,
+          )
+          .join("\n"),
+      );
+      for (const m of Object.values(world.state.machines))
+        console.log(
+          m.id,
+          m.defId,
+          m.actualMode,
+          m.output.toFixed(2),
+          m.temperature.toFixed(2),
+          JSON.stringify(m.faults),
+        );
+    }
+
+    // Freight: a job is taken, its cargo is hauled aboard by the crew, the ship leaves port.
+    expect(count(log, "jobAccepted")).toBeGreaterThanOrEqual(1);
+    const loadProblems = Object.values(world.state.work.problems).filter(
+      (p) => p.kind === "cargoToLoad",
+    );
+    expect(loadProblems.some((p) => p.status === "resolved")).toBe(true);
+    expect([...log.stages].some((stage) => stage !== "docked")).toBe(true);
+    expect(log.decisions).toBeLessThanOrEqual(3);
+
+    // Ship systems: the fault injected at 30 s is found and fixed.
+    expect(count(log, "faultOccurred")).toBeGreaterThanOrEqual(1);
+    expect(count(log, "faultDiagnosed")).toBeGreaterThanOrEqual(1);
+    expect(count(log, "faultRepaired")).toBeGreaterThanOrEqual(1);
+
+    // The crew's day: everyone does at least three different things.
+    expect(log.labels.size).toBe(8);
+    for (const [actorId, labels] of log.labels) {
+      expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
+    }
+    expect(checkInvariants(world.state)).toEqual([]);
+  });
+});

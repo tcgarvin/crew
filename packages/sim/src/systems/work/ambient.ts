@@ -4,9 +4,9 @@
  * a one-line conversation that shows in the ticker (`conversation`, notable). No relationship
  * effects in V1; the `socialize` hold is what actually meets the social need.
  *
- * W4a decision: `ConfigDef.social` is optional until the content schema (W10) carries it; when
- * absent the fallbacks below apply (radius 2 tiles per the W4a brief, 45 s cooldown, the lines
- * below). Speaker/listener order alternates by pass so the lowest ID does not always speak.
+ * Tunables come from `config.social` (Integration 2 made it required). `AMBIENT_FALLBACK` is
+ * kept as a reference value for fixtures. Speaker/listener order alternates by pass so the
+ * lowest ID does not always speak.
  */
 import { configTicks } from "../../core/clock";
 import type { Actor } from "../../core/types/actor";
@@ -16,7 +16,7 @@ import { isAsleep } from "./activity";
 
 export const AMBIENT_EVERY_TICKS = 20;
 
-export const AMBIENT_FALLBACK: NonNullable<ConfigDef["social"]> = {
+export const AMBIENT_FALLBACK: ConfigDef["social"] = {
   chatRadiusTiles: 2,
   chatCooldownSeconds: 45,
   templateLines: [
@@ -52,7 +52,7 @@ export const ambientChatSystem: System = {
   phase: "perception",
   every: AMBIENT_EVERY_TICKS,
   run(ctx) {
-    const social = ctx.config.social ?? AMBIENT_FALLBACK;
+    const social = ctx.config.social;
     if (social.templateLines.length === 0) return;
     const cooldown = configTicks(ctx.config, social.chatCooldownSeconds);
     const pool = Object.values(ctx.state.actors).filter((a) => eligible(ctx, a, cooldown));

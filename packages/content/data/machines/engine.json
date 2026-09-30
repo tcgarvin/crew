@@ -32,7 +32,7 @@
   },
   "heat": {
     "risePerSecond": 0.02,
-    "coolPerSecond": 0.01,
+    "coolPerSecond": 0.025,
     "derateAbove": 0.75
   },
   "operation": {

@@ -1,4 +1,4 @@
-import type { ClaimId, ProblemId, TaskId } from "../ids";
+import type { ClaimId, ItemId, ProblemId, TaskId } from "../ids";
 /** Work events (W4): problems, tasks, claims, actions. */
 import type {
   ActionKind,
@@ -21,7 +21,14 @@ export interface WorkEventPayloads {
   taskSelected: { readonly taskId: TaskId; readonly urgency: UrgencyClass };
   personalActivityStarted: { readonly activity: PersonalActivity; readonly urgency: UrgencyClass };
   taskBlocked: { readonly taskId: TaskId; readonly reason: BlockageReason };
-  taskCompleted: { readonly taskId: TaskId };
+  /**
+   * Subjects: task, problem, then the actors who held it (Integration 2). `haul` (Integration 2
+   * addition) names the item moved and which way, so the ticker can say who carried what.
+   */
+  taskCompleted: {
+    readonly taskId: TaskId;
+    readonly haul?: { readonly itemId: ItemId; readonly to: "ship" | "port" };
+  };
   claimExpired: { readonly taskId: TaskId };
   /** W4a addition: an actor took a lease on a task. Subjects: actor, task. */
   taskClaimed: { readonly taskId: TaskId; readonly claimId: ClaimId };

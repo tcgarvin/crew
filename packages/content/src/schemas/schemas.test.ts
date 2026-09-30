@@ -183,6 +183,12 @@ const config = {
     mealSeconds: 15,
     sleepMinSeconds: 60,
     wakeBelow: 0.1,
+    initialRange: {
+      hunger: { min: 0.2, max: 0.6 },
+      fatigue: { min: 0.1, max: 0.5 },
+      comfort: { min: 0, max: 0.3 },
+      social: { min: 0.1, max: 0.5 },
+    },
   },
   work: {
     reconsiderEveryTicks: 10,
@@ -209,11 +215,15 @@ const config = {
     approachSeconds: 5,
     dockSeconds: 4,
     nominalSpeed: 1,
+    staffEstimateSeconds: 0,
   },
   commerce: {
     priceBands: { general: band, fragile: band, perishable: band, hazardous: band },
     jobOfferTtlSeconds: 300,
     boardSize: 3,
+    dockingFee: 0,
+    haulEstimateSeconds: 5,
+    reofferSeconds: 60,
   },
   narrator: {
     quietTooLongSeconds: 180,
@@ -223,6 +233,7 @@ const config = {
     spawnBudget: 4,
     faultBudget: 2,
     budgetRefillSeconds: 600,
+    hookOnEvents: [],
   },
   host: {
     runAheadCapSeconds: 60,
@@ -233,6 +244,7 @@ const config = {
     frameEveryTicks: 2,
   },
   shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+  social: { chatRadiusTiles: 2, chatCooldownSeconds: 45, templateLines: ["{a} joked"] },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
 };
 

@@ -1,6 +1,7 @@
 /**
  * `setCourse` (PLAN §6 W6 item 1): valid only while docked, targeting a different port with a
- * known route. Enters `preparingDeparture`; the travel system (`travel.ts`) then holds progress
+ * known route. Enters `preparingDeparture` (or, while cargo work is open, plans the course and
+ * waits docked — see `apply`); the travel system (`travel.ts`) then holds progress
  * there until ramps are closed, cargo is loaded and (if required) the bridge is staffed.
  */
 import {
@@ -10,11 +11,13 @@ import {
   NO_TEMP_REFS,
   type ValidateCtx,
   type Validation,
+  causedBy,
   ok,
   reject,
 } from "../../core/commands";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { PortDefId } from "../../core/types/ids";
+import { beginDeparture, hasOpenCargoWork } from "./travel";
 
 function findRoute(
   ctx: Pick<ValidateCtx, "content">,
@@ -51,26 +54,21 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     }
     return ok({ distance });
   },
-  apply(ctx: ApplyCtx, command: CommandOfKind<"setCourse">, plan: SetCoursePlan): AppliedCommand {
+  apply(ctx: ApplyCtx, command: CommandOfKind<"setCourse">): AppliedCommand {
     const travel = ctx.state.travel;
     if (travel.stage !== "docked") throw new Error("validated docked travel state vanished");
-    ctx.state.travel = {
-      stage: "preparingDeparture",
-      fromPortId: travel.portId,
-      toPortId: command.payload.destinationPortId,
-      stageProgress: 0,
-      routeProgress: 0,
-      routeDistance: plan.distance,
-      drifting: false,
-      stageStartedTick: ctx.tick,
-    };
-    ctx.emit({
-      type: "travelStageChanged",
-      subjectIds: [],
-      causeIds: [command.id],
-      source: command.source,
-      payload: { from: "docked", to: "preparingDeparture" },
-    });
+    const destinationPortId = command.payload.destinationPortId;
+    if (hasOpenCargoWork(ctx)) {
+      // Integration 2: freight is still moving through the open ramp; stay docked with the
+      // course planned. The travel system begins departure prep once the cargo work is done.
+      ctx.state.travel = {
+        stage: "docked",
+        portId: travel.portId,
+        plannedDestinationId: destinationPortId,
+      };
+      return NO_TEMP_REFS;
+    }
+    beginDeparture(ctx, destinationPortId, causedBy(command));
     return NO_TEMP_REFS;
   },
 };

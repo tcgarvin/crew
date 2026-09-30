@@ -11,9 +11,7 @@
   },
   "dependencies": {
     "@crew/content": "workspace:*",
-    "@crew/server": "workspace:*",
     "@crew/sim": "workspace:*",
-    "hono": "^4.6.16",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

@@ -59,10 +59,9 @@ pnpm --filter @crew/web dev      # Vite dev server, proxies /api to :3001
   accidental use of DOM or Node globals fails to type-check — the kernel must stay
   host-agnostic.
 - **`apps/web`**: uses a solution-style `tsconfig.json` (no `files`, just `references`) pointing
-  at `tsconfig.app.json` (browser code under `src/` and the Vercel function under `api/`, DOM
-  lib) and `tsconfig.node.json` (`vite.config.ts`, Node lib) — the standard Vite + TS project
-  split, extended to also cover `api/`.
-- **Vercel**: `apps/web/api/index.ts` wraps the `@crew/server` Hono app with `hono/vercel`'s
-  `handle()`. The root `vercel.json` builds only `@crew/web` and maps
-  `apps/web/api/**/*.ts` to `nodejs22.x` functions, so the API ships from inside the web app's
-  own directory rather than needing a second Vercel project.
+  at `tsconfig.app.json` (browser code under `src/`, DOM lib) and `tsconfig.node.json`
+  (`vite.config.ts`, Node lib) — the standard Vite + TS project split.
+- **Vercel**: the build command (root `vercel.json`) runs migrations, builds `@crew/web`, then
+  `scripts/vercel-output.mjs`, which writes Build Output API v3: the web `dist/` as static files
+  and `packages/server/src/vercel.ts` bundled by esbuild into one `api` function that serves every
+  `/api/*` route. See `docs/DEPLOYMENT.md` for why it is bundled rather than a zero-config `api/`.

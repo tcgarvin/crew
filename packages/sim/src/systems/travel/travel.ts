@@ -9,6 +9,7 @@ import { configTicks } from "../../core/clock";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ExternalStoreDef, MachineTag, PortDef } from "../../core/types/content";
+import type { EventDraft } from "../../core/types/events";
 import type {
   ActorId,
   DeckDefId,
@@ -222,10 +223,6 @@ function emitStageChanged(
   });
 }
 
-function noteNarrative(ctx: StepCtx, type: string): void {
-  ctx.state.narrator.lastNarrativeEvent = { tick: ctx.tick, type };
-}
-
 function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
   return port.routes.find((r) => r.toPortId === toPortId)?.distance;
 }
@@ -245,9 +242,50 @@ export function portStoreLocation(port: PortDef): PhysicalLocation {
 // The system
 // ---------------------------------------------------------------------------------------------
 
+/** Open freight work (either direction) that must finish before the ship may leave. */
+export function hasOpenCargoWork(ctx: Pick<StepCtx, "state">): boolean {
+  return Object.values(ctx.state.work.problems).some(
+    (p) => (p.kind === "cargoToLoad" || p.kind === "cargoToUnload") && p.status === "open",
+  );
+}
+
+/** Enter `preparingDeparture` from `docked` towards `toPortId` (shared with `setCourse`). */
+export function beginDeparture(
+  ctx: Pick<StepCtx, "state" | "content" | "emit" | "tick">,
+  toPortId: PortDefId,
+  cause: Pick<EventDraft, "causeIds" | "source"> = { causeIds: [], source: "sim" },
+): void {
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked") return;
+  const fromPort = ctx.content.ports[travel.portId];
+  const distance = fromPort === undefined ? undefined : findRoute(fromPort, toPortId);
+  ctx.state.travel = {
+    stage: "preparingDeparture",
+    fromPortId: travel.portId,
+    toPortId,
+    stageProgress: 0,
+    routeProgress: 0,
+    routeDistance: distance ?? 0,
+    drifting: false,
+    stageStartedTick: ctx.tick,
+  };
+  ctx.emit({
+    ...cause,
+    type: "travelStageChanged",
+    subjectIds: [],
+    payload: { from: "docked", to: "preparingDeparture" },
+  });
+}
+
 function advanceTravel(ctx: StepCtx): void {
   const travel = ctx.state.travel;
-  if (travel.stage === "docked") return;
+  if (travel.stage === "docked") {
+    // Integration 2: a course set while freight was still moving waits here, docked with the
+    // ramp open, until the last crate is aboard (or ashore), then departure prep begins.
+    const planned = travel.plannedDestinationId;
+    if (planned !== undefined && !hasOpenCargoWork(ctx)) beginDeparture(ctx, planned);
+    return;
+  }
 
   const machineDefs = machineTagsByDefId(ctx);
 
@@ -281,7 +319,6 @@ function advanceTravel(ctx: StepCtx): void {
         source: "sim",
         payload: { drifting },
       });
-      noteNarrative(ctx, "driftingChanged");
     }
     const secondsElapsed = ctx.elapsedTicks / ctx.config.time.tickRate;
     travel.routeProgress = Math.min(
@@ -316,7 +353,7 @@ function advanceStage(ctx: StepCtx): void {
     requestRamps(ctx, "open");
     // W6 decision: the fee is a flat config value, not per-`PortDef`, to keep V1 thin; a
     // per-port fee would read `ctx.defs.port(portId)` here instead.
-    const fee = ctx.config.commerce.dockingFee ?? 0;
+    const fee = ctx.config.commerce.dockingFee;
     if (fee > 0) {
       const txId = allocateId(ctx.state, "transaction");
       ctx.state.money.balance -= fee;
@@ -335,7 +372,6 @@ function advanceStage(ctx: StepCtx): void {
       source: "sim",
       payload: { portId },
     });
-    noteNarrative(ctx, "arrived");
     return;
   }
 
@@ -362,7 +398,6 @@ function advanceStage(ctx: StepCtx): void {
       source: "sim",
       payload: { fromPortId: travel.fromPortId, toPortId: travel.toPortId },
     });
-    noteNarrative(ctx, "departed");
   }
   if (to === "approaching") {
     raiseHookIfIdle(ctx, "approachingPort", {
@@ -372,13 +407,19 @@ function advanceStage(ctx: StepCtx): void {
   }
 }
 
-/** Raise `notableEvent` the tick after a hookable narrative event was recorded (see decisions.ts). */
+/**
+ * Raise `notableEvent` the tick after a hookable narrative event was committed. Core's phase 8
+ * records `lastNarrativeEvent` for every `narrative`-significance event, preferring one whose type
+ * is in `config.narrator.hookOnEvents` (see `core/pipeline.ts`).
+ */
 function checkNotableEventHook(ctx: StepCtx): void {
   const last = ctx.state.narrator.lastNarrativeEvent;
   if (last === undefined || last.tick !== ctx.tick - 1) return;
-  const kinds = ctx.config.narrator.hookOnEvents ?? [];
+  const kinds = ctx.config.narrator.hookOnEvents;
   if (!kinds.includes(last.type)) return;
-  raiseHookIfIdle(ctx, "notableEvent", { eventIds: [] });
+  raiseHookIfIdle(ctx, "notableEvent", {
+    eventIds: last.eventId === undefined ? [] : [last.eventId],
+  });
 }
 
 export const travelSystem: System = {

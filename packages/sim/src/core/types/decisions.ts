@@ -94,13 +94,12 @@ export interface NarratorState {
   /** Resolved hooks, most recent last, trimmed to a small tail (for the digest). */
   recentHookIds: HookId[];
   /**
-   * W6 addition: the type and tick of the most recent narrative event *this workstream* emitted
-   * (travel/commerce), so the `notableEvent` hook (raised the following tick, since events are
-   * only stamped after phase 8) can filter by kind without core (`pipeline.ts`) recording every
-   * event's type. Events from other systems are not reflected here (see W6 report: this is a
-   * thin approximation, not a general "last narrative event of any kind" mechanism).
+   * The most recent `narrative`-significance event committed (phase 8, `core/pipeline.ts`),
+   * preferring within one tick an event whose type is in `config.narrator.hookOnEvents`. Travel
+   * raises the `notableEvent` hook from it the following tick (events are stamped after the
+   * systems run, so a hook cannot be raised in the same tick).
    */
-  lastNarrativeEvent?: { tick: Tick; type: string };
+  lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
   /**
    * W6 addition: the port the `jobBoard` hook was last raised for while docked there, so it
    * raises at most once per dock stay; cleared when travel leaves `docked`.

@@ -28,24 +28,18 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
 }
 
 /**
- * `jobBoard` (PLAN §6 item 5): raised when docked with no offers on the board and no job
- * decision already queued, so a real narrator gets a chance to flavour an otherwise-empty board
- * (the deterministic job source, run first each tick, normally fills it first — see
- * `commerce/jobSource.ts` — so this only fires when a port's `jobTemplates` can't cover
- * `config.commerce.boardSize`, e.g. an empty list).
+ * `jobBoard` (PLAN §6 item 5): raised while docked when the deterministic job source was free to
+ * make an offer but had nothing to offer (e.g. a port with no `jobTemplates`), so a real narrator
+ * gets a chance to flavour an otherwise-empty board. At most once per dock stay.
  */
-export function raiseJobBoardHookIfNeeded(
-  ctx: StepCtx,
-  hasOffers: boolean,
-  hasQueuedJobDecision: boolean,
-): void {
+export function raiseJobBoardHookIfNeeded(ctx: StepCtx, boardEmpty: boolean): void {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") {
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
     delete ctx.state.narrator.jobBoardHookRaisedAtPortId;
     return;
   }
-  if (hasOffers || hasQueuedJobDecision) return;
+  if (!boardEmpty) return;
   if (ctx.state.narrator.jobBoardHookRaisedAtPortId === travel.portId) return;
   if (raiseHookIfIdle(ctx, "jobBoard", { portId: travel.portId })) {
     ctx.state.narrator.jobBoardHookRaisedAtPortId = travel.portId;

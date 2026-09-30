@@ -79,13 +79,28 @@ export function runStep(world: World, registry: KernelRegistry): SimEvent[] {
   return events;
 }
 
-/** Bookkeeping over the committed events: the quiet timer's input and the trace ring. */
+/**
+ * Bookkeeping over the committed events: the quiet timer's input, the last narrative event (the
+ * `notableEvent` hook's input; a type in `config.narrator.hookOnEvents` wins within a tick) and
+ * the trace ring.
+ */
 function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void {
   const { state, caches } = world;
   const ringSize = world.config.values.events.traceRingSize;
+  const hookable = world.config.values.narrator.hookOnEvents;
+  let hookableSeen = false;
   for (const event of events) {
     if (event.significance === "narrative") {
       state.narrator.lastNarrativeTick = event.tick;
+      const isHookable = hookable.includes(event.type);
+      if (isHookable || !hookableSeen) {
+        state.narrator.lastNarrativeEvent = {
+          tick: event.tick,
+          type: event.type,
+          eventId: event.id,
+        };
+      }
+      hookableSeen ||= isHookable;
     } else if (event.significance === "trace") {
       caches.diagnostics.traceEvents.push(event);
     }

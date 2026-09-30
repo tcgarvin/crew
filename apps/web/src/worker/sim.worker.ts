@@ -1,27 +1,19 @@
 /// <reference lib="webworker" />
 /**
- * Web Worker entry point. Wires the real `@crew/sim` kernel: a registry with the spatial system
- * (W3) plus a temporary dev-only wander system, the authored `@crew/content` bundle, and the
- * narrator stub. `host.ts` itself never imports any of this file's dependencies directly, so it
- * stays kernel-agnostic.
+ * Web Worker entry point. Wires the real `@crew/sim` kernel with every V1 system
+ * (`createFullRegistry`) and the authored `@crew/content` bundle. `host.ts` itself never imports
+ * a concrete kernel, so it stays kernel-agnostic. The narrator is called from the main thread
+ * (which holds the auth token); the worker only halts and waits for the answering commands.
  */
-import { createKernel, createRegistry, registerSpatial } from "@crew/sim";
 import type { ToWorker } from "@crew/sim";
+import { createKernel } from "@crew/sim";
 import { loadWebContent } from "./content";
-import { DEV_WANDER, devWanderSystem } from "./devWander";
 import { createHost } from "./host";
-import { stubNarrator } from "./narrator";
+import { createFullRegistry } from "./registry";
 
 declare const self: DedicatedWorkerGlobalScope;
 
-const registry = createRegistry();
-registerSpatial(registry);
-// TODO(W4a): remove when the planner lands.
-if (DEV_WANDER) {
-  registry.registerSystem(devWanderSystem);
-}
-
-const kernel = createKernel(registry);
+const kernel = createKernel(createFullRegistry());
 const { bundle, config } = loadWebContent();
 
 const host = createHost({
@@ -29,7 +21,6 @@ const host = createHost({
   content: bundle,
   config,
   postMessage: (message) => self.postMessage(message),
-  narrator: stubNarrator,
 });
 
 self.onmessage = (event: MessageEvent<ToWorker>) => {

@@ -24,3 +24,22 @@ export { rotateOffset } from "./systems/spatial/geometry";
 /** Commerce (W6) is complete enough for hosts to register: the narrator package's own tests need
  * it to enqueue `spawnAtBoundary`/`offerJob`/etc. through a real kernel. */
 export { registerCommerce } from "./systems/commerce/index";
+
+/**
+ * Integration 2: everything a host needs to build the full V1 registry (see
+ * `apps/web/src/worker/registry.ts` for the order).
+ */
+export { equipmentTaskDerivation, registerEquipmentSystems } from "./systems/equipment/index";
+export { registerTravel, travelTaskDerivations } from "./systems/travel/index";
+export { commerceTaskDerivations } from "./systems/commerce/index";
+export { registerNeeds } from "./systems/needs/index";
+export {
+  equipmentStages,
+  registerWork,
+  type RegisterWorkOptions,
+  type StageExecutor,
+} from "./systems/work/index";
+export { workViolations } from "./systems/work/invariants";
+export { spatialViolations } from "./systems/spatial/invariants";
+export { registerPlannerDefaults } from "./planner/index";
+export { registerAgentView, toAgentViewSnapshot } from "./view/index";

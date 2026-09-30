@@ -142,9 +142,15 @@ describe("kernel integration", () => {
     kernel.advance(world, 3);
     const frame = kernel.getRenderFrame(world);
     expect(frame.machines[0]?.state).toBe("failed");
-    // faultOccurred and commandApplied are trace-level; only the observation is shown.
+    // commandApplied is trace-level and hidden; faultOccurred is trace but on the ticker
+    // allowlist (Integration 2), and the observation is notable.
     expect(frame.tickerEvents).toEqual([
-      { tick: 2, text: "Fault observed: Mara Voss, Coolant Pump", significance: "notable" },
+      { tick: 1, text: "Coolant Pump: seized", significance: "trace" },
+      {
+        tick: 2,
+        text: "Mara Voss noticed grinding from the coolant pump",
+        significance: "notable",
+      },
     ]);
     kernel.advance(world, 1);
     expect(kernel.getRenderFrame(world).tickerEvents).toEqual([]);

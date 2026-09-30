@@ -1,10 +1,9 @@
 # Deployment (W8)
 
 `packages/server` is stateless (PLAN §3): every request loads whatever it needs from the `Db`
-and writes back before responding. The API is designed to run as a Vercel Node function
-(`apps/web/api/index.ts` imports `app` from `@crew/server` and re-exports its `fetch` handler —
-Hono apps are Fetch-API-shaped, so no adapter is needed) and to run locally with
-`@hono/node-server` (`src/dev.ts`).
+and writes back before responding. The API runs as one Vercel Node function
+(`src/vercel.ts`: `@hono/node-server/vercel`'s `handle(app)`, bundled — see "The Vercel function"
+below) and locally with `@hono/node-server` (`src/dev.ts`, which also logs every request).
 
 ## Running locally
 
@@ -55,25 +54,32 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter 
 | `DATABASE_URL` | In production (or whenever `CREW_DB` isn't `memory`) | Neon Postgres connection string, used by `@neondatabase/serverless` via `drizzle-orm/neon-http`. |
 | `CREW_DB` | No | Set to `memory` to force the in-memory `Db` fake (dev/tests only). |
 | `OPENROUTER_API_KEY` | For the real narrator (W9) | Passed through as `NarratorCtx.openRouterApiKey`. Without it the server answers every hook with the deterministic null narrator. W9 decision: the narrator talks to OpenRouter (owner); the transport itself is still pending, so a set key currently yields `fallback: "notConfigured"` in `narrator_calls.response`. |
-| `CREW_NARRATOR_MODEL` | No (default `anthropic/claude-opus-4.6`) | OpenRouter model slug for the narrator. The model that actually answered is recorded in `narrator_calls.model`. |
+| `CREW_NARRATOR_MODEL` | No (default `anthropic/claude-sonnet-4.6`, `DEFAULT_SERVER_NARRATOR_MODEL` in `src/env.ts`) | OpenRouter model slug for the narrator. The model that actually answered is recorded in `narrator_calls.model`. |
 | `CREW_SAVE_MAX_BYTES` | No (default 4 MiB) | Max accepted save size, measured on the **gzipped** blob. Vercel functions cap request bodies at 4.5 MB, so leave headroom above this for base64 + JSON overhead if raising it. |
 | `CREW_NARRATOR_MAX_CALLS_PER_HOUR` | No (default 6) | Per-game narrator call budget (rolling wall-clock hour). A second budget knob — minimum sim ticks between calls — is currently a constant in `src/routes/narrator.ts` (`MIN_TICKS_BETWEEN_NARRATOR_CALLS`), not yet an env var. |
 
 `env.ts`'s `loadEnv()` throws immediately if `DATABASE_URL` is missing and `NODE_ENV=production`
 and `CREW_DB` isn't `memory` — fail fast rather than silently falling back in prod.
 
-## What the Vercel function entry expects
+## The Vercel function
 
-`apps/web/api/index.ts` (owned by W7) should:
+Integration 2. The build command in `vercel.json` ends with `node scripts/vercel-output.mjs`,
+which writes `.vercel/output` in Build Output API v3 form: `apps/web/dist` as `static/`, and
+`functions/api.func/index.mjs`, an esbuild bundle of `src/vercel.ts` (the default `app`, built
+from `process.env` by `loadEnv()`, wrapped by `@hono/node-server/vercel`'s `handle`). The route
+table sends `^/api(/.*)?$` to that function, which routes on the original path.
 
-1. Build (or import) an `Env` via `loadEnv()` from `@crew/server`.
-2. Build a `Db` via `createDb(env)` from `@crew/server`.
-3. Call `createApp({ db, env })` — `runNarrator` defaults to `defaultNarrator` (W9), which uses
-   `@crew/narrator`'s `runNarrator` when `OPENROUTER_API_KEY` is set and `nullNarrator` otherwise.
-   Tests inject their own `runNarrator`.
-4. Export the resulting Hono app's `fetch` as the function's default export (Hono apps implement
-   the standard Fetch API `fetch(Request): Promise<Response>`, which Vercel's Node runtime
-   accepts directly).
+Why not a zero-config `api/index.ts`: Vercel's Node builder transpiles files one by one and keeps
+imports as written, but the workspace packages export TypeScript source (`"exports":
+"./src/index.ts"`), use extensionless relative imports and import JSON without import
+attributes. The function builds, then fails at runtime. Bundling sidesteps all three.
+
+Check locally without deploying: `vercel build` (the repo is linked) — it runs the build command
+and keeps the generated output; `.vercel/output/functions/api.func/index.mjs` must exist. The
+build command's first step migrates `DATABASE_URL`, so for a local check run
+`pnpm --filter @crew/web build && node scripts/vercel-output.mjs` instead, or strip the migrate
+step from a scratch copy of `vercel.json`. `CREW_DB=memory node -e` importing the bundle and
+serving its default export with `node:http` is a quick smoke test.
 
 Nothing about auth, saves, or narrator routing needs Vercel-specific code; the only Vercel-aware
 piece is `src/waitUntil.ts`, which probes for `@vercel/functions`'s `waitUntil` at runtime and

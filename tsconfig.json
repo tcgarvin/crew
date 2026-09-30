@@ -1,11 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/sim" },
-    { "path": "packages/content" },
-    { "path": "packages/narrator" },
-    { "path": "packages/server" },
-    { "path": "apps/web" },
-    { "path": "apps/cli" }
+    {
+      "path": "packages/sim"
+    },
+    {
+      "path": "packages/content"
+    },
+    {
+      "path": "packages/narrator"
+    },
+    {
+      "path": "packages/server"
+    },
+    {
+      "path": "apps/web"
+    },
+    {
+      "path": "apps/cli"
+    }
   ]
 }
