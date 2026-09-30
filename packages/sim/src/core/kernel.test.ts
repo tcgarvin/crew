@@ -84,8 +84,12 @@ describe("kernel integration", () => {
         actionLabel: "idle",
       },
     ]);
-    expect(frame.machines).toEqual([{ id: "m1", state: "ok", temperatureNorm: 0 }]);
-    expect(frame.doors).toEqual([{ id: "d1", physicalState: "closed" }]);
+    expect(frame.machines).toEqual([
+      { id: "m1", state: "ok", temperatureNorm: 0, deckId: TINY.deck, placementKey: "pump1" },
+    ]);
+    expect(frame.doors).toEqual([
+      { id: "d1", physicalState: "closed", deckId: TINY.deck, placementKey: "holdDoor" },
+    ]);
     expect(frame.travel).toEqual({ state: "docked", progress: 0 });
     expect(frame.money).toBe(500);
     expect(frame.tickerEvents).toEqual([]);

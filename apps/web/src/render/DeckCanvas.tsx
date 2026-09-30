@@ -3,10 +3,20 @@ import type { RenderFrame } from "@crew/sim";
  * Canvas host component (PLAN §6 W7). Fits the deck to the viewport (devicePixelRatio-aware),
  * redraws on every new frame, and turns taps/clicks into entity selection for the inspector.
  * Pan/zoom is explicitly not required (task brief).
+ *
+ * Integration 1: takes the real `DeckLayout` (derived from `@crew/content`'s `DeckDef`) instead
+ * of the mock geometry, and rotates the canvas 90° on portrait viewports so a landscape deck
+ * still fills the width (task item 5).
  */
 import { useCallback, useEffect, useRef } from "react";
-import { MOCK_MACHINES } from "../worker/mockGeometry";
-import { type ViewTransform, computeFitTransform, drawFrame } from "./draw";
+import {
+  type DeckLayout,
+  type ViewTransform,
+  computeFitTransform,
+  drawFrame,
+  screenToWorld,
+  shouldRotate,
+} from "./draw";
 
 export interface Selection {
   readonly kind: "actor" | "machine";
@@ -14,6 +24,7 @@ export interface Selection {
 }
 
 export interface DeckCanvasProps {
+  readonly layout: DeckLayout;
   readonly frame: RenderFrame | undefined;
   readonly selected: Selection | undefined;
   readonly onSelect: (selection: Selection | undefined) => void;
@@ -21,11 +32,12 @@ export interface DeckCanvasProps {
 
 const HIT_RADIUS_TILES = 0.8;
 
-export function DeckCanvas({ frame, selected, onSelect }: DeckCanvasProps) {
+export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<ViewTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const sizeRef = useRef({ width: 0, height: 0 });
+  const rotatedRef = useRef(false);
 
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -41,8 +53,9 @@ export function DeckCanvas({ frame, selected, onSelect }: DeckCanvasProps) {
     canvas.style.height = `${height}px`;
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    transformRef.current = computeFitTransform(width, height);
-  }, []);
+    rotatedRef.current = shouldRotate(width, height, layout);
+    transformRef.current = computeFitTransform(width, height, layout, rotatedRef.current);
+  }, [layout]);
 
   useEffect(() => {
     resize();
@@ -60,8 +73,17 @@ export function DeckCanvas({ frame, selected, onSelect }: DeckCanvasProps) {
     const ctx = canvas?.getContext("2d");
     if (!ctx || !frame) return;
     const { width, height } = sizeRef.current;
-    drawFrame(ctx, transformRef.current, frame, width, height, selected);
-  }, [frame, selected]);
+    drawFrame(
+      ctx,
+      transformRef.current,
+      layout,
+      frame,
+      width,
+      height,
+      rotatedRef.current,
+      selected,
+    );
+  }, [frame, selected, layout]);
 
   const handlePointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -72,8 +94,13 @@ export function DeckCanvas({ frame, selected, onSelect }: DeckCanvasProps) {
       const px = event.clientX - rect.left;
       const py = event.clientY - rect.top;
       const t = transformRef.current;
-      const worldX = (px - t.offsetX) / t.scale;
-      const worldY = (py - t.offsetY) / t.scale;
+      const { x: worldX, y: worldY } = screenToWorld(
+        t,
+        px,
+        py,
+        rotatedRef.current,
+        sizeRef.current.width,
+      );
 
       let best: Selection | undefined;
       let bestDist = HIT_RADIUS_TILES;
@@ -85,17 +112,25 @@ export function DeckCanvas({ frame, selected, onSelect }: DeckCanvasProps) {
         }
       }
       if (!best) {
-        for (const m of MOCK_MACHINES) {
-          const d = Math.hypot(m.x - worldX, m.y - worldY);
-          if (d < HIT_RADIUS_TILES) {
-            best = { kind: "machine", id: m.id };
-            break;
+        const machineByKey = new Map(
+          frame.machines
+            .filter((m) => m.deckId === layout.deckId)
+            .map((m) => [m.placementKey, m.id] as const),
+        );
+        for (const m of layout.machines) {
+          const d = Math.hypot(m.center.x - worldX, m.center.y - worldY);
+          if (d < HIT_RADIUS_TILES + m.footprint.length * 0.4) {
+            const id = machineByKey.get(m.placementKey);
+            if (id !== undefined) {
+              best = { kind: "machine", id };
+              break;
+            }
           }
         }
       }
       onSelect(best);
     },
-    [frame, onSelect],
+    [frame, layout, onSelect],
   );
 
   return (

@@ -8,24 +8,23 @@ import type {
   Machine,
   MachineId,
   RenderFrame,
-  ScenarioDefId,
   TickerEntry,
 } from "@crew/sim";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createSimConnection } from "./host/connection";
 import { FramePlayback, runPlaybackLoop } from "./host/playback";
 import { clearLocalSave, readLocalSave, writeLocalSave } from "./host/saves";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
+import { buildDeckLayout } from "./render/deckLayout";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Inspector, type InspectorData } from "./ui/Inspector";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
 import { Ticker } from "./ui/Ticker";
 import { TopBar } from "./ui/TopBar";
+import { loadWebContent } from "./worker/content";
 
 type HealthState = "checking" | "ok" | "error";
 
-const TICK_RATE = 20; // matches MOCK_TICK_RATE; the real config will report its own via load.
-const SAVE_EVERY_TICKS = TICK_RATE * 15;
 const TICKER_LIMIT = 6;
 
 let requestCounter = 0;
@@ -41,8 +40,23 @@ function nextCommandId(): CommandId {
 }
 
 export function App() {
+  // Loaded once, synchronously: same authored bundle the worker validates and loads (task item
+  // 4). Only used here for the static deck layout and the tick rate the playback loop paces to.
+  const { bundle, config, scenarioId } = useMemo(() => loadWebContent(), []);
+  const tickRate = config.values.time.tickRate;
+  const saveEveryTicks = tickRate * 15;
+  const deck = useMemo(() => {
+    const scenario = bundle.scenarios[scenarioId];
+    const deckDef = scenario ? bundle.decks[scenario.deckId] : undefined;
+    if (deckDef === undefined) {
+      throw new Error(`No deck for scenario "${scenarioId}"`);
+    }
+    return deckDef;
+  }, [bundle, scenarioId]);
+  const layout = useMemo(() => buildDeckLayout(deck, bundle), [deck, bundle]);
+
   const connectionRef = useRef<ReturnType<typeof createSimConnection> | undefined>(undefined);
-  const playbackRef = useRef(new FramePlayback(TICK_RATE));
+  const playbackRef = useRef(new FramePlayback(tickRate));
   const pendingRequests = useRef(new Map<string, (message: FromWorker) => void>());
   const lastSaveTickRef = useRef(0);
 
@@ -90,12 +104,16 @@ export function App() {
       switch (message.type) {
         case "frame": {
           playback.push(message.frame);
+          // A frame only arrives once the kernel is running again, so this also covers the
+          // quiet-too-long hook (and any other hook) resolving with no decision surfaced: the
+          // overlay clears as soon as the sim resumes producing frames.
+          setThinking(false);
           if (message.frame.tickerEvents.length > 0) {
             setTicker((prev) =>
               [...message.frame.tickerEvents].reverse().concat(prev).slice(0, TICKER_LIMIT),
             );
           }
-          if (message.frame.tick - lastSaveTickRef.current >= SAVE_EVERY_TICKS) {
+          if (message.frame.tick - lastSaveTickRef.current >= saveEveryTicks) {
             lastSaveTickRef.current = message.frame.tick;
             requestSave(connection);
           }
@@ -119,7 +137,12 @@ export function App() {
           requestSave(connection);
           return;
         case "error":
+          // Requests correlated by `requestId` are handled above; an uncorrelated error is the
+          // worker's own recovery, currently just "the save was incompatible" (host.ts's `load`
+          // handler already started a new game) — clear the stale save so the next reload
+          // doesn't retry it.
           console.warn("[sim worker]", message.message);
+          void clearLocalSave();
           return;
         default:
           return;
@@ -148,7 +171,7 @@ export function App() {
           type: "load",
           source: {
             kind: "scenario",
-            scenarioId: "scenario.mock.default" as ScenarioDefId,
+            scenarioId,
             seed: Math.floor(Math.random() * 1_000_000),
           },
         });
@@ -160,7 +183,9 @@ export function App() {
       unsubscribe();
       connection.dispose();
     };
-  }, []);
+    // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once via `useMemo(() =>
+    // loadWebContent(), [])` above, so they never change across this component's lifetime.
+  }, [scenarioId, saveEveryTicks]);
 
   // -------------------------------------------------------------- speed / pause
   const onSetSpeed = useCallback((next: number) => {
@@ -250,7 +275,7 @@ export function App() {
 
   const money = frame?.money ?? 0;
   const travelState = frame?.travel.state ?? "docked";
-  const runAheadSeconds = runAhead.buffered / TICK_RATE;
+  const runAheadSeconds = runAhead.buffered / tickRate;
 
   return (
     <div className="app">
@@ -260,14 +285,14 @@ export function App() {
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
         simTick={frame?.tick ?? 0}
-        tickRate={TICK_RATE}
+        tickRate={tickRate}
         money={money}
         travelState={travelState}
         runAheadBufferedSeconds={runAheadSeconds}
         health={health}
       />
       <div className="main-area">
-        <DeckCanvas frame={frame} selected={selection} onSelect={onSelect} />
+        <DeckCanvas layout={layout} frame={frame} selected={selection} onSelect={onSelect} />
         <Ticker entries={ticker} />
       </div>
       <Inspector data={inspectorData} onClose={onCloseInspector} />

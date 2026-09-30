@@ -1,23 +1,35 @@
 /// <reference lib="webworker" />
 /**
- * Web Worker entry point. The only file that wires a concrete `Kernel` into `createHost` — swap
- * `mockKernel`/`MOCK_CONTENT_BUNDLE`/`MOCK_CONFIG` and `mockNarrator` for the real
- * `@crew/sim` kernel export, a real content bundle load and a `fetch` to the narrator server to
- * go live. `host.ts` itself never imports the mock.
+ * Web Worker entry point. Wires the real `@crew/sim` kernel: a registry with the spatial system
+ * (W3) plus a temporary dev-only wander system, the authored `@crew/content` bundle, and the
+ * narrator stub. `host.ts` itself never imports any of this file's dependencies directly, so it
+ * stays kernel-agnostic.
  */
+import { createKernel, createRegistry, registerSpatial } from "@crew/sim";
 import type { ToWorker } from "@crew/sim";
+import { loadWebContent } from "./content";
+import { DEV_WANDER, devWanderSystem } from "./devWander";
 import { createHost } from "./host";
-import { MOCK_CONFIG, MOCK_CONTENT_BUNDLE, mockDecisionCard, mockKernel } from "./mockKernel";
-import { mockNarrator } from "./mockNarrator";
+import { stubNarrator } from "./narrator";
 
 declare const self: DedicatedWorkerGlobalScope;
 
+const registry = createRegistry();
+registerSpatial(registry);
+// TODO(W4a): remove when the planner lands.
+if (DEV_WANDER) {
+  registry.registerSystem(devWanderSystem);
+}
+
+const kernel = createKernel(registry);
+const { bundle, config } = loadWebContent();
+
 const host = createHost({
-  kernel: mockKernel,
-  content: MOCK_CONTENT_BUNDLE,
-  config: MOCK_CONFIG,
+  kernel,
+  content: bundle,
+  config,
   postMessage: (message) => self.postMessage(message),
-  narrator: (hook) => mockNarrator(hook, mockDecisionCard),
+  narrator: stubNarrator,
 });
 
 self.onmessage = (event: MessageEvent<ToWorker>) => {

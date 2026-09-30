@@ -10,7 +10,7 @@
  */
 import type { Capacities, FactType, KnownFact, Needs } from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
-import type { DeckDef, MachineTag, RoleTag, SkillLevels } from "./content";
+import type { DeckDef, ItemTag, MachineTag, RoleTag, SkillLevels, ToolKind } from "./content";
 import type { Significance } from "./events";
 import type {
   ActorId,
@@ -20,6 +20,7 @@ import type {
   EntityId,
   ItemDefId,
   ItemId,
+  LocalKey,
   MachineDefId,
   MachineId,
   TraitDefId,
@@ -57,6 +58,27 @@ export interface SelfView {
   /** From the shift schedule at the current tick. */
   readonly onDuty: boolean;
   readonly lastPlannedTick: Tick;
+  /** W4a addition: the actor's own retry backoff (`Actor.workBackoff`); refs → retry tick. */
+  readonly backoff?: Readonly<Record<string, Tick>>;
+}
+
+/**
+ * W4a addition: an item the actor has an `itemLocation` belief about, joined with its static
+ * definition (what a ration pack is is common knowledge; where this one is, is belief).
+ */
+export interface KnownItemView {
+  readonly itemId: ItemId;
+  readonly defId: ItemDefId;
+  readonly name: string;
+  readonly tags: readonly ItemTag[];
+  readonly toolKinds: readonly ToolKind[];
+  /** Believed location (from the fact, not truth). */
+  readonly location: PhysicalLocation;
+  /** Believed tile, when the believed location is on deck. */
+  readonly tile?: TileCoord;
+  /** The actor looked and it was not there (see `FactValues.itemLocation.absent`). */
+  readonly absent: boolean;
+  readonly observedTick: Tick;
 }
 
 /** A task as its planner may see it. Claim bookkeeping is hidden (SD §14.5). */
@@ -122,6 +144,14 @@ export interface AgentView {
   knownProblems(): readonly ProblemView[];
   knownTasks(): readonly TaskView[];
   roster(): readonly RosterEntry[];
+  /** W4a addition: items the actor holds a location belief about (plus what it carries). */
+  knownItems(): readonly KnownItemView[];
+  /**
+   * W4a addition: schematic travel estimate in ticks from `from` (default: the actor's tile) to
+   * `to`, or null if the layout has no route. Wraps spatial's `estimateTravelTicks`, which the
+   * planner may not import. Ignores congestion and dynamic door state.
+   */
+  estimateTravelTicks(to: TileCoord, from?: TileCoord): number | null;
 }
 
 /**
@@ -161,11 +191,21 @@ export interface RenderMachine {
   readonly state: RenderMachineState;
   /** 0 ambient … 1 failure point. */
   readonly temperatureNorm?: number;
+  /**
+   * Integration 1 addition: lets a host that already has the static `DeckDef` (from
+   * `@crew/content`) match this dynamic state back to the authored placement without guessing
+   * instance-ID allocation order.
+   */
+  readonly deckId: DeckDefId;
+  readonly placementKey: LocalKey;
 }
 
 export interface RenderDoor {
   readonly id: DoorId;
   readonly physicalState: DoorPhysicalState;
+  /** Integration 1 addition: see `RenderMachine.placementKey`. */
+  readonly deckId: DeckDefId;
+  readonly placementKey: LocalKey;
 }
 
 export interface TickerEntry {

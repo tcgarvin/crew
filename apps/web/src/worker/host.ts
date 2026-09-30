@@ -2,9 +2,9 @@
  * Worker host: owns the kernel and the run-ahead loop (D14, PLAN §6 W7).
  *
  * Depends only on the `Kernel` interface plus a `Narrator` callback (how the "call the server"
- * step is performed) — never on `mockKernel` directly, so `sim.worker.ts` is the only file that
- * needs to change to swap the mock kernel for the real `@crew/sim` one. Runnable outside a worker
- * (e.g. in a Vitest test) since `postMessage`/timers/clock are injected.
+ * step is performed) — never on a concrete kernel implementation, so `sim.worker.ts` is the only
+ * file that wires one in (see its header comment). Runnable outside a worker (e.g. in a Vitest
+ * test) since `postMessage`/timers/clock are injected.
  */
 import type {
   Command,
@@ -16,6 +16,7 @@ import type {
   Kernel,
   NarratorHook,
   SaveEnvelope,
+  ScenarioDefId,
   Tick,
   ToWorker,
   World,
@@ -159,20 +160,34 @@ export function createHost(deps: HostDeps): Host {
   async function resolveHook(hookId: NarratorHook["id"], hook: NarratorHook): Promise<void> {
     const response = await deps.narrator(hook);
     if (!world) return;
+    // `enqueueCommand` rejects a `targetTick` at or before the current committed tick
+    // (`core/commands.ts`'s `earliest = state.tick + 1`) — the world is halted on this exact
+    // tick, so `tick + 1` is the earliest tick a command can land on, not `tick` itself. Passing
+    // `tick` here silently rejected every `acknowledgeHook`, leaving the world (and the narrator
+    // overlay) halted forever; this was masked by the mock kernel's looser `enqueueCommand`.
+    const targetTick = world.state.tick + 1;
     for (const draft of response.commands) {
       deps.kernel.enqueueCommand(world, {
         ...draft,
         id: nextHostCommandId(),
-        targetTick: world.state.tick,
+        targetTick,
       } as Command);
     }
-    deps.kernel.enqueueCommand(world, {
+    const ack = deps.kernel.enqueueCommand(world, {
       id: nextHostCommandId(),
       source: "system",
       kind: "acknowledgeHook",
       payload: { hookId },
-      targetTick: world.state.tick,
+      targetTick,
     } as Command);
+    if (ack.status === "rejected") {
+      // Should not happen given the above, but surface it rather than hang silently if it ever
+      // does (e.g. a future change narrows `AUTHORITY` for "system").
+      deps.postMessage({
+        type: "error",
+        message: `acknowledgeHook rejected: ${ack.rejection.code} (${ack.rejection.reason})`,
+      });
+    }
     haltedFor = undefined;
     // A decision may now be queued (from the narrator's `surfaceDecision`); let the loop notice.
   }
@@ -240,7 +255,28 @@ export function createHost(deps: HostDeps): Host {
             deps.config,
           );
         } else {
-          world = deps.kernel.restore(message.source.envelope, deps.content);
+          try {
+            world = deps.kernel.restore(message.source.envelope, deps.content);
+          } catch (error) {
+            // Schema/content-hash mismatch (or any other restore failure, PLAN §3 "Saves"):
+            // discard the save and start a new game rather than leaving the world undefined.
+            const reason = error instanceof Error ? error.message : String(error);
+            console.error(`[host] save incompatible, starting a new game: ${reason}`);
+            const fallbackScenarioId = Object.keys(deps.content.scenarios)[0] as
+              | ScenarioDefId
+              | undefined;
+            if (fallbackScenarioId === undefined) throw error;
+            world = deps.kernel.createWorld(
+              fallbackScenarioId,
+              Math.floor(Math.random() * 1_000_000),
+              deps.content,
+              deps.config,
+            );
+            deps.postMessage({
+              type: "error",
+              message: `Save could not be loaded (${reason}); started a new game.`,
+            });
+          }
         }
         tickRate = world.config.values.time.tickRate;
         lastSnapshotTick = world.state.tick;
@@ -302,22 +338,31 @@ export function createHost(deps: HostDeps): Host {
           });
           return;
         }
-        const snapshotWorld = deps.kernel.restore(entry.envelope, deps.content);
-        const view = deps.kernel.getAgentView(snapshotWorld, message.actorId);
-        deps.postMessage({
-          type: "agentViewResult",
-          requestId: message.requestId,
-          actorId: message.actorId,
-          tick: entry.tick,
-          view: {
-            tick: view.tick,
-            self: view.self,
-            facts: view.facts(),
-            problems: view.knownProblems(),
-            tasks: view.knownTasks(),
-            roster: view.roster(),
-          },
-        });
+        try {
+          const snapshotWorld = deps.kernel.restore(entry.envelope, deps.content);
+          const view = deps.kernel.getAgentView(snapshotWorld, message.actorId);
+          deps.postMessage({
+            type: "agentViewResult",
+            requestId: message.requestId,
+            actorId: message.actorId,
+            tick: entry.tick,
+            view: {
+              tick: view.tick,
+              self: view.self,
+              facts: view.facts(),
+              problems: view.knownProblems(),
+              tasks: view.knownTasks(),
+              roster: view.roster(),
+            },
+          });
+        } catch (error) {
+          // Integration 1: the registry has no `AgentViewBuilder` registered until W4a's planner
+          // lands (`registerSpatial` doesn't set one), so this currently always lands here — see
+          // the Integration 1 report. Caught so a click on a crew member fails cleanly (the
+          // Inspector clears) instead of throwing out of the worker's `onmessage` handler.
+          const reason = error instanceof Error ? error.message : String(error);
+          deps.postMessage({ type: "error", requestId: message.requestId, message: reason });
+        }
         return;
       }
       default:

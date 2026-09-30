@@ -48,6 +48,8 @@ export function actionLabel(
   if (activity.kind === "idle") {
     return actor.movement.kind === "moving" ? "walking" : "idle";
   }
+  // W4a: the work system keeps a ready-made label on the activity (systems/work/labels.ts).
+  if (activity.label !== undefined) return activity.label;
   const action = activity.action;
   if (action.kind === "sleep" && action.stage !== "asleep") {
     return action.stage === "waking" ? "waking up" : "lying down";
@@ -108,6 +110,8 @@ export function describeEvent(
   state: ReadonlyWorldState,
   content: ContentBundle,
 ): string {
+  // W4a: a conversation carries its own rendered line.
+  if (event.type === "conversation") return event.payload.line;
   const names = event.subjectIds
     .map((id) => {
       const actor = state.actors[id as Actor["id"]];
@@ -132,6 +136,8 @@ export function getRenderFrame(world: World): RenderFrame {
     id: machine.id,
     state: machineState(machine, content),
     temperatureNorm: machine.temperature,
+    deckId: machine.deckId,
+    placementKey: machine.placementKey,
   }));
   const travel = state.travel;
   const progress =
@@ -154,6 +160,8 @@ export function getRenderFrame(world: World): RenderFrame {
     doors: Object.values(state.doors).map((door) => ({
       id: door.id,
       physicalState: door.physicalState,
+      deckId: door.deckId,
+      placementKey: door.placementKey,
     })),
     travel: { state: travel.stage, progress },
     tickerEvents,
