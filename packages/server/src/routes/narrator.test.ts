@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { loadEnv } from "../env";
 import type { NarratorCtx, RunNarrator } from "../narrator";
@@ -136,5 +138,53 @@ describe("narrator", () => {
     expect(call?.model).toBe("anthropic/claude-opus-4.6");
     expect(call?.promptVersion).toBe("v0.1");
     expect(call?.inputTokens).toBe(10);
+  });
+
+  it("accepts the real approaching-port fixture posted without gameId (it's already in the path)", async () => {
+    // Regression test: the fixture's shape is `{gameId, hook, snapshot, recentEvents}`, but a
+    // caller posting to `/api/games/:id/narrator` may reasonably omit `gameId` from the body
+    // since it's already in the URL. The schema used to require it unconditionally, which 400'd
+    // this exact, legitimate request in production.
+    const fixturePath = fileURLToPath(
+      new URL("../../../narrator/fixtures/approaching-port.json", import.meta.url),
+    );
+    const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as {
+      gameId: string;
+      hook: unknown;
+      snapshot: unknown;
+      recentEvents: unknown;
+    };
+    const { gameId: _fixtureGameId, ...bodyWithoutGameId } = fixture;
+
+    const { app } = buildTestApp({ runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(bodyWithoutGameId),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await readJson(res);
+    expect(body.commands).toEqual([]);
+  });
+
+  it("returns the Zod issues as `details` in a 400 response", async () => {
+    const { app } = buildTestApp();
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gameId: game.id, hook: {} }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await readJson(res);
+    expect(Array.isArray(body.details)).toBe(true);
+    expect(body.details.length).toBeGreaterThan(0);
   });
 });

@@ -17,16 +17,33 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-/** Raw bytes. `bytea` over the Neon HTTP driver round-trips as base64 text; queries.ts handles the encode/decode. */
-const bytea = customType<{ data: Buffer; driverData: string }>({
+/**
+ * Raw bytes.
+ *
+ * `toDriver` sends a `\x`-prefixed hex string. `@neondatabase/serverless`'s `prepareValue` /
+ * `encodeBuffersAsBytea` (see `prepareQuery` in the driver's `index.js`) only re-encodes actual
+ * `Buffer` instances and passes a `string` param straight through, so this hex literal reaches
+ * Postgres unchanged either way.
+ *
+ * On the way back, `@neondatabase/serverless` 1.x already runs the row through `pg-types`'s
+ * default OID-17 (`bytea`) parser before drizzle's `fromDriver` sees it, and that parser returns
+ * a `Buffer`, not the `\x`-hex string the old comment here assumed. So `fromDriver` must accept
+ * a `Buffer`, a `Uint8Array` (defensively, in case some driver path hands back a typed array
+ * that isn't a `Buffer` subclass), or — kept for `MemoryDb`/tests and any driver that skips type
+ * parsing — a `\x`-hex or base64 string.
+ */
+const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array | string }>({
   dataType() {
     return "bytea";
   },
   toDriver(value: Buffer): string {
     return `\\x${value.toString("hex")}`;
   },
-  fromDriver(value: string): Buffer {
-    // neon-http returns bytea as a `\x`-prefixed hex string.
+  fromDriver(value: Buffer | Uint8Array | string): Buffer {
+    if (Buffer.isBuffer(value)) return value;
+    if (value instanceof Uint8Array) {
+      return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+    }
     if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
     return Buffer.from(value, "base64");
   },

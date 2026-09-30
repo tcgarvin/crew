@@ -22,9 +22,15 @@ export interface NarratorRouteEnv {
  * shape are `@crew/sim` contracts this package doesn't re-validate field by field. The kernel
  * revalidates every returned command against live state on apply (PLAN rule 8), so a malformed
  * hook/event here fails safely downstream rather than needing to be caught twice.
+ *
+ * `gameId` is optional here even though it's required on `NarratorRequest`: the route already
+ * takes the game id from the path (`:id`), so it's redundant in the body, and callers that don't
+ * echo it (e.g. posting a `@crew/narrator` fixture verbatim) shouldn't 400 for omitting
+ * information the server already has. When the body does include it, it must still agree with
+ * the path (checked below) so a caller can't be confused about which game it's talking to.
  */
 const narratorRequestSchema = z.object({
-  gameId: z.string().min(1),
+  gameId: z.string().min(1).optional(),
   hook: z.object({ kind: z.string().min(1) }).loose(),
   snapshot: saveEnvelopeSchema,
   recentEvents: z.array(z.unknown()),
@@ -55,18 +61,22 @@ export function registerNarratorRoutes(
     const parsed = narratorRequestSchema.safeParse(raw);
     if (!parsed.success) {
       return c.json(
-        { error: { code: "badRequest", message: "Invalid narrator request body." } },
+        {
+          error: { code: "badRequest", message: "Invalid narrator request body." },
+          details: parsed.error.issues,
+        },
         400,
       );
     }
-    if (parsed.data.gameId !== gameId) {
+    if (parsed.data.gameId !== undefined && parsed.data.gameId !== gameId) {
       return c.json(
         { error: { code: "badRequest", message: "gameId does not match the route." } },
         400,
       );
     }
     // Shape-checked, not deep-validated against `@crew/sim`'s exact unions (see schema comment).
-    const reqBody = parsed.data as unknown as NarratorRequest;
+    // `gameId` always comes from the path, not the (optional) body field — see schema comment.
+    const reqBody = { ...parsed.data, gameId } as unknown as NarratorRequest;
 
     // Store the snapshot as a milestone save; it becomes this call's (and the next check's) basis.
     const snapshotBlob = gzipSync(Buffer.from(JSON.stringify(reqBody.snapshot), "utf8"));
