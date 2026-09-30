@@ -6,8 +6,10 @@
  */
 import type { ApplyCtx } from "../../core/commands";
 import { allocateId } from "../../core/ids";
+import type { PhysicalLocation } from "../../core/types/common";
 import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
-import type { ItemId, PortDefId, ProblemId, TransactionId } from "../../core/types/ids";
+import type { EventDraft } from "../../core/types/events";
+import type { ItemDefId, ItemId, PortDefId, ProblemId, TransactionId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job } from "../../core/types/travel";
@@ -89,17 +91,60 @@ function warehouseStoreKey(port: PortDef): ExternalStoreDef["key"] {
 }
 
 /** V1's single ship deck (see `travel.ts` `theDeckId`); a `cargoStowage`-tagged zone on it. */
-function cargoStowageZoneKey(ctx: Pick<StepCtx, "content">): string | undefined {
+export function cargoStowageZoneKey(ctx: Pick<StepCtx, "content">): string | undefined {
   const [deck] = Object.values(ctx.content.decks);
   return deck?.zones.find((z) => z.tags.includes("cargoStowage"))?.key;
 }
 
 /**
- * Spawn a job's manifest into the origin port's store and open one `cargoToLoad` problem per
- * item (owner: commerce). Uses the same allocate-and-insert pattern as `scenarioSpawn`'s
- * `apply()` (the "kernel spawn path"): there is no separate boundary-spawn command for commerce
- * to call into, so it performs the insert directly with `allocateId`.
+ * Spawn one manifest item into a job's origin-port store and open its `cargoToLoad` problem
+ * (owner: commerce). The "kernel spawn path": allocate-and-insert directly, the same pattern
+ * `scenarioSpawn`'s `apply()` uses; there is no separate boundary-spawn command for commerce to
+ * call into for a job's own manifest. Shared by `acceptJob` and `spawnAtBoundary`'s `jobManifest`
+ * location, so freight added to an already-accepted job after acceptance loads the same way.
  */
+export function spawnCargoItem(
+  ctx: ApplyCtx,
+  job: Pick<Job, "id" | "fromPortId">,
+  def: { readonly id: ItemDefId },
+  count: number,
+  stacking: "unique" | "stackable",
+  location: PhysicalLocation,
+  stowageZoneKey: string,
+  /** Event attribution; defaults to the unattributed system cause `acceptJob` has always used. */
+  cause: Pick<EventDraft, "causeIds" | "source"> = { causeIds: [], source: "system" },
+): ItemId {
+  const id = allocateId(ctx.state, "item");
+  const item: Item =
+    stacking === "unique"
+      ? { id, defId: def.id, stacking: "unique", location, condition: 1, jobId: job.id }
+      : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, jobId: job.id };
+  ctx.state.items[id] = item;
+  ctx.caches.dirty.inventory = true;
+  ctx.emit({
+    type: "entitySpawned",
+    subjectIds: [id],
+    ...cause,
+    payload: { entityId: id, defId: def.id },
+  });
+  const problemId = allocateId(ctx.state, "problem") as ProblemId;
+  ctx.state.work.problems[problemId] = {
+    id: problemId,
+    kind: "cargoToLoad",
+    payload: { jobId: job.id, itemId: id, stowageZoneKey },
+    owner: "commerce",
+    visibility: "public",
+    dedupeKey: `cargoToLoad:${job.id}:${id}`,
+    status: "open",
+    createdTick: ctx.tick,
+    revision: 1,
+    baseUrgency: "routineObligation",
+    location: { kind: "port", portId: job.fromPortId },
+  };
+  return id;
+}
+
+/** Spawn a job's whole manifest into the origin port's store on acceptance. */
 export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
   const fromPort = ctx.defs.port(job.fromPortId);
   const location = portStoreLocation(fromPort);
@@ -108,35 +153,7 @@ export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
   for (const line of job.cargo) {
     const def = ctx.defs.item(line.itemDefId);
     for (const count of itemSpawnChunks(def.maxStack, def.stacking, line.count)) {
-      const id = allocateId(ctx.state, "item");
-      const item: Item =
-        def.stacking === "unique"
-          ? { id, defId: def.id, stacking: "unique", location, condition: 1, jobId: job.id }
-          : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, jobId: job.id };
-      ctx.state.items[id] = item;
-      ctx.caches.dirty.inventory = true;
-      spawnedIds.push(id);
-      ctx.emit({
-        type: "entitySpawned",
-        subjectIds: [id],
-        causeIds: [],
-        source: "system",
-        payload: { entityId: id, defId: def.id },
-      });
-      const problemId = allocateId(ctx.state, "problem") as ProblemId;
-      ctx.state.work.problems[problemId] = {
-        id: problemId,
-        kind: "cargoToLoad",
-        payload: { jobId: job.id, itemId: id, stowageZoneKey },
-        owner: "commerce",
-        visibility: "public",
-        dedupeKey: `cargoToLoad:${job.id}:${id}`,
-        status: "open",
-        createdTick: ctx.tick,
-        revision: 1,
-        baseUrgency: "routineObligation",
-        location: { kind: "port", portId: job.fromPortId },
-      };
+      spawnedIds.push(spawnCargoItem(ctx, job, def, count, def.stacking, location, stowageZoneKey));
     }
   }
   return spawnedIds;

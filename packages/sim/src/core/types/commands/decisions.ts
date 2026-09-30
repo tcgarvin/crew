@@ -2,19 +2,25 @@
  * Decision and hook commands (review §D.6, D5).
  */
 import type { TextRef } from "../common";
-import type { DecisionId, HookId, JobId } from "../ids";
+import type { ActorId, DecisionId, HookId, JobId } from "../ids";
 import type { CommandDraft } from "./index";
 
 /**
  * A decision card as authored by the narrator or a policy. W0 decision: narrator cards are
  * single-level (no nested `next` card) to keep the LLM schema non-recursive; the kernel picks the
- * perspective actor (captain, else first officer, D8).
+ * perspective actor (captain, else first officer, D8) when `perspectiveActorId` is absent.
  */
 export interface DecisionCardSpec {
   readonly prompt: TextRef;
   readonly left: { readonly label: TextRef; readonly commands: readonly CommandDraft[] };
   readonly right: { readonly label: TextRef; readonly commands: readonly CommandDraft[] };
   readonly jobId?: JobId;
+  /**
+   * Additive (2026-09-30): an explicit perspective override for `surfaceDecision`, for a
+   * system/scenario caller framing a card from someone other than the current command actor.
+   * Absent = the kernel's D8 fallback (captain, else first officer).
+   */
+  readonly perspectiveActorId?: ActorId;
 }
 
 export interface DecisionCommandPayloads {

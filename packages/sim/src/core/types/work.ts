@@ -324,7 +324,9 @@ export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
  * W4a addition: where a `moveTo` step goes. A tile, or a machine interaction position (resolved
  * by spatial to its absolute tile, and reserved on arrival).
  */
-export type StepTarget = TileCoord | { readonly machineId: MachineId; readonly positionKey: LocalKey };
+export type StepTarget =
+  | TileCoord
+  | { readonly machineId: MachineId; readonly positionKey: LocalKey };
 
 /** W4a addition: what a `work` step does each tick. */
 export type WorkStageKey =

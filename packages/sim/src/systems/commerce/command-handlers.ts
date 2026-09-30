@@ -1,4 +1,5 @@
 import { configTicks } from "../../core/clock";
+import { newActor } from "../../core/command-handlers";
 /**
  * Commerce command handlers (PLAN §6 W6 items 3–4): `offerJob`, `acceptContract`, `declineJob`.
  */
@@ -7,16 +8,36 @@ import {
   type ApplyCtx,
   type CommandHandler,
   NO_TEMP_REFS,
+  type ValidateCtx,
   type Validation,
+  causedBy,
   ok,
   reject,
 } from "../../core/commands";
+import { findCrewDef, findItemDef } from "../../core/defs";
 import { allocateId } from "../../core/ids";
-import type { CommandOfKind } from "../../core/types/commands";
-import type { DecisionId, JobId } from "../../core/types/ids";
+import type { BoundaryLocation, CommandOfKind, CommandRejection } from "../../core/types/commands";
+import type { PhysicalLocation } from "../../core/types/common";
+import type { CrewDef, ItemDef } from "../../core/types/content";
+import type {
+  CrewDefId,
+  DecisionId,
+  EntityId,
+  ItemDefId,
+  JobId,
+  TempRef,
+} from "../../core/types/ids";
+import type { Item } from "../../core/types/ship";
 import type { Job } from "../../core/types/travel";
 import { commandActor } from "../travel/roster";
-import { acceptJob, cargoClassOf, checkPriceBand } from "./jobs";
+import { portStoreLocation } from "../travel/travel";
+import {
+  acceptJob,
+  cargoClassOf,
+  cargoStowageZoneKey,
+  checkPriceBand,
+  spawnCargoItem,
+} from "./jobs";
 
 // ---------------------------------------------------------------------------------------------
 // offerJob
@@ -159,5 +180,251 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       payload: { jobId: job.id },
     });
     return NO_TEMP_REFS;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// spawnAtBoundary (D6, review §D.3): commerce owns the external stores this creates into.
+// ---------------------------------------------------------------------------------------------
+
+const BOUNDARY_TEMP_REF_PATTERN = /^\$[A-Za-z0-9_]+$/;
+
+/**
+ * `BoundaryLocation` excludes on-deck/aboard kinds at the type level (only `portStore` and
+ * `jobManifest` exist), so this only rejects a real "not a boundary" location; the `default`
+ * branch exists to catch a hand-built/untyped payload that bypassed the type checker.
+ */
+function checkBoundaryLocation(
+  ctx: ValidateCtx,
+  location: BoundaryLocation,
+): CommandRejection | null {
+  switch (location.kind) {
+    case "portStore": {
+      const port = ctx.content.ports[location.portId];
+      if (port === undefined) {
+        return {
+          code: "unknownEntity",
+          reason: `spawnAtBoundary: unknown port "${location.portId}"`,
+        };
+      }
+      if (!port.externalStores.some((s) => s.key === location.storeKey)) {
+        return {
+          code: "unknownEntity",
+          reason: `spawnAtBoundary: port "${location.portId}" has no store "${location.storeKey}"`,
+        };
+      }
+      return null;
+    }
+    case "jobManifest": {
+      const job = ctx.state.jobs[location.jobId];
+      if (job === undefined) {
+        return {
+          code: "unknownEntity",
+          reason: `spawnAtBoundary: unknown job "${location.jobId}"`,
+        };
+      }
+      if (job.status !== "accepted") {
+        return {
+          code: "preconditionFailed",
+          reason: `spawnAtBoundary: job "${location.jobId}" is not accepted (status "${job.status}")`,
+        };
+      }
+      return null;
+    }
+    default:
+      return { code: "outOfBounds", reason: "spawnAtBoundary: boundaryOnly" };
+  }
+}
+
+interface SpawnBoundaryPlan {
+  readonly newItemDefs: readonly ItemDef[];
+  readonly newCrewDefs: readonly CrewDef[];
+  readonly location: BoundaryLocation;
+}
+
+export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPlan> = {
+  validate(ctx, command): Validation<SpawnBoundaryPlan> {
+    const { defs, spawns, location } = command.payload;
+    if (!Array.isArray(spawns) || spawns.length === 0) {
+      return reject("invalidPayload", "spawnAtBoundary needs at least one spawn");
+    }
+    const locationRejection = checkBoundaryLocation(ctx, location);
+    if (locationRejection !== null) return { ok: false, rejection: locationRejection };
+    if (location.kind === "jobManifest" && spawns.some((s) => s.kind === "npc")) {
+      return reject("invalidPayload", "spawnAtBoundary: an npc cannot spawn into a job manifest");
+    }
+
+    // New per-game defs (review §C.6): `gen.` namespace, not already known anywhere.
+    const newItemIds = new Set<ItemDefId>();
+    for (const def of defs.items) {
+      if (!def.id.startsWith("gen.")) {
+        return reject(
+          "invalidPayload",
+          `spawnAtBoundary: item def "${def.id}" must be in the "gen." namespace`,
+        );
+      }
+      if (findItemDef(ctx.content, ctx.state, def.id) !== undefined || newItemIds.has(def.id)) {
+        return reject("invalidPayload", `spawnAtBoundary: item def "${def.id}" already exists`);
+      }
+      newItemIds.add(def.id);
+    }
+    const newCrewIds = new Set<CrewDefId>();
+    for (const def of defs.crew) {
+      if (!def.id.startsWith("gen.")) {
+        return reject(
+          "invalidPayload",
+          `spawnAtBoundary: crew def "${def.id}" must be in the "gen." namespace`,
+        );
+      }
+      if (findCrewDef(ctx.content, ctx.state, def.id) !== undefined || newCrewIds.has(def.id)) {
+        return reject("invalidPayload", `spawnAtBoundary: crew def "${def.id}" already exists`);
+      }
+      newCrewIds.add(def.id);
+    }
+    const draftItems = new Map(defs.items.map((d) => [d.id, d] as const));
+    const draftCrew = new Map(defs.crew.map((d) => [d.id, d] as const));
+
+    const refs = new Set<TempRef>();
+    for (const spawn of spawns) {
+      if (!BOUNDARY_TEMP_REF_PATTERN.test(spawn.tempRef)) {
+        return reject("invalidPayload", `spawnAtBoundary: bad temp ref "${spawn.tempRef}"`);
+      }
+      if (refs.has(spawn.tempRef)) {
+        return reject("invalidPayload", `spawnAtBoundary: duplicate temp ref "${spawn.tempRef}"`);
+      }
+      refs.add(spawn.tempRef);
+      if (spawn.kind === "item") {
+        const def =
+          findItemDef(ctx.content, ctx.state, spawn.itemDefId) ?? draftItems.get(spawn.itemDefId);
+        if (def === undefined) {
+          return reject("unknownEntity", `spawnAtBoundary: unknown item def "${spawn.itemDefId}"`);
+        }
+        if (!Number.isInteger(spawn.count) || spawn.count < 1) {
+          return reject("invalidPayload", "spawnAtBoundary: count must be an integer >= 1");
+        }
+        if (def.stacking === "unique") {
+          if (spawn.count !== 1) {
+            return reject(
+              "invalidPayload",
+              `spawnAtBoundary: unique item "${def.id}" must spawn with count 1`,
+            );
+          }
+        } else if (spawn.count > def.maxStack) {
+          return reject(
+            "outOfBounds",
+            `spawnAtBoundary: count ${spawn.count} exceeds maxStack ${def.maxStack}`,
+          );
+        }
+        if (spawn.count > ctx.config.narrator.maxSpawnsPerCommand) {
+          return reject(
+            "outOfBounds",
+            `spawnAtBoundary: count ${spawn.count} exceeds maxSpawnsPerCommand ${ctx.config.narrator.maxSpawnsPerCommand}`,
+          );
+        }
+      } else {
+        const def =
+          findCrewDef(ctx.content, ctx.state, spawn.crewDefId) ?? draftCrew.get(spawn.crewDefId);
+        if (def === undefined) {
+          return reject("unknownEntity", `spawnAtBoundary: unknown crew def "${spawn.crewDefId}"`);
+        }
+      }
+    }
+
+    if (spawns.length > ctx.state.narrator.budget.spawnsRemaining) {
+      return reject("budgetExhausted", "spawnAtBoundary: narrator spawn budget exhausted");
+    }
+
+    return ok({ newItemDefs: defs.items, newCrewDefs: defs.crew, location });
+  },
+  apply(
+    ctx: ApplyCtx,
+    command: CommandOfKind<"spawnAtBoundary">,
+    plan: SpawnBoundaryPlan,
+  ): AppliedCommand {
+    const { state } = ctx;
+    for (const def of plan.newItemDefs) state.defs.dynamic.items[def.id] = def;
+    for (const def of plan.newCrewDefs) state.defs.dynamic.crew[def.id] = def;
+
+    state.narrator.budget.spawnsRemaining -= command.payload.spawns.length;
+
+    const cause = causedBy(command);
+    let job: Job | undefined;
+    let physicalLocation: PhysicalLocation;
+    let stowageZoneKey = "cargoHold";
+    if (plan.location.kind === "portStore") {
+      physicalLocation = {
+        kind: "inExternalStore",
+        portId: plan.location.portId,
+        storeKey: plan.location.storeKey,
+      };
+    } else {
+      job = state.jobs[plan.location.jobId];
+      if (job === undefined) throw new Error("validated job vanished");
+      physicalLocation = portStoreLocation(ctx.defs.port(job.fromPortId));
+      stowageZoneKey = cargoStowageZoneKey(ctx) ?? "cargoHold";
+    }
+
+    const tempRefs: Record<TempRef, EntityId> = {};
+    for (const spawn of command.payload.spawns) {
+      if (spawn.kind === "item") {
+        const def = ctx.defs.item(spawn.itemDefId);
+        let id: EntityId;
+        if (job !== undefined) {
+          const itemId = spawnCargoItem(
+            ctx,
+            job,
+            def,
+            spawn.count,
+            def.stacking,
+            physicalLocation,
+            stowageZoneKey,
+            cause,
+          );
+          job.cargoItemIds.push(itemId);
+          id = itemId;
+        } else {
+          const newId = allocateId(state, "item");
+          const item: Item =
+            def.stacking === "unique"
+              ? {
+                  id: newId,
+                  defId: def.id,
+                  stacking: "unique",
+                  location: physicalLocation,
+                  condition: 1,
+                }
+              : {
+                  id: newId,
+                  defId: def.id,
+                  stacking: "stack",
+                  location: physicalLocation,
+                  count: spawn.count,
+                  reserved: 0,
+                };
+          state.items[newId] = item;
+          ctx.caches.dirty.inventory = true;
+          ctx.emit({
+            ...cause,
+            type: "entitySpawned",
+            subjectIds: [newId],
+            payload: { entityId: newId, defId: def.id },
+          });
+          id = newId;
+        }
+        tempRefs[spawn.tempRef] = id;
+      } else {
+        const def = ctx.defs.crew(spawn.crewDefId);
+        const id = allocateId(state, "actor");
+        state.actors[id] = newActor(id, def, physicalLocation);
+        ctx.emit({
+          ...cause,
+          type: "entitySpawned",
+          subjectIds: [id],
+          payload: { entityId: id, defId: def.id },
+        });
+        tempRefs[spawn.tempRef] = id;
+      }
+    }
+    return { tempRefs };
   },
 };

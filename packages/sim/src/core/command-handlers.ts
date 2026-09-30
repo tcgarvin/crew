@@ -145,9 +145,10 @@ function validateSpawn(
 /**
  * W2 decision: an actor spawned by a scenario is crew unless it spawns in a port external store
  * (a waiting NPC passenger). Absent `CrewDef.traits` spawn as no traits: procedural sampling needs
- * a trait-count knob that `ConfigDef` does not have yet.
+ * a trait-count knob that `ConfigDef` does not have yet. Exported for `spawnAtBoundary` (commerce),
+ * the other command kind that can spawn an actor at a boundary.
  */
-function newActor(id: ActorId, def: CrewDef, location: PhysicalLocation): Actor {
+export function newActor(id: ActorId, def: CrewDef, location: PhysicalLocation): Actor {
   return {
     id,
     defId: def.id,
@@ -336,6 +337,132 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
 };
 
 // ---------------------------------------------------------------------------------------------
+// surfaceDecision
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * True when an actor is asleep right now (sleeping is an activity, not an `Availability`). Takes
+ * just the two `activity` fields it reads (rather than `Pick<Actor, "activity">`) so it accepts
+ * both a mutable `Actor` and the `DeepReadonly<Actor>` a `ValidateCtx.state` lookup returns.
+ */
+function isAsleepNow(activity: { readonly kind: string; readonly activity?: string }): boolean {
+  return activity.kind === "personal" && activity.activity === "sleep";
+}
+
+/**
+ * D8's perspective fallback (captain, else first officer), duplicated from
+ * `systems/travel/roster.ts`'s `commandActor` because `core` may not import from `systems`
+ * (dependency-cruiser boundary: systems depend on core, never the reverse). Keep the two in sync
+ * if D8's rule changes.
+ */
+function defaultPerspectiveActor(state: ValidateCtx["state"]): ActorId {
+  const actors = Object.values(state.actors) as Actor[];
+  const captain = actors.find((a) => a.roleTags.includes("captain"));
+  if (captain === undefined) {
+    throw new Error("surfaceDecision: no crew member has the captain role tag");
+  }
+  const fit = captain.availability === "available" && !isAsleepNow(captain.activity);
+  if (fit) return captain.id;
+  const firstOfficer = actors.find((a) => a.roleTags.includes("firstOfficer"));
+  return firstOfficer?.id ?? captain.id;
+}
+
+interface SurfaceDecisionPlan {
+  readonly perspectiveActorId: ActorId;
+}
+
+/**
+ * Decisions are kernel-owned (CONTRACTS: `Decision`/`NarratorHook` types), so `surfaceDecision`
+ * lives here rather than in a system, unlike `resolveDecision`'s option commands which do belong
+ * to their owning systems. Each option's commands are checked twice: authorized for `player`
+ * here (so a stale queued card cannot smuggle in a command nobody could ever pick), and again,
+ * fully, by `resolveDecision` at resolve time against the state as it is then.
+ */
+function surfaceDecisionHandler(
+  registry: KernelRegistry,
+): CommandHandler<"surfaceDecision", SurfaceDecisionPlan> {
+  return {
+    validate(ctx, command): Validation<SurfaceDecisionPlan> {
+      const { card } = command.payload;
+      for (const [which, side] of [
+        ["left", card.left],
+        ["right", card.right],
+      ] as const) {
+        for (const [index, draft] of side.commands.entries()) {
+          if (!(AUTHORITY.player as readonly CommandKind[]).includes(draft.kind)) {
+            return reject(
+              "unauthorized",
+              `surfaceDecision: ${which} option ${index} ("${draft.kind}") is not a player command`,
+            );
+          }
+          const sub = {
+            id: `${command.id}#${which}#${index}` as CommandId,
+            source: "player",
+            kind: draft.kind,
+            payload: draft.payload,
+          } as Command;
+          const validation = validateCommand(registry, ctx, sub);
+          if (!validation.ok) {
+            return reject(
+              validation.rejection.code,
+              `surfaceDecision: ${which} option ${index} (${draft.kind}): ${validation.rejection.reason}`,
+            );
+          }
+        }
+      }
+      let perspectiveActorId: ActorId;
+      if (card.perspectiveActorId !== undefined) {
+        const actor = ctx.state.actors[card.perspectiveActorId];
+        if (actor === undefined) {
+          return reject(
+            "unknownEntity",
+            `surfaceDecision: unknown perspective actor "${card.perspectiveActorId}"`,
+          );
+        }
+        if (actor.availability !== "available" || isAsleepNow(actor.activity)) {
+          return reject(
+            "preconditionFailed",
+            `surfaceDecision: perspective actor "${card.perspectiveActorId}" is not available`,
+          );
+        }
+        perspectiveActorId = actor.id;
+      } else {
+        perspectiveActorId = defaultPerspectiveActor(ctx.state);
+      }
+      if (card.jobId !== undefined) {
+        const duplicate = Object.values(ctx.state.decisions.records).find(
+          (d) => d.status === "pending" && d.jobId === card.jobId,
+        );
+        if (duplicate !== undefined) {
+          return reject(
+            "duplicate",
+            `surfaceDecision: a decision for job "${card.jobId}" is already queued`,
+          );
+        }
+      }
+      return ok({ perspectiveActorId });
+    },
+    apply(ctx, command, plan): AppliedCommand {
+      const { card } = command.payload;
+      const decisionId = allocateId(ctx.state, "decision");
+      ctx.state.decisions.records[decisionId] = {
+        id: decisionId,
+        origin: command.source === "narrator" ? "narrator" : "policy",
+        perspectiveActorId: plan.perspectiveActorId,
+        prompt: card.prompt,
+        left: { label: card.left.label, commands: [...card.left.commands] },
+        right: { label: card.right.label, commands: [...card.right.commands] },
+        status: "pending",
+        createdTick: ctx.tick,
+        ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),
+      };
+      ctx.state.decisions.queue.push(decisionId);
+      return NO_TEMP_REFS;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // resolveDecision
 // ---------------------------------------------------------------------------------------------
 
@@ -434,5 +561,6 @@ export function registerCoreCommandHandlers(registry: KernelRegistry): void {
   registry.registerCommandHandler("scenarioInjectFault", scenarioInjectFault);
   registry.registerCommandHandler("scenarioSetNeeds", scenarioSetNeeds);
   registry.registerCommandHandler("acknowledgeHook", acknowledgeHook);
+  registry.registerCommandHandler("surfaceDecision", surfaceDecisionHandler(registry));
   registry.registerCommandHandler("resolveDecision", resolveDecisionHandler(registry));
 }

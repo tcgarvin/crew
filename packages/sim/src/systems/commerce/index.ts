@@ -1,6 +1,6 @@
 /** Registration entry point for the commerce system (PLAN §6 W6). */
 import type { KernelRegistry } from "../../core/registry";
-import { acceptContract, declineJob, offerJob } from "./command-handlers";
+import { acceptContract, declineJob, offerJob, spawnAtBoundary } from "./command-handlers";
 import { commerceSystem } from "./commerce";
 
 export function registerCommerce(registry: KernelRegistry): void {
@@ -8,9 +8,11 @@ export function registerCommerce(registry: KernelRegistry): void {
   registry.registerCommandHandler("offerJob", offerJob);
   registry.registerCommandHandler("acceptContract", acceptContract);
   registry.registerCommandHandler("declineJob", declineJob);
+  registry.registerCommandHandler("spawnAtBoundary", spawnAtBoundary);
 }
 
 export { commerceSystem } from "./commerce";
+export { spawnAtBoundary } from "./command-handlers";
 export {
   checkPriceBand,
   cargoClassOf,
@@ -20,6 +22,8 @@ export {
   payJobIfDue,
   expireStaleOffers,
   routeDistance,
+  spawnCargoItem,
+  cargoStowageZoneKey,
 } from "./jobs";
 export { runJobSource } from "./jobSource";
 export { commerceTaskDerivations } from "./tasks";

@@ -20,3 +20,7 @@ export {
 // `rotateOffset` isn't re-exported from `systems/spatial/index` yet; import straight from its
 // module rather than editing that aggregator (out of scope for Integration 1).
 export { rotateOffset } from "./systems/spatial/geometry";
+
+/** Commerce (W6) is complete enough for hosts to register: the narrator package's own tests need
+ * it to enqueue `spawnAtBoundary`/`offerJob`/etc. through a real kernel. */
+export { registerCommerce } from "./systems/commerce/index";
