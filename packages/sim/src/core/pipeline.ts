@@ -116,6 +116,7 @@ function runPlannerStage(
     work: config.work,
     urgency: config.urgency,
     needs: config.needs,
+    time: config.time,
   };
   const due = dueActors(actorIds, base.tick, config.work.reconsiderEveryTicks);
   for (const actorId of due) {

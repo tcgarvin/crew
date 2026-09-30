@@ -110,14 +110,25 @@ export interface FactValues {
   /** Symptom noticed on a machine. */
   machineSymptom: { symptomKey: LocalKey };
   doorState: { physicalState: "closed" | "opening" | "open" | "closing" | "jammed" };
-  /** Last known location of an item (tool, spare, food). */
-  itemLocation: { location: PhysicalLocation };
+  /**
+   * Last known location of an item (tool, spare, food).
+   * W4a addition: `absent` marks a discrepancy: the actor looked at `location` and the item was
+   * not there. The planner ignores absent items until the fact is replaced by a sighting.
+   */
+  itemLocation: { location: PhysicalLocation; absent?: true };
   /** Someone is known to have claimed a task. */
   taskClaim: { taskId: TaskId; claimantId: ActorId };
   /** Unexpected obstruction on a tile. */
   obstruction: { tile: TileCoord; blocked: boolean };
   /** Coarse status of another person, from sight or report. */
-  actorStatus: { availability: Availability; asleep: boolean };
+  actorStatus: {
+    availability: Availability;
+    asleep: boolean;
+    /** W4a addition: tile the person was seen on (bed occupancy, chat partners). */
+    tile?: TileCoord;
+    /** W4a addition: seen doing nothing in particular (activity `idle`). */
+    idle?: boolean;
+  };
 }
 
 export type FactType = keyof FactValues;
@@ -188,6 +199,14 @@ export interface Actor {
   /** Bumped whenever navigation-relevant knowledge changes (doors, obstructions). */
   navigationKnowledgeRevision: number;
   availability: Availability;
+  /**
+   * W4a addition: per-candidate retry backoff, `ref` → first tick it may be retried (SD §14.7:
+   * never retry a failed pickup every tick). Refs are `task:<id>`, `eat`, `sleep:<machineId>`,
+   * etc. Written by work when an activity fails; expired entries are pruned by work.
+   */
+  workBackoff?: Record<string, Tick>;
+  /** W4a addition: tick of this actor's last ambient conversation (chat cooldown). */
+  lastConversationTick?: Tick;
   /**
    * Crew or NPC. W0 decision: NPC passengers are `Actor`s with `crew: false`; they never plan work.
    */

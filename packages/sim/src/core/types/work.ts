@@ -321,8 +321,50 @@ export const PERSONAL_ACTIVITIES = ["eat", "sleep", "rest", "socialize", "wander
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
 /**
+ * W4a addition: where a `moveTo` step goes. A tile, or a machine interaction position (resolved
+ * by spatial to its absolute tile, and reserved on arrival).
+ */
+export type StepTarget = TileCoord | { readonly machineId: MachineId; readonly positionKey: LocalKey };
+
+/** W4a addition: what a `work` step does each tick. */
+export type WorkStageKey =
+  /** Personal timed work (eating), `ticksDone`/`ticksNeeded` on the step. */
+  | "eat"
+  /** A recipe stage owned by equipment (W5): progress lives on the fault/machine. */
+  | "recipe";
+
+/** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
+export type HoldKind = "sleep" | "staff" | "rest" | "socialize";
+
+/**
+ * W4a addition: one step of an activity's bounded plan (SD §14.3). The work system builds the
+ * plan when an intent starts and walks it one step at a time; the contract `action` mirrors the
+ * current step for render/inspection.
+ */
+export type ActivityStep =
+  | { kind: "moveTo"; target: StepTarget; requested: boolean }
+  /** Take `itemId` from its believed location; `split` takes one unit off a stack. */
+  | { kind: "pickUp"; itemId: ItemId; split: boolean }
+  | { kind: "work"; stage: WorkStageKey; ticksDone: number; ticksNeeded: number }
+  /** Eat commit point: one carried unit of `itemId` is consumed. */
+  | { kind: "consume"; itemId: ItemId }
+  /** Put a carried item down here (deck floor, or a port store across the cargo ramp). */
+  | { kind: "putDown"; itemId: ItemId }
+  | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
+
+/** W4a addition: the steps of one activity and the current index. */
+export interface ActivityPlan {
+  steps: ActivityStep[];
+  stepIndex: number;
+}
+
+/**
  * W0 decision: an actor's current work is one discriminated `activity` rather than nullable
  * `activeTaskId`/`activeAction` fields.
+ *
+ * W4a addition: `label` (short verb phrase for the render label, e.g. "hauling crate") and
+ * `plan` (the bounded step list the work system executes). Both optional so hand-built
+ * fixtures without them stay valid; the work system always sets them.
  */
 export type Activity =
   | { kind: "idle" }
@@ -333,6 +375,8 @@ export type Activity =
       urgency: UrgencyClass;
       action: Action;
       sinceTick: Tick;
+      label?: string;
+      plan?: ActivityPlan;
     }
   | {
       kind: "personal";
@@ -340,6 +384,8 @@ export type Activity =
       urgency: UrgencyClass;
       action: Action;
       sinceTick: Tick;
+      label?: string;
+      plan?: ActivityPlan;
     };
 
 // ---------------------------------------------------------------------------------------------
@@ -364,6 +410,10 @@ export type Intent =
       activity: PersonalActivity;
       /** Amenity to use (bed, galley) or actor to chat with. */
       targetId?: MachineId | ActorId;
+      /** W4a addition: the item to use (the ration stack to eat from). */
+      itemId?: ItemId;
+      /** W4a addition: where to go for rest/socialize (a floor tile in a mess or quarters). */
+      tile?: TileCoord;
       urgency: UrgencyClass;
       trace: PlannerTrace;
     };

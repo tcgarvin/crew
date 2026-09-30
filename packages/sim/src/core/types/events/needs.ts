@@ -11,6 +11,11 @@ export interface NeedsEventPayloads {
   fellAsleep: Record<string, never>;
   wokeUp: Record<string, never>;
   ateMeal: { readonly nutrition: number };
+  /**
+   * W4a addition: ambient chat between two nearby off-duty/idle crew (subjects: speaker,
+   * listener). `line` is the rendered ticker text. No relationship effects in V1.
+   */
+  conversation: { readonly line: string };
   actorIncapacitated: { readonly cause: string };
   actorDied: { readonly cause: string };
   /** Deferred with bodies (PLAN §7); reserved so the catalog matches SD §19.3. */
@@ -23,6 +28,7 @@ export const NEEDS_EVENT_SIGNIFICANCE = {
   fellAsleep: "trace",
   wokeUp: "trace",
   ateMeal: "trace",
+  conversation: "notable",
   actorIncapacitated: "narrative",
   actorDied: "narrative",
   woundCreated: "narrative",

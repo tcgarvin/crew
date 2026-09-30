@@ -1,11 +1,25 @@
-import type { EntityId } from "../core/types";
-import { VIEW_PLACEHOLDER } from "../view/index";
+/**
+ * Task selection. Per SD §4.3, planner code may only import from `core/types*` and `view/**`
+ * (plus planner siblings) — never `systems/**` or raw world state. dependency-cruiser enforces it.
+ */
+import type { Planner } from "../core/types/pipeline";
+import { selectIntent } from "./select";
+
+export const PLANNER_PLACEHOLDER = { planner: "planner" } as const;
+export { compareCandidates, selectIntent } from "./select";
+export { enumerateCandidates, needUrgency, taskUrgency } from "./candidates";
+export type { Candidate, CandidateSet, Rejection } from "./candidates";
+
+/** The V1 planner. */
+export const defaultPlanner: Planner = selectIntent;
 
 /**
- * Task selection. Per SD §4.3, planner code may only import from
- * `core/types*` and `view/**` (plus planner siblings) — never `systems/**`
- * or raw world state.
+ * Register the V1 planner. Structural registry type (not `KernelRegistry`) so the planner does
+ * not import `core/registry`, which the boundary forbids. Register after `registerWork` so task
+ * derivation runs before planning within phase 7.
  */
-export const PLANNER_PLACEHOLDER = { view: VIEW_PLACEHOLDER } satisfies Record<string, unknown>;
-
-export type PlannerAgentId = EntityId;
+export function registerPlannerDefaults(registry: {
+  registerPlanner(planner: Planner): () => void;
+}): () => void {
+  return registry.registerPlanner(defaultPlanner);
+}

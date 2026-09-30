@@ -1,4 +1,4 @@
-import type { ProblemId, TaskId } from "../ids";
+import type { ClaimId, ProblemId, TaskId } from "../ids";
 /** Work events (W4): problems, tasks, claims, actions. */
 import type {
   ActionKind,
@@ -10,6 +10,9 @@ import type {
 } from "../work";
 import type { SignificanceCatalog } from "./significance";
 
+/** W4a addition: why a claim was released. */
+export type TaskReleaseReason = "interrupted" | "failed" | "incapacitated" | "cancelled";
+
 export interface WorkEventPayloads {
   problemRaised: { readonly problemId: ProblemId; readonly kind: ProblemKind };
   problemResolved: { readonly problemId: ProblemId; readonly kind: ProblemKind };
@@ -20,6 +23,12 @@ export interface WorkEventPayloads {
   taskBlocked: { readonly taskId: TaskId; readonly reason: BlockageReason };
   taskCompleted: { readonly taskId: TaskId };
   claimExpired: { readonly taskId: TaskId };
+  /** W4a addition: an actor took a lease on a task. Subjects: actor, task. */
+  taskClaimed: { readonly taskId: TaskId; readonly claimId: ClaimId };
+  /** W4a addition: a claim ended without completion (interrupt, failure, incapacity, cancel). */
+  taskReleased: { readonly taskId: TaskId; readonly reason: TaskReleaseReason };
+  /** W4a addition: minimal perception noticed a `discovered` problem. Subjects: actor, problem. */
+  problemObserved: { readonly problemId: ProblemId; readonly kind: ProblemKind };
   actionStarted: { readonly action: ActionKind };
   actionCompleted: { readonly action: ActionKind };
   actionFailed: { readonly action: ActionKind; readonly reason: BlockageReason };
@@ -34,6 +43,9 @@ export const WORK_EVENT_SIGNIFICANCE = {
   taskBlocked: "trace",
   taskCompleted: "trace",
   claimExpired: "trace",
+  taskClaimed: "trace",
+  taskReleased: "trace",
+  problemObserved: "trace",
   actionStarted: "trace",
   actionCompleted: "trace",
   actionFailed: "trace",

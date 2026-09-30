@@ -219,8 +219,12 @@ export interface System {
   run(ctx: StepCtx): void;
 }
 
-/** What a planner may read about tuning. */
-export type PlannerConfig = Pick<ConfigDef, "work" | "urgency" | "needs">;
+/**
+ * What a planner may read about tuning.
+ * W4a addition: `time`, so the planner can put travel (ticks, from the view) and work
+ * (`estimatedWorkSeconds`) on one scale for SD §15.3 step 5.
+ */
+export type PlannerConfig = Pick<ConfigDef, "work" | "urgency" | "needs" | "time">;
 
 /**
  * The planner (phase 7) is a pure function of one actor's view. It never sees `StepCtx`, state,
