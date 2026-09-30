@@ -1,0 +1,29 @@
+{
+  "name": "@crew/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@crew/content": "workspace:*",
+    "@crew/narrator": "workspace:*",
+    "@crew/sim": "workspace:*",
+    "@neondatabase/serverless": "^1.0.0",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.16"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@types/node": "^22.10.5",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

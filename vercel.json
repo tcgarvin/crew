@@ -1,0 +1,10 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @crew/web build",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "apps/web/api/**/*.ts": {
+      "runtime": "nodejs22.x"
+    }
+  }
+}

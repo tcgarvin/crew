@@ -1,0 +1,25 @@
+{
+  "name": "@crew/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "crew": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@crew/content": "workspace:*",
+    "@crew/narrator": "workspace:*",
+    "@crew/server": "workspace:*",
+    "@crew/sim": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

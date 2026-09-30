@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/sim" },
+    { "path": "../../packages/content" },
+    { "path": "../../packages/narrator" },
+    { "path": "../../packages/server" }
+  ]
+}
