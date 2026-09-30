@@ -17,6 +17,8 @@ export interface SpatialEventPayloads {
   doorJammed: { readonly doorId: DoorId };
   /** Execution met an obstruction the actor did not know about (SD §7.2). */
   routeBlocked: { readonly tile: TileCoord; readonly doorId?: DoorId };
+  /** W3 addition: a route completed; the actor stands at the centre of `tile`. */
+  reachedTile: { readonly tile: TileCoord };
 }
 
 export const SPATIAL_EVENT_SIGNIFICANCE = {
@@ -24,4 +26,5 @@ export const SPATIAL_EVENT_SIGNIFICANCE = {
   doorStateChanged: "trace",
   doorJammed: "notable",
   routeBlocked: "trace",
+  reachedTile: "trace",
 } as const satisfies SignificanceCatalog<SpatialEventPayloads>;

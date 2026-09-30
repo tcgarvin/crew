@@ -12,6 +12,7 @@ export * from "./decisions";
 export * from "./events";
 export * from "./ids";
 export * from "./kernel";
+export * from "./nav";
 export * from "./pipeline";
 export * from "./protocol";
 export * from "./save";

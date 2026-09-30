@@ -6,13 +6,17 @@ import type { KernelRegistry } from "./registry";
 import type { ContentBundle } from "./types/content";
 import type { ActorId, CompartmentId, DeckDefId, ItemId, MachineId } from "./types/ids";
 import type { World } from "./types/kernel";
-import type { DerivedCaches, IndexCache, ReadonlyWorldState } from "./types/pipeline";
+import type { DerivedCaches, IndexCache, NavCache, ReadonlyWorldState } from "./types/pipeline";
+
+/** An unbuilt nav cache (W3 owns it); `geometryRevision` -1 means "never built". */
+export function emptyNavCache(): NavCache {
+  return { geometryRevision: -1, edgeMask: {}, decks: {}, paths: new Map(), reservations: {} };
+}
 
 export function emptyCaches(): DerivedCaches {
   return {
     dirty: { navigation: true, power: true, inventory: true },
-    // W3 owns nav; -1 means "never built".
-    nav: { geometryRevision: -1, edgeMask: {} },
+    nav: emptyNavCache(),
     index: {
       itemsByHolder: {},
       itemsByContainer: {},

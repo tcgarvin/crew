@@ -1,0 +1,55 @@
+/**
+ * Spatial invariants for tests and debugging: on-deck actors stand on walkable floor, a moving
+ * actor's x/y equals the position derived from its route, nobody is inside a door aperture
+ * unless the door is open, and no interaction position is over capacity.
+ */
+import type { World } from "../../core/types/kernel";
+import { doorBetween } from "./geometry";
+import { derivedPosition, isStandable } from "./movement";
+import { tileCapacity } from "./reservations";
+
+export function spatialViolations(world: World): string[] {
+  const out: string[] = [];
+  const { state, caches } = world;
+  for (const actor of Object.values(state.actors)) {
+    const location = actor.location;
+    if (location.kind !== "onDeck") continue;
+    const geometry = caches.nav.decks[location.deckId];
+    if (geometry === undefined) {
+      out.push(`actors.${actor.id} is on unknown deck ${location.deckId}`);
+      continue;
+    }
+    if (!isStandable(geometry, location)) {
+      out.push(`actors.${actor.id} stands on non-floor at ${location.x},${location.y}`);
+    }
+    const movement = actor.movement;
+    if (movement.kind !== "moving") continue;
+    const derived = derivedPosition(movement);
+    if (
+      derived === undefined ||
+      Math.abs(derived.x - location.x) > 1e-9 ||
+      Math.abs(derived.y - location.y) > 1e-9
+    ) {
+      out.push(`actors.${actor.id} location disagrees with its route`);
+    }
+    const a = movement.path[movement.segmentIndex];
+    const b = movement.path[movement.segmentIndex + 1];
+    if (a !== undefined && b !== undefined && movement.segmentDistanceTravelled > 0) {
+      const doorId = doorBetween(geometry, a, b);
+      const door = doorId === undefined ? undefined : state.doors[doorId];
+      if (door !== undefined && door.physicalState !== "open") {
+        out.push(`actors.${actor.id} is in the aperture of ${door.physicalState} door ${door.id}`);
+      }
+    }
+  }
+  for (const [key, holders] of Object.entries(caches.nav.reservations)) {
+    const [deckId, coords] = key.split(":");
+    const geometry = caches.nav.decks[deckId as keyof typeof caches.nav.decks];
+    const [x, y] = (coords ?? "").split(",").map(Number);
+    if (geometry === undefined || x === undefined || y === undefined) continue;
+    if (holders.length > tileCapacity(geometry, { x, y })) {
+      out.push(`reservation ${key} has ${holders.length} holders`);
+    }
+  }
+  return out;
+}

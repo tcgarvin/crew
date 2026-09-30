@@ -5,7 +5,7 @@
  * phases in order. No dynamic registration: ordering is part of the sim version. A system is a
  * function over `StepCtx`; the planner is special and only ever sees an `AgentView`.
  */
-import type { DeepReadonly, RngStreamName, Tick } from "./common";
+import type { DeepReadonly, RngStreamName, Tick, TileCoord } from "./common";
 import type {
   ConfigDef,
   ContentBundle,
@@ -30,6 +30,7 @@ import type {
   PortDefId,
   TraitDefId,
 } from "./ids";
+import type { DeckGeometry } from "./nav";
 import type { WorldState } from "./state";
 import type { AgentView } from "./view";
 import type { Intent } from "./work";
@@ -116,8 +117,23 @@ export interface DerivedCaches {
 export interface NavCache {
   /** `DeckState.geometryRevision` this cache was built for. */
   geometryRevision: number;
-  /** Per deck: row-major passability of tile edges, bit per side (n=1, e=2, s=4, w=8 blocked). */
+  /**
+   * Per deck: row-major passability of tile edges, bit per side (n=1, e=2, s=4, w=8 blocked).
+   * W3 decision: static walls plus door edges (a door edge needs a door check to cross).
+   */
   edgeMask: Record<DeckDefId, Uint8Array>;
+  /** W3 addition: per-deck geometry (walkable grid, compartments, doors by edge, interaction positions). */
+  decks: Record<DeckDefId, DeckGeometry>;
+  /**
+   * W3 addition: lazily cached A* results keyed by deck, planning policy, from and to. Cleared when
+   * the geometry revision changes.
+   */
+  paths: Map<string, readonly TileCoord[] | null>;
+  /**
+   * W3 addition: exclusive interaction-position reservations, `${deckId}:${x},${y}` → holders.
+   * Not state: rebuilt from actor positions and routes on restore (see systems/spatial/reservations.ts).
+   */
+  reservations: Record<string, ActorId[]>;
 }
 
 export interface IndexCache {
@@ -126,8 +142,8 @@ export interface IndexCache {
   /** Items whose location is `inContainer` this item. Rebuilt with `itemsByHolder`. */
   itemsByContainer: Record<ItemId, ItemId[]>;
   /**
-   * On-deck actors by the compartment of the tile they stand on. Rebuilt every tick in phase 2,
-   * so it is as of the start of the tick (movement in phase 3 does not update it).
+   * On-deck actors by the compartment of the tile they stand on. Rebuilt every tick in phase 2 and
+   * updated incrementally by movement (W3) in phase 3 whenever an actor changes compartment.
    */
   actorsByCompartment: Record<CompartmentId, ActorId[]>;
   /** Machines by the compartment of their placement origin tile. */

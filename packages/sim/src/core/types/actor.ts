@@ -52,7 +52,14 @@ export type Availability = "available" | "incapacitated" | "dead" | "offShip";
  * `path` is the sequence of tile centres; segment i runs from path[i] to path[i+1].
  */
 export type MovementState =
-  | { kind: "stationary" }
+  | {
+      kind: "stationary";
+      /**
+       * W3 addition: why the last route ended without arriving. Set by spatial; the work system
+       * (W4) treats it as "replan now" and it is cleared by the next `requestMove`.
+       */
+      routeFailure?: RouteFailure;
+    }
   | {
       kind: "moving";
       path: TileCoord[];
@@ -68,6 +75,19 @@ export type MovementState =
       /** Door the actor is waiting on or currently crossing, if any. */
       doorId?: DoorId;
     };
+
+/** W3 addition: a route that ended early, for the planner to react to. */
+export interface RouteFailure {
+  readonly tick: Tick;
+  /**
+   * `blocked`: an obstruction or a door that would not open. `positionTaken`: the destination
+   * interaction position stayed occupied past the bounded wait. `unreachable`: a knowledge
+   * change left no route.
+   */
+  readonly reason: "blocked" | "positionTaken" | "unreachable";
+  /** Tile the actor could not enter. */
+  readonly tile: TileCoord;
+}
 
 /**
  * Schedule (SD §11.4). `shiftKey` indexes `config.shifts.shifts`; on/off duty is derived from

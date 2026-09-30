@@ -51,5 +51,5 @@ export {
 } from "./registry";
 export { createRngApi, seedAllStreams, seedStream } from "./rng";
 export { migrateState, migrations, restore, SaveCompatibilityError, serialize } from "./save";
-export { createCompartmentLocator, emptyCaches, rebuildCaches } from "./caches";
+export { createCompartmentLocator, emptyCaches, emptyNavCache, rebuildCaches } from "./caches";
 export { advance, createWorld, haltReason } from "./world";
