@@ -5,10 +5,18 @@ export interface DecisionModalProps {
   readonly card: DecisionCardText;
   readonly onChoose: (side: "left" | "right") => void;
   readonly onInspect: () => void;
+  /**
+   * D26: set once a side is chosen. The card stays up showing this caption with both buttons
+   * disabled, then the host closes it.
+   */
+  readonly aftermath?: { readonly side: "left" | "right"; readonly caption: string };
 }
 
 /** Full-screen binary card (GDD §22): title, situation prose, two big buttons. */
-export function DecisionModal({ card, onChoose, onInspect }: DecisionModalProps) {
+export function DecisionModal({ card, onChoose, onInspect, aftermath }: DecisionModalProps) {
+  const chosen = aftermath?.side;
+  const optionClass = (side: "left" | "right") =>
+    `decision-option decision-option-${side}${chosen === side ? " chosen" : ""}`;
   return (
     // biome-ignore lint/a11y/useSemanticElements: a native <dialog> needs showModal()/open-state wiring beyond W7's scope; role="dialog" is the documented fallback.
     <div className="decision-modal" role="dialog" aria-modal="true">
@@ -18,22 +26,30 @@ export function DecisionModal({ card, onChoose, onInspect }: DecisionModalProps)
         <div className="decision-options">
           <button
             type="button"
-            className="decision-option decision-option-left"
+            className={optionClass("left")}
+            disabled={chosen !== undefined}
             onClick={() => onChoose("left")}
           >
             {card.leftLabel}
           </button>
           <button
             type="button"
-            className="decision-option decision-option-right"
+            className={optionClass("right")}
+            disabled={chosen !== undefined}
             onClick={() => onChoose("right")}
           >
             {card.rightLabel}
           </button>
         </div>
-        <button type="button" className="decision-inspect" onClick={onInspect}>
-          Inspect ship
-        </button>
+        {aftermath === undefined ? (
+          <button type="button" className="decision-inspect" onClick={onInspect}>
+            Inspect ship
+          </button>
+        ) : (
+          <output className="decision-aftermath" aria-live="polite">
+            {aftermath.caption}
+          </output>
+        )}
       </div>
     </div>
   );

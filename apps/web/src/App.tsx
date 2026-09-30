@@ -6,6 +6,7 @@ import type {
   CommandId,
   Decision,
   FromWorker,
+  ItemId,
   Machine,
   MachineId,
   NarratorHook,
@@ -36,12 +37,15 @@ import {
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
+import { Headline } from "./ui/Headline";
 import { Inspector, type InspectorData } from "./ui/Inspector";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
 import { Ticker } from "./ui/Ticker";
 import { Toast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
+import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
+import { inspectItem } from "./ui/itemInspection";
 import { loadWebContent } from "./worker/content";
 
 type HealthState = "checking" | "ok" | "error";
@@ -110,6 +114,14 @@ export function App() {
   const [health, setHealth] = useState<HealthState>("checking");
   const [toast, setToast] = useState<string>();
   const [stale, setStale] = useState(false);
+  /** D26: the card just answered, kept up with its aftermath caption until the timer closes it. */
+  const [closingCard, setClosingCard] = useState<{
+    readonly card: DecisionCardText;
+    readonly side: "left" | "right";
+    readonly caption: string;
+  }>();
+  const closingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(closingTimer.current), []);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const showToast = useCallback((message: string) => {
@@ -373,6 +385,16 @@ export function App() {
           actorId: next.id as ActorId,
           tick: viewTick,
         });
+      } else if (next.kind === "item") {
+        pendingRequests.current.set(requestId, (msg) => {
+          if (msg.type === "snapshot") {
+            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout);
+            setInspectorData(item === undefined ? undefined : { kind: "item", item });
+          } else if (msg.type === "error") {
+            setInspectorData(undefined);
+          }
+        });
+        connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
       } else {
         pendingRequests.current.set(requestId, (msg) => {
           if (msg.type === "snapshot") {
@@ -394,7 +416,7 @@ export function App() {
         connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
       }
     },
-    [frame, runAhead.viewTick, bundle],
+    [frame, runAhead.viewTick, bundle, layout],
   );
 
   const onCloseInspector = useCallback(() => {
@@ -414,11 +436,26 @@ export function App() {
         payload: { decisionId: decision.id, side },
       };
       connection.send({ type: "command", requestId: nextRequestId(), command });
+      // D26: keep the answered card up for a moment with a line on what happens next. The sim
+      // resumes behind it straight away; only the card lingers.
+      const narrated = prose[decision.id];
+      setClosingCard({
+        card: narrated ?? templateCard(decision, bundle),
+        side,
+        caption: aftermathCaption(decision, side, narrated, bundle),
+      });
+      clearTimeout(closingTimer.current);
+      closingTimer.current = setTimeout(() => setClosingCard(undefined), AFTERMATH_MS);
       setDecision(undefined);
       setDecisionHidden(false);
     },
-    [decision],
+    [decision, prose, bundle],
   );
+
+  const onNewGame = useCallback(() => {
+    forgetServerGame();
+    void clearLocalSave().then(() => window.location.reload());
+  }, []);
 
   const viewTick = frame?.tick ?? 0;
   // D14: the worker may be ahead of the viewer; show hook/decision UI once playback reaches it.
@@ -431,6 +468,7 @@ export function App() {
 
   const money = frame?.money ?? 0;
   const travelState = frame?.travel.state ?? "docked";
+  const showCard = card !== undefined && decisionDue && !decisionHidden && !thinking;
   const runAheadSeconds = runAhead.buffered / tickRate;
 
   return (
@@ -443,10 +481,11 @@ export function App() {
         simTick={viewTick}
         tickRate={tickRate}
         money={money}
-        travelState={travelState}
         runAheadBufferedSeconds={runAheadSeconds}
         health={health}
+        onNewGame={onNewGame}
       />
+      <Headline text={frame?.headline ?? ""} />
       <TravelBar stage={travelState} progress={frame?.travel.progress ?? 0} />
       {stale && (
         <div className="stale-banner" role="alert">
@@ -459,25 +498,24 @@ export function App() {
       </div>
       <Inspector data={inspectorData} onClose={onCloseInspector} />
       {thinking && <NarratorOverlay />}
-      {card && decisionDue && !decisionHidden && !thinking && (
+      {closingCard !== undefined ? (
         <DecisionModal
-          card={card}
-          onChoose={onChooseDecision}
-          onInspect={() => setDecisionHidden(true)}
+          card={closingCard.card}
+          onChoose={() => undefined}
+          onInspect={() => undefined}
+          aftermath={{ side: closingCard.side, caption: closingCard.caption }}
         />
+      ) : (
+        showCard && (
+          <DecisionModal
+            card={card}
+            onChoose={onChooseDecision}
+            onInspect={() => setDecisionHidden(true)}
+          />
+        )
       )}
       {decisionDue && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
       <Toast message={toast} />
-      <button
-        type="button"
-        className="new-game-button"
-        onClick={() => {
-          forgetServerGame();
-          void clearLocalSave().then(() => window.location.reload());
-        }}
-      >
-        New game
-      </button>
     </div>
   );
 }

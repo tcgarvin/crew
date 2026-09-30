@@ -37,6 +37,24 @@ export interface LayoutMachine {
   readonly center: { readonly x: number; readonly y: number };
 }
 
+/** Polish A: a wall edge in tile units, from (x1,y1) to (x2,y2); always one tile long. */
+export interface WallSegment {
+  readonly x1: number;
+  readonly y1: number;
+  readonly x2: number;
+  readonly y2: number;
+  /** On the outside of the ship rather than between two compartments. */
+  readonly hull: boolean;
+}
+
+export interface CompartmentBox {
+  readonly minX: number;
+  readonly minY: number;
+  /** Exclusive. */
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
 export interface DeckLayout {
   readonly deckId: DeckDef["id"];
   readonly width: number;
@@ -44,6 +62,12 @@ export interface DeckLayout {
   readonly tiles: readonly LayoutTile[];
   readonly compartmentNames: Readonly<Record<string, string>>;
   readonly compartmentBounds: Readonly<Record<string, { readonly x: number; readonly y: number }>>;
+  /** Polish A: semantic tags per compartment (`cargoHold`, `galley`, …) for fills. */
+  readonly compartmentTags: Readonly<Record<string, readonly string[]>>;
+  /** Polish A: tile bounding box per compartment, for corner labels. */
+  readonly compartmentBoxes: Readonly<Record<string, CompartmentBox>>;
+  /** Polish A: walls along compartment and hull boundaries, minus doors and openings. */
+  readonly walls: readonly WallSegment[];
   readonly doors: readonly LayoutDoor[];
   readonly machines: readonly LayoutMachine[];
 }
@@ -63,6 +87,66 @@ function doorCentre(edge: TileEdge): {
     case "e":
       return { cx: edge.x + 1, cy: edge.y + 0.5, orientation: "vertical" };
   }
+}
+
+/** Canonical key for an edge, so `{x,y,n}` and `{x,y-1,s}` compare equal. */
+export function edgeKey(edge: TileEdge): string {
+  switch (edge.side) {
+    case "n":
+      return `${edge.x},${edge.y - 1},s`;
+    case "w":
+      return `${edge.x - 1},${edge.y},e`;
+    default:
+      return `${edge.x},${edge.y},${edge.side}`;
+  }
+}
+
+function segmentFor(edge: TileEdge, hull: boolean): WallSegment {
+  const { x, y } = edge;
+  switch (edge.side) {
+    case "n":
+      return { x1: x, y1: y, x2: x + 1, y2: y, hull };
+    case "s":
+      return { x1: x, y1: y + 1, x2: x + 1, y2: y + 1, hull };
+    case "w":
+      return { x1: x, y1: y, x2: x, y2: y + 1, hull };
+    case "e":
+      return { x1: x + 1, y1: y, x2: x + 1, y2: y + 1, hull };
+  }
+}
+
+/**
+ * Walls: every tile edge whose two sides are different compartments (or floor and void/outside),
+ * plus the authored interior walls, minus door apertures and doorless openings.
+ */
+function buildWalls(deck: DeckDef, keyAt: (x: number, y: number) => string | undefined) {
+  const gaps = new Set([...deck.doors.map((d) => edgeKey(d.edge)), ...deck.openings.map(edgeKey)]);
+  const seen = new Set<string>();
+  const walls: WallSegment[] = [];
+  const add = (edge: TileEdge, hull: boolean) => {
+    const key = edgeKey(edge);
+    if (gaps.has(key) || seen.has(key)) return;
+    seen.add(key);
+    walls.push(segmentFor(edge, hull));
+  };
+  const sides = [
+    ["n", 0, -1],
+    ["s", 0, 1],
+    ["w", -1, 0],
+    ["e", 1, 0],
+  ] as const;
+  for (let y = 0; y < deck.height; y++) {
+    for (let x = 0; x < deck.width; x++) {
+      const here = keyAt(x, y);
+      if (here === undefined) continue;
+      for (const [side, dx, dy] of sides) {
+        const there = keyAt(x + dx, y + dy);
+        if (there !== here) add({ x, y, side }, there === undefined);
+      }
+    }
+  }
+  for (const edge of deck.walls) add(edge, false);
+  return walls;
 }
 
 /** Builds the canvas layout for one deck. Pure; safe to call once and cache on the main thread. */
@@ -86,6 +170,27 @@ export function buildDeckLayout(deck: DeckDef, content: ContentBundle): DeckLayo
         }
       }
     }
+  }
+
+  const keyAt = (x: number, y: number): string | undefined => {
+    if (x < 0 || y < 0 || x >= deck.width || y >= deck.height) return undefined;
+    return tiles[y * deck.width + x]?.compartmentKey;
+  };
+  const compartmentTags: Record<string, readonly string[]> = {};
+  for (const c of deck.compartments) compartmentTags[c.key] = c.tags;
+  const compartmentBoxes: Record<string, CompartmentBox> = {};
+  for (const tile of tiles) {
+    if (tile.compartmentKey === undefined) continue;
+    const box = compartmentBoxes[tile.compartmentKey];
+    compartmentBoxes[tile.compartmentKey] =
+      box === undefined
+        ? { minX: tile.x, minY: tile.y, maxX: tile.x + 1, maxY: tile.y + 1 }
+        : {
+            minX: Math.min(box.minX, tile.x),
+            minY: Math.min(box.minY, tile.y),
+            maxX: Math.max(box.maxX, tile.x + 1),
+            maxY: Math.max(box.maxY, tile.y + 1),
+          };
   }
 
   const doors: LayoutDoor[] = deck.doors.map((d) => {
@@ -118,6 +223,9 @@ export function buildDeckLayout(deck: DeckDef, content: ContentBundle): DeckLayo
     tiles,
     compartmentNames,
     compartmentBounds,
+    compartmentTags,
+    compartmentBoxes,
+    walls: buildWalls(deck, keyAt),
     doors,
     machines,
   };

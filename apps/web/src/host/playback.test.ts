@@ -21,6 +21,8 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     travel: { state: "docked", progress: 0 },
     tickerEvents: [],
     money: 0,
+    items: [],
+    headline: "",
   };
 }
 

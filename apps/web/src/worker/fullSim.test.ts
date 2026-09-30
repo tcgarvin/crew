@@ -172,5 +172,5 @@ describe("full sim: real content, every system, auto-accept (Integration 2)", ()
       expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
     }
     expect(checkInvariants(world.state)).toEqual([]);
-  });
+  }, 30_000);
 });

@@ -3,7 +3,23 @@ import type { AgentViewSnapshot, Machine } from "@crew/sim";
 export type InspectorData =
   | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
   | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
+  | { readonly kind: "item"; readonly item: ItemInspection }
   | { readonly kind: "loading" };
+
+/** Polish A: what the inspector shows for a tapped crate (or any item on deck). */
+export interface ItemInspection {
+  readonly name: string;
+  readonly count: number;
+  /** Plain words: "in the cargo hold", "carried by Mara Osei". */
+  readonly where: string;
+  /** Present when the item is freight on a contract. */
+  readonly job?: {
+    readonly issuer: string;
+    readonly from: string;
+    readonly to: string;
+    readonly status: string;
+  };
+}
 
 export interface InspectorProps {
   readonly data: InspectorData | undefined;
@@ -34,6 +50,7 @@ export function Inspector({ data, onClose }: InspectorProps) {
         {data.kind === "loading" && <p>Loading…</p>}
         {data.kind === "actor" && <ActorInspector view={data.view} label={data.label} />}
         {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
+        {data.kind === "item" && <ItemInspector item={data.item} />}
       </aside>
     </div>
   );
@@ -95,6 +112,42 @@ function MachineInspector({ machine, name }: { machine: Machine; name?: string |
         <dd>
           {machine.faults.length === 0 ? "none" : machine.faults.map((f) => f.faultKey).join(", ")}
         </dd>
+      </dl>
+    </div>
+  );
+}
+
+const JOB_STATUS_WORDS: Readonly<Record<string, string>> = {
+  offered: "on offer",
+  accepted: "waiting to ship",
+  inTransit: "in transit",
+  delivered: "delivered",
+  paid: "delivered and paid",
+  failed: "failed",
+};
+
+function ItemInspector({ item }: { item: ItemInspection }) {
+  return (
+    <div>
+      <h2>{item.name}</h2>
+      <p className="inspector-subtitle">{item.job === undefined ? "ship's stores" : "freight"}</p>
+      <dl className="inspector-grid">
+        <dt>Count</dt>
+        <dd>{item.count}</dd>
+        <dt>Where</dt>
+        <dd>{item.where}</dd>
+        {item.job !== undefined && (
+          <>
+            <dt>Going to</dt>
+            <dd>{item.job.to}</dd>
+            <dt>From</dt>
+            <dd>{item.job.from}</dd>
+            <dt>For</dt>
+            <dd>{item.job.issuer}</dd>
+            <dt>Contract</dt>
+            <dd>{JOB_STATUS_WORDS[item.job.status] ?? item.job.status}</dd>
+          </>
+        )}
       </dl>
     </div>
   );

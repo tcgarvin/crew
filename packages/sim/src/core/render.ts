@@ -1,17 +1,22 @@
 /**
  * Generic render projection (D7: the map shows truth). Fills `RenderFrame` from state: actor
  * positions and action labels, machine and door states, travel progress, money, and the ticker.
+ * Polish A adds the items aboard (D28) and a one-line ship headline (D27).
  */
 import type { Actor } from "./types/actor";
 import type { DeepReadonly } from "./types/common";
-import type { ContentBundle } from "./types/content";
+import type { ContentBundle, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
+import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
-import type { Machine } from "./types/ship";
+import type { Item, Machine } from "./types/ship";
 import type {
   RenderActor,
   RenderFrame,
+  RenderItem,
+  RenderItemKind,
+  RenderItemLocation,
   RenderMachine,
   RenderMachineState,
   TickerEntry,
@@ -296,6 +301,227 @@ export function tickerLine(
   return describeEvent(event, state, content);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Items aboard (Polish A, D28)
+// ---------------------------------------------------------------------------------------------
+
+function itemDef(
+  item: DeepReadonly<Item>,
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+): DeepReadonly<ItemDef> | undefined {
+  return content.items[item.defId] ?? state.defs.dynamic.items[item.defId];
+}
+
+function itemKind(def: DeepReadonly<ItemDef> | undefined): RenderItemKind {
+  if (def === undefined) return "other";
+  if (def.cargoClass !== undefined || def.tags.includes("cargo")) return "crate";
+  if (def.tags.includes("tool")) return "tool";
+  if (def.tags.includes("food")) return "food";
+  return "other";
+}
+
+/** Containment is acyclic (invariant), but a bad save must not hang the renderer. */
+const MAX_CONTAINER_DEPTH = 8;
+
+/** Is this item physically aboard: on deck, carried, or inside something that is? */
+function isAboard(item: DeepReadonly<Item>, state: ReadonlyWorldState): boolean {
+  let location = item.location;
+  for (let depth = 0; depth < MAX_CONTAINER_DEPTH; depth++) {
+    switch (location.kind) {
+      case "onDeck":
+      case "carriedBy":
+      case "equippedBy":
+        return true;
+      case "inContainer": {
+        const container = state.items[location.containerId];
+        if (container === undefined) return false;
+        location = container.location;
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  return false;
+}
+
+function renderItemLocation(item: DeepReadonly<Item>): RenderItemLocation | null {
+  const location = item.location;
+  switch (location.kind) {
+    case "onDeck":
+      return { kind: "deck", deckId: location.deckId, x: location.x, y: location.y };
+    case "carriedBy":
+    case "equippedBy":
+      return { kind: "carried", actorId: location.actorId };
+    case "inContainer":
+      return { kind: "container", containerId: location.containerId };
+    default:
+      return null;
+  }
+}
+
+/** Items aboard the ship, for the canvas. Port-store and installed items are left out. */
+export function renderItems(state: ReadonlyWorldState, content: ContentBundle): RenderItem[] {
+  const items: RenderItem[] = [];
+  for (const item of Object.values(state.items)) {
+    const location = renderItemLocation(item);
+    if (location === null || !isAboard(item, state)) continue;
+    const def = itemDef(item, state, content);
+    items.push({
+      id: item.id,
+      defId: item.defId,
+      name: def?.name ?? "Cargo",
+      kind: itemKind(def),
+      ...(def?.cargoClass === undefined ? {} : { cargoClass: def.cargoClass }),
+      ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
+      location,
+      count: item.stacking === "stack" ? item.count : 1,
+    });
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ship headline (Polish A, D27)
+// ---------------------------------------------------------------------------------------------
+
+function portName(content: ContentBundle, portId: PortDefId): string {
+  return content.ports[portId]?.name ?? portId;
+}
+
+/** "34 s", "2 min 05 s". Sim seconds, rounded up so it never reads "0 s" while under way. */
+export function formatEta(seconds: number): string {
+  const total = Math.max(1, Math.ceil(seconds));
+  if (total < 60) return `${total} s`;
+  const minutes = Math.floor(total / 60);
+  return `${minutes} min ${(total % 60).toString().padStart(2, "0")} s`;
+}
+
+/** Mean engine output, as travel's propulsion factor (no engines = unconstrained). */
+function engineFactor(state: ReadonlyWorldState, content: ContentBundle): number {
+  const engines = Object.values(state.machines).filter((m) =>
+    (content.machines[m.defId]?.tags ?? []).includes("engine"),
+  );
+  if (engines.length === 0) return 1;
+  const sum = engines.reduce((acc, m) => acc + (m.actualMode === "on" ? m.output : 0), 0);
+  return sum / engines.length;
+}
+
+interface FreightCount {
+  readonly done: number;
+  readonly total: number;
+}
+
+/**
+ * Progress over the manifests of the jobs with open `kind` problems, in units (a stack of two
+ * crates is two): stowed on deck (load) or no longer aboard (unload). `undefined` when no such
+ * problem is open.
+ */
+function freightProgress(
+  state: ReadonlyWorldState,
+  kind: "cargoToLoad" | "cargoToUnload",
+): FreightCount | undefined {
+  const jobIds = new Set<JobId>();
+  for (const problem of Object.values(state.work.problems)) {
+    if (problem.kind === kind && problem.status === "open") jobIds.add(problem.payload.jobId);
+  }
+  if (jobIds.size === 0) return undefined;
+  let done = 0;
+  let total = 0;
+  for (const jobId of jobIds) {
+    const job = state.jobs[jobId];
+    if (job === undefined) continue;
+    const units = job.cargo.reduce((sum, line) => sum + line.count, 0);
+    total += units;
+    let stowed = 0;
+    let aboard = 0;
+    for (const itemId of job.cargoItemIds) {
+      const item = state.items[itemId];
+      if (item === undefined) continue;
+      const count = item.stacking === "stack" ? item.count : 1;
+      const where = item.location.kind;
+      if (where === "onDeck" || where === "inContainer") stowed += count;
+      if (where !== "inExternalStore") aboard += count;
+    }
+    done += kind === "cargoToLoad" ? stowed : Math.max(0, units - aboard);
+  }
+  return { done: Math.min(done, total), total };
+}
+
+function crates(n: number): string {
+  return n === 1 ? "crate" : "crates";
+}
+
+function loadingLine(count: FreightCount): string {
+  return `loading cargo (${count.done} of ${count.total} ${crates(count.total)} aboard)`;
+}
+
+function hasOpenProblem(state: ReadonlyWorldState, kind: "stationToStaff"): boolean {
+  return Object.values(state.work.problems).some((p) => p.kind === kind && p.status === "open");
+}
+
+/**
+ * One plain-language line of what the ship is doing (D27), derived from travel stage, open
+ * freight problems and the job board. Pure; cheap enough to compute every frame.
+ */
+export function shipHeadline(
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+  nominalSpeed: number,
+): string {
+  const travel = state.travel;
+  if (travel.stage === "docked") {
+    const here = `Docked at ${portName(content, travel.portId)}`;
+    const unloading = freightProgress(state, "cargoToUnload");
+    if (unloading !== undefined) {
+      return `${here} — unloading cargo (${unloading.done} of ${unloading.total} ${crates(unloading.total)} ashore)`;
+    }
+    const loading = freightProgress(state, "cargoToLoad");
+    if (loading !== undefined) return `${here} — ${loadingLine(loading)}`;
+    if (travel.plannedDestinationId !== undefined) {
+      return `Preparing to depart for ${portName(content, travel.plannedDestinationId)}`;
+    }
+    const offer = Object.values(state.jobs).find(
+      (job) => job.status === "offered" && job.fromPortId === travel.portId,
+    );
+    if (offer !== undefined) {
+      // The person, not "name, org" (D25); older jobs only have the `issuer` label.
+      const who = offer.issuerPerson?.name ?? offer.issuer;
+      return `${here} — ${who} is offering freight for ${portName(content, offer.toPortId)}`;
+    }
+    return `${here} — waiting for work`;
+  }
+
+  const to = portName(content, travel.toPortId);
+  switch (travel.stage) {
+    case "preparingDeparture": {
+      const loading = freightProgress(state, "cargoToLoad");
+      if (loading !== undefined) return `Preparing to depart for ${to} — ${loadingLine(loading)}`;
+      if (hasOpenProblem(state, "stationToStaff")) {
+        return `Preparing to depart for ${to} — waiting for someone at the helm`;
+      }
+      return `Preparing to depart for ${to}`;
+    }
+    case "undocking":
+      return `Undocking from ${portName(content, travel.fromPortId)} — bound for ${to}`;
+    case "departing":
+      return `Departing ${portName(content, travel.fromPortId)} for ${to}`;
+    case "transit": {
+      const speed = nominalSpeed * engineFactor(state, content);
+      if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
+      const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
+      return `Under way to ${to} — ${formatEta(remaining / speed)}`;
+    }
+    case "approaching":
+      return `Approaching ${to}`;
+    case "docking":
+      return hasOpenProblem(state, "stationToStaff")
+        ? `Docking at ${to} — waiting for someone at the helm`
+        : `Docking at ${to}`;
+  }
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors: RenderActor[] = [];
@@ -339,5 +565,7 @@ export function getRenderFrame(world: World): RenderFrame {
     travel: { state: travel.stage, progress },
     tickerEvents,
     money: state.money.balance,
+    items: renderItems(state, content),
+    headline: shipHeadline(state, content, world.config.values.travel.nominalSpeed),
   };
 }

@@ -90,6 +90,8 @@ function makeFakeKernel(hookAtTick: number) {
         travel: { state: "docked", progress: 0 },
         tickerEvents: [],
         money: 0,
+        items: [],
+        headline: "",
       };
     },
     serialize: (world) =>

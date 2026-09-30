@@ -6,24 +6,16 @@ export interface TravelBarProps {
   readonly progress: number;
 }
 
-const STAGE_LABEL: Readonly<Record<TravelStage, string>> = {
-  docked: "Docked",
-  preparingDeparture: "Preparing to depart",
-  undocking: "Undocking",
-  departing: "Departing",
-  transit: "In transit",
-  approaching: "Approaching",
-  docking: "Docking",
-};
-
-/** Thin progress bar under the top bar while the ship is not docked. */
+/**
+ * Thin progress bar under the ship headline while the ship is not docked. Polish A: the headline
+ * says what the stage is, so the bar itself carries no label.
+ */
 export function TravelBar({ stage, progress }: TravelBarProps) {
   if (stage === "docked") return null;
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
-    <div className="travel-bar" title={`${STAGE_LABEL[stage]} ${pct}%`}>
+    <div className="travel-bar" title={`${pct}%`}>
       <div className="travel-bar-fill" style={{ width: `${pct}%` }} />
-      <span className="travel-bar-label">{STAGE_LABEL[stage]}</span>
     </div>
   );
 }

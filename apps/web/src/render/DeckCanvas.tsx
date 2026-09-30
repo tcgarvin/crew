@@ -13,13 +13,14 @@ import {
   type DeckLayout,
   type ViewTransform,
   computeFitTransform,
+  deckPiles,
   drawFrame,
   screenToWorld,
   shouldRotate,
 } from "./draw";
 
 export interface Selection {
-  readonly kind: "actor" | "machine";
+  readonly kind: "actor" | "machine" | "item";
   readonly id: string;
 }
 
@@ -31,6 +32,8 @@ export interface DeckCanvasProps {
 }
 
 const HIT_RADIUS_TILES = 0.8;
+/** Crates sit on a tile; tapping anywhere near its square selects the pile's top item. */
+const ITEM_HIT_RADIUS_TILES = 0.5;
 
 export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -109,6 +112,16 @@ export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProp
         if (d < bestDist) {
           bestDist = d;
           best = { kind: "actor", id: actor.id };
+        }
+      }
+      if (!best) {
+        let bestItem = ITEM_HIT_RADIUS_TILES;
+        for (const pile of deckPiles(frame, layout.deckId)) {
+          const d = Math.hypot(pile.x - worldX, pile.y - worldY);
+          if (d < bestItem) {
+            bestItem = d;
+            best = { kind: "item", id: pile.top.id };
+          }
         }
       }
       if (!best) {

@@ -23,8 +23,8 @@ export function lerpAngle(a: number, b: number, t: number): number {
 /**
  * Interpolate between two frames at `t` in [0, 1]. Actors are matched by id; an actor present in
  * only one of the two frames (spawned/despawned) is passed through unchanged rather than
- * interpolated. Non-positional fields (machines, doors, ticker, money, travel) snap to `next` at
- * t > 0, matching D7 (truth, not a smoothed guess).
+ * interpolated. Non-positional fields (machines, doors, ticker, money, travel, items, headline)
+ * snap to `next` at t > 0, matching D7 (truth, not a smoothed guess).
  */
 export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number): RenderFrame {
   const clamped = Math.max(0, Math.min(1, t));
@@ -52,6 +52,8 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     travel: next.travel,
     money: next.money,
     tickerEvents: next.tickerEvents,
+    items: next.items,
+    headline: next.headline,
   };
 }
 

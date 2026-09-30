@@ -10,7 +10,15 @@
  */
 import type { Capacities, FactType, KnownFact, Needs } from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
-import type { DeckDef, ItemTag, MachineTag, RoleTag, SkillLevels, ToolKind } from "./content";
+import type {
+  CargoClass,
+  DeckDef,
+  ItemTag,
+  MachineTag,
+  RoleTag,
+  SkillLevels,
+  ToolKind,
+} from "./content";
 import type { Significance } from "./events";
 import type {
   ActorId,
@@ -20,6 +28,7 @@ import type {
   EntityId,
   ItemDefId,
   ItemId,
+  JobId,
   LocalKey,
   MachineDefId,
   MachineId,
@@ -208,6 +217,41 @@ export interface RenderDoor {
   readonly placementKey: LocalKey;
 }
 
+/** Polish A (D28): coarse display class of an item, for colour and inspector wording. */
+export type RenderItemKind = "crate" | "tool" | "food" | "other";
+
+/**
+ * Where a rendered item is. Only ship-side custody reaches the frame: port stores are ashore and
+ * installed components are drawn as their machine.
+ */
+export type RenderItemLocation =
+  | {
+      readonly kind: "deck";
+      readonly deckId: DeckDefId;
+      /** Continuous tile-unit position, as `OnDeckLocation`. */
+      readonly x: number;
+      readonly y: number;
+    }
+  /** Carried or equipped: drawn riding the actor's dot. */
+  | { readonly kind: "carried"; readonly actorId: ActorId }
+  /** Inside a container that is itself on deck or carried. */
+  | { readonly kind: "container"; readonly containerId: ItemId };
+
+/** Polish A (D28): an item that is aboard, so cargo loading is visible on the map. */
+export interface RenderItem {
+  readonly id: ItemId;
+  readonly defId: ItemDefId;
+  readonly name: string;
+  readonly kind: RenderItemKind;
+  /** Freight class from the def, when it has one (drives the crate colour). */
+  readonly cargoClass?: CargoClass;
+  /** The contract this freight belongs to, if any. */
+  readonly jobId?: JobId;
+  readonly location: RenderItemLocation;
+  /** Stack size; 1 for unique items. */
+  readonly count: number;
+}
+
 export interface TickerEntry {
   readonly tick: Tick;
   readonly text: string;
@@ -228,4 +272,11 @@ export interface RenderFrame {
   /** Notable/narrative events since the previous frame, already rendered to text. */
   readonly tickerEvents: readonly TickerEntry[];
   readonly money: number;
+  /** Polish A (D28): items aboard (on deck, carried, or in a container that is). */
+  readonly items: readonly RenderItem[];
+  /**
+   * Polish A (D27): one plain-language line of what the ship is doing right now, e.g.
+   * "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".
+   */
+  readonly headline: string;
 }

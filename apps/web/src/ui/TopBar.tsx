@@ -1,5 +1,3 @@
-import type { TravelStage } from "@crew/sim";
-
 const SPEEDS = [1, 2, 4, 8] as const;
 
 export interface TopBarProps {
@@ -10,9 +8,9 @@ export interface TopBarProps {
   readonly simTick: number;
   readonly tickRate: number;
   readonly money: number;
-  readonly travelState: TravelStage;
   readonly runAheadBufferedSeconds: number;
   readonly health: "checking" | "ok" | "error";
+  readonly onNewGame: () => void;
 }
 
 function formatClock(simTick: number, tickRate: number): string {
@@ -30,9 +28,9 @@ export function TopBar({
   simTick,
   tickRate,
   money,
-  travelState,
   runAheadBufferedSeconds,
   health,
+  onNewGame,
 }: TopBarProps) {
   return (
     <header className="top-bar">
@@ -64,12 +62,15 @@ export function TopBar({
       </div>
       <div className="top-bar-group">
         <span className="money">{money}cr</span>
-        <span className="travel-state">{travelState}</span>
         <span
           className={`health-dot ${health}`}
           title={`API health: ${health}`}
           aria-label={`API health: ${health}`}
         />
+        {/* Polish A: in the bar rather than floating, so it never covers the ticker column. */}
+        <button type="button" className="new-game-button" onClick={onNewGame}>
+          New game
+        </button>
       </div>
     </header>
   );
