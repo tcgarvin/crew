@@ -67,3 +67,10 @@ the viewer only watches a delayed stream. **Depends on:** player input occurring
 Costs accepted: the inspector reads from a ring of view-time snapshots (not the ahead-state) so
 the future never leaks; on reload the viewer snaps to the saved ahead-state. Built after the plain
 real-time host works; the worker↔main protocol is designed for it from W0.
+
+**D15. LLM calls go through OpenRouter.** Owner decision (2026-09-30). The narrator uses the
+OpenAI-compatible chat-completions API at openrouter.ai with `response_format: json_schema`;
+model is configurable (`CREW_NARRATOR_MODEL`), key is `OPENROUTER_API_KEY`. No direct
+Anthropic SDK dependency. Vercel is managed through the Vercel connector (MCP), not the CLI,
+where possible; Neon is attached from the dashboard because the connector token cannot manage
+Marketplace integrations. Vercel project: `crew` in team `tims-projects-6bc94f1b`.
