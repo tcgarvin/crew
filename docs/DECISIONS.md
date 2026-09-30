@@ -121,3 +121,25 @@ narrator model: `anthropic/claude-sonnet-4.6` when `CREW_NARRATOR_MODEL` is unse
 
 **D23. The API ships as a bundled Build Output API function** (`scripts/vercel-output.mjs`), not
 a zero-config `api/` file: see `docs/DEPLOYMENT.md` "The Vercel function".
+
+## 2026-09-30 — After the owner's first phone playtest
+
+**D24. Cards never mention pay.** Owner: "pay hints are not that interesting." Offers describe the
+job and the person offering it; money appears only in the top bar.
+
+**D25. Job offers come from people, not companies.** Every `offerJob` carries an `issuer` person
+(name, role, organisation) and a `pitch` line of dialogue. The narrator writes them and keeps them
+in its cast so they can recur (GDD §21); the null job source draws from a name table so offline
+play has the same shape.
+
+**D26. Reigns-style aftermath.** Every decision option carries a one-line aftermath caption
+shown for a moment after the choice and before the card closes, stating what happens next in
+plain terms. Template text by default; narrator prose when available. Owner: "when I declined a
+job, it really wasn't sure what was going to happen next."
+
+**D27. Ship headline.** A persistent one-line status derived from state (travel stage,
+destination, ETA, loading progress, waiting for work) sits under the top bar. The ticker is
+secondary. Owner: "not clear what's happening at the top level."
+
+**D28. Cargo and rooms are visible.** Items render on deck and on the carrier; compartments get
+distinct fills and drawn walls. Re-offer cooldown after a decline drops from 60 s to 20 s.
