@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadEnv } from "../env";
+import type { NarratorCtx, RunNarrator } from "../narrator";
 import { buildTestApp, echoNarrator, fakeEnvelope, mintUser, readJson } from "../test-helpers";
 
 async function authed(
@@ -47,7 +48,7 @@ describe("narrator", () => {
     expect(res.status).toBe(200);
     const body = await readJson(res);
     expect(body.commands).toEqual([]);
-    expect(body.notesUpdate).toBe("updated notes");
+    expect(body.notesUpdate.summary).toBe("updated notes");
 
     const lastCall = await db.getLastNarratorCall(game.id);
     expect(lastCall?.status).toBe("ok");
@@ -90,5 +91,50 @@ describe("narrator", () => {
       body: JSON.stringify({ gameId: game.id, hook: {} }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("round-trips structured notes through the jsonb column into the next call", async () => {
+    const seen: unknown[] = [];
+    const notes = {
+      summary: "Took on core samples at the Drift.",
+      openThreads: ["Who is the assay clerk?"],
+      cast: [{ name: "Ines Varga", note: "assay clerk, nervous" }],
+      lastUpdatedTick: 0,
+      lastRejections: ["offerJob: no route"],
+    };
+    const recording: RunNarrator = async (_req, ctx: NarratorCtx) => {
+      seen.push(ctx.notes);
+      return {
+        commands: [],
+        callId: `call-${seen.length}`,
+        model: "anthropic/claude-opus-4.6",
+        promptVersion: "v0.1",
+        usage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
+        notesUpdate: notes,
+      };
+    };
+    const { app, db } = buildTestApp({ runNarrator: recording });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    for (const tick of [0, 500]) {
+      const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(narratorBody(game.id, tick)),
+      });
+      expect(res.status).toBe(200);
+    }
+    expect(seen[0]).toEqual({});
+    expect(seen[1]).toEqual(notes);
+    expect((await db.getGame(game.id))?.narrativeNotes).toEqual(notes);
+    const call = await db.getLastNarratorCall(game.id);
+    expect(call?.model).toBe("anthropic/claude-opus-4.6");
+    expect(call?.promptVersion).toBe("v0.1");
+    expect(call?.inputTokens).toBe(10);
   });
 });

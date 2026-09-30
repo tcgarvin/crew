@@ -18,8 +18,10 @@ export interface Env {
   readonly databaseUrl: string | undefined;
   /** Use the in-memory fake db instead of Neon. Intended for dev and tests only. */
   readonly useMemoryDb: boolean;
-  /** Passed through to the narrator ctx only; this package never calls the Anthropic SDK. */
-  readonly anthropicApiKey: string | undefined;
+  /** `OPENROUTER_API_KEY`, passed through to the narrator ctx only (W9: OpenRouter transport). */
+  readonly openRouterApiKey: string | undefined;
+  /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; absent = the narrator's default. */
+  readonly narratorModel: string | undefined;
   /** Max accepted save size, in bytes, measured on the gzipped blob (post-gzip, pre-base64). */
   readonly maxSaveBytes: number;
   /** Narrator budget: max calls per game per rolling wall-clock hour. */
@@ -45,7 +47,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return {
     databaseUrl,
     useMemoryDb,
-    anthropicApiKey: source.ANTHROPIC_API_KEY,
+    openRouterApiKey: source.OPENROUTER_API_KEY,
+    narratorModel: source.CREW_NARRATOR_MODEL,
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 6),
     nodeEnv,

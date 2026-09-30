@@ -49,7 +49,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter 
 |---|---|---|
 | `DATABASE_URL` | In production (or whenever `CREW_DB` isn't `memory`) | Neon Postgres connection string, used by `@neondatabase/serverless` via `drizzle-orm/neon-http`. |
 | `CREW_DB` | No | Set to `memory` to force the in-memory `Db` fake (dev/tests only). |
-| `ANTHROPIC_API_KEY` | For the real narrator (W9) | Passed through to `runNarrator`'s `NarratorCtx.anthropicApiKey`; `@crew/server` never reads it beyond that — it has no LLM SDK dependency of its own. |
+| `OPENROUTER_API_KEY` | For the real narrator (W9) | Passed through as `NarratorCtx.openRouterApiKey`. Without it the server answers every hook with the deterministic null narrator. W9 decision: the narrator talks to OpenRouter (owner); the transport itself is still pending, so a set key currently yields `fallback: "notConfigured"` in `narrator_calls.response`. |
+| `CREW_NARRATOR_MODEL` | No (default `anthropic/claude-opus-4.6`) | OpenRouter model slug for the narrator. The model that actually answered is recorded in `narrator_calls.model`. |
 | `CREW_SAVE_MAX_BYTES` | No (default 4 MiB) | Max accepted save size, measured on the **gzipped** blob. Vercel functions cap request bodies at 4.5 MB, so leave headroom above this for base64 + JSON overhead if raising it. |
 | `CREW_NARRATOR_MAX_CALLS_PER_HOUR` | No (default 6) | Per-game narrator call budget (rolling wall-clock hour). A second budget knob — minimum sim ticks between calls — is currently a constant in `src/routes/narrator.ts` (`MIN_TICKS_BETWEEN_NARRATOR_CALLS`), not yet an env var. |
 
@@ -62,9 +63,9 @@ and `CREW_DB` isn't `memory` — fail fast rather than silently falling back in 
 
 1. Build (or import) an `Env` via `loadEnv()` from `@crew/server`.
 2. Build a `Db` via `createDb(env)` from `@crew/server`.
-3. Call `createApp({ db, env, runNarrator })` — `runNarrator` defaults to `nullNarrator` until W9
-   supplies the real one; W9's function should be constructed once at module scope (it may hold
-   an Anthropic client) and passed in, not rebuilt per request.
+3. Call `createApp({ db, env })` — `runNarrator` defaults to `defaultNarrator` (W9), which uses
+   `@crew/narrator`'s `runNarrator` when `OPENROUTER_API_KEY` is set and `nullNarrator` otherwise.
+   Tests inject their own `runNarrator`.
 4. Export the resulting Hono app's `fetch` as the function's default export (Hono apps implement
    the standard Fetch API `fetch(Request): Promise<Response>`, which Vercel's Node runtime
    accepts directly).

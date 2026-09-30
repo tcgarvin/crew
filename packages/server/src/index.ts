@@ -4,7 +4,7 @@ import type { AuthAnonResponse } from "./contract";
 import { createDb } from "./db/client";
 import type { Db } from "./db/types";
 import { type Env, loadEnv } from "./env";
-import { type RunNarrator, nullNarrator } from "./narrator";
+import { type RunNarrator, defaultNarrator } from "./narrator";
 import { registerGameRoutes } from "./routes/games";
 import { registerNarratorRoutes } from "./routes/narrator";
 import { registerSaveRoutes } from "./routes/saves";
@@ -14,7 +14,7 @@ export type { Db } from "./db/types";
 export { createDb } from "./db/client";
 export { loadEnv } from "./env";
 export type { Env } from "./env";
-export { nullNarrator } from "./narrator";
+export { defaultNarrator, nullNarrator } from "./narrator";
 export type { NarratorCtx, RunNarrator } from "./narrator";
 
 export interface AppEnv {
@@ -24,7 +24,7 @@ export interface AppEnv {
 export interface AppDeps {
   readonly db: Db;
   readonly env: Env;
-  /** W9 injects the real LLM-backed narrator here; defaults to `nullNarrator`. */
+  /** Tests inject a fake here; defaults to `defaultNarrator` (W9). */
   readonly runNarrator?: RunNarrator;
 }
 
@@ -34,7 +34,7 @@ export interface AppDeps {
  * without touching Neon or an LLM.
  */
 export function createApp(deps: AppDeps): Hono<AppEnv> {
-  const { db, env, runNarrator = nullNarrator } = deps;
+  const { db, env, runNarrator = defaultNarrator } = deps;
   const app = new Hono<AppEnv>();
   const mintLimiter = new MintRateLimiter();
 

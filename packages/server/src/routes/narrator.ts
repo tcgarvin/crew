@@ -117,8 +117,10 @@ export function registerNarratorRoutes(
     const startedAt = Date.now();
     try {
       const response: NarratorResponse = await runNarrator(reqBody, {
-        anthropicApiKey: env.anthropicApiKey,
+        openRouterApiKey: env.openRouterApiKey,
         gameId,
+        notes: game.narrativeNotes,
+        ...(env.narratorModel === undefined ? {} : { model: env.narratorModel }),
       });
       const latencyMs = Date.now() - startedAt;
 
@@ -127,10 +129,12 @@ export function registerNarratorRoutes(
           gameId,
           hookKind: reqBody.hook.kind,
           basisSaveId: basisSave.id,
-          model: MODEL_PLACEHOLDER,
-          promptVersion: PROMPT_VERSION_PLACEHOLDER,
-          inputTokens: null,
-          outputTokens: null,
+          // W9: the response carries model, prompt version and usage; `fallback` (null path and
+          // why) is kept in the `response` jsonb.
+          model: response.model,
+          promptVersion: response.promptVersion,
+          inputTokens: response.usage?.inputTokens ?? null,
+          outputTokens: response.usage?.outputTokens ?? null,
           latencyMs,
           status: "ok",
           request: reqBody,

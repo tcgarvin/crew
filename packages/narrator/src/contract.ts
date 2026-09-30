@@ -23,6 +23,9 @@ import type {
   Tick,
 } from "@crew/sim";
 import { z } from "zod";
+import type { NarratorNotes } from "./notes";
+
+export type { NarratorCastEntry, NarratorNotes } from "./notes";
 
 // ---------------------------------------------------------------------------------------------
 // HTTP exchange
@@ -41,22 +44,70 @@ export interface NarratorRequest {
  * Prose for a decision card that already exists in sim state (e.g. a policy decision), written
  * from the captain's point of view. Presentation only: the main thread shows it over the
  * template text; it never enters sim state. W0 decision.
+ *
+ * W9 change: `{prompt, left, right}` became `{title, situation, leftLabel, rightLabel}` (GDD §22:
+ * a full-screen card with a heading, the situation, and two sides). No numbers in any field.
  */
 export interface DecisionCardProse {
   readonly decisionId: string;
-  readonly prompt: string;
-  readonly left: string;
-  readonly right: string;
+  readonly title: string;
+  /** Captain's point of view, at most `CARD_SITUATION_MAX_WORDS` words. */
+  readonly situation: string;
+  readonly leftLabel: string;
+  readonly rightLabel: string;
+}
+
+/** GDD §22 card budget. */
+export const CARD_SITUATION_MAX_WORDS = 60;
+
+/** Why a response came from the deterministic null path instead of the model (W9). */
+export const FALLBACK_REASONS = [
+  "notConfigured",
+  "apiError",
+  "timeout",
+  "refusal",
+  "truncated",
+  "schemaInvalid",
+] as const;
+export type FallbackReason = (typeof FALLBACK_REASONS)[number];
+
+/** Token accounting for `narrator_calls` (W9). Zero on the null path. */
+export interface NarratorUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadInputTokens: number;
+  readonly cacheCreationInputTokens: number;
+}
+
+/** An intent the translator refused, with a reason fed back to the model via notes. */
+export interface DroppedIntent {
+  readonly intentIndex: number;
+  /** The intent's `kind` as the model wrote it (may be anything for a malformed intent). */
+  readonly kind: string;
+  readonly reason: string;
 }
 
 export interface NarratorResponse {
   /** Already translated and validated against the snapshot; the kernel revalidates on apply. */
   readonly commands: readonly NarratorCommand[];
   readonly card?: DecisionCardProse;
-  /** Replacement running summary, stored in `games.narrative_notes`. */
-  readonly notesUpdate?: string;
+  /**
+   * Replacement running notes, stored in `games.narrative_notes` (jsonb). W9 change: was a
+   * string; now the structured `NarratorNotes` object.
+   */
+  readonly notesUpdate?: NarratorNotes;
   /** `narrator_calls.id`, for audit and for minting command IDs (`cmd:narrator:<callId>:<n>`). */
   readonly callId: string;
+  /** W9 addition: model ID, or `"null-narrator"` on the fallback path (`narrator_calls.model`). */
+  readonly model: string;
+  /** W9 addition: `PROMPT_VERSION` (`narrator_calls.prompt_version`). */
+  readonly promptVersion: string;
+  /** W9 addition. */
+  readonly usage?: NarratorUsage;
+  /** W9 addition: set when the null path answered instead of the model, and why. */
+  readonly fallback?: FallbackReason;
+  /** W9 addition: intents the translator dropped (audit; also folded into the notes). */
+  readonly dropped?: readonly DroppedIntent[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -71,7 +122,10 @@ export interface NarratorResponse {
 export interface NarratorVocabulary {
   /** Port def IDs. */
   readonly ports: readonly [string, ...string[]];
-  /** Machine instance IDs aboard. */
+  /**
+   * Machine instance IDs aboard. W9: only machines whose def has a fault catalog; when none do,
+   * the builder uses `NO_CHOICE` so the enum stays non-empty and the translator drops it.
+   */
   readonly machines: readonly [string, ...string[]];
   /** Fault keys across those machines' catalogs; the translator checks the pairing. */
   readonly faultKeys: readonly [string, ...string[]];
@@ -80,6 +134,9 @@ export interface NarratorVocabulary {
   /** External store keys across ports; the translator checks the pairing. */
   readonly storeKeys: readonly [string, ...string[]];
 }
+
+/** Placeholder enum value for a vocabulary list that would otherwise be empty (W9). */
+export const NO_CHOICE = "(none)";
 
 /** Coarse pay position inside the config price band; the translator maps it to credits. */
 export const PAY_TIERS = ["low", "standard", "generous"] as const;
@@ -129,7 +186,10 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
 
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
-    prompt: z.string().describe("The situation, from the captain's point of view. No numbers."),
+    title: z.string().describe("Card heading, two to six words."),
+    situation: z
+      .string()
+      .describe("The situation from the captain's point of view. At most 60 words. No numbers."),
     left: decisionSide,
     right: decisionSide,
   });
@@ -139,9 +199,22 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
     rationale: z.string(),
     intents: z.array(z.union([offerJob, spawnAtBoundary, scheduleFault, surfaceDecision])),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */
-    card: z.strictObject({ prompt: z.string(), left: z.string(), right: z.string() }).nullable(),
-    /** The full replacement running summary of the story so far. */
-    notes: z.string(),
+    card: z
+      .strictObject({
+        title: z.string(),
+        situation: z.string(),
+        leftLabel: z.string(),
+        rightLabel: z.string(),
+      })
+      .nullable(),
+    /** The full replacement running notes (W9: structured, see `NarratorNotes`). */
+    notes: z.strictObject({
+      summary: z.string().describe("The story so far in a few sentences."),
+      openThreads: z.array(z.string()).describe("Hooks set up and not yet paid off."),
+      cast: z
+        .array(z.strictObject({ name: z.string(), note: z.string() }))
+        .describe("Supporting characters you introduced; not the crew."),
+    }),
   });
 }
 
@@ -159,12 +232,16 @@ export interface TranslationCtx {
   /** Commands are targeted at this tick (the hook tick, D5). */
   readonly hookTick: Tick;
   readonly callId: string;
+  /** W9 addition: the hook being answered; defaults to the snapshot's pending hook. */
+  readonly hook?: DeepReadonly<NarratorHook>;
 }
 
 export interface TranslationResult {
   readonly commands: readonly NarratorCommand[];
+  /** W9 addition: prose for the pending policy decision, when the plan's card passed checks. */
+  readonly card?: DecisionCardProse;
   /** Intents dropped with a reason (bad pairing, out of budget, stale target); logged, not fatal. */
-  readonly dropped: readonly { readonly intentIndex: number; readonly reason: string }[];
+  readonly dropped: readonly DroppedIntent[];
 }
 
 /**

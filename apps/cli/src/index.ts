@@ -112,7 +112,14 @@ export function crew(argv: readonly string[]): CliResult {
 
 const isMain = process.argv[1]?.endsWith("index.ts") ?? false;
 if (isMain) {
-  const result = crew(process.argv.slice(2));
-  console.log(result.output);
-  process.exitCode = result.exitCode;
+  const argv = process.argv.slice(2);
+  // W9: `crew narrator …` is async (it may call a model), so it is dispatched here.
+  const pending =
+    argv[0] === "narrator"
+      ? import("./narrator-eval").then((m) => m.runNarratorCli(argv[1], argv.slice(2)))
+      : Promise.resolve(crew(argv));
+  pending.then((result) => {
+    console.log(result.output);
+    process.exitCode = result.exitCode;
+  });
 }

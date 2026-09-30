@@ -2,8 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "types": ["node"]
   },
   "include": ["src"],
-  "references": [{ "path": "../sim" }, { "path": "../content" }]
+  "references": [
+    {
+      "path": "../sim"
+    },
+    {
+      "path": "../content"
+    }
+  ]
 }

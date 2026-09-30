@@ -75,13 +75,18 @@ describe("NarratorPlan structured-output schema", () => {
         { kind: "scheduleFault", machine: "m1", faultKey: "wornBearing", window: "later" },
         {
           kind: "surfaceDecision",
-          prompt: "A stranger asks for passage.",
+          title: "A stranger at the ramp",
+          situation: "A stranger asks for passage.",
           left: { label: "Take her aboard", effect: "setCourse", coursePort: "port.b" },
           right: { label: "Refuse", effect: "none", coursePort: null },
         },
       ],
       card: null,
-      notes: "The crew took on seals at Port A.",
+      notes: {
+        summary: "The crew took on seals at Port A.",
+        openThreads: ["Who is the stranger?"],
+        cast: [{ name: "Harbour co-op", note: "Regular employer." }],
+      },
     };
     expect(schema.parse(plan)).toEqual(plan);
     expect(schema.safeParse({ ...plan, intents: [{ kind: "setMoney", amount: 5 }] }).success).toBe(

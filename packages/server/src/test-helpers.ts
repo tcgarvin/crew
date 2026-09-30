@@ -49,8 +49,18 @@ export async function readJson(res: Response): Promise<any> {
   return res.json();
 }
 
+export const TEST_NOTES = {
+  summary: "updated notes",
+  openThreads: [],
+  cast: [],
+  lastUpdatedTick: 0,
+  lastRejections: [],
+};
+
 export const echoNarrator: RunNarrator = async () => ({
   commands: [],
   callId: "test-call",
-  notesUpdate: "updated notes",
+  model: "test-model",
+  promptVersion: "test",
+  notesUpdate: TEST_NOTES,
 });

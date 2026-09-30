@@ -1,28 +1,51 @@
 /**
- * The narrator function the server calls, and its default (W9 replaces `runNarrator` via
- * injection — see `routes/narrator.ts` — with the real LLM-backed implementation; this package
- * imports only *types* from `@crew/narrator`, never `@anthropic-ai/sdk`, so it has no LLM runtime
- * dependency of its own).
+ * The narrator function the server calls (W9). `defaultNarrator` runs `@crew/narrator`'s
+ * `runNarrator` when an OpenRouter key is configured and the deterministic `nullNarrator`
+ * otherwise; tests inject their own through `createApp({ runNarrator })`.
  */
-import { randomUUID } from "node:crypto";
-import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
+import {
+  type ModelTransport,
+  type NarratorRequest,
+  type NarratorResponse,
+  nullNarratorResponse,
+  openRouterTransport,
+  runNarrator,
+} from "@crew/narrator";
 
-/** Context passed to `runNarrator`; carries secrets through without this package reading them. */
+/** Context passed to a `RunNarrator`; carries secrets through without this package using them. */
 export interface NarratorCtx {
-  readonly anthropicApiKey: string | undefined;
+  /** `OPENROUTER_API_KEY`. */
+  readonly openRouterApiKey: string | undefined;
   readonly gameId: string;
+  /** Stored `games.narrative_notes` jsonb, as read from the db (parsed by the narrator). */
+  readonly notes?: unknown;
+  /** `CREW_NARRATOR_MODEL`; absent = the narrator's default. */
+  readonly model?: string;
 }
 
 export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorResponse>;
 
+/** Deterministic offline narrator: no commands, a template card for policy decisions. */
+export const nullNarrator: RunNarrator = async (req) => nullNarratorResponse(req);
+
 /**
- * Deterministic offline/test narrator: no commands, no card, no notes change. Keeps the game
- * playable end-to-end (hook fires, request round-trips, response applies as a no-op) before W9
- * lands. `docs/DEPLOYMENT.md` explains how to swap in the real one.
+ * W9 decision: OpenRouter transport (owner). The transport that sends the key to OpenRouter is
+ * not implemented yet (see the W9 report); until it is, a configured key still yields the null
+ * fallback, marked `fallback: "notConfigured"` in the call log.
  */
-export const nullNarrator: RunNarrator = async (_req, _ctx) => {
-  return {
-    commands: [],
-    callId: randomUUID(),
-  };
+function transportFor(apiKey: string): ModelTransport | undefined {
+  return openRouterTransport({ apiKey });
+}
+
+export const defaultNarrator: RunNarrator = async (req, ctx) => {
+  if (ctx.openRouterApiKey === undefined || ctx.openRouterApiKey === "") {
+    return nullNarrator(req, ctx);
+  }
+  const transport = transportFor(ctx.openRouterApiKey);
+  return runNarrator(req, {
+    gameId: ctx.gameId,
+    notes: ctx.notes,
+    ...(transport === undefined ? {} : { transport }),
+    ...(ctx.model === undefined ? {} : { model: ctx.model }),
+  });
 };

@@ -10,12 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "latest",
     "@crew/content": "workspace:*",
     "@crew/sim": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }
