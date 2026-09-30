@@ -68,6 +68,9 @@ import portKesslerDrift from "../data/ports/kessler-drift.json";
 // Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
 
+// People (D25)
+import peopleNameTable from "../data/people/name-table.json";
+
 // Config
 import configDefault from "../data/config/default.json";
 
@@ -192,6 +195,7 @@ export function rawBundle(): Record<string, unknown> {
     traits: keyById(TRAITS),
     ports: keyById(PORTS),
     scenarios: keyById(SCENARIOS),
+    people: stripSchemaKey(peopleNameTable),
     config: stripSchemaKey(configDefault),
   };
   return { ...withoutHash, hash: hashOf(withoutHash) };

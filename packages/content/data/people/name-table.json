@@ -1,0 +1,84 @@
+{
+  "$schema": "../../schema-json/people.schema.json",
+  "givenNames": [
+    "Ysolde",
+    "Rendell",
+    "Maren",
+    "Tobiah",
+    "Anouk",
+    "Caspar",
+    "Ifeoma",
+    "Lio",
+    "Petra",
+    "Hamid",
+    "Juno",
+    "Oskar",
+    "Saoirse",
+    "Teodor",
+    "Wren",
+    "Adaeze",
+    "Bram",
+    "Noor",
+    "Emeric",
+    "Halla"
+  ],
+  "familyNames": [
+    "Maren",
+    "Okafor",
+    "Vance",
+    "Lindqvist",
+    "Castellanos",
+    "Achterberg",
+    "Nakamura-Reyes",
+    "Duarte",
+    "Farrow",
+    "Iyer",
+    "Kowalczyk",
+    "Mbeki",
+    "Ortega",
+    "Rask",
+    "Sadler",
+    "Thorne",
+    "Ueda",
+    "Whitlock"
+  ],
+  "pitches": [
+    "I've got {cargo} sitting on my dock and a buyer in {to} who keeps asking where it is.",
+    "Nothing clever about this one: {cargo} from {from} to {to}, handled like you mean it.",
+    "You look like a crew that shows up where they say they will. I need that for {to}.",
+    "My usual hauler went quiet a week ago. I'd rather not find out why the hard way.",
+    "It's {cargo} for {to}. Keep it dry, keep it upright, and we'll get along fine."
+  ],
+  "cargoWords": {
+    "general": "general freight",
+    "fragile": "fragile equipment",
+    "perishable": "fresh produce",
+    "hazardous": "hazardous cargo"
+  },
+  "ports": {
+    "port.crossroads_hub": {
+      "roles": ["freight broker", "berth agent", "transfer clerk", "dispatcher"],
+      "orgs": ["Crossroads Logistics Co-op", "Meridian Trading House", "Hub Transfer Office"],
+      "pitches": [
+        "Three lanes meet here and every one of them is running late. Yours doesn't have to be.",
+        "I've had this manifest on my screen all shift. Take it off my hands?"
+      ]
+    },
+    "port.kessler_drift": {
+      "roles": ["shift foreman", "assay clerk", "fabrication lead", "ore-dock boss"],
+      "orgs": ["Kessler Drift Mining Guild", "Drift Fabrication Shop", "Drift Assay Office"],
+      "pitches": [
+        "The ore haulers won't touch anything that isn't ore. You're not an ore hauler.",
+        "Packed it myself. If it arrives in {to} the way it left here, I'll remember your ship."
+      ]
+    },
+    "port.green_meridian": {
+      "roles": ["grower", "silo keeper", "co-op steward", "seed-bank archivist"],
+      "orgs": ["Meridian Growers Collective", "Green Meridian Cooperative", "Meridian Seed Bank"],
+      "pitches": [
+        "This lot was picked this morning. It won't wait for the next quiet ship.",
+        "We grow it slow out here. Getting it to {to} is the part we can't do ourselves."
+      ]
+    }
+  }
+}

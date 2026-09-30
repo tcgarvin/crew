@@ -8,7 +8,13 @@ export { buildDigest, DIGEST_MAX_CHARS, type NarratorDigest } from "./digest";
 export { EMPTY_NOTES, boundNotes, parseNotes } from "./notes";
 export { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 export { planJsonSchema, planSchemaFor } from "./plan";
-export { HOOK_INSTRUCTIONS, PROMPT_VERSION, SYSTEM_PROMPT, buildPrompt } from "./prompts/index";
+export {
+  HOOK_INSTRUCTIONS,
+  PROMPT_VERSION,
+  STATIC_RULES,
+  SYSTEM_PROMPT,
+  buildPrompt,
+} from "./prompts/index";
 export {
   DEFAULT_NARRATOR_MODEL,
   NARRATOR_TIMEOUT_MS,
@@ -29,4 +35,4 @@ export {
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";
 export { buildVocabulary } from "./vocabulary";
 export { approachingPortRequest, FIXTURE_SCENARIO, quietTooLongRequest } from "./fixtures";
-export { OPENROUTER_URL, openRouterTransport } from "./openrouter";
+export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";

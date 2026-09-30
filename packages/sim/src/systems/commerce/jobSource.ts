@@ -5,6 +5,10 @@
  * `surface: true` — the same command path a real narrator would use (see `jobs.ts` module doc),
  * so the game has content offline.
  *
+ * D25 (2026-09-30): each offer comes from a person with a pitch, drawn from the content name
+ * table (`ContentBundle.people`) over the `social` stream, so offline offers have the same shape
+ * as the narrator's.
+ *
  * Integration 2 (job-board loop fix): the board used to refill whenever fewer than `boardSize`
  * offers were open, and every offer surfaces a decision, so a host that resolves decisions at
  * once saw a fresh offer (and, on accept, a fresh manifest) every tick. The source now stays
@@ -18,9 +22,10 @@
 import { configTicks } from "../../core/clock";
 import type { Command, JobDraft, QueuedCommand } from "../../core/types/commands";
 import type { JobTemplateDef, PortDef } from "../../core/types/content";
-import type { CommandId, PortDefId } from "../../core/types/ids";
+import type { CommandId, ItemDefId, PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
-import { checkPriceBand } from "./jobs";
+import { JOB_URGENCIES } from "../../core/types/travel";
+import { LEGACY_ISSUER_ROLE, checkPriceBand } from "./jobs";
 
 /**
  * What the source did this tick: `issued` an offer, stayed `quiet` by the rules above, or found
@@ -75,12 +80,55 @@ function draftFromTemplate(
   const max = Math.floor(band.max * distance * units);
   const pay = max < min ? min : ctx.rng.int("commerce", min, max);
   return {
+    // Replaced by `drawPerson` once a draft passes the price band.
     issuer: template.issuer,
     description: { key: "job.template", params: { template: template.key } },
     fromPortId,
     toPortId: template.toPortId,
     cargo,
     pay,
+  };
+}
+
+/**
+ * D25: who offers the job and what they say, drawn from the content name table over the
+ * `social` stream (people are social; the `commerce` stream keeps drawing only routes, counts and
+ * pay, so adding people did not reshuffle which jobs appear). Without a table entry for the port
+ * the template's `issuer` becomes the name.
+ */
+function drawPerson(
+  ctx: Pick<StepCtx, "content" | "rng">,
+  portId: PortDefId,
+  template: JobTemplateDef,
+  draft: JobDraft,
+): Pick<JobDraft, "issuer" | "pitch" | "urgency"> {
+  const people = ctx.content.people;
+  const local = people?.ports[portId];
+  if (people === undefined || local === undefined) {
+    return { issuer: { name: template.issuer, role: LEGACY_ISSUER_ROLE } };
+  }
+  const given = ctx.rng.pick("social", people.givenNames);
+  const familyIndex = ctx.rng.int("social", 0, people.familyNames.length - 1);
+  // "Maren Maren" reads as a typo; step to the next family name instead.
+  const family =
+    people.familyNames[familyIndex] === given
+      ? people.familyNames[(familyIndex + 1) % people.familyNames.length]
+      : people.familyNames[familyIndex];
+  const role = ctx.rng.pick("social", local.roles);
+  const org = ctx.rng.pick("social", local.orgs);
+  const line = ctx.rng.pick("social", [...people.pitches, ...local.pitches]);
+  const urgency = ctx.rng.pick("social", JOB_URGENCIES);
+  const cargoClass = ctx.content.items[draft.cargo[0]?.itemDefId ?? ("" as ItemDefId)]?.cargoClass;
+  const fill: Record<string, string> = {
+    cargo: cargoClass === undefined ? "freight" : people.cargoWords[cargoClass],
+    from: ctx.content.ports[draft.fromPortId]?.name ?? draft.fromPortId,
+    to: ctx.content.ports[draft.toPortId]?.name ?? draft.toPortId,
+  };
+  const prose = line.replace(/\{(\w+)\}/g, (whole, key: string) => fill[key] ?? whole);
+  return {
+    issuer: { name: `${given} ${family ?? ""}`.trim(), role, org },
+    pitch: { key: "job.pitch", params: { template: template.key }, prose },
+    urgency,
   };
 }
 
@@ -105,7 +153,7 @@ export function runJobSource(ctx: StepCtx): JobSourceOutcome {
       id: `cmd:jobsource:${ctx.tick}` as CommandId,
       source: "system",
       kind: "offerJob",
-      payload: { job: draft, surface: true },
+      payload: { job: { ...draft, ...drawPerson(ctx, portId, template, draft) }, surface: true },
     });
     return "issued";
   }

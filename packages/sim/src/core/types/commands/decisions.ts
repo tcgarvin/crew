@@ -5,6 +5,13 @@ import type { TextRef } from "../common";
 import type { ActorId, DecisionId, HookId, JobId } from "../ids";
 import type { CommandDraft } from "./index";
 
+/** One side of a card. `aftermath` (D26, additive) is copied onto the `DecisionOption`. */
+export interface DecisionCardSide {
+  readonly label: TextRef;
+  readonly commands: readonly CommandDraft[];
+  readonly aftermath?: TextRef;
+}
+
 /**
  * A decision card as authored by the narrator or a policy. W0 decision: narrator cards are
  * single-level (no nested `next` card) to keep the LLM schema non-recursive; the kernel picks the
@@ -12,8 +19,8 @@ import type { CommandDraft } from "./index";
  */
 export interface DecisionCardSpec {
   readonly prompt: TextRef;
-  readonly left: { readonly label: TextRef; readonly commands: readonly CommandDraft[] };
-  readonly right: { readonly label: TextRef; readonly commands: readonly CommandDraft[] };
+  readonly left: DecisionCardSide;
+  readonly right: DecisionCardSide;
   readonly jobId?: JobId;
   /**
    * Additive (2026-09-30): an explicit perspective override for `surfaceDecision`, for a

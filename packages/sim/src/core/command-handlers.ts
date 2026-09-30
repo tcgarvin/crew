@@ -19,10 +19,17 @@ import { findCrewDef, findItemDef } from "./defs";
 import { allocateId } from "./ids";
 import type { KernelRegistry } from "./registry";
 import type { Actor, Needs } from "./types/actor";
-import type { Command, CommandKind, CommandOfKind, ScenarioSpawn } from "./types/commands";
+import type {
+  Command,
+  CommandKind,
+  CommandOfKind,
+  DecisionCardSide,
+  ScenarioSpawn,
+} from "./types/commands";
 import { AUTHORITY } from "./types/commands/authority";
 import type { PhysicalLocation } from "./types/common";
 import type { CrewDef } from "./types/content";
+import type { DecisionOption } from "./types/decisions";
 import type { ActorId, CommandId, DecisionId, EntityId, TempRef } from "./types/ids";
 import type { Item } from "./types/ship";
 
@@ -367,6 +374,15 @@ function defaultPerspectiveActor(state: ValidateCtx["state"]): ActorId {
   return firstOfficer?.id ?? captain.id;
 }
 
+/** A card side as a decision option; `aftermath` (D26) only when the side has one (JSON-safe). */
+function optionFromSide(side: DecisionCardSide): DecisionOption {
+  return {
+    label: side.label,
+    commands: [...side.commands],
+    ...(side.aftermath === undefined ? {} : { aftermath: side.aftermath }),
+  };
+}
+
 interface SurfaceDecisionPlan {
   readonly perspectiveActorId: ActorId;
 }
@@ -450,8 +466,8 @@ function surfaceDecisionHandler(
         origin: command.source === "narrator" ? "narrator" : "policy",
         perspectiveActorId: plan.perspectiveActorId,
         prompt: card.prompt,
-        left: { label: card.left.label, commands: [...card.left.commands] },
-        right: { label: card.right.label, commands: [...card.right.commands] },
+        left: optionFromSide(card.left),
+        right: optionFromSide(card.right),
         status: "pending",
         createdTick: ctx.tick,
         ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),

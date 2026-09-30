@@ -9,10 +9,10 @@
     "tick": 4000
   },
   "snapshot": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "simVersion": "0.1.0",
-    "contentHash": "4e06bb1771611bd5",
-    "configHash": "4e06bb1771611bd5",
+    "contentHash": "23dc2fb5dcc8d3c7",
+    "configHash": "23dc2fb5dcc8d3c7",
     "savedAtTick": 4000,
     "config": {
       "time": {
@@ -44,7 +44,25 @@
         "seekThreshold": 0.5,
         "mealSeconds": 15,
         "sleepMinSeconds": 90,
-        "wakeBelow": 0.15
+        "wakeBelow": 0.15,
+        "initialRange": {
+          "hunger": {
+            "min": 0.2,
+            "max": 0.6
+          },
+          "fatigue": {
+            "min": 0.1,
+            "max": 0.5
+          },
+          "comfort": {
+            "min": 0,
+            "max": 0.3
+          },
+          "social": {
+            "min": 0.1,
+            "max": 0.5
+          }
+        }
       },
       "work": {
         "reconsiderEveryTicks": 10,
@@ -76,7 +94,8 @@
         "departSeconds": 5,
         "approachSeconds": 8,
         "dockSeconds": 5,
-        "nominalSpeed": 1
+        "nominalSpeed": 1,
+        "staffEstimateSeconds": 0
       },
       "commerce": {
         "priceBands": {
@@ -98,7 +117,10 @@
           }
         },
         "jobOfferTtlSeconds": 600,
-        "boardSize": 3
+        "boardSize": 3,
+        "dockingFee": 150,
+        "haulEstimateSeconds": 5,
+        "reofferSeconds": 20
       },
       "narrator": {
         "quietTooLongSeconds": 40,
@@ -107,7 +129,8 @@
         "maxFaultWindowSeconds": 90,
         "spawnBudget": 3,
         "faultBudget": 2,
-        "budgetRefillSeconds": 300
+        "budgetRefillSeconds": 300,
+        "hookOnEvents": ["driftingChanged", "contractCompleted"]
       },
       "host": {
         "runAheadCapSeconds": 60,
@@ -134,18 +157,32 @@
           }
         ]
       },
+      "social": {
+        "chatRadiusTiles": 2,
+        "chatCooldownSeconds": 45,
+        "templateLines": [
+          "{a} joked about the food",
+          "{b} complained about the docking fee",
+          "{a} asked {b} whether the coolant pump always sounds like that",
+          "{a} and {b} argued about the fastest route home",
+          "{a} told {b} a story about an old captain",
+          "{a} and {b} swapped gossip from the last port",
+          "{b} laughed at {a}'s joke about the engine",
+          "{a} wondered aloud what the next job pays"
+        ]
+      },
       "events": {
         "tickerMaxEntries": 30,
         "traceRingSize": 1000
       }
     },
     "state": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 23,
       "tick": 4000,
       "rng": {
-        "setup": [3464898602, 320481471, 2130406177, 2112697213],
+        "setup": [2185677829, 3017915094, 3950393640, 2112697245],
         "failures": [1134699342, 2349627105, 3509581199, 2790150076],
         "perception": [2761679845, 1175231655, 4062458773, 2543368377],
         "social": [1003637810, 3702929690, 1558872614, 2487836107],
@@ -320,7 +357,7 @@
           "location": {
             "kind": "onDeck",
             "deckId": "deck.freighter_mk1",
-            "x": 26.5,
+            "x": 28.5,
             "y": 7.5
           },
           "movement": {
@@ -1314,7 +1351,18 @@
         "j1": {
           "id": "j1",
           "origin": "portBoard",
-          "issuer": "Meridian Trading House",
+          "issuer": "Tobiah Rask, Meridian Trading House",
+          "issuerPerson": {
+            "name": "Tobiah Rask",
+            "role": "freight broker",
+            "org": "Meridian Trading House"
+          },
+          "pitch": {
+            "key": "job.pitch",
+            "params": {},
+            "prose": "Four crates for the growers. They've been waiting since before the lane reopened."
+          },
+          "urgency": "soon",
           "description": {
             "key": "job.template",
             "params": {

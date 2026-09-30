@@ -6,6 +6,7 @@ import {
   deckDefSchema,
   itemDefSchema,
   machineDefSchema,
+  peopleTableDefSchema,
   portDefSchema,
   scenarioDefSchema,
   traitDefSchema,
@@ -303,6 +304,37 @@ describe("content def schemas", () => {
   });
 });
 
+const people = {
+  givenNames: ["Ysolde"],
+  familyNames: ["Maren"],
+  pitches: ["I've got {cargo} for {to}."],
+  cargoWords: {
+    general: "general freight",
+    fragile: "fragile equipment",
+    perishable: "fresh produce",
+    hazardous: "hazardous cargo",
+  },
+  ports: {
+    "port.test.a": { roles: ["grower"], orgs: ["Test Growers"], pitches: [] },
+  },
+};
+
+describe("people table (D25)", () => {
+  it("accepts a valid table", () => {
+    expect(peopleTableDefSchema.safeParse(people).success).toBe(true);
+  });
+
+  it("rejects a pitch that mentions a number (D24: no pay on cards)", () => {
+    const bad = { ...people, pitches: ["I'll pay 500 for it."] };
+    expect(peopleTableDefSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects an unknown placeholder", () => {
+    const bad = { ...people, pitches: ["Ask {captain} about it."] };
+    expect(peopleTableDefSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
 describe("bundle validation", () => {
   const bundle = {
     decks: { [deck.id]: deck },
@@ -312,6 +344,7 @@ describe("bundle validation", () => {
     traits: { [trait.id]: trait },
     ports: { [port.id]: port, [portB.id]: portB },
     scenarios: { [scenario.id]: scenario },
+    people,
     config,
     hash: "test",
   };

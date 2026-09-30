@@ -25,12 +25,14 @@ import {
   configTicks,
 } from "@crew/sim";
 import {
+  AFTERMATH_MAX_WORDS,
   CARD_SITUATION_MAX_WORDS,
   type DecisionCardProse,
   type DroppedIntent,
   NO_CHOICE,
   type NarratorIntent,
   type NarratorPlan,
+  PITCH_MAX_WORDS,
   type TranslateIntents,
   type TranslationCtx,
   type TranslationResult,
@@ -156,10 +158,22 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
     return no("offerJob: cannot surface a new card while a policy decision is pending");
   }
   if (intent.surface && env.tally.cardUsed) return no("offerJob: only one card per call");
-  const issuer = clipChars(intent.issuer, ISSUER_MAX_CHARS);
+  const name = clipChars(intent.issuerName, ISSUER_MAX_CHARS);
+  const role = clipChars(intent.issuerRole, ISSUER_MAX_CHARS).toLowerCase();
+  const org = intent.issuerOrg === null ? "" : clipChars(intent.issuerOrg, ISSUER_MAX_CHARS);
+  const pitch = clipWords(intent.pitch, PITCH_MAX_WORDS);
   const description = clipChars(intent.description, DESCRIPTION_MAX_CHARS);
-  const problem = textProblem(issuer, env.secrets) ?? textProblem(description, env.secrets);
-  if (problem !== undefined) return no(`offerJob: ${problem}`);
+  const texts: [string, string][] = [
+    ["issuerName", name],
+    ["issuerRole", role],
+    ["pitch", pitch],
+    ["description", description],
+  ];
+  if (org !== "") texts.push(["issuerOrg", org]);
+  for (const [field, text] of texts) {
+    const problem = textProblem(text, env.secrets);
+    if (problem !== undefined) return no(`offerJob: ${field}: ${problem}`);
+  }
   const units = JOB_QUANTITY_UNITS[intent.quantity];
   const { pay } = payFor(config, item.cargoClass, distance, units, intent.payTier);
   if (intent.surface) env.tally.cardUsed = true;
@@ -167,7 +181,9 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
     kind: "offerJob",
     payload: {
       job: {
-        issuer,
+        issuer: { name, role, ...(org === "" ? {} : { org }) },
+        pitch: { key: NARRATOR_TEXT_KEYS.jobPitch, params: {}, prose: pitch },
+        urgency: intent.urgency,
         description: { key: NARRATOR_TEXT_KEYS.jobDescription, params: {}, prose: description },
         fromPortId: intent.fromPort as PortDefId,
         toPortId: intent.toPort as PortDefId,
@@ -272,6 +288,17 @@ function translateSide(
   return ok({ label, commands: [command] });
 }
 
+/**
+ * D26: an aftermath caption, clipped to `AFTERMATH_MAX_WORDS`. Blank means "none" (the card
+ * closes without one) rather than a reason to drop the whole card; numbers or secrets do drop it.
+ */
+function aftermathText(env: Env, text: string, which: string): Outcome<string> {
+  if (text.trim() === "") return ok("");
+  const clipped = clipWords(text, AFTERMATH_MAX_WORDS);
+  const problem = textProblem(clipped, env.secrets);
+  return problem === undefined ? ok(clipped) : no(`${which}: ${problem}`);
+}
+
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
   if (env.hook?.kind === "policyDecision") {
     return no("surfaceDecision: a policy decision is pending; dress it with `card` instead");
@@ -285,13 +312,20 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   if (!left.ok) return no(`surfaceDecision: ${left.reason}`);
   const right = translateSide(env, intent.right, "right");
   if (!right.ok) return no(`surfaceDecision: ${right.reason}`);
+  const leftAftermath = aftermathText(env, intent.leftAftermath, "leftAftermath");
+  if (!leftAftermath.ok) return no(`surfaceDecision: ${leftAftermath.reason}`);
+  const rightAftermath = aftermathText(env, intent.rightAftermath, "rightAftermath");
+  if (!rightAftermath.ok) return no(`surfaceDecision: ${rightAftermath.reason}`);
   if (left.value.label.toLowerCase() === right.value.label.toLowerCase()) {
     return no("surfaceDecision: both sides have the same label");
   }
   env.tally.cardUsed = true;
-  const sideSpec = (s: { label: string; commands: CommandDraft[] }) => ({
+  const sideSpec = (s: { label: string; commands: CommandDraft[] }, aftermath: string) => ({
     label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
     commands: s.commands,
+    ...(aftermath === ""
+      ? {}
+      : { aftermath: { key: NARRATOR_TEXT_KEYS.aftermath, params: {}, prose: aftermath } }),
   });
   return ok({
     kind: "surfaceDecision",
@@ -299,8 +333,8 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
       card: {
         // W9 decision: `DecisionCardSpec` has no title field; it travels in the prompt params.
         prompt: { key: NARRATOR_TEXT_KEYS.situation, params: { title }, prose: situation },
-        left: sideSpec(left.value),
-        right: sideSpec(right.value),
+        left: sideSpec(left.value, leftAftermath.value),
+        right: sideSpec(right.value, rightAftermath.value),
       },
     },
   });
@@ -323,6 +357,15 @@ function translateOne(env: Env, intent: NarratorIntent): Outcome<NarratorDraft> 
 // Policy card
 // ---------------------------------------------------------------------------------------------
 
+/** `{[key]: value}` when the card has that optional field, else `{}` (JSON-safe spreading). */
+function pick<K extends "leftAftermath" | "rightAftermath">(
+  card: DecisionCardProse,
+  key: K,
+): Partial<Pick<DecisionCardProse, K>> {
+  const value = card[key];
+  return value === undefined ? {} : ({ [key]: value } as Pick<DecisionCardProse, K>);
+}
+
 function policyCard(
   env: Env,
   plan: NarratorPlan,
@@ -334,14 +377,30 @@ function policyCard(
   if (decision === undefined || decision.status !== "pending") return undefined;
   const fallback = templateCard(decision, env.content);
   if (plan.card === null) return fallback;
+  const leftAftermath = plan.card.leftAftermath.trim();
+  const rightAftermath = plan.card.rightAftermath.trim();
   const card: DecisionCardProse = {
     decisionId: decision.id,
     title: clipChars(plan.card.title, TITLE_MAX_CHARS),
     situation: clipWords(plan.card.situation, CARD_SITUATION_MAX_WORDS),
     leftLabel: clipChars(plan.card.leftLabel, LABEL_MAX_CHARS),
     rightLabel: clipChars(plan.card.rightLabel, LABEL_MAX_CHARS),
+    // D26: a blank aftermath falls back to the decision's template one, if it has one.
+    ...(leftAftermath === ""
+      ? pick(fallback, "leftAftermath")
+      : { leftAftermath: clipWords(leftAftermath, AFTERMATH_MAX_WORDS) }),
+    ...(rightAftermath === ""
+      ? pick(fallback, "rightAftermath")
+      : { rightAftermath: clipWords(rightAftermath, AFTERMATH_MAX_WORDS) }),
   };
-  const problem = [card.title, card.situation, card.leftLabel, card.rightLabel]
+  const problem = [
+    card.title,
+    card.situation,
+    card.leftLabel,
+    card.rightLabel,
+    ...(card.leftAftermath === undefined ? [] : [card.leftAftermath]),
+    ...(card.rightAftermath === undefined ? [] : [card.rightAftermath]),
+  ]
     .map((t) => textProblem(t, env.secrets))
     .find((p) => p !== undefined);
   if (problem !== undefined) {

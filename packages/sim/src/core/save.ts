@@ -4,6 +4,7 @@
  */
 import { emptyCaches, rebuildCaches } from "./caches";
 import { checkInvariants } from "./invariants";
+import { migrations } from "./migrations";
 import type { KernelRegistry } from "./registry";
 import type { ContentBundle } from "./types/content";
 import type { RestoredWorld, World } from "./types/kernel";
@@ -11,12 +12,11 @@ import { type MigrationRegistry, SIM_VERSION, type SaveEnvelope } from "./types/
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
 
 /**
- * Migrations keyed by the schema version they upgrade *from*. Empty while `SCHEMA_VERSION` is 1:
- * there is no older schema (before the slice is playable, bumps wipe saves instead).
+ * Migrations keyed by the schema version they upgrade *from* (`./migrations`).
  * W2 decision: no identity entry at the current version, because by the contract's keying that
  * entry would claim to upgrade the current version to the next one.
  */
-export const migrations: MigrationRegistry = {};
+export { migrations } from "./migrations";
 
 export class SaveCompatibilityError extends Error {
   constructor(message: string) {

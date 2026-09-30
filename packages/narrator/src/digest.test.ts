@@ -76,4 +76,30 @@ describe("buildDigest", () => {
     expect(text).toContain("open thread: A buyer at Meridian");
     expect(text).toContain("rejected last time: offerJob: no route");
   });
+
+  it("lists the people the captain knows at the port, without pay (D24, D25)", () => {
+    const req = quietTooLongRequest(content());
+    const notes = {
+      ...EMPTY_NOTES,
+      cast: [
+        {
+          name: "Ysolde Maren",
+          note: "grower, owes us a favour",
+          portId: "port.green_meridian",
+          lastSeenTick: 1200,
+        },
+        {
+          name: "Hamid Rask",
+          note: "Hub dispatcher",
+          portId: "port.crossroads_hub",
+          lastSeenTick: 3,
+        },
+      ],
+    };
+    const { text } = buildDigest(req.snapshot, req.recentEvents, notes, content(), req.hook);
+    const section = text.split("## People you know here (Green Meridian)\n")[1]?.split("\n\n")[0];
+    expect(section).toBe("- Ysolde Maren: grower, owes us a favour; last seen at tick 1200");
+    expect(text).toContain("from Tobiah Rask (freight broker, Meridian Trading House)");
+    expect(text).not.toContain("pays");
+  });
 });

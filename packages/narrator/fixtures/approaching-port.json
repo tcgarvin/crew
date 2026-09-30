@@ -10,10 +10,10 @@
     "tick": 1800
   },
   "snapshot": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "simVersion": "0.1.0",
-    "contentHash": "4e06bb1771611bd5",
-    "configHash": "4e06bb1771611bd5",
+    "contentHash": "23dc2fb5dcc8d3c7",
+    "configHash": "23dc2fb5dcc8d3c7",
     "savedAtTick": 1800,
     "config": {
       "time": {
@@ -45,7 +45,25 @@
         "seekThreshold": 0.5,
         "mealSeconds": 15,
         "sleepMinSeconds": 90,
-        "wakeBelow": 0.15
+        "wakeBelow": 0.15,
+        "initialRange": {
+          "hunger": {
+            "min": 0.2,
+            "max": 0.6
+          },
+          "fatigue": {
+            "min": 0.1,
+            "max": 0.5
+          },
+          "comfort": {
+            "min": 0,
+            "max": 0.3
+          },
+          "social": {
+            "min": 0.1,
+            "max": 0.5
+          }
+        }
       },
       "work": {
         "reconsiderEveryTicks": 10,
@@ -77,7 +95,8 @@
         "departSeconds": 5,
         "approachSeconds": 8,
         "dockSeconds": 5,
-        "nominalSpeed": 1
+        "nominalSpeed": 1,
+        "staffEstimateSeconds": 0
       },
       "commerce": {
         "priceBands": {
@@ -99,7 +118,10 @@
           }
         },
         "jobOfferTtlSeconds": 600,
-        "boardSize": 3
+        "boardSize": 3,
+        "dockingFee": 150,
+        "haulEstimateSeconds": 5,
+        "reofferSeconds": 20
       },
       "narrator": {
         "quietTooLongSeconds": 40,
@@ -108,7 +130,8 @@
         "maxFaultWindowSeconds": 90,
         "spawnBudget": 3,
         "faultBudget": 2,
-        "budgetRefillSeconds": 300
+        "budgetRefillSeconds": 300,
+        "hookOnEvents": ["driftingChanged", "contractCompleted"]
       },
       "host": {
         "runAheadCapSeconds": 60,
@@ -135,18 +158,32 @@
           }
         ]
       },
+      "social": {
+        "chatRadiusTiles": 2,
+        "chatCooldownSeconds": 45,
+        "templateLines": [
+          "{a} joked about the food",
+          "{b} complained about the docking fee",
+          "{a} asked {b} whether the coolant pump always sounds like that",
+          "{a} and {b} argued about the fastest route home",
+          "{a} told {b} a story about an old captain",
+          "{a} and {b} swapped gossip from the last port",
+          "{b} laughed at {a}'s joke about the engine",
+          "{a} wondered aloud what the next job pays"
+        ]
+      },
       "events": {
         "tickerMaxEntries": 30,
         "traceRingSize": 1000
       }
     },
     "state": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 1800,
       "rng": {
-        "setup": [717875034, 940798222, 2374502547, 2642480682],
+        "setup": [579729197, 3804436575, 2292900567, 2642480714],
         "failures": [1582426525, 2602999351, 3919693342, 331545566],
         "perception": [2529467439, 2466509179, 3806309496, 3389621],
         "social": [4013384287, 356094304, 665230829, 3499190074],
@@ -321,7 +358,7 @@
           "location": {
             "kind": "onDeck",
             "deckId": "deck.freighter_mk1",
-            "x": 26.5,
+            "x": 28.5,
             "y": 7.5
           },
           "movement": {

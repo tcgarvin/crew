@@ -4,7 +4,7 @@
  * sim cannot do. Static for a game (it changes only with content), so it sits in the cached
  * system prefix; per-call limits (budgets, current port) are in the digest.
  */
-import type { ConfigDef, ContentBundle, FaultEffect } from "@crew/sim";
+import { type ConfigDef, type ContentBundle, type FaultEffect, JOB_URGENCIES } from "@crew/sim";
 import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
@@ -74,7 +74,10 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   );
   lines.push(`- One cargo item kind per job. quantity: ${q(JOB_QUANTITY_UNITS)} units.`);
   lines.push(
-    "- payTier low | standard | generous places the pay inside the class price band for the route; the engine computes the credits. Never state amounts in prose.",
+    "- payTier low | standard | generous is a private lever: it places the pay inside the class price band for the route and the engine computes it. No text ever mentions pay.",
+  );
+  lines.push(
+    `- issuerName, issuerRole and issuerOrg (or null) name the one person offering it; pitch is one line they say to the captain. urgency ${JOB_URGENCIES.join(" | ")} colours the card only; nothing enforces a deadline.`,
   );
   lines.push(
     "- surface=true shows it to the captain now as an accept/decline card (counts as this call's one card). surface=false posts it quietly on the port board.",
@@ -118,6 +121,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   );
   lines.push(
     "- At most one card per call (a surfaced job counts). No new cards on a policyDecision hook: dress the existing one instead.",
+  );
+  lines.push(
+    "- leftAftermath / rightAftermath: what happens next on each side, shown to the captain for a moment after the choice.",
   );
   return lines.join("\n");
 }

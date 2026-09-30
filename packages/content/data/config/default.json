@@ -105,7 +105,7 @@
     "boardSize": 3,
     "dockingFee": 150,
     "haulEstimateSeconds": 5,
-    "reofferSeconds": 60
+    "reofferSeconds": 20
   },
   "narrator": {
     "quietTooLongSeconds": 40,

@@ -1346,6 +1346,86 @@
         "additionalProperties": false
       }
     },
+    "people": {
+      "type": "object",
+      "properties": {
+        "givenNames": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "familyNames": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "pitches": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cargoWords": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": ["general", "fragile", "perishable", "hazardous"]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": ["general", "fragile", "perishable", "hazardous"]
+        },
+        "ports": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "roles": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "orgs": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "pitches": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": ["roles", "orgs", "pitches"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["givenNames", "familyNames", "pitches", "cargoWords", "ports"],
+      "additionalProperties": false
+    },
     "config": {
       "type": "object",
       "properties": {
@@ -2042,6 +2122,7 @@
     "traits",
     "ports",
     "scenarios",
+    "people",
     "config",
     "hash"
   ],

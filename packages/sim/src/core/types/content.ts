@@ -678,6 +678,31 @@ export interface ConfigDef {
  *
  * W0 decision: the bundle also carries `traits` and `scenarios` tables beyond the six def kinds.
  */
+/**
+ * D25 (2026-09-30): who offers work, for the deterministic job source (`data/people/`). Names
+ * are drawn from the shared lists; roles, organisations and extra pitch lines are per port, so
+ * the people at a mining outpost sound like it. Pitch lines take `{cargo}`, `{from}` and `{to}`
+ * placeholders and never mention pay (D24).
+ */
+export interface PeopleTableDef {
+  readonly givenNames: readonly string[];
+  readonly familyNames: readonly string[];
+  /** Pitch lines usable at any port. */
+  readonly pitches: readonly string[];
+  /** How people say each cargo class in a pitch or on a card ("fragile equipment"), lower case. */
+  readonly cargoWords: Readonly<Record<CargoClass, string>>;
+  readonly ports: Readonly<
+    Record<
+      PortDefId,
+      {
+        readonly roles: readonly string[];
+        readonly orgs: readonly string[];
+        readonly pitches: readonly string[];
+      }
+    >
+  >;
+}
+
 export interface ContentBundle {
   readonly decks: Readonly<Record<DeckDefId, DeckDef>>;
   readonly machines: Readonly<Record<MachineDefId, MachineDef>>;
@@ -686,6 +711,11 @@ export interface ContentBundle {
   readonly traits: Readonly<Record<TraitDefId, TraitDef>>;
   readonly ports: Readonly<Record<PortDefId, PortDef>>;
   readonly scenarios: Readonly<Record<ScenarioDefId, ScenarioDef>>;
+  /**
+   * D25 name table. Optional so hand-built test bundles need not carry one; without it the job
+   * source falls back to the template's `issuer` as the person's name.
+   */
+  readonly people?: PeopleTableDef;
   readonly config: ConfigDef;
   readonly hash: string;
 }

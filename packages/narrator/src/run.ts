@@ -7,7 +7,13 @@
  * blocks the game (review N3).
  */
 import { loadBundle } from "@crew/content";
-import type { ContentBundle } from "@crew/sim";
+import {
+  type ContentBundle,
+  type NarratorCommand,
+  SCHEMA_VERSION,
+  type SaveEnvelope,
+  migrateState,
+} from "@crew/sim";
 import { buildCapabilities } from "./capabilities";
 import type {
   DroppedIntent,
@@ -18,7 +24,7 @@ import type {
   NarratorResponse,
 } from "./contract";
 import { buildDigest } from "./digest";
-import { type NarratorNotes, boundNotes, parseNotes } from "./notes";
+import { type MetIssuer, type NarratorNotes, boundNotes, mergeCast, parseNotes } from "./notes";
 import { nullNarratorResponse } from "./null";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
@@ -125,18 +131,45 @@ function parsePlan(content: string, schema: NarratorPlanSchema): NarratorPlan {
   return result.data;
 }
 
+/** D25: the people who made the captain an offer this call, for the cast. */
+function issuersMet(commands: readonly NarratorCommand[]): MetIssuer[] {
+  return commands.flatMap((command) => {
+    if (command.kind !== "offerJob") return [];
+    const { issuer, fromPortId } = command.payload.job;
+    if (typeof issuer === "string") return [];
+    const note = issuer.org === undefined ? issuer.role : `${issuer.role}, ${issuer.org}`;
+    return [{ name: issuer.name, note: `${note}; offered us work`, portId: fromPortId }];
+  });
+}
+
 function notesFrom(
   plan: NarratorPlan,
+  previous: NarratorNotes,
   tick: number,
+  commands: readonly NarratorCommand[],
   dropped: readonly DroppedIntent[],
 ): NarratorNotes {
   return boundNotes({
     summary: plan.notes.summary,
     openThreads: plan.notes.openThreads,
-    cast: plan.notes.cast,
+    cast: mergeCast(plan.notes.cast, previous.cast, issuersMet(commands), tick),
     lastUpdatedTick: tick,
     lastRejections: dropped.map((d) => d.reason),
   });
+}
+
+/**
+ * A snapshot from an older build (a client mid-deploy, a stored fixture) is upgraded with the
+ * kernel's save migrations before anything reads it, so the digest and translator only ever see
+ * the current state shape.
+ */
+function currentSnapshot(snapshot: SaveEnvelope): SaveEnvelope {
+  if (snapshot.schemaVersion === SCHEMA_VERSION) return snapshot;
+  const state = migrateState(
+    JSON.parse(JSON.stringify(snapshot.state)),
+    snapshot.schemaVersion,
+  ) as SaveEnvelope["state"];
+  return { ...snapshot, schemaVersion: SCHEMA_VERSION, state };
 }
 
 async function callTransport(
@@ -172,14 +205,14 @@ export async function runNarratorWithTrace(
 ): Promise<NarratorRun> {
   const content = ctx.content ?? defaultContent();
   const callId = ctx.callId ?? globalThis.crypto.randomUUID();
-  const snapshot = req.snapshot;
+  const snapshot = currentSnapshot(req.snapshot);
   const notes = parseNotes(ctx.notes);
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
   const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
   const prompt = buildPrompt(capabilities, digest, req.hook.kind);
   const baseTrace: NarratorTrace = { digest: digest.text, capabilities, prompt };
   const fallback = (reason: FallbackReason, error: string, trace = baseTrace): NarratorRun => ({
-    response: nullNarratorResponse(req, { callId, fallback: reason, content }),
+    response: nullNarratorResponse({ ...req, snapshot }, { callId, fallback: reason, content }),
     trace,
     error,
   });
@@ -203,7 +236,7 @@ export async function runNarratorWithTrace(
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
-      notesUpdate: notesFrom(plan, req.hook.tick, translated.dropped),
+      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated.commands, translated.dropped),
       callId,
       model: result.model,
       promptVersion: PROMPT_VERSION,

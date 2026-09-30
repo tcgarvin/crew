@@ -100,7 +100,14 @@ describe("narrator", () => {
     const notes = {
       summary: "Took on core samples at the Drift.",
       openThreads: ["Who is the assay clerk?"],
-      cast: [{ name: "Ines Varga", note: "assay clerk, nervous" }],
+      cast: [
+        {
+          name: "Ines Varga",
+          note: "assay clerk, nervous",
+          portId: "port.kessler_drift",
+          lastSeenTick: 1800,
+        },
+      ],
       lastUpdatedTick: 0,
       lastRejections: ["offerJob: no route"],
     };

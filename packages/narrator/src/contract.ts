@@ -13,14 +13,15 @@
  *   every property required (absence is `null`).
  * - `NarratorCommand`: the kernel's strict command subset. Only the translator produces these.
  */
-import type {
-  ContentBundle,
-  DeepReadonly,
-  NarratorCommand,
-  NarratorHook,
-  SaveEnvelope,
-  SimEvent,
-  Tick,
+import {
+  type ContentBundle,
+  type DeepReadonly,
+  JOB_URGENCIES,
+  type NarratorCommand,
+  type NarratorHook,
+  type SaveEnvelope,
+  type SimEvent,
+  type Tick,
 } from "@crew/sim";
 import { z } from "zod";
 import type { NarratorNotes } from "./notes";
@@ -55,10 +56,20 @@ export interface DecisionCardProse {
   readonly situation: string;
   readonly leftLabel: string;
   readonly rightLabel: string;
+  /**
+   * D26 (additive, 2026-09-30): what happens next once that side is chosen, shown briefly before
+   * the card closes. At most `AFTERMATH_MAX_WORDS` words, no numbers. Absent = none available.
+   */
+  readonly leftAftermath?: string;
+  readonly rightAftermath?: string;
 }
 
 /** GDD §22 card budget. */
 export const CARD_SITUATION_MAX_WORDS = 60;
+/** D25: an issuer's pitch is one line of dialogue. */
+export const PITCH_MAX_WORDS = 30;
+/** D26: an aftermath caption is one plain statement. */
+export const AFTERMATH_MAX_WORDS = 20;
 
 /** Why a response came from the deterministic null path instead of the model (W9). */
 export const FALLBACK_REASONS = [
@@ -154,15 +165,24 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
     coursePort: port.nullable(),
   });
 
+  // D25: every offer comes from a named person who says something; D24: nobody talks pay.
   const offerJob = z.strictObject({
     kind: z.literal("offerJob"),
-    issuer: z.string(),
-    description: z.string().describe("One or two sentences a dockside contact would say."),
+    issuerName: z.string().describe("The person offering the job: given and family name."),
+    issuerRole: z.string().describe("What they do, lower case, e.g. 'shift foreman'."),
+    issuerOrg: z.string().nullable().describe("Who they work for, or null if nobody."),
+    pitch: z
+      .string()
+      .describe(
+        "One line the issuer says to the captain, in their own voice. At most 30 words. No pay, prices or numbers.",
+      ),
+    description: z.string().describe("One or two sentences about the job itself. No pay."),
     fromPort: port,
     toPort: port,
     cargoItem: z.enum(vocab.cargoItems),
     quantity: z.enum(QUANTITIES),
     payTier: z.enum(PAY_TIERS),
+    urgency: z.enum(JOB_URGENCIES).describe("How pressing it sounds on the card."),
     /** Present it as an accept/decline card now. */
     surface: z.boolean(),
   });
@@ -184,6 +204,13 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
     window: z.enum(FAULT_WINDOWS),
   });
 
+  // D26: shown for a moment after the choice, before the card closes.
+  const aftermath = z
+    .string()
+    .describe(
+      "What happens next if the captain picks this side, as one plain statement. At most 20 words. No numbers.",
+    );
+
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
     title: z.string().describe("Card heading, two to six words."),
@@ -192,6 +219,8 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
       .describe("The situation from the captain's point of view. At most 60 words. No numbers."),
     left: decisionSide,
     right: decisionSide,
+    leftAftermath: aftermath,
+    rightAftermath: aftermath,
   });
 
   return z.strictObject({
@@ -205,6 +234,8 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
         situation: z.string(),
         leftLabel: z.string(),
         rightLabel: z.string(),
+        leftAftermath: aftermath,
+        rightAftermath: aftermath,
       })
       .nullable(),
     /** The full replacement running notes (W9: structured, see `NarratorNotes`). */
@@ -212,8 +243,16 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
       summary: z.string().describe("The story so far in a few sentences."),
       openThreads: z.array(z.string()).describe("Hooks set up and not yet paid off."),
       cast: z
-        .array(z.strictObject({ name: z.string(), note: z.string() }))
-        .describe("Supporting characters you introduced; not the crew."),
+        .array(
+          z.strictObject({
+            name: z.string(),
+            note: z.string(),
+            portId: port.nullable().describe("The port where the captain can find them, if any."),
+          }),
+        )
+        .describe(
+          "Supporting characters you introduced (issuers, contacts); not the crew. Keep people the captain has met.",
+        ),
     }),
   });
 }

@@ -35,13 +35,17 @@ function plan(intents: unknown[]): NarratorPlan {
 
 const job = {
   kind: "offerJob",
-  issuer: "Kessler Drift Mining Guild",
+  issuerName: "Ysolde Maren",
+  issuerRole: "Shift foreman",
+  issuerOrg: "Kessler Drift Mining Guild",
+  pitch: "The deep face ate our last set of bits. Get these to the Hub and I'll owe you one.",
   description: "Drill bits for the deep face, and quick about it.",
   fromPort: "port.kessler_drift",
   toPort: "port.crossroads_hub",
   cargoItem: "item.crate_hazardous",
   quantity: "few",
   payTier: "generous",
+  urgency: "urgent",
   surface: true,
 };
 
@@ -51,6 +55,8 @@ const decision = {
   situation: "A dock foreman asks whether we could run a sealed crate to the Hub on our way.",
   left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
   right: { label: "Not our business", effect: "none", coursePort: null },
+  leftAftermath: "We set course for the Hub with the crate aboard.",
+  rightAftermath: "The foreman nods and goes looking for another ship.",
 };
 
 function expectNarratorOnly(commands: readonly NarratorCommand[]): void {
@@ -79,6 +85,40 @@ describe("translateIntents: valid intents", () => {
     expect(draft.pay).toBeGreaterThanOrEqual(Math.round(band.min * distance * 3));
     expect(draft.pay).toBeLessThanOrEqual(Math.round(band.max * distance * 3));
     expect(command.payload.surface).toBe(true);
+    // D25: a person with a role, an organisation and a line of dialogue.
+    expect(draft.issuer).toEqual({
+      name: "Ysolde Maren",
+      role: "shift foreman",
+      org: "Kessler Drift Mining Guild",
+    });
+    expect(draft.pitch?.prose).toBe(job.pitch);
+    expect(draft.urgency).toBe("urgent");
+  });
+
+  it("offerJob without an organisation leaves org out, and clips a long pitch", () => {
+    const req = approachingPortRequest(content());
+    const long = {
+      ...job,
+      issuerOrg: null,
+      pitch: Array.from({ length: 50 }, () => "word").join(" "),
+    };
+    const [command] = translateIntents(plan([long]), ctxOf(req)).commands;
+    if (command?.kind !== "offerJob") throw new Error("expected an offerJob");
+    expect(command.payload.job.issuer).toEqual({ name: "Ysolde Maren", role: "shift foreman" });
+    expect(command.payload.job.pitch?.prose?.split(" ")).toHaveLength(30);
+  });
+
+  it("drops an offer whose pitch talks pay (D24)", () => {
+    const req = approachingPortRequest(content());
+    const paid = {
+      ...job,
+      pitch: "Four hundred's too low. I'll make it 500 credits if you leave now.",
+    };
+    const result = translateIntents(plan([paid]), ctxOf(req));
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "offerJob: pitch: player-facing text states a numeric consequence",
+    );
   });
 
   it("every pay tier lands inside the band for every class and route", () => {
@@ -168,6 +208,9 @@ describe("translateIntents: valid intents", () => {
       { kind: "setCourse", payload: { destinationPortId: "port.crossroads_hub" } },
     ]);
     expect(card.right.commands).toEqual([]);
+    // D26: aftermaths travel on the card sides and land on the Decision options.
+    expect(card.left.aftermath?.prose).toBe(decision.leftAftermath);
+    expect(card.right.aftermath?.prose).toBe(decision.rightAftermath);
     for (const option of [card.left, card.right]) {
       for (const draft of option.commands) {
         expect(AUTHORITY.player as readonly CommandKind[]).toContain(draft.kind);
@@ -268,6 +311,19 @@ describe("translateIntents: drops with reasons", () => {
     expect(two.dropped[0]?.reason).toBe("surfaceDecision: only one card per call");
   });
 
+  it("drops a card whose aftermath states numbers, and omits a blank one (D26)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const numeric = { ...decision, leftAftermath: "We lose 10% of the fuel getting there." };
+    expect(translateIntents(plan([numeric]), ctxOf(req)).dropped[0]?.reason).toBe(
+      "surfaceDecision: leftAftermath: player-facing text states a numeric consequence",
+    );
+    const blank = { ...decision, rightAftermath: "  " };
+    const [command] = translateIntents(plan([blank]), ctxOf(req)).commands;
+    if (command?.kind !== "surfaceDecision") throw new Error("expected a card");
+    expect(command.payload.card.left.aftermath?.prose).toBe(decision.leftAftermath);
+    expect(command.payload.card.right).not.toHaveProperty("aftermath");
+  });
+
   it("drops setCourse sides while not docked", () => {
     const req = approachingPortRequest(content());
     const result = translateIntents(plan([decision]), ctxOf(req));
@@ -316,6 +372,8 @@ describe("translateIntents: malicious plans (N6)", () => {
       situation: "y",
       left: { label: "a", effect: "setMoney", coursePort: null },
       right: { label: "b", effect: "none", coursePort: null },
+      leftAftermath: "",
+      rightAftermath: "",
     },
   ];
 

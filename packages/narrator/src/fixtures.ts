@@ -149,7 +149,14 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
   state.jobs[jobId] = {
     id: jobId,
     origin: "portBoard",
-    issuer: "Meridian Trading House",
+    issuer: "Tobiah Rask, Meridian Trading House",
+    issuerPerson: { name: "Tobiah Rask", role: "freight broker", org: "Meridian Trading House" },
+    pitch: {
+      key: "job.pitch",
+      params: {},
+      prose: "Four crates for the growers. They've been waiting since before the lane reopened.",
+    },
+    urgency: "soon",
     description: { key: "job.template", params: { template: "crates_to_agri" } },
     fromPortId: HUB,
     toPortId: MERIDIAN,

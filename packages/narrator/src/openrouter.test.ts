@@ -1,0 +1,119 @@
+/**
+ * Prompt caching through OpenRouter: the system prefix up to the last breakpoint must be byte
+ * identical between calls for the same game, whatever the tick, digest, notes or hook, or the
+ * provider never reads the cache (the first live call showed zero cache reads).
+ */
+import type { CommandId, SaveEnvelope } from "@crew/sim";
+import { describe, expect, it } from "vitest";
+import type { NarratorRequest } from "./contract";
+import { approachingPortRequest } from "./fixtures";
+import { openRouterTransport, systemContentParts } from "./openrouter";
+import { STATIC_RULES } from "./prompts/index";
+import { runNarrator } from "./run";
+import { content, emptyPlan } from "./test-support";
+
+interface SentBody {
+  readonly messages: readonly [
+    { readonly role: "system"; readonly content: readonly Record<string, unknown>[] },
+    { readonly role: "user"; readonly content: string },
+  ];
+}
+
+/** An OpenRouter stand-in that records request bodies and answers with an empty plan. */
+function recordingFetch() {
+  const bodies: SentBody[] = [];
+  const fake = async (_url: unknown, init?: { body?: unknown }) => {
+    bodies.push(JSON.parse(String(init?.body)) as SentBody);
+    const reply = {
+      model: "anthropic/claude-sonnet-4.6",
+      choices: [{ message: { content: JSON.stringify(emptyPlan()) }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
+    };
+    return new Response(JSON.stringify(reply), { status: 200 });
+  };
+  return { bodies, fetch: fake as unknown as typeof fetch };
+}
+
+/** The same game later on: docked, time moved on, a fault scheduled, different notes and hook. */
+function laterInTheSameGame(req: NarratorRequest): NarratorRequest {
+  if (req.hook.kind !== "approachingPort") throw new Error("expected an arrival fixture");
+  const portId = req.hook.context.portId;
+  const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+  const state = snapshot.state;
+  state.tick += 2_400;
+  state.travel = { stage: "docked", portId };
+  const machine = Object.values(state.machines).find((m) => m.defId === "machine.engine");
+  if (machine === undefined) throw new Error("fixture has no engine");
+  machine.scheduledFaults.push({
+    faultKey: "failed_controller",
+    fireAtTick: state.tick + 400,
+    causeCommandId: "cmd:narrator:earlier:0" as CommandId,
+  });
+  state.narrator.budget.faultsRemaining -= 1;
+  const hook = {
+    id: req.hook.id,
+    kind: "jobBoard" as const,
+    context: { portId },
+    tick: state.tick,
+  } as NarratorRequest["hook"];
+  state.narrator.pendingHook = hook as never;
+  return { ...req, hook, snapshot: { ...snapshot, savedAtTick: state.tick } };
+}
+
+describe("OpenRouter prompt caching", () => {
+  it("two calls for the same game share the system prefix byte for byte", async () => {
+    const { bodies, fetch } = recordingFetch();
+    const transport = openRouterTransport({ apiKey: "test", fetch });
+    const first = approachingPortRequest(content());
+    const second = laterInTheSameGame(first);
+    const notes = {
+      summary: "They owe the Guild a favour.",
+      openThreads: ["The assay office"],
+      cast: [],
+      lastUpdatedTick: first.hook.tick,
+    };
+    await runNarrator(first, { gameId: "g1", content: content(), transport });
+    await runNarrator(second, { gameId: "g1", content: content(), transport, notes });
+
+    const [a, b] = bodies;
+    if (a === undefined || b === undefined) throw new Error("expected two requests");
+    const systemA = a.messages[0].content;
+    const systemB = b.messages[0].content;
+    // Everything up to and including the last breakpoint is identical.
+    const lastBreakpoint = systemA.map((p) => "cache_control" in p).lastIndexOf(true);
+    expect(lastBreakpoint).toBe(systemA.length - 1);
+    expect(JSON.stringify(systemB)).toBe(JSON.stringify(systemA));
+    // The volatile part really did change, and lives after the breakpoint.
+    expect(b.messages[1].content).not.toBe(a.messages[1].content);
+    expect(b.messages[1].content).toContain(`tick ${second.hook.tick}`);
+    expect(JSON.stringify(systemA)).not.toContain(`tick ${first.hook.tick}`);
+    expect(JSON.stringify(systemA)).not.toContain("failed_controller due in");
+  });
+
+  it("puts the game-independent rules first, then the game's capability list", async () => {
+    const { bodies, fetch } = recordingFetch();
+    await runNarrator(approachingPortRequest(content()), {
+      gameId: "g1",
+      content: content(),
+      transport: openRouterTransport({ apiKey: "test", fetch }),
+    });
+    const system = bodies[0]?.messages[0].content ?? [];
+    expect(system[0]).toEqual({
+      type: "text",
+      text: STATIC_RULES,
+      cache_control: { type: "ephemeral" },
+    });
+    // Machine instance IDs (per game) appear only in the second block.
+    expect(String(system[1]?.text)).toMatch(/machine m\d+ "/);
+    expect(STATIC_RULES).not.toMatch(/machine m\d+ "/);
+  });
+
+  it("never marks more than four breakpoints, always including the last block", () => {
+    const parts = systemContentParts(["a", "b", "c", "d", "e", "f"]);
+    const marked = parts.map((p) => "cache_control" in p);
+    expect(marked).toEqual([false, false, true, true, true, true]);
+    expect(systemContentParts(["only"])).toEqual([
+      { type: "text", text: "only", cache_control: { type: "ephemeral" } },
+    ]);
+  });
+});

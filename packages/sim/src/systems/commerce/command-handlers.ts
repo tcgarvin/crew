@@ -32,10 +32,13 @@ import type { Job } from "../../core/types/travel";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 import {
+  DEFAULT_PITCH_KEY,
   acceptJob,
   cargoClassOf,
   cargoStowageZoneKey,
   checkPriceBand,
+  issuerLabel,
+  normaliseIssuer,
   spawnCargoItem,
 } from "./jobs";
 
@@ -43,9 +46,35 @@ import {
 // offerJob
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Params for the offer card's `job.offer` template (`@crew/content` renders them): the person,
+ * the route, the cargo kind, the urgency and the pitch (its prose, or its key when it has none).
+ * D24: pay is deliberately absent, so no card can print it.
+ */
+function offerPromptParams(job: Job): Record<string, string> {
+  const person = job.issuerPerson;
+  const firstLine = job.cargo[0];
+  const pitch = job.pitch.prose;
+  return {
+    issuer: job.issuer,
+    name: person.name,
+    role: person.role,
+    ...(person.org === undefined ? {} : { org: person.org }),
+    from: job.fromPortId,
+    to: job.toPortId,
+    ...(firstLine === undefined ? {} : { cargo: firstLine.itemDefId }),
+    urgency: job.urgency,
+    ...(pitch === undefined || pitch.trim() === "" ? { pitchKey: job.pitch.key } : { pitch }),
+  };
+}
+
 export const offerJob: CommandHandler<"offerJob", null> = {
   validate(ctx, command): Validation<null> {
     const { job } = command.payload;
+    const issuer = normaliseIssuer(job.issuer);
+    if (issuer.name === "" || issuer.role === "") {
+      return reject("invalidPayload", "offerJob: the issuer needs a name and a role");
+    }
     const problem = checkPriceBand(ctx, job.fromPortId, job.toPortId, job.cargo, job.pay);
     if (problem !== null) return reject("outOfBounds", `offerJob: ${problem}`);
     for (const line of job.cargo) {
@@ -63,10 +92,14 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     const jobId: JobId = allocateId(ctx.state, "job");
     // Validated by `checkPriceBand` above: every cargo line shares one `CargoClass`.
     const cargoClass = cargoClassOf(ctx, draft.cargo) ?? "general";
+    const issuerPerson = normaliseIssuer(draft.issuer);
     const job: Job = {
       id: jobId,
       origin: command.source === "narrator" ? "narrator" : "portBoard",
-      issuer: draft.issuer,
+      issuer: issuerLabel(issuerPerson),
+      issuerPerson,
+      pitch: draft.pitch ?? { key: DEFAULT_PITCH_KEY, params: {} },
+      urgency: draft.urgency ?? "relaxed",
       description: draft.description,
       fromPortId: draft.fromPortId,
       toPortId: draft.toPortId,
@@ -93,10 +126,7 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         id: decisionId,
         origin: command.source === "narrator" ? "narrator" : "policy",
         perspectiveActorId: commandActor(ctx.state),
-        prompt: {
-          key: "job.offer",
-          params: { issuer: job.issuer, pay: job.pay, from: job.fromPortId, to: job.toPortId },
-        },
+        prompt: { key: "job.offer", params: offerPromptParams(job) },
         // Integration 2: accepting also sets course for the job's destination. `setCourse`
         // applies after `acceptContract` in the same resolution, sees the freshly raised
         // `cargoToLoad` problems and holds departure until the freight is aboard.
@@ -106,10 +136,12 @@ export const offerJob: CommandHandler<"offerJob", null> = {
             { kind: "acceptContract", payload: { jobId } },
             { kind: "setCourse", payload: { destinationPortId: job.toPortId } },
           ],
+          aftermath: { key: "job.accept.aftermath", params: {} },
         },
         right: {
           label: { key: "job.offer.decline", params: {} },
           commands: [{ kind: "declineJob", payload: { jobId } }],
+          aftermath: { key: "job.decline.aftermath", params: {} },
         },
         status: "pending",
         createdTick: ctx.tick,

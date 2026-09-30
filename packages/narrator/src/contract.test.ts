@@ -56,13 +56,17 @@ describe("NarratorPlan structured-output schema", () => {
       intents: [
         {
           kind: "offerJob",
-          issuer: "Harbour co-op",
+          issuerName: "Ines Varga",
+          issuerRole: "berth agent",
+          issuerOrg: "Harbour co-op",
+          pitch: "Seals for the ring pumps. They've been asking for a month.",
           description: "Crates of pump seals for the ring.",
           fromPort: "port.a",
           toPort: "port.b",
           cargoItem: "item.crate",
           quantity: "few",
           payTier: "standard",
+          urgency: "soon",
           surface: true,
         },
         {
@@ -79,13 +83,15 @@ describe("NarratorPlan structured-output schema", () => {
           situation: "A stranger asks for passage.",
           left: { label: "Take her aboard", effect: "setCourse", coursePort: "port.b" },
           right: { label: "Refuse", effect: "none", coursePort: null },
+          leftAftermath: "She comes aboard and we plot for Port B.",
+          rightAftermath: "She walks back into the crowd.",
         },
       ],
       card: null,
       notes: {
         summary: "The crew took on seals at Port A.",
         openThreads: ["Who is the stranger?"],
-        cast: [{ name: "Harbour co-op", note: "Regular employer." }],
+        cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
       },
     };
     expect(schema.parse(plan)).toEqual(plan);

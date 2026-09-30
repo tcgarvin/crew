@@ -6,11 +6,23 @@ describe("parseNotes", () => {
     const notes = {
       summary: "s",
       openThreads: ["t"],
-      cast: [{ name: "Ines", note: "dock boss" }],
+      cast: [{ name: "Ines", note: "dock boss", portId: "port.kessler_drift", lastSeenTick: 30 }],
       lastUpdatedTick: 40,
       lastRejections: ["r"],
     };
     expect(parseNotes(JSON.parse(JSON.stringify(notes)))).toEqual(notes);
+  });
+
+  it("reads cast stored before D25 with no port and an unknown sighting", () => {
+    const notes = parseNotes({
+      summary: "s",
+      openThreads: [],
+      cast: [{ name: "Ines", note: "dock boss" }],
+      lastUpdatedTick: 40,
+    });
+    expect(notes.cast).toEqual([
+      { name: "Ines", note: "dock boss", portId: null, lastSeenTick: -1 },
+    ]);
   });
 
   it("treats the column default, junk and old strings tolerantly", () => {

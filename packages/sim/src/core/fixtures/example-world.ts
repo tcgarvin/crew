@@ -319,7 +319,14 @@ export function exampleWorldState(): WorldState {
       [j1]: {
         id: j1,
         origin: "portBoard",
-        issuer: "Kessel Freight Cooperative",
+        issuer: "Idris Vane, Kessel Freight Cooperative",
+        issuerPerson: {
+          name: "Idris Vane",
+          role: "freight broker",
+          org: "Kessel Freight Cooperative",
+        },
+        pitch: { key: "job.pitch.default", params: {} },
+        urgency: "relaxed",
         description: {
           key: "job.freight.generic",
           params: { count: 1, destination: "Dantooine Ring" },

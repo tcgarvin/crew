@@ -12,8 +12,37 @@ import type { EventDraft } from "../../core/types/events";
 import type { ItemDefId, ItemId, PortDefId, ProblemId, TransactionId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
-import type { CargoLine, Job } from "../../core/types/travel";
+import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
 import { portStoreLocation } from "../travel/travel";
+
+// ---------------------------------------------------------------------------------------------
+// Issuers (D25)
+// ---------------------------------------------------------------------------------------------
+
+/** Role given to an issuer known only by a bare name (old saves, string-issuer drafts). */
+export const LEGACY_ISSUER_ROLE = "shipper";
+
+/** Text key for the pitch of a job whose draft carried none. */
+export const DEFAULT_PITCH_KEY = "job.pitch.default";
+
+/** The one-line display form of an issuer: "Name, Org", or "Name, role" without an org. */
+export function issuerLabel(issuer: Readonly<JobIssuer>): string {
+  return `${issuer.name}, ${issuer.org ?? issuer.role}`;
+}
+
+/**
+ * A draft's issuer as a person. A bare string (older drafts) becomes the name with the legacy
+ * role; whitespace is trimmed and an empty `org` is dropped, so the result is JSON-safe.
+ */
+export function normaliseIssuer(issuer: string | Readonly<JobIssuer>): JobIssuer {
+  if (typeof issuer === "string") return { name: issuer.trim(), role: LEGACY_ISSUER_ROLE };
+  const org = issuer.org?.trim();
+  return {
+    name: issuer.name.trim(),
+    role: issuer.role.trim(),
+    ...(org === undefined || org === "" ? {} : { org }),
+  };
+}
 
 // ---------------------------------------------------------------------------------------------
 // Price bands (D6)

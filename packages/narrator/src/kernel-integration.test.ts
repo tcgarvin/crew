@@ -43,6 +43,8 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
           situation: "Nothing much is happening, but someone should decide something.",
           left: { label: "Carry on", effect: "none", coursePort: null },
           right: { label: "Take a break", effect: "none", coursePort: null },
+          leftAftermath: "Everyone goes back to what they were doing.",
+          rightAftermath: "The crew down tools for a cup of something hot.",
         },
       ] as unknown as NarratorPlan["intents"],
     });

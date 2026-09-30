@@ -9,6 +9,7 @@
 import {
   type ContentBundle,
   type DeepReadonly,
+  type JobIssuer,
   type NarratorHook,
   type SimEvent,
   actionLabel,
@@ -198,9 +199,50 @@ function jobSection(state: State, content: ContentBundle): Section {
       const cargo = j.cargo
         .map((c) => `${c.count}x ${content.items[c.itemDefId]?.name ?? c.itemDefId}`)
         .join(", ");
-      return `- ${j.id} ${j.status} (${j.origin}): ${j.issuer}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}, ${cargo}, pays ${j.pay}`;
+      // D24: pay is left out; the model has no use for the amount and must never repeat it.
+      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}, ${cargo}`;
     });
   return { heading: "Jobs", lines, priority: 7, trimFrom: "end" };
+}
+
+function personLine(person: DeepReadonly<JobIssuer>): string {
+  return `${person.name} (${person.org === undefined ? person.role : `${person.role}, ${person.org}`})`;
+}
+
+/**
+ * D25 / GDD §21: people the captain has already met at the port the ship is at or approaching:
+ * the narrator's cast placed there, and whoever offered jobs from there before (the null job
+ * source's people too), so the model can bring someone back instead of inventing a stranger.
+ */
+function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: ContentBundle): Section {
+  const state = snapshot.state;
+  const t = state.travel;
+  const portId = offerPortNow(state) ?? (t.stage === "docked" ? t.portId : t.toPortId);
+  const lines: string[] = [];
+  const named = new Set<string>();
+  for (const c of notes.cast) {
+    if (c.portId !== portId) continue;
+    named.add(c.name.toLowerCase());
+    const seen = c.lastSeenTick >= 0 ? `; last seen at tick ${c.lastSeenTick}` : "";
+    lines.push(`- ${c.name}: ${c.note}${seen}`);
+  }
+  const issuers = Object.values(state.jobs)
+    .filter((j) => j.fromPortId === portId)
+    .sort((a, b) => b.offeredTick - a.offeredTick || a.id.localeCompare(b.id));
+  for (const job of issuers) {
+    const key = job.issuerPerson.name.toLowerCase();
+    if (named.has(key)) continue;
+    named.add(key);
+    lines.push(
+      `- ${personLine(job.issuerPerson)}: offered a job to ${portName(content, job.toPortId)} at tick ${job.offeredTick} (${job.status})`,
+    );
+  }
+  return {
+    heading: `People you know here (${portName(content, portId)})`,
+    lines,
+    priority: 5.5,
+    trimFrom: "end",
+  };
 }
 
 function decisionSection(state: State): Section {
@@ -239,7 +281,10 @@ function notesSection(notes: NarratorNotes): Section {
   const lines: string[] = [];
   lines.push(`summary: ${notes.summary || "(nothing yet: this is the first call)"}`);
   for (const thread of notes.openThreads) lines.push(`open thread: ${thread}`);
-  for (const c of notes.cast) lines.push(`cast: ${c.name}: ${c.note}`);
+  for (const c of notes.cast) {
+    const where = c.portId === null ? "" : ` [at ${c.portId}]`;
+    lines.push(`cast: ${c.name}${where}: ${c.note}`);
+  }
   for (const r of notes.lastRejections) lines.push(`rejected last time: ${r}`);
   return { heading: "Your notes so far", lines, priority: 5, trimFrom: "end" };
 }
@@ -281,6 +326,7 @@ export function buildDigest(
     jobSection(state, content),
     crewSection(state, content),
     notesSection(notes),
+    peopleSection(snapshot, notes, content),
     problemSection(state),
     eventSection(recentEvents, state, content),
   ];

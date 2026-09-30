@@ -3,8 +3,12 @@
  *
  * One OpenAI-compatible chat completion with `response_format: json_schema` (strict). The
  * system parts are sent as separate text content parts with Anthropic-style `cache_control`
- * on the last one; OpenRouter forwards that to providers that support prompt caching and
+ * (`systemContentParts`); OpenRouter forwards that to providers that support prompt caching and
  * ignores it elsewhere. `fetch` is injectable so tests never touch the network.
+ *
+ * Caching caveats (2026-09-30): a prefix below the model's minimum cacheable length is silently
+ * not cached (Anthropic: 1024 tokens for Sonnet 4.6, 4096 for Opus 4.6), and a cache lives with
+ * one upstream provider, so a call routed to a different provider starts cold.
  */
 import {
   type ModelRequest,
@@ -38,14 +42,29 @@ interface CompletionBody {
   readonly error?: { readonly message?: string; readonly code?: number | string };
 }
 
+/** Anthropic allows at most four cache breakpoints per request. */
+const MAX_CACHE_BREAKPOINTS = 4;
+
+/**
+ * The system message's content parts. Every system block is static (see `prompts/index.ts`), so
+ * each carries a breakpoint, up to the provider's limit counted back from the last block: the
+ * last static block always has one (the whole static prefix is cached), and an earlier block
+ * that is shared more widely (the rules, identical across games) gets its own so a new game still
+ * reads it from cache. Nothing volatile may ever be passed in `system`.
+ */
+export function systemContentParts(system: readonly string[]) {
+  const firstMarked = Math.max(0, system.length - MAX_CACHE_BREAKPOINTS);
+  return system.map((text, i) =>
+    i >= firstMarked
+      ? { type: "text" as const, text, cache_control: { type: "ephemeral" as const } }
+      : { type: "text" as const, text },
+  );
+}
+
 export function openRouterTransport(options: OpenRouterOptions): ModelTransport {
   const doFetch = options.fetch ?? fetch;
   return async (request: ModelRequest): Promise<ModelResult> => {
-    const systemParts = request.system.map((text, i) =>
-      i === request.system.length - 1
-        ? { type: "text", text, cache_control: { type: "ephemeral" } }
-        : { type: "text", text },
-    );
+    const systemParts = systemContentParts(request.system);
     const body = {
       model: request.model,
       max_tokens: request.maxTokens,

@@ -6,6 +6,7 @@ import { crewDefSchema, traitDefSchema } from "./crew";
 import { deckDefSchema } from "./deck";
 import { itemDefSchema } from "./item";
 import { machineDefSchema } from "./machine";
+import { peopleTableDefSchema } from "./people";
 import { portDefSchema } from "./port";
 import {
   crewDefIdSchema,
@@ -26,6 +27,8 @@ export const contentBundleSchema = z.strictObject({
   traits: z.record(traitDefIdSchema, traitDefSchema),
   ports: z.record(portDefIdSchema, portDefSchema),
   scenarios: z.record(scenarioDefIdSchema, scenarioDefSchema),
+  /** D25: required for authored content; the sim type is optional for hand-built test bundles. */
+  people: peopleTableDefSchema,
   config: configDefSchema,
   /** SHA-256 hex of the canonical bundle, filled in by the bundle compiler. */
   hash: z.string(),

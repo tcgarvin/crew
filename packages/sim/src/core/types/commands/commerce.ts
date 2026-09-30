@@ -3,7 +3,7 @@
  */
 import type { TextRef } from "../common";
 import type { JobId, PortDefId } from "../ids";
-import type { CargoLine } from "../travel";
+import type { CargoLine, JobIssuer, JobUrgency } from "../travel";
 
 /**
  * A job as proposed by the narrator or the deterministic job source. The kernel rejects it if
@@ -11,7 +11,15 @@ import type { CargoLine } from "../travel";
  * narrator cannot mint money.
  */
 export interface JobDraft {
-  readonly issuer: string;
+  /**
+   * D25: the person offering the job. A bare string is still accepted (commands queued by an
+   * older build, hand-written scenarios) and normalised by the handler to `{name, role: "shipper"}`.
+   */
+  readonly issuer: string | Readonly<JobIssuer>;
+  /** D25: one line in the issuer's voice; absent = a generic template line. No pay talk (D24). */
+  readonly pitch?: TextRef;
+  /** Absent = `"relaxed"`. */
+  readonly urgency?: JobUrgency;
   readonly description: TextRef;
   readonly fromPortId: PortDefId;
   readonly toPortId: PortDefId;

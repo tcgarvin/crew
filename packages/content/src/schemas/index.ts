@@ -10,6 +10,7 @@ import { crewDefSchema, traitDefSchema } from "./crew";
 import { deckDefSchema } from "./deck";
 import { itemDefSchema } from "./item";
 import { machineDefSchema } from "./machine";
+import { peopleTableDefSchema } from "./people";
 import { portDefSchema } from "./port";
 import { scenarioDefSchema } from "./scenario";
 
@@ -19,6 +20,7 @@ export * from "./crew";
 export * from "./deck";
 export * from "./item";
 export * from "./machine";
+export * from "./people";
 export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
@@ -33,6 +35,7 @@ export const DEF_SCHEMAS = {
   trait: traitDefSchema,
   port: portDefSchema,
   scenario: scenarioDefSchema,
+  people: peopleTableDefSchema,
   config: configDefSchema,
   bundle: contentBundleSchema,
 } as const;

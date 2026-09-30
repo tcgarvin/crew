@@ -41,9 +41,9 @@ import type { Claim, Problem, Task } from "./work";
 
 /**
  * Bumped on any breaking change to this shape. Each bump ships a `Migration` from the previous
- * version (see save.ts). Before the slice is playable, bump freely and wipe saves.
+ * version (see save.ts). 2 (2026-09-30): jobs gained `issuerPerson`, `pitch` and `urgency` (D25).
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Work slice (W4): problems are written by their owning systems, tasks/claims by work. */
 export interface WorkState {

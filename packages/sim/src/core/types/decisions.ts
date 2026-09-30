@@ -22,6 +22,11 @@ export interface DecisionOption {
   commands: CommandDraft[];
   /** Binary tree: surface this decision next after applying the commands. */
   nextDecisionId?: DecisionId;
+  /**
+   * D26 (additive, 2026-09-30): one line shown for a moment after this side is chosen, before
+   * the card closes, saying plainly what happens next. No numbers.
+   */
+  aftermath?: TextRef;
 }
 
 export type DecisionStatus = "pending" | "resolved" | "dropped";

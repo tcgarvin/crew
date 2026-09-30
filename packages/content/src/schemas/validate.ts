@@ -508,6 +508,28 @@ function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void
   }
 }
 
+/** D25: every port with job templates has people to offer them, and every entry is a port. */
+function checkPeople(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const people = bundle.people;
+  if (people === undefined) return;
+  for (const portId of Object.keys(people.ports)) {
+    if (!(portId in bundle.ports)) {
+      issues.push(issue("referential", ["people", "ports", portId], `unknown port "${portId}"`));
+    }
+  }
+  for (const port of Object.values(bundle.ports)) {
+    if (port.jobTemplates.length > 0 && people.ports[port.id] === undefined) {
+      issues.push(
+        issue(
+          "referential",
+          ["people", "ports"],
+          `port "${port.id}" has job templates but no people entry`,
+        ),
+      );
+    }
+  }
+}
+
 /** L2: cross-references, uniqueness and closed-namespace rules. */
 export function validateReferences(bundle: ContentBundle): readonly ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -521,6 +543,7 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   for (const port of Object.values(bundle.ports)) checkPort(port, bundle, issues);
   for (const scenario of Object.values(bundle.scenarios)) checkScenario(scenario, bundle, issues);
   checkPriceBands(bundle, issues);
+  checkPeople(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;

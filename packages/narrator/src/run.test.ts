@@ -17,13 +17,17 @@ import { TransportError } from "./transport";
 
 const offer = {
   kind: "offerJob",
-  issuer: "Drift Assay Office",
+  issuerName: "Halla Iyer",
+  issuerRole: "assay clerk",
+  issuerOrg: "Drift Assay Office",
+  pitch: "These cores took three shifts to pull. Keep them upright and the Hub labs will love you.",
   description: "Core samples for the Hub labs. Keep them upright.",
   fromPort: "port.kessler_drift",
   toPort: "port.crossroads_hub",
   cargoItem: "item.crate_fragile",
   quantity: "one",
   payTier: "standard",
+  urgency: "relaxed",
   surface: false,
 };
 
@@ -49,14 +53,27 @@ function policyRequest(): NarratorRequest {
     prompt: {
       key: "job.offer",
       params: {
-        issuer: "Hub Co-op",
-        pay: 400,
+        issuer: "Noor Sadler, Hub Co-op",
+        name: "Noor Sadler",
+        role: "dispatcher",
+        org: "Hub Co-op",
         from: "port.crossroads_hub",
         to: "port.kessler_drift",
+        cargo: "item.crate_general",
+        urgency: "soon",
+        pitch: "I've had this manifest on my screen all shift. Take it off my hands?",
       },
     },
-    left: { label: { key: "job.offer.accept", params: {} }, commands: [] },
-    right: { label: { key: "job.offer.decline", params: {} }, commands: [] },
+    left: {
+      label: { key: "job.offer.accept", params: {} },
+      commands: [],
+      aftermath: { key: "job.accept.aftermath", params: {} },
+    },
+    right: {
+      label: { key: "job.offer.decline", params: {} },
+      commands: [],
+      aftermath: { key: "job.decline.aftermath", params: {} },
+    },
     status: "pending",
     createdTick: req.hook.tick,
   };
@@ -88,7 +105,15 @@ describe("runNarrator", () => {
     expect(res.notesUpdate).toEqual({
       summary: "Arrived at the Drift.",
       openThreads: ["The assay office"],
-      cast: [],
+      // D25: whoever made an offer joins the cast at their port, even if the model forgot them.
+      cast: [
+        {
+          name: "Halla Iyer",
+          note: "assay clerk, Drift Assay Office; offered us work",
+          portId: "port.kessler_drift",
+          lastSeenTick: req.hook.tick,
+        },
+      ],
       lastUpdatedTick: req.hook.tick,
       lastRejections: [expect.stringContaining("fromPort must be port.kessler_drift")],
     });
@@ -157,11 +182,13 @@ describe("runNarrator", () => {
     const res = await runNarrator(policyRequest(), ctx());
     expect(res.card).toEqual({
       decisionId: "d1",
-      title: "A job offer",
+      title: "Noor Sadler, Hub Co-op",
       situation:
-        "Hub Co-op has freight bound from Crossroads Hub to Kessler Drift and wants us to carry it.",
+        "“I've had this manifest on my screen all shift. Take it off my hands?” General freight, Crossroads Hub to Kessler Drift, wanted soon.",
       leftLabel: "Take the job",
       rightLabel: "Pass on it",
+      leftAftermath: "Taken. The crew start loading — we leave once the hold is full.",
+      rightAftermath: "You pass. Word gets around the board; another offer usually turns up.",
     });
     expect(res.card?.situation).not.toMatch(/\d/);
   });
@@ -172,6 +199,8 @@ describe("runNarrator", () => {
       situation: "A co-op clerk leans in the hatch with a manifest and a tired smile.",
       leftLabel: "Sign it",
       rightLabel: "Not today",
+      leftAftermath: "The clerk hands over the manifest and the crew start on it.",
+      rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
     const res = await runNarrator(policyRequest(), ctx(transport));

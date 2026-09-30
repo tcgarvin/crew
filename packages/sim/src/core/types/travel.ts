@@ -55,6 +55,24 @@ export type JobStatus =
 
 export type JobOrigin = "portBoard" | "narrator" | "scenario";
 
+/**
+ * D25: the person offering a job. `org` is who they work for, when they work for anyone.
+ * Added 2026-09-30 (schema 2); saves from schema 1 are migrated from the old `issuer` string.
+ */
+export interface JobIssuer {
+  name: string;
+  /** What they do, lower case: "dock foreman", "assay clerk". */
+  role: string;
+  org?: string;
+}
+
+/**
+ * How pressing an offer sounds (presentation only: nothing in the sim enforces a deadline).
+ * Added 2026-09-30.
+ */
+export const JOB_URGENCIES = ["relaxed", "soon", "urgent"] as const;
+export type JobUrgency = (typeof JOB_URGENCIES)[number];
+
 export interface CargoLine {
   itemDefId: ItemDefId;
   count: number;
@@ -68,7 +86,18 @@ export interface CargoLine {
 export interface Job {
   id: JobId;
   origin: JobOrigin;
+  /**
+   * Display label of the issuer ("Ysolde Maren, Meridian Growers"), always
+   * `issuerLabel(issuerPerson)` (systems/commerce) for jobs created since schema 2. Kept a string so existing readers
+   * (the ticker, old saves) are unchanged; the structured person is `issuerPerson`.
+   */
   issuer: string;
+  /** D25 (schema 2): the person offering the job. */
+  issuerPerson: JobIssuer;
+  /** D25 (schema 2): one line of dialogue in the issuer's voice. Never mentions pay (D24). */
+  pitch: TextRef;
+  /** Schema 2: presentation-only urgency, shown as a word on the offer card. */
+  urgency: JobUrgency;
   description: TextRef;
   fromPortId: PortDefId;
   toPortId: PortDefId;
