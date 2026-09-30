@@ -32,6 +32,8 @@ export interface SaveRow {
   readonly savedAtTick: number;
   readonly isMilestone: boolean;
   readonly createdAt: Date;
+  /** Monotonic insertion sequence; breaks `createdAt` ties deterministically (see schema.ts). */
+  readonly seq: number;
 }
 
 export type NarratorCallStatus = "ok" | "error" | "budgetExceeded";
@@ -51,6 +53,8 @@ export interface NarratorCallRow {
   readonly response: unknown;
   readonly error: string | null;
   readonly createdAt: Date;
+  /** Monotonic insertion sequence; breaks `createdAt` ties deterministically (see schema.ts). */
+  readonly seq: number;
 }
 
 export interface PutSaveInput {

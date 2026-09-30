@@ -1,5 +1,5 @@
 {
-  "id": "9297cb59-bb8c-4b7a-9721-31cf01e58f1b",
+  "id": "449c3cd4-244f-4ad9-9aee-19b24e371295",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -185,6 +185,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "seq": {
+          "name": "seq",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -274,6 +280,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "seq": {
+          "name": "seq",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {

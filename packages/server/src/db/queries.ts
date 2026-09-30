@@ -51,6 +51,7 @@ function toSaveRow(row: typeof saves.$inferSelect): SaveRow {
     savedAtTick: row.savedAtTick,
     isMilestone: row.isMilestone,
     createdAt: row.createdAt,
+    seq: row.seq,
   };
 }
 
@@ -70,6 +71,7 @@ function toNarratorCallRow(row: typeof narratorCalls.$inferSelect): NarratorCall
     response: row.response,
     error: row.error,
     createdAt: row.createdAt,
+    seq: row.seq,
   };
 }
 
@@ -180,7 +182,8 @@ export class DrizzleDb implements Db {
       .select()
       .from(narratorCalls)
       .where(eq(narratorCalls.gameId, gameId))
-      .orderBy(desc(narratorCalls.createdAt))
+      // `seq` breaks `created_at` ties deterministically (see schema.ts / memory.ts `byNewest`).
+      .orderBy(desc(narratorCalls.createdAt), desc(narratorCalls.seq))
       .limit(1);
     return row ? toNarratorCallRow(row) : undefined;
   }
@@ -190,7 +193,8 @@ export class DrizzleDb implements Db {
       .select({ id: saves.id })
       .from(saves)
       .where(and(eq(saves.gameId, gameId), eq(saves.isMilestone, false)))
-      .orderBy(desc(saves.createdAt));
+      // `seq` breaks `created_at` ties deterministically (see schema.ts / memory.ts `byNewest`).
+      .orderBy(desc(saves.createdAt), desc(saves.seq));
     const toDelete = rolling.slice(ROLLING_SAVES_KEPT).map((r) => r.id);
     if (toDelete.length === 0) return;
     for (const id of toDelete) {

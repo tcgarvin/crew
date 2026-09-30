@@ -5,6 +5,7 @@
  */
 import {
   bigint,
+  bigserial,
   boolean,
   customType,
   index,
@@ -69,6 +70,11 @@ export const saves = pgTable(
     savedAtTick: bigint("saved_at_tick", { mode: "number" }).notNull(),
     isMilestone: boolean("is_milestone").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Monotonic tie-breaker for `created_at`, which can collide under fast/batched inserts
+    // (multiple saves land in the same millisecond). Ordering by (created_at desc, seq desc)
+    // gives a deterministic, insertion-order-correct "last N" for pruning. Not exposed on the
+    // wire; `MemoryDb` maintains the equivalent with an in-process counter.
+    seq: bigserial("seq", { mode: "number" }).notNull(),
   },
   (table) => [index("saves_game_id_created_at_idx").on(table.gameId, table.createdAt.desc())],
 );
@@ -92,4 +98,6 @@ export const narratorCalls = pgTable("narrator_calls", {
   response: jsonb("response"),
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Same tie-break purpose as `saves.seq`, for `getLastNarratorCall`.
+  seq: bigserial("seq", { mode: "number" }).notNull(),
 });

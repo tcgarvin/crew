@@ -23,7 +23,8 @@ CREATE TABLE "narrator_calls" (
 	"request" jsonb NOT NULL,
 	"response" jsonb,
 	"error" text,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"seq" bigserial NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "saves" (
@@ -35,7 +36,8 @@ CREATE TABLE "saves" (
 	"content_hash" text NOT NULL,
 	"saved_at_tick" bigint NOT NULL,
 	"is_milestone" boolean DEFAULT false NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"seq" bigserial NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "users" (

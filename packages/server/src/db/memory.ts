@@ -15,11 +15,28 @@ import type {
 
 const ROLLING_SAVES_KEPT = 5;
 
+/**
+ * Compares rows newest-first by `(createdAt, seq)`. `createdAt` has millisecond resolution and
+ * several rows can land in the same tick (e.g. a tight test loop, or batched writes); `seq` is a
+ * per-table monotonic counter assigned at insert time, so ties always resolve to true insertion
+ * order. Mirrors `ORDER BY created_at DESC, seq DESC` in `queries.ts`.
+ */
+function byNewest(
+  a: { createdAt: Date; seq: number },
+  b: { createdAt: Date; seq: number },
+): number {
+  const byTime = b.createdAt.getTime() - a.createdAt.getTime();
+  if (byTime !== 0) return byTime;
+  return b.seq - a.seq;
+}
+
 export class MemoryDb implements Db {
   private readonly users = new Map<string, UserRow>();
   private readonly games = new Map<string, GameRow>();
   private readonly saves = new Map<string, SaveRow>();
   private readonly narratorCalls = new Map<string, NarratorCallRow>();
+  private nextSaveSeq = 1;
+  private nextNarratorCallSeq = 1;
 
   async createUser(anonTokenHash: string): Promise<UserRow> {
     const row: UserRow = { id: randomUUID(), anonTokenHash, createdAt: new Date() };
@@ -77,6 +94,7 @@ export class MemoryDb implements Db {
       savedAtTick: input.savedAtTick,
       isMilestone: input.isMilestone,
       createdAt: new Date(),
+      seq: this.nextSaveSeq++,
     };
     this.saves.set(row.id, row);
     this.games.set(input.gameId, { ...game, headSaveId: row.id, updatedAt: new Date() });
@@ -100,7 +118,12 @@ export class MemoryDb implements Db {
   }
 
   async logNarratorCall(input: LogNarratorCallInput): Promise<NarratorCallRow> {
-    const row: NarratorCallRow = { id: randomUUID(), createdAt: new Date(), ...input };
+    const row: NarratorCallRow = {
+      id: randomUUID(),
+      createdAt: new Date(),
+      seq: this.nextNarratorCallSeq++,
+      ...input,
+    };
     this.narratorCalls.set(row.id, row);
     return row;
   }
@@ -118,7 +141,7 @@ export class MemoryDb implements Db {
     let latest: NarratorCallRow | undefined;
     for (const call of this.narratorCalls.values()) {
       if (call.gameId !== gameId) continue;
-      if (!latest || call.createdAt.getTime() > latest.createdAt.getTime()) latest = call;
+      if (!latest || byNewest(call, latest) < 0) latest = call;
     }
     return latest;
   }
@@ -130,9 +153,7 @@ export class MemoryDb implements Db {
   }
 
   private pruneSaves(gameId: string): void {
-    const gameSaves = [...this.saves.values()]
-      .filter((s) => s.gameId === gameId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const gameSaves = [...this.saves.values()].filter((s) => s.gameId === gameId).sort(byNewest);
     let rollingSeen = 0;
     for (const save of gameSaves) {
       if (save.isMilestone) continue;
