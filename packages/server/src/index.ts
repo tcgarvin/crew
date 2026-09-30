@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 
+export * from "./contract";
+
 /**
  * The Hono app: auth, games/saves API, and narrator orchestration.
  * Only the `GET /api/health` route is wired up for the scaffold; everything

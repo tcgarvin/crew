@@ -1,0 +1,37 @@
+/**
+ * Save envelope and migrations (SD §20.1, PLAN §3 "Saves").
+ */
+import type { Tick } from "./common";
+import type { ConfigDef } from "./content";
+import type { WorldState } from "./state";
+
+/**
+ * What `serialize()` produces and `restore()` accepts. The host gzips and stores it (IndexedDB
+ * locally, Neon remotely). Saves happen only at committed tick boundaries.
+ *
+ * W0 decision: the envelope embeds the full effective `config` (SD §20.1 requires the values, not
+ * just the hash); content is referenced by `contentHash` only, plus `state.defs.dynamic`.
+ */
+export interface SaveEnvelope {
+  /** `WorldState.schemaVersion` at save time; drives migrations. */
+  readonly schemaVersion: number;
+  /** Kernel build identifier (`SIM_VERSION`); informational, for bug reports. */
+  readonly simVersion: string;
+  readonly contentHash: string;
+  readonly configHash: string;
+  readonly savedAtTick: Tick;
+  readonly config: ConfigDef;
+  readonly state: WorldState;
+}
+
+/** Kernel build identifier. Bump when pipeline order or system semantics change. */
+export const SIM_VERSION = "0.1.0";
+
+/** Upgrades raw state from schema version N to N+1. Pure; input is untrusted JSON. */
+export type Migration = (state: unknown) => unknown;
+
+/**
+ * Keyed by the version a migration upgrades *from*. `restore()` applies them in sequence up to
+ * `SCHEMA_VERSION` and throws a clear error on a save newer than the kernel or with a gap.
+ */
+export type MigrationRegistry = Readonly<Record<number, Migration>>;

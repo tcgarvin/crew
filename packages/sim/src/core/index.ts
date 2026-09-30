@@ -1,5 +1,5 @@
 /**
- * Core kernel primitives: world state, clock, ids, rng, events, the tick
- * pipeline, and serialize/restore/migrate. Placeholder for the V1 slice.
+ * Core kernel: world, clock, ids, rng, events, the tick pipeline, and serialize/restore/migrate
+ * (W2). W0 provides only the contracts in `./types`.
  */
-export const CORE_PLACEHOLDER = "core" as const;
+export * from "./types";
