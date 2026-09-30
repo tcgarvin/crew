@@ -25,6 +25,11 @@ and `src/test-helpers.ts` — so they run fully offline and never touch Neon.
 
 ## Migrations
 
+On Vercel, migrations run automatically as the first step of the build command (see
+`vercel.json`): Neon marks `DATABASE_URL` as a sensitive variable, so it cannot be pulled locally
+with `vercel env pull` (it arrives as `[SENSITIVE]`), but it is available to the build and to the
+function at runtime. To migrate a local or throwaway database, set `DATABASE_URL` yourself.
+
 Schema lives in `src/db/schema.ts` (Drizzle); SQL migrations are generated and committed under
 `drizzle/`. Regenerate after changing the schema, then apply:
 

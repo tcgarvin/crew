@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter @crew/web build",
+  "buildCommand": "pnpm --filter @crew/server exec drizzle-kit migrate && pnpm --filter @crew/web build",
   "outputDirectory": "apps/web/dist",
   "functions": {
     "apps/web/api/**/*.ts": {
