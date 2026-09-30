@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.spare_parts_stack",
+  "name": "Spare Parts",
+  "stacking": "stackable",
+  "maxStack": 20,
+  "tags": ["spare"],
+  "toolKinds": [],
+  "mass": 0.5
+}

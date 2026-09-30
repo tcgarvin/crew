@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "modifiers": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": ["hungerRate", "fatigueRate", "comfortRate", "socialRate", "workSpeed", "walkSpeed"]
+      },
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0.25,
+        "maximum": 4
+      }
+    },
+    "excludes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+      }
+    }
+  },
+  "required": ["id", "name", "modifiers", "excludes"],
+  "additionalProperties": false
+}

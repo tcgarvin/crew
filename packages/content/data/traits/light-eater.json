@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.light_eater",
+  "name": "Light Eater",
+  "modifiers": {
+    "hungerRate": 0.8
+  },
+  "excludes": ["trait.hearty_appetite"]
+}

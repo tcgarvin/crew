@@ -20,7 +20,7 @@ import type {
   TaskId,
   TraitDefId,
 } from "./ids";
-import type { Activity } from "./work";
+import type { Activity, Intent } from "./work";
 
 /**
  * Need deficits in [0, 1] (0 = satisfied, 1 = critical). W0 decision (see ConfigDef.needs).
@@ -157,6 +157,11 @@ export interface Actor {
   mood: number;
   schedule: Schedule;
   activity: Activity;
+  /**
+   * W2 addition: the planner's latest `Intent`, written by the planner stage (phase 7) and
+   * consumed (deleted) by the work system when it turns it into a claim/action next tick.
+   */
+  pendingIntent?: Intent;
   /** Tick of the last planner run for this actor; drives switch cooldown and staggering. */
   lastPlannedTick: Tick;
   knowledge: KnowledgeTable;

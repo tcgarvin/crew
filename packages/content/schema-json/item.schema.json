@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stacking": {
+      "type": "string",
+      "enum": ["unique", "stackable"]
+    },
+    "maxStack": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["tool", "consumable", "food", "spare", "cargo", "medical", "container"]
+      }
+    },
+    "toolKinds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+      }
+    },
+    "mass": {
+      "type": "number",
+      "minimum": 0
+    },
+    "cargoClass": {
+      "type": "string",
+      "enum": ["general", "fragile", "perishable", "hazardous"]
+    },
+    "nutrition": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  },
+  "required": ["id", "name", "stacking", "maxStack", "tags", "toolKinds", "mass"],
+  "additionalProperties": false
+}

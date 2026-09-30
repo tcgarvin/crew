@@ -1,0 +1,126 @@
+{
+  "$schema": "../../schema-json/config.schema.json",
+  "time": {
+    "tickRate": 20
+  },
+  "movement": {
+    "walkSpeed": 2,
+    "passDelaySeconds": 0.3,
+    "blockedRerouteSeconds": 2,
+    "fatigueSpeedFloor": 0.6,
+    "loadSpeedPerKg": 0.01,
+    "loadSpeedFloor": 0.5
+  },
+  "doors": {
+    "openSeconds": 0.75,
+    "closeSeconds": 0.75,
+    "autoCloseAfterSeconds": 3,
+    "manualOpenSeconds": 4
+  },
+  "needs": {
+    "hungerPerSecond": 0.000833,
+    "fatiguePerSecondAwake": 0.000556,
+    "fatiguePerSecondWorking": 0.000833,
+    "fatigueRecoveryPerSecondAsleep": 0.00833,
+    "comfortPerSecond": 0.000556,
+    "comfortRecoveryPerSecondResting": 0.0167,
+    "socialPerSecond": 0.000417,
+    "socialRecoveryPerSecondChatting": 0.00833,
+    "seekThreshold": 0.5,
+    "mealSeconds": 15,
+    "sleepMinSeconds": 90,
+    "wakeBelow": 0.15
+  },
+  "work": {
+    "reconsiderEveryTicks": 10,
+    "switchCooldownSeconds": 2,
+    "claimLeaseSeconds": 4,
+    "timeBucketSeconds": 1,
+    "retryBackoffSeconds": 5,
+    "skillGainPerSecond": 0.0002,
+    "workSpeedPerSkillLevel": 0.08
+  },
+  "urgency": {
+    "needEssentialAbove": 0.7,
+    "needSurvivalAbove": 0.9,
+    "heatContainmentAbove": 0.7,
+    "heatSurvivalAbove": 0.9,
+    "routineAgingSeconds": 90
+  },
+  "equipment": {
+    "hazardScale": 1,
+    "overheatDamagePerSecond": 0.02,
+    "maintenanceConditionBelow": 0.3
+  },
+  "power": {
+    "priorityOrder": ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"]
+  },
+  "travel": {
+    "prepareDepartureSeconds": 5,
+    "undockSeconds": 4,
+    "departSeconds": 5,
+    "approachSeconds": 8,
+    "dockSeconds": 5,
+    "nominalSpeed": 1
+  },
+  "commerce": {
+    "priceBands": {
+      "general": {
+        "min": 2,
+        "max": 5
+      },
+      "fragile": {
+        "min": 4,
+        "max": 9
+      },
+      "perishable": {
+        "min": 3,
+        "max": 7
+      },
+      "hazardous": {
+        "min": 6,
+        "max": 14
+      }
+    },
+    "jobOfferTtlSeconds": 600,
+    "boardSize": 3
+  },
+  "narrator": {
+    "quietTooLongSeconds": 40,
+    "approachHookLeadSeconds": 10,
+    "maxSpawnsPerCommand": 3,
+    "maxFaultWindowSeconds": 90,
+    "spawnBudget": 3,
+    "faultBudget": 2,
+    "budgetRefillSeconds": 300
+  },
+  "host": {
+    "runAheadCapSeconds": 60,
+    "snapshotRingSeconds": 90,
+    "snapshotEverySeconds": 1,
+    "localSaveEverySeconds": 10,
+    "remoteSaveEverySeconds": 60,
+    "frameEveryTicks": 2
+  },
+  "shifts": {
+    "cycleSeconds": 1200,
+    "shifts": [
+      {
+        "key": "alpha",
+        "workWindows": [[0, 600]]
+      },
+      {
+        "key": "beta",
+        "workWindows": [[600, 1200]]
+      },
+      {
+        "key": "gamma",
+        "workWindows": [[300, 900]]
+      }
+    ]
+  },
+  "events": {
+    "tickerMaxEntries": 30,
+    "traceRingSize": 1000
+  }
+}

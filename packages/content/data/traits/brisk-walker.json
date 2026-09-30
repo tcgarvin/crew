@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.brisk_walker",
+  "name": "Brisk Walker",
+  "modifiers": {
+    "walkSpeed": 1.15
+  },
+  "excludes": []
+}

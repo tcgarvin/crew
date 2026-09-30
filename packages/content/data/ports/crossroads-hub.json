@@ -1,0 +1,74 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.crossroads_hub",
+  "name": "Crossroads Hub",
+  "description": "A crowded transfer station at the junction of three trade lanes; docking queues, blaring announcements, and a market that never quite closes.",
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Hub Warehouse",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Crossroads Market",
+      "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Transit Lounge",
+      "kind": "lounge"
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "parts_to_mining",
+      "issuer": "Crossroads Logistics Co-op",
+      "toPortId": "port.kessler_drift",
+      "cargo": [
+        {
+          "itemDefId": "item.spare_parts_stack",
+          "countMin": 5,
+          "countMax": 15
+        }
+      ],
+      "weight": 2
+    },
+    {
+      "key": "crates_to_agri",
+      "issuer": "Meridian Trading House",
+      "toPortId": "port.green_meridian",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_general",
+          "countMin": 2,
+          "countMax": 6
+        }
+      ],
+      "weight": 2
+    },
+    {
+      "key": "hazmat_to_mining",
+      "issuer": "Kessler Drift Mining Guild",
+      "toPortId": "port.kessler_drift",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_hazardous",
+          "countMin": 1,
+          "countMax": 3
+        }
+      ],
+      "weight": 1
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.kessler_drift",
+      "distance": 25
+    },
+    {
+      "toPortId": "port.green_meridian",
+      "distance": 45
+    }
+  ]
+}

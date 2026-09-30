@@ -1,0 +1,61 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.green_meridian",
+  "name": "Green Meridian",
+  "description": "A quiet agricultural station ringed by hydroponic domes; slow traffic, fresh air scrubbers, and a lounge that actually feels like one.",
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Meridian Silo",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Meridian Co-op Market",
+      "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Greenhouse Lounge",
+      "kind": "lounge"
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "rations_to_hub",
+      "issuer": "Green Meridian Cooperative",
+      "toPortId": "port.crossroads_hub",
+      "cargo": [
+        {
+          "itemDefId": "item.ration_pack",
+          "countMin": 10,
+          "countMax": 30
+        }
+      ],
+      "weight": 3
+    },
+    {
+      "key": "perishables_to_mining",
+      "issuer": "Green Meridian Cooperative",
+      "toPortId": "port.kessler_drift",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_perishable",
+          "countMin": 2,
+          "countMax": 8
+        }
+      ],
+      "weight": 2
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.crossroads_hub",
+      "distance": 45
+    },
+    {
+      "toPortId": "port.kessler_drift",
+      "distance": 70
+    }
+  ]
+}

@@ -1,0 +1,531 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "bed",
+          "galley",
+          "messTable",
+          "pilotStation",
+          "engine",
+          "generator",
+          "battery",
+          "lifeSupport",
+          "cooling",
+          "rampControl"
+        ]
+      }
+    },
+    "footprint": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "y": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["x", "y"],
+        "additionalProperties": false
+      }
+    },
+    "interactionPositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "offset": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "y": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "purposes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["operate", "repair", "use"]
+            }
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["key", "offset", "purposes", "capacity"],
+        "additionalProperties": false
+      }
+    },
+    "power": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": ["role"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "const": "consumer"
+            },
+            "drawKw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "priority": {
+              "type": "string",
+              "enum": ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"]
+            },
+            "partialPower": {
+              "type": "string",
+              "enum": ["derate", "off"]
+            }
+          },
+          "required": ["role", "drawKw", "priority", "partialPower"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "const": "generator"
+            },
+            "supplyKw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": ["role", "supplyKw"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "const": "battery"
+            },
+            "capacityKj": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maxChargeKw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maxDischargeKw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": ["role", "capacityKj", "maxChargeKw", "maxDischargeKw"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "heat": {
+      "type": "object",
+      "properties": {
+        "risePerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coolPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "derateAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["risePerSecond", "coolPerSecond", "derateAbove"],
+      "additionalProperties": false
+    },
+    "operation": {
+      "type": "object",
+      "properties": {
+        "requiresOperator": {
+          "type": "boolean"
+        },
+        "operatorSkill": {
+          "type": "object",
+          "properties": {
+            "skill": {
+              "type": "string",
+              "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+            },
+            "min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": ["skill", "min"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["requiresOperator"],
+      "additionalProperties": false
+    },
+    "failure": {
+      "type": "object",
+      "properties": {
+        "baseHazardPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "heatFactor": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wearPerSecond": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["baseHazardPerSecond", "heatFactor", "wearPerSecond"],
+      "additionalProperties": false
+    },
+    "faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "effect": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "inoperable"
+                  }
+                },
+                "required": ["kind"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "derate"
+                  },
+                  "outputFactor": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": ["kind", "outputFactor"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "overheat"
+                  },
+                  "extraRisePerSecond": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": ["kind", "extraRisePerSecond"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "symptom": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "channel": {
+                "type": "string",
+                "enum": ["visual", "audible", "sensor"]
+              }
+            },
+            "required": ["key", "channel"],
+            "additionalProperties": false
+          },
+          "repair": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "inspect",
+                        "diagnose",
+                        "repair",
+                        "removeComponent",
+                        "installComponent",
+                        "test"
+                      ]
+                    },
+                    "workSeconds": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "skill": {
+                      "type": "object",
+                      "properties": {
+                        "skill": {
+                          "type": "string",
+                          "enum": [
+                            "engineering",
+                            "electrical",
+                            "piloting",
+                            "cargo",
+                            "medical",
+                            "cooking"
+                          ]
+                        },
+                        "min": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 10
+                        }
+                      },
+                      "required": ["skill", "min"],
+                      "additionalProperties": false
+                    },
+                    "tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+                      }
+                    },
+                    "consumes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "itemDefId": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["itemDefId", "count"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "at": {
+                      "type": "string",
+                      "enum": ["operate", "repair", "use"]
+                    }
+                  },
+                  "required": ["key", "action", "workSeconds", "tools", "consumes", "at"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["steps"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["key", "name", "weight", "effect", "symptom", "repair"],
+        "additionalProperties": false
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "itemDefId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          }
+        },
+        "required": ["slot", "itemDefId"],
+        "additionalProperties": false
+      }
+    },
+    "maintenance": {
+      "type": "object",
+      "properties": {
+        "intervalSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "inspect": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "inspect",
+                "diagnose",
+                "repair",
+                "removeComponent",
+                "installComponent",
+                "test"
+              ]
+            },
+            "workSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "skill": {
+              "type": "object",
+              "properties": {
+                "skill": {
+                  "type": "string",
+                  "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+                },
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10
+                }
+              },
+              "required": ["skill", "min"],
+              "additionalProperties": false
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+              }
+            },
+            "consumes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "itemDefId": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["itemDefId", "count"],
+                "additionalProperties": false
+              }
+            },
+            "at": {
+              "type": "string",
+              "enum": ["operate", "repair", "use"]
+            }
+          },
+          "required": ["key", "action", "workSeconds", "tools", "consumes", "at"],
+          "additionalProperties": false
+        },
+        "conditionRestored": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["intervalSeconds", "inspect", "conditionRestored"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "tags",
+    "footprint",
+    "interactionPositions",
+    "power",
+    "heat",
+    "operation",
+    "failure",
+    "faults",
+    "components"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "../../schema-json/scenario.schema.json",
+  "id": "scenario.default_freighter_run",
+  "name": "Freighter Run",
+  "deckId": "deck.freighter_mk1",
+  "startPortId": "port.crossroads_hub",
+  "crew": [
+    "crew.mara_osei",
+    "crew.dane_whitcross",
+    "crew.priya_kessler",
+    "crew.tomas_ruiz",
+    "crew.jax_okonkwo",
+    "crew.bettina_solheim",
+    "crew.oyelaran_abiodun",
+    "crew.sunniva_park"
+  ],
+  "startingMoney": 5000,
+  "startingItems": [
+    {
+      "itemDefId": "item.toolkit",
+      "count": 2,
+      "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 10,
+      "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 40,
+      "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.coolant_canister",
+      "count": 4,
+      "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.med_kit",
+      "count": 3,
+      "zoneKey": "cargo_stow"
+    }
+  ],
+  "initialFaults": []
+}

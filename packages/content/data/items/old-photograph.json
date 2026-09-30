@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.old_photograph",
+  "name": "Old Photograph",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": [],
+  "toolKinds": [],
+  "mass": 0.05
+}

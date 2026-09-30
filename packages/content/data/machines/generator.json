@@ -1,0 +1,122 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.generator",
+  "name": "Fusion Generator",
+  "tags": ["generator"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "panel",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["repair"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "generator",
+    "supplyKw": 60
+  },
+  "heat": {
+    "risePerSecond": 0.015,
+    "coolPerSecond": 0.01,
+    "derateAbove": 0.8
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0005,
+    "heatFactor": 3,
+    "wearPerSecond": 0.0006
+  },
+  "faults": [
+    {
+      "key": "electrical_short",
+      "name": "Electrical short",
+      "weight": 1,
+      "effect": {
+        "kind": "overheat",
+        "extraRisePerSecond": 0.03
+      },
+      "symptom": {
+        "key": "sparking",
+        "channel": "visual"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "inspect_short",
+            "action": "inspect",
+            "workSeconds": 5,
+            "tools": ["diagnosticScanner"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 2
+            }
+          },
+          {
+            "key": "repair_short",
+            "action": "repair",
+            "workSeconds": 20,
+            "tools": ["welder", "wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.spare_parts_stack",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 3
+            }
+          },
+          {
+            "key": "test_generator",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "slot": "stator_coil",
+      "itemDefId": "item.spare_parts_stack"
+    }
+  ],
+  "maintenance": {
+    "intervalSeconds": 600,
+    "inspect": {
+      "key": "routine_inspect",
+      "action": "inspect",
+      "workSeconds": 10,
+      "tools": ["multimeter"],
+      "consumes": [],
+      "at": "repair",
+      "skill": {
+        "skill": "electrical",
+        "min": 1
+      }
+    },
+    "conditionRestored": 1
+  }
+}

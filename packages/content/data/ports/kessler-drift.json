@@ -1,0 +1,56 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.kessler_drift",
+  "name": "Kessler Drift",
+  "description": "A mining outpost bolted to a nickel-iron asteroid; bare corridors, docked ore haulers, and a market that only wants to talk about ore prices.",
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Drift Warehouse",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Drift Exchange",
+      "kind": "market"
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "ore_to_hub",
+      "issuer": "Kessler Drift Mining Guild",
+      "toPortId": "port.crossroads_hub",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_general",
+          "countMin": 3,
+          "countMax": 10
+        }
+      ],
+      "weight": 3
+    },
+    {
+      "key": "fragile_equipment_to_agri",
+      "issuer": "Drift Fabrication Shop",
+      "toPortId": "port.green_meridian",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_fragile",
+          "countMin": 1,
+          "countMax": 4
+        }
+      ],
+      "weight": 1
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.crossroads_hub",
+      "distance": 25
+    },
+    {
+      "toPortId": "port.green_meridian",
+      "distance": 70
+    }
+  ]
+}

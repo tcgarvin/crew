@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.harmonica",
+  "name": "Harmonica",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": [],
+  "toolKinds": [],
+  "mass": 0.2
+}

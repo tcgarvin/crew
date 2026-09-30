@@ -1,0 +1,48 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.bridge_console",
+  "name": "Bridge Console",
+  "tags": ["pilotStation"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "seat",
+      "offset": {
+        "x": 1,
+        "y": 0
+      },
+      "purposes": ["operate", "repair"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 2,
+    "priority": "propulsion",
+    "partialPower": "derate"
+  },
+  "heat": {
+    "risePerSecond": 0,
+    "coolPerSecond": 0.01,
+    "derateAbove": 1
+  },
+  "operation": {
+    "requiresOperator": true,
+    "operatorSkill": {
+      "skill": "piloting",
+      "min": 3
+    }
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0001,
+    "heatFactor": 1,
+    "wearPerSecond": 0.0001
+  },
+  "faults": [],
+  "components": []
+}

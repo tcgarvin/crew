@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.ration_pack",
+  "name": "Ration Pack",
+  "stacking": "stackable",
+  "maxStack": 20,
+  "tags": ["food", "consumable"],
+  "toolKinds": [],
+  "mass": 0.4,
+  "nutrition": 0.25
+}

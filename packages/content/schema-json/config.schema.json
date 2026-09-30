@@ -1,0 +1,552 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "time": {
+      "type": "object",
+      "properties": {
+        "tickRate": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["tickRate"],
+      "additionalProperties": false
+    },
+    "movement": {
+      "type": "object",
+      "properties": {
+        "walkSpeed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "passDelaySeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "blockedRerouteSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fatigueSpeedFloor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "loadSpeedPerKg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "loadSpeedFloor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "walkSpeed",
+        "passDelaySeconds",
+        "blockedRerouteSeconds",
+        "fatigueSpeedFloor",
+        "loadSpeedPerKg",
+        "loadSpeedFloor"
+      ],
+      "additionalProperties": false
+    },
+    "doors": {
+      "type": "object",
+      "properties": {
+        "openSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "closeSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "autoCloseAfterSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "manualOpenSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["openSeconds", "closeSeconds", "autoCloseAfterSeconds", "manualOpenSeconds"],
+      "additionalProperties": false
+    },
+    "needs": {
+      "type": "object",
+      "properties": {
+        "hungerPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fatiguePerSecondAwake": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fatiguePerSecondWorking": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fatigueRecoveryPerSecondAsleep": {
+          "type": "number",
+          "minimum": 0
+        },
+        "comfortPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "comfortRecoveryPerSecondResting": {
+          "type": "number",
+          "minimum": 0
+        },
+        "socialPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "socialRecoveryPerSecondChatting": {
+          "type": "number",
+          "minimum": 0
+        },
+        "seekThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mealSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sleepMinSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wakeBelow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "hungerPerSecond",
+        "fatiguePerSecondAwake",
+        "fatiguePerSecondWorking",
+        "fatigueRecoveryPerSecondAsleep",
+        "comfortPerSecond",
+        "comfortRecoveryPerSecondResting",
+        "socialPerSecond",
+        "socialRecoveryPerSecondChatting",
+        "seekThreshold",
+        "mealSeconds",
+        "sleepMinSeconds",
+        "wakeBelow"
+      ],
+      "additionalProperties": false
+    },
+    "work": {
+      "type": "object",
+      "properties": {
+        "reconsiderEveryTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "switchCooldownSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "claimLeaseSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timeBucketSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "retryBackoffSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "skillGainPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "workSpeedPerSkillLevel": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "reconsiderEveryTicks",
+        "switchCooldownSeconds",
+        "claimLeaseSeconds",
+        "timeBucketSeconds",
+        "retryBackoffSeconds",
+        "skillGainPerSecond",
+        "workSpeedPerSkillLevel"
+      ],
+      "additionalProperties": false
+    },
+    "urgency": {
+      "type": "object",
+      "properties": {
+        "needEssentialAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "needSurvivalAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "heatContainmentAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "heatSurvivalAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "routineAgingSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "needEssentialAbove",
+        "needSurvivalAbove",
+        "heatContainmentAbove",
+        "heatSurvivalAbove",
+        "routineAgingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "equipment": {
+      "type": "object",
+      "properties": {
+        "hazardScale": {
+          "type": "number",
+          "minimum": 0
+        },
+        "overheatDamagePerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maintenanceConditionBelow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["hazardScale", "overheatDamagePerSecond", "maintenanceConditionBelow"],
+      "additionalProperties": false
+    },
+    "power": {
+      "type": "object",
+      "properties": {
+        "priorityOrder": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"]
+          }
+        }
+      },
+      "required": ["priorityOrder"],
+      "additionalProperties": false
+    },
+    "travel": {
+      "type": "object",
+      "properties": {
+        "prepareDepartureSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "undockSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "departSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "approachSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dockSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nominalSpeed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "prepareDepartureSeconds",
+        "undockSeconds",
+        "departSeconds",
+        "approachSeconds",
+        "dockSeconds",
+        "nominalSpeed"
+      ],
+      "additionalProperties": false
+    },
+    "commerce": {
+      "type": "object",
+      "properties": {
+        "priceBands": {
+          "type": "object",
+          "properties": {
+            "general": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "fragile": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "perishable": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            },
+            "hazardous": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["general", "fragile", "perishable", "hazardous"],
+          "additionalProperties": false
+        },
+        "jobOfferTtlSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "boardSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["priceBands", "jobOfferTtlSeconds", "boardSize"],
+      "additionalProperties": false
+    },
+    "narrator": {
+      "type": "object",
+      "properties": {
+        "quietTooLongSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "approachHookLeadSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxSpawnsPerCommand": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maxFaultWindowSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "spawnBudget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "faultBudget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "budgetRefillSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "quietTooLongSeconds",
+        "approachHookLeadSeconds",
+        "maxSpawnsPerCommand",
+        "maxFaultWindowSeconds",
+        "spawnBudget",
+        "faultBudget",
+        "budgetRefillSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "runAheadCapSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "snapshotRingSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "snapshotEverySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "localSaveEverySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "remoteSaveEverySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "frameEveryTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "runAheadCapSeconds",
+        "snapshotRingSeconds",
+        "snapshotEverySeconds",
+        "localSaveEverySeconds",
+        "remoteSaveEverySeconds",
+        "frameEveryTicks"
+      ],
+      "additionalProperties": false
+    },
+    "shifts": {
+      "type": "object",
+      "properties": {
+        "cycleSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shifts": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "workWindows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            },
+            "required": ["key", "workWindows"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["cycleSeconds", "shifts"],
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "tickerMaxEntries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "traceRingSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["tickerMaxEntries", "traceRingSize"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "time",
+    "movement",
+    "doors",
+    "needs",
+    "work",
+    "urgency",
+    "equipment",
+    "power",
+    "travel",
+    "commerce",
+    "narrator",
+    "host",
+    "shifts",
+    "events"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.sunniva_park",
+  "name": "Sunniva Park",
+  "roleTags": ["deckhand"],
+  "skills": {
+    "cargo": 8,
+    "engineering": 2,
+    "electrical": 1,
+    "medical": 1,
+    "cooking": 2,
+    "piloting": 1
+  },
+  "startingInventory": [],
+  "shift": "beta",
+  "bio": "Cargo hand; knows exactly how to stack a hold so nothing shifts in transit."
+}

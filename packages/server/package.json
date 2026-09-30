@@ -16,7 +16,8 @@
     "@crew/sim": "workspace:*",
     "@neondatabase/serverless": "^1.0.0",
     "drizzle-orm": "^0.38.3",
-    "hono": "^4.6.16"
+    "hono": "^4.6.16",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@hono/node-server": "^1.13.7",

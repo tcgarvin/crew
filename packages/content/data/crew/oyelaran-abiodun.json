@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.oyelaran_abiodun",
+  "name": "Oyelaran Abiodun",
+  "roleTags": ["medic"],
+  "skills": {
+    "medical": 8,
+    "cargo": 2,
+    "cooking": 2,
+    "engineering": 1,
+    "electrical": 1,
+    "piloting": 2
+  },
+  "startingInventory": [],
+  "shift": "gamma",
+  "bio": "Ship's medic; trained in a border-station trauma ward before signing on."
+}

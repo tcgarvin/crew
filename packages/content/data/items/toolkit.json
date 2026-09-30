@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.toolkit",
+  "name": "Toolkit",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": ["tool"],
+  "toolKinds": ["wrench", "multimeter", "diagnosticScanner"],
+  "mass": 3.0
+}

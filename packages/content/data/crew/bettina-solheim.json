@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.bettina_solheim",
+  "name": "Bettina Solheim",
+  "roleTags": ["cook"],
+  "skills": {
+    "cooking": 8,
+    "cargo": 2,
+    "medical": 2,
+    "engineering": 1,
+    "electrical": 1,
+    "piloting": 1
+  },
+  "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
+  "startingInventory": [
+    {
+      "itemDefId": "item.harmonica",
+      "count": 1
+    }
+  ],
+  "shift": "gamma",
+  "bio": "Cook; runs the galley and doubles as an extra pair of hands in sickbay."
+}

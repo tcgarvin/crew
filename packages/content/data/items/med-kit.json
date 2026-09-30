@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.med_kit",
+  "name": "Med Kit",
+  "stacking": "stackable",
+  "maxStack": 5,
+  "tags": ["medical", "consumable"],
+  "toolKinds": [],
+  "mass": 1.0
+}

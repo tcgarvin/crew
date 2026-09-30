@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.restless",
+  "name": "Restless",
+  "modifiers": {
+    "fatigueRate": 1.15,
+    "socialRate": 0.9
+  },
+  "excludes": []
+}

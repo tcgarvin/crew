@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.jax_okonkwo",
+  "name": "Jax Okonkwo",
+  "roleTags": ["pilot"],
+  "skills": {
+    "piloting": 8,
+    "cargo": 2,
+    "engineering": 2,
+    "electrical": 1,
+    "medical": 1,
+    "cooking": 1
+  },
+  "startingInventory": [],
+  "shift": "alpha",
+  "bio": "Pilot; flies the approach and docking on every hop."
+}

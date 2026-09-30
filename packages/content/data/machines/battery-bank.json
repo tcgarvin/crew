@@ -1,0 +1,48 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.battery_bank",
+  "name": "Battery Bank",
+  "tags": ["battery"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "panel",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["repair"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "battery",
+    "capacityKj": 36000,
+    "maxChargeKw": 20,
+    "maxDischargeKw": 30
+  },
+  "heat": {
+    "risePerSecond": 0.005,
+    "coolPerSecond": 0.01,
+    "derateAbove": 0.85
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0003,
+    "heatFactor": 2,
+    "wearPerSecond": 0.0003
+  },
+  "faults": [],
+  "components": []
+}

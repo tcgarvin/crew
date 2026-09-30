@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.priya_kessler",
+  "name": "Priya Kessler",
+  "roleTags": ["engineer"],
+  "skills": {
+    "engineering": 8,
+    "electrical": 6,
+    "cargo": 2,
+    "piloting": 1,
+    "medical": 1,
+    "cooking": 1
+  },
+  "traits": ["trait.night_owl"],
+  "startingInventory": [
+    {
+      "itemDefId": "item.toolkit",
+      "count": 1
+    }
+  ],
+  "shift": "alpha",
+  "bio": "Chief engineer; can diagnose a failing bearing by ear."
+}

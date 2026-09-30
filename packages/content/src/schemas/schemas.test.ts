@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  NotImplementedError,
   configDefSchema,
   contentBundleSchema,
   crewDefSchema,
@@ -11,6 +10,8 @@ import {
   scenarioDefSchema,
   traitDefSchema,
   validateBundle,
+  validatePhysical,
+  validateReferences,
   validateStructure,
 } from "./index";
 
@@ -83,7 +84,7 @@ const machine = {
             workSeconds: 10,
             skill: { skill: "engineering", min: 2 },
             tools: ["wrench"],
-            consumes: [{ itemDefId: "item.test.bearing", count: 1 }],
+            consumes: [{ itemDefId: "item.test.wrench", count: 1 }],
             at: "repair",
           },
         ],
@@ -130,11 +131,20 @@ const port = {
       key: "parts",
       issuer: "Co-op",
       toPortId: "port.test.b",
-      cargo: [{ itemDefId: "item.test.crate", countMin: 1, countMax: 3 }],
+      cargo: [{ itemDefId: "item.test.wrench", countMin: 1, countMax: 3 }],
       weight: 1,
     },
   ],
   routes: [{ toPortId: "port.test.b", distance: 40 }],
+};
+
+const portB = {
+  id: "port.test.b",
+  name: "Port B",
+  description: "",
+  externalStores: [{ key: "warehouse", name: "Warehouse B", kind: "warehouse" }],
+  jobTemplates: [],
+  routes: [{ toPortId: "port.test.a", distance: 40 }],
 };
 
 const scenario = {
@@ -288,7 +298,7 @@ describe("bundle validation", () => {
     items: { [item.id]: item },
     crew: { [crew.id]: crew },
     traits: { [trait.id]: trait },
-    ports: { [port.id]: port },
+    ports: { [port.id]: port, [portB.id]: portB },
     scenarios: { [scenario.id]: scenario },
     config,
     hash: "test",
@@ -308,8 +318,178 @@ describe("bundle validation", () => {
     }
   });
 
-  it("validateBundle returns L1 issues and otherwise hits the L2 stub", () => {
+  it("validateBundle accepts a fully valid bundle through L1-L3", () => {
+    const result = validateBundle(bundle);
+    expect(result.ok).toBe(true);
+  });
+
+  it("validateBundle still returns L1 issues for a structurally invalid bundle", () => {
     expect(validateBundle({}).ok).toBe(false);
-    expect(() => validateBundle(bundle)).toThrow(NotImplementedError);
+  });
+
+  describe("L2 referential rules", () => {
+    it("rejects a record key that does not match its def id", () => {
+      const parsed = validateStructure({ ...bundle, items: { "item.test.other": item } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(
+          issues.some((i) => i.level === "referential" && i.message.includes("item.test.other")),
+        ).toBe(true);
+      }
+    });
+
+    it("rejects an id outside its table's namespace", () => {
+      const badItem = { ...item, id: "trait.test.not_an_item" };
+      const parsed = validateStructure({ ...bundle, items: { [badItem.id]: badItem } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("must start with"))).toBe(true);
+      }
+    });
+
+    it("rejects a dangling item reference in a crew starting inventory", () => {
+      const badCrew = {
+        ...crew,
+        startingInventory: [{ itemDefId: "item.does.not_exist", count: 1 }],
+      };
+      const parsed = validateStructure({ ...bundle, crew: { [badCrew.id]: badCrew } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("item.does.not_exist"))).toBe(true);
+      }
+    });
+
+    it("rejects a unique item with maxStack other than 1", () => {
+      const badItem = { ...item, maxStack: 2 };
+      const parsed = validateStructure({ ...bundle, items: { [badItem.id]: badItem } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("must have maxStack 1"))).toBe(true);
+      }
+    });
+
+    it("rejects asymmetric port routes", () => {
+      const lonelyB = { ...portB, routes: [] };
+      const parsed = validateStructure({
+        ...bundle,
+        ports: { [port.id]: port, [lonelyB.id]: lonelyB },
+      });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("no return route"))).toBe(true);
+      }
+    });
+
+    it("rejects an inverted price band", () => {
+      const badConfig = {
+        ...config,
+        commerce: {
+          ...config.commerce,
+          priceBands: { ...config.commerce.priceBands, general: { min: 5, max: 1 } },
+        },
+      };
+      const parsed = validateStructure({ ...bundle, config: badConfig });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("exceeds max"))).toBe(true);
+      }
+    });
+  });
+
+  describe("L3 physical rules", () => {
+    it("rejects a door that is not on a compartment boundary", () => {
+      const badDeck = {
+        ...deck,
+        doors: deck.doors.map((d) =>
+          d.key === "d1" ? { ...d, edge: { x: 0, y: 0, side: "e" } } : d,
+        ),
+      };
+      const parsed = validateStructure({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("two different compartments"))).toBe(true);
+      }
+    });
+
+    it("rejects a ramp that is not on a hull edge", () => {
+      const badDeck = {
+        ...deck,
+        doors: deck.doors.map((d) =>
+          d.key === "ramp" ? { ...d, edge: { x: 1, y: 0, side: "e" } } : d,
+        ),
+      };
+      const parsed = validateStructure({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("hull edge"))).toBe(true);
+      }
+    });
+
+    it("rejects a disconnected compartment (deck connectivity)", () => {
+      const badDeck = { ...deck, doors: deck.doors.filter((d) => d.key !== "d1") };
+      const parsed = validateStructure({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("not reachable"))).toBe(true);
+      }
+    });
+
+    it("rejects overlapping machine footprints", () => {
+      const badDeck = {
+        ...deck,
+        machines: [
+          ...deck.machines,
+          { key: "pump2", machineDefId: "machine.test.pump", origin: { x: 2, y: 0 }, rotation: 0 },
+        ],
+      };
+      const parsed = validateStructure({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("overlaps"))).toBe(true);
+      }
+    });
+
+    it("rejects a spawn point off the floor", () => {
+      const badDeck = {
+        ...deck,
+        spawnPoints: [{ key: "s1", tile: { x: 5, y: 5 }, tags: ["crew"] }],
+      };
+      const parsed = validateStructure({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("is not floor"))).toBe(true);
+      }
+    });
+
+    it("rejects a recipe step whose tool kind no item satisfies", () => {
+      const badMachine = {
+        ...machine,
+        faults: [
+          {
+            ...machine.faults[0],
+            repair: {
+              steps: [{ ...machine.faults[0]?.repair.steps[0], tools: ["welder"] }],
+            },
+          },
+        ],
+      };
+      const parsed = validateStructure({ ...bundle, machines: { [badMachine.id]: badMachine } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("no item def provides tool kind"))).toBe(true);
+      }
+    });
   });
 });

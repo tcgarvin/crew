@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.life_support",
+  "name": "Life Support Unit",
+  "tags": ["lifeSupport"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "side",
+      "offset": {
+        "x": 1,
+        "y": 0
+      },
+      "purposes": ["repair"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 8,
+    "priority": "lifeSupport",
+    "partialPower": "derate"
+  },
+  "heat": {
+    "risePerSecond": 0.004,
+    "coolPerSecond": 0.01,
+    "derateAbove": 0.85
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0004,
+    "heatFactor": 2,
+    "wearPerSecond": 0.0004
+  },
+  "faults": [],
+  "components": []
+}

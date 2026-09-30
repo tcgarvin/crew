@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.dane_whitcross",
+  "name": "Dane Whitcross",
+  "roleTags": ["firstOfficer"],
+  "skills": {
+    "piloting": 4,
+    "cargo": 2,
+    "engineering": 4,
+    "electrical": 3,
+    "medical": 2,
+    "cooking": 1
+  },
+  "traits": ["trait.steady", "trait.methodical"],
+  "startingInventory": [],
+  "shift": "beta",
+  "bio": "First officer; steps up whenever the captain is asleep."
+}

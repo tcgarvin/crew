@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.crate_fragile",
+  "name": "Fragile Cargo Crate",
+  "stacking": "stackable",
+  "maxStack": 20,
+  "tags": ["cargo", "container"],
+  "toolKinds": [],
+  "mass": 8.0,
+  "cargoClass": "fragile"
+}

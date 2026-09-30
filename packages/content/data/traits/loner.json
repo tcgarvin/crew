@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.loner",
+  "name": "Loner",
+  "modifiers": {
+    "socialRate": 0.7
+  },
+  "excludes": ["trait.social_butterfly"]
+}

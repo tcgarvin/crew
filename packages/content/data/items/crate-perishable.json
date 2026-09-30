@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.crate_perishable",
+  "name": "Perishable Cargo Crate",
+  "stacking": "stackable",
+  "maxStack": 20,
+  "tags": ["cargo", "container"],
+  "toolKinds": [],
+  "mass": 6.0,
+  "cargoClass": "perishable"
+}

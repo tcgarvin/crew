@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.crate_hazardous",
+  "name": "Hazardous Cargo Crate",
+  "stacking": "stackable",
+  "maxStack": 10,
+  "tags": ["cargo", "container"],
+  "toolKinds": [],
+  "mass": 12.0,
+  "cargoClass": "hazardous"
+}

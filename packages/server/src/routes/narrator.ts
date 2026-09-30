@@ -1,0 +1,166 @@
+/**
+ * `POST /api/games/:id/narrator` (W8). Validates the request, enforces per-game budgets, stores
+ * the snapshot as a milestone save (its id is the `basis_save_id` for this call and for the next
+ * budget check), calls the injected `runNarrator`, logs the call, and persists `notesUpdate`.
+ */
+import { gzipSync } from "node:zlib";
+import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
+import type { Hono } from "hono";
+import { z } from "zod";
+import type { Db } from "../db/types";
+import type { Env } from "../env";
+import type { RunNarrator } from "../narrator";
+import { saveEnvelopeSchema } from "../validation";
+import { runAfterResponse } from "../waitUntil";
+
+export interface NarratorRouteEnv {
+  Variables: { userId: string };
+}
+
+/**
+ * Loose shape check only: `hook`'s exact discriminated-union shape and `recentEvents`' element
+ * shape are `@crew/sim` contracts this package doesn't re-validate field by field. The kernel
+ * revalidates every returned command against live state on apply (PLAN rule 8), so a malformed
+ * hook/event here fails safely downstream rather than needing to be caught twice.
+ */
+const narratorRequestSchema = z.object({
+  gameId: z.string().min(1),
+  hook: z.object({ kind: z.string().min(1) }).loose(),
+  snapshot: saveEnvelopeSchema,
+  recentEvents: z.array(z.unknown()),
+});
+
+// Server-side tunables not (yet) worth a dedicated env var; bump alongside playtesting feedback.
+const NARRATOR_CALL_WINDOW_MS = 60 * 60 * 1000;
+const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
+
+const MODEL_PLACEHOLDER = "null-narrator";
+const PROMPT_VERSION_PLACEHOLDER = "v0";
+
+export function registerNarratorRoutes(
+  app: Hono<NarratorRouteEnv>,
+  db: Db,
+  env: Env,
+  runNarrator: RunNarrator,
+): void {
+  app.post("/api/games/:id/narrator", async (c) => {
+    const userId = c.get("userId");
+    const gameId = c.req.param("id");
+    const game = await db.getGame(gameId);
+    if (!game || game.userId !== userId) {
+      return c.json({ error: { code: "notFound", message: "No such game." } }, 404);
+    }
+
+    const raw = await c.req.json().catch(() => undefined);
+    const parsed = narratorRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        { error: { code: "badRequest", message: "Invalid narrator request body." } },
+        400,
+      );
+    }
+    if (parsed.data.gameId !== gameId) {
+      return c.json(
+        { error: { code: "badRequest", message: "gameId does not match the route." } },
+        400,
+      );
+    }
+    // Shape-checked, not deep-validated against `@crew/sim`'s exact unions (see schema comment).
+    const reqBody = parsed.data as unknown as NarratorRequest;
+
+    // Store the snapshot as a milestone save; it becomes this call's (and the next check's) basis.
+    const snapshotBlob = gzipSync(Buffer.from(JSON.stringify(reqBody.snapshot), "utf8"));
+    const basisSave = await db.putSave({
+      gameId,
+      blob: snapshotBlob,
+      schemaVersion: reqBody.snapshot.schemaVersion,
+      simVersion: reqBody.snapshot.simVersion,
+      contentHash: reqBody.snapshot.contentHash,
+      savedAtTick: reqBody.snapshot.savedAtTick,
+      isMilestone: true,
+    });
+
+    const logRejection = (status: "budgetExceeded", error: string) =>
+      db.logNarratorCall({
+        gameId,
+        hookKind: reqBody.hook.kind,
+        basisSaveId: basisSave.id,
+        model: MODEL_PLACEHOLDER,
+        promptVersion: PROMPT_VERSION_PLACEHOLDER,
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs: null,
+        status,
+        request: reqBody,
+        response: null,
+        error,
+      });
+
+    const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS);
+    if (callsInWindow >= env.narratorMaxCallsPerHour) {
+      const message = `Hourly narrator call budget (${env.narratorMaxCallsPerHour}) exceeded for this game.`;
+      await logRejection("budgetExceeded", message);
+      return c.json({ error: { code: "budgetExceeded", message } }, 429);
+    }
+
+    const lastCall = await db.getLastNarratorCall(gameId);
+    if (lastCall) {
+      const lastBasis = await db.getSave(lastCall.basisSaveId);
+      const lastTick = lastBasis?.savedAtTick ?? 0;
+      if (reqBody.snapshot.savedAtTick - lastTick < MIN_TICKS_BETWEEN_NARRATOR_CALLS) {
+        const message = `Too soon since the last narrator call (min ${MIN_TICKS_BETWEEN_NARRATOR_CALLS} ticks).`;
+        await logRejection("budgetExceeded", message);
+        return c.json({ error: { code: "budgetExceeded", message } }, 429);
+      }
+    }
+
+    const startedAt = Date.now();
+    try {
+      const response: NarratorResponse = await runNarrator(reqBody, {
+        anthropicApiKey: env.anthropicApiKey,
+        gameId,
+      });
+      const latencyMs = Date.now() - startedAt;
+
+      await runAfterResponse(async () => {
+        await db.logNarratorCall({
+          gameId,
+          hookKind: reqBody.hook.kind,
+          basisSaveId: basisSave.id,
+          model: MODEL_PLACEHOLDER,
+          promptVersion: PROMPT_VERSION_PLACEHOLDER,
+          inputTokens: null,
+          outputTokens: null,
+          latencyMs,
+          status: "ok",
+          request: reqBody,
+          response,
+          error: null,
+        });
+        if (response.notesUpdate !== undefined) {
+          await db.updateNotes(gameId, response.notesUpdate);
+        }
+      });
+
+      return c.json(response);
+    } catch (err) {
+      const latencyMs = Date.now() - startedAt;
+      const message = err instanceof Error ? err.message : "Unknown narrator error.";
+      await db.logNarratorCall({
+        gameId,
+        hookKind: reqBody.hook.kind,
+        basisSaveId: basisSave.id,
+        model: MODEL_PLACEHOLDER,
+        promptVersion: PROMPT_VERSION_PLACEHOLDER,
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs,
+        status: "error",
+        request: reqBody,
+        response: null,
+        error: message,
+      });
+      return c.json({ error: { code: "narratorFailed", message } }, 502);
+    }
+  });
+}

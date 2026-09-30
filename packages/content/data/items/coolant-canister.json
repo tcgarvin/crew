@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.coolant_canister",
+  "name": "Coolant Canister",
+  "stacking": "stackable",
+  "maxStack": 10,
+  "tags": ["consumable"],
+  "toolKinds": [],
+  "mass": 2.0
+}

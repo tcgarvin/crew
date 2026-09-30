@@ -19,11 +19,14 @@ import type {
 import type { EventDraft, SimEvent } from "./events";
 import type {
   ActorId,
+  CompartmentId,
   CrewDefId,
+  DecisionId,
   DeckDefId,
   ItemDefId,
   ItemId,
   MachineDefId,
+  MachineId,
   PortDefId,
   TraitDefId,
 } from "./ids";
@@ -120,12 +123,28 @@ export interface NavCache {
 export interface IndexCache {
   /** Items whose location is `carriedBy`/`equippedBy` this actor. */
   itemsByHolder: Record<ActorId, ItemId[]>;
+  /** Items whose location is `inContainer` this item. Rebuilt with `itemsByHolder`. */
+  itemsByContainer: Record<ItemId, ItemId[]>;
+  /**
+   * On-deck actors by the compartment of the tile they stand on. Rebuilt every tick in phase 2,
+   * so it is as of the start of the tick (movement in phase 3 does not update it).
+   */
+  actorsByCompartment: Record<CompartmentId, ActorId[]>;
+  /** Machines by the compartment of their placement origin tile. */
+  machinesByCompartment: Record<CompartmentId, MachineId[]>;
 }
 
 export interface DiagnosticsCache {
   /** Recent `trace` events for the inspector. */
   traceEvents: SimEvent[];
   plannerTraces: { tick: Tick; actorId: ActorId; intent: Intent }[];
+  /**
+   * W2 addition: `notable`+ events returned by the most recent `advance()` call, bounded by
+   * `config.events.tickerMaxEntries`; feeds `RenderFrame.tickerEvents`.
+   */
+  lastEvents: SimEvent[];
+  /** W2 addition: head of `state.decisions.queue` already announced with `decisionPending`. */
+  announcedDecisionId: DecisionId | null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -166,6 +185,12 @@ export interface StepCtx {
   readonly elapsedTicks: number;
   /** Alias of `caches.dirty`. */
   readonly dirty: DirtyFlags;
+  /**
+   * W2 addition: for a `staggerBy: "actor"` system, the actors due this tick (in `state.actors`
+   * key order). Absent for other systems, meaning "all actors". With stagger, `elapsedTicks` is
+   * the per-actor interval (`every`).
+   */
+  readonly dueActorIds?: readonly ActorId[];
 }
 
 export interface System {

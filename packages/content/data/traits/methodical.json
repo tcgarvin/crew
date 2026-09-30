@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.methodical",
+  "name": "Methodical",
+  "modifiers": {
+    "workSpeed": 0.9,
+    "comfortRate": 0.9
+  },
+  "excludes": []
+}

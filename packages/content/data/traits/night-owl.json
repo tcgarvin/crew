@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.night_owl",
+  "name": "Night Owl",
+  "modifiers": {
+    "fatigueRate": 0.9
+  },
+  "excludes": ["trait.early_riser"]
+}

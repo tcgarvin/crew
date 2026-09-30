@@ -1,0 +1,127 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.engine",
+  "name": "Main Engine",
+  "tags": ["engine"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "panel",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["repair"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 40,
+    "priority": "propulsion",
+    "partialPower": "derate"
+  },
+  "heat": {
+    "risePerSecond": 0.02,
+    "coolPerSecond": 0.01,
+    "derateAbove": 0.75
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0006,
+    "heatFactor": 4,
+    "wearPerSecond": 0.0008
+  },
+  "faults": [
+    {
+      "key": "failed_controller",
+      "name": "Failed engine controller",
+      "weight": 1,
+      "effect": {
+        "kind": "inoperable"
+      },
+      "symptom": {
+        "key": "stall_warning",
+        "channel": "sensor"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "remove_controller",
+            "action": "removeComponent",
+            "workSeconds": 10,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 3
+            }
+          },
+          {
+            "key": "install_controller",
+            "action": "installComponent",
+            "workSeconds": 20,
+            "tools": ["wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.spare_parts_stack",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 3
+            }
+          },
+          {
+            "key": "test_engine",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 2
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "slot": "controller",
+      "itemDefId": "item.spare_parts_stack"
+    }
+  ],
+  "maintenance": {
+    "intervalSeconds": 600,
+    "inspect": {
+      "key": "routine_inspect",
+      "action": "inspect",
+      "workSeconds": 10,
+      "tools": ["multimeter"],
+      "consumes": [],
+      "at": "repair",
+      "skill": {
+        "skill": "engineering",
+        "min": 1
+      }
+    },
+    "conditionRestored": 1
+  }
+}

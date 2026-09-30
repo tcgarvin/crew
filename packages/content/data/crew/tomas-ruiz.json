@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.tomas_ruiz",
+  "name": "Tomas Ruiz",
+  "roleTags": ["engineer", "deckhand"],
+  "skills": {
+    "engineering": 5,
+    "electrical": 3,
+    "cargo": 4,
+    "piloting": 1,
+    "medical": 1,
+    "cooking": 1
+  },
+  "traits": ["trait.brisk_walker"],
+  "startingInventory": [],
+  "shift": "beta",
+  "bio": "Second engineer and deckhand; splits time between engineering and the hold."
+}

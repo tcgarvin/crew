@@ -185,6 +185,9 @@ export interface TextRef {
  */
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown
   ? T
-  : T extends object
-    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-    : T;
+  : // Primitives first: a branded ID (`string & { [brand] }`) is an object type to `extends object`.
+    T extends string | number | boolean | bigint | symbol | null | undefined
+    ? T
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;

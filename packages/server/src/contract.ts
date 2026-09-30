@@ -5,18 +5,35 @@
  * Save blobs travel as base64 of the gzipped JSON `SaveEnvelope` (the host gzips; the server
  * stores bytes and reads only the metadata fields it is given, never trusting them for authority).
  *
+ * **W8 implementation changes to this contract** (additive; nothing above was removed):
+ * - Added `POST /api/games/:id/open` (bumps `lease_epoch`, returns the new one + the head save)
+ *   per the W8 task brief — needed for D9's "stale tab goes read-only" flow, missing from the
+ *   original sketch.
+ * - `PutSaveRequest` gained an optional `milestone?: boolean` (defaults false); milestone saves
+ *   are exempt from the rolling-5 prune. `PutSaveResponse` gained `savedAtTick` (echoes the
+ *   request) so the client doesn't have to track it separately.
+ * - Added `"budgetExceeded"` to `ApiError["error"]["code"]` for the narrator route's 429.
+ * - Table sketch below is the actual implemented schema (`src/db/schema.ts`); it renames/extends
+ *   the original sketch: `users.token_hash` → `anon_token_hash`; `games.title` (wire field,
+ *   unchanged) is stored as `games.name`; `saves` gained `sim_version` and `is_milestone`;
+ *   `narrator_calls` gained `basis_save_id` (the milestone save taken at call time — doubles as
+ *   the audit trail for what the model saw) and `prompt_version`/`status`, and
+ *   `request_digest`/`plan`/`commands`/`dropped`/`hook_tick` were folded into `request jsonb` +
+ *   `response jsonb` (the whole `NarratorRequest`/`NarratorResponse`, W9's dropped-intents list
+ *   included) to avoid guessing W9's internal shape before it exists.
+ *
  * Table sketch (Neon Postgres, W8 owns the migrations):
  *
  *   users(
  *     id uuid pk,
- *     token_hash text unique not null,      -- sha256 of the anon bearer token
+ *     anon_token_hash text unique not null,      -- sha256 of the anon bearer token
  *     created_at timestamptz not null default now()
  *   )
  *   games(
  *     id uuid pk,
  *     user_id uuid not null references users,
- *     title text not null,
- *     head_save_id uuid null references saves,   -- latest save (one linear timeline, D9)
+ *     name text not null,
+ *     head_save_id uuid null,                    -- latest save (one linear timeline, D9)
  *     lease_epoch integer not null default 0,    -- bumped on open; stale tabs' saves are rejected
  *     narrative_notes jsonb not null default '{}'::jsonb,  -- running summary, rewritten each call
  *     created_at timestamptz not null default now(),
@@ -27,21 +44,23 @@
  *     game_id uuid not null references games,
  *     blob bytea not null,                  -- gzipped SaveEnvelope JSON
  *     schema_version integer not null,
- *     saved_at_tick bigint not null,
+ *     sim_version text not null,
  *     content_hash text not null,
+ *     saved_at_tick bigint not null,
+ *     is_milestone boolean not null default false,
  *     created_at timestamptz not null default now()
- *   )  -- W8 may prune to the last N per game; D9 forbids offering older ones to the player
+ *   )  -- W8 prunes non-milestone saves to the last 5 per game; D9 forbids offering older ones
  *   narrator_calls(
  *     id uuid pk,
  *     game_id uuid not null references games,
  *     hook_kind text not null,
- *     hook_tick bigint not null,
- *     request_digest jsonb not null,        -- what the model saw (not the whole snapshot)
- *     plan jsonb null,                      -- raw NarratorPlan
- *     commands jsonb null,                  -- translated NarratorCommand[]
- *     dropped jsonb null,
+ *     basis_save_id uuid not null references saves,  -- the milestone snapshot the call used
  *     model text not null,
+ *     prompt_version text not null,
  *     input_tokens integer, output_tokens integer, latency_ms integer,
+ *     status text not null,                  -- 'ok' | 'error' | 'budgetExceeded'
+ *     request jsonb not null,
+ *     response jsonb null,
  *     error text null,
  *     created_at timestamptz not null default now()
  *   )
@@ -54,6 +73,7 @@ export const ROUTES = {
   authAnon: { method: "POST", path: "/api/auth/anon" },
   listGames: { method: "GET", path: "/api/games" },
   createGame: { method: "POST", path: "/api/games" },
+  openGame: { method: "POST", path: "/api/games/:id/open" },
   putSave: { method: "PUT", path: "/api/games/:id/save" },
   getSave: { method: "GET", path: "/api/games/:id/save" },
   narrator: { method: "POST", path: "/api/games/:id/narrator" },
@@ -69,6 +89,8 @@ export interface ApiError {
       | "notFound"
       | "badRequest"
       | "staleLease"
+      | "payloadTooLarge"
+      | "budgetExceeded"
       | "narratorFailed"
       | "internal";
     readonly message: string;
@@ -110,27 +132,40 @@ export interface CreateGameResponse {
   readonly leaseEpoch: number;
 }
 
+// POST /api/games/:id/open -----------------------------------------------------------------------
+
+/** Opening a game bumps `lease_epoch` and returns the new one; other tabs' saves then fail. */
+export type OpenGameRequest = Record<string, never>;
+
+export interface OpenGameResponse {
+  readonly leaseEpoch: number;
+  readonly headSave?: GetSaveResponse;
+}
+
 // PUT /api/games/:id/save, GET /api/games/:id/save ----------------------------------------------
 
 export interface PutSaveRequest {
-  /** From create or the last GET; a lower epoch than the game's gets `409 staleLease`. */
+  /** From create, open, or the last GET; a lower epoch than the game's gets `409 staleLease`. */
   readonly leaseEpoch: number;
   readonly schemaVersion: number;
   readonly savedAtTick: number;
   readonly contentHash: string;
   /** base64(gzip(JSON.stringify(SaveEnvelope))). */
   readonly blob: string;
+  /** Exempts this save from the rolling-5 prune (W8 addition). Default false. */
+  readonly milestone?: boolean;
 }
 
 export interface PutSaveResponse {
   readonly saveId: string;
+  readonly savedAtTick: number;
 }
 
-/** Opening a game bumps `lease_epoch` and returns the new one; other tabs' saves then fail. */
 export interface GetSaveResponse {
   readonly saveId: string;
   readonly leaseEpoch: number;
   readonly schemaVersion: number;
+  readonly simVersion: string;
   readonly savedAtTick: number;
   readonly contentHash: string;
   readonly blob: string;

@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.galley_stove",
+  "name": "Galley Stove",
+  "tags": ["galley"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "front",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 3,
+    "priority": "domestic",
+    "partialPower": "off"
+  },
+  "heat": {
+    "risePerSecond": 0.01,
+    "coolPerSecond": 0.03,
+    "derateAbove": 0.9
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0.0001,
+    "heatFactor": 1,
+    "wearPerSecond": 0.0002
+  },
+  "faults": [],
+  "components": []
+}

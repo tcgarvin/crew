@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.welder_torch",
+  "name": "Welder Torch",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": ["tool"],
+  "toolKinds": ["welder"],
+  "mass": 4.0
+}

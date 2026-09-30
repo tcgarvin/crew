@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schema-json/trait.schema.json",
+  "id": "trait.steady",
+  "name": "Steady",
+  "modifiers": {
+    "workSpeed": 1.1
+  },
+  "excludes": []
+}
