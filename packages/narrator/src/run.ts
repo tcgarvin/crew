@@ -22,9 +22,18 @@ import type {
   NarratorPlanSchema,
   NarratorRequest,
   NarratorResponse,
+  TranslationResult,
 } from "./contract";
 import { buildDigest } from "./digest";
-import { type MetIssuer, type NarratorNotes, boundNotes, mergeCast, parseNotes } from "./notes";
+import { applyDecisionEvents, recordCardsFromCall } from "./history";
+import {
+  type MetIssuer,
+  type NarratorNotes,
+  boundNotes,
+  mergeCast,
+  mergeThreads,
+  parseNotes,
+} from "./notes";
 import { nullNarratorResponse } from "./null";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
@@ -142,16 +151,39 @@ function issuersMet(commands: readonly NarratorCommand[]): MetIssuer[] {
   });
 }
 
+/** D32: every player-facing text this call produced, to tell which threads had a beat. */
+function textsShown(translated: TranslationResult): string[] {
+  const texts: string[] = [];
+  const card = translated.card;
+  if (card !== undefined) texts.push(card.title, card.situation, card.speaker ?? "");
+  for (const command of translated.commands) {
+    if (command.kind === "surfaceDecision") {
+      const { prompt } = command.payload.card;
+      const params = prompt.params as Record<string, unknown>;
+      texts.push(prompt.prose ?? "", String(params.title ?? ""), String(params.speaker ?? ""));
+    } else if (command.kind === "offerJob") {
+      const { issuer } = command.payload.job;
+      texts.push(typeof issuer === "string" ? issuer : issuer.name);
+    }
+  }
+  return texts;
+}
+
+/**
+ * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
+ * cast sightings, D31 card history, D32 thread beats, and why intents were dropped).
+ */
 function notesFrom(
   plan: NarratorPlan,
   previous: NarratorNotes,
   tick: number,
-  commands: readonly NarratorCommand[],
-  dropped: readonly DroppedIntent[],
+  translated: TranslationResult,
 ): NarratorNotes {
+  const { commands, dropped } = translated;
   return boundNotes({
     summary: plan.notes.summary,
-    openThreads: plan.notes.openThreads,
+    threads: mergeThreads(plan.notes.threads, previous.threads, tick, textsShown(translated)),
+    cardsShown: recordCardsFromCall(previous.cardsShown, tick, translated.card, commands),
     cast: mergeCast(plan.notes.cast, previous.cast, issuersMet(commands), tick),
     lastUpdatedTick: tick,
     lastRejections: dropped.map((d) => d.reason),
@@ -206,7 +238,12 @@ export async function runNarratorWithTrace(
   const content = ctx.content ?? defaultContent();
   const callId = ctx.callId ?? globalThis.crypto.randomUUID();
   const snapshot = currentSnapshot(req.snapshot);
-  const notes = parseNotes(ctx.notes);
+  const stored = parseNotes(ctx.notes);
+  // D31: fold the kernel's decision events in before the digest, so the model sees what was chosen.
+  const notes: NarratorNotes = {
+    ...stored,
+    cardsShown: applyDecisionEvents(stored.cardsShown, req.recentEvents, snapshot.state, content),
+  };
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
   const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
   const prompt = buildPrompt(capabilities, digest, req.hook.kind);
@@ -236,7 +273,7 @@ export async function runNarratorWithTrace(
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
-      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated.commands, translated.dropped),
+      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated),
       callId,
       model: result.model,
       promptVersion: PROMPT_VERSION,

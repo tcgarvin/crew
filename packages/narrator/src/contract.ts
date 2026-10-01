@@ -24,9 +24,16 @@ import {
   type Tick,
 } from "@crew/sim";
 import { z } from "zod";
-import type { NarratorNotes } from "./notes";
+import { type NarratorNotes, THREAD_SCALES } from "./notes";
 
-export type { NarratorCastEntry, NarratorNotes } from "./notes";
+export type {
+  CardShown,
+  NarratorCastEntry,
+  NarratorNotes,
+  Thread,
+  ThreadScale,
+} from "./notes";
+export { THREAD_SCALES } from "./notes";
 
 // ---------------------------------------------------------------------------------------------
 // HTTP exchange
@@ -256,10 +263,33 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
         rightAftermath: aftermath,
       })
       .nullable(),
-    /** The full replacement running notes (W9: structured, see `NarratorNotes`). */
+    /**
+     * The full replacement running notes (W9: structured, see `NarratorNotes`). D31: the card
+     * history is server-kept and not part of the plan; D32: threads are structured.
+     */
     notes: z.strictObject({
       summary: z.string().describe("The story so far in a few sentences."),
-      openThreads: z.array(z.string()).describe("Hooks set up and not yet paid off."),
+      threads: z
+        .array(
+          z.strictObject({
+            title: z.string().describe("Short name for the thread."),
+            scale: z
+              .enum(THREAD_SCALES)
+              .describe(
+                "beat: one card with a follow-up; episode: one complete story, usually a job's length, though it need not involve a job; season: returns every few jobs; series: a slow pressure that surfaces rarely.",
+              ),
+            people: z.array(z.string()).describe("Crew or cast involved, by full name."),
+            stage: z.string().describe("One sentence: where the thread is now."),
+            nextBeat: z
+              .string()
+              .describe(
+                "One sentence: what must be true before it returns, and roughly what happens then.",
+              ),
+          }),
+        )
+        .describe(
+          "Every open thread, rewritten in full: two to four alive at different scales. Retire the ones events have made moot.",
+        ),
       cast: z
         .array(
           z.strictObject({

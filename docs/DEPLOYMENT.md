@@ -61,6 +61,36 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter 
 `env.ts`'s `loadEnv()` throws immediately if `DATABASE_URL` is missing and `NODE_ENV=production`
 and `CREW_DB` isn't `memory` — fail fast rather than silently falling back in prod.
 
+## Reading the narrator log
+
+`pnpm --filter @crew/server narrator-log` is a read-only terminal view of `narrator_calls`
+(`src/tools/narratorLog.ts`; the CLI shell is `src/tools/narratorLogCli.ts`). It reads
+`DATABASE_URL` from the environment, or from `packages/server/.env.local` (gitignored via `.env*`)
+when the variable is unset and that file exists. Use a Neon **read-only role** or a **branch** of
+production for it, not the production writer: the script only ever `SELECT`s, but the credential
+in that file should not be able to do more. The script never prints the URL; error messages are
+scrubbed of the connection string, its user, password and host before they reach the terminal.
+
+```
+pnpm --filter @crew/server narrator-log games
+pnpm --filter @crew/server narrator-log calls [--game <id|prefix>] [--last N] [--hook <kind>] [--status ok|error|budgetExceeded]
+pnpm --filter @crew/server narrator-log call <id|prefix> [--raw]
+pnpm --filter @crew/server narrator-log notes [--game <id|prefix>]
+pnpm --filter @crew/server narrator-log digest <callId|prefix>
+```
+
+`games` lists every game with its call count and the last call's prompt version. `calls` prints
+one block per call, newest first (default: the last 10 for the most recently updated game): the
+header line (time, hook, status, model, prompt version, latency, tokens), the card prose, every
+surfaced decision and job offer, other commands, dropped intents, fallback reason and error.
+`call` adds the model's rationale (when a prompt version recorded one) and the full notes update;
+`--raw` also dumps the stored request (which includes the whole snapshot) and response JSON.
+`notes` prints the game's current `narrative_notes`. `digest` rebuilds the digest the model was
+shown by running `@crew/narrator`'s `buildDigest` on the stored snapshot, hook and recent events,
+with the notes taken from the previous ok call's `notesUpdate` (the request row does not store
+them); it uses today's digest code, so it can differ from what an older prompt version produced.
+Ids may be given as any unambiguous prefix. Fields missing from older prompt versions print as `-`.
+
 ## The Vercel function
 
 Integration 2. The build command in `vercel.json` ends with `node scripts/vercel-output.mjs`,

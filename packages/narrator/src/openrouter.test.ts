@@ -68,7 +68,8 @@ describe("OpenRouter prompt caching", () => {
     const second = laterInTheSameGame(first);
     const notes = {
       summary: "They owe the Guild a favour.",
-      openThreads: ["The assay office"],
+      threads: [],
+      cardsShown: [],
       cast: [],
       lastUpdatedTick: first.hook.tick,
     };

@@ -22,7 +22,7 @@ export function emptyPlan(overrides: Partial<NarratorPlan> = {}): NarratorPlan {
     rationale: "test",
     intents: [],
     card: null,
-    notes: { summary: "so far", openThreads: [], cast: [] },
+    notes: { summary: "so far", threads: [], cast: [] },
     ...overrides,
   };
 }

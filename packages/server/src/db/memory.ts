@@ -3,14 +3,17 @@
  * fully offline. Mirrors the pruning and lease semantics of the real Neon-backed `Db` exactly.
  */
 import { randomUUID } from "node:crypto";
-import type {
-  Db,
-  GameRow,
-  LogNarratorCallInput,
-  NarratorCallRow,
-  PutSaveInput,
-  SaveRow,
-  UserRow,
+import {
+  type Db,
+  type GameNarratorSummary,
+  type GameRow,
+  type LogNarratorCallInput,
+  type NarratorCallFilter,
+  type NarratorCallRow,
+  type PutSaveInput,
+  type SaveRow,
+  type UserRow,
+  assertIdPrefix,
 } from "./types";
 
 const ROLLING_SAVES_KEPT = 5;
@@ -144,6 +147,50 @@ export class MemoryDb implements Db {
       if (!latest || byNewest(call, latest) < 0) latest = call;
     }
     return latest;
+  }
+
+  async listGamesWithNarratorStats(): Promise<readonly GameNarratorSummary[]> {
+    const ordered = [...this.games.values()].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+    );
+    const summaries: GameNarratorSummary[] = [];
+    for (const game of ordered) {
+      const calls = [...this.narratorCalls.values()]
+        .filter((c) => c.gameId === game.id)
+        .sort(byNewest);
+      const last = calls[0];
+      summaries.push({
+        game,
+        callCount: calls.length,
+        lastCallAt: last?.createdAt ?? null,
+        lastPromptVersion: last?.promptVersion ?? null,
+      });
+    }
+    return summaries;
+  }
+
+  async listNarratorCalls(filter: NarratorCallFilter): Promise<readonly NarratorCallRow[]> {
+    return [...this.narratorCalls.values()]
+      .filter(
+        (c) =>
+          (filter.gameId === undefined || c.gameId === filter.gameId) &&
+          (filter.hookKind === undefined || c.hookKind === filter.hookKind) &&
+          (filter.status === undefined || c.status === filter.status),
+      )
+      .sort(byNewest)
+      .slice(0, filter.limit);
+  }
+
+  async findNarratorCallsByIdPrefix(prefix: string): Promise<readonly NarratorCallRow[]> {
+    assertIdPrefix(prefix);
+    const lower = prefix.toLowerCase();
+    return [...this.narratorCalls.values()].filter((c) => c.id.startsWith(lower)).sort(byNewest);
+  }
+
+  async findGamesByIdPrefix(prefix: string): Promise<readonly GameRow[]> {
+    assertIdPrefix(prefix);
+    const lower = prefix.toLowerCase();
+    return [...this.games.values()].filter((g) => g.id.startsWith(lower));
   }
 
   private requireGame(gameId: string): GameRow {

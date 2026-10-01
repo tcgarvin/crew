@@ -51,7 +51,8 @@ export async function readJson(res: Response): Promise<any> {
 
 export const TEST_NOTES = {
   summary: "updated notes",
-  openThreads: [],
+  threads: [],
+  cardsShown: [],
   cast: [],
   lastUpdatedTick: 0,
   lastRejections: [],

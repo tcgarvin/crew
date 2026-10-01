@@ -280,13 +280,36 @@ function budgetSection(state: State): Section {
 function notesSection(notes: NarratorNotes): Section {
   const lines: string[] = [];
   lines.push(`summary: ${notes.summary || "(nothing yet: this is the first call)"}`);
-  for (const thread of notes.openThreads) lines.push(`open thread: ${thread}`);
+  for (const t of notes.threads) {
+    const people = t.people.length > 0 ? t.people.join(", ") : "nobody yet";
+    const last = t.lastBeatTick === null ? "none yet" : `t${t.lastBeatTick}`;
+    lines.push(
+      `- [${t.scale}] ${t.title} (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}`,
+    );
+  }
   for (const c of notes.cast) {
     const where = c.portId === null ? "" : ` [at ${c.portId}]`;
     lines.push(`cast: ${c.name}${where}: ${c.note}`);
   }
   for (const r of notes.lastRejections) lines.push(`rejected last time: ${r}`);
   return { heading: "Your notes so far", lines, priority: 5, trimFrom: "end" };
+}
+
+/**
+ * D31: what the captain actually knows. The captain experiences the story only through the
+ * cards, so this list (newest first) is the ground truth for "has the captain seen this?". It
+ * outranks the machine list in the trim order.
+ */
+function cardsSeenSection(notes: NarratorNotes): Section {
+  const lines = [...notes.cardsShown].reverse().map((c) => {
+    const who = c.speaker ?? "observed";
+    const chose =
+      c.chosen === null
+        ? "unresolved"
+        : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
+    return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}`;
+  });
+  return { heading: "What the captain has seen", lines, priority: 8.5, trimFrom: "start" };
 }
 
 function render(sections: readonly Section[], note: string | undefined): string {
@@ -326,6 +349,7 @@ export function buildDigest(
     jobSection(state, content),
     crewSection(state, content),
     notesSection(notes),
+    cardsSeenSection(notes),
     peopleSection(snapshot, notes, content),
     problemSection(state),
     eventSection(recentEvents, state, content),

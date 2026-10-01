@@ -25,11 +25,48 @@ export interface MetIssuer {
   readonly portId: string;
 }
 
+/** D32: how long a thread runs. An episode is one complete story, usually about a job's length; it need not involve a job. */
+export const THREAD_SCALES = ["beat", "episode", "season", "series"] as const;
+export type ThreadScale = (typeof THREAD_SCALES)[number];
+
+/** D32: a story thread the narrator keeps alive, TV-writers'-room style. */
+export interface Thread {
+  readonly title: string;
+  readonly scale: ThreadScale;
+  /** Who is involved: crew names or cast names. */
+  readonly people: readonly string[];
+  /** One sentence: where the thread is now. */
+  readonly stage: string;
+  /** One sentence: what must be true before it returns, and roughly what happens then. */
+  readonly nextBeat: string;
+  /** Hook tick of the last call that put a card or an offer from this thread in front of the captain. */
+  readonly lastBeatTick: number | null;
+}
+
+/**
+ * D31: a card the captain has actually seen, kept by the server (never written by the model), so
+ * the narrator knows what the captain knows and which way they went.
+ */
+export interface CardShown {
+  readonly tick: number;
+  /** Minted by the kernel on apply, so a surfaced card has none until its decision shows up. */
+  readonly decisionId: string | null;
+  readonly title: string;
+  readonly speaker: string | null;
+  /** The situation clipped to `NOTES_LIMITS.gistWords` words. */
+  readonly gist: string;
+  readonly leftLabel: string;
+  readonly rightLabel: string;
+  readonly chosen: "left" | "right" | null;
+}
+
 export interface NarratorNotes {
   /** The story so far, a few sentences. */
   readonly summary: string;
-  /** Hooks set up and not yet paid off. */
-  readonly openThreads: readonly string[];
+  /** D32: structured open threads (was `openThreads: string[]`). */
+  readonly threads: readonly Thread[];
+  /** D31: the most recent cards shown, oldest first; server-maintained. */
+  readonly cardsShown: readonly CardShown[];
   /** Supporting characters the narrator has introduced (not the crew). */
   readonly cast: readonly NarratorCastEntry[];
   /** Tick of the hook that produced these notes; -1 before the first call. */
@@ -42,6 +79,9 @@ export const NOTES_LIMITS = {
   summaryChars: 1200,
   threads: 6,
   threadChars: 200,
+  threadPeople: 6,
+  cardsShown: 12,
+  gistWords: 25,
   cast: 12,
   castNoteChars: 160,
   rejections: 6,
@@ -49,15 +89,39 @@ export const NOTES_LIMITS = {
 
 export const EMPTY_NOTES: NarratorNotes = {
   summary: "",
-  openThreads: [],
+  threads: [],
+  cardsShown: [],
   cast: [],
   lastUpdatedTick: -1,
   lastRejections: [],
 };
 
+const storedThreadSchema = z.object({
+  title: z.string(),
+  scale: z.enum(THREAD_SCALES),
+  people: z.array(z.string()),
+  stage: z.string(),
+  nextBeat: z.string(),
+  lastBeatTick: z.number().int().nullable(),
+});
+
+const storedCardSchema = z.object({
+  tick: z.number().int(),
+  decisionId: z.string().nullable(),
+  title: z.string(),
+  speaker: z.string().nullable(),
+  gist: z.string(),
+  leftLabel: z.string(),
+  rightLabel: z.string(),
+  chosen: z.enum(["left", "right"]).nullable(),
+});
+
 const storedNotesSchema = z.object({
   summary: z.string(),
-  openThreads: z.array(z.string()),
+  /** Notes stored before D32. */
+  openThreads: z.array(z.string()).optional(),
+  threads: z.array(storedThreadSchema).optional(),
+  cardsShown: z.array(storedCardSchema).optional(),
   cast: z.array(
     z.object({
       name: z.string(),
@@ -72,6 +136,51 @@ const storedNotesSchema = z.object({
 
 function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
+/** The first `max` words of a text, collapsed onto one line. */
+export function clipWords(text: string, max: number): string {
+  const words = text
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w !== "");
+  return words.length <= max ? words.join(" ") : `${words.slice(0, max).join(" ")}…`;
+}
+
+/** D32: an `openThreads` string from before structured threads becomes an episode thread. */
+export function threadFromLegacy(text: string): Thread {
+  return {
+    title: text,
+    scale: "episode",
+    people: [],
+    stage: text,
+    nextBeat: "",
+    lastBeatTick: null,
+  };
+}
+
+function boundThread(thread: Thread): Thread {
+  return {
+    title: clip(thread.title, 80),
+    scale: thread.scale,
+    people: thread.people.slice(0, NOTES_LIMITS.threadPeople).map((p) => clip(p, 60)),
+    stage: clip(thread.stage, NOTES_LIMITS.threadChars),
+    nextBeat: clip(thread.nextBeat, NOTES_LIMITS.threadChars),
+    lastBeatTick: thread.lastBeatTick,
+  };
+}
+
+function boundCard(card: CardShown): CardShown {
+  return {
+    tick: card.tick,
+    decisionId: card.decisionId,
+    title: clip(card.title, 60),
+    speaker: card.speaker === null ? null : clip(card.speaker, 80),
+    gist: clipWords(card.gist, NOTES_LIMITS.gistWords),
+    leftLabel: clip(card.leftLabel, 48),
+    rightLabel: clip(card.rightLabel, 48),
+    chosen: card.chosen,
+  };
 }
 
 /** Over the cast limit, the people seen longest ago go first; order is otherwise kept. */
@@ -127,9 +236,8 @@ export function mergeCast(
 export function boundNotes(notes: NarratorNotes): NarratorNotes {
   return {
     summary: clip(notes.summary, NOTES_LIMITS.summaryChars),
-    openThreads: notes.openThreads
-      .slice(0, NOTES_LIMITS.threads)
-      .map((t) => clip(t, NOTES_LIMITS.threadChars)),
+    threads: notes.threads.slice(0, NOTES_LIMITS.threads).map(boundThread),
+    cardsShown: notes.cardsShown.slice(-NOTES_LIMITS.cardsShown).map(boundCard),
     cast: keepRecentCast(notes.cast).map((c) => ({
       name: clip(c.name, 60),
       note: clip(c.note, NOTES_LIMITS.castNoteChars),
@@ -152,8 +260,12 @@ export function parseNotes(raw: unknown): NarratorNotes {
   }
   const parsed = storedNotesSchema.safeParse(raw);
   if (!parsed.success) return EMPTY_NOTES;
+  const { openThreads, threads, cardsShown, ...rest } = parsed.data;
   return boundNotes({
-    ...parsed.data,
+    ...rest,
+    // Notes stored before D32 have free-text threads; before D31 no card history.
+    threads: threads ?? (openThreads ?? []).map(threadFromLegacy),
+    cardsShown: cardsShown ?? [],
     // Notes stored before D25 have no port or sighting for their cast.
     cast: parsed.data.cast.map((c) => ({
       name: c.name,
@@ -163,4 +275,30 @@ export function parseNotes(raw: unknown): NarratorNotes {
     })),
     lastRejections: parsed.data.lastRejections ?? [],
   });
+}
+
+/**
+ * D32: the threads after a call. The model rewrites them in full; the server carries
+ * `lastBeatTick` by title: it becomes the hook tick when this call put one of the thread's people
+ * in front of the captain (as a card's speaker, named on a card, or as a job's issuer), else the
+ * previous value, or null for a thread the model just started and did not use.
+ */
+export function mergeThreads(
+  written: readonly Omit<Thread, "lastBeatTick">[],
+  previous: readonly Thread[],
+  tick: number,
+  /** Player-facing texts from this call: card titles, speakers, situations, issuer names. */
+  textsThisCall: readonly string[],
+): Thread[] {
+  const key = (s: string) => s.trim().toLowerCase();
+  const before = new Map(previous.map((t) => [key(t.title), t.lastBeatTick]));
+  const lowered = textsThisCall.map(key);
+  const named = (person: string) => {
+    const k = key(person);
+    return k !== "" && lowered.some((text) => text.includes(k));
+  };
+  return written.map((t) => ({
+    ...t,
+    lastBeatTick: t.people.some(named) ? tick : (before.get(key(t.title)) ?? null),
+  }));
 }

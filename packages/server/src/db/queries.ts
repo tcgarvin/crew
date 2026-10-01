@@ -4,17 +4,20 @@
  * `./memory.ts` exactly (tests run against the memory fake; this file is exercised only by hand
  * against a real Neon database — see `docs/DEPLOYMENT.md`).
  */
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { type SQL, and, desc, eq, gte, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { games, narratorCalls, saves, users } from "./schema";
-import type {
-  Db,
-  GameRow,
-  LogNarratorCallInput,
-  NarratorCallRow,
-  PutSaveInput,
-  SaveRow,
-  UserRow,
+import {
+  type Db,
+  type GameNarratorSummary,
+  type GameRow,
+  type LogNarratorCallInput,
+  type NarratorCallFilter,
+  type NarratorCallRow,
+  type PutSaveInput,
+  type SaveRow,
+  type UserRow,
+  assertIdPrefix,
 } from "./types";
 
 const ROLLING_SAVES_KEPT = 5;
@@ -186,6 +189,77 @@ export class DrizzleDb implements Db {
       .orderBy(desc(narratorCalls.createdAt), desc(narratorCalls.seq))
       .limit(1);
     return row ? toNarratorCallRow(row) : undefined;
+  }
+
+  async listGamesWithNarratorStats(): Promise<readonly GameNarratorSummary[]> {
+    const stats = this.db
+      .select({
+        gameId: narratorCalls.gameId,
+        callCount: sql<number>`count(*)::int`.as("call_count"),
+        lastCallAt: sql<Date | string>`max(${narratorCalls.createdAt})`.as("last_call_at"),
+        lastPromptVersion:
+          sql<string>`(array_agg(${narratorCalls.promptVersion} order by ${narratorCalls.createdAt} desc, ${narratorCalls.seq} desc))[1]`.as(
+            "last_prompt_version",
+          ),
+      })
+      .from(narratorCalls)
+      .groupBy(narratorCalls.gameId)
+      .as("stats");
+    const rows = await this.db
+      .select({
+        game: games,
+        callCount: stats.callCount,
+        lastCallAt: stats.lastCallAt,
+        lastPromptVersion: stats.lastPromptVersion,
+      })
+      .from(games)
+      .leftJoin(stats, eq(stats.gameId, games.id))
+      .orderBy(desc(games.updatedAt));
+    return rows.map((row) => ({
+      game: toGameRow(row.game),
+      callCount: row.callCount ?? 0,
+      // Aggregates bypass drizzle's column mappers, so the driver may hand back a string.
+      lastCallAt:
+        row.lastCallAt === null || row.lastCallAt === undefined
+          ? null
+          : row.lastCallAt instanceof Date
+            ? row.lastCallAt
+            : new Date(row.lastCallAt),
+      lastPromptVersion: row.lastPromptVersion ?? null,
+    }));
+  }
+
+  async listNarratorCalls(filter: NarratorCallFilter): Promise<readonly NarratorCallRow[]> {
+    const conditions: SQL[] = [];
+    if (filter.gameId !== undefined) conditions.push(eq(narratorCalls.gameId, filter.gameId));
+    if (filter.hookKind !== undefined) conditions.push(eq(narratorCalls.hookKind, filter.hookKind));
+    if (filter.status !== undefined) conditions.push(eq(narratorCalls.status, filter.status));
+    const rows = await this.db
+      .select()
+      .from(narratorCalls)
+      .where(conditions.length === 0 ? undefined : and(...conditions))
+      .orderBy(desc(narratorCalls.createdAt), desc(narratorCalls.seq))
+      .limit(filter.limit);
+    return rows.map(toNarratorCallRow);
+  }
+
+  async findNarratorCallsByIdPrefix(prefix: string): Promise<readonly NarratorCallRow[]> {
+    assertIdPrefix(prefix);
+    const rows = await this.db
+      .select()
+      .from(narratorCalls)
+      .where(sql`${narratorCalls.id}::text like ${`${prefix.toLowerCase()}%`}`)
+      .orderBy(desc(narratorCalls.createdAt), desc(narratorCalls.seq));
+    return rows.map(toNarratorCallRow);
+  }
+
+  async findGamesByIdPrefix(prefix: string): Promise<readonly GameRow[]> {
+    assertIdPrefix(prefix);
+    const rows = await this.db
+      .select()
+      .from(games)
+      .where(sql`${games.id}::text like ${`${prefix.toLowerCase()}%`}`);
+    return rows.map(toGameRow);
   }
 
   private async pruneSaves(gameId: string): Promise<void> {

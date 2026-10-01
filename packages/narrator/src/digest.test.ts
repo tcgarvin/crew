@@ -63,18 +63,95 @@ describe("buildDigest", () => {
     ).toEqual(small);
   });
 
-  it("includes the running notes and past rejections", () => {
+  it("includes the running notes, threads and past rejections (D32)", () => {
     const req = quietTooLongRequest(content());
     const notes = {
       ...EMPTY_NOTES,
       summary: "The pump has been grumbling.",
-      openThreads: ["A buyer at Meridian"],
+      threads: [
+        {
+          title: "A buyer at Meridian",
+          scale: "season" as const,
+          people: ["Ysolde Maren", "Jax"],
+          stage: "Ysolde hinted she has a buyer",
+          nextBeat: "When we next dock at Meridian, she names a price",
+          lastBeatTick: 1200,
+        },
+      ],
       lastRejections: ["offerJob: no route"],
     };
     const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
     expect(text).toContain("summary: The pump has been grumbling.");
-    expect(text).toContain("open thread: A buyer at Meridian");
+    expect(text).toContain(
+      "- [season] A buyer at Meridian (Ysolde Maren, Jax): Ysolde hinted she has a buyer. Next: When we next dock at Meridian, she names a price. Last beat t1200",
+    );
     expect(text).toContain("rejected last time: offerJob: no route");
+  });
+
+  it("lists what the captain has seen, newest first, right after the notes (D31)", () => {
+    const req = quietTooLongRequest(content());
+    const base = {
+      decisionId: null,
+      speaker: null,
+      leftLabel: "Take it",
+      rightLabel: "Leave it",
+      chosen: null,
+    };
+    const notes = {
+      ...EMPTY_NOTES,
+      summary: "s",
+      cardsShown: [
+        {
+          ...base,
+          tick: 10,
+          title: "Resupply",
+          gist: "Mara wants more seals.",
+          chosen: "right" as const,
+        },
+        {
+          ...base,
+          tick: 20,
+          decisionId: "decision:2",
+          title: "A stranger",
+          speaker: "Mara Osei",
+          gist: "Someone at the ramp.",
+        },
+      ],
+    };
+    const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
+    const section = text.split("## What the captain has seen\n")[1]?.split("\n\n")[0];
+    expect(section).toBe(
+      [
+        '- t20 "A stranger" (Mara Osei): Someone at the ramp. → unresolved',
+        '- t10 "Resupply" (observed): Mara wants more seals. → chose "Leave it"',
+      ].join("\n"),
+    );
+    expect(text.indexOf("## Your notes so far")).toBeLessThan(
+      text.indexOf("## What the captain has seen"),
+    );
+  });
+
+  it("trims the crew and events before what the captain has seen", () => {
+    const req = quietTooLongRequest(content());
+    const notes = {
+      ...EMPTY_NOTES,
+      cardsShown: Array.from({ length: 12 }, (_, i) => ({
+        tick: i,
+        decisionId: null,
+        title: `Card ${i}`,
+        speaker: null,
+        gist: "g",
+        leftLabel: "l",
+        rightLabel: "r",
+        chosen: null,
+      })),
+    };
+    const small = buildDigest(req.snapshot, manyEvents(20), notes, content(), req.hook, 1_500);
+    expect(small.truncated).toBe(true);
+    expect(small.text).toContain('- t11 "Card 11"');
+    expect(small.text).toContain('- t0 "Card 0"');
+    expect(small.text).not.toContain("## Crew");
+    expect(small.text).not.toContain("## Recent events");
   });
 
   it("lists the people the captain knows at the port, without pay (D24, D25)", () => {

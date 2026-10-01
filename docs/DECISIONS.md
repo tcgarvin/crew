@@ -158,3 +158,28 @@ bursts `burstTicksPerLoop` ticks per loop iteration (measured: ~0.3 ms/tick on t
 scenario → default 40) until the 60 s cap, emitting a frame every `frameEveryTicks` ticks (default
 2) so playback interpolation stays smooth, and rebuilds the lead after every hook. Owner: "waiting
 for the narrator ... feels like we're waiting the entire cycle."
+
+**D31. The narrator knows what the captain has seen.** Owner, after three resupply cards in a
+row, the third re-asking a detail of the second: the server keeps an exact history of the cards
+shown and the side chosen (`cardsShown` in the narrator's notes, maintained in `run.ts` from the
+call's own card and `surfaceDecision` output plus the kernel's `decisionPending` and
+`decisionResolved` events; never model-written), shown in the digest as "What the captain has
+seen". A card must bring something the captain has not seen on a card (new information, a new
+person, a consequence, the next beat of a thread) or the narrator does nothing. No card spacing
+rule and cards need not be trades: minor crew cards are welcome. `decisionResolved` carries only
+the decision ID, so a narrator-surfaced card (which has no ID until the kernel mints one) is
+matched to its decision by title through the decision record kept in the snapshot.
+
+**D32. Threads are structured, TV-style.** Open threads (`threads`, replacing the free-text
+`openThreads`) carry a scale (beat: one card with a follow-up; episode = one complete story, usually a
+job's length, typically opening with the captain looking for work, the narrator deciding what the
+crew runs into; a boarding attempt while docked is an episode with no job in it; season: returns every few
+jobs; series: a slow pressure that surfaces rarely), the people in
+them, a stage sentence, a next-beat condition and the tick of the last beat (server-kept: the
+hook tick whenever a card or offer this call named one of the thread's people). Two to four
+alive at different scales; a thread returns only when its condition holds and something has
+changed. Old notes migrate each string into an episode thread. Prompt v0.4.
+
+**D33. Narrator log CLI.** `pnpm --filter @crew/server narrator-log` reads `narrator_calls`
+read-only from a locally supplied `DATABASE_URL` and can rebuild the digest a call saw, so card
+problems are debugged from the record rather than screenshots. The credential is never printed.

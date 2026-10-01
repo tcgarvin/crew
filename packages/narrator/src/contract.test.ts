@@ -91,7 +91,15 @@ describe("NarratorPlan structured-output schema", () => {
       card: null,
       notes: {
         summary: "The crew took on seals at Port A.",
-        openThreads: ["Who is the stranger?"],
+        threads: [
+          {
+            title: "Who is the stranger?",
+            scale: "episode",
+            people: ["Ines Varga"],
+            stage: "A stranger asked for passage at Port A.",
+            nextBeat: "Once underway, she lets slip why she left.",
+          },
+        ],
         cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
       },
     };
@@ -115,7 +123,7 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "r",
       intents: [],
       card,
-      notes: { summary: "", openThreads: [], cast: [] },
+      notes: { summary: "", threads: [], cast: [] },
     };
     expect(schema.safeParse(plan).success).toBe(true);
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: "Mara Osei" } }).success).toBe(

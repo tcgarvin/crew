@@ -99,7 +99,17 @@ describe("narrator", () => {
     const seen: unknown[] = [];
     const notes = {
       summary: "Took on core samples at the Drift.",
-      openThreads: ["Who is the assay clerk?"],
+      threads: [
+        {
+          title: "Who is the assay clerk?",
+          scale: "episode" as const,
+          people: ["Ines Varga"],
+          stage: "Ines was nervous at the handover.",
+          nextBeat: "When the ship is next at the Drift, she asks a favour.",
+          lastBeatTick: null,
+        },
+      ],
+      cardsShown: [],
       cast: [
         {
           name: "Ines Varga",

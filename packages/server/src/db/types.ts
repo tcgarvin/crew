@@ -82,6 +82,23 @@ export interface LogNarratorCallInput {
   readonly error: string | null;
 }
 
+/** Narrator-call filter for the read-only log tooling (`src/tools/narratorLog.ts`). */
+export interface NarratorCallFilter {
+  readonly gameId?: string;
+  readonly hookKind?: string;
+  readonly status?: NarratorCallStatus;
+  /** Upper bound on rows returned; newest first. */
+  readonly limit: number;
+}
+
+/** A game plus a summary of its narrator calls, for `narrator-log games`. */
+export interface GameNarratorSummary {
+  readonly game: GameRow;
+  readonly callCount: number;
+  readonly lastCallAt: Date | null;
+  readonly lastPromptVersion: string | null;
+}
+
 export interface Db {
   createUser(anonTokenHash: string): Promise<UserRow>;
   getUserByTokenHash(anonTokenHash: string): Promise<UserRow | undefined>;
@@ -108,4 +125,25 @@ export interface Db {
   countNarratorCallsSince(gameId: string, sinceMs: number): Promise<number>;
   /** Most recent narrator call for a game, if any, for the min-ticks-between-calls check. */
   getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined>;
+
+  // Read-only queries for the narrator log CLI (`src/tools/narratorLog.ts`). Not used by routes.
+
+  /** Every game (all users), most recently updated first, with narrator-call counts. */
+  listGamesWithNarratorStats(): Promise<readonly GameNarratorSummary[]>;
+  /** Narrator calls matching `filter`, newest first (`created_at desc, seq desc`). */
+  listNarratorCalls(filter: NarratorCallFilter): Promise<readonly NarratorCallRow[]>;
+  /** Narrator calls whose id starts with `prefix` (hex and dashes only); a full id matches one. */
+  findNarratorCallsByIdPrefix(prefix: string): Promise<readonly NarratorCallRow[]>;
+  /** Games whose id starts with `prefix` (hex and dashes only); a full id matches one. */
+  findGamesByIdPrefix(prefix: string): Promise<readonly GameRow[]>;
+}
+
+/**
+ * Id prefixes reach Postgres as a `LIKE` pattern, so only uuid characters are allowed; anything
+ * else (including `%` and `_`) is rejected here rather than silently matching too much.
+ */
+export function assertIdPrefix(prefix: string): void {
+  if (prefix === "" || !/^[0-9a-fA-F-]+$/.test(prefix)) {
+    throw new Error(`Invalid id prefix: ${JSON.stringify(prefix)} (expected uuid characters)`);
+  }
 }

@@ -1,8 +1,10 @@
 import {
   type CommandId,
   type DecisionId,
+  type EventId,
   type MachineId,
   type SaveEnvelope,
+  type SimEvent,
   createKernel,
   createRegistry,
 } from "@crew/sim";
@@ -31,6 +33,46 @@ const offer = {
   urgency: "relaxed",
   surface: false,
 };
+
+const assayThread = {
+  title: "The assay office",
+  scale: "episode" as const,
+  people: ["Halla Iyer"],
+  stage: "Halla wants her cores at the Hub upright.",
+  nextBeat: "At the Hub, the lab finds one cracked.",
+};
+
+const stranger = {
+  kind: "surfaceDecision",
+  title: "A stranger at the ramp",
+  speaker: "Mara Osei",
+  situation:
+    "Mara stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where to.”",
+  left: { label: "Bring her up.", effect: "none", coursePort: null },
+  right: { label: "Not this run.", effect: "none", coursePort: null },
+  leftAftermath: "Mara waves her aboard.",
+  rightAftermath: "Mara sends her back down the ramp.",
+};
+
+function event(
+  tick: number,
+  type: "decisionPending" | "decisionResolved",
+  decisionId: string,
+  side: "left" | "right" = "left",
+): SimEvent {
+  const payload = type === "decisionResolved" ? { decisionId, side } : { decisionId };
+  return {
+    id: `e${tick}` as EventId,
+    tick,
+    seq: 0,
+    type,
+    subjectIds: [],
+    causeIds: [],
+    source: "sim",
+    significance: "narrative",
+    payload,
+  } as unknown as SimEvent;
+}
 
 function ctx(transport?: ReturnType<typeof fakeTransport>) {
   return {
@@ -93,7 +135,7 @@ describe("runNarrator", () => {
   it("translates a valid plan and rewrites the notes", async () => {
     const plan = emptyPlan({
       intents: [offer, { ...offer, fromPort: "port.green_meridian" }] as never,
-      notes: { summary: "Arrived at the Drift.", openThreads: ["The assay office"], cast: [] },
+      notes: { summary: "Arrived at the Drift.", threads: [assayThread], cast: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = approachingPortRequest(content());
@@ -105,7 +147,9 @@ describe("runNarrator", () => {
     expect(res.usage?.cacheReadInputTokens).toBe(900);
     expect(res.notesUpdate).toEqual({
       summary: "Arrived at the Drift.",
-      openThreads: ["The assay office"],
+      // D32: Halla made an offer this call, so her thread's last beat is now.
+      threads: [{ ...assayThread, lastBeatTick: req.hook.tick }],
+      cardsShown: [],
       // D25: whoever made an offer joins the cast at their port, even if the model forgot them.
       cast: [
         {
@@ -131,12 +175,13 @@ describe("runNarrator", () => {
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
     const notes = {
       summary: "They owe the Guild a favour.",
-      openThreads: [],
+      openThreads: ["The Guild's favour"],
       cast: [],
       lastUpdatedTick: 10,
     };
     await runNarrator(quietTooLongRequest(content()), { ...ctx(transport), notes });
     expect(transport.calls[0]?.user).toContain("summary: They owe the Guild a favour.");
+    expect(transport.calls[0]?.user).toContain("- [episode] The Guild's favour (nobody yet)");
   });
 
   it.each([
@@ -211,12 +256,206 @@ describe("runNarrator", () => {
   });
 });
 
-describe("prompt text (D29)", () => {
+describe("what the captain has seen (D31)", () => {
+  it("records a surfaced card and stamps the thread it belongs to", async () => {
+    const plan = emptyPlan({
+      intents: [stranger] as never,
+      notes: {
+        summary: "s",
+        threads: [{ ...assayThread, title: "The stranger", people: ["Mara Osei"] }],
+        cast: [],
+      },
+    });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const res = await runNarrator(req, ctx(transport));
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.notesUpdate?.cardsShown).toEqual([
+      {
+        tick: req.hook.tick,
+        decisionId: null,
+        title: "A stranger at the ramp",
+        speaker: "Mara Osei",
+        // Clipped to 25 words.
+        gist: "Mara stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where…",
+        leftLabel: "Bring her up.",
+        rightLabel: "Not this run.",
+        chosen: null,
+      },
+    ]);
+    expect(res.notesUpdate?.threads[0]?.lastBeatTick).toBe(req.hook.tick);
+  });
+
+  it("records the policy card prose with the pending decision's id", async () => {
+    const card = {
+      title: "Hub Co-op wants a runner",
+      speaker: "Noor Sadler",
+      situation: "A co-op clerk leans in the hatch with a manifest and a tired smile.",
+      leftLabel: "Sign it",
+      rightLabel: "Not today",
+      leftAftermath: "",
+      rightAftermath: "",
+    };
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
+    const req = policyRequest();
+    const res = await runNarrator(req, ctx(transport));
+    expect(res.notesUpdate?.cardsShown).toEqual([
+      {
+        tick: req.hook.tick,
+        decisionId: "d1",
+        title: "Hub Co-op wants a runner",
+        speaker: "Noor Sadler",
+        gist: card.situation,
+        leftLabel: "Sign it",
+        rightLabel: "Not today",
+        chosen: null,
+      },
+    ]);
+  });
+
+  it("marks the side chosen from a resolution event, by id or by title, and shows it", async () => {
+    const req = policyRequest();
+    const decision = req.snapshot.state.decisions.records["d1" as DecisionId];
+    if (decision === undefined) throw new Error("fixture");
+    decision.status = "resolved";
+    decision.chosen = "right";
+    req.snapshot.state.decisions.queue = [];
+    const hook = { ...req.hook, kind: "quietTooLong" as const, context: { quietSinceTick: 0 } };
+    req.snapshot.state.narrator.pendingHook = hook;
+    const notes = {
+      summary: "s",
+      threads: [],
+      cast: [],
+      lastUpdatedTick: 10,
+      cardsShown: [
+        {
+          tick: 5,
+          decisionId: null,
+          title: "Noor Sadler, Hub Co-op",
+          speaker: "Noor Sadler",
+          gist: "An offer.",
+          leftLabel: "Take the job",
+          rightLabel: "Pass on it",
+          chosen: null,
+        },
+      ],
+    };
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
+    const res = await runNarrator(
+      { ...req, hook, recentEvents: [event(8, "decisionResolved", "d1", "right")] },
+      { ...ctx(transport), notes },
+    );
+    expect(res.notesUpdate?.cardsShown).toEqual([
+      { ...notes.cardsShown[0], decisionId: "d1", chosen: "right" },
+    ]);
+    expect(transport.calls[0]?.user).toContain(
+      '- t5 "Noor Sadler, Hub Co-op" (Noor Sadler): An offer. → chose "Pass on it"',
+    );
+  });
+
+  it("fills in a resolution from the snapshot when the event was lost", async () => {
+    const req = policyRequest();
+    const decision = req.snapshot.state.decisions.records["d1" as DecisionId];
+    if (decision === undefined) throw new Error("fixture");
+    decision.status = "resolved";
+    decision.chosen = "left";
+    req.snapshot.state.decisions.queue = [];
+    const hook = { ...req.hook, kind: "quietTooLong" as const, context: { quietSinceTick: 0 } };
+    req.snapshot.state.narrator.pendingHook = hook;
+    const entry = {
+      tick: 5,
+      speaker: "Noor Sadler",
+      gist: "An offer.",
+      leftLabel: "Take the job",
+      rightLabel: "Pass on it",
+      chosen: null,
+    };
+    const notes = {
+      summary: "s",
+      threads: [],
+      cast: [],
+      lastUpdatedTick: 10,
+      cardsShown: [
+        { ...entry, decisionId: "d1", title: "Hub Co-op wants a runner" },
+        { ...entry, decisionId: null, title: "Noor Sadler, Hub Co-op" },
+        { ...entry, decisionId: null, title: "Something else" },
+      ],
+    };
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
+    const res = await runNarrator({ ...req, hook, recentEvents: [] }, { ...ctx(transport), notes });
+    expect(res.notesUpdate?.cardsShown.map((c) => [c.decisionId, c.chosen])).toEqual([
+      ["d1", "left"],
+      // Already claimed by the entry above, so the title match does not double up.
+      [null, null],
+      [null, null],
+    ]);
+    const alone = await runNarrator(
+      { ...req, hook, recentEvents: [] },
+      { ...ctx(transport), notes: { ...notes, cardsShown: notes.cardsShown.slice(1) } },
+    );
+    expect(alone.notesUpdate?.cardsShown.map((c) => [c.decisionId, c.chosen])).toEqual([
+      ["d1", "left"],
+      [null, null],
+    ]);
+  });
+
+  it("records a card the kernel surfaced itself from its pending event", async () => {
+    const req = policyRequest();
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
+    const res = await runNarrator(
+      { ...req, recentEvents: [event(8, "decisionPending", "d1")] },
+      ctx(transport),
+    );
+    // The model wrote no card, so the template entry from the event stands.
+    expect(res.notesUpdate?.cardsShown).toEqual([
+      {
+        tick: 8,
+        decisionId: "d1",
+        title: "Noor Sadler, Hub Co-op",
+        speaker: "Noor Sadler",
+        gist: expect.stringContaining("I've had this manifest"),
+        leftLabel: "Take the job",
+        rightLabel: "Pass on it",
+        chosen: null,
+      },
+    ]);
+  });
+
+  it("keeps only the most recent twelve cards", async () => {
+    const plan = emptyPlan({ intents: [stranger] as never });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const cardsShown = Array.from({ length: 12 }, (_, i) => ({
+      tick: i,
+      decisionId: `decision:${i}`,
+      title: `Card ${i}`,
+      speaker: null,
+      gist: "g",
+      leftLabel: "l",
+      rightLabel: "r",
+      chosen: "left" as const,
+    }));
+    const notes = { summary: "s", threads: [], cast: [], lastUpdatedTick: 11, cardsShown };
+    const res = await runNarrator(req, { ...ctx(transport), notes });
+    expect(res.notesUpdate?.cardsShown).toHaveLength(12);
+    expect(res.notesUpdate?.cardsShown[0]?.title).toBe("Card 1");
+    expect(res.notesUpdate?.cardsShown.at(-1)?.title).toBe("A stranger at the ramp");
+  });
+});
+
+describe("prompt text (D29, D31, D32)", () => {
   it("tells the model cards are spoken by a named person and capped at 70 words", () => {
     expect(STATIC_RULES).toContain("never more than 70");
     expect(STATIC_RULES).toContain("firstOfficer");
     expect(STATIC_RULES).not.toContain("60 words");
-    expect(PROMPT_VERSION).toBe("v0.3");
+  });
+
+  it("tells the model the captain only knows what the cards showed, and keeps threads TV-style", () => {
+    expect(STATIC_RULES).toContain('"What the captain has seen" is what they know');
+    expect(STATIC_RULES).toContain("variation on a recent one, do nothing");
+    expect(STATIC_RULES).toContain("Think like a TV writers' room");
+    expect(STATIC_RULES).not.toContain("openThreads");
+    expect(PROMPT_VERSION).toBe("v0.4");
   });
 });
 

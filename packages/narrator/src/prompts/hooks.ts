@@ -10,7 +10,7 @@ export const HOOK_INSTRUCTIONS: Readonly<Record<NarratorHookKind, string>> = {
   jobBoard:
     "The ship is docked and the port board is empty. Offer one or two jobs from this port (offerJob with fromPort set to it), as for an arrival: a named person, a pitch, and people you know here first. At most one surfaced card. Card is null.",
   quietTooLong:
-    "Nothing story-worthy has happened for a while. Choose one: schedule a fault on a machine that has none pending (scheduleFault, pick a window), or a small low-stakes surfaceDecision about ship life, brought by a crew member in their own words (speaker set to their name), or deliberately nothing if the ship already has enough going on (say why in rationale and notes). Card is null.",
+    'Nothing story-worthy has happened for a while. Prefer advancing a thread whose nextBeat condition is now true (a surfaceDecision brought by one of its people, or a scheduleFault on a machine that has none pending if that is the beat); otherwise a minor crew card that shows someone the captain has not seen on a card yet, in their own words (speaker set to their name); otherwise nothing (say why in rationale and notes). Check "What the captain has seen" first: never a variation on a recent card. Card is null.',
   notableEvent:
     "Something notable just happened (see the hook line and recent events). Update your notes to reflect it. Add an intent only if the event genuinely invites one, for example a decision it raises for the captain. Card is null.",
   policyDecision:
