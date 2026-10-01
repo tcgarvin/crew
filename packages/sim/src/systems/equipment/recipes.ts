@@ -159,6 +159,13 @@ function advanceRepair(ctx: RecipeCtx, task: Task, actorId: ActorId, ticks: numb
     if (fault.repairStepIndex >= steps.length) {
       machine.faults = machine.faults.filter((f) => f.faultKey !== faultKey);
       machine.condition = clamp(machine.condition + REPAIR_CONDITION_RESTORE, 0, 1);
+      // D35: a completed repair is the only path that restores integrity (overheat is the only
+      // thing that costs it), so a machine blocked on integrity can come back once it is fixed.
+      machine.integrity = clamp(
+        Math.max(machine.integrity, ctx.config.equipment.integrityDerateBelow),
+        0,
+        1,
+      );
       events.push({
         type: "faultRepaired",
         subjectIds: [machineId],

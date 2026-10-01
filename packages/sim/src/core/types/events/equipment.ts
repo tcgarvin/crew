@@ -3,6 +3,9 @@ import type { LocalKey, MachineId } from "../ids";
 import type { OperatingMode } from "../ship";
 import type { SignificanceCatalog } from "./significance";
 
+/** Why a machine's output fell below 1: the smallest of its output factors (D35 adds integrity). */
+export type DerateCause = "power" | "heat" | "fault" | "integrity";
+
 export interface EquipmentEventPayloads {
   /** Truth: a fault now exists (whether or not anyone knows). */
   faultOccurred: { readonly machineId: MachineId; readonly faultKey: LocalKey };
@@ -13,7 +16,7 @@ export interface EquipmentEventPayloads {
   machineDerated: {
     readonly machineId: MachineId;
     readonly output: number;
-    readonly cause: "power" | "heat" | "fault";
+    readonly cause: DerateCause;
   };
   machineModeChanged: {
     readonly machineId: MachineId;

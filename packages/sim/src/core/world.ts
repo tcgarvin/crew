@@ -4,6 +4,7 @@ import { emptyCaches, rebuildCaches } from "./caches";
  * instantiates the scenario deck, then spawns crew, stores and faults through the command path.
  */
 import { type ApplyCtx, applyCommandNow } from "./commands";
+import { headNeedingNarration } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
@@ -320,6 +321,11 @@ const COMPLETED: AdvanceHalt = { kind: "completed" };
  * Why the world cannot run its next tick, or `null` if it can. W2 decision: a pending
  * hook/decision halts unless its `acknowledgeHook`/`resolveDecision` is already queued for the
  * next tick; that tick then runs and phase 1 applies it. A hook outranks a decision.
+ *
+ * D37: a policy decision that has not had its `policyDecision` hook yet does not halt the world
+ * by itself; the next tick runs so phase 8 can raise the hook (the only way the head can lack
+ * one is that another hook was pending when it reached the head), and the hook halt comes
+ * first. The host therefore always sees `hook` before `decision` for a policy card.
  */
 export function haltReason(state: WorldState): AdvanceHalt | null {
   const nextTick = state.tick + 1;
@@ -335,6 +341,7 @@ export function haltReason(state: WorldState): AdvanceHalt | null {
   const head = state.decisions.queue[0];
   if (
     head !== undefined &&
+    headNeedingNarration(state) === undefined &&
     !queuedDue((c) => c.kind === "resolveDecision" && c.payload.decisionId === head)
   ) {
     return { kind: "decision" };
@@ -342,10 +349,12 @@ export function haltReason(state: WorldState): AdvanceHalt | null {
   return null;
 }
 
-/** Halt after a completed tick: anything pending stops the run. */
+/** Halt after a completed tick: anything pending stops the run (D37: a hook first). */
 function haltAfterStep(state: WorldState): AdvanceHalt | null {
   if (state.narrator.pendingHook !== undefined) return { kind: "hook" };
-  if (state.decisions.queue.length > 0) return { kind: "decision" };
+  if (state.decisions.queue.length > 0 && headNeedingNarration(state) === undefined) {
+    return { kind: "decision" };
+  }
   return null;
 }
 

@@ -31,12 +31,18 @@
  * `condition` a completed repair restores. `REPAIR_CONDITION_RESTORE` below is hardcoded pending
  * a `ConfigDef.equipment.repairConditionRestore` addition; adding it now would require also
  * updating `packages/content`'s (W10-owned) Zod schema, out of scope here.
+ *
+ * D35 (2026-10-01): integrity counts. Output carries an integrity factor (1 above
+ * `config.equipment.integrityDerateBelow`, linear to 0 at `integrityInoperableBelow`) and a
+ * machine below the inoperable threshold is blocked like an inoperable fault until a completed
+ * fault repair (`recipes.ts`) lifts its integrity back to at least `integrityDerateBelow`.
+ * Overheat is still the only thing that costs integrity.
  */
 import { ticksToSeconds } from "../../core/clock";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
-import type { MachineDef } from "../../core/types/content";
-import type { EventDraft } from "../../core/types/events";
+import type { ConfigDef, MachineDef } from "../../core/types/content";
+import type { DerateCause, EventDraft } from "../../core/types/events";
 import type { CommandId, LocalKey } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
@@ -51,6 +57,49 @@ export const DIAGNOSE_SKILL = { skill: "engineering", min: 1 } as const;
 export const REPAIR_CONDITION_RESTORE = 0.5;
 /** W5 decision: see module doc — residual cooling fraction while a domain's coolant pump is down. */
 const COOLANT_OFFLINE_COOLING_FRACTION = 0.2;
+
+type EquipmentConfig = ConfigDef["equipment"];
+
+/**
+ * D35: output factor from integrity: 1 at or above `integrityDerateBelow`, falling linearly to 0
+ * at `integrityInoperableBelow` (and 0 below it, where the machine is blocked outright).
+ */
+export function integrityOutputFactor(integrity: number, config: EquipmentConfig): number {
+  const { integrityDerateBelow: derateBelow, integrityInoperableBelow: inoperableBelow } = config;
+  if (integrity >= derateBelow) return 1;
+  if (integrity < inoperableBelow || derateBelow <= inoperableBelow) return 0;
+  return clamp((integrity - inoperableBelow) / (derateBelow - inoperableBelow), 0, 1);
+}
+
+/** D35: integrity so low the machine will not run until repaired. */
+export function isIntegrityBlocked(integrity: number, config: EquipmentConfig): boolean {
+  return integrity < config.integrityInoperableBelow;
+}
+
+/**
+ * Whether `machine` is blocked from running regardless of power: an `inoperable` fault, its
+ * temperature at the failure point, or integrity below the inoperable threshold. The same rule
+ * `tickMachine` applies, exported so travel's departure gate (D36) asks the same question.
+ */
+export function isMachineBlocked(
+  machine: Pick<Machine, "faults" | "temperature" | "integrity">,
+  def: Pick<MachineDef, "faults">,
+  config: EquipmentConfig,
+): boolean {
+  const inoperableFault = machine.faults.some(
+    (f) => def.faults.find((d) => d.key === f.faultKey)?.effect.kind === "inoperable",
+  );
+  return (
+    inoperableFault || machine.temperature >= 1 || isIntegrityBlocked(machine.integrity, config)
+  );
+}
+
+/** The smallest output factor names the cause; ties go to the earlier entry. */
+function derateCause(factors: readonly (readonly [DerateCause, number])[]): DerateCause {
+  let worst = factors[0] ?? (["power", 1] as const);
+  for (const entry of factors) if (entry[1] < worst[1]) worst = entry;
+  return worst[0];
+}
 
 function coolantAvailable(ctx: StepCtx, machine: Machine): boolean {
   const domainKey = domainKeyOf(ctx, machine);
@@ -194,8 +243,13 @@ function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
   if (newTemp >= 1) heatFactor = 0;
   else if (newTemp > def.heat.derateAbove) heatFactor = (1 - newTemp) / (1 - def.heat.derateAbove);
 
+  // D35: integrity after this tick's overheat damage, so a machine that just crossed the
+  // inoperable threshold stops now rather than next tick.
+  const integrityFactor = integrityOutputFactor(machine.integrity, ctx.config.equipment);
+  const integrityBlocked = isIntegrityBlocked(machine.integrity, ctx.config.equipment);
+
   // Mode: power already set the baseline this tick; equipment may only push further toward off.
-  const blocked = inoperableFromFault || newTemp >= 1;
+  const blocked = inoperableFromFault || newTemp >= 1 || integrityBlocked;
   const wasMode = machine.actualMode;
   if (def.power.role === "consumer") {
     if (blocked) machine.actualMode = "off";
@@ -219,15 +273,17 @@ function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
       ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
       : 1;
   const oldOutput = machine.output;
-  const newOutput = finalOn ? clamp(powerFraction * heatFactor * faultOutputFactor, 0, 1) : 0;
+  const newOutput = finalOn
+    ? clamp(powerFraction * heatFactor * faultOutputFactor * integrityFactor, 0, 1)
+    : 0;
   machine.output = newOutput;
   if (oldOutput >= 1 && newOutput < 1) {
-    const cause =
-      powerFraction <= heatFactor && powerFraction <= faultOutputFactor
-        ? "power"
-        : heatFactor <= faultOutputFactor
-          ? "heat"
-          : "fault";
+    const cause = derateCause([
+      ["power", powerFraction],
+      ["heat", heatFactor],
+      ["fault", faultOutputFactor],
+      ["integrity", integrityFactor],
+    ]);
     ctx.emit({
       type: "machineDerated",
       subjectIds: [machine.id],

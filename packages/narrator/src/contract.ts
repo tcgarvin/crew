@@ -24,7 +24,7 @@ import {
   type Tick,
 } from "@crew/sim";
 import { z } from "zod";
-import { type NarratorNotes, THREAD_SCALES } from "./notes";
+import { type NarratorNotes, THREAD_SCALES, type Thread } from "./notes";
 
 export type {
   CardShown,
@@ -32,6 +32,7 @@ export type {
   NarratorNotes,
   Thread,
   ThreadScale,
+  WrittenThread,
 } from "./notes";
 export { THREAD_SCALES } from "./notes";
 
@@ -236,6 +237,14 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
       "A stage line, then what the speaker says in quotes, in their own voice. Aim for 35 to 55 words, never more than 70. No numbers.",
     );
 
+  // D39: a beat card foreshadows a thread without asking for a decision.
+  const beatOfThread = z
+    .string()
+    .nullable()
+    .describe(
+      "Null for a normal card. For a beat card (foreshadowing): the exact title of the thread under your notes whose nextBeat will pay it off. Both sides must then be effect none, and are how the captain takes it. One beat card per thread, ever.",
+    );
+
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
     title: z.string().describe("Card heading, two to six words."),
@@ -245,6 +254,7 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
     right: decisionSide,
     leftAftermath: aftermath,
     rightAftermath: aftermath,
+    beatOfThread,
   });
 
   return z.strictObject({
@@ -321,6 +331,12 @@ export interface TranslationCtx {
   readonly callId: string;
   /** W9 addition: the hook being answered; defaults to the snapshot's pending hook. */
   readonly hook?: DeepReadonly<NarratorHook>;
+  /**
+   * D39: the threads the digest showed, so a beat card can be checked against them (title match,
+   * one beat card per thread). Absent = no stored threads; a beat card may still name a thread
+   * the plan's notes introduce this call.
+   */
+  readonly threads?: readonly Thread[];
 }
 
 export interface TranslationResult {
@@ -329,6 +345,16 @@ export interface TranslationResult {
   readonly card?: DecisionCardProse;
   /** Intents dropped with a reason (bad pairing, out of budget, stale target); logged, not fatal. */
   readonly dropped: readonly DroppedIntent[];
+  /**
+   * D41: corrections that did not drop anything (a captain speaker nulled to an observed scene).
+   * Fed back to the model with the drop reasons under "rejected last time".
+   */
+  readonly notes: readonly string[];
+  /**
+   * D39: the title (as written in notes) of the thread this call's beat card foreshadows, when a
+   * surfaced card was a beat card; the notes merge sets `beatCardShown` on it.
+   */
+  readonly beatCardThread?: string;
 }
 
 /**

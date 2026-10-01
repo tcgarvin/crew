@@ -58,6 +58,31 @@ const decision = {
   right: { label: "Not our business", effect: "none", coursePort: null },
   leftAftermath: "We set course for the Hub with the crate aboard.",
   rightAftermath: "The foreman nods and goes looking for another ship.",
+  beatOfThread: null,
+};
+
+/** D39: a foreshadowing card; both sides are the captain's attitude. */
+const beatCard = {
+  kind: "surfaceDecision",
+  title: "A blip on the board",
+  speaker: "Dane Whitcross",
+  situation:
+    "Dane stops by the hatch, tablet in hand. “Captain. The aft sensor picked up something on the last sweep. Gone now. I have logged it.”",
+  left: { label: "Keep an eye on it.", effect: "none", coursePort: null },
+  right: { label: "Probably nothing.", effect: "none", coursePort: null },
+  leftAftermath: "Dane nods and adds it to his watch list.",
+  rightAftermath: "Dane files it and goes back to his rounds.",
+  beatOfThread: "the aft sensor",
+};
+
+const sensorThread = {
+  title: "The aft sensor",
+  scale: "episode" as const,
+  people: ["Dane Whitcross"],
+  stage: "Something showed on a sweep.",
+  nextBeat: "Underway, it shows again and does not go away.",
+  lastBeatTick: null,
+  beatCardShown: false,
 };
 
 function expectNarratorOnly(commands: readonly NarratorCommand[]): void {
@@ -220,6 +245,70 @@ describe("translateIntents: valid intents", () => {
   });
 });
 
+describe("translateIntents: beat cards (D39)", () => {
+  it("accepts a beat card naming a stored thread, matched case-insensitively", () => {
+    const req = quietTooLongRequest(content());
+    const result = translateIntents(plan([beatCard]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.dropped).toEqual([]);
+    expect(result.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(result.beatCardThread).toBe("The aft sensor");
+  });
+
+  it("accepts a beat card for a thread the plan's notes start this call", () => {
+    const req = quietTooLongRequest(content());
+    const { lastBeatTick: _t, beatCardShown: _b, ...written } = sensorThread;
+    const withThread = emptyPlan({
+      intents: [beatCard] as never,
+      notes: { summary: "s", threads: [written], cast: [] },
+    });
+    const result = translateIntents(withThread, ctxOf(req));
+    expect(result.dropped).toEqual([]);
+    expect(result.beatCardThread).toBe("The aft sensor");
+  });
+
+  it("drops a beat card whose thread matches none in the notes", () => {
+    const req = quietTooLongRequest(content());
+    const result = translateIntents(plan([beatCard]), { ...ctxOf(req), threads: [] });
+    expect(result.commands).toEqual([]);
+    expect(result.beatCardThread).toBeUndefined();
+    expect(result.dropped[0]?.reason).toBe(
+      'surfaceDecision: beatOfThread "the aft sensor" matches no thread in your notes; name one exactly',
+    );
+  });
+
+  it("drops a second beat card for a thread that already had one", () => {
+    const req = quietTooLongRequest(content());
+    const result = translateIntents(plan([beatCard]), {
+      ...ctxOf(req),
+      threads: [{ ...sensorThread, beatCardShown: true }],
+    });
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      'surfaceDecision: thread "The aft sensor" already had its beat card; its next card must pay it off (nextBeat)',
+    );
+  });
+
+  it("drops a beat card with a setCourse side", () => {
+    const req = docked(quietTooLongRequest(content()));
+    const steering = {
+      ...beatCard,
+      left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
+    };
+    const result = translateIntents(plan([steering]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: a beat card's sides are the captain's attitude; both must be effect none",
+    );
+  });
+
+  it("a normal card (beatOfThread null) attributes no beat", () => {
+    const req = docked(approachingPortRequest(content()));
+    const result = translateIntents(plan([decision]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.dropped).toEqual([]);
+    expect(result.beatCardThread).toBeUndefined();
+  });
+});
+
 describe("translateIntents: drops with reasons", () => {
   it("drops an offer from a port the ship is not at", () => {
     const req = approachingPortRequest(content());
@@ -343,6 +432,22 @@ describe("translateIntents: drops with reasons", () => {
     );
   });
 
+  it("nulls a captain speaker, keeps the card and tells the model why (D41)", () => {
+    const req = docked(approachingPortRequest(content()));
+    for (const name of ["Mara Osei", "mara osei"]) {
+      const result = translateIntents(plan([{ ...decision, speaker: name }]), ctxOf(req));
+      expect(result.dropped).toEqual([]);
+      expect(result.notes).toEqual([
+        `speaker: "${name}" is the captain and cannot bring a card; name the crew member who does`,
+      ]);
+      const [command] = result.commands;
+      if (command?.kind !== "surfaceDecision") throw new Error("expected a card");
+      expect(command.payload.card.prompt.params).toEqual({ title: decision.title });
+    }
+    const other = translateIntents(plan([decision]), ctxOf(req));
+    expect(other.notes).toEqual([]);
+  });
+
   it("drops setCourse sides while not docked", () => {
     const req = approachingPortRequest(content());
     const result = translateIntents(plan([decision]), ctxOf(req));
@@ -394,6 +499,7 @@ describe("translateIntents: malicious plans (N6)", () => {
       right: { label: "b", effect: "none", coursePort: null },
       leftAftermath: "",
       rightAftermath: "",
+      beatOfThread: null,
     },
   ];
 

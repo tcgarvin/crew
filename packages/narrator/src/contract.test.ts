@@ -86,6 +86,7 @@ describe("NarratorPlan structured-output schema", () => {
           right: { label: "Refuse", effect: "none", coursePort: null },
           leftAftermath: "She comes aboard and we plot for Port B.",
           rightAftermath: "She walks back into the crowd.",
+          beatOfThread: null,
         },
       ],
       card: null,

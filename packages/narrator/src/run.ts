@@ -171,7 +171,8 @@ function textsShown(translated: TranslationResult): string[] {
 
 /**
  * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
- * cast sightings, D31 card history, D32 thread beats, and why intents were dropped).
+ * cast sightings, D31 card history, D32 thread beats, D39 beat cards, and why intents were
+ * dropped).
  */
 function notesFrom(
   plan: NarratorPlan,
@@ -182,11 +183,18 @@ function notesFrom(
   const { commands, dropped } = translated;
   return boundNotes({
     summary: plan.notes.summary,
-    threads: mergeThreads(plan.notes.threads, previous.threads, tick, textsShown(translated)),
+    threads: mergeThreads(
+      plan.notes.threads,
+      previous.threads,
+      tick,
+      textsShown(translated),
+      translated.beatCardThread,
+    ),
     cardsShown: recordCardsFromCall(previous.cardsShown, tick, translated.card, commands),
     cast: mergeCast(plan.notes.cast, previous.cast, issuersMet(commands), tick),
     lastUpdatedTick: tick,
-    lastRejections: dropped.map((d) => d.reason),
+    // D41: non-fatal corrections ride along with the drop reasons.
+    lastRejections: [...dropped.map((d) => d.reason), ...translated.notes],
   });
 }
 
@@ -269,6 +277,7 @@ export async function runNarratorWithTrace(
       hookTick: req.hook.tick,
       callId,
       hook: req.hook,
+      threads: notes.threads,
     });
     const response: NarratorResponse = {
       commands: translated.commands,

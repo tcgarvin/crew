@@ -22,6 +22,7 @@ import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
 import type { TravelStage, TravelState } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
+import { departureCleared } from "./departure-gate";
 import { raiseHookIfIdle } from "./hooks";
 
 // ---------------------------------------------------------------------------------------------
@@ -268,6 +269,8 @@ export function beginDeparture(
     routeDistance: distance ?? 0,
     drifting: false,
     stageStartedTick: ctx.tick,
+    // D36: "leave anyway" answered while docked still covers the departure it was asked for.
+    ...(travel.departureRiskAccepted === true ? { departureRiskAccepted: true } : {}),
   };
   ctx.emit({
     ...cause,
@@ -303,7 +306,10 @@ function advanceTravel(ctx: StepCtx): void {
         updateStaffingProblem(ctx, console_.id, isStaffed(ctx) && !hasOpenCargoWork(ctx));
       }
     }
-    if (planned !== undefined && !hasOpenCargoWork(ctx)) beginDeparture(ctx, planned);
+    // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
+    if (planned !== undefined && !hasOpenCargoWork(ctx) && departureCleared(ctx)) {
+      beginDeparture(ctx, planned);
+    }
     return;
   }
 
@@ -314,6 +320,9 @@ function advanceTravel(ctx: StepCtx): void {
     const console_ = bridgeConsole(ctx);
     const staffed = isStaffed(ctx);
     if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
+    // D36: a course set with no cargo work enters this stage straight from `setCourse`, so the
+    // departure gate is also checked here; a hold stalls the stage like any other precondition.
+    if (!departureCleared(ctx)) return;
     const openCargo = Object.values(ctx.state.work.problems).some(
       (p) => p.kind === "cargoToLoad" && p.status === "open",
     );

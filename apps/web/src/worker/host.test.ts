@@ -281,6 +281,131 @@ describe("createHost run-ahead accumulator", () => {
   });
 });
 
+/**
+ * D37: a kernel that raises a `policyDecision` hook for a queued decision at `hookAtTick`; the
+ * decision halt only shows once the hook is acknowledged (as `haltReason` orders it).
+ */
+function makePolicyKernel(hookAtTick: number): Kernel {
+  const base = makeFakeKernel(Number.POSITIVE_INFINITY).kernel;
+  type FakeState = {
+    tick: number;
+    narrator: {
+      pendingHook: { id: string; kind: string; context: unknown; tick: number } | undefined;
+    };
+    decisions: { records: Record<string, unknown>; queue: string[] };
+  };
+  const halt = (state: FakeState): AdvanceResult["halt"] => {
+    if (state.narrator.pendingHook) return { kind: "hook" };
+    if (state.decisions.queue.length > 0) return { kind: "decision" };
+    return { kind: "completed" };
+  };
+  return {
+    ...base,
+    advance(world, ticks): AdvanceResult {
+      const state = world.state as unknown as FakeState;
+      let advanced = 0;
+      while (advanced < ticks && halt(state).kind === "completed") {
+        state.tick += 1;
+        advanced += 1;
+        if (state.tick === hookAtTick) {
+          const decisionId = "d1";
+          state.decisions.records[decisionId] = {
+            id: decisionId,
+            origin: "policy",
+            prompt: { key: "travel.departureGate", params: {} },
+            createdTick: state.tick,
+          };
+          state.decisions.queue.push(decisionId);
+          state.narrator.pendingHook = {
+            id: `k${state.tick}`,
+            kind: "policyDecision",
+            context: { decisionId },
+            tick: state.tick,
+          };
+        }
+      }
+      return { events: [], ticksAdvanced: advanced, halt: halt(state) };
+    },
+    enqueueCommand(world, command): EnqueueResult {
+      const state = world.state as unknown as FakeState;
+      if (command.kind === "acknowledgeHook") state.narrator.pendingHook = undefined;
+      if (command.kind === "resolveDecision") state.decisions.queue.shift();
+      return { status: "accepted", commandId: command.id, applyAtTick: 0 };
+    },
+  };
+}
+
+describe("createHost policy decision (D37)", () => {
+  it("posts hookRaised for the policy hook, then decisionPending only once it is acknowledged", () => {
+    const kernel = makePolicyKernel(5);
+    const messages: FromWorker[] = [];
+    const { clock, advance } = makeFakeClock();
+    const host = createHost({
+      kernel,
+      content: {} as ContentBundle,
+      config: CONFIG,
+      postMessage: (m) => messages.push(m),
+      clock,
+      loopIntervalMs: 50,
+      runAheadCapSeconds: 60,
+    });
+    host.handleMessage({
+      type: "load",
+      source: { kind: "scenario", scenarioId: "s" as ScenarioDefId, seed: 1 },
+    });
+
+    for (let i = 0; i < 10; i++) advance(50);
+    const kinds = () =>
+      messages.filter((m) => m.type === "hookRaised" || m.type === "decisionPending");
+    expect(kinds().map((m) => m.type)).toEqual(["hookRaised"]);
+    const hook = messages.find(
+      (m): m is Extract<FromWorker, { type: "hookRaised" }> => m.type === "hookRaised",
+    );
+    expect(hook?.hook).toMatchObject({ kind: "policyDecision", context: { decisionId: "d1" } });
+
+    // The main thread answers (with the card prose in hand) and acknowledges.
+    host.handleMessage({
+      type: "command",
+      requestId: "r1",
+      command: {
+        id: "cmd:system:ack:1",
+        source: "system",
+        kind: "acknowledgeHook",
+        payload: { hookId: hook?.hook.id },
+        targetTick: 6,
+      } as Command,
+    });
+    for (let i = 0; i < 5; i++) advance(50);
+    expect(kinds().map((m) => m.type)).toEqual(["hookRaised", "decisionPending"]);
+    const pending = messages.find(
+      (m): m is Extract<FromWorker, { type: "decisionPending" }> => m.type === "decisionPending",
+    );
+    expect(pending?.decision.id).toBe("d1");
+
+    // Resolving the decision resumes the sim; nothing is re-announced.
+    host.handleMessage({
+      type: "command",
+      requestId: "r2",
+      command: {
+        id: "cmd:player:1",
+        source: "player",
+        kind: "resolveDecision",
+        payload: { decisionId: "d1", side: "left" },
+        targetTick: 6,
+      } as Command,
+    });
+    for (let i = 0; i < 10; i++) advance(50);
+    expect(kinds()).toHaveLength(2);
+    const maxFrameTick = Math.max(
+      ...messages
+        .filter((m) => m.type === "frame")
+        .map((m) => (m as { frame: { tick: number } }).frame.tick),
+    );
+    expect(maxFrameTick).toBeGreaterThan(5);
+    host.dispose();
+  });
+});
+
 describe("createHost hook halt", () => {
   it("stops advancing at a hook, posts hookRaised, and resumes once acknowledgeHook arrives as a command", () => {
     const { kernel } = makeFakeKernel(5);

@@ -1,10 +1,15 @@
 /**
  * The commerce system (PLAN §6 W6 items 3–5): one per-tick pass that
- *  1. runs the deterministic job source (one offer at a time while docked),
- *  2. raises the `jobBoard` hook if the source was free to offer but had nothing to offer,
- *  3. moves accepted jobs to `inTransit` once the ship leaves dock, raises `cargoToUnload`
+ *  1. moves accepted jobs to `inTransit` once the ship leaves dock, raises `cargoToUnload`
  *     problems on arrival at the destination, and pays a delivered job exactly once,
- *  4. expires stale offers.
+ *  2. expires stale offers,
+ *  3. raises the `jobBoard` hook when the captain is docked with nothing to do (see
+ *     `travel/hooks.ts` `raiseJobBoardHookIfNeeded`).
+ *
+ * D40 (2026-10-01): the narrator is the only source of work. The deterministic job source that
+ * used to live beside this system (posting template offers while docked) is gone; `jobBoard` is
+ * the sim asking the narrator for an offer, and the null narrator answers it offline from the
+ * port's `jobTemplates`. Nothing here ever creates a job on its own.
  *
  * Runs in the same phase as travel (`equipment`), after it (registration order), so a job
  * accepted/offered this tick and a `setCourse` applied this tick are both visible by the time
@@ -12,7 +17,6 @@
  */
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { raiseJobBoardHookIfNeeded } from "../travel/hooks";
-import { runJobSource } from "./jobSource";
 import { expireStaleOffers, payJobIfDue, raiseUnloadProblems } from "./jobs";
 
 function sweepJobs(ctx: StepCtx): void {
@@ -35,8 +39,7 @@ export const commerceSystem: System = {
   name: "commerce.jobs",
   phase: "equipment",
   run(ctx) {
-    const outcome = runJobSource(ctx);
     sweepJobs(ctx);
-    raiseJobBoardHookIfNeeded(ctx, outcome === "nothing");
+    raiseJobBoardHookIfNeeded(ctx);
   },
 };

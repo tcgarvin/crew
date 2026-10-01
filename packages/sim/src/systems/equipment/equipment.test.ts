@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cmd } from "../../core/fixtures/test-world";
 import { checkInvariants } from "../../core/invariants";
+import { getRenderFrame } from "../../core/render";
 import type { Machine } from "../../core/types/ship";
 import { w5TestWorld } from "./fixtures/test-world";
 import { W5 } from "./fixtures/w5-content";
@@ -141,5 +142,44 @@ describe("maintenance", () => {
     expect(problemId !== undefined ? world.state.work.problems[problemId]?.status : undefined).toBe(
       "resolved",
     );
+  });
+});
+
+describe("integrity (D35)", () => {
+  it("derates output linearly between the derate and inoperable thresholds", () => {
+    const { kernel, world } = w5TestWorld();
+    const { integrityDerateBelow, integrityInoperableBelow } = world.config.values.equipment;
+    const engine = byDef(world, W5.engine);
+    kernel.advance(world, 1);
+    expect(engine.output).toBe(1);
+
+    engine.integrity = integrityDerateBelow; // at the threshold: untouched
+    kernel.advance(world, 1);
+    expect(engine.output).toBe(1);
+
+    engine.integrity = (integrityDerateBelow + integrityInoperableBelow) / 2; // halfway down
+    const derated = kernel.advance(world, 1);
+    expect(engine.output).toBeCloseTo(0.5, 5);
+    expect(engine.actualMode).toBe("on");
+    expect(derated.events.find((e) => e.type === "machineDerated")).toMatchObject({
+      payload: { machineId: engine.id, cause: "integrity" },
+    });
+    expect(checkInvariants(world.state)).toEqual([]);
+  });
+
+  it("blocks the machine below the inoperable threshold and renders it as failed", () => {
+    const { kernel, world } = w5TestWorld();
+    const engine = byDef(world, W5.engine);
+    engine.integrity = world.config.values.equipment.integrityInoperableBelow - 0.01;
+    kernel.advance(world, 5);
+    expect(engine.actualMode).toBe("off");
+    expect(engine.output).toBe(0);
+    const rendered = getRenderFrame(world).machines.find((m) => m.id === engine.id);
+    expect(rendered?.state).toBe("failed");
+
+    // Still blocked next tick: nothing but a repair restores integrity.
+    kernel.advance(world, 20);
+    expect(engine.actualMode).toBe("off");
+    expect(checkInvariants(world.state)).toEqual([]);
   });
 });

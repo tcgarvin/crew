@@ -113,6 +113,7 @@ const crew = {
   startingInventory: [],
   shift: "alpha",
   bio: "Test captain.",
+  voice: "Plain and brief.",
 };
 
 const trait = {
@@ -207,7 +208,13 @@ const config = {
     heatSurvivalAbove: 0.9,
     routineAgingSeconds: 120,
   },
-  equipment: { hazardScale: 1, overheatDamagePerSecond: 0.01, maintenanceConditionBelow: 0.3 },
+  equipment: {
+    hazardScale: 1,
+    overheatDamagePerSecond: 0.01,
+    maintenanceConditionBelow: 0.3,
+    integrityDerateBelow: 0.5,
+    integrityInoperableBelow: 0.15,
+  },
   power: { priorityOrder: ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"] },
   travel: {
     prepareDepartureSeconds: 5,
@@ -217,11 +224,11 @@ const config = {
     dockSeconds: 4,
     nominalSpeed: 1,
     staffEstimateSeconds: 0,
+    departureMinOutput: 0.5,
   },
   commerce: {
     priceBands: { general: band, fragile: band, perishable: band, hazardous: band },
     jobOfferTtlSeconds: 300,
-    boardSize: 3,
     dockingFee: 0,
     haulEstimateSeconds: 5,
     reofferSeconds: 60,
@@ -302,6 +309,12 @@ describe("content def schemas", () => {
 
   it("rejects an explicit undefined for an optional key", () => {
     expect(itemDefSchema.safeParse({ ...item, cargoClass: undefined }).success).toBe(false);
+  });
+
+  it("requires a voice on every crew member (D38)", () => {
+    const { voice: _omitted, ...voiceless } = crew;
+    expect(crewDefSchema.safeParse(voiceless).success).toBe(false);
+    expect(crewDefSchema.safeParse({ ...crew, voice: "" }).success).toBe(false);
   });
 });
 

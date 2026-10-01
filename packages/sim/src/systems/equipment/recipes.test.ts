@@ -179,3 +179,79 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
     expect(done.status).toBe("recipeComplete");
   });
 });
+
+describe("integrity restore on repair (D35)", () => {
+  it("lifts a blocked machine's integrity back to the derate threshold when the repair completes", () => {
+    const { kernel, world } = w5TestWorld();
+    const techId = Object.keys(world.state.actors)[0] as ActorId;
+    const machineId = injectEngineFault(world, kernel);
+    const recipeCtx = {
+      state: world.state,
+      content: world.content,
+      config: world.config.values,
+      tick: world.state.tick,
+    };
+
+    const symptom = Object.values(world.state.work.problems).find(
+      (p): p is ProblemOfKind<"machineSymptom"> =>
+        p.kind === "machineSymptom" && p.payload.machineId === machineId,
+    );
+    if (symptom === undefined) throw new Error("no symptom problem");
+    const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
+    const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
+    beginStage(recipeCtx, inspectTaskId, techId);
+    expect(advanceStage(recipeCtx, inspectTaskId, techId, 20 * 20).status).toBe("recipeComplete");
+
+    const fault = Object.values(world.state.work.problems).find(
+      (p): p is ProblemOfKind<"machineFault"> =>
+        p.kind === "machineFault" && p.payload.machineId === machineId,
+    );
+    if (fault === undefined) throw new Error("no fault problem");
+    const repairSpecs = equipmentTaskDerivation.machineFault?.(fault, ctxOf(world)) ?? [];
+    const repairTaskId = installTask(world, fault.id, repairSpecs[0] as TaskSpec);
+
+    const engine = byDef(world, W5.engine);
+    engine.integrity = 0.05; // below `integrityInoperableBelow`: blocked
+    const finished = completeStage(recipeCtx, repairTaskId, techId);
+    expect(finished.status).toBe("recipeComplete");
+    expect(engine.faults).toEqual([]);
+    expect(engine.integrity).toBe(world.config.values.equipment.integrityDerateBelow);
+
+    // Machine runs again at full output once integrity is back at the threshold.
+    kernel.advance(world, 1);
+    expect(engine.actualMode).toBe("on");
+    expect(engine.output).toBe(1);
+  });
+
+  it("never lowers integrity on repair", () => {
+    const { kernel, world } = w5TestWorld();
+    const techId = Object.keys(world.state.actors)[0] as ActorId;
+    const machineId = injectEngineFault(world, kernel);
+    const recipeCtx = {
+      state: world.state,
+      content: world.content,
+      config: world.config.values,
+      tick: world.state.tick,
+    };
+    const symptom = Object.values(world.state.work.problems).find(
+      (p): p is ProblemOfKind<"machineSymptom"> =>
+        p.kind === "machineSymptom" && p.payload.machineId === machineId,
+    );
+    if (symptom === undefined) throw new Error("no symptom problem");
+    const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
+    const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
+    beginStage(recipeCtx, inspectTaskId, techId);
+    advanceStage(recipeCtx, inspectTaskId, techId, 20 * 20);
+    const fault = Object.values(world.state.work.problems).find(
+      (p): p is ProblemOfKind<"machineFault"> =>
+        p.kind === "machineFault" && p.payload.machineId === machineId,
+    );
+    if (fault === undefined) throw new Error("no fault problem");
+    const repairSpecs = equipmentTaskDerivation.machineFault?.(fault, ctxOf(world)) ?? [];
+    const repairTaskId = installTask(world, fault.id, repairSpecs[0] as TaskSpec);
+    const engine = byDef(world, W5.engine);
+    engine.integrity = 0.9;
+    completeStage(recipeCtx, repairTaskId, techId);
+    expect(engine.integrity).toBe(0.9);
+  });
+});

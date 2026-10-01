@@ -391,6 +391,11 @@ export interface CrewDef {
   readonly shift: LocalKey;
   /** One line of flavour for the inspector and narrator digest. */
   readonly bio: string;
+  /**
+   * D38: how this person talks and how they handle the captain, two or three sentences. Not what
+   * they want (that surfaces as narrator threads). The narrator writes them in it.
+   */
+  readonly voice: string;
 }
 
 /** Things a trait may scale. Each modifier is a multiplier (1 = no effect). */
@@ -422,7 +427,10 @@ export interface PortDef {
   readonly name: string;
   readonly description: string;
   readonly externalStores: readonly ExternalStoreDef[];
-  /** Deterministic job source templates (W6). Pay is not authored: it comes from price bands. */
+  /**
+   * Offline job templates (W6, D40): the null narrator draws from these when it answers an
+   * `approachingPort` or `jobBoard` hook. Pay is not authored: it comes from price bands.
+   */
   readonly jobTemplates: readonly JobTemplateDef[];
   /**
    * W0 decision: distance is "transit seconds at nominal propulsion" (D10: time is a knob).
@@ -446,7 +454,7 @@ export interface JobTemplateDef {
     readonly countMin: number;
     readonly countMax: number;
   }[];
-  /** Relative weight when the job source draws a template. */
+  /** Relative weight when the null narrator draws a template. */
   readonly weight: number;
 }
 
@@ -569,6 +577,13 @@ export interface ConfigDef {
     readonly overheatDamagePerSecond: number;
     /** Condition below which a `maintenanceDue` problem is raised regardless of interval. */
     readonly maintenanceConditionBelow: number;
+    /**
+     * D35: integrity below this derates output linearly (factor 1 here, 0 at
+     * `integrityInoperableBelow`). Above it integrity does not affect output.
+     */
+    readonly integrityDerateBelow: number;
+    /** D35: integrity below this makes the machine inoperable until a repair restores it. */
+    readonly integrityInoperableBelow: number;
   };
   readonly power: {
     readonly priorityOrder: readonly PowerPriority[];
@@ -586,6 +601,11 @@ export interface ConfigDef {
      * task; staffing has no accumulated work, so 0 (present-or-not) is the usual value.
      */
     readonly staffEstimateSeconds: Seconds;
+    /**
+     * D36: an `engine`/`generator` machine whose output is below this while departure is planned
+     * counts as impaired, and the departure gate asks the captain before leaving.
+     */
+    readonly departureMinOutput: number;
   };
   readonly commerce: {
     /** Credits per unit distance per cargo unit, inclusive band. Narrator `offerJob` pay must fit. */
@@ -594,11 +614,6 @@ export interface ConfigDef {
     >;
     readonly jobOfferTtlSeconds: Seconds;
     /**
-     * Jobs kept on each port board by the deterministic job source. Integration 2: the source
-     * offers one job at a time (each offer is a decision), so this is currently unused by it.
-     */
-    readonly boardSize: number;
-    /**
      * W6 addition: flat integer credits charged on arrival at a port (SD §17.3 "simple running
      * costs"), so money can go down even on an uneventful loop. 0 = no fee.
      */
@@ -606,8 +621,8 @@ export interface ConfigDef {
     /** W6 addition: `TaskDerivationTable` planner-ranking estimate for a `haul` task (SD §15.3). */
     readonly haulEstimateSeconds: Seconds;
     /**
-     * Integration 2 addition: after an offer at a port is declined or expires, the job source
-     * waits this long before offering another there.
+     * How long after a declined or expired offer at a port before the narrator is asked again
+     * there (the `jobBoard` hook, D40).
      */
     readonly reofferSeconds: Seconds;
     /**
@@ -685,7 +700,7 @@ export interface ConfigDef {
  * W0 decision: the bundle also carries `traits` and `scenarios` tables beyond the six def kinds.
  */
 /**
- * D25 (2026-09-30): who offers work, for the deterministic job source (`data/people/`). Names
+ * D25 (2026-09-30): who offers work, for the null narrator's offline offers (`data/people/`). Names
  * are drawn from the shared lists; roles, organisations and extra pitch lines are per port, so
  * the people at a mining outpost sound like it. Pitch lines take `{cargo}`, `{from}` and `{to}`
  * placeholders and never mention pay (D24).
@@ -718,8 +733,8 @@ export interface ContentBundle {
   readonly ports: Readonly<Record<PortDefId, PortDef>>;
   readonly scenarios: Readonly<Record<ScenarioDefId, ScenarioDef>>;
   /**
-   * D25 name table. Optional so hand-built test bundles need not carry one; without it the job
-   * source falls back to the template's `issuer` as the person's name.
+   * D25 name table. Optional so hand-built test bundles need not carry one; without it the null
+   * narrator falls back to the template's `issuer` as the person's name.
    */
   readonly people?: PeopleTableDef;
   readonly config: ConfigDef;

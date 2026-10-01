@@ -32,7 +32,14 @@ export type NarratorCommandIsCommand = NarratorCommand extends Command ? true : 
  */
 export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> = {
   /** D14: the player acts only at hooks; option commands of a chosen decision run as `player`. */
-  player: ["resolveDecision", "acceptContract", "declineJob", "setCourse"],
+  player: [
+    "resolveDecision",
+    "acceptContract",
+    "declineJob",
+    "setCourse",
+    "holdDepartureForRepairs",
+    "acceptDepartureRisk",
+  ],
   narrator: NARRATOR_COMMAND_KINDS,
   system: [
     "offerJob",
@@ -41,6 +48,8 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "acceptContract",
     "declineJob",
     "setCourse",
+    "holdDepartureForRepairs",
+    "acceptDepartureRisk",
   ],
   scenario: [
     "scenarioSpawn",

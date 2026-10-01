@@ -206,6 +206,8 @@ export function App() {
       if (disposed) return;
       if (outcome?.ok) {
         recentEventsRef.current.length = 0;
+        // D37: a `policyDecision` hook halts before its decision does, so this prose is in the
+        // map before `decisionPending` arrives and the modal opens dressed.
         const card = outcome.reply.card;
         if (card !== undefined) setProse((prev) => ({ ...prev, [card.decisionId]: card }));
         for (const command of hookAnswer(hook, tick, outcome.reply)) send(command);

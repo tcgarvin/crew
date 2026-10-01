@@ -3,6 +3,7 @@ import {
   type DecisionId,
   type EventId,
   type MachineId,
+  type PortDefId,
   type SaveEnvelope,
   type SimEvent,
   createKernel,
@@ -11,6 +12,7 @@ import {
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
+import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
@@ -45,13 +47,14 @@ const assayThread = {
 const stranger = {
   kind: "surfaceDecision",
   title: "A stranger at the ramp",
-  speaker: "Mara Osei",
+  speaker: "Dane Whitcross",
   situation:
-    "Mara stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where to.”",
+    "Dane stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where to.”",
   left: { label: "Bring her up.", effect: "none", coursePort: null },
   right: { label: "Not this run.", effect: "none", coursePort: null },
-  leftAftermath: "Mara waves her aboard.",
-  rightAftermath: "Mara sends her back down the ramp.",
+  leftAftermath: "Dane waves her aboard.",
+  rightAftermath: "Dane sends her back down the ramp.",
+  beatOfThread: null,
 };
 
 function event(
@@ -131,6 +134,62 @@ function policyRequest(): NarratorRequest {
   return { ...req, hook, snapshot };
 }
 
+/**
+ * D37: a departure-gate card (D36) as the kernel queues it, with the fixture's engineer named as
+ * the speaker in the template params, under a `policyDecision` hook naming the machine.
+ */
+function departureGateRequest(): NarratorRequest {
+  const req = approachingPortRequest(content());
+  const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+  const decisionId = "d9" as DecisionId;
+  const actors = Object.values(snapshot.state.actors);
+  const captain = actors[0];
+  const engineer = actors.find((a) => a.roleTags.includes("engineer"));
+  if (captain === undefined || engineer === undefined) throw new Error("fixture lacks crew");
+  const engine = Object.values(snapshot.state.machines).find((m) =>
+    content().machines[m.defId]?.tags.includes("engine"),
+  );
+  if (engine === undefined) throw new Error("fixture lacks an engine");
+  snapshot.state.decisions.records[decisionId] = {
+    id: decisionId,
+    origin: "policy",
+    perspectiveActorId: captain.id,
+    prompt: {
+      key: "travel.departureGate",
+      params: {
+        machineId: engine.id,
+        machine: content().machines[engine.defId]?.name ?? "Main Engine",
+        reason: "fault",
+        speaker: engineer.name,
+      },
+    },
+    left: {
+      label: { key: "travel.departureGate.hold", params: {} },
+      commands: [],
+      aftermath: { key: "travel.departureGate.hold.aftermath", params: {} },
+    },
+    right: {
+      label: { key: "travel.departureGate.leave", params: {} },
+      commands: [],
+      aftermath: { key: "travel.departureGate.leave.aftermath", params: {} },
+    },
+    status: "pending",
+    createdTick: req.hook.tick,
+    narratorHookId: req.hook.id,
+  };
+  snapshot.state.decisions.queue.push(decisionId);
+  const hook = {
+    id: req.hook.id,
+    kind: "policyDecision" as const,
+    context: { decisionId, machineId: engine.id },
+    tick: req.hook.tick,
+  };
+  snapshot.state.narrator.pendingHook = hook;
+  // The kernel announces the decision in the tick that raises the hook (D37).
+  const recentEvents = [...req.recentEvents, event(req.hook.tick, "decisionPending", decisionId)];
+  return { ...req, hook, snapshot, recentEvents };
+}
+
 describe("runNarrator", () => {
   it("translates a valid plan and rewrites the notes", async () => {
     const plan = emptyPlan({
@@ -148,7 +207,7 @@ describe("runNarrator", () => {
     expect(res.notesUpdate).toEqual({
       summary: "Arrived at the Drift.",
       // D32: Halla made an offer this call, so her thread's last beat is now.
-      threads: [{ ...assayThread, lastBeatTick: req.hook.tick }],
+      threads: [{ ...assayThread, lastBeatTick: req.hook.tick, beatCardShown: false }],
       cardsShown: [],
       // D25: whoever made an offer joins the cast at their port, even if the model forgot them.
       cast: [
@@ -256,13 +315,57 @@ describe("runNarrator", () => {
   });
 });
 
+describe("policy decisions are narrated (D37)", () => {
+  it("dresses a departure-gate card in the engineer's voice, keyed to its decision", async () => {
+    const card = {
+      title: "Priya on the engine",
+      speaker: "Priya Kessler",
+      situation:
+        "Priya wipes her hands on a rag by the engine hatch. “She'll run, but that bearing's talking to me. Give me a few hours and I'll have it quiet.”",
+      leftLabel: "Take your few hours.",
+      rightLabel: "We go now.",
+      leftAftermath: "Priya gets to work and we leave when she says so.",
+      rightAftermath: "Priya seals the hatch and we go as we are.",
+    };
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
+    const req = departureGateRequest();
+    const res = await runNarrator(req, ctx(transport));
+    expect(res.fallback).toBeUndefined();
+    expect(res.card).toEqual({ decisionId: "d9", ...card });
+    expect(res.card?.speaker).toBe("Priya Kessler");
+    expect(res.commands).toEqual([]);
+
+    // The digest tells the model who brings the card and which machine it is about, and does not
+    // list the card as already seen.
+    const user = transport.calls[0]?.user ?? "";
+    expect(user).toContain(
+      "policyDecision: decision d9 needs the captain (about Main Engine); Priya Kessler brings it",
+    );
+    expect(user).toContain(
+      'd9 (policy): Before we leave: Main Engine (brought by Priya Kessler): The main engine is running with an unrepaired fault. We can sit here while it\'s fixed, or go as we are. Left: "Hold for repairs". Right: "Leave anyway".',
+    );
+    expect(user).not.toMatch(/## What the captain has seen[\s\S]*d9/);
+    // ...but the history records it with the prose once dressed.
+    expect(res.notesUpdate?.cardsShown).toEqual([
+      expect.objectContaining({ decisionId: "d9", speaker: "Priya Kessler", title: card.title }),
+    ]);
+  });
+
+  it("keeps the engineer as the template speaker when the narrator is unavailable", async () => {
+    const res = await runNarrator(departureGateRequest(), ctx());
+    expect(res.fallback).toBe("notConfigured");
+    expect(res.card).toMatchObject({ decisionId: "d9", speaker: "Priya Kessler" });
+    expect(res.card?.leftLabel).toBe("Hold for repairs");
+  });
+});
+
 describe("what the captain has seen (D31)", () => {
   it("records a surfaced card and stamps the thread it belongs to", async () => {
     const plan = emptyPlan({
       intents: [stranger] as never,
       notes: {
         summary: "s",
-        threads: [{ ...assayThread, title: "The stranger", people: ["Mara Osei"] }],
+        threads: [{ ...assayThread, title: "The stranger", people: ["Dane Whitcross"] }],
         cast: [],
       },
     });
@@ -275,15 +378,61 @@ describe("what the captain has seen (D31)", () => {
         tick: req.hook.tick,
         decisionId: null,
         title: "A stranger at the ramp",
-        speaker: "Mara Osei",
+        speaker: "Dane Whitcross",
         // Clipped to 25 words.
-        gist: "Mara stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where…",
+        gist: "Dane stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where…",
         leftLabel: "Bring her up.",
         rightLabel: "Not this run.",
         chosen: null,
       },
     ]);
     expect(res.notesUpdate?.threads[0]?.lastBeatTick).toBe(req.hook.tick);
+  });
+
+  it("nulls the captain as a speaker, keeps the card and says why next call (D41)", async () => {
+    const plan = emptyPlan({
+      intents: [{ ...stranger, speaker: "Mara Osei" }] as never,
+      notes: { summary: "s", threads: [], cast: [] },
+    });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const res = await runNarrator(req, ctx(transport));
+    expect(res.dropped).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.notesUpdate?.cardsShown[0]?.speaker).toBeNull();
+    expect(res.notesUpdate?.lastRejections).toEqual([
+      'speaker: "Mara Osei" is the captain and cannot bring a card; name the crew member who does',
+    ]);
+    await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    expect(transport.calls.at(-1)?.user).toContain(
+      'rejected last time: speaker: "Mara Osei" is the captain and cannot bring a card',
+    );
+  });
+
+  it("sets beatCardShown on the thread a beat card foreshadows (D39)", async () => {
+    const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
+    const beat = { ...stranger, beatOfThread: "the stranger" };
+    const plan = emptyPlan({
+      intents: [beat] as never,
+      notes: { summary: "s", threads: [thread], cast: [] },
+    });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const stored = {
+      ...EMPTY_NOTES,
+      threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
+    };
+    const res = await runNarrator(req, { ...ctx(transport), notes: stored });
+    expect(res.dropped).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.notesUpdate?.threads).toEqual([
+      { ...thread, lastBeatTick: req.hook.tick, beatCardShown: true },
+    ]);
+    // A second beat card for the same thread is refused next call, with the reason in the notes.
+    const again = await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    expect(again.commands).toEqual([]);
+    expect(again.notesUpdate?.lastRejections[0]).toMatch(/already had its beat card/);
+    expect(again.notesUpdate?.threads[0]?.beatCardShown).toBe(true);
   });
 
   it("records the policy card prose with the pending decision's id", async () => {
@@ -455,7 +604,73 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("variation on a recent one, do nothing");
     expect(STATIC_RULES).toContain("Think like a TV writers' room");
     expect(STATIC_RULES).not.toContain("openThreads");
-    expect(PROMPT_VERSION).toBe("v0.4");
+  });
+
+  it("tells the model to write crew in their voice, share the stage, pick the oldest beat, and foreshadow once (D38, D39)", () => {
+    expect(STATIC_RULES).toContain("the voice line is how they sound, every time");
+    expect(STATIC_RULES).toContain("A crew member never sounds like another");
+    expect(STATIC_RULES).toContain("Share the stage");
+    expect(STATIC_RULES).toContain("advance the one with the oldest last beat");
+    expect(STATIC_RULES).toContain("unless an episode thread is at its climax");
+    expect(STATIC_RULES).toContain("A beat card advances a thread without asking for a decision");
+    expect(STATIC_RULES).toContain("at most one beat card before its payoff");
+  });
+
+  it("tells the model it is the only source of work, on arrival and at the board (D40)", () => {
+    expect(STATIC_RULES).toContain(
+      "approachingPort: The ship is about to dock. You are the only source of work",
+    );
+    expect(STATIC_RULES).toContain(
+      "jobBoard: The ship is docked and the captain is looking for work",
+    );
+    expect(STATIC_RULES).toContain("there is no work at this port until the next call");
+    expect(STATIC_RULES).toContain("Offering nothing must be a deliberate story choice");
+    expect(STATIC_RULES).toContain("At most one surfaced card");
+    expect(STATIC_RULES).not.toContain("the port board is empty");
+  });
+
+  it("tells the model the captain is the player and never speaks on a card (D41)", () => {
+    expect(STATIC_RULES).toContain("The captain is the player and never speaks on a card");
+    expect(STATIC_RULES).toContain("cards are brought to them");
+    expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
+    expect(STATIC_RULES).toContain("how others react to or quote the captain");
+    expect(PROMPT_VERSION).toBe("v0.7");
+  });
+});
+
+describe("the null path hands out work (D40)", () => {
+  function jobBoardRequest(): NarratorRequest {
+    const req = approachingPortRequest(content());
+    const tick = 2_400;
+    const snapshot: SaveEnvelope = { ...structuredClone(req.snapshot), savedAtTick: tick };
+    snapshot.state.tick = tick;
+    snapshot.state.travel = { stage: "docked", portId: "port.kessler_drift" as PortDefId };
+    const hook = {
+      id: "k2" as never,
+      kind: "jobBoard" as const,
+      context: { portId: "port.kessler_drift" as PortDefId },
+      tick,
+    };
+    snapshot.state.narrator.pendingHook = hook;
+    return { gameId: "fixture-board", hook, snapshot, recentEvents: [] };
+  }
+
+  it("offers a job on approachingPort with no model configured", async () => {
+    const res = await runNarrator(approachingPortRequest(content()), ctx());
+    expect(res.fallback).toBe("notConfigured");
+    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+  });
+
+  it("still offers a job at the board after a provider error", async () => {
+    const transport = fakeTransport(new TransportError("apiError", "HTTP 502"));
+    const res = await runNarrator(jobBoardRequest(), ctx(transport));
+    expect(res.fallback).toBe("apiError");
+    expect(res.model).toBe(NULL_NARRATOR_MODEL);
+    expect(res.commands).toHaveLength(1);
+    const command = res.commands[0];
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    expect(command.payload.surface).toBe(true);
+    expect(command.payload.job.fromPortId).toBe("port.kessler_drift");
   });
 });
 

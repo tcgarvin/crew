@@ -25,7 +25,15 @@ export {
   type Validation,
   validateCommand,
 } from "./commands";
+export {
+  headNeedingNarration,
+  needsNarration,
+  type PolicyDecisionDraft,
+  queuePolicyDecision,
+  raisePolicyDecisionHookIfDue,
+} from "./decisions";
 export { createDefLookup, findCrewDef, findItemDef } from "./defs";
+export { raiseHookIfIdle } from "./hooks";
 export { createEventBuffer, type EventBuffer, isNotableOrAbove } from "./events";
 export {
   allocateId,

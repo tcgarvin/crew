@@ -8,6 +8,7 @@ const thread = {
   stage: "Halla wants her cores delivered upright.",
   nextBeat: "On arrival at the Hub, the lab finds one cracked.",
   lastBeatTick: 30,
+  beatCardShown: false,
 };
 
 const card = {
@@ -61,6 +62,7 @@ describe("parseNotes", () => {
         stage: "Who is the stranger?",
         nextBeat: "",
         lastBeatTick: null,
+        beatCardShown: false,
       },
     ]);
     expect(notes.cardsShown).toEqual([]);
@@ -111,5 +113,20 @@ describe("mergeThreads (D32)", () => {
   it("keeps the previous tick for a thread that stayed quiet", () => {
     const merged = mergeThreads(written, [thread], 90, []);
     expect(merged.map((t) => t.lastBeatTick)).toEqual([30, null, null]);
+  });
+
+  it("sets beatCardShown on the thread a beat card foreshadowed and keeps it afterwards (D39)", () => {
+    const merged = mergeThreads(written, [thread], 90, [], "jax's debt");
+    expect(merged.map((t) => t.beatCardShown)).toEqual([false, true, false]);
+    // A beat card is a card: the thread's last beat is now.
+    expect(merged[1]?.lastBeatTick).toBe(90);
+    const later = mergeThreads(written, merged, 120, []);
+    expect(later.map((t) => t.beatCardShown)).toEqual([false, true, false]);
+  });
+
+  it("reads a stored thread without the flag as not foreshadowed (pre-D39)", () => {
+    const { beatCardShown: _omitted, ...stored } = thread;
+    const notes = parseNotes({ summary: "s", threads: [stored], cast: [], lastUpdatedTick: 1 });
+    expect(notes.threads[0]?.beatCardShown).toBe(false);
   });
 });

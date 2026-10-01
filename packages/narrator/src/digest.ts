@@ -8,8 +8,10 @@
  */
 import {
   type ContentBundle,
+  type DecisionId,
   type DeepReadonly,
   type JobIssuer,
+  type MachineId,
   type NarratorHook,
   type SimEvent,
   actionLabel,
@@ -27,6 +29,10 @@ import {
   portName,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
+import { templateCard } from "./templates";
+
+/** Policy prompt keys whose template text is the card the captain sees (D36 gate; job offers keep their params line). */
+const TEMPLATED_PROMPT_KEYS: ReadonlySet<string> = new Set(["travel.departureGate"]);
 
 /** ~2.5k tokens at ~4 characters per token. */
 export const DIGEST_MAX_CHARS = 10_000;
@@ -60,7 +66,32 @@ function needWord(value: number): string | undefined {
   return undefined;
 }
 
-function hookLine(hook: DeepReadonly<NarratorHook>, content: ContentBundle): string {
+/**
+ * D37: the policy hook line says who brings the card (the template's `speaker`, e.g. the
+ * engineer for the departure gate) and which machine it is about, so the model dresses the card
+ * in that person's voice rather than picking a messenger of its own.
+ */
+function policyHookLine(
+  hook: DeepReadonly<Extract<NarratorHook, { kind: "policyDecision" }>>,
+  state: State,
+  content: ContentBundle,
+): string {
+  const decisionId = hook.context.decisionId as DecisionId;
+  const decision = state.decisions.records[decisionId];
+  let line = `policyDecision: decision ${decisionId} needs the captain`;
+  if (hook.context.machineId !== undefined) {
+    const machine = state.machines[hook.context.machineId as MachineId];
+    const name = machine === undefined ? undefined : content.machines[machine.defId]?.name;
+    line += ` (about ${name ?? hook.context.machineId})`;
+  }
+  const speaker = decision === undefined ? undefined : templateCard(decision, content).speaker;
+  if (speaker !== undefined) {
+    line += `; ${speaker} brings it: write the card in their voice with speaker set to their name`;
+  }
+  return line;
+}
+
+function hookLine(hook: DeepReadonly<NarratorHook>, state: State, content: ContentBundle): string {
   switch (hook.kind) {
     case "approachingPort":
       return `approachingPort: arriving at ${portName(content, hook.context.portId)} (${hook.context.portId}) shortly`;
@@ -71,7 +102,7 @@ function hookLine(hook: DeepReadonly<NarratorHook>, content: ContentBundle): str
     case "notableEvent":
       return `notableEvent: events ${hook.context.eventIds.join(", ")}`;
     case "policyDecision":
-      return `policyDecision: decision ${hook.context.decisionId} needs the captain`;
+      return policyHookLine(hook, state, content);
   }
 }
 
@@ -103,9 +134,15 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
 }
 
 function crewSection(state: State, content: ContentBundle): Section {
+  const isCaptain = (a: { readonly roleTags: readonly string[] }) => a.roleTags.includes("captain");
+  // D41: the captain (the player's avatar) is listed first and never as a speaker.
   const actors = Object.values(state.actors)
     .filter((a) => a.crew)
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+    .sort(
+      (a, b) =>
+        Number(isCaptain(b)) - Number(isCaptain(a)) ||
+        a.id.localeCompare(b.id, "en", { numeric: true }),
+    );
   const lines = actors.map((actor) => {
     const roles = actor.roleTags.length > 0 ? ` [${actor.roleTags.join(", ")}]` : "";
     const skills = Object.entries(actor.skills)
@@ -124,8 +161,16 @@ function crewSection(state: State, content: ContentBundle): Section {
     const where =
       loc.kind === "onDeck" ? compartmentNameAt(content, loc.deckId, loc.x, loc.y) : loc.kind;
     const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
-    const bio = content.crew[actor.defId]?.bio;
-    return `- ${actor.name}${roles}${status}: ${actionLabel(actor, state, content)}${where ? ` in ${where}` : ""}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}${bio ? `. ${bio}` : ""}`;
+    const def = content.crew[actor.defId];
+    const bio = def?.bio;
+    // D38: the voice line is how this person sounds on every card.
+    const voice = def?.voice;
+    const doing = `${actionLabel(actor, state, content)}${where ? ` in ${where}` : ""}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}`;
+    if (isCaptain(actor)) {
+      // D41: the captain's voice is how they come across, for how others react to them.
+      return `- ${actor.name}${roles}${status}: this is the captain, the player; never a speaker. ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
+    }
+    return `- ${actor.name}${roles}${status}: ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
   const npcs = Object.values(state.actors).filter((a) => !a.crew);
   if (npcs.length > 0) {
@@ -245,10 +290,17 @@ function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: Conten
   };
 }
 
-function decisionSection(state: State): Section {
+function decisionSection(state: State, content: ContentBundle): Section {
   const lines = state.decisions.queue.map((id) => {
     const d = state.decisions.records[id];
     if (d === undefined) return `- ${id} (missing)`;
+    // Template cards (policy decisions) read as the captain will see them, not as key+params,
+    // with both sides named so `card` keeps the kernel's left/right order (D37).
+    if (d.prompt.prose === undefined && TEMPLATED_PROMPT_KEYS.has(d.prompt.key)) {
+      const card = templateCard(d, content);
+      const who = card.speaker === undefined ? "" : ` (brought by ${card.speaker})`;
+      return `- ${d.id} (${d.origin}): ${card.title}${who}: ${card.situation} Left: "${card.leftLabel}". Right: "${card.rightLabel}".`;
+    }
     const prompt = d.prompt.prose ?? `${d.prompt.key} ${JSON.stringify(d.prompt.params)}`;
     return `- ${d.id} (${d.origin}): ${prompt}`;
   });
@@ -283,8 +335,10 @@ function notesSection(notes: NarratorNotes): Section {
   for (const t of notes.threads) {
     const people = t.people.length > 0 ? t.people.join(", ") : "nobody yet";
     const last = t.lastBeatTick === null ? "none yet" : `t${t.lastBeatTick}`;
+    // D39: a thread that has had its beat card gets no second one; the next card pays it off.
+    const foreshadowed = t.beatCardShown ? " (foreshadowed)" : "";
     lines.push(
-      `- [${t.scale}] ${t.title} (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}`,
+      `- [${t.scale}] ${t.title} (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}${foreshadowed}`,
     );
   }
   for (const c of notes.cast) {
@@ -300,15 +354,24 @@ function notesSection(notes: NarratorNotes): Section {
  * cards, so this list (newest first) is the ground truth for "has the captain seen this?". It
  * outranks the machine list in the trim order.
  */
-function cardsSeenSection(notes: NarratorNotes): Section {
-  const lines = [...notes.cardsShown].reverse().map((c) => {
-    const who = c.speaker ?? "observed";
-    const chose =
-      c.chosen === null
-        ? "unresolved"
-        : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
-    return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}`;
-  });
+function cardsSeenSection(
+  notes: NarratorNotes,
+  hook: DeepReadonly<NarratorHook> | undefined,
+): Section {
+  // D37: the card this call is dressing has not been shown yet, though its `decisionPending`
+  // event has already been folded into the history.
+  const pendingId = hook?.kind === "policyDecision" ? hook.context.decisionId : undefined;
+  const lines = [...notes.cardsShown]
+    .filter((c) => c.decisionId !== pendingId)
+    .reverse()
+    .map((c) => {
+      const who = c.speaker ?? "observed";
+      const chose =
+        c.chosen === null
+          ? "unresolved"
+          : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
+      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}`;
+    });
   return { heading: "What the captain has seen", lines, priority: 8.5, trimFrom: "start" };
 }
 
@@ -336,7 +399,7 @@ export function buildDigest(
   const state = snapshot.state;
   const hookSection: Section = {
     heading: "Why you were called",
-    lines: [hook === undefined ? "no hook recorded" : hookLine(hook, content)],
+    lines: [hook === undefined ? "no hook recorded" : hookLine(hook, state, content)],
     priority: Number.POSITIVE_INFINITY,
     trimFrom: "end",
   };
@@ -344,12 +407,12 @@ export function buildDigest(
     hookSection,
     shipSection(snapshot, content),
     budgetSection(state),
-    decisionSection(state),
+    decisionSection(state, content),
     machineSection(state, content, snapshot.config.time.tickRate),
     jobSection(state, content),
     crewSection(state, content),
     notesSection(notes),
-    cardsSeenSection(notes),
+    cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),
     problemSection(state),
     eventSection(recentEvents, state, content),

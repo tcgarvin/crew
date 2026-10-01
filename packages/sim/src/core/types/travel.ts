@@ -18,14 +18,27 @@ export const TRAVEL_STAGES = [
 ] as const;
 export type TravelStage = (typeof TRAVEL_STAGES)[number];
 
+/**
+ * D36 departure-gate flags, meaningful while a departure is planned (`docked` with a
+ * `plannedDestinationId`, or `preparingDeparture`). Both are dropped by the fresh state object
+ * every later stage builds, so "leave anyway" is forgotten by the next docking and a hold never
+ * outlives the departure it held.
+ */
+export interface DepartureGateFlags {
+  /** "Hold for repairs": wait docked until no engine/generator is impaired, then go. */
+  holdForRepairs?: boolean;
+  /** "Leave anyway": the gate does not ask again for this docking. */
+  departureRiskAccepted?: boolean;
+}
+
 export type TravelState =
-  | {
+  | ({
       stage: "docked";
       portId: PortDefId;
       /** Set by `setCourse`; departure prep begins when cleared to go. */
       plannedDestinationId?: PortDefId;
-    }
-  | {
+    } & DepartureGateFlags)
+  | ({
       stage: Exclude<TravelStage, "docked">;
       fromPortId: PortDefId;
       toPortId: PortDefId;
@@ -37,7 +50,7 @@ export type TravelState =
       /** Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed). */
       drifting: boolean;
       stageStartedTick: Tick;
-    };
+    } & DepartureGateFlags);
 
 // ---------------------------------------------------------------------------------------------
 // Jobs
@@ -112,8 +125,8 @@ export interface Job {
   cargoItemIds: ItemId[];
   paymentTransactionId?: TransactionId;
   /**
-   * Integration 2 addition: tick the offer was declined or expired. Drives the job source's
-   * re-offer cooldown (`config.commerce.reofferSeconds`).
+   * Integration 2 addition: tick the offer was declined or expired. Drives the `jobBoard`
+   * re-ask cooldown (`config.commerce.reofferSeconds`, D40).
    */
   closedTick?: Tick;
   /** Command that created it (narrator audit). */

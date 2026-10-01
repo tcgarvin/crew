@@ -1,10 +1,23 @@
 /**
  * Integration 2 headless run: the real authored bundle, every V1 system in the worker's order
- * (`createFullRegistry`), an auto-accept decision policy and a null narrator, for five
+ * (`createFullRegistry`), an auto-accept decision policy and a stand-in narrator, for five
  * sim-minutes. Checks the freight loop and the crew's day actually happen, not just that nothing
  * throws.
+ *
+ * D40: the narrator is the only source of work, and `apps/web` may not import `@crew/narrator`,
+ * so `answerHook` plays the narrator here: it answers each `jobBoard` hook with one offer built
+ * from the port's first job template, the way the null narrator does offline.
  */
-import type { ActorId, Command, CommandId, MachineId, SimEvent, World } from "@crew/sim";
+import type {
+  ActorId,
+  Command,
+  CommandId,
+  MachineId,
+  NarratorHook,
+  PortDefId,
+  SimEvent,
+  World,
+} from "@crew/sim";
 import {
   actionLabel,
   checkInvariants,
@@ -22,6 +35,42 @@ const INJECT_FAULT_AT = TICK_RATE * 30;
 
 type Policy = (world: World) => "left" | "right";
 const autoAccept: Policy = () => "left";
+
+/**
+ * The stand-in narrator's answer to a hook: for `jobBoard`, one surfaced offer of the port's
+ * first freight template (an item with a cargo class and a route) at its maximum count (the
+ * kernel clamps to `maxCratesPerJob`) and the band's lowest pay; nothing for other hooks.
+ */
+function answerHook(world: World, hook: NarratorHook): Omit<Command, "id"> | undefined {
+  if (hook.kind !== "jobBoard") return undefined;
+  const portId = hook.context.portId as PortDefId;
+  const port = world.content.ports[portId];
+  if (port === undefined) return undefined;
+  for (const template of port.jobTemplates) {
+    const line = template.cargo[0];
+    const distance = port.routes.find((r) => r.toPortId === template.toPortId)?.distance;
+    const cargoClass =
+      line === undefined ? undefined : world.content.items[line.itemDefId]?.cargoClass;
+    if (line === undefined || distance === undefined || cargoClass === undefined) continue;
+    const band = world.config.values.commerce.priceBands[cargoClass];
+    return {
+      source: "narrator",
+      kind: "offerJob",
+      payload: {
+        job: {
+          issuer: { name: "Stand-in Narrator", role: "dispatcher" },
+          description: { key: "test.job", params: {} },
+          fromPortId: portId,
+          toPortId: template.toPortId,
+          cargo: [{ itemDefId: line.itemDefId, count: line.countMax }],
+          pay: Math.ceil(band.min * distance * line.countMax),
+        },
+        surface: true,
+      },
+    };
+  }
+  return undefined;
+}
 
 interface HaulClaim {
   readonly tick: number;
@@ -116,6 +165,8 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
       const hook = world.state.narrator.pendingHook;
       if (hook === undefined) throw new Error("hook halt without a pending hook");
       log.hooks.push(hook.kind);
+      const answer = answerHook(world, hook);
+      if (answer !== undefined) send(answer);
       send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
     } else if (result.halt.kind === "decision") {
       const head = world.state.decisions.queue[0];

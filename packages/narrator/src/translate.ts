@@ -126,6 +126,14 @@ interface Tally {
   spawns: number;
   faults: number;
   cardUsed: boolean;
+  /** D39: the thread this call's beat card was attributed to. */
+  beatCardThread: string | undefined;
+}
+
+/** D39: what the translator needs to know about a thread to accept a beat card for it. */
+interface KnownThread {
+  readonly title: string;
+  readonly beatCardShown: boolean;
 }
 
 interface Env {
@@ -133,7 +141,25 @@ interface Env {
   readonly content: ContentBundle;
   readonly hook: DeepReadonly<NarratorHook> | undefined;
   readonly secrets: readonly string[];
+  /** Stored threads first, then any the plan's notes introduce this call. */
+  readonly threads: readonly KnownThread[];
+  /** D41: the player's avatar; never a card speaker. Undefined when nobody is tagged captain. */
+  readonly captainName: string | undefined;
   readonly tally: Tally;
+  /** D41: non-fatal corrections, reported back to the model next call. */
+  readonly notes: string[];
+}
+
+/**
+ * D41: the captain's name, from the crew member tagged `captain` in the snapshot, or failing
+ * that from the content crew defs (a scenario that has not spawned its crew yet).
+ */
+export function captainName(snapshot: Snapshot, content: ContentBundle): string | undefined {
+  const actor = Object.values(snapshot.state.actors).find(
+    (a) => a.crew && a.roleTags.includes("captain"),
+  );
+  if (actor !== undefined) return actor.name;
+  return Object.values(content.crew).find((def) => def.roleTags.includes("captain"))?.name;
 }
 
 type Intent<K extends NarratorIntent["kind"]> = Extract<NarratorIntent, { kind: K }>;
@@ -307,7 +333,40 @@ function speakerName(env: Env, raw: string | null): Outcome<string | undefined> 
   if (raw === null || raw.trim() === "") return ok(undefined);
   const name = clipChars(raw, ISSUER_MAX_CHARS);
   const problem = textProblem(name, env.secrets);
-  return problem === undefined ? ok(name) : no(`speaker: ${problem}`);
+  if (problem !== undefined) return no(`speaker: ${problem}`);
+  // D41: the captain is the player; cards are brought to them. The card survives as an observed
+  // scene and the model is told why next call.
+  if (env.captainName !== undefined && name.toLowerCase() === env.captainName.toLowerCase()) {
+    env.notes.push(
+      `speaker: "${name}" is the captain and cannot bring a card; name the crew member who does`,
+    );
+    return ok(undefined);
+  }
+  return ok(name);
+}
+
+/**
+ * D39: a beat card must name a thread the model has (stored, or written this call) that has not
+ * had its beat card yet, and both sides must be effect none: the card records the captain's
+ * attitude, it does not set a course.
+ */
+function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
+  const raw = intent.beatOfThread;
+  if (raw === null || raw.trim() === "") return ok(undefined);
+  const wanted = raw.trim().toLowerCase();
+  const thread = env.threads.find((t) => t.title.trim().toLowerCase() === wanted);
+  if (thread === undefined) {
+    return no(`beatOfThread "${raw.trim()}" matches no thread in your notes; name one exactly`);
+  }
+  if (thread.beatCardShown) {
+    return no(
+      `thread "${thread.title}" already had its beat card; its next card must pay it off (nextBeat)`,
+    );
+  }
+  if (intent.left.effect !== "none" || intent.right.effect !== "none") {
+    return no("a beat card's sides are the captain's attitude; both must be effect none");
+  }
+  return ok(thread.title);
 }
 
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
@@ -315,6 +374,8 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
     return no("surfaceDecision: a policy decision is pending; dress it with `card` instead");
   }
   if (env.tally.cardUsed) return no("surfaceDecision: only one card per call");
+  const beat = beatThread(env, intent);
+  if (!beat.ok) return no(`surfaceDecision: ${beat.reason}`);
   const title = clipChars(intent.title, TITLE_MAX_CHARS);
   const situation = clipWords(intent.situation, CARD_SITUATION_MAX_WORDS);
   const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
@@ -333,6 +394,7 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
     return no("surfaceDecision: both sides have the same label");
   }
   env.tally.cardUsed = true;
+  env.tally.beatCardThread = beat.value;
   const sideSpec = (s: { label: string; commands: CommandDraft[] }, aftermath: string) => ({
     label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
     commands: s.commands,
@@ -465,12 +527,30 @@ export const translateIntents: TranslateIntents = (
   const hook = ctx.hook ?? snapshot.state.narrator.pendingHook;
   const intentSchema = buildNarratorPlanSchema(buildVocabulary(snapshot.state, ctx.content)).shape
     .intents.element;
+  const written: readonly { readonly title?: unknown }[] = Array.isArray(plan.notes?.threads)
+    ? plan.notes.threads
+    : [];
   const env: Env = {
     snapshot,
     content: ctx.content,
     hook,
     secrets: secretPhrases(snapshot, ctx.content),
-    tally: { spawns: 0, faults: 0, cardUsed: snapshot.state.decisions.queue.length > 0 },
+    // D39: a thread the plan starts this call can be foreshadowed, but only stored threads can
+    // already have had their beat card.
+    threads: [
+      ...(ctx.threads ?? []),
+      ...written.flatMap((t) =>
+        typeof t.title === "string" ? [{ title: t.title, beatCardShown: false }] : [],
+      ),
+    ],
+    captainName: captainName(snapshot, ctx.content),
+    tally: {
+      spawns: 0,
+      faults: 0,
+      cardUsed: snapshot.state.decisions.queue.length > 0,
+      beatCardThread: undefined,
+    },
+    notes: [],
   };
   const commands: NarratorCommand[] = [];
   const dropped: DroppedIntent[] = [];
@@ -514,5 +594,12 @@ export const translateIntents: TranslateIntents = (
   });
 
   const card = policyCard(env, plan, dropped);
-  return card === undefined ? { commands, dropped } : { commands, dropped, card };
+  const beat = env.tally.beatCardThread;
+  return {
+    commands,
+    dropped,
+    notes: env.notes,
+    ...(card === undefined ? {} : { card }),
+    ...(beat === undefined ? {} : { beatCardThread: beat }),
+  };
 };

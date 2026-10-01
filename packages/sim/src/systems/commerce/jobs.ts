@@ -211,7 +211,7 @@ export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
 
 /**
  * Raise one `cargoToUnload` problem per manifest item (owner: commerce), called on arrival at
- * the job's destination (see `jobSource.ts`/travel `arrived` handling). Deduped like `acceptJob`.
+ * the job's destination (see `commerce.ts` `sweepJobs`). Deduped like `acceptJob`.
  */
 export function raiseUnloadProblems(ctx: ApplyCtx, job: Job): void {
   const toPort = ctx.defs.port(job.toPortId);

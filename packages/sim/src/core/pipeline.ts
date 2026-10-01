@@ -6,6 +6,7 @@ import { configTicks } from "./clock";
  * finalises the tick's events (phase 8).
  */
 import { applyDueCommands } from "./commands";
+import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
 import { allocateId } from "./ids";
@@ -195,11 +196,17 @@ export const quietTimerSystem: System = {
  * `state.decisions.queue` once. W2 decision: "announced" lives in the diagnostics cache, not
  * state; after a restore the halted world does not step, so nothing is re-announced until the
  * queue head changes.
+ *
+ * D37: a kernel-raised (policy) head gets its `policyDecision` hook here first, in the tick it
+ * reaches the head, so the world halts on the hook before the decision (`world.ts`) and the
+ * narrator dresses the card before it is shown. If another hook is pending the raise waits for
+ * the next tick, which `haltReason` lets run once that hook is acknowledged.
  */
 export const decisionPendingSystem: System = {
   name: "core.decisionPending",
   phase: "finalize",
   run(ctx) {
+    raisePolicyDecisionHookIfDue(ctx);
     const head = ctx.state.decisions.queue[0];
     const kernelCache = ctx.caches.diagnostics;
     if (head === undefined) {

@@ -319,9 +319,25 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "integrityDerateBelow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "integrityInoperableBelow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
-      "required": ["hazardScale", "overheatDamagePerSecond", "maintenanceConditionBelow"],
+      "required": [
+        "hazardScale",
+        "overheatDamagePerSecond",
+        "maintenanceConditionBelow",
+        "integrityDerateBelow",
+        "integrityInoperableBelow"
+      ],
       "additionalProperties": false
     },
     "power": {
@@ -369,6 +385,11 @@
         "staffEstimateSeconds": {
           "type": "number",
           "minimum": 0
+        },
+        "departureMinOutput": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "required": [
@@ -378,7 +399,8 @@
         "approachSeconds",
         "dockSeconds",
         "nominalSpeed",
-        "staffEstimateSeconds"
+        "staffEstimateSeconds",
+        "departureMinOutput"
       ],
       "additionalProperties": false
     },
@@ -456,11 +478,6 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
-        "boardSize": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "dockingFee": {
           "type": "integer",
           "minimum": 0,
@@ -483,7 +500,6 @@
       "required": [
         "priceBands",
         "jobOfferTtlSeconds",
-        "boardSize",
         "dockingFee",
         "haulEstimateSeconds",
         "reofferSeconds",

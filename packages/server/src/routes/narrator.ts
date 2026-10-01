@@ -39,6 +39,12 @@ const narratorRequestSchema = z.object({
 // Server-side tunables not (yet) worth a dedicated env var; bump alongside playtesting feedback.
 const NARRATOR_CALL_WINDOW_MS = 60 * 60 * 1000;
 const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
+/**
+ * D37: hooks the player is waiting on. A policy card can follow another hook within a few ticks
+ * (the departure gate right after an arrival), and refusing it would show the card undressed;
+ * the hourly cap still applies.
+ */
+const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision"]);
 
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";
@@ -113,7 +119,9 @@ export function registerNarratorRoutes(
       return c.json({ error: { code: "budgetExceeded", message } }, 429);
     }
 
-    const lastCall = await db.getLastNarratorCall(gameId);
+    const lastCall = SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
+      ? null
+      : await db.getLastNarratorCall(gameId);
     if (lastCall) {
       const lastBasis = await db.getSave(lastCall.basisSaveId);
       const lastTick = lastBasis?.savedAtTick ?? 0;

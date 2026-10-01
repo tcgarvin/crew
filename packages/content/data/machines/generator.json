@@ -95,6 +95,60 @@
           }
         ]
       }
+    },
+    {
+      "key": "coil_burnout",
+      "name": "Stator coil burnout",
+      "weight": 1,
+      "effect": {
+        "kind": "derate",
+        "outputFactor": 0.35
+      },
+      "symptom": {
+        "key": "output_flicker",
+        "channel": "sensor"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "inspect_coil",
+            "action": "inspect",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 2
+            }
+          },
+          {
+            "key": "replace_coil",
+            "action": "repair",
+            "workSeconds": 25,
+            "tools": ["wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.spare_parts_stack",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 3
+            }
+          },
+          {
+            "key": "test_coil",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
     }
   ],
   "components": [

@@ -248,6 +248,7 @@ export function w5Content(
         ],
         shift: "alpha",
         bio: "Keeps the reactor humming.",
+        voice: "Plain and brief.",
       },
     },
     traits: {},

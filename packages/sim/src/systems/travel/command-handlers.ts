@@ -16,7 +16,7 @@ import {
   reject,
 } from "../../core/commands";
 import type { CommandOfKind } from "../../core/types/commands";
-import type { PortDefId } from "../../core/types/ids";
+import type { MachineId, PortDefId } from "../../core/types/ids";
 import { beginDeparture, hasOpenCargoWork } from "./travel";
 
 function findRoute(
@@ -69,6 +69,72 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
       return NO_TEMP_REFS;
     }
     beginDeparture(ctx, destinationPortId, causedBy(command));
+    return NO_TEMP_REFS;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// D36 departure gate options
+// ---------------------------------------------------------------------------------------------
+
+/** Both gate options need a planned departure: docked with a course set, or preparing to leave. */
+function checkDeparturePlanned(
+  ctx: ValidateCtx,
+  machineId: MachineId,
+  kind: string,
+): Validation<null> {
+  const travel = ctx.state.travel;
+  const planned =
+    (travel.stage === "docked" && travel.plannedDestinationId !== undefined) ||
+    travel.stage === "preparingDeparture";
+  if (!planned) {
+    return reject(
+      "preconditionFailed",
+      `${kind}: no departure is planned (stage "${travel.stage}")`,
+    );
+  }
+  if (ctx.state.machines[machineId] === undefined) {
+    return reject("unknownEntity", `${kind}: unknown machine "${machineId}"`);
+  }
+  return ok(null);
+}
+
+export const holdDepartureForRepairs: CommandHandler<"holdDepartureForRepairs", null> = {
+  validate(ctx, command): Validation<null> {
+    return checkDeparturePlanned(ctx, command.payload.machineId, "holdDepartureForRepairs");
+  },
+  apply(ctx: ApplyCtx, command: CommandOfKind<"holdDepartureForRepairs">): AppliedCommand {
+    const travel = ctx.state.travel;
+    travel.holdForRepairs = true;
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.departureRiskAccepted;
+    ctx.emit({
+      ...causedBy(command),
+      type: "departureHeld",
+      subjectIds: [command.payload.machineId],
+      locationRef: { kind: "machine", machineId: command.payload.machineId },
+      payload: { machineId: command.payload.machineId },
+    });
+    return NO_TEMP_REFS;
+  },
+};
+
+export const acceptDepartureRisk: CommandHandler<"acceptDepartureRisk", null> = {
+  validate(ctx, command): Validation<null> {
+    return checkDeparturePlanned(ctx, command.payload.machineId, "acceptDepartureRisk");
+  },
+  apply(ctx: ApplyCtx, command: CommandOfKind<"acceptDepartureRisk">): AppliedCommand {
+    const travel = ctx.state.travel;
+    travel.departureRiskAccepted = true;
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.holdForRepairs;
+    ctx.emit({
+      ...causedBy(command),
+      type: "departureRiskAccepted",
+      subjectIds: [command.payload.machineId],
+      locationRef: { kind: "machine", machineId: command.payload.machineId },
+      payload: { machineId: command.payload.machineId },
+    });
     return NO_TEMP_REFS;
   },
 };

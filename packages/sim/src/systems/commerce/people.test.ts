@@ -1,118 +1,63 @@
 /**
- * D25/D26/D24 on the kernel side: offers come from a person with a pitch (the null job source
- * draws them from the content name table), the offer card carries aftermaths and no pay, a bare
- * string issuer is still accepted, and schema-1 saves migrate to the person form.
+ * D25/D26/D24 on the kernel side: an offer from a person with a pitch makes a card that names
+ * them, carries aftermaths and no pay; a bare string issuer is still accepted; and schema-1 saves
+ * migrate to the person form. Who the person is comes from the narrator (D40; offline, the null
+ * narrator draws from the content name table, tested in `@crew/narrator`).
  */
 import { describe, expect, it } from "vitest";
-import { createKernel } from "../../core/kernel";
 import { migrateJobsToPeople } from "../../core/migrations";
-import { createRegistry } from "../../core/registry";
 import { migrateState } from "../../core/save";
 import type { Command } from "../../core/types/commands";
-import type { ContentBundle, PeopleTableDef } from "../../core/types/content";
 import type { CommandId } from "../../core/types/ids";
-import type { World } from "../../core/types/kernel";
 import { SCHEMA_VERSION } from "../../core/types/state";
 import type { Job } from "../../core/types/travel";
-import { registerTravel } from "../travel";
-import {
-  FIX,
-  PORTS,
-  advanceThroughHooks,
-  fixtureConfig,
-  fixtureContent,
-  fixtureEffectiveConfig,
-  freightTestWorld,
-} from "../travel/fixtures";
-import { registerCommerce } from "./index";
+import { FIX, PORTS, freightTestWorld } from "../travel/fixtures";
 
-const PEOPLE: PeopleTableDef = {
-  givenNames: ["Ysolde", "Tobiah", "Anouk", "Hamid", "Wren"],
-  familyNames: ["Maren", "Okafor", "Lindqvist", "Duarte"],
-  pitches: ["I've got {cargo} for {to} and nobody else I trust with it."],
-  cargoWords: {
-    general: "general freight",
-    fragile: "fragile equipment",
-    perishable: "fresh produce",
-    hazardous: "hazardous cargo",
-  },
-  ports: {
-    [PORTS.a]: {
-      roles: ["dock foreman", "freight broker"],
-      orgs: ["Alpha Freight Co-op", "Alpha Growers"],
-      pitches: ["Ship's been sitting at the ramp all shift. Want something to carry to {to}?"],
+function personOffer(): Command {
+  return {
+    id: "cmd:people-test:0" as CommandId,
+    source: "narrator",
+    kind: "offerJob",
+    payload: {
+      job: {
+        issuer: { name: "Ysolde Maren", role: "dock foreman", org: "Alpha Freight Co-op" },
+        pitch: {
+          key: "narrator.job.pitch",
+          params: {},
+          prose: "Ship's been at the ramp all shift.",
+        },
+        urgency: "soon",
+        description: { key: "test.job", params: {} },
+        fromPortId: PORTS.a,
+        toPortId: PORTS.b,
+        cargo: [{ itemDefId: FIX.crate, count: 2 }],
+        pay: 100,
+      },
+      surface: true,
     },
-  },
-};
-
-function worldWithPeople(seed: number): { world: World; kernel: ReturnType<typeof createKernel> } {
-  const registry = createRegistry();
-  registerTravel(registry);
-  registerCommerce(registry);
-  const kernel = createKernel(registry);
-  const config = fixtureConfig();
-  const content: ContentBundle = { ...fixtureContent(config), people: PEOPLE };
-  const world = kernel.createWorld(FIX.scenario, seed, content, fixtureEffectiveConfig(config));
-  return { world, kernel };
-}
-
-/** Run until the job source's first offer is on the board and return it with its decision. */
-function firstOffer(world: World, kernel: ReturnType<typeof createKernel>) {
-  advanceThroughHooks(kernel, world, 200);
-  const job = Object.values(world.state.jobs)[0];
-  const decision = Object.values(world.state.decisions.records).find((d) => d.jobId === job?.id);
-  if (job === undefined || decision === undefined) throw new Error("no offer was made");
-  return { job, decision };
-}
-
-function personOf(job: Job) {
-  return { issuer: job.issuer, person: job.issuerPerson, pitch: job.pitch, urgency: job.urgency };
+  } as Command;
 }
 
 describe("commerce: offers come from people (D25)", () => {
-  it("the null job source draws a person and a pitch from the name table", () => {
-    const { world, kernel } = worldWithPeople(7);
-    const { job } = firstOffer(world, kernel);
-    const person = job.issuerPerson;
-    const [given, family] = person.name.split(" ");
-    expect(PEOPLE.givenNames).toContain(given);
-    expect(PEOPLE.familyNames).toContain(family);
-    expect(PEOPLE.ports[PORTS.a]?.roles).toContain(person.role);
-    expect(PEOPLE.ports[PORTS.a]?.orgs).toContain(person.org);
-    expect(job.issuer).toBe(`${person.name}, ${person.org}`);
-    // Placeholders are filled from content; no braces and no numbers survive.
-    expect(job.pitch.prose).toBeDefined();
-    expect(job.pitch.prose).not.toMatch(/[{}]|\d/);
-    expect(job.pitch.prose).toMatch(/general freight|Beta Yard|Gamma Ring/);
-  });
-
-  it("is deterministic per seed", () => {
-    const a = worldWithPeople(11);
-    const b = worldWithPeople(11);
-    expect(personOf(firstOffer(a.world, a.kernel).job)).toEqual(
-      personOf(firstOffer(b.world, b.kernel).job),
-    );
-    const names = new Set(
-      [1, 2, 3, 4, 5, 6].map((seed) => {
-        const w = worldWithPeople(seed);
-        return firstOffer(w.world, w.kernel).job.issuerPerson.name;
-      }),
-    );
-    expect(names.size).toBeGreaterThan(1);
-  });
-
   it("the offer card names the person, carries aftermaths and never the pay (D24, D26)", () => {
-    const { world, kernel } = worldWithPeople(3);
-    const { job, decision } = firstOffer(world, kernel);
+    const { world, kernel } = freightTestWorld();
+    const command = personOffer();
+    expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    kernel.advance(world, 1);
+    const job = Object.values(world.state.jobs).find((j) => j.causeCommandId === command.id);
+    if (job === undefined) throw new Error("no offer was made");
+    expect(job.issuer).toBe("Ysolde Maren, Alpha Freight Co-op");
+    const decision = Object.values(world.state.decisions.records).find((d) => d.jobId === job.id);
+    if (decision === undefined) throw new Error("the offer was not surfaced");
     expect(decision.prompt.key).toBe("job.offer");
     expect(decision.prompt.params).toMatchObject({
-      name: job.issuerPerson.name,
-      role: job.issuerPerson.role,
-      org: job.issuerPerson.org,
+      name: "Ysolde Maren",
+      role: "dock foreman",
+      org: "Alpha Freight Co-op",
       from: job.fromPortId,
       to: job.toPortId,
-      urgency: job.urgency,
-      pitch: job.pitch.prose,
+      urgency: "soon",
+      pitch: "Ship's been at the ramp all shift.",
     });
     expect(decision.prompt.params).not.toHaveProperty("pay");
     expect(Object.values(decision.prompt.params)).not.toContain(job.pay);

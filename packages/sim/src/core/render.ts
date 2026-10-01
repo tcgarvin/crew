@@ -5,7 +5,7 @@
  */
 import type { Actor } from "./types/actor";
 import type { DeepReadonly } from "./types/common";
-import type { ContentBundle, ItemDef } from "./types/content";
+import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
@@ -72,13 +72,19 @@ export function actionLabel(
   return verb;
 }
 
-function machineState(machine: DeepReadonly<Machine>, content: ContentBundle): RenderMachineState {
-  if (machine.actualMode === "off") return "off";
+function machineState(
+  machine: DeepReadonly<Machine>,
+  content: ContentBundle,
+  config: ConfigDef,
+): RenderMachineState {
   const faultDefs = content.machines[machine.defId]?.faults ?? [];
   const inoperable = machine.faults.some(
     (fault) => faultDefs.find((def) => def.key === fault.faultKey)?.effect.kind === "inoperable",
   );
-  if (inoperable || machine.integrity <= 0) return "failed";
+  // D35: a machine blocked by an inoperable fault or low integrity (at the config threshold, not
+  // only at 0) reads "failed" even though equipment has switched it off.
+  if (inoperable || machine.integrity < config.equipment.integrityInoperableBelow) return "failed";
+  if (machine.actualMode === "off") return "off";
   if (machine.faults.length > 0 || machine.output < 1) return "degraded";
   return "ok";
 }
@@ -252,6 +258,12 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Docked at ${n.port(event.payload.portId)}`;
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
+    case "departureHeld":
+      return `Holding for repairs to the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}`;
+    case "departureRiskAccepted":
+      return `Leaving with the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()} as it is`;
+    case "departureHoldLifted":
+      return `Repairs done: departing for ${n.port(event.payload.toPortId)}`;
     case "jobOffered": {
       const job = n.job(event.payload.jobId);
       return job === undefined ? "A job is on offer" : `${job.issuer} has freight for ${job.to}`;
@@ -480,7 +492,10 @@ export function shipHeadline(
     const loading = freightProgress(state, "cargoToLoad");
     if (loading !== undefined) return `${here} — ${loadingLine(loading)}`;
     if (travel.plannedDestinationId !== undefined) {
-      return `Preparing to depart for ${portName(content, travel.plannedDestinationId)}`;
+      const to = portName(content, travel.plannedDestinationId);
+      return travel.holdForRepairs === true
+        ? `${here} — holding for repairs before departing for ${to}`
+        : `Preparing to depart for ${to}`;
     }
     // Offers are the card's story to tell, not the headline's (D34): the headline only says what
     // the ship is doing.
@@ -490,6 +505,7 @@ export function shipHeadline(
   const to = portName(content, travel.toPortId);
   switch (travel.stage) {
     case "preparingDeparture": {
+      if (travel.holdForRepairs === true) return `Holding for repairs before departing for ${to}`;
       const loading = freightProgress(state, "cargoToLoad");
       if (loading !== undefined) return `Preparing to depart for ${to} — ${loadingLine(loading)}`;
       if (hasOpenProblem(state, "stationToStaff")) {
@@ -525,7 +541,7 @@ export function getRenderFrame(world: World): RenderFrame {
   }
   const machines: RenderMachine[] = Object.values(state.machines).map((machine) => ({
     id: machine.id,
-    state: machineState(machine, content),
+    state: machineState(machine, content, world.config.values),
     temperatureNorm: machine.temperature,
     deckId: machine.deckId,
     placementKey: machine.placementKey,

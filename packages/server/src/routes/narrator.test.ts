@@ -26,10 +26,10 @@ async function createGame(app: ReturnType<typeof buildTestApp>["app"], token: st
   return (await res.json()) as { game: { id: string } };
 }
 
-function narratorBody(gameId: string, savedAtTick = 0) {
+function narratorBody(gameId: string, savedAtTick = 0, hookKind = "approachingPort") {
   return {
     gameId,
-    hook: { kind: "approachingPort" },
+    hook: { kind: hookKind },
     snapshot: fakeEnvelope({ savedAtTick }),
     recentEvents: [],
   };
@@ -82,6 +82,44 @@ describe("narrator", () => {
     expect(lastCall?.status).toBe("budgetExceeded");
   });
 
+  it("429s a call too soon after the last one, but not a policyDecision hook (D37)", async () => {
+    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const post = (body: unknown) =>
+      authed(app, token, `/api/games/${game.id}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await post(narratorBody(game.id, 0))).status).toBe(200);
+
+    const tooSoon = await post(narratorBody(game.id, 40));
+    expect(tooSoon.status).toBe(429);
+    expect((await readJson(tooSoon)).error.message).toMatch(/too soon/i);
+
+    // The player is waiting on the card: spacing does not apply.
+    const policy = await post(narratorBody(game.id, 40, "policyDecision"));
+    expect(policy.status).toBe(200);
+    expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("policyDecision");
+
+    // The hourly cap still does.
+    const capped = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" });
+    const second = buildTestApp({ env: capped, runNarrator: echoNarrator });
+    const user = await mintUser(second.app);
+    const { game: other } = await createGame(second.app, user.token);
+    const postOther = (body: unknown) =>
+      authed(second.app, user.token, `/api/games/${other.id}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    expect((await postOther(narratorBody(other.id, 0))).status).toBe(200);
+    expect((await postOther(narratorBody(other.id, 500, "policyDecision"))).status).toBe(429);
+  });
+
   it("400s an invalid narrator request", async () => {
     const { app } = buildTestApp();
     const { token } = await mintUser(app);
@@ -107,6 +145,7 @@ describe("narrator", () => {
           stage: "Ines was nervous at the handover.",
           nextBeat: "When the ship is next at the Drift, she asks a favour.",
           lastBeatTick: null,
+          beatCardShown: false,
         },
       ],
       cardsShown: [],

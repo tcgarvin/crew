@@ -74,7 +74,13 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       heatSurvivalAbove: 0.95,
       routineAgingSeconds: 60,
     },
-    equipment: { hazardScale: 1, overheatDamagePerSecond: 0.01, maintenanceConditionBelow: 0.3 },
+    equipment: {
+      hazardScale: 1,
+      overheatDamagePerSecond: 0.01,
+      maintenanceConditionBelow: 0.3,
+      integrityDerateBelow: 0.5,
+      integrityInoperableBelow: 0.15,
+    },
     power: { priorityOrder: ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"] },
     travel: {
       prepareDepartureSeconds: 5,
@@ -84,6 +90,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       dockSeconds: 3,
       nominalSpeed: 1,
       staffEstimateSeconds: 0,
+      departureMinOutput: 0.5,
     },
     commerce: {
       priceBands: {
@@ -93,7 +100,6 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
         hazardous: { min: 3, max: 8 },
       },
       jobOfferTtlSeconds: 120,
-      boardSize: 3,
       dockingFee: 0,
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
@@ -248,6 +254,7 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         startingInventory: [{ itemDefId: TINY.rations, count: 3 }],
         shift: "alpha",
         bio: "Keeps the ship flying.",
+        voice: "Plain and brief.",
       },
     },
     traits: {},

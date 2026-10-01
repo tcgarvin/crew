@@ -108,8 +108,34 @@ function offerSituation(p: Params, c: ContentBundle | undefined): string {
   return clipWords(`“${pitch}” ${context}`, SITUATION_MAX_WORDS);
 }
 
+/** D36: the gate card's reason, in plain words (no numbers, D24). Keyed by `ImpairmentReason`. */
+const GATE_REASONS: Readonly<Record<string, string>> = {
+  blocked: "won't run at all until it's repaired",
+  faultDerated: "is running below full power with an unrepaired fault",
+  fault: "is running with an unrepaired fault",
+  lowOutput: "is putting out well below full power",
+};
+
+/** D36: "The main engine is running below full power with an unrepaired fault. ..." */
+function departureGateSituation(p: Params): string {
+  const machine =
+    p.machine === undefined ? "A machine we need" : `The ${String(p.machine).toLowerCase()}`;
+  const reason = GATE_REASONS[String(p.reason)] ?? "isn't right";
+  return `${machine} ${reason}. We can sit here while it's fixed, or go as we are.`;
+}
+
+const DEPARTURE_GATE_KEY = "travel.departureGate";
+
 const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefined) => string>> = {
   "job.offer": offerSituation,
+  // D36 departure gate.
+  [DEPARTURE_GATE_KEY]: departureGateSituation,
+  "travel.departureGate.hold": () => "Hold for repairs",
+  "travel.departureGate.leave": () => "Leave anyway",
+  "travel.departureGate.hold.aftermath": () =>
+    "We stay put. The crew get to work on it, and we leave the moment it's fixed.",
+  "travel.departureGate.leave.aftermath": () =>
+    "We go as we are. Whatever's wrong with it comes with us.",
   "job.offer.accept": () => "Take the job",
   "job.offer.decline": () => "Pass on it",
   // D26 aftermaths for the offer card.
@@ -138,12 +164,17 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
         : String(p.issuer),
   // Narrator cards carry their heading in the prompt params (`translate.ts`).
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.title === undefined ? undefined : String(p.title)),
+  // D36: "Before we leave: Main Engine".
+  [DEPARTURE_GATE_KEY]: (p) =>
+    p.machine === undefined ? "Before we leave" : `Before we leave: ${String(p.machine)}`,
 };
 
 /** D29: who is speaking, per prompt key; the offer card's issuer, or the narrator's param. */
 const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
   "job.offer": (p) => (p.name === undefined ? undefined : String(p.name)),
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+  // D36: the engineer brings the gate card (D29), when the ship has one.
+  [DEPARTURE_GATE_KEY]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
 };
 
 const GENERIC_TITLE = "The captain's call";

@@ -14,5 +14,6 @@
   "traits": ["trait.steady", "trait.methodical"],
   "startingInventory": [],
   "shift": "beta",
-  "bio": "First officer; steps up whenever the captain is asleep."
+  "bio": "First officer; steps up whenever the captain is asleep.",
+  "voice": "Measured, complete sentences, nothing wasted. Always \"Captain\", never a first name. Gives the problem first, then what he has already done about it, then the one decision he needs. Bad news comes in the same even tone as good; he does not joke and does not hurry."
 }

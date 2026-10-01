@@ -4,22 +4,10 @@
  * `jobBoard` hook.
  */
 import { describe, expect, it } from "vitest";
-import { createKernel } from "../../core/kernel";
-import { createRegistry } from "../../core/registry";
 import type { Command } from "../../core/types/commands";
 import type { CommandId, HookId, JobId } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
-import { registerTravel } from "../travel";
-import {
-  FIX,
-  PORTS,
-  advanceThroughHooks,
-  fixtureConfig,
-  fixtureContent,
-  fixtureEffectiveConfig,
-  freightTestWorld,
-} from "../travel/fixtures";
-import { registerCommerce } from "./index";
+import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "../travel/fixtures";
 
 let counter = 0;
 function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
@@ -106,21 +94,10 @@ describe("commerce: decision perspective (D8)", () => {
 });
 
 describe("commerce: jobBoard hook", () => {
-  it("raises jobBoard when docked with no offers, and does not raise it twice", () => {
-    const config = fixtureConfig();
-    const base = fixtureContent(config);
-    const startPort = base.ports[PORTS.a];
-    if (startPort === undefined) throw new Error("no start port");
-    // A port with no templates so the deterministic job source can't fill the board.
-    const content = {
-      ...base,
-      ports: { ...base.ports, [PORTS.a]: { ...startPort, jobTemplates: [] } },
-    };
-    const registry = createRegistry();
-    registerTravel(registry);
-    registerCommerce(registry);
-    const kernel = createKernel(registry);
-    const world = kernel.createWorld(FIX.scenario, 42, content, fixtureEffectiveConfig(config));
+  it("raises jobBoard when docked with nothing on, and does not raise it twice", () => {
+    // D40: the narrator is the only source of work, so a fresh world docked at its start port
+    // asks for an offer on the first tick, and asks once per docking.
+    const { world, kernel } = freightTestWorld();
 
     const first = kernel.advance(world, 1);
     expect(first.halt).toEqual({ kind: "hook" });
@@ -139,10 +116,8 @@ describe("commerce: jobBoard hook", () => {
 
 describe("commerce: full freight loop", () => {
   it("offers, accepts, loads, travels, unloads and pays exactly once", () => {
-    // `boardSize: 0` disables the deterministic job source for this test, so only the job
-    // offered explicitly below exists — otherwise it would keep refilling the board with more
-    // surfaced decisions once this job leaves `offered` status.
-    const { world, kernel } = freightTestWorld({ dockingFee: 3, boardSize: 0 });
+    // D40: nothing in the sim offers work, so the only job is the one offered explicitly below.
+    const { world, kernel } = freightTestWorld({ dockingFee: 3 });
     const startingBalance = world.state.money.balance;
 
     const offerCmd = cmd({
@@ -159,8 +134,8 @@ describe("commerce: full freight loop", () => {
       world,
       cmd({ source: "player", kind: "resolveDecision", payload: { decisionId, side: "left" } }),
     );
-    // Accepting empties the offered board, which (with the real job source disabled here via
-    // `boardSize: 0`) raises `jobBoard`; acknowledge it so `setCourse` below isn't blocked.
+    // D40: `jobBoard` stays quiet while an offer or an accepted job is open, so nothing halts
+    // here; the helper only guards against an incidental hook.
     advanceThroughHooks(kernel, world, 30);
 
     const jobId = Object.keys(world.state.jobs)[0] as JobId | undefined;
@@ -202,7 +177,7 @@ describe("commerce: full freight loop", () => {
       world,
       cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
     );
-    // Arrival at B (no job templates there) also raises `jobBoard`; acknowledge that too.
+    // Docking at B with nothing on raises `jobBoard` (D40); acknowledge that too.
     advanceThroughHooks(kernel, world, 1000);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
     expect(job.status).toBe("inTransit");

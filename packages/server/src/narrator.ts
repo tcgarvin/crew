@@ -3,6 +3,7 @@
  * `runNarrator` when an OpenRouter key is configured and the deterministic `nullNarrator`
  * otherwise; tests inject their own through `createApp({ runNarrator })`.
  */
+import { loadBundle } from "@crew/content";
 import {
   type ModelTransport,
   type NarratorRequest,
@@ -11,6 +12,7 @@ import {
   openRouterTransport,
   runNarrator,
 } from "@crew/narrator";
+import type { ContentBundle } from "@crew/sim";
 
 /** Context passed to a `RunNarrator`; carries secrets through without this package using them. */
 export interface NarratorCtx {
@@ -25,8 +27,29 @@ export interface NarratorCtx {
 
 export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorResponse>;
 
-/** Deterministic offline narrator: no commands, a template card for policy decisions. */
-export const nullNarrator: RunNarrator = async (req) => nullNarratorResponse(req);
+let cachedBundle: ContentBundle | undefined;
+
+/** The validated content bundle, loaded once; the null narrator needs it for its offers (D40). */
+function content(): ContentBundle {
+  if (cachedBundle === undefined) {
+    const result = loadBundle();
+    if (!result.ok) {
+      throw new Error(
+        `narrator: content bundle failed validation (${result.issues.length} issues)`,
+      );
+    }
+    cachedBundle = result.bundle;
+  }
+  return cachedBundle;
+}
+
+/**
+ * Deterministic offline narrator: a template card for policy decisions and, for
+ * `approachingPort`/`jobBoard`, one templated job offer (D40: the narrator is the only source of
+ * work, so the offline path must still hand out work).
+ */
+export const nullNarrator: RunNarrator = async (req) =>
+  nullNarratorResponse(req, { content: content() });
 
 /**
  * W9 decision: OpenRouter transport (owner). The transport that sends the key to OpenRouter is

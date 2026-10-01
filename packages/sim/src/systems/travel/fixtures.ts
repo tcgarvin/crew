@@ -43,7 +43,6 @@ export interface FixtureConfigOverrides {
   quietTooLongSeconds?: number;
   dockingFee?: number;
   hookOnEvents?: readonly string[];
-  boardSize?: number;
   maxCratesPerJob?: number;
 }
 
@@ -95,7 +94,13 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       heatSurvivalAbove: 0.95,
       routineAgingSeconds: 60,
     },
-    equipment: { hazardScale: 1, overheatDamagePerSecond: 0.01, maintenanceConditionBelow: 0.3 },
+    equipment: {
+      hazardScale: 1,
+      overheatDamagePerSecond: 0.01,
+      maintenanceConditionBelow: 0.3,
+      integrityDerateBelow: 0.5,
+      integrityInoperableBelow: 0.15,
+    },
     power: { priorityOrder: ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"] },
     travel: {
       // Short, test-friendly durations (seconds); D10: time is a gameplay knob, not a ratio.
@@ -106,6 +111,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       dockSeconds: 1,
       nominalSpeed: 5,
       staffEstimateSeconds: 0,
+      departureMinOutput: 0.5,
     },
     commerce: {
       priceBands: {
@@ -115,7 +121,6 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         hazardous: { min: 3, max: 8 },
       },
       jobOfferTtlSeconds: 120,
-      boardSize: overrides.boardSize ?? 2,
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
@@ -208,7 +213,26 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         heat: { risePerSecond: 0.01, coolPerSecond: 0.02, derateAbove: 0.8 },
         operation: { requiresOperator: false },
         failure: { baseHazardPerSecond: 0.0001, heatFactor: 2, wearPerSecond: 0.0001 },
-        faults: [],
+        // D36 gate tests: one derating fault and one symptom-only (overheat) fault. No equipment
+        // system runs here, so neither ever fires on its own or changes `output`.
+        faults: [
+          {
+            key: "wornBearing",
+            name: "Worn bearing",
+            weight: 1,
+            effect: { kind: "derate", outputFactor: 0.5 },
+            symptom: { key: "vibration", channel: "audible" },
+            repair: { steps: [] },
+          },
+          {
+            key: "hotPanel",
+            name: "Hot panel",
+            weight: 1,
+            effect: { kind: "overheat", extraRisePerSecond: 0.01 },
+            symptom: { key: "warmPanel", channel: "visual" },
+            repair: { steps: [] },
+          },
+        ],
         components: [],
       },
     },
@@ -243,15 +267,17 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         startingInventory: [],
         shift: "alpha",
         bio: "Runs the boat.",
+        voice: "Plain and brief.",
       },
       [FIX.firstOfficer]: {
         id: FIX.firstOfficer,
         name: "First Officer Kade",
-        roleTags: ["firstOfficer"],
+        roleTags: ["firstOfficer", "engineer"],
         skills: { piloting: 4 },
         startingInventory: [],
         shift: "alpha",
         bio: "Backs up the captain.",
+        voice: "Plain and brief.",
       },
     },
     traits: {},

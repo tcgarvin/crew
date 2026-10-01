@@ -45,6 +45,12 @@ export interface Decision {
   chosen?: "left" | "right";
   /** The job this decision is about, if any (job offers are decisions, review §D.6.7). */
   jobId?: JobId;
+  /**
+   * D37: the `policyDecision` hook raised for a kernel-raised decision, set when it reached the
+   * head of the queue (`core/decisions.ts`). Absent on narrator cards and job offers, which
+   * carry their own prose.
+   */
+  narratorHookId?: HookId;
 }
 
 export interface DecisionsState {

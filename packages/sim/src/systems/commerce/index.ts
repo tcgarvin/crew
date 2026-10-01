@@ -25,5 +25,4 @@ export {
   spawnCargoItem,
   cargoStowageZoneKey,
 } from "./jobs";
-export { runJobSource } from "./jobSource";
 export { commerceTaskDerivations } from "./tasks";

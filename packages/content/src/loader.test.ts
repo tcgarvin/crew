@@ -16,6 +16,15 @@ describe("loadBundle", () => {
     expect(rawBundle().hash).toBe(rawBundle().hash);
   });
 
+  it("gives every crew member a voice of their own (D38)", () => {
+    const result = loadBundle();
+    if (!result.ok) throw new Error("content bundle failed validation");
+    const voices = Object.values(result.bundle.crew).map((c) => c.voice);
+    expect(voices).toHaveLength(8);
+    for (const voice of voices) expect(voice.trim().split(/\s+/).length).toBeLessThan(60);
+    expect(new Set(voices).size).toBe(8);
+  });
+
   it("has all 8 crew, 10 traits and the default scenario", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;

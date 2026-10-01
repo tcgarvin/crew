@@ -95,3 +95,57 @@ describe("offer card templates", () => {
     expect(renderTextRef({ key: "job.decline.aftermath", params: {} })).toMatch(/^You pass\./);
   });
 });
+
+describe("departure gate card templates (D36)", () => {
+  function gate(params: Decision["prompt"]["params"]): Decision {
+    return {
+      ...offer({}),
+      prompt: { key: "travel.departureGate", params },
+      left: {
+        label: { key: "travel.departureGate.hold", params: {} },
+        commands: [],
+        aftermath: { key: "travel.departureGate.hold.aftermath", params: {} },
+      },
+      right: {
+        label: { key: "travel.departureGate.leave", params: {} },
+        commands: [],
+        aftermath: { key: "travel.departureGate.leave.aftermath", params: {} },
+      },
+    };
+  }
+
+  it("names the machine and the reason in plain words, spoken by the engineer, with no numbers", () => {
+    const card = templateCard(
+      gate({
+        machineId: "m1",
+        machine: "Main Engine",
+        reason: "faultDerated",
+        speaker: "Priya Kessler",
+      }),
+      bundle(),
+    );
+    expect(card.title).toBe("Before we leave: Main Engine");
+    expect(card.speaker).toBe("Priya Kessler");
+    expect(card.situation).toMatch(
+      /^The main engine is running below full power with an unrepaired fault\./,
+    );
+    expect(card.situation).not.toMatch(/\d/);
+    expect(card.leftLabel).toBe("Hold for repairs");
+    expect(card.rightLabel).toBe("Leave anyway");
+    expect(card.leftAftermath).toBeTruthy();
+    expect(card.rightAftermath).toBeTruthy();
+  });
+
+  it("has a line for every impairment reason and a generic fallback", () => {
+    for (const reason of ["blocked", "fault", "lowOutput", "faultDerated", "unknown"]) {
+      const text = renderTextRef({
+        key: "travel.departureGate",
+        params: { machine: "Generator", reason },
+      });
+      expect(text).toMatch(/^The generator /);
+      expect(text).not.toMatch(/\d/);
+    }
+    expect(templateCard(gate({ reason: "blocked" })).speaker).toBeUndefined();
+    expect(templateCard(gate({ reason: "blocked" })).title).toBe("Before we leave");
+  });
+});

@@ -68,7 +68,9 @@
   "equipment": {
     "hazardScale": 1,
     "overheatDamagePerSecond": 0.02,
-    "maintenanceConditionBelow": 0.3
+    "maintenanceConditionBelow": 0.3,
+    "integrityDerateBelow": 0.5,
+    "integrityInoperableBelow": 0.15
   },
   "power": {
     "priorityOrder": ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"]
@@ -80,7 +82,8 @@
     "approachSeconds": 8,
     "dockSeconds": 5,
     "nominalSpeed": 1,
-    "staffEstimateSeconds": 0
+    "staffEstimateSeconds": 0,
+    "departureMinOutput": 0.5
   },
   "commerce": {
     "priceBands": {
@@ -102,7 +105,6 @@
       }
     },
     "jobOfferTtlSeconds": 600,
-    "boardSize": 3,
     "dockingFee": 150,
     "haulEstimateSeconds": 5,
     "reofferSeconds": 20,
@@ -116,7 +118,12 @@
     "spawnBudget": 3,
     "faultBudget": 2,
     "budgetRefillSeconds": 300,
-    "hookOnEvents": ["driftingChanged", "contractCompleted"]
+    "hookOnEvents": [
+      "driftingChanged",
+      "contractCompleted",
+      "departureRiskAccepted",
+      "departureHoldLifted"
+    ]
   },
   "host": {
     "runAheadCapSeconds": 60,

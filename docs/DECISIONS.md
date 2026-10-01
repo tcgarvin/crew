@@ -187,3 +187,54 @@ problems are debugged from the record rather than screenshots. The credential is
 **D34. The headline never narrates.** Owner: the docked headline said "<issuer> is offering freight
 for <port>", a story claim the narrator never made, hardcoded in the sim. Docked with no cargo work
 now reads "looking for work" whether or not an offer is open; offers are the card's to tell.
+
+**D35. Integrity affects output.** Owner, after the generator showed "bad shape" and the ship
+flew anyway: output now derates linearly below `equipment.integrityDerateBelow` (0.5) and the
+machine is inoperable below `equipment.integrityInoperableBelow` (0.15) until repaired; a
+completed fault repair restores integrity to at least the derate threshold (the only path that
+restores it; overheat is the only thing that costs it). A blocked machine renders as "failed". A
+derating `coil_burnout` fault (stator coil burnout, output ×0.35, sensor symptom) joins the
+generator's content.
+
+**D36. Departure gate, asked once.** A planned departure with an impaired engine or generator
+(blocked, a derating/disabling fault unrepaired, or output below `travel.departureMinOutput`,
+0.5) raises one policy decision, "Hold for repairs" / "Leave anyway", brought by the engineer
+(D29). Hold keeps the planned course, waits for the repair and departs on its own
+(`departureHoldLifted`); leave anyway (`departureRiskAccepted`) is remembered until the next
+docking. Both events are in the default `hookOnEvents`. Owner: "careful that we don't bother the
+player every time a single system isn't 100%": symptoms, warm panels and moderate integrity never
+trigger it.
+
+**D37. Every policy decision is narrated.** Kernel-raised decisions (the departure gate, and any
+future repair or safety card queued through `queuePolicyDecision`) now raise a `policyDecision`
+hook first, in the tick they reach the head of the queue (`decisionPendingSystem`), and the
+world does not halt on such a decision until its hook has been raised (`haltReason`), so the
+host always sees the hook halt before the decision halt, calls the narrator, and has the card's
+prose keyed by decision id before the modal opens. Template text remains the fallback when the
+narrator fails or is offline. The digest's hook line names the machine and the template speaker
+(the engineer for the gate) so the model dresses the card in that voice. Policy hooks are exempt
+from the server's minimum tick spacing (not the hourly cap). Job offers are not hooked: the
+offer card already carries the issuer's pitch (D25). Owner: "anything that requires a decision
+gets narrated."
+
+**D38. Crew have voices, not wants.** Each crew member carries a `voice` (how they talk and
+handle the captain), shown in the digest; the narrator writes them in it and shares the stage
+across the crew. Owner deferred "wants": those surface as threads, not as a sheet.
+
+**D39. Arc selection and beat cards.** When several threads are ready, the oldest-beat thread
+goes first unless an episode is at its climax. A beat card (Reigns-style) advances a thread
+without a decision: both sides are the captain's attitude, recorded into the thread; one per
+thread before its payoff, enforced by the translator. Prompt v0.5.
+
+**D40. The narrator is the only source of work.** The sim's deterministic job source is gone (it
+ran in production alongside the narrator, refilling the board from port templates after every
+decline). `jobBoard` now fires once per docking when the captain has no offer, no job and no
+course (and not within `commerce.reofferSeconds` of a declined or expired offer at that port);
+the narrator answers it, and the null narrator answers it offline (and on every fallback) with
+one templated offer through the same translator. `commerce.boardSize` is removed. Prompt v0.6.
+Owner: "let the narrator figure that out dynamically as part of its arc generation."
+
+**D41. The captain never speaks on a card.** The `captain`-tagged crew member is the player's
+avatar (Mara Osei today; others later). They keep a voice for how they come across, shown to the
+narrator, but the translator nulls them as a speaker (the card survives as an observed scene and
+the reason is fed back under "rejected last time"). Prompt v0.7.

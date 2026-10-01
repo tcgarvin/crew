@@ -41,6 +41,12 @@ export interface Thread {
   readonly nextBeat: string;
   /** Hook tick of the last call that put a card or an offer from this thread in front of the captain. */
   readonly lastBeatTick: number | null;
+  /**
+   * D39: server-kept like `lastBeatTick`. True once a beat (foreshadowing) card has been
+   * attributed to this thread; the model cannot clear it, and it stays true until the thread is
+   * retired. One beat card per thread before its payoff.
+   */
+  readonly beatCardShown: boolean;
 }
 
 /**
@@ -103,6 +109,8 @@ const storedThreadSchema = z.object({
   stage: z.string(),
   nextBeat: z.string(),
   lastBeatTick: z.number().int().nullable(),
+  /** Notes stored before D39 have no beat-card flag. */
+  beatCardShown: z.boolean().optional(),
 });
 
 const storedCardSchema = z.object({
@@ -156,6 +164,7 @@ export function threadFromLegacy(text: string): Thread {
     stage: text,
     nextBeat: "",
     lastBeatTick: null,
+    beatCardShown: false,
   };
 }
 
@@ -167,6 +176,7 @@ function boundThread(thread: Thread): Thread {
     stage: clip(thread.stage, NOTES_LIMITS.threadChars),
     nextBeat: clip(thread.nextBeat, NOTES_LIMITS.threadChars),
     lastBeatTick: thread.lastBeatTick,
+    beatCardShown: thread.beatCardShown,
   };
 }
 
@@ -264,7 +274,9 @@ export function parseNotes(raw: unknown): NarratorNotes {
   return boundNotes({
     ...rest,
     // Notes stored before D32 have free-text threads; before D31 no card history.
-    threads: threads ?? (openThreads ?? []).map(threadFromLegacy),
+    threads:
+      threads?.map((t) => ({ ...t, beatCardShown: t.beatCardShown ?? false })) ??
+      (openThreads ?? []).map(threadFromLegacy),
     cardsShown: cardsShown ?? [],
     // Notes stored before D25 have no port or sighting for their cast.
     cast: parsed.data.cast.map((c) => ({
@@ -277,28 +289,44 @@ export function parseNotes(raw: unknown): NarratorNotes {
   });
 }
 
+/** What the model writes for a thread: everything the server does not keep for it. */
+export type WrittenThread = Omit<Thread, "lastBeatTick" | "beatCardShown">;
+
 /**
  * D32: the threads after a call. The model rewrites them in full; the server carries
  * `lastBeatTick` by title: it becomes the hook tick when this call put one of the thread's people
  * in front of the captain (as a card's speaker, named on a card, or as a job's issuer), else the
  * previous value, or null for a thread the model just started and did not use.
+ *
+ * D39: `beatCardShown` is carried by title too, and set when this call's beat card named the
+ * thread (`beatCardThread`, the title as the translator matched it). A beat card is a card, so
+ * it also stamps `lastBeatTick`.
  */
 export function mergeThreads(
-  written: readonly Omit<Thread, "lastBeatTick">[],
+  written: readonly WrittenThread[],
   previous: readonly Thread[],
   tick: number,
   /** Player-facing texts from this call: card titles, speakers, situations, issuer names. */
   textsThisCall: readonly string[],
+  /** Title of the thread this call's beat card was attributed to, if any. */
+  beatCardThread: string | undefined = undefined,
 ): Thread[] {
   const key = (s: string) => s.trim().toLowerCase();
-  const before = new Map(previous.map((t) => [key(t.title), t.lastBeatTick]));
+  const before = new Map(previous.map((t) => [key(t.title), t]));
   const lowered = textsThisCall.map(key);
   const named = (person: string) => {
     const k = key(person);
     return k !== "" && lowered.some((text) => text.includes(k));
   };
-  return written.map((t) => ({
-    ...t,
-    lastBeatTick: t.people.some(named) ? tick : (before.get(key(t.title)) ?? null),
-  }));
+  const beatKey = beatCardThread === undefined ? undefined : key(beatCardThread);
+  return written.map((t) => {
+    const earlier = before.get(key(t.title));
+    const foreshadowedNow = beatKey !== undefined && key(t.title) === beatKey;
+    return {
+      ...t,
+      lastBeatTick:
+        t.people.some(named) || foreshadowedNow ? tick : (earlier?.lastBeatTick ?? null),
+      beatCardShown: foreshadowedNow || (earlier?.beatCardShown ?? false),
+    };
+  });
 }

@@ -71,6 +71,8 @@ export const configDefSchema = z.strictObject({
     hazardScale: nonNegative,
     overheatDamagePerSecond: nonNegative,
     maintenanceConditionBelow: unitInterval,
+    integrityDerateBelow: unitInterval,
+    integrityInoperableBelow: unitInterval,
   }),
   power: z.strictObject({ priorityOrder: z.array(powerPrioritySchema).min(1) }),
   travel: z.strictObject({
@@ -81,11 +83,11 @@ export const configDefSchema = z.strictObject({
     dockSeconds: positive,
     nominalSpeed: positive,
     staffEstimateSeconds: nonNegative,
+    departureMinOutput: unitInterval,
   }),
   commerce: z.strictObject({
     priceBands: z.strictObject({ general: band, fragile: band, perishable: band, hazardous: band }),
     jobOfferTtlSeconds: positive,
-    boardSize: positiveInt,
     dockingFee: z.number().int().min(0),
     haulEstimateSeconds: nonNegative,
     reofferSeconds: nonNegative,

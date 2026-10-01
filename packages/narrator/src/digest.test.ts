@@ -76,6 +76,7 @@ describe("buildDigest", () => {
           stage: "Ysolde hinted she has a buyer",
           nextBeat: "When we next dock at Meridian, she names a price",
           lastBeatTick: 1200,
+          beatCardShown: false,
         },
       ],
       lastRejections: ["offerJob: no route"],
@@ -86,6 +87,62 @@ describe("buildDigest", () => {
       "- [season] A buyer at Meridian (Ysolde Maren, Jax): Ysolde hinted she has a buyer. Next: When we next dock at Meridian, she names a price. Last beat t1200",
     );
     expect(text).toContain("rejected last time: offerJob: no route");
+  });
+
+  it("shows each crew member's voice after their bio (D38)", () => {
+    const req = quietTooLongRequest(content());
+    const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
+    const crewLines = text
+      .split("## Crew")[1]
+      ?.split("\n\n")[0]
+      ?.split("\n")
+      .filter((line) => line.startsWith("- ") && !line.startsWith("- passengers"));
+    expect(crewLines?.length).toBe(8);
+    for (const line of crewLines ?? []) expect(line).toMatch(/\. .+ voice: .+/);
+    const dane = content().crew["crew.dane_whitcross" as keyof ReturnType<typeof content>["crew"]];
+    expect(text).toContain(`${dane?.bio} voice: ${dane?.voice}`);
+  });
+
+  it("lists the captain first, as the player and never a speaker, with her voice (D41)", () => {
+    const req = quietTooLongRequest(content());
+    const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
+    const crewLines = text
+      .split("## Crew")[1]
+      ?.split("\n\n")[0]
+      ?.split("\n")
+      .filter((line) => line.startsWith("- ") && !line.startsWith("- passengers"));
+    const mara = content().crew["crew.mara_osei" as keyof ReturnType<typeof content>["crew"]];
+    const first = crewLines?.[0] ?? "";
+    expect(first).toMatch(
+      /^- Mara Osei \[captain\]: this is the captain, the player; never a speaker\. .+; needs: .+; good at: .+/,
+    );
+    expect(first).toContain(`voice: ${mara?.voice}`);
+    expect(first).not.toContain("captain, the player; never a speaker. voice:");
+    expect(text.match(/never a speaker/g)).toHaveLength(1);
+  });
+
+  it("marks threads that have had their beat card as foreshadowed (D39)", () => {
+    const req = quietTooLongRequest(content());
+    const thread = {
+      title: "The quiet pump",
+      scale: "episode" as const,
+      people: ["Priya Kessler"],
+      stage: "Priya heard something",
+      nextBeat: "Underway, the pump fails",
+      lastBeatTick: 400,
+      beatCardShown: true,
+    };
+    const notes = {
+      ...EMPTY_NOTES,
+      threads: [thread, { ...thread, title: "Plain", beatCardShown: false }],
+    };
+    const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
+    expect(text).toContain(
+      "- [episode] The quiet pump (Priya Kessler): Priya heard something. Next: Underway, the pump fails. Last beat t400 (foreshadowed)\n",
+    );
+    expect(text).toMatch(
+      /^- \[episode\] Plain \(Priya Kessler\): Priya heard something\. Next: Underway, the pump fails\. Last beat t400$/m,
+    );
   });
 
   it("lists what the captain has seen, newest first, right after the notes (D31)", () => {
