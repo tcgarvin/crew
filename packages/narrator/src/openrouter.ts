@@ -39,7 +39,12 @@ interface CompletionBody {
     readonly prompt_tokens_details?: { readonly cached_tokens?: number };
     readonly cache_creation_input_tokens?: number;
   };
-  readonly error?: { readonly message?: string; readonly code?: number | string };
+  readonly error?: {
+    readonly message?: string;
+    readonly code?: number | string;
+    /** OpenRouter wraps the upstream provider's own error text here. */
+    readonly metadata?: { readonly raw?: unknown; readonly provider_name?: string };
+  };
 }
 
 /** Anthropic allows at most four cache breakpoints per request. */
@@ -106,7 +111,13 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
     }
     if (!response.ok || parsed.error !== undefined) {
       const detail = parsed.error?.message ?? response.statusText;
-      throw new TransportError("apiError", `OpenRouter ${response.status}: ${detail}`);
+      const raw = parsed.error?.metadata?.raw;
+      const provider = parsed.error?.metadata?.provider_name;
+      const upstream =
+        raw === undefined
+          ? ""
+          : ` [${provider ?? "provider"}: ${typeof raw === "string" ? raw : JSON.stringify(raw)}]`;
+      throw new TransportError("apiError", `OpenRouter ${response.status}: ${detail}${upstream}`);
     }
 
     const choice = parsed.choices?.[0];
