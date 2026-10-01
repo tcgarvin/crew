@@ -102,17 +102,15 @@ function headline(state: WorldState, content = tinyTestWorld().world.content): s
 }
 
 describe("shipHeadline", () => {
-  it("says the ship is waiting for work when docked with nothing on", () => {
+  it("says the ship is looking for work when docked with nothing on", () => {
     const { world } = tinyTestWorld();
-    expect(headline(world.state)).toBe("Docked at Tiny Dock — waiting for work");
+    expect(headline(world.state)).toBe("Docked at Tiny Dock — looking for work");
   });
 
-  it("names the person offering freight while an offer is open", () => {
+  it("does not narrate an open offer in the headline", () => {
     const { world } = tinyTestWorld();
     world.state.jobs[JOB] = job("offered");
-    expect(headline(world.state)).toBe(
-      "Docked at Tiny Dock — Ines Oduya is offering freight for Far Dock",
-    );
+    expect(headline(world.state)).toBe("Docked at Tiny Dock — looking for work");
   });
 
   it("counts crates stowed aboard while loading", () => {
@@ -233,7 +231,7 @@ describe("renderItems", () => {
   it("is on the render frame alongside the headline", () => {
     const { world, kernel } = tinyTestWorld();
     const frame = kernel.getRenderFrame(world);
-    expect(frame.headline).toBe("Docked at Tiny Dock — waiting for work");
+    expect(frame.headline).toBe("Docked at Tiny Dock — looking for work");
     expect(frame.items.length).toBe(2);
   });
 });

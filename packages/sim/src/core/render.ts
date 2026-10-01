@@ -482,15 +482,9 @@ export function shipHeadline(
     if (travel.plannedDestinationId !== undefined) {
       return `Preparing to depart for ${portName(content, travel.plannedDestinationId)}`;
     }
-    const offer = Object.values(state.jobs).find(
-      (job) => job.status === "offered" && job.fromPortId === travel.portId,
-    );
-    if (offer !== undefined) {
-      // The person, not "name, org" (D25); older jobs only have the `issuer` label.
-      const who = offer.issuerPerson?.name ?? offer.issuer;
-      return `${here} — ${who} is offering freight for ${portName(content, offer.toPortId)}`;
-    }
-    return `${here} — waiting for work`;
+    // Offers are the card's story to tell, not the headline's (D34): the headline only says what
+    // the ship is doing.
+    return `${here} — looking for work`;
   }
 
   const to = portName(content, travel.toPortId);

@@ -183,3 +183,7 @@ changed. Old notes migrate each string into an episode thread. Prompt v0.4.
 **D33. Narrator log CLI.** `pnpm --filter @crew/server narrator-log` reads `narrator_calls`
 read-only from a locally supplied `DATABASE_URL` and can rebuild the digest a call saw, so card
 problems are debugged from the record rather than screenshots. The credential is never printed.
+
+**D34. The headline never narrates.** Owner: the docked headline said "<issuer> is offering freight
+for <port>", a story claim the narrator never made, hardcoded in the sim. Docked with no cargo work
+now reads "looking for work" whether or not an offer is open; offers are the card's to tell.
