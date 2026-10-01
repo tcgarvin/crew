@@ -51,7 +51,9 @@ describe("offer card templates", () => {
     expect(card.situation).toBe(
       "“This lot was picked this morning. It won't wait for the next quiet ship.” Fresh produce, Green Meridian to Crossroads Hub, needed urgently.",
     );
-    expect(card.situation.split(/\s+/).length).toBeLessThanOrEqual(60);
+    expect(card.situation.split(/\s+/).length).toBeLessThanOrEqual(70);
+    // D29: the issuer speaks on the offer card.
+    expect(card.speaker).toBe("Ysolde Maren");
     expect(card.leftAftermath).toBe(
       "Taken. The crew start loading — we leave once the hold is full.",
     );

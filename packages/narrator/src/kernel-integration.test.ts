@@ -40,6 +40,7 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
         {
           kind: "surfaceDecision",
           title: "A quiet moment",
+          speaker: null,
           situation: "Nothing much is happening, but someone should decide something.",
           left: { label: "Carry on", effect: "none", coursePort: null },
           right: { label: "Take a break", effect: "none", coursePort: null },

@@ -33,6 +33,11 @@ export interface DecisionCardText {
   readonly rightLabel: string;
   readonly leftAftermath?: string;
   readonly rightAftermath?: string;
+  /**
+   * D29 (additive, 2026-10-01): who is speaking on the card, full name as the digest lists them;
+   * absent for an observed scene.
+   */
+  readonly speaker?: string;
 }
 
 /** Template keys used by narrator-authored cards; prose is always present on these. */
@@ -48,8 +53,8 @@ export const NARRATOR_TEXT_KEYS = {
 /** The pitch key the kernel gives a job whose draft carried no pitch (`systems/commerce`). */
 const DEFAULT_PITCH_KEY = "job.pitch.default";
 
-/** GDD §22 card budget, as in `@crew/narrator`'s `CARD_SITUATION_MAX_WORDS`. */
-const SITUATION_MAX_WORDS = 60;
+/** GDD §22 card budget, as in `@crew/narrator`'s `CARD_SITUATION_MAX_WORDS` (D29: 70). */
+const SITUATION_MAX_WORDS = 70;
 
 type Params = Readonly<Record<string, string | number>>;
 
@@ -135,6 +140,12 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.title === undefined ? undefined : String(p.title)),
 };
 
+/** D29: who is speaking, per prompt key; the offer card's issuer, or the narrator's param. */
+const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
+  "job.offer": (p) => (p.name === undefined ? undefined : String(p.name)),
+  [NARRATOR_TEXT_KEYS.situation]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+};
+
 const GENERIC_TITLE = "The captain's call";
 
 function humanize(key: string): string {
@@ -161,9 +172,11 @@ export function templateCard(
 ): DecisionCardText {
   const leftAftermath = decision.left.aftermath;
   const rightAftermath = decision.right.aftermath;
+  const speaker = SPEAKERS[decision.prompt.key]?.(decision.prompt.params);
   return {
     decisionId: decision.id,
     title: TITLES[decision.prompt.key]?.(decision.prompt.params) ?? GENERIC_TITLE,
+    ...(speaker === undefined || speaker.trim() === "" ? {} : { speaker }),
     situation: renderTextRef(decision.prompt, content),
     leftLabel: renderTextRef(decision.left.label, content),
     rightLabel: renderTextRef(decision.right.label, content),

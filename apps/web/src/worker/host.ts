@@ -1,5 +1,5 @@
 /**
- * Worker host: owns the kernel and the run-ahead loop (D14, PLAN §6 W7).
+ * Worker host: owns the kernel and the run-ahead loop (D14, D30, PLAN §6 W7).
  *
  * Depends only on the `Kernel` interface — never on a concrete kernel implementation, so
  * `sim.worker.ts` is the only file that wires one in. Runnable outside a worker (e.g. in a Vitest
@@ -47,6 +47,20 @@ export interface HostDeps {
   readonly loopIntervalMs?: number;
   /** Sim-seconds of run-ahead allowed beyond the viewer (D14). Default 60. */
   readonly runAheadCapSeconds?: number;
+  /**
+   * Ticks simulated per loop iteration while run-ahead budget remains (D30). The loop runs at
+   * least this many ticks (more if wall-clock × `speed` wants more) until the cap is reached, so
+   * the lead actually builds instead of tracking real time. Default 40: measured ~0.3 ms/tick on
+   * the default scenario (plus ~0.03 ms per frame), so 40 ticks keeps one iteration under ~15 ms
+   * of worker time — 2 sim-seconds per 50 ms loop, filling the 60 s lead in about 1.5 s.
+   */
+  readonly burstTicksPerLoop?: number;
+  /**
+   * A frame is emitted after every this-many ticks of a burst (D30), so playback interpolation
+   * has enough points to follow walking paths rather than cutting corners across a whole burst.
+   * Default 2 (a frame every 100 sim-ms at tickRate 20).
+   */
+  readonly frameEveryTicks?: number;
   /** How often to snapshot into the view-time ring, in sim-seconds. Default 2. */
   readonly snapshotIntervalSeconds?: number;
   readonly clock?: HostClock;
@@ -66,6 +80,8 @@ export function createHost(deps: HostDeps): Host {
   const clock = deps.clock ?? defaultClock;
   const loopIntervalMs = deps.loopIntervalMs ?? 50;
   const runAheadCapSeconds = deps.runAheadCapSeconds ?? 60;
+  const burstTicksPerLoop = Math.max(1, deps.burstTicksPerLoop ?? 40);
+  const frameEveryTicks = Math.max(1, deps.frameEveryTicks ?? 2);
   const snapshotIntervalSeconds = deps.snapshotIntervalSeconds ?? 2;
 
   let world: World | undefined;
@@ -183,39 +199,59 @@ export function createHost(deps: HostDeps): Host {
     }
 
     const ticksWanted = Math.floor(accumulatorMs / msPerTick);
-    if (ticksWanted <= 0) {
-      return;
-    }
     const budget = runAheadBudgetTicks();
-    const ticksToRun = Math.min(ticksWanted, budget);
-    if (ticksToRun <= 0) {
+    if (budget <= 0) {
       // Capped by run-ahead: hold the accumulated time so we resume smoothly once the viewer
       // catches up, but don't let it grow without bound.
       accumulatorMs = Math.min(accumulatorMs, msPerTick * 4);
       emitRunAheadStatus();
       return;
     }
-    accumulatorMs -= ticksToRun * msPerTick;
+    // D30: burst ahead while budget remains; the burst only matters below the cap, where the
+    // accumulator alone would merely track wall-clock and never build a lead.
+    const ticksToRun = Math.min(budget, Math.max(ticksWanted, burstTicksPerLoop));
+    if (ticksToRun <= 0) {
+      return;
+    }
+    // Wall-clock time the burst "pre-spent": never let the accumulator go negative, or the next
+    // iterations would owe time back and stall at the cap.
+    accumulatorMs = Math.max(0, accumulatorMs - ticksToRun * msPerTick);
 
-    const result = deps.kernel.advance(world, ticksToRun);
-    if (result.events.length > 0) {
-      deps.postMessage({ type: "events", events: result.events });
-    }
-    if (result.ticksAdvanced > 0) {
-      pushSnapshotIfDue();
-      emitFrame();
-    }
-    if (result.halt.kind !== "completed") {
-      handleHalt(result.halt.kind);
-    }
+    advanceInChunks(ticksToRun);
     emitRunAheadStatus();
+  }
+
+  /**
+   * Advance `ticks` in sub-chunks of `frameEveryTicks`, emitting a frame after each so playback
+   * has evenly spaced interpolation points. Stops early at a halt; `kernel.advance` itself
+   * returns at the tick that raises a hook or leaves a decision pending, so a chunk never runs
+   * past one.
+   */
+  function advanceInChunks(ticks: number): void {
+    if (!world) return;
+    let remaining = ticks;
+    while (remaining > 0) {
+      const chunk = Math.min(frameEveryTicks, remaining);
+      const result = deps.kernel.advance(world, chunk);
+      remaining -= chunk;
+      if (result.events.length > 0) {
+        deps.postMessage({ type: "events", events: result.events });
+      }
+      if (result.ticksAdvanced > 0) {
+        pushSnapshotIfDue();
+        emitFrame();
+      }
+      if (result.halt.kind !== "completed") {
+        handleHalt(result.halt.kind);
+        return;
+      }
+    }
   }
 
   function handleMessage(message: ToWorker): void {
     switch (message.type) {
       case "load": {
         haltedFor = undefined;
-        lastViewTick = undefined;
         accumulatorMs = 0;
         lastLoopAt = clock.now();
         ring.length = 0;
@@ -253,6 +289,9 @@ export function createHost(deps: HostDeps): Host {
           }
         }
         tickRate = world.config.values.time.tickRate;
+        // The viewer starts at the loaded tick, so a restored game has its full run-ahead budget
+        // immediately rather than waiting for the first `viewProgress` report.
+        lastViewTick = world.state.tick;
         lastSnapshotTick = world.state.tick;
         pushSnapshotIfDue();
         emitFrame();

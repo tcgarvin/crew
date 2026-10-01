@@ -75,8 +75,20 @@ export class FramePlayback {
   constructor(private readonly tickRate = 20) {}
 
   push(frame: RenderFrame): void {
-    this.buffer.push(frame);
-    this.buffer.sort((a, b) => a.tick - b.tick);
+    // Frames arrive in tick order from the worker, so the common case is a plain append; with
+    // hundreds of frames buffered (D30 bursts) a sort per push would be O(n log n) per frame.
+    const last = this.buffer[this.buffer.length - 1];
+    if (last === undefined || last.tick <= frame.tick) {
+      this.buffer.push(frame);
+      return;
+    }
+    let index = this.buffer.length - 1;
+    while (index > 0) {
+      const candidate = this.buffer[index - 1];
+      if (candidate === undefined || candidate.tick <= frame.tick) break;
+      index -= 1;
+    }
+    this.buffer.splice(index, 0, frame);
   }
 
   setSpeed(speed: number): void {

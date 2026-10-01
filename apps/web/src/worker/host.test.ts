@@ -141,7 +141,50 @@ function makeFakeClock(): { clock: HostClock; advance: (ms: number) => void; now
 const CONFIG: EffectiveConfig = { values: { time: { tickRate: 20 } } as never, hash: "test" };
 
 describe("createHost run-ahead accumulator", () => {
-  it("advances roughly tickRate * speed ticks per second and reports run-ahead status", () => {
+  it("bursts ahead to the cap, then holds at the cap until viewProgress frees budget", () => {
+    const { kernel } = makeFakeKernel(Number.POSITIVE_INFINITY);
+    const messages: FromWorker[] = [];
+    const { clock, advance } = makeFakeClock();
+    const host = createHost({
+      kernel,
+      content: {} as ContentBundle,
+      config: CONFIG,
+      postMessage: (m) => messages.push(m),
+      clock,
+      loopIntervalMs: 50,
+      runAheadCapSeconds: 60, // 1200 ticks
+      burstTicksPerLoop: 40,
+    });
+
+    host.handleMessage({
+      type: "load",
+      source: { kind: "scenario", scenarioId: "s" as ScenarioDefId, seed: 1 },
+    });
+    messages.length = 0;
+
+    const lastFrameTick = () =>
+      messages.filter((m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame").at(-1)
+        ?.frame.tick;
+
+    // One 50 ms loop at speed 1 wants 1 tick; the burst runs 40 (D30), far ahead of real time.
+    advance(50);
+    expect(lastFrameTick()).toBe(40);
+
+    // 30 iterations × 40 ticks = 1200 = the cap; it must not pass it however long we wait.
+    for (let i = 0; i < 100; i++) advance(50);
+    expect(lastFrameTick()).toBe(1200);
+    const statuses = messages.filter(
+      (m): m is Extract<FromWorker, { type: "runAheadStatus" }> => m.type === "runAheadStatus",
+    );
+    expect(statuses.at(-1)?.buffered).toBe(1200);
+
+    // The viewer catches up by 100 ticks: exactly that much budget is refilled, in one burst.
+    host.handleMessage({ type: "viewProgress", viewTick: 100 });
+    for (let i = 0; i < 10; i++) advance(50);
+    expect(lastFrameTick()).toBe(1300);
+  });
+
+  it("emits a frame every frameEveryTicks ticks during a burst", () => {
     const { kernel } = makeFakeKernel(Number.POSITIVE_INFINITY);
     const messages: FromWorker[] = [];
     const { clock, advance } = makeFakeClock();
@@ -153,6 +196,8 @@ describe("createHost run-ahead accumulator", () => {
       clock,
       loopIntervalMs: 50,
       runAheadCapSeconds: 60,
+      burstTicksPerLoop: 10,
+      frameEveryTicks: 2,
     });
 
     host.handleMessage({
@@ -161,15 +206,11 @@ describe("createHost run-ahead accumulator", () => {
     });
     messages.length = 0;
 
-    // 1 real second at speed 1, tickRate 20 => ~20 ticks.
-    for (let i = 0; i < 20; i++) advance(50);
-
-    const frames = messages.filter(
-      (m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame",
-    );
-    const lastFrame = frames.at(-1);
-    expect(lastFrame?.frame.tick).toBeGreaterThanOrEqual(18);
-    expect(lastFrame?.frame.tick).toBeLessThanOrEqual(21);
+    advance(50);
+    const frameTicks = messages
+      .filter((m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame")
+      .map((m) => m.frame.tick);
+    expect(frameTicks).toEqual([2, 4, 6, 8, 10]);
   });
 
   it("caps run-ahead at the configured number of sim-seconds ahead of the last reported view tick", () => {
@@ -299,5 +340,51 @@ describe("createHost hook halt", () => {
 
     for (let i = 0; i < 10; i++) advance(50);
     expect(maxFrameTick()).toBeGreaterThan(5);
+  });
+
+  it("bursts again to rebuild the lead once a hook is answered", () => {
+    const { kernel } = makeFakeKernel(5);
+    const messages: FromWorker[] = [];
+    const { clock, advance } = makeFakeClock();
+    const host = createHost({
+      kernel,
+      content: {} as ContentBundle,
+      config: CONFIG,
+      postMessage: (m) => messages.push(m),
+      clock,
+      loopIntervalMs: 50,
+      runAheadCapSeconds: 60,
+      burstTicksPerLoop: 40,
+    });
+
+    host.handleMessage({
+      type: "load",
+      source: { kind: "scenario", scenarioId: "s" as ScenarioDefId, seed: 1 },
+    });
+    advance(50); // the burst runs into the hook at tick 5 and stops there
+    const hook = messages.find(
+      (m): m is Extract<FromWorker, { type: "hookRaised" }> => m.type === "hookRaised",
+    );
+    expect(hook?.tick).toBe(5);
+    messages.length = 0;
+
+    host.handleMessage({
+      type: "command",
+      requestId: "r1",
+      command: {
+        id: "cmd:system:ack:1",
+        source: "system",
+        kind: "acknowledgeHook",
+        payload: { hookId: hook?.hook.id },
+        targetTick: 6,
+      } as Command,
+    });
+
+    // One loop iteration after the acknowledgement: a full burst, not a single wall-clock tick.
+    advance(50);
+    const frameTicks = messages
+      .filter((m): m is Extract<FromWorker, { type: "frame" }> => m.type === "frame")
+      .map((m) => m.frame.tick);
+    expect(frameTicks.at(-1)).toBe(45);
   });
 });

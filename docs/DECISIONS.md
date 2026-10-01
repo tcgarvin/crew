@@ -143,3 +143,18 @@ secondary. Owner: "not clear what's happening at the top level."
 
 **D28. Cargo and rooms are visible.** Items render on deck and on the carrier; compartments get
 distinct fills and drawn walls. Re-offer cooldown after a decline drops from 60 s to 20 s.
+
+## 2026-10-01
+
+**D29. Cards are spoken, not narrated.** Owner, after reviewing a "Jax and Priya's Argument"
+card: cards are now brought to the captain by a named person in their own words (grievances from
+the crew member concerned, operational matters from the first officer, offers from the issuer),
+Reigns-style, with a `speaker` field so a face can be shown later. Situation cap raised from 60
+to 70 words with a 35 to 55 target; side labels are what the captain says or does. Prompt v0.3.
+
+**D30. The worker actually runs ahead.** The D14 loop advanced at wall-clock rate, so the lead
+was always ~0 and every hook stalled the viewer for the full narrator round trip. The worker now
+bursts `burstTicksPerLoop` ticks per loop iteration (measured: ~0.3 ms/tick on the default
+scenario → default 40) until the 60 s cap, emitting a frame every `frameEveryTicks` ticks (default
+2) so playback interpolation stays smooth, and rebuilds the lead after every hook. Owner: "waiting
+for the narrator ... feels like we're waiting the entire cycle."

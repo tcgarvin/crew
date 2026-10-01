@@ -80,6 +80,7 @@ describe("NarratorPlan structured-output schema", () => {
         {
           kind: "surfaceDecision",
           title: "A stranger at the ramp",
+          speaker: null,
           situation: "A stranger asks for passage.",
           left: { label: "Take her aboard", effect: "setCourse", coursePort: "port.b" },
           right: { label: "Refuse", effect: "none", coursePort: null },
@@ -98,5 +99,29 @@ describe("NarratorPlan structured-output schema", () => {
     expect(schema.safeParse({ ...plan, intents: [{ kind: "setMoney", amount: 5 }] }).success).toBe(
       false,
     );
+  });
+
+  it("accepts a null or named speaker on the card and on surfaceDecision (D29)", () => {
+    const card = {
+      title: "Mara flags a problem",
+      speaker: null,
+      situation: "Mara catches you in the corridor.",
+      leftLabel: "I'll take it.",
+      rightLabel: "You handle it.",
+      leftAftermath: "You go looking for Jax.",
+      rightAftermath: "Mara nods and heads aft.",
+    };
+    const plan = {
+      rationale: "r",
+      intents: [],
+      card,
+      notes: { summary: "", openThreads: [], cast: [] },
+    };
+    expect(schema.safeParse(plan).success).toBe(true);
+    expect(schema.safeParse({ ...plan, card: { ...card, speaker: "Mara Osei" } }).success).toBe(
+      true,
+    );
+    const { speaker: _omitted, ...withoutSpeaker } = card;
+    expect(schema.safeParse({ ...plan, card: withoutSpeaker }).success).toBe(false);
   });
 });

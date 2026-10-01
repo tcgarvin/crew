@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
 import { NULL_NARRATOR_MODEL } from "./null";
+import { STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
 import { runNarrator } from "./run";
 import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
@@ -183,6 +184,7 @@ describe("runNarrator", () => {
     expect(res.card).toEqual({
       decisionId: "d1",
       title: "Noor Sadler, Hub Co-op",
+      speaker: "Noor Sadler",
       situation:
         "“I've had this manifest on my screen all shift. Take it off my hands?” General freight, Crossroads Hub to Kessler Drift, wanted soon.",
       leftLabel: "Take the job",
@@ -196,6 +198,7 @@ describe("runNarrator", () => {
   it("uses the model's card prose for a policy decision when it passes checks", async () => {
     const card = {
       title: "Hub Co-op wants a runner",
+      speaker: "Noor Sadler",
       situation: "A co-op clerk leans in the hatch with a manifest and a tired smile.",
       leftLabel: "Sign it",
       rightLabel: "Not today",
@@ -205,6 +208,15 @@ describe("runNarrator", () => {
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
     const res = await runNarrator(policyRequest(), ctx(transport));
     expect(res.card).toEqual({ decisionId: "d1", ...card });
+  });
+});
+
+describe("prompt text (D29)", () => {
+  it("tells the model cards are spoken by a named person and capped at 70 words", () => {
+    expect(STATIC_RULES).toContain("never more than 70");
+    expect(STATIC_RULES).toContain("firstOfficer");
+    expect(STATIC_RULES).not.toContain("60 words");
+    expect(PROMPT_VERSION).toBe("v0.3");
   });
 });
 

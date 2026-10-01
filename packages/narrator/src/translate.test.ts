@@ -52,6 +52,7 @@ const job = {
 const decision = {
   kind: "surfaceDecision",
   title: "A request at the ramp",
+  speaker: "Oren Vale",
   situation: "A dock foreman asks whether we could run a sealed crate to the Hub on our way.",
   left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
   right: { label: "Not our business", effect: "none", coursePort: null },
@@ -203,7 +204,7 @@ describe("translateIntents: valid intents", () => {
     if (command?.kind !== "surfaceDecision") return;
     const card = command.payload.card;
     expect(card.prompt.prose).toBe(decision.situation);
-    expect(card.prompt.params).toEqual({ title: decision.title });
+    expect(card.prompt.params).toEqual({ title: decision.title, speaker: "Oren Vale" });
     expect(card.left.commands).toEqual([
       { kind: "setCourse", payload: { destinationPortId: "port.crossroads_hub" } },
     ]);
@@ -324,6 +325,24 @@ describe("translateIntents: drops with reasons", () => {
     expect(command.payload.card.right).not.toHaveProperty("aftermath");
   });
 
+  it("keeps a valid speaker and omits a null or blank one (D29)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const speakerOf = (intent: unknown) => {
+      const result = translateIntents(plan([intent]), ctxOf(req));
+      expect(result.dropped).toEqual([]);
+      const [command] = result.commands;
+      if (command?.kind !== "surfaceDecision") throw new Error("expected a card");
+      return command.payload.card.prompt.params;
+    };
+    expect(speakerOf(decision)).toEqual({ title: decision.title, speaker: "Oren Vale" });
+    expect(speakerOf({ ...decision, speaker: null })).toEqual({ title: decision.title });
+    expect(speakerOf({ ...decision, speaker: "   " })).toEqual({ title: decision.title });
+    const numeric = translateIntents(plan([{ ...decision, speaker: "Unit 7%" }]), ctxOf(req));
+    expect(numeric.dropped[0]?.reason).toBe(
+      "surfaceDecision: speaker: player-facing text states a numeric consequence",
+    );
+  });
+
   it("drops setCourse sides while not docked", () => {
     const req = approachingPortRequest(content());
     const result = translateIntents(plan([decision]), ctxOf(req));
@@ -369,6 +388,7 @@ describe("translateIntents: malicious plans (N6)", () => {
     {
       kind: "surfaceDecision",
       title: "x",
+      speaker: null,
       situation: "y",
       left: { label: "a", effect: "setMoney", coursePort: null },
       right: { label: "b", effect: "none", coursePort: null },

@@ -299,6 +299,17 @@ function aftermathText(env: Env, text: string, which: string): Outcome<string> {
   return problem === undefined ? ok(clipped) : no(`${which}: ${problem}`);
 }
 
+/**
+ * D29: the speaker's name, clipped; null or blank means an observed scene (no speaker). Numbers
+ * or secrets in the name are a problem like in any other player-facing text.
+ */
+function speakerName(env: Env, raw: string | null): Outcome<string | undefined> {
+  if (raw === null || raw.trim() === "") return ok(undefined);
+  const name = clipChars(raw, ISSUER_MAX_CHARS);
+  const problem = textProblem(name, env.secrets);
+  return problem === undefined ? ok(name) : no(`speaker: ${problem}`);
+}
+
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
   if (env.hook?.kind === "policyDecision") {
     return no("surfaceDecision: a policy decision is pending; dress it with `card` instead");
@@ -308,6 +319,8 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   const situation = clipWords(intent.situation, CARD_SITUATION_MAX_WORDS);
   const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
   if (problem !== undefined) return no(`surfaceDecision: ${problem}`);
+  const speaker = speakerName(env, intent.speaker);
+  if (!speaker.ok) return no(`surfaceDecision: ${speaker.reason}`);
   const left = translateSide(env, intent.left, "left");
   if (!left.ok) return no(`surfaceDecision: ${left.reason}`);
   const right = translateSide(env, intent.right, "right");
@@ -331,8 +344,13 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
     kind: "surfaceDecision",
     payload: {
       card: {
-        // W9 decision: `DecisionCardSpec` has no title field; it travels in the prompt params.
-        prompt: { key: NARRATOR_TEXT_KEYS.situation, params: { title }, prose: situation },
+        // W9 decision: `DecisionCardSpec` has no title field; it and the D29 speaker travel in
+        // the prompt params, where `templateCard` picks them up.
+        prompt: {
+          key: NARRATOR_TEXT_KEYS.situation,
+          params: { title, ...(speaker.value === undefined ? {} : { speaker: speaker.value }) },
+          prose: situation,
+        },
         left: sideSpec(left.value, leftAftermath.value),
         right: sideSpec(right.value, rightAftermath.value),
       },
@@ -379,9 +397,15 @@ function policyCard(
   if (plan.card === null) return fallback;
   const leftAftermath = plan.card.leftAftermath.trim();
   const rightAftermath = plan.card.rightAftermath.trim();
+  const speaker = speakerName(env, plan.card.speaker);
+  if (!speaker.ok) {
+    dropped.push({ intentIndex: -1, kind: "card", reason: `card: ${speaker.reason}` });
+    return fallback;
+  }
   const card: DecisionCardProse = {
     decisionId: decision.id,
     title: clipChars(plan.card.title, TITLE_MAX_CHARS),
+    ...(speaker.value === undefined ? {} : { speaker: speaker.value }),
     situation: clipWords(plan.card.situation, CARD_SITUATION_MAX_WORDS),
     leftLabel: clipChars(plan.card.leftLabel, LABEL_MAX_CHARS),
     rightLabel: clipChars(plan.card.rightLabel, LABEL_MAX_CHARS),

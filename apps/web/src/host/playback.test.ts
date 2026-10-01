@@ -116,6 +116,19 @@ describe("FramePlayback", () => {
     expect(firstActor(fastStep.frame).x).toBeGreaterThan(firstActor(slowStep.frame).x);
   });
 
+  it("appends in-order frames and inserts an out-of-order frame at its tick position", () => {
+    const playback = new FramePlayback(20);
+    playback.push(frame(0, 0, 0));
+    playback.push(frame(4, 4, 0));
+    playback.push(frame(6, 6, 0));
+    playback.push(frame(2, 2, 0)); // late arrival: must slot between ticks 0 and 4
+    expect(playback.bufferedFrameCount).toBe(4);
+    // Walk the queue: 100ms per 2-tick interval at 20 Hz.
+    expect(playback.advance(100)?.frame.tick).toBe(2);
+    expect(playback.advance(100)?.frame.tick).toBe(4);
+    expect(playback.advance(100)?.frame.tick).toBe(6);
+  });
+
   it("drops a fully consumed interval and holds at the last frame once caught up", () => {
     const playback = new FramePlayback(20);
     playback.push(frame(0, 0, 0));

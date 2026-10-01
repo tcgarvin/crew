@@ -22,6 +22,10 @@ export function DecisionModal({ card, onChoose, onInspect, aftermath }: Decision
     <div className="decision-modal" role="dialog" aria-modal="true">
       <div className="decision-card">
         <h1 className="decision-title">{card.title}</h1>
+        {card.speaker === undefined ? null : (
+          // D29: who is speaking; the hook for a face later.
+          <p className="decision-speaker">{card.speaker}</p>
+        )}
         <p className="decision-prose">{card.situation}</p>
         <div className="decision-options">
           <button

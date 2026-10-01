@@ -62,10 +62,15 @@ export interface DecisionCardProse {
    */
   readonly leftAftermath?: string;
   readonly rightAftermath?: string;
+  /**
+   * D29 (additive, 2026-10-01): who is speaking on the card, full name as the digest lists them;
+   * absent for an observed scene.
+   */
+  readonly speaker?: string;
 }
 
-/** GDD §22 card budget. */
-export const CARD_SITUATION_MAX_WORDS = 60;
+/** GDD §22 card budget; D29 raised it from 60 to 70 (target 35 to 55). */
+export const CARD_SITUATION_MAX_WORDS = 70;
 /** D25: an issuer's pitch is one line of dialogue. */
 export const PITCH_MAX_WORDS = 30;
 /** D26: an aftermath caption is one plain statement. */
@@ -159,7 +164,7 @@ export const QUANTITIES = ["one", "few", "several"] as const;
 export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
   const port = z.enum(vocab.ports);
   const decisionSide = z.strictObject({
-    label: z.string().describe("Two to five words, captain's voice."),
+    label: z.string().describe("What the captain says or does in reply, two to six words."),
     /** Side effect when chosen; `setCourse` needs `coursePort`. */
     effect: z.enum(["none", "setCourse"]),
     coursePort: port.nullable(),
@@ -211,12 +216,24 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
       "What happens next if the captain picks this side, as one plain statement. At most 20 words. No numbers.",
     );
 
+  // D29: a named person brings the card and speaks; null only for an observed scene.
+  const speaker = z
+    .string()
+    .nullable()
+    .describe(
+      "Full name of the person speaking on the card, as the digest lists them, or null for an observed scene.",
+    );
+  const situation = z
+    .string()
+    .describe(
+      "A stage line, then what the speaker says in quotes, in their own voice. Aim for 35 to 55 words, never more than 70. No numbers.",
+    );
+
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
     title: z.string().describe("Card heading, two to six words."),
-    situation: z
-      .string()
-      .describe("The situation from the captain's point of view. At most 60 words. No numbers."),
+    speaker,
+    situation,
     left: decisionSide,
     right: decisionSide,
     leftAftermath: aftermath,
@@ -231,7 +248,8 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
     card: z
       .strictObject({
         title: z.string(),
-        situation: z.string(),
+        speaker,
+        situation,
         leftLabel: z.string(),
         rightLabel: z.string(),
         leftAftermath: aftermath,
