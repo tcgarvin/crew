@@ -253,3 +253,13 @@ the game on an error panel with the reason and a Retry button. Only the spacing 
 acknowledges a hook without an answer: that is a rate rule, not a failure. The null narrator
 remains for tests and explicit offline use (`CREW_NARRATOR_FALLBACK=null`, the default outside
 production). Owner: "retry/delay or in the worst case pause the game with an error message."
+
+**D44. Live narrator tests.** `pnpm test:live` makes one real OpenRouter call per hook kind
+through the production transport, prompt and schema, and fails on any fallback, printing the
+provider's error text; the unit suite cannot see a provider rejecting the request, and production
+had been failing every call with "OpenRouter 400: Provider returned error" while `pnpm test` was
+green. The file lives under `packages/narrator/src/live/`, is excluded from `pnpm test`, runs
+through the root `vitest.live.config.ts`, reads the key from `OPENROUTER_API_KEY` or
+`packages/narrator/.env.local`, and is skipped without one. Run it before deploying prompt,
+schema or transport changes. Owner: "a suite of LLM tests to use not all the time, but for these
+kinds of situations."

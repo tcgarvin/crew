@@ -92,6 +92,49 @@ with the notes taken from the previous ok call's `notesUpdate` (the request row 
 them); it uses today's digest code, so it can differ from what an older prompt version produced.
 Ids may be given as any unambiguous prefix. Fields missing from older prompt versions print as `-`.
 
+## Live narrator tests
+
+`pnpm test` never makes a model call (every transport is a fake), so it cannot see the upstream
+provider rejecting the real request: a prompt, schema or transport change can leave the unit
+suite green and production answering every hook with `apiError` (as happened on 2026-10-01:
+"OpenRouter 400: Provider returned error"). `pnpm test:live` (D44) is the check for that:
+
+```
+pnpm test:live
+```
+
+It runs `packages/narrator/src/live/narrator.live.test.ts` through the root
+`vitest.live.config.ts`: one real OpenRouter call per hook kind (`approachingPort`, `jobBoard`,
+`quietTooLong`, `notableEvent`, `policyDecision`) with the production `openRouterTransport`,
+prompt and JSON schema, plus one repeated call that checks prompt caching reports cache-read
+tokens. Each test fails on any fallback and prints the narrator's error, which includes the
+provider's own text in brackets, so the reason is visible without reading the call log. Tests
+run one at a time with a 60 s timeout each.
+
+Run it by hand before deploying anything that touches the narrator prompt (`src/prompts/`), the
+plan schema (`plan.ts`, `contract.ts`), the transport (`openrouter.ts`, `run.ts`) or the model
+slug. It is not part of `pnpm test` (the narrator package's `vitest.config.ts` excludes
+`src/live/`), and it does not run in CI.
+
+The key comes from `OPENROUTER_API_KEY` in the environment, or from
+`packages/narrator/.env.local` (gitignored by the root `.env*` rule) when the variable is unset
+and that file exists:
+
+```
+# packages/narrator/.env.local
+OPENROUTER_API_KEY=sk-or-...
+```
+
+Without a key the whole file is skipped (reported as 6 skipped tests), never failed, so a
+checkout without credentials still runs it cleanly. `CREW_NARRATOR_MODEL` overrides the model;
+the default is the narrator package's `DEFAULT_NARRATOR_MODEL`, which may differ from the
+server's `DEFAULT_SERVER_NARRATOR_MODEL`, so set it to the production slug to test what
+production sends. The key is never printed.
+
+Cost: seven calls of a few thousand input tokens and a few hundred output tokens each, on the
+order of tens of cents per run with Claude Opus 4.6 and less with Sonnet; the second half of the
+repeated call reads its system prefix from cache.
+
 ## The Vercel function
 
 Integration 2. The build command in `vercel.json` ends with `node scripts/vercel-output.mjs`,

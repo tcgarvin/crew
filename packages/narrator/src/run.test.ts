@@ -11,7 +11,12 @@ import {
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
-import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
+import {
+  approachingPortRequest,
+  departureGateRequest,
+  jobBoardRequest,
+  quietTooLongRequest,
+} from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { STATIC_RULES } from "./prompts/index";
@@ -132,62 +137,6 @@ function policyRequest(): NarratorRequest {
   };
   snapshot.state.narrator.pendingHook = hook;
   return { ...req, hook, snapshot };
-}
-
-/**
- * D37: a departure-gate card (D36) as the kernel queues it, with the fixture's engineer named as
- * the speaker in the template params, under a `policyDecision` hook naming the machine.
- */
-function departureGateRequest(): NarratorRequest {
-  const req = approachingPortRequest(content());
-  const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
-  const decisionId = "d9" as DecisionId;
-  const actors = Object.values(snapshot.state.actors);
-  const captain = actors[0];
-  const engineer = actors.find((a) => a.roleTags.includes("engineer"));
-  if (captain === undefined || engineer === undefined) throw new Error("fixture lacks crew");
-  const engine = Object.values(snapshot.state.machines).find((m) =>
-    content().machines[m.defId]?.tags.includes("engine"),
-  );
-  if (engine === undefined) throw new Error("fixture lacks an engine");
-  snapshot.state.decisions.records[decisionId] = {
-    id: decisionId,
-    origin: "policy",
-    perspectiveActorId: captain.id,
-    prompt: {
-      key: "travel.departureGate",
-      params: {
-        machineId: engine.id,
-        machine: content().machines[engine.defId]?.name ?? "Main Engine",
-        reason: "fault",
-        speaker: engineer.name,
-      },
-    },
-    left: {
-      label: { key: "travel.departureGate.hold", params: {} },
-      commands: [],
-      aftermath: { key: "travel.departureGate.hold.aftermath", params: {} },
-    },
-    right: {
-      label: { key: "travel.departureGate.leave", params: {} },
-      commands: [],
-      aftermath: { key: "travel.departureGate.leave.aftermath", params: {} },
-    },
-    status: "pending",
-    createdTick: req.hook.tick,
-    narratorHookId: req.hook.id,
-  };
-  snapshot.state.decisions.queue.push(decisionId);
-  const hook = {
-    id: req.hook.id,
-    kind: "policyDecision" as const,
-    context: { decisionId, machineId: engine.id },
-    tick: req.hook.tick,
-  };
-  snapshot.state.narrator.pendingHook = hook;
-  // The kernel announces the decision in the tick that raises the hook (D37).
-  const recentEvents = [...req.recentEvents, event(req.hook.tick, "decisionPending", decisionId)];
-  return { ...req, hook, snapshot, recentEvents };
 }
 
 describe("runNarrator", () => {
@@ -328,7 +277,7 @@ describe("policy decisions are narrated (D37)", () => {
       rightAftermath: "Priya seals the hatch and we go as we are.",
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
-    const req = departureGateRequest();
+    const req = departureGateRequest(content());
     const res = await runNarrator(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
     expect(res.card).toEqual({ decisionId: "d9", ...card });
@@ -352,7 +301,7 @@ describe("policy decisions are narrated (D37)", () => {
   });
 
   it("keeps the engineer as the template speaker when the narrator is unavailable", async () => {
-    const res = await runNarrator(departureGateRequest(), ctx());
+    const res = await runNarrator(departureGateRequest(content()), ctx());
     expect(res.fallback).toBe("notConfigured");
     expect(res.card).toMatchObject({ decisionId: "d9", speaker: "Priya Kessler" });
     expect(res.card?.leftLabel).toBe("Hold for repairs");
@@ -639,22 +588,6 @@ describe("prompt text (D29, D31, D32)", () => {
 });
 
 describe("the null path hands out work (D40)", () => {
-  function jobBoardRequest(): NarratorRequest {
-    const req = approachingPortRequest(content());
-    const tick = 2_400;
-    const snapshot: SaveEnvelope = { ...structuredClone(req.snapshot), savedAtTick: tick };
-    snapshot.state.tick = tick;
-    snapshot.state.travel = { stage: "docked", portId: "port.kessler_drift" as PortDefId };
-    const hook = {
-      id: "k2" as never,
-      kind: "jobBoard" as const,
-      context: { portId: "port.kessler_drift" as PortDefId },
-      tick,
-    };
-    snapshot.state.narrator.pendingHook = hook;
-    return { gameId: "fixture-board", hook, snapshot, recentEvents: [] };
-  }
-
   it("offers a job on approachingPort with no model configured", async () => {
     const res = await runNarrator(approachingPortRequest(content()), ctx());
     expect(res.fallback).toBe("notConfigured");
@@ -663,7 +596,7 @@ describe("the null path hands out work (D40)", () => {
 
   it("still offers a job at the board after a provider error", async () => {
     const transport = fakeTransport(new TransportError("apiError", "HTTP 502"));
-    const res = await runNarrator(jobBoardRequest(), ctx(transport));
+    const res = await runNarrator(jobBoardRequest(content()), ctx(transport));
     expect(res.fallback).toBe("apiError");
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
     expect(res.commands).toHaveLength(1);

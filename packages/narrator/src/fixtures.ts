@@ -6,9 +6,11 @@
 import {
   type ActorId,
   type ContentBundle,
+  type DecisionId,
   type EventId,
   type MachineId,
   type PortDefId,
+  type SaveEnvelope,
   type ScenarioDefId,
   type SimEvent,
   type World,
@@ -185,4 +187,111 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
     ]),
   ];
   return { gameId: "fixture-quiet", hook, snapshot: kernel.serialize(world), recentEvents };
+}
+
+/** Docked at Kessler Drift with nothing on offer, so the captain is looking for work (D40). */
+export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequest {
+  const base = approachingPortRequest(content, seed);
+  const tick = 2_400;
+  const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
+  snapshot.state.tick = tick;
+  snapshot.state.travel = { stage: "docked", portId: DRIFT };
+  const hook = {
+    id: allocateId(snapshot.state, "hook"),
+    kind: "jobBoard" as const,
+    context: { portId: DRIFT },
+    tick,
+  };
+  snapshot.state.narrator.pendingHook = hook;
+  return { gameId: "fixture-board", hook, snapshot, recentEvents: [] };
+}
+
+/**
+ * The ship has started drifting in transit to Green Meridian (the coolant pump's worn bearing
+ * finally bit): a `driftingChanged` event, which `config.narrator.hookOnEvents` lists, raised
+ * the `notableEvent` hook the following tick.
+ */
+export function notableEventRequest(content: ContentBundle, seed = 23): NarratorRequest {
+  const base = quietTooLongRequest(content, seed);
+  const tick = 4_101;
+  const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
+  const state = snapshot.state;
+  state.tick = tick;
+  if (state.travel.stage === "docked") throw new Error("fixture: expected the ship in transit");
+  state.travel = { ...state.travel, drifting: true };
+  const drifted = event(4, 4_100, "driftingChanged", { drifting: true }, "narrative");
+  const hook = {
+    id: allocateId(state, "hook"),
+    kind: "notableEvent" as const,
+    context: { eventIds: [drifted.id] },
+    tick,
+  };
+  state.narrator.pendingHook = hook;
+  state.narrator.lastNarrativeTick = 4_100;
+  state.narrator.lastNarrativeEvent = { tick: 4_100, type: "driftingChanged", eventId: drifted.id };
+  return {
+    gameId: "fixture-notable",
+    hook,
+    snapshot,
+    recentEvents: [...base.recentEvents, drifted],
+  };
+}
+
+/**
+ * D37: a departure-gate card (D36) as the kernel queues it, with the fixture's engineer named as
+ * the speaker in the template params, under a `policyDecision` hook naming the engine.
+ */
+export function departureGateRequest(content: ContentBundle, seed = 11): NarratorRequest {
+  const base = approachingPortRequest(content, seed);
+  const snapshot = structuredClone(base.snapshot) as SaveEnvelope;
+  const decisionId = "d9" as DecisionId;
+  const actors = Object.values(snapshot.state.actors);
+  const captain = actors[0];
+  const engineer = actors.find((a) => a.roleTags.includes("engineer"));
+  if (captain === undefined || engineer === undefined) throw new Error("fixture lacks crew");
+  const engine = Object.values(snapshot.state.machines).find((m) =>
+    content.machines[m.defId]?.tags.includes("engine"),
+  );
+  if (engine === undefined) throw new Error("fixture lacks an engine");
+  snapshot.state.decisions.records[decisionId] = {
+    id: decisionId,
+    origin: "policy",
+    perspectiveActorId: captain.id,
+    prompt: {
+      key: "travel.departureGate",
+      params: {
+        machineId: engine.id,
+        machine: content.machines[engine.defId]?.name ?? "Main Engine",
+        reason: "fault",
+        speaker: engineer.name,
+      },
+    },
+    left: {
+      label: { key: "travel.departureGate.hold", params: {} },
+      commands: [],
+      aftermath: { key: "travel.departureGate.hold.aftermath", params: {} },
+    },
+    right: {
+      label: { key: "travel.departureGate.leave", params: {} },
+      commands: [],
+      aftermath: { key: "travel.departureGate.leave.aftermath", params: {} },
+    },
+    status: "pending",
+    createdTick: base.hook.tick,
+    narratorHookId: base.hook.id,
+  };
+  snapshot.state.decisions.queue.push(decisionId);
+  const hook = {
+    id: base.hook.id,
+    kind: "policyDecision" as const,
+    context: { decisionId, machineId: engine.id },
+    tick: base.hook.tick,
+  };
+  snapshot.state.narrator.pendingHook = hook;
+  // The kernel announces the decision in the tick that raises the hook (D37).
+  const recentEvents = [
+    ...base.recentEvents,
+    event(3, base.hook.tick, "decisionPending", { decisionId }, "narrative"),
+  ];
+  return { ...base, hook, snapshot, recentEvents };
 }
