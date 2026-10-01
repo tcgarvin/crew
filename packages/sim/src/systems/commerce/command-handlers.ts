@@ -19,18 +19,9 @@ import { allocateId } from "../../core/ids";
 import type { BoundaryLocation, CommandOfKind, CommandRejection } from "../../core/types/commands";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { CrewDef, ItemDef } from "../../core/types/content";
-import type {
-  CrewDefId,
-  DecisionId,
-  EntityId,
-  ItemDefId,
-  ItemId,
-  JobId,
-  TempRef,
-} from "../../core/types/ids";
+import type { CrewDefId, EntityId, ItemDefId, ItemId, JobId, TempRef } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
 import type { Job } from "../../core/types/travel";
-import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 import {
   DEFAULT_PITCH_KEY,
@@ -39,36 +30,16 @@ import {
   cargoStowageZoneKey,
   checkPriceBand,
   clampCargoToMaxCrates,
+  dockedAtOrigin,
   issuerLabel,
   normaliseIssuer,
   spawnCargoItem,
+  surfaceOfferCard,
 } from "./jobs";
 
 // ---------------------------------------------------------------------------------------------
 // offerJob
 // ---------------------------------------------------------------------------------------------
-
-/**
- * Params for the offer card's `job.offer` template (`@crew/content` renders them): the person,
- * the route, the cargo kind, the urgency and the pitch (its prose, or its key when it has none).
- * D24: pay is deliberately absent, so no card can print it.
- */
-function offerPromptParams(job: Job): Record<string, string> {
-  const person = job.issuerPerson;
-  const firstLine = job.cargo[0];
-  const pitch = job.pitch.prose;
-  return {
-    issuer: job.issuer,
-    name: person.name,
-    role: person.role,
-    ...(person.org === undefined ? {} : { org: person.org }),
-    from: job.fromPortId,
-    to: job.toPortId,
-    ...(firstLine === undefined ? {} : { cargo: firstLine.itemDefId }),
-    urgency: job.urgency,
-    ...(pitch === undefined || pitch.trim() === "" ? { pitchKey: job.pitch.key } : { pitch }),
-  };
-}
 
 export const offerJob: CommandHandler<"offerJob", null> = {
   validate(ctx, command): Validation<null> {
@@ -130,33 +101,11 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       payload: { jobId },
     });
     if (surface) {
-      const decisionId: DecisionId = allocateId(ctx.state, "decision");
-      ctx.state.decisions.records[decisionId] = {
-        id: decisionId,
-        origin: command.source === "narrator" ? "narrator" : "policy",
-        perspectiveActorId: commandActor(ctx.state),
-        prompt: { key: "job.offer", params: offerPromptParams(job) },
-        // Integration 2: accepting also sets course for the job's destination. `setCourse`
-        // applies after `acceptContract` in the same resolution, sees the freshly raised
-        // `cargoToLoad` problems and holds departure until the freight is aboard.
-        left: {
-          label: { key: "job.offer.accept", params: {} },
-          commands: [
-            { kind: "acceptContract", payload: { jobId } },
-            { kind: "setCourse", payload: { destinationPortId: job.toPortId } },
-          ],
-          aftermath: { key: "job.accept.aftermath", params: {} },
-        },
-        right: {
-          label: { key: "job.offer.decline", params: {} },
-          commands: [{ kind: "declineJob", payload: { jobId } }],
-          aftermath: { key: "job.decline.aftermath", params: {} },
-        },
-        status: "pending",
-        createdTick: ctx.tick,
-        jobId,
-      };
-      ctx.state.decisions.queue.push(decisionId);
+      // D42: the card can only be taken at the dock (`acceptContract` and `setCourse` need the
+      // ship docked at the origin), so an offer surfaced on approach waits for it; commerce
+      // builds the card the first tick the ship is docked there (`surfaceDeferredOffers`).
+      if (dockedAtOrigin(ctx.state, job)) surfaceOfferCard(ctx, job);
+      else job.surfaceWhenDocked = true;
     }
     return NO_TEMP_REFS;
   },

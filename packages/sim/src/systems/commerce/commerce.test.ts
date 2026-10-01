@@ -224,3 +224,128 @@ describe("commerce: full freight loop", () => {
     expect(world.state.jobs[jobId]?.status).toBe("declined");
   });
 });
+
+describe("commerce: offers surfaced on approach wait for the dock (D42)", () => {
+  function jobDraftFrom(fromPortId: typeof PORTS.a, toPortId: typeof PORTS.a, pay: number) {
+    return { ...jobDraft(pay), fromPortId, toPortId };
+  }
+
+  /** Drive the ship from A toward B and stop at the `approachingPort` hook. */
+  function approachB() {
+    const { world, kernel } = freightTestWorld();
+    kernel.enqueueCommand(
+      world,
+      cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
+    );
+    // `advanceThroughHooks` would acknowledge the approach hook too; stop on it by hand,
+    // acknowledging only the incidental `jobBoard` raised at the start port.
+    for (let guard = 0; guard < 10; guard++) {
+      const result = kernel.advance(world, 2000);
+      expect(result.halt).toEqual({ kind: "hook" });
+      const hook = world.state.narrator.pendingHook;
+      if (hook === undefined) throw new Error("hook halt without a pending hook");
+      if (hook.kind === "approachingPort") break;
+      kernel.enqueueCommand(
+        world,
+        cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } }),
+      );
+    }
+    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    expect(world.state.travel.stage).toBe("approaching");
+    return { world, kernel };
+  }
+
+  it("records the offer without a card, then shows exactly one card once docked", () => {
+    const { world, kernel } = approachB();
+    const offer = kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "narrator",
+        kind: "offerJob",
+        payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: true },
+      }),
+    );
+    expect(offer.status).toBe("accepted");
+    const hookId = world.state.narrator.pendingHook?.id as HookId;
+    kernel.enqueueCommand(
+      world,
+      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
+    );
+    kernel.advance(world, 1);
+
+    const job = Object.values(world.state.jobs)[0];
+    if (job === undefined) throw new Error("no job offered");
+    expect(job.status).toBe("offered");
+    expect(job.surfaceWhenDocked).toBe(true);
+    expect(world.state.decisions.queue).toEqual([]);
+
+    const untilDocked = advanceThroughHooks(kernel, world, 2000);
+    expect(untilDocked.halt).toEqual({ kind: "decision" });
+    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.decisions.queue).toHaveLength(1);
+    const decisionId = world.state.decisions.queue[0] as string;
+    const decision = world.state.decisions.records[decisionId as never];
+    expect(decision?.jobId).toBe(job.id);
+    expect(decision?.origin).toBe("narrator");
+    expect(job.surfaceWhenDocked).toBeUndefined();
+
+    // "Take the job" now accepts and plans the course home.
+    const resolve = kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "player",
+        kind: "resolveDecision",
+        payload: { decisionId: decisionId as never, side: "left" },
+      }),
+    );
+    expect(resolve.status).toBe("accepted");
+    advanceThroughHooks(kernel, world, 1);
+    expect(world.state.jobs[job.id]?.status).toBe("accepted");
+    expect(world.state.travel).toMatchObject({
+      stage: "docked",
+      portId: PORTS.b,
+      plannedDestinationId: PORTS.a,
+    });
+    expect(world.state.decisions.queue).toEqual([]);
+  });
+
+  it("never shows a card for a deferred offer that expired on the way in", () => {
+    const { world, kernel } = approachB();
+    kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "narrator",
+        kind: "offerJob",
+        payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: true },
+      }),
+    );
+    const hookId = world.state.narrator.pendingHook?.id as HookId;
+    kernel.enqueueCommand(
+      world,
+      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
+    );
+    kernel.advance(world, 1);
+    const job = Object.values(world.state.jobs)[0];
+    if (job === undefined) throw new Error("no job offered");
+    job.expiresAtTick = world.state.tick + 1;
+
+    advanceThroughHooks(kernel, world, 2000);
+    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(job.status).toBe("expired");
+    expect(job.surfaceWhenDocked).toBeUndefined();
+    expect(world.state.decisions.queue).toEqual([]);
+  });
+
+  it("shows the card at once when surfaced while docked at the job's port", () => {
+    const { world, kernel } = freightTestWorld();
+    kernel.enqueueCommand(
+      world,
+      cmd({ source: "narrator", kind: "offerJob", payload: { job: jobDraft(100), surface: true } }),
+    );
+    const result = kernel.advance(world, 1);
+    expect(result.halt).toEqual({ kind: "decision" });
+    expect(world.state.decisions.queue).toHaveLength(1);
+    const job = Object.values(world.state.jobs)[0];
+    expect(job?.surfaceWhenDocked).toBeUndefined();
+  });
+});

@@ -10,7 +10,7 @@ import {
   type NarratorResponse,
   nullNarratorResponse,
   openRouterTransport,
-  runNarrator,
+  runNarratorWithTrace,
 } from "@crew/narrator";
 import type { ContentBundle } from "@crew/sim";
 
@@ -25,7 +25,17 @@ export interface NarratorCtx {
   readonly model?: string;
 }
 
-export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorResponse>;
+/**
+ * What a narrator call hands the route: the response the client gets, plus, when the response
+ * is the fallback (`response.fallback` set), why (D42: the route logs it; the message never
+ * carries the API key or the request body).
+ */
+export interface NarratorOutcome {
+  readonly response: NarratorResponse;
+  readonly error?: string;
+}
+
+export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorOutcome>;
 
 let cachedBundle: ContentBundle | undefined;
 
@@ -48,8 +58,9 @@ function content(): ContentBundle {
  * `approachingPort`/`jobBoard`, one templated job offer (D40: the narrator is the only source of
  * work, so the offline path must still hand out work).
  */
-export const nullNarrator: RunNarrator = async (req) =>
-  nullNarratorResponse(req, { content: content() });
+export const nullNarrator: RunNarrator = async (req) => ({
+  response: nullNarratorResponse(req, { content: content() }),
+});
 
 /**
  * W9 decision: OpenRouter transport (owner). The transport that sends the key to OpenRouter is
@@ -65,10 +76,11 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     return nullNarrator(req, ctx);
   }
   const transport = transportFor(ctx.openRouterApiKey);
-  return runNarrator(req, {
+  const run = await runNarratorWithTrace(req, {
     gameId: ctx.gameId,
     notes: ctx.notes,
     ...(transport === undefined ? {} : { transport }),
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
   });
+  return { response: run.response, ...(run.error === undefined ? {} : { error: run.error }) };
 };

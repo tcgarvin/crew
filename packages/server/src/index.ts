@@ -15,7 +15,7 @@ export { createDb } from "./db/client";
 export { DEFAULT_SERVER_NARRATOR_MODEL, loadEnv } from "./env";
 export type { Env } from "./env";
 export { defaultNarrator, nullNarrator } from "./narrator";
-export type { NarratorCtx, RunNarrator } from "./narrator";
+export type { NarratorCtx, NarratorOutcome, RunNarrator } from "./narrator";
 
 export interface AppEnv {
   Variables: { userId: string };

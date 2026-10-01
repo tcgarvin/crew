@@ -1,9 +1,16 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../env";
 import type { NarratorCtx, RunNarrator } from "../narrator";
-import { buildTestApp, echoNarrator, fakeEnvelope, mintUser, readJson } from "../test-helpers";
+import {
+  TEST_NOTES,
+  buildTestApp,
+  echoNarrator,
+  fakeEnvelope,
+  mintUser,
+  readJson,
+} from "../test-helpers";
 
 async function authed(
   app: ReturnType<typeof buildTestApp>["app"],
@@ -36,6 +43,65 @@ function narratorBody(gameId: string, savedAtTick = 0, hookKind = "approachingPo
 }
 
 describe("narrator", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logs a fallback reply as one structured warn line, without the API key (D42)", async () => {
+    const env = loadEnv({ CREW_DB: "memory", OPENROUTER_API_KEY: "sk-or-secret-key" });
+    const fallbackNarrator: RunNarrator = async () => ({
+      response: {
+        commands: [],
+        callId: "fallback-call",
+        model: "null-narrator",
+        promptVersion: "v0.8",
+        fallback: "apiError",
+        notesUpdate: TEST_NOTES,
+      },
+      error: "OpenRouter 402: insufficient credits",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { app } = buildTestApp({ env, runNarrator: fallbackNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(narratorBody(game.id)),
+    });
+    expect(res.status).toBe(200);
+
+    const fallbackLines = warn.mock.calls.filter((call) => call[0] === "[narrator] fallback");
+    expect(fallbackLines).toHaveLength(1);
+    const logged = fallbackLines[0]?.[1] as Record<string, unknown>;
+    expect(logged).toMatchObject({
+      gameId: game.id,
+      hookKind: "approachingPort",
+      fallback: "apiError",
+      model: "null-narrator",
+      promptVersion: "v0.8",
+      error: "OpenRouter 402: insufficient credits",
+    });
+    expect(typeof logged.latencyMs).toBe("number");
+    expect(JSON.stringify(logged)).not.toContain("sk-or-secret-key");
+    expect(logged).not.toHaveProperty("request");
+  });
+
+  it("does not warn when the reply is not a fallback", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { app } = buildTestApp({ runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(narratorBody(game.id)),
+    });
+    expect(res.status).toBe(200);
+    expect(warn.mock.calls.filter((call) => call[0] === "[narrator] fallback")).toHaveLength(0);
+  });
+
   it("calls the injected narrator and logs the call", async () => {
     const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
@@ -163,17 +229,19 @@ describe("narrator", () => {
     const recording: RunNarrator = async (_req, ctx: NarratorCtx) => {
       seen.push(ctx.notes);
       return {
-        commands: [],
-        callId: `call-${seen.length}`,
-        model: "anthropic/claude-opus-4.6",
-        promptVersion: "v0.1",
-        usage: {
-          inputTokens: 10,
-          outputTokens: 5,
-          cacheReadInputTokens: 0,
-          cacheCreationInputTokens: 0,
+        response: {
+          commands: [],
+          callId: `call-${seen.length}`,
+          model: "anthropic/claude-opus-4.6",
+          promptVersion: "v0.1",
+          usage: {
+            inputTokens: 10,
+            outputTokens: 5,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+          },
+          notesUpdate: notes,
         },
-        notesUpdate: notes,
       };
     };
     const { app, db } = buildTestApp({ runNarrator: recording });

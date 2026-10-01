@@ -17,8 +17,9 @@
  * with an offer from someone who fits the port and the threads.
  * v0.7 (2026-10-01): the captain is the player and never speaks on a card; cards are brought to
  * them, and the captain's voice line is only how others react to or quote them (D41).
+ * v0.8 (2026-10-01): an offer surfaced on approach is shown once the ship has docked (D42).
  */
-export const PROMPT_VERSION = "v0.7";
+export const PROMPT_VERSION = "v0.8";
 
 export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the eight people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (arriving at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 

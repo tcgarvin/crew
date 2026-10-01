@@ -238,3 +238,7 @@ Owner: "let the narrator figure that out dynamically as part of its arc generati
 avatar (Mara Osei today; others later). They keep a voice for how they come across, shown to the
 narrator, but the translator nulls them as a speaker (the card survives as an observed scene and
 the reason is fed back under "rejected last time"). Prompt v0.7.
+
+**D42. Offer cards wait for the dock; failures are visible.** An offer surfaced on approach is
+shown once the ship is docked at its port so "Take the job" can succeed; narrator fallbacks are
+logged with their reason; rejected player commands raise a toast. Prompt v0.8.

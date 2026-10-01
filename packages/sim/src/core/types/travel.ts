@@ -129,6 +129,12 @@ export interface Job {
    * re-ask cooldown (`config.commerce.reofferSeconds`, D40).
    */
   closedTick?: Tick;
+  /**
+   * D42: the offer was surfaced (`offerJob` with `surface: true`) while the ship was not docked
+   * at `fromPortId`, so its card waits: commerce builds it the first tick the ship is docked
+   * there and clears this. Absent otherwise; never `false`.
+   */
+  surfaceWhenDocked?: true;
   /** Command that created it (narrator audit). */
   causeCommandId?: CommandId;
 }

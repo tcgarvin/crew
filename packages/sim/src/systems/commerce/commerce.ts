@@ -2,7 +2,7 @@
  * The commerce system (PLAN §6 W6 items 3–5): one per-tick pass that
  *  1. moves accepted jobs to `inTransit` once the ship leaves dock, raises `cargoToUnload`
  *     problems on arrival at the destination, and pays a delivered job exactly once,
- *  2. expires stale offers,
+ *  2. expires stale offers and surfaces the cards of offers that waited for the dock (D42),
  *  3. raises the `jobBoard` hook when the captain is docked with nothing to do (see
  *     `travel/hooks.ts` `raiseJobBoardHookIfNeeded`).
  *
@@ -17,7 +17,7 @@
  */
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { raiseJobBoardHookIfNeeded } from "../travel/hooks";
-import { expireStaleOffers, payJobIfDue, raiseUnloadProblems } from "./jobs";
+import { expireStaleOffers, payJobIfDue, raiseUnloadProblems, surfaceDeferredOffers } from "./jobs";
 
 function sweepJobs(ctx: StepCtx): void {
   const travel = ctx.state.travel;
@@ -33,6 +33,7 @@ function sweepJobs(ctx: StepCtx): void {
     }
   }
   expireStaleOffers(ctx);
+  surfaceDeferredOffers(ctx);
 }
 
 export const commerceSystem: System = {

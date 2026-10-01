@@ -134,13 +134,28 @@ export function registerNarratorRoutes(
 
     const startedAt = Date.now();
     try {
-      const response: NarratorResponse = await runNarrator(reqBody, {
+      const outcome = await runNarrator(reqBody, {
         openRouterApiKey: env.openRouterApiKey,
         gameId,
         notes: game.narrativeNotes,
         model: env.narratorModel,
       });
+      const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;
+      if (response.fallback !== undefined) {
+        // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
+        // the API key: `error` is the narrator's own failure text (for a transport failure,
+        // `OpenRouter <status>: <response body>`), never the request or its headers.
+        console.warn("[narrator] fallback", {
+          gameId,
+          hookKind: reqBody.hook.kind,
+          fallback: response.fallback,
+          model: response.model,
+          promptVersion: response.promptVersion,
+          latencyMs,
+          error: outcome.error ?? null,
+        });
+      }
 
       await runAfterResponse(async () => {
         await db.logNarratorCall({
@@ -168,6 +183,14 @@ export function registerNarratorRoutes(
     } catch (err) {
       const latencyMs = Date.now() - startedAt;
       const message = err instanceof Error ? err.message : "Unknown narrator error.";
+      console.error("[narrator] failed", {
+        gameId,
+        hookKind: reqBody.hook.kind,
+        model: MODEL_PLACEHOLDER,
+        promptVersion: PROMPT_VERSION_PLACEHOLDER,
+        latencyMs,
+        error: message,
+      });
       await db.logNarratorCall({
         gameId,
         hookKind: reqBody.hook.kind,

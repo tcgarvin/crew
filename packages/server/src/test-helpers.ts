@@ -59,9 +59,11 @@ export const TEST_NOTES = {
 };
 
 export const echoNarrator: RunNarrator = async () => ({
-  commands: [],
-  callId: "test-call",
-  model: "test-model",
-  promptVersion: "test",
-  notesUpdate: TEST_NOTES,
+  response: {
+    commands: [],
+    callId: "test-call",
+    model: "test-model",
+    promptVersion: "test",
+    notesUpdate: TEST_NOTES,
+  },
 });

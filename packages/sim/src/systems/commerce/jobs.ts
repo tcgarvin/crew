@@ -9,10 +9,18 @@ import { allocateId } from "../../core/ids";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
-import type { ItemDefId, ItemId, PortDefId, ProblemId, TransactionId } from "../../core/types/ids";
+import type {
+  DecisionId,
+  ItemDefId,
+  ItemId,
+  PortDefId,
+  ProblemId,
+  TransactionId,
+} from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
+import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 
 // ---------------------------------------------------------------------------------------------
@@ -295,6 +303,8 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
     if (job.status === "offered" && ctx.tick > job.expiresAtTick) {
       job.status = "expired";
       job.closedTick = ctx.tick;
+      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+      delete job.surfaceWhenDocked;
       ctx.emit({
         type: "jobExpired",
         subjectIds: [job.id],
@@ -303,5 +313,92 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
         payload: { jobId: job.id },
       });
     }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Offer cards (D42)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Params for the offer card's `job.offer` template (`@crew/content` renders them): the person,
+ * the route, the cargo kind, the urgency and the pitch (its prose, or its key when it has none).
+ * D24: pay is deliberately absent, so no card can print it.
+ */
+function offerPromptParams(job: Readonly<Job>): Record<string, string> {
+  const person = job.issuerPerson;
+  const firstLine = job.cargo[0];
+  const pitch = job.pitch.prose;
+  return {
+    issuer: job.issuer,
+    name: person.name,
+    role: person.role,
+    ...(person.org === undefined ? {} : { org: person.org }),
+    from: job.fromPortId,
+    to: job.toPortId,
+    ...(firstLine === undefined ? {} : { cargo: firstLine.itemDefId }),
+    urgency: job.urgency,
+    ...(pitch === undefined || pitch.trim() === "" ? { pitchKey: job.pitch.key } : { pitch }),
+  };
+}
+
+/** Whether the ship is docked at the port the job departs from. */
+export function dockedAtOrigin(state: ReadonlyWorldState, job: Readonly<Job>): boolean {
+  const travel = state.travel;
+  return travel.stage === "docked" && travel.portId === job.fromPortId;
+}
+
+/**
+ * Queue the offer's decision card: "Take the job" accepts and sets course for the destination,
+ * "Pass" declines. The one place a job card is built, whether `offerJob` surfaces it at once or
+ * commerce surfaces it later at the dock (D42).
+ */
+export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
+  const decisionId: DecisionId = allocateId(ctx.state, "decision");
+  ctx.state.decisions.records[decisionId] = {
+    id: decisionId,
+    origin: job.origin === "narrator" ? "narrator" : "policy",
+    perspectiveActorId: commandActor(ctx.state),
+    prompt: { key: "job.offer", params: offerPromptParams(job) },
+    // Integration 2: accepting also sets course for the job's destination. `setCourse`
+    // applies after `acceptContract` in the same resolution, sees the freshly raised
+    // `cargoToLoad` problems and holds departure until the freight is aboard.
+    left: {
+      label: { key: "job.offer.accept", params: {} },
+      commands: [
+        { kind: "acceptContract", payload: { jobId: job.id } },
+        { kind: "setCourse", payload: { destinationPortId: job.toPortId } },
+      ],
+      aftermath: { key: "job.accept.aftermath", params: {} },
+    },
+    right: {
+      label: { key: "job.offer.decline", params: {} },
+      commands: [{ kind: "declineJob", payload: { jobId: job.id } }],
+      aftermath: { key: "job.decline.aftermath", params: {} },
+    },
+    status: "pending",
+    createdTick: ctx.tick,
+    jobId: job.id,
+  };
+  ctx.state.decisions.queue.push(decisionId);
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete job.surfaceWhenDocked;
+  return decisionId;
+}
+
+/**
+ * D42: surface the cards of offers that were surfaced on approach, now that the ship is docked
+ * at their port. Runs after `expireStaleOffers`, so an offer that expired on the way in never
+ * gets a card.
+ */
+export function surfaceDeferredOffers(ctx: ApplyCtx): void {
+  for (const job of Object.values(ctx.state.jobs)) {
+    if (job.surfaceWhenDocked !== true) continue;
+    if (job.status !== "offered") {
+      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+      delete job.surfaceWhenDocked;
+      continue;
+    }
+    if (dockedAtOrigin(ctx.state, job)) surfaceOfferCard(ctx, job);
   }
 }

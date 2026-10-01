@@ -46,6 +46,7 @@ import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
 import { inspectItem } from "./ui/itemInspection";
+import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
 type HealthState = "checking" | "ok" | "error";
@@ -94,6 +95,8 @@ export function App() {
   const connectionRef = useRef<SimConnection | undefined>(undefined);
   const playbackRef = useRef(new FramePlayback(tickRate));
   const pendingRequests = useRef(new Map<string, (message: FromWorker) => void>());
+  /** D42: player commands in flight, by request id, so a rejection can be shown as a toast. */
+  const playerCommands = useRef(new Map<string, Command["kind"]>());
   const lastSaveTickRef = useRef(0);
   const serverRef = useRef<ServerSaves | undefined>(undefined);
   const recentEventsRef = useRef<SimEvent[]>([]);
@@ -180,7 +183,9 @@ export function App() {
     }
 
     function send(command: Command): void {
-      connection.send({ type: "command", requestId: nextRequestId(), command });
+      const requestId = nextRequestId();
+      if (command.source === "player") playerCommands.current.set(requestId, command.kind);
+      connection.send({ type: "command", requestId, command });
     }
 
     /** D5: call the narrator for a hook, apply its answer, and always acknowledge. */
@@ -266,11 +271,16 @@ export function App() {
           setDecisionHidden(false);
           save("none");
           return;
-        case "commandResult":
+        case "commandResult": {
+          const kind = playerCommands.current.get(message.requestId);
+          playerCommands.current.delete(message.requestId);
           if (message.result.status === "rejected") {
             console.warn("[sim worker] command rejected", message.result.rejection);
+            // D42: a player's own command failing is shown, not just logged.
+            if (kind !== undefined) showToast(rejectionMessage(kind, message.result.rejection));
           }
           return;
+        }
         case "error":
           // Requests correlated by `requestId` are handled above; an uncorrelated error is the
           // worker's own recovery ("the save was incompatible, started a new game") — clear the
@@ -437,7 +447,9 @@ export function App() {
         kind: "resolveDecision",
         payload: { decisionId: decision.id, side },
       };
-      connection.send({ type: "command", requestId: nextRequestId(), command });
+      const requestId = nextRequestId();
+      playerCommands.current.set(requestId, command.kind);
+      connection.send({ type: "command", requestId, command });
       // D26: keep the answered card up for a moment with a line on what happens next. The sim
       // resumes behind it straight away; only the card lingers.
       const narrated = prose[decision.id];
