@@ -126,7 +126,8 @@ export interface Db {
   /** Most recent narrator call for a game, if any, for the min-ticks-between-calls check. */
   getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined>;
 
-  // Read-only queries for the narrator log CLI (`src/tools/narratorLog.ts`). Not used by routes.
+  // Read-only queries for the narrator log CLI (`src/tools/narratorLog.ts`). The narrator route
+  // also uses `listNarratorCalls` for the last answered call (spacing check).
 
   /** Every game (all users), most recently updated first, with narrator-call counts. */
   listGamesWithNarratorStats(): Promise<readonly GameNarratorSummary[]>;

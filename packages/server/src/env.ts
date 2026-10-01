@@ -19,6 +19,23 @@ function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): num
  */
 export const DEFAULT_SERVER_NARRATOR_MODEL = "anthropic/claude-sonnet-4.6";
 
+/**
+ * D43: what the narrator route does when the model cannot answer. `"error"` refuses the hook
+ * (503 without a key, 502 on a model failure) so the client retries and, failing that, pauses
+ * the game; `"null"` answers with the deterministic template narrator instead. Players must
+ * never get the null narrator, so production defaults to `"error"`.
+ */
+export type NarratorFallbackMode = "error" | "null";
+
+function readNarratorFallback(source: NodeJS.ProcessEnv, nodeEnv: string): NarratorFallbackMode {
+  const raw = source.CREW_NARRATOR_FALLBACK;
+  if (raw === undefined || raw === "") return nodeEnv === "production" ? "error" : "null";
+  if (raw === "error" || raw === "null") return raw;
+  throw new Error(
+    `Invalid CREW_NARRATOR_FALLBACK: expected "error" or "null", got ${JSON.stringify(raw)}`,
+  );
+}
+
 export interface Env {
   /** Neon Postgres connection string. Required in production; optional when `CREW_DB=memory`. */
   readonly databaseUrl: string | undefined;
@@ -28,6 +45,11 @@ export interface Env {
   readonly openRouterApiKey: string | undefined;
   /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; unset = `DEFAULT_SERVER_NARRATOR_MODEL`. */
   readonly narratorModel: string;
+  /**
+   * `CREW_NARRATOR_FALLBACK` (D43): `"error"` or `"null"`; unset = `"error"` when
+   * `NODE_ENV=production`, `"null"` otherwise (local dev without a key and the test suite).
+   */
+  readonly narratorFallback: NarratorFallbackMode;
   /** Max accepted save size, in bytes, measured on the gzipped blob (post-gzip, pre-base64). */
   readonly maxSaveBytes: number;
   /** Narrator budget: max calls per game per rolling wall-clock hour. */
@@ -58,6 +80,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       source.CREW_NARRATOR_MODEL === undefined || source.CREW_NARRATOR_MODEL === ""
         ? DEFAULT_SERVER_NARRATOR_MODEL
         : source.CREW_NARRATOR_MODEL,
+    narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 6),
     nodeEnv,

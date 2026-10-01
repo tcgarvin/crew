@@ -18,6 +18,10 @@ export type ApiResult<T> =
       readonly status: number;
       readonly code: string;
       readonly message: string;
+      /** The error body's `reason`, when the route gave one (narrator 429/502/503, D43). */
+      readonly reason?: string;
+      /** The error body's `retryable`, when the route gave one (narrator 502/503, D43). */
+      readonly retryable?: boolean;
     };
 
 export interface ApiCallOptions {
@@ -52,12 +56,18 @@ export async function apiCall<T>(path: string, options: ApiCallOptions): Promise
       parsed = undefined;
     }
     if (!response.ok) {
-      const error = (parsed as { error?: { code?: string; message?: string } } | undefined)?.error;
+      const error = (
+        parsed as
+          | { error?: { code?: string; message?: string; reason?: string; retryable?: boolean } }
+          | undefined
+      )?.error;
       return {
         ok: false,
         status: response.status,
         code: error?.code ?? "http",
         message: error?.message ?? `HTTP ${response.status}`,
+        ...(typeof error?.reason === "string" ? { reason: error.reason } : {}),
+        ...(typeof error?.retryable === "boolean" ? { retryable: error.retryable } : {}),
       };
     }
     if (parsed === undefined) {

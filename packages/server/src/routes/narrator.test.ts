@@ -186,6 +186,140 @@ describe("narrator", () => {
     expect((await postOther(narratorBody(other.id, 500, "policyDecision"))).status).toBe(429);
   });
 
+  it("marks the hourly cap and the spacing rule apart in the 429 body (D43)", async () => {
+    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "2" });
+    const { app } = buildTestApp({ env, runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const post = (body: unknown) =>
+      authed(app, token, `/api/games/${game.id}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await post(narratorBody(game.id, 0))).status).toBe(200);
+    const spaced = await post(narratorBody(game.id, 40));
+    expect(spaced.status).toBe(429);
+    expect((await readJson(spaced)).error).toMatchObject({
+      code: "budgetExceeded",
+      reason: "spacing",
+    });
+    // The rejection does not count toward the cap of 2 (it never reached the model), so a
+    // properly spaced call still goes through; the one after it hits the hourly rule.
+    expect((await post(narratorBody(game.id, 500))).status).toBe(200);
+    const capped = await post(narratorBody(game.id, 1000));
+    expect(capped.status).toBe(429);
+    expect((await readJson(capped)).error).toMatchObject({
+      code: "budgetExceeded",
+      reason: "hourly",
+    });
+  });
+
+  describe("CREW_NARRATOR_FALLBACK=error (D43)", () => {
+    const fallbackOutcome = (fallback: string, error: string): RunNarrator => {
+      return async () => ({
+        response: {
+          commands: [],
+          callId: "fallback-call",
+          model: "null-narrator",
+          promptVersion: "v0.8",
+          fallback: fallback as "apiError",
+          notesUpdate: TEST_NOTES,
+        },
+        error,
+      });
+    };
+    const post = (
+      app: ReturnType<typeof buildTestApp>["app"],
+      token: string,
+      gameId: string,
+      tick = 0,
+    ) =>
+      authed(app, token, `/api/games/${gameId}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(narratorBody(gameId, tick)),
+      });
+
+    it("503s notConfigured (not retryable) and logs the call as an error", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_FALLBACK: "error" });
+      const { app, db } = buildTestApp({
+        env,
+        runNarrator: fallbackOutcome("notConfigured", "no OPENROUTER_API_KEY configured"),
+      });
+      const { token } = await mintUser(app);
+      const { game } = await createGame(app, token);
+
+      const res = await post(app, token, game.id);
+      expect(res.status).toBe(503);
+      expect((await readJson(res)).error).toEqual({
+        code: "narratorUnavailable",
+        reason: "notConfigured",
+        message: "no OPENROUTER_API_KEY configured",
+        retryable: false,
+      });
+      const call = await db.getLastNarratorCall(game.id);
+      expect(call?.status).toBe("error");
+      expect(call?.error).toBe("notConfigured: no OPENROUTER_API_KEY configured");
+      expect((await db.getGame(game.id))?.narrativeNotes).toEqual({});
+    });
+
+    it("502s a model failure with its reason, retryable, and does not space out the retry", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const env = loadEnv({
+        CREW_DB: "memory",
+        CREW_NARRATOR_FALLBACK: "error",
+        CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10",
+      });
+      let attempts = 0;
+      const flaky: RunNarrator = async (req, ctx) => {
+        attempts += 1;
+        if (attempts < 3) {
+          return fallbackOutcome("timeout", "narrator call timed out")(req, ctx);
+        }
+        return echoNarrator(req, ctx);
+      };
+      const { app, db } = buildTestApp({ env, runNarrator: flaky });
+      const { token } = await mintUser(app);
+      const { game } = await createGame(app, token);
+
+      const first = await post(app, token, game.id, 300);
+      expect(first.status).toBe(502);
+      expect((await readJson(first)).error).toEqual({
+        code: "narratorUnavailable",
+        reason: "timeout",
+        message: "narrator call timed out",
+        retryable: true,
+      });
+      expect((await db.getLastNarratorCall(game.id))?.status).toBe("error");
+
+      expect((await post(app, token, game.id, 300)).status).toBe(502);
+      // Same hook, same tick: the failed attempts are not "the last call" for spacing.
+      const third = await post(app, token, game.id, 300);
+      expect(third.status).toBe(200);
+      expect((await db.getLastNarratorCall(game.id))?.status).toBe("ok");
+      expect(attempts).toBe(3);
+    });
+
+    it("serves the template fallback in null mode (the default outside production)", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const env = loadEnv({ CREW_DB: "memory" });
+      expect(env.narratorFallback).toBe("null");
+      const { app, db } = buildTestApp({
+        env,
+        runNarrator: fallbackOutcome("apiError", "OpenRouter 500"),
+      });
+      const { token } = await mintUser(app);
+      const { game } = await createGame(app, token);
+      const res = await post(app, token, game.id);
+      expect(res.status).toBe(200);
+      expect((await readJson(res)).fallback).toBe("apiError");
+      expect((await db.getLastNarratorCall(game.id))?.status).toBe("ok");
+    });
+  });
+
   it("400s an invalid narrator request", async () => {
     const { app } = buildTestApp();
     const { token } = await mintUser(app);

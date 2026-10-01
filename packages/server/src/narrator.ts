@@ -1,10 +1,13 @@
 /**
  * The narrator function the server calls (W9). `defaultNarrator` runs `@crew/narrator`'s
- * `runNarrator` when an OpenRouter key is configured and the deterministic `nullNarrator`
- * otherwise; tests inject their own through `createApp({ runNarrator })`.
+ * `runNarrator` when an OpenRouter key is configured and otherwise answers with the
+ * deterministic null response marked `notConfigured`, which the route refuses in
+ * `CREW_NARRATOR_FALLBACK=error` mode (D43); tests inject their own through
+ * `createApp({ runNarrator })`.
  */
 import { loadBundle } from "@crew/content";
 import {
+  type FallbackReason,
   type ModelTransport,
   type NarratorRequest,
   type NarratorResponse,
@@ -33,6 +36,26 @@ export interface NarratorCtx {
 export interface NarratorOutcome {
   readonly response: NarratorResponse;
   readonly error?: string;
+}
+
+/** D43: why a narrator call could not be answered by the model, as the route reports it. */
+export interface NarratorFailure {
+  readonly reason: FallbackReason;
+  readonly message: string;
+}
+
+/**
+ * D43: the failure behind a fallback outcome, or `undefined` when the model answered. Only
+ * `notConfigured` is final; every other reason is a transient model failure the client retries.
+ */
+export function narratorFailure(outcome: NarratorOutcome): NarratorFailure | undefined {
+  const reason = outcome.response.fallback;
+  if (reason === undefined) return undefined;
+  return { reason, message: outcome.error ?? `narrator fallback: ${reason}` };
+}
+
+export function isRetryableFailure(failure: NarratorFailure): boolean {
+  return failure.reason !== "notConfigured";
 }
 
 export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorOutcome>;
@@ -71,9 +94,16 @@ function transportFor(apiKey: string): ModelTransport | undefined {
   return openRouterTransport({ apiKey });
 }
 
+/**
+ * Without a key the null narrator answers, marked `fallback: "notConfigured"` so the route can
+ * refuse it in `error` mode (D43) and the call log says why the template path was taken.
+ */
 export const defaultNarrator: RunNarrator = async (req, ctx) => {
   if (ctx.openRouterApiKey === undefined || ctx.openRouterApiKey === "") {
-    return nullNarrator(req, ctx);
+    return {
+      response: nullNarratorResponse(req, { content: content(), fallback: "notConfigured" }),
+      error: "no OPENROUTER_API_KEY configured",
+    };
   }
   const transport = transportFor(ctx.openRouterApiKey);
   const run = await runNarratorWithTrace(req, {

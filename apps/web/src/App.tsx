@@ -19,11 +19,13 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type SimConnection, createSimConnection } from "./host/connection";
 import {
+  type NarratorFailure,
   type NarratorOutcome,
   appendRecentEvents,
   callNarrator,
   hookAnswer,
 } from "./host/narrator";
+import { nextRetryAction, resetRetry } from "./host/narratorRetry";
 import { FramePlayback, runPlaybackLoop } from "./host/playback";
 import {
   ServerSaves,
@@ -39,6 +41,7 @@ import { buildDeckLayout } from "./render/deckLayout";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Headline } from "./ui/Headline";
 import { Inspector, type InspectorData } from "./ui/Inspector";
+import { NarratorErrorPanel } from "./ui/NarratorErrorPanel";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
 import { Ticker } from "./ui/Ticker";
 import { Toast } from "./ui/Toast";
@@ -57,7 +60,6 @@ const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
 const SERVER_OPEN_GRACE_MS = 3_000;
 const TOAST_MS = 4_000;
-const NARRATOR_UNAVAILABLE = "Narrator unavailable — carrying on";
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -74,6 +76,25 @@ function nextCommandId(): CommandId {
 interface PendingHook {
   readonly hookId: NarratorHook["id"];
   readonly tick: Tick;
+}
+
+/** D43: the client is between attempts at a hook; shown on the overlay once the viewer is there. */
+interface NarratorRetryStatus {
+  readonly attempt: number;
+  readonly nextRetryInMs: number;
+  readonly lastReason: string;
+}
+
+/** D43: retries are exhausted (or pointless); the game is paused on the error panel. */
+interface NarratorError {
+  readonly hook: NarratorHook;
+  readonly tick: Tick;
+  readonly reason: string;
+  readonly message: string;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function App() {
@@ -111,6 +132,12 @@ export function App() {
   const [selection, setSelection] = useState<Selection>();
   const [inspectorData, setInspectorData] = useState<InspectorData>();
   const [pendingHook, setPendingHook] = useState<PendingHook>();
+  const [narratorRetry, setNarratorRetry] = useState<NarratorRetryStatus>();
+  const [narratorError, setNarratorError] = useState<NarratorError>();
+  /** The effect's `answerHook`, for the error panel's Retry button. */
+  const answerHookRef = useRef<((hook: NarratorHook, tick: Tick) => Promise<void>) | undefined>(
+    undefined,
+  );
   const [decision, setDecision] = useState<Decision>();
   const [decisionHidden, setDecisionHidden] = useState(false);
   const [prose, setProse] = useState<Readonly<Record<string, DecisionCardText>>>({});
@@ -131,6 +158,14 @@ export function App() {
     setToast(message);
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(undefined), TOAST_MS);
+  }, []);
+
+  /** What the pause button does, also used when the narrator error panel pauses the game. */
+  const applyPause = useCallback((next: boolean) => {
+    setPausedState(next);
+    pausedRef.current = next;
+    connectionRef.current?.setUserPaused(next);
+    connectionRef.current?.send({ type: next ? "pause" : "resume" });
   }, []);
 
   // -------------------------------------------------------------- API health dot
@@ -188,46 +223,81 @@ export function App() {
       connection.send({ type: "command", requestId, command });
     }
 
-    /** D5: call the narrator for a hook, apply its answer, and always acknowledge. */
-    async function answerHook(hook: NarratorHook, tick: Tick): Promise<void> {
-      setPendingHook({ hookId: hook.id, tick });
-      let envelope: SaveEnvelope | undefined;
+    /** One narrator call for a hook; every way it can fail is a `NarratorFailure` (D43). */
+    async function attemptNarrator(hook: NarratorHook): Promise<NarratorOutcome> {
+      const failed = (failure: NarratorFailure): NarratorOutcome => ({ ok: false, failure });
+      let envelope: SaveEnvelope;
       try {
         envelope = await requestEnvelope();
       } catch (error) {
-        console.warn("[narrator] no snapshot for the hook", error);
+        const message = error instanceof Error ? error.message : String(error);
+        return failed({ kind: "retryable", reason: "snapshot", message });
       }
-      const server = serverRef.current;
-      let outcome: NarratorOutcome | undefined;
-      if (server !== undefined && envelope !== undefined) {
-        outcome = await callNarrator({
-          gameId: server.gameId,
-          token: server.token,
-          hook,
-          snapshot: envelope,
-          recentEvents: recentEventsRef.current.slice(),
+      if (serverRef.current === undefined) {
+        return failed({
+          kind: "retryable",
+          reason: "network",
+          message: "no server session for this game",
         });
       }
-      if (disposed) return;
-      if (outcome?.ok) {
-        recentEventsRef.current.length = 0;
-        // D37: a `policyDecision` hook halts before its decision does, so this prose is in the
-        // map before `decisionPending` arrives and the modal opens dressed.
-        const card = outcome.reply.card;
-        if (card !== undefined) setProse((prev) => ({ ...prev, [card.decisionId]: card }));
-        for (const command of hookAnswer(hook, tick, outcome.reply)) send(command);
-      } else {
-        if (outcome !== undefined) console.warn(`[narrator] ${outcome.reason}`);
-        showToast(NARRATOR_UNAVAILABLE);
-        for (const command of hookAnswer(hook, tick, undefined)) send(command);
-        // The narrator route stores the snapshot itself; without it, keep a milestone anyway.
-        if (envelope !== undefined && !staleRef.current) {
-          void writeLocalSave(envelope);
-          serverRef.current?.write(envelope, true);
+      return callNarrator({
+        gameId: serverRef.current.gameId,
+        token: serverRef.current.token,
+        hook,
+        snapshot: envelope,
+        recentEvents: recentEventsRef.current.slice(),
+      });
+    }
+
+    /**
+     * D5/D43: call the narrator for a hook and apply its answer. On failure the hook stays
+     * unacknowledged (the sim stays halted) while the client retries with backoff; when the
+     * scheduler gives up, the game pauses on the error panel, whose Retry calls this again.
+     * Only the spacing rule acknowledges a hook without an answer.
+     */
+    async function answerHook(hook: NarratorHook, tick: Tick): Promise<void> {
+      setPendingHook({ hookId: hook.id, tick });
+      setNarratorRetry(undefined);
+      // Every entry (first hook, or the error panel's Retry) starts the sequence from attempt 1.
+      let retry = resetRetry();
+      for (;;) {
+        const outcome = await attemptNarrator(hook);
+        if (disposed) return;
+        if (outcome.ok) {
+          recentEventsRef.current.length = 0;
+          // D37: a `policyDecision` hook halts before its decision does, so this prose is in
+          // the map before `decisionPending` arrives and the modal opens dressed.
+          const card = outcome.reply.card;
+          if (card !== undefined) setProse((prev) => ({ ...prev, [card.decisionId]: card }));
+          for (const command of hookAnswer(hook, tick, outcome.reply)) send(command);
+          break;
         }
+        const { failure } = outcome;
+        const action = nextRetryAction(retry, failure);
+        console.warn(`[narrator] ${failure.reason}: ${failure.message}`, action);
+        if (action.type === "acknowledge") {
+          for (const command of hookAnswer(hook, tick, undefined)) send(command);
+          break;
+        }
+        if (action.type === "fail") {
+          setNarratorRetry(undefined);
+          setNarratorError({ hook, tick, reason: action.reason, message: action.message });
+          applyPause(true);
+          return;
+        }
+        retry = action.state;
+        setNarratorRetry({
+          attempt: action.attempt,
+          nextRetryInMs: action.delayMs,
+          lastReason: failure.reason,
+        });
+        await sleep(action.delayMs);
+        if (disposed) return;
       }
+      setNarratorRetry(undefined);
       setPendingHook(undefined);
     }
+    answerHookRef.current = answerHook;
 
     const unsubscribe = connection.subscribe((message) => {
       const requestId = "requestId" in message ? message.requestId : undefined;
@@ -336,13 +406,14 @@ export function App() {
 
     return () => {
       disposed = true;
+      answerHookRef.current = undefined;
       clearInterval(remoteTimer);
       loop.stop();
       unsubscribe();
       connection.dispose();
     };
     // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once, so they never change.
-  }, [scenarioId, saveEveryTicks, showToast]);
+  }, [scenarioId, saveEveryTicks, showToast, applyPause]);
 
   // -------------------------------------------------------------- speed / pause
   const onSetSpeed = useCallback((next: number) => {
@@ -356,14 +427,18 @@ export function App() {
   }, []);
 
   const onTogglePause = useCallback(() => {
-    setPausedState((prev) => {
-      const next = !prev;
-      pausedRef.current = next;
-      connectionRef.current?.setUserPaused(next);
-      connectionRef.current?.send({ type: next ? "pause" : "resume" });
-      return next;
-    });
-  }, []);
+    applyPause(!pausedRef.current);
+  }, [applyPause]);
+
+  // -------------------------------------------------------------- narrator error (D43)
+  /** Retry: resume the game and run the backoff sequence again from attempt 1. */
+  const onRetryNarrator = useCallback(() => {
+    const failed = narratorError;
+    if (failed === undefined) return;
+    setNarratorError(undefined);
+    applyPause(false);
+    void answerHookRef.current?.(failed.hook, failed.tick);
+  }, [narratorError, applyPause]);
 
   // -------------------------------------------------------------- inspector
   const onSelect = useCallback(
@@ -511,7 +586,19 @@ export function App() {
         <Ticker entries={ticker} />
       </div>
       <Inspector data={inspectorData} onClose={onCloseInspector} />
-      {thinking && <NarratorOverlay />}
+      {narratorError !== undefined ? (
+        <NarratorErrorPanel
+          reason={narratorError.reason}
+          message={narratorError.message}
+          onRetry={onRetryNarrator}
+        />
+      ) : (
+        thinking && (
+          <NarratorOverlay
+            {...(narratorRetry === undefined ? {} : { attempt: narratorRetry.attempt })}
+          />
+        )
+      )}
       {closingCard !== undefined ? (
         <DecisionModal
           card={closingCard.card}

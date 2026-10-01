@@ -19,3 +19,24 @@ describe("loadEnv", () => {
     expect(env.databaseUrl).toBe("postgres://x");
   });
 });
+
+describe("loadEnv narrator fallback (D43)", () => {
+  it("defaults to error in production and null elsewhere", () => {
+    expect(loadEnv({ NODE_ENV: "production", DATABASE_URL: "postgres://x" }).narratorFallback).toBe(
+      "error",
+    );
+    expect(loadEnv({ NODE_ENV: "development" }).narratorFallback).toBe("null");
+    expect(loadEnv({ NODE_ENV: "test" }).narratorFallback).toBe("null");
+    expect(loadEnv({}).narratorFallback).toBe("null");
+  });
+
+  it("honours CREW_NARRATOR_FALLBACK in either environment and rejects other values", () => {
+    expect(loadEnv({ CREW_NARRATOR_FALLBACK: "error" }).narratorFallback).toBe("error");
+    expect(
+      loadEnv({ NODE_ENV: "production", CREW_DB: "memory", CREW_NARRATOR_FALLBACK: "null" })
+        .narratorFallback,
+    ).toBe("null");
+    expect(loadEnv({ CREW_NARRATOR_FALLBACK: "" }).narratorFallback).toBe("null");
+    expect(() => loadEnv({ CREW_NARRATOR_FALLBACK: "template" })).toThrow(/CREW_NARRATOR_FALLBACK/);
+  });
+});

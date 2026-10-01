@@ -135,6 +135,7 @@ export class MemoryDb implements Db {
     const cutoff = Date.now() - sinceMs;
     let count = 0;
     for (const call of this.narratorCalls.values()) {
+      if (call.status === "budgetExceeded") continue; // rejections never reached the model (D43)
       if (call.gameId === gameId && call.createdAt.getTime() >= cutoff) count += 1;
     }
     return count;

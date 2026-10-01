@@ -242,3 +242,14 @@ the reason is fed back under "rejected last time"). Prompt v0.7.
 **D42. Offer cards wait for the dock; failures are visible.** An offer surfaced on approach is
 shown once the ship is docked at its port so "Take the job" can succeed; narrator fallbacks are
 logged with their reason; rejected player commands raise a toast. Prompt v0.8.
+
+**D43. No offline narrator for players.** `CREW_NARRATOR_FALLBACK` defaults to `error` in
+production: a model failure is an error, never a template card. The route answers 503
+`narratorUnavailable` (`notConfigured`, not retryable) or 502 (any other fallback reason,
+retryable), and its 429s say whether the hourly cap or the tick spacing fired. The client
+retries with backoff (2, 4, 8, 16, 30 s; the hourly cap is waited out in 30 s steps for up to
+5 minutes) while the sim stays halted (the run-ahead lead hides the first retries), then pauses
+the game on an error panel with the reason and a Retry button. Only the spacing rule still
+acknowledges a hook without an answer: that is a rate rule, not a failure. The null narrator
+remains for tests and explicit offline use (`CREW_NARRATOR_FALLBACK=null`, the default outside
+production). Owner: "retry/delay or in the worst case pause the game with an error message."

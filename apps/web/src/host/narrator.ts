@@ -1,9 +1,11 @@
 /**
- * Main-thread narrator call (Integration 2, D5). When the worker halts on a hook, the main
+ * Main-thread narrator call (Integration 2, D5, D43). When the worker halts on a hook, the main
  * thread POSTs `{gameId, hook, snapshot, recentEvents}` to `/api/games/:id/narrator`, forwards
- * the returned commands to the worker at the hook tick + 1, keeps any card prose for the modal
- * (presentation only, W9 decision 39), and always acknowledges the hook — on failure too, so the
- * sim is never left halted.
+ * the returned commands to the worker at the hook tick + 1 and keeps any card prose for the
+ * modal (presentation only, W9 decision 39). A failure is classified here (`NarratorFailure`)
+ * for the retry scheduler in `./narratorRetry.ts`: the hook stays unacknowledged while the
+ * client retries, and the game pauses on an error if it keeps failing. Only the spacing rule
+ * (429 `spacing`) acknowledges a hook without an answer: that is a rate rule, not a failure.
  *
  * `apps/web/src` may not import `@crew/narrator` (dependency-cruiser `web-no-secrets`); the
  * response shape used here is restated structurally from its `NarratorResponse`.
@@ -18,7 +20,7 @@ import type {
   SimEvent,
   Tick,
 } from "@crew/sim";
-import { apiCall } from "./api";
+import { type ApiResult, apiCall } from "./api";
 
 /** The part of `NarratorResponse` the host acts on. */
 export interface NarratorReply {
@@ -42,9 +44,55 @@ export interface NarratorCallDeps {
   readonly recentEvents: readonly SimEvent[];
 }
 
+/**
+ * How the client treats a failed call (D43):
+ * - `retryable`: a model or transport failure; retry with backoff, then the error panel.
+ * - `fatal`: no point retrying (no narrator configured, a rejected request); the error panel.
+ * - `budget`: the hourly call cap; wait it out in 30 s steps for a while, then the error panel.
+ * - `spacing`: the min-tick spacing rule; acknowledge the hook with no answer, silently.
+ */
+export type NarratorFailureKind = "retryable" | "fatal" | "budget" | "spacing";
+
+export interface NarratorFailure {
+  readonly kind: NarratorFailureKind;
+  /**
+   * The narrator's `FallbackReason` (`notConfigured`, `apiError`, `timeout`, `refusal`,
+   * `truncated`, `schemaInvalid`) or the client's own: `network`, `server`, `request`,
+   * `budget`, `spacing`, `snapshot`, `malformed`.
+   */
+  readonly reason: string;
+  /** The raw message, for the error panel's small print and the console. */
+  readonly message: string;
+}
+
 export type NarratorOutcome =
   | { readonly ok: true; readonly reply: NarratorReply }
-  | { readonly ok: false; readonly reason: string };
+  | { readonly ok: false; readonly failure: NarratorFailure };
+
+/** Classify an API failure for the retry scheduler (D43). */
+export function classifyFailure(
+  result: Extract<ApiResult<unknown>, { ok: false }>,
+): NarratorFailure {
+  const { status, code, message } = result;
+  if (status === 0) {
+    return { kind: "retryable", reason: code === "timeout" ? "timeout" : "network", message };
+  }
+  if (code === "badResponse") {
+    // e.g. the dev server's HTML fallback when no API is running behind the proxy.
+    return { kind: "retryable", reason: "network", message };
+  }
+  if (status === 429) {
+    if (result.reason === "spacing") return { kind: "spacing", reason: "spacing", message };
+    return { kind: "budget", reason: "budget", message };
+  }
+  if (code === "narratorUnavailable") {
+    const reason = result.reason ?? "apiError";
+    const retryable = result.retryable ?? reason !== "notConfigured";
+    return { kind: retryable ? "retryable" : "fatal", reason, message };
+  }
+  if (status >= 500) return { kind: "retryable", reason: "server", message };
+  return { kind: "fatal", reason: "request", message: `${code}: ${message}` };
+}
 
 export async function callNarrator(deps: NarratorCallDeps): Promise<NarratorOutcome> {
   const result = await apiCall<NarratorReply>(
@@ -61,9 +109,14 @@ export async function callNarrator(deps: NarratorCallDeps): Promise<NarratorOutc
       },
     },
   );
-  if (!result.ok) return { ok: false, reason: `${result.code}: ${result.message}` };
+  if (!result.ok) return { ok: false, failure: classifyFailure(result) };
   const reply = result.body;
-  if (!Array.isArray(reply.commands)) return { ok: false, reason: "malformed narrator response" };
+  if (!Array.isArray(reply.commands)) {
+    return {
+      ok: false,
+      failure: { kind: "retryable", reason: "malformed", message: "malformed narrator response" },
+    };
+  }
   return { ok: true, reply };
 }
 
@@ -71,8 +124,8 @@ let ackCounter = 0;
 
 /**
  * The commands to send the worker for a hook: the narrator's (retargeted to `hookTick + 1`, the
- * earliest tick the halted world accepts), then `acknowledgeHook`. With no reply (failure,
- * offline) this is just the acknowledgement.
+ * earliest tick the halted world accepts), then `acknowledgeHook`. With no reply (the spacing
+ * rule declined to narrate) this is just the acknowledgement.
  */
 export function hookAnswer(
   hook: NarratorHook,

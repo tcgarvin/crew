@@ -9,7 +9,7 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import type { Db } from "../db/types";
 import type { Env } from "../env";
-import type { RunNarrator } from "../narrator";
+import { type RunNarrator, isRetryableFailure, narratorFailure } from "../narrator";
 import { saveEnvelopeSchema } from "../validation";
 import { runAfterResponse } from "../waitUntil";
 
@@ -112,23 +112,27 @@ export function registerNarratorRoutes(
         error,
       });
 
+    // The 429 body says which rule fired (D43): the client waits out the hourly cap but treats
+    // spacing as a deliberate "no narration this time", not a failure.
     const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS);
     if (callsInWindow >= env.narratorMaxCallsPerHour) {
       const message = `Hourly narrator call budget (${env.narratorMaxCallsPerHour}) exceeded for this game.`;
       await logRejection("budgetExceeded", message);
-      return c.json({ error: { code: "budgetExceeded", message } }, 429);
+      return c.json({ error: { code: "budgetExceeded", reason: "hourly", message } }, 429);
     }
 
-    const lastCall = SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
-      ? null
-      : await db.getLastNarratorCall(gameId);
+    // Spacing is measured from the last call the model answered: a failed attempt narrated
+    // nothing, so the client's retry of the same hook (D43) must not be refused as "too soon".
+    const [lastCall] = SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
+      ? []
+      : await db.listNarratorCalls({ gameId, status: "ok", limit: 1 });
     if (lastCall) {
       const lastBasis = await db.getSave(lastCall.basisSaveId);
       const lastTick = lastBasis?.savedAtTick ?? 0;
       if (reqBody.snapshot.savedAtTick - lastTick < MIN_TICKS_BETWEEN_NARRATOR_CALLS) {
         const message = `Too soon since the last narrator call (min ${MIN_TICKS_BETWEEN_NARRATOR_CALLS} ticks).`;
         await logRejection("budgetExceeded", message);
-        return c.json({ error: { code: "budgetExceeded", message } }, 429);
+        return c.json({ error: { code: "budgetExceeded", reason: "spacing", message } }, 429);
       }
     }
 
@@ -155,6 +159,38 @@ export function registerNarratorRoutes(
           latencyMs,
           error: outcome.error ?? null,
         });
+      }
+
+      // D43: in `error` mode a fallback is refused, never served. The call is logged as an
+      // error with its reason; the client retries (the sim stays halted) or pauses the game.
+      const failure = narratorFailure(outcome);
+      if (failure !== undefined && env.narratorFallback === "error") {
+        await db.logNarratorCall({
+          gameId,
+          hookKind: reqBody.hook.kind,
+          basisSaveId: basisSave.id,
+          model: response.model,
+          promptVersion: response.promptVersion,
+          inputTokens: null,
+          outputTokens: null,
+          latencyMs,
+          status: "error",
+          request: reqBody,
+          response: null,
+          error: `${failure.reason}: ${failure.message}`,
+        });
+        const retryable = isRetryableFailure(failure);
+        return c.json(
+          {
+            error: {
+              code: "narratorUnavailable",
+              reason: failure.reason,
+              message: failure.message,
+              retryable,
+            },
+          },
+          retryable ? 502 : 503,
+        );
       }
 
       await runAfterResponse(async () => {

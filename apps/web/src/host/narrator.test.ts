@@ -1,6 +1,6 @@
 import type { HookId, NarratorCommand, NarratorHook, SimEvent } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { appendRecentEvents, hookAnswer } from "./narrator";
+import { appendRecentEvents, classifyFailure, hookAnswer } from "./narrator";
 import { newerSave } from "./saves";
 
 const HOOK = {
@@ -55,5 +55,27 @@ describe("newerSave", () => {
     expect(newerSave(undefined, save(5))).toEqual(save(5));
     expect(newerSave(save(5), undefined)).toEqual(save(5));
     expect(newerSave(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe("classifyFailure", () => {
+  it("maps the server's narrator errors to retry kinds (D43)", () => {
+    const fail = (status: number, code: string, extra: Record<string, unknown> = {}) =>
+      classifyFailure({ ok: false, status, code, message: "m", ...extra });
+    expect(fail(0, "timeout")).toMatchObject({ kind: "retryable", reason: "timeout" });
+    expect(fail(0, "network")).toMatchObject({ kind: "retryable", reason: "network" });
+    expect(fail(200, "badResponse")).toMatchObject({ kind: "retryable", reason: "network" });
+    expect(fail(429, "budgetExceeded", { reason: "spacing" })).toMatchObject({ kind: "spacing" });
+    expect(fail(429, "budgetExceeded", { reason: "hourly" })).toMatchObject({ kind: "budget" });
+    expect(fail(429, "budgetExceeded")).toMatchObject({ kind: "budget" });
+    expect(
+      fail(503, "narratorUnavailable", { reason: "notConfigured", retryable: false }),
+    ).toMatchObject({ kind: "fatal", reason: "notConfigured" });
+    expect(fail(502, "narratorUnavailable", { reason: "refusal", retryable: true })).toMatchObject({
+      kind: "retryable",
+      reason: "refusal",
+    });
+    expect(fail(502, "narratorFailed")).toMatchObject({ kind: "retryable", reason: "server" });
+    expect(fail(404, "notFound")).toMatchObject({ kind: "fatal", reason: "request" });
   });
 });

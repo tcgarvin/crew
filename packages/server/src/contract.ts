@@ -92,8 +92,18 @@ export interface ApiError {
       | "payloadTooLarge"
       | "budgetExceeded"
       | "narratorFailed"
+      | "narratorUnavailable"
       | "internal";
     readonly message: string;
+    /**
+     * `budgetExceeded`: `"hourly"` (the per-game cap; retry later) or `"spacing"` (too soon
+     * after the last call; a rate rule, not a failure). `narratorUnavailable` (D43): the
+     * narrator's `FallbackReason` (`notConfigured`, `apiError`, `timeout`, `refusal`,
+     * `truncated`, `schemaInvalid`).
+     */
+    readonly reason?: string;
+    /** `narratorUnavailable` only: false for `notConfigured`, true for every model failure. */
+    readonly retryable?: boolean;
   };
 }
 
