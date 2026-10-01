@@ -10,6 +10,7 @@ import { loadBundle } from "@crew/content";
 import {
   type ContentBundle,
   type NarratorCommand,
+  type PortDefId,
   SCHEMA_VERSION,
   type SaveEnvelope,
   migrateState,
@@ -39,7 +40,6 @@ import { planJsonSchema, planSchemaFor } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
 import { translateIntents } from "./translate";
 import { type ModelResult, type ModelTransport, TransportError } from "./transport";
-import { buildVocabulary } from "./vocabulary";
 
 /** Default model slug (owner); override with `CREW_NARRATOR_MODEL` via `ctx.model`. */
 export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
@@ -174,11 +174,23 @@ function textsShown(translated: TranslationResult): string[] {
  * cast sightings, D31 card history, D32 thread beats, D39 beat cards, and why intents were
  * dropped).
  */
+/**
+ * D45: a cast entry's `portId` is a plain string in the plan; empty, or a port that does not
+ * exist, means nowhere in particular.
+ */
+function castWritten(plan: NarratorPlan, content: ContentBundle) {
+  return plan.notes.cast.map((entry) => ({
+    ...entry,
+    portId: content.ports[entry.portId as PortDefId] === undefined ? null : entry.portId,
+  }));
+}
+
 function notesFrom(
   plan: NarratorPlan,
   previous: NarratorNotes,
   tick: number,
   translated: TranslationResult,
+  content: ContentBundle,
 ): NarratorNotes {
   const { commands, dropped } = translated;
   return boundNotes({
@@ -191,7 +203,7 @@ function notesFrom(
       translated.beatCardThread,
     ),
     cardsShown: recordCardsFromCall(previous.cardsShown, tick, translated.card, commands),
-    cast: mergeCast(plan.notes.cast, previous.cast, issuersMet(commands), tick),
+    cast: mergeCast(castWritten(plan, content), previous.cast, issuersMet(commands), tick),
     lastUpdatedTick: tick,
     // D41: non-fatal corrections ride along with the drop reasons.
     lastRejections: [...dropped.map((d) => d.reason), ...translated.notes],
@@ -265,7 +277,7 @@ export async function runNarratorWithTrace(
   if (ctx.transport === undefined) {
     return fallback("notConfigured", "no model transport configured");
   }
-  const schema = planSchemaFor(buildVocabulary(snapshot.state, content));
+  const schema = planSchemaFor();
   let rawContent: string | undefined;
   try {
     const result = await callTransport(ctx.transport, ctx, prompt, schema);
@@ -282,7 +294,7 @@ export async function runNarratorWithTrace(
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
-      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated),
+      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated, content),
       callId,
       model: result.model,
       promptVersion: PROMPT_VERSION,

@@ -263,3 +263,17 @@ through the root `vitest.live.config.ts`, reads the key from `OPENROUTER_API_KEY
 `packages/narrator/.env.local`, and is skipped without one. Run it before deploying prompt,
 schema or transport changes. Owner: "a suite of LLM tests to use not all the time, but for these
 kinds of situations."
+
+**D45. The plan schema no longer embeds the vocabulary.** Strict structured output compiles the
+schema into a grammar; per-game enums for ports, items, machines, faults and stores pushed it
+past the provider's limit ("compiled grammar is too large", every call failing since the
+beat-card field was added). Those fields are plain strings validated by the translator against
+the snapshot, with drop reasons the model sees; the capabilities block is the model's list of
+valid ids. Removing the enums alone was not enough: a live probe showed the nullable strings
+(issuerOrg, speaker, beatOfThread, coursePort, cast portId) were what pushed the grammar over,
+since every nullable field is a union type and unions compile at exponential cost (Anthropic's
+documented limit is 16 union parameters per request, with a stricter internal grammar-size cap).
+Those fields are now plain strings where empty means none; only `card` (null when not a policy
+decision) and the four-way intents union remain. A new schema compiles on first use (tens of
+seconds, longer than the 25 s call budget, so the first call after a schema change can fall back
+once) and is then cached by the provider for 24 hours from last use. Prompt v0.9.

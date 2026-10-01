@@ -117,7 +117,7 @@ function drawPerson(
     return {
       issuerName: template.issuer,
       issuerRole: TEMPLATE_ISSUER_ROLE,
-      issuerOrg: null,
+      issuerOrg: "",
       pitch: fill("I need {cargo} carried to {to}. Interested?", words),
     };
   }
@@ -131,7 +131,7 @@ function drawPerson(
   return {
     issuerName: `${given} ${family ?? ""}`.trim(),
     issuerRole: rng.pick("social", local.roles),
-    issuerOrg: local.orgs.length === 0 ? null : rng.pick("social", local.orgs),
+    issuerOrg: local.orgs.length === 0 ? "" : rng.pick("social", local.orgs),
     pitch: fill(rng.pick("social", [...people.pitches, ...local.pitches]), words),
   };
 }

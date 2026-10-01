@@ -2,13 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { buildNarratorPlanSchema } from "./contract";
 
-const schema = buildNarratorPlanSchema({
-  ports: ["port.a", "port.b"],
-  machines: ["m1"],
-  faultKeys: ["wornBearing"],
-  cargoItems: ["item.crate"],
-  storeKeys: ["warehouse"],
-});
+const schema = buildNarratorPlanSchema();
 
 /** Walk a JSON Schema and collect every object node. */
 function walk(node: unknown, visit: (n: Record<string, unknown>) => void): void {
@@ -80,13 +74,13 @@ describe("NarratorPlan structured-output schema", () => {
         {
           kind: "surfaceDecision",
           title: "A stranger at the ramp",
-          speaker: null,
+          speaker: "",
           situation: "A stranger asks for passage.",
           left: { label: "Take her aboard", effect: "setCourse", coursePort: "port.b" },
-          right: { label: "Refuse", effect: "none", coursePort: null },
+          right: { label: "Refuse", effect: "none", coursePort: "" },
           leftAftermath: "She comes aboard and we plot for Port B.",
           rightAftermath: "She walks back into the crowd.",
-          beatOfThread: null,
+          beatOfThread: "",
         },
       ],
       card: null,
@@ -110,10 +104,25 @@ describe("NarratorPlan structured-output schema", () => {
     );
   });
 
-  it("accepts a null or named speaker on the card and on surfaceDecision (D29)", () => {
+  it("does not embed the vocabulary: ids are strings the translator checks (D45)", () => {
+    walk(json, (n) => {
+      if (Array.isArray(n.enum)) expect(n.enum.length).toBeLessThanOrEqual(8);
+    });
+    // Unions are the grammar compiler's expensive construct: only `card` and the intents union.
+    let unions = 0;
+    walk(json, (n) => {
+      if (Array.isArray(n.anyOf) || Array.isArray(n.type)) unions += 1;
+    });
+    expect(unions).toBe(2);
+    const text = JSON.stringify(json);
+    expect(text).not.toContain("port.a");
+    expect(text).toContain('from \\"What you can do\\", copied exactly');
+  });
+
+  it("accepts an empty or named speaker on the card, never a missing one (D29, D45)", () => {
     const card = {
       title: "Mara flags a problem",
-      speaker: null,
+      speaker: "",
       situation: "Mara catches you in the corridor.",
       leftLabel: "I'll take it.",
       rightLabel: "You handle it.",
@@ -132,5 +141,7 @@ describe("NarratorPlan structured-output schema", () => {
     );
     const { speaker: _omitted, ...withoutSpeaker } = card;
     expect(schema.safeParse({ ...plan, card: withoutSpeaker }).success).toBe(false);
+    // D45: null is a union type for the grammar compiler; empty means none.
+    expect(schema.safeParse({ ...plan, card: { ...card, speaker: null } }).success).toBe(false);
   });
 });

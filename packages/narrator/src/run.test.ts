@@ -55,11 +55,11 @@ const stranger = {
   speaker: "Dane Whitcross",
   situation:
     "Dane stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where to.”",
-  left: { label: "Bring her up.", effect: "none", coursePort: null },
-  right: { label: "Not this run.", effect: "none", coursePort: null },
+  left: { label: "Bring her up.", effect: "none", coursePort: "" },
+  right: { label: "Not this run.", effect: "none", coursePort: "" },
   leftAftermath: "Dane waves her aboard.",
   rightAftermath: "Dane sends her back down the ramp.",
-  beatOfThread: null,
+  beatOfThread: "",
 };
 
 function event(
@@ -583,7 +583,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.8");
+    expect(PROMPT_VERSION).toBe("v0.9");
   });
 });
 

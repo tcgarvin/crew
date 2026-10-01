@@ -34,6 +34,5 @@ export {
   TransportError,
 } from "./transport";
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";
-export { buildVocabulary } from "./vocabulary";
 export { approachingPortRequest, FIXTURE_SCENARIO, quietTooLongRequest } from "./fixtures";
 export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";

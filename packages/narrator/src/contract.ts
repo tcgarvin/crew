@@ -8,9 +8,11 @@
  * commands at the hook tick, then sends `acknowledgeHook`.
  *
  * Two layers, deliberately separate (review §D.3, §E.1):
- * - `NarratorPlan`: what the LLM emits. Flat, closed, enum-heavy, name/choice based, no raw
- *   numbers where a tier will do, no recursion, every object `additionalProperties: false`,
- *   every property required (absence is `null`).
+ * - `NarratorPlan`: what the LLM emits. Flat, closed, name/choice based, no raw numbers where a
+ *   tier will do, no recursion, every object `additionalProperties: false`, every property
+ *   required. Ids (ports, items, machines, faults, stores) are plain strings the translator
+ *   validates, optional strings are empty for "none", and only small fixed tiers are enums
+ *   (D45: the grammar compiler charges for enums and unions). `card` alone is nullable.
  * - `NarratorCommand`: the kernel's strict command subset. Only the translator produces these.
  */
 import {
@@ -139,28 +141,23 @@ export interface NarratorResponse {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Per-game choices the LLM may pick from. Built by the server from the snapshot and content so
- * the schema's enums list only things that exist. W0 decision: the plan schema is a factory over
- * this vocabulary rather than free strings validated after the fact.
+ * D45: the schema no longer embeds the per-game vocabulary. Strict structured output compiles
+ * the schema into a grammar, and per-game enums for ports, items, machines, faults and stores
+ * pushed it past the provider's limit ("compiled grammar is too large"). Ids are plain strings
+ * here; the capabilities block ("What you can do") is the model's list of valid ids and the
+ * translator validates every one against the snapshot and content, with a drop reason the model
+ * sees next call.
  */
-export interface NarratorVocabulary {
-  /** Port def IDs. */
-  readonly ports: readonly [string, ...string[]];
-  /**
-   * Machine instance IDs aboard. W9: only machines whose def has a fault catalog; when none do,
-   * the builder uses `NO_CHOICE` so the enum stays non-empty and the translator drops it.
-   */
-  readonly machines: readonly [string, ...string[]];
-  /** Fault keys across those machines' catalogs; the translator checks the pairing. */
-  readonly faultKeys: readonly [string, ...string[]];
-  /** Item def IDs that may be freight or luggage. */
-  readonly cargoItems: readonly [string, ...string[]];
-  /** External store keys across ports; the translator checks the pairing. */
-  readonly storeKeys: readonly [string, ...string[]];
-}
+const ID_HINT = 'from "What you can do", copied exactly';
+const idOf = (what: string) => z.string().describe(`${what} ${ID_HINT}.`);
 
-/** Placeholder enum value for a vocabulary list that would otherwise be empty (W9). */
-export const NO_CHOICE = "(none)";
+/**
+ * D45: optional strings are plain strings where empty means "none", not `nullable()`. Every
+ * nullable field is a union type for the grammar compiler, and unions are what made the grammar
+ * too large; the live probe showed the schema compiling once they were gone. Only `card` (a
+ * whole object) and the intents union remain unions.
+ */
+const EMPTY_FOR_NONE = "empty string for none";
 
 /** Coarse pay position inside the config price band; the translator maps it to credits. */
 export const PAY_TIERS = ["low", "standard", "generous"] as const;
@@ -169,33 +166,33 @@ export const FAULT_WINDOWS = ["soon", "later", "muchLater"] as const;
 /** Coarse quantity; the translator maps it to a count within config limits. */
 export const QUANTITIES = ["one", "few", "several"] as const;
 
-export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
-  const port = z.enum(vocab.ports);
+export function buildNarratorPlanSchema() {
+  const port = idOf("Port id");
   const decisionSide = z.strictObject({
     label: z.string().describe("What the captain says or does in reply, two to six words."),
     /** Side effect when chosen; `setCourse` needs `coursePort`. */
     effect: z.enum(["none", "setCourse"]),
-    coursePort: port.nullable(),
+    coursePort: z
+      .string()
+      .describe(`Port id ${ID_HINT} when effect is setCourse; otherwise empty.`),
   });
 
   // D25: every offer comes from a named person who says something; D24: nobody talks pay.
   const offerJob = z.strictObject({
     kind: z.literal("offerJob"),
-    issuerName: z.string().describe("The person offering the job: given and family name."),
+    issuerName: z.string().describe("Given and family name."),
     issuerRole: z.string().describe("What they do, lower case, e.g. 'shift foreman'."),
-    issuerOrg: z.string().nullable().describe("Who they work for, or null if nobody."),
+    issuerOrg: z.string().describe(`Who they work for; ${EMPTY_FOR_NONE}.`),
     pitch: z
       .string()
-      .describe(
-        "One line the issuer says to the captain, in their own voice. At most 30 words. No pay, prices or numbers.",
-      ),
-    description: z.string().describe("One or two sentences about the job itself. No pay."),
+      .describe("One line the issuer says to the captain, in their voice. Max 30 words. No pay."),
+    description: z.string().describe("One or two sentences about the job. No pay."),
     fromPort: port,
     toPort: port,
-    cargoItem: z.enum(vocab.cargoItems),
+    cargoItem: idOf("Item id"),
     quantity: z.enum(QUANTITIES),
     payTier: z.enum(PAY_TIERS),
-    urgency: z.enum(JOB_URGENCIES).describe("How pressing it sounds on the card."),
+    urgency: z.enum(JOB_URGENCIES),
     /** Present it as an accept/decline card now. */
     surface: z.boolean(),
   });
@@ -205,44 +202,36 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
   const spawnAtBoundary = z.strictObject({
     kind: z.literal("spawnAtBoundary"),
     port: port,
-    store: z.enum(vocab.storeKeys),
-    cargoItem: z.enum(vocab.cargoItems),
+    store: idOf("Store key of that port"),
+    cargoItem: idOf("Item id"),
     quantity: z.enum(QUANTITIES),
   });
 
   const scheduleFault = z.strictObject({
     kind: z.literal("scheduleFault"),
-    machine: z.enum(vocab.machines),
-    faultKey: z.enum(vocab.faultKeys),
+    machine: idOf("Machine id"),
+    faultKey: idOf("faultKey of that machine"),
     window: z.enum(FAULT_WINDOWS),
   });
 
   // D26: shown for a moment after the choice, before the card closes.
   const aftermath = z
     .string()
-    .describe(
-      "What happens next if the captain picks this side, as one plain statement. At most 20 words. No numbers.",
-    );
+    .describe("What happens next on this side: one sentence, max 20 words, no numbers.");
 
-  // D29: a named person brings the card and speaks; null only for an observed scene.
+  // D29: a named person brings the card and speaks; empty only for an observed scene.
   const speaker = z
     .string()
-    .nullable()
-    .describe(
-      "Full name of the person speaking on the card, as the digest lists them, or null for an observed scene.",
-    );
+    .describe("Full name of who speaks, as the digest lists them; empty for an observed scene.");
   const situation = z
     .string()
-    .describe(
-      "A stage line, then what the speaker says in quotes, in their own voice. Aim for 35 to 55 words, never more than 70. No numbers.",
-    );
+    .describe("A stage line, then what they say in quotes. 35 to 55 words, max 70. No numbers.");
 
   // D39: a beat card foreshadows a thread without asking for a decision.
   const beatOfThread = z
     .string()
-    .nullable()
     .describe(
-      "Null for a normal card. For a beat card (foreshadowing): the exact title of the thread under your notes whose nextBeat will pay it off. Both sides must then be effect none, and are how the captain takes it. One beat card per thread, ever.",
+      "Empty for a normal card; for a beat card, the exact title of the thread it foreshadows (both sides effect none).",
     );
 
   const surfaceDecision = z.strictObject({
@@ -278,39 +267,31 @@ export function buildNarratorPlanSchema(vocab: NarratorVocabulary) {
      * history is server-kept and not part of the plan; D32: threads are structured.
      */
     notes: z.strictObject({
-      summary: z.string().describe("The story so far in a few sentences."),
+      summary: z.string(),
       threads: z
         .array(
           z.strictObject({
-            title: z.string().describe("Short name for the thread."),
-            scale: z
-              .enum(THREAD_SCALES)
-              .describe(
-                "beat: one card with a follow-up; episode: one complete story, usually a job's length, though it need not involve a job; season: returns every few jobs; series: a slow pressure that surfaces rarely.",
-              ),
-            people: z.array(z.string()).describe("Crew or cast involved, by full name."),
-            stage: z.string().describe("One sentence: where the thread is now."),
+            title: z.string(),
+            scale: z.enum(THREAD_SCALES),
+            people: z.array(z.string()).describe("Full names."),
+            stage: z.string().describe("Where it is now."),
             nextBeat: z
               .string()
-              .describe(
-                "One sentence: what must be true before it returns, and roughly what happens then.",
-              ),
+              .describe("What must be true before it returns, and roughly what happens then."),
           }),
         )
-        .describe(
-          "Every open thread, rewritten in full: two to four alive at different scales. Retire the ones events have made moot.",
-        ),
+        .describe("Every open thread, rewritten in full; retire the moot ones."),
       cast: z
         .array(
           z.strictObject({
             name: z.string(),
             note: z.string(),
-            portId: port.nullable().describe("The port where the captain can find them, if any."),
+            portId: z
+              .string()
+              .describe(`Port id ${ID_HINT} where the captain can find them; ${EMPTY_FOR_NONE}.`),
           }),
         )
-        .describe(
-          "Supporting characters you introduced (issuers, contacts); not the crew. Keep people the captain has met.",
-        ),
+        .describe("Supporting characters, not the crew; keep those the captain has met."),
     }),
   });
 }
@@ -358,8 +339,8 @@ export interface TranslationResult {
 }
 
 /**
- * Pure translation (W9 implements): tiers → numbers from config, names → IDs, pairing checks
- * (fault in machine's catalog, store in port), dry-run validation against the snapshot. Never
- * emits a kind outside `NARRATOR_COMMAND_KINDS`.
+ * Pure translation (W9 implements): tiers → numbers from config, names → IDs, existence checks
+ * on every id (D45), pairing checks (fault in machine's catalog, store in port), dry-run
+ * validation against the snapshot. Never emits a kind outside `NARRATOR_COMMAND_KINDS`.
  */
 export type TranslateIntents = (plan: NarratorPlan, ctx: TranslationCtx) => TranslationResult;

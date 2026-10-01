@@ -55,10 +55,10 @@ const decision = {
   speaker: "Oren Vale",
   situation: "A dock foreman asks whether we could run a sealed crate to the Hub on our way.",
   left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
-  right: { label: "Not our business", effect: "none", coursePort: null },
+  right: { label: "Not our business", effect: "none", coursePort: "" },
   leftAftermath: "We set course for the Hub with the crate aboard.",
   rightAftermath: "The foreman nods and goes looking for another ship.",
-  beatOfThread: null,
+  beatOfThread: "",
 };
 
 /** D39: a foreshadowing card; both sides are the captain's attitude. */
@@ -68,8 +68,8 @@ const beatCard = {
   speaker: "Dane Whitcross",
   situation:
     "Dane stops by the hatch, tablet in hand. “Captain. The aft sensor picked up something on the last sweep. Gone now. I have logged it.”",
-  left: { label: "Keep an eye on it.", effect: "none", coursePort: null },
-  right: { label: "Probably nothing.", effect: "none", coursePort: null },
+  left: { label: "Keep an eye on it.", effect: "none", coursePort: "" },
+  right: { label: "Probably nothing.", effect: "none", coursePort: "" },
   leftAftermath: "Dane nods and adds it to his watch list.",
   rightAftermath: "Dane files it and goes back to his rounds.",
   beatOfThread: "the aft sensor",
@@ -125,7 +125,7 @@ describe("translateIntents: valid intents", () => {
     const req = approachingPortRequest(content());
     const long = {
       ...job,
-      issuerOrg: null,
+      issuerOrg: "",
       pitch: Array.from({ length: 50 }, () => "word").join(" "),
     };
     const [command] = translateIntents(plan([long]), ctxOf(req)).commands;
@@ -341,7 +341,7 @@ describe("translateIntents: drops with reasons", () => {
     );
     expect(result.commands).toEqual([]);
     expect(result.dropped.map((d) => d.reason)).toEqual([
-      `scheduleFault: machine ${pump?.id} has no fault "electrical_short"`,
+      `scheduleFault: machine ${pump?.id} has no fault "electrical_short"; use a faultKey listed under it in What you can do`,
       `scheduleFault: ${pump?.id} already has or awaits "worn_bearing"`,
     ]);
   });
@@ -362,8 +362,60 @@ describe("translateIntents: drops with reasons", () => {
     const result = translateIntents(plan([onDeck, noLounge]), ctxOf(req));
     expect(result.commands).toEqual([]);
     expect(result.dropped[1]?.reason).toBe(
-      'spawnAtBoundary: port port.kessler_drift has no store "lounge"',
+      'spawnAtBoundary: port port.kessler_drift has no store "lounge"; use one listed under What you can do',
     );
+  });
+
+  it("drops every unknown id with a pointer to What you can do (D45)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const pump = Object.values(req.snapshot.state.machines).find(
+      (m) => m.defId === "machine.coolant_pump",
+    );
+    const spawn = {
+      kind: "spawnAtBoundary",
+      port: "port.kessler_drift",
+      store: "warehouse",
+      cargoItem: "item.crate_general",
+      quantity: "one",
+    };
+    const result = translateIntents(
+      plan([
+        { ...job, fromPort: "port.nowhere" },
+        { ...job, toPort: "port.nowhere" },
+        { ...job, cargoItem: "item.unobtainium" },
+        { ...spawn, port: "port.nowhere" },
+        { ...spawn, store: "vault" },
+        { ...spawn, cargoItem: "item.unobtainium" },
+        { kind: "scheduleFault", machine: "m99", faultKey: "worn_bearing", window: "soon" },
+        { kind: "scheduleFault", machine: pump?.id, faultKey: "gremlins", window: "soon" },
+        {
+          ...decision,
+          left: { label: "Go", effect: "setCourse", coursePort: "port.nowhere" },
+        },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.commands).toEqual([]);
+    const hint = "use one listed under What you can do";
+    expect(result.dropped.map((d) => d.reason)).toEqual([
+      `offerJob: fromPort: unknown port "port.nowhere"; ${hint}`,
+      `offerJob: toPort: unknown port "port.nowhere"; ${hint}`,
+      `offerJob: cargoItem: unknown item "item.unobtainium"; ${hint}`,
+      `spawnAtBoundary: port: unknown port "port.nowhere"; ${hint}`,
+      `spawnAtBoundary: port port.kessler_drift has no store "vault"; ${hint}`,
+      `spawnAtBoundary: cargoItem: unknown item "item.unobtainium"; ${hint}`,
+      `scheduleFault: machine: unknown machine "m99"; ${hint}`,
+      `scheduleFault: machine ${pump?.id} has no fault "gremlins"; use a faultKey listed under it in What you can do`,
+      `surfaceDecision: left: coursePort: unknown port "port.nowhere"; ${hint}`,
+    ]);
+  });
+
+  it("drops a known item that is not cargo", () => {
+    const req = approachingPortRequest(content());
+    const tool = Object.values(content().items).find((i) => i.cargoClass === undefined);
+    expect(tool).toBeDefined();
+    const result = translateIntents(plan([{ ...job, cargoItem: tool?.id }]), ctxOf(req));
+    expect(result.dropped[0]?.reason).toBe(`offerJob: cargoItem: ${tool?.id} is not a cargo item`);
   });
 
   it("drops faults and spawns past the budget", () => {
@@ -414,7 +466,7 @@ describe("translateIntents: drops with reasons", () => {
     expect(command.payload.card.right).not.toHaveProperty("aftermath");
   });
 
-  it("keeps a valid speaker and omits a null or blank one (D29)", () => {
+  it("keeps a valid speaker and omits an empty or blank one (D29, D45)", () => {
     const req = docked(approachingPortRequest(content()));
     const speakerOf = (intent: unknown) => {
       const result = translateIntents(plan([intent]), ctxOf(req));
@@ -424,7 +476,7 @@ describe("translateIntents: drops with reasons", () => {
       return command.payload.card.prompt.params;
     };
     expect(speakerOf(decision)).toEqual({ title: decision.title, speaker: "Oren Vale" });
-    expect(speakerOf({ ...decision, speaker: null })).toEqual({ title: decision.title });
+    expect(speakerOf({ ...decision, speaker: "" })).toEqual({ title: decision.title });
     expect(speakerOf({ ...decision, speaker: "   " })).toEqual({ title: decision.title });
     const numeric = translateIntents(plan([{ ...decision, speaker: "Unit 7%" }]), ctxOf(req));
     expect(numeric.dropped[0]?.reason).toBe(
@@ -460,7 +512,7 @@ describe("translateIntents: drops with reasons", () => {
     const leak = {
       ...decision,
       situation: "Priya swears she hears a grinding noise from the pump. Stop and check?",
-      left: { label: "Stop and check", effect: "none", coursePort: null },
+      left: { label: "Stop and check", effect: "none", coursePort: "" },
     };
     const numbers = {
       ...leak,
@@ -493,13 +545,13 @@ describe("translateIntents: malicious plans (N6)", () => {
     {
       kind: "surfaceDecision",
       title: "x",
-      speaker: null,
+      speaker: "",
       situation: "y",
-      left: { label: "a", effect: "setMoney", coursePort: null },
-      right: { label: "b", effect: "none", coursePort: null },
+      left: { label: "a", effect: "setMoney", coursePort: "" },
+      right: { label: "b", effect: "none", coursePort: "" },
       leftAftermath: "",
       rightAftermath: "",
-      beatOfThread: null,
+      beatOfThread: "",
     },
   ];
 

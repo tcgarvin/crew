@@ -52,6 +52,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     "You have exactly four levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
+  lines.push(
+    "The ids below (ports, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
+  );
   lines.push("");
   lines.push("## Ports and routes");
   for (const port of ports) {
@@ -60,7 +63,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
       .join(", ");
     const stores = port.externalStores.map((s) => `${s.key} (${s.kind})`).join(", ");
     lines.push(`- ${port.id} "${port.name}": ${port.description}`);
-    lines.push(`  routes to: ${routes || "none"}; stores: ${stores}`);
+    lines.push(`  routes to: ${routes || "none"}; store keys: ${stores || "none"}`);
   }
   lines.push("");
   lines.push("## Cargo items and classes");
@@ -77,7 +80,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     "- payTier low | standard | generous is a private lever: it places the pay inside the class price band for the route and the engine computes it. No text ever mentions pay.",
   );
   lines.push(
-    `- issuerName, issuerRole and issuerOrg (or null) name the one person offering it; pitch is one line they say to the captain. urgency ${JOB_URGENCIES.join(" | ")} colours the card only; nothing enforces a deadline.`,
+    `- issuerName, issuerRole and issuerOrg (or empty) name the one person offering it; pitch is one line they say to the captain. urgency ${JOB_URGENCIES.join(" | ")} colours the card only; nothing enforces a deadline.`,
   );
   lines.push(
     "- surface=true shows it to the captain now as an accept/decline card (counts as this call's one card). surface=false posts it quietly on the port board.",

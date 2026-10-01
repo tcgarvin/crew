@@ -15,11 +15,13 @@ import {
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
+  type ItemDef,
   type ItemDefId,
   type MachineId,
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
   type NarratorHook,
+  type PortDef,
   type PortDefId,
   type TempRef,
   configTicks,
@@ -29,7 +31,6 @@ import {
   CARD_SITUATION_MAX_WORDS,
   type DecisionCardProse,
   type DroppedIntent,
-  NO_CHOICE,
   type NarratorIntent,
   type NarratorPlan,
   PITCH_MAX_WORDS,
@@ -50,7 +51,6 @@ import {
   routeDistance,
 } from "./lookups";
 import { NARRATOR_TEXT_KEYS, templateCard } from "./templates";
-import { buildVocabulary } from "./vocabulary";
 
 const LABEL_MAX_CHARS = 48;
 const TITLE_MAX_CHARS = 60;
@@ -62,6 +62,26 @@ type Outcome<T> =
   | { readonly ok: false; readonly reason: string };
 const ok = <T>(value: T): Outcome<T> => ({ ok: true, value });
 const no = (reason: string): Outcome<never> => ({ ok: false, reason });
+
+/** D45: an id the model wrote that nothing in the game matches. */
+const unknownId = (what: string, id: string) =>
+  `unknown ${what} "${id}"; use one listed under What you can do`;
+
+function knownPort(content: ContentBundle, id: string): Outcome<PortDef> {
+  const port = content.ports[id as PortDefId];
+  return port === undefined ? no(unknownId("port", id)) : ok(port);
+}
+
+/** A cargo item: an existing item def that has a cargo class (freight, not a tool or a meal). */
+type CargoItemDef = ItemDef & { readonly cargoClass: NonNullable<ItemDef["cargoClass"]> };
+
+function cargoItem(content: ContentBundle, id: string): Outcome<CargoItemDef> {
+  const item = content.items[id as ItemDefId];
+  if (item === undefined) return no(unknownId("item", id));
+  const cargoClass = item.cargoClass;
+  if (cargoClass === undefined) return no(`${id} is not a cargo item`);
+  return ok({ ...item, cargoClass });
+}
 
 type NarratorDraft = {
   [K in NarratorCommand["kind"]]: Extract<CommandDraft, { kind: K }>;
@@ -169,6 +189,10 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const config = snapshot.config;
   const here = offerPortNow(snapshot.state);
   if (here === undefined) return no("offerJob: the ship is not at or approaching a port");
+  const fromPort = knownPort(content, intent.fromPort);
+  if (!fromPort.ok) return no(`offerJob: fromPort: ${fromPort.reason}`);
+  const toPort = knownPort(content, intent.toPort);
+  if (!toPort.ok) return no(`offerJob: toPort: ${toPort.reason}`);
   if (intent.fromPort !== here) {
     return no(
       `offerJob: fromPort must be ${here} (${portName(content, here)}), the port the ship is at or approaching`,
@@ -178,15 +202,16 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const distance = routeDistance(content, intent.fromPort, intent.toPort);
   if (distance === undefined)
     return no(`offerJob: no route from ${intent.fromPort} to ${intent.toPort}`);
-  const item = content.items[intent.cargoItem as ItemDefId];
-  if (item?.cargoClass === undefined) return no(`offerJob: ${intent.cargoItem} is not freight`);
+  const cargo = cargoItem(content, intent.cargoItem);
+  if (!cargo.ok) return no(`offerJob: cargoItem: ${cargo.reason}`);
+  const item = cargo.value;
   if (intent.surface && env.hook?.kind === "policyDecision") {
     return no("offerJob: cannot surface a new card while a policy decision is pending");
   }
   if (intent.surface && env.tally.cardUsed) return no("offerJob: only one card per call");
   const name = clipChars(intent.issuerName, ISSUER_MAX_CHARS);
   const role = clipChars(intent.issuerRole, ISSUER_MAX_CHARS).toLowerCase();
-  const org = intent.issuerOrg === null ? "" : clipChars(intent.issuerOrg, ISSUER_MAX_CHARS);
+  const org = clipChars(intent.issuerOrg, ISSUER_MAX_CHARS);
   const pitch = clipWords(intent.pitch, PITCH_MAX_WORDS);
   const description = clipChars(intent.description, DESCRIPTION_MAX_CHARS);
   const texts: [string, string][] = [
@@ -226,14 +251,17 @@ function translateSpawn(env: Env, intent: Intent<"spawnAtBoundary">): Outcome<Na
   const config = snapshot.config;
   const budget = snapshot.state.narrator.budget.spawnsRemaining - env.tally.spawns;
   if (budget <= 0) return no("spawnAtBoundary: spawn budget exhausted");
-  const port = content.ports[intent.port as PortDefId];
-  if (port === undefined) return no(`spawnAtBoundary: unknown port ${intent.port}`);
+  const known = knownPort(content, intent.port);
+  if (!known.ok) return no(`spawnAtBoundary: port: ${known.reason}`);
+  const port = known.value;
   if (!port.externalStores.some((s) => s.key === intent.store)) {
-    return no(`spawnAtBoundary: port ${intent.port} has no store "${intent.store}"`);
+    return no(
+      `spawnAtBoundary: port ${intent.port} has no store "${intent.store}"; use one listed under What you can do`,
+    );
   }
-  const item = content.items[intent.cargoItem as ItemDefId];
-  if (item?.cargoClass === undefined)
-    return no(`spawnAtBoundary: ${intent.cargoItem} is not a cargo item`);
+  const cargo = cargoItem(content, intent.cargoItem);
+  if (!cargo.ok) return no(`spawnAtBoundary: cargoItem: ${cargo.reason}`);
+  const item = cargo.value;
   const wanted = SPAWN_QUANTITY_UNITS[intent.quantity];
   const count =
     item.stacking === "unique"
@@ -253,12 +281,15 @@ function translateSpawn(env: Env, intent: Intent<"spawnAtBoundary">): Outcome<Na
 function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<NarratorDraft> {
   const { snapshot, content } = env;
   const config = snapshot.config;
-  if (intent.machine === NO_CHOICE) return no("scheduleFault: no machine named");
   const machine = snapshot.state.machines[intent.machine as MachineId];
-  if (machine === undefined) return no(`scheduleFault: unknown machine ${intent.machine}`);
+  if (machine === undefined) {
+    return no(`scheduleFault: machine: ${unknownId("machine", intent.machine)}`);
+  }
   const def = content.machines[machine.defId];
   if (def === undefined || !def.faults.some((f) => f.key === intent.faultKey)) {
-    return no(`scheduleFault: machine ${intent.machine} has no fault "${intent.faultKey}"`);
+    return no(
+      `scheduleFault: machine ${intent.machine} has no fault "${intent.faultKey}"; use a faultKey listed under it in What you can do`,
+    );
   }
   if (
     machine.faults.some((f) => f.faultKey === intent.faultKey) ||
@@ -297,7 +328,9 @@ function translateSide(
   if (side.effect === "none") return ok({ label, commands: [] });
   const travel = env.snapshot.state.travel;
   if (travel.stage !== "docked") return no(`${which}: setCourse is only possible while docked`);
-  if (side.coursePort === null) return no(`${which}: setCourse needs coursePort`);
+  if (side.coursePort.trim() === "") return no(`${which}: setCourse needs coursePort`);
+  const course = knownPort(env.content, side.coursePort);
+  if (!course.ok) return no(`${which}: coursePort: ${course.reason}`);
   if (side.coursePort === travel.portId)
     return no(`${which}: already docked at ${side.coursePort}`);
   if (routeDistance(env.content, travel.portId, side.coursePort) === undefined) {
@@ -326,11 +359,11 @@ function aftermathText(env: Env, text: string, which: string): Outcome<string> {
 }
 
 /**
- * D29: the speaker's name, clipped; null or blank means an observed scene (no speaker). Numbers
- * or secrets in the name are a problem like in any other player-facing text.
+ * D29: the speaker's name, clipped; blank means an observed scene (no speaker). Numbers or
+ * secrets in the name are a problem like in any other player-facing text.
  */
-function speakerName(env: Env, raw: string | null): Outcome<string | undefined> {
-  if (raw === null || raw.trim() === "") return ok(undefined);
+function speakerName(env: Env, raw: string): Outcome<string | undefined> {
+  if (raw.trim() === "") return ok(undefined);
   const name = clipChars(raw, ISSUER_MAX_CHARS);
   const problem = textProblem(name, env.secrets);
   if (problem !== undefined) return no(`speaker: ${problem}`);
@@ -352,7 +385,7 @@ function speakerName(env: Env, raw: string | null): Outcome<string | undefined> 
  */
 function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
   const raw = intent.beatOfThread;
-  if (raw === null || raw.trim() === "") return ok(undefined);
+  if (raw.trim() === "") return ok(undefined);
   const wanted = raw.trim().toLowerCase();
   const thread = env.threads.find((t) => t.title.trim().toLowerCase() === wanted);
   if (thread === undefined) {
@@ -516,8 +549,9 @@ export function commandIdFor(callId: string, n: number): CommandId {
 
 /**
  * Translate a plan. The plan is treated as untrusted even though it passed the schema: each
- * intent is re-parsed against the per-game intent schema, so a hand-built or partially valid plan
- * cannot smuggle through an unknown kind, an extra field, or a name outside the vocabulary.
+ * intent is re-parsed against the intent schema, so a hand-built or partially valid plan cannot
+ * smuggle through an unknown kind or an extra field; every id is then checked against the
+ * snapshot and content (D45).
  */
 export const translateIntents: TranslateIntents = (
   plan: NarratorPlan,
@@ -525,8 +559,7 @@ export const translateIntents: TranslateIntents = (
 ): TranslationResult => {
   const snapshot = ctx.snapshot;
   const hook = ctx.hook ?? snapshot.state.narrator.pendingHook;
-  const intentSchema = buildNarratorPlanSchema(buildVocabulary(snapshot.state, ctx.content)).shape
-    .intents.element;
+  const intentSchema = buildNarratorPlanSchema().shape.intents.element;
   const written: readonly { readonly title?: unknown }[] = Array.isArray(plan.notes?.threads)
     ? plan.notes.threads
     : [];
