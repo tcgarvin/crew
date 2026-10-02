@@ -1,7 +1,8 @@
 /**
- * D40: the narrator is the only source of work. The sim never offers a job on its own; the
- * `jobBoard` hook is the captain looking for work, raised once per docking when nothing is on,
- * and not within `commerce.reofferSeconds` of a declined or expired offer at that port.
+ * D40, D46: the narrator is the only source of work. The sim never offers a job on its own; the
+ * `jobBoard` hook is the captain looking for work, raised when nothing is on and raised again,
+ * not more often than `commerce.reofferSeconds`, while the captain stays idle at that port, and
+ * not within that cooldown of a declined or expired offer there.
  */
 import { describe, expect, it } from "vitest";
 import { configTicks } from "../../core/clock";
@@ -36,10 +37,14 @@ function acknowledgePendingHook(kernel: Kernel, world: World): void {
   );
 }
 
-/** Make the board eligible again without leaving port (a fixture nudge, not a simulation). */
+/** Make the board eligible again without waiting out the cooldown (a fixture nudge). */
 function forgetThisDockingsAsk(world: World): void {
   // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete world.state.narrator.jobBoardHookRaisedAtPortId;
+  delete world.state.narrator.jobBoardLastAsk;
+}
+
+function reofferTicks(world: World): number {
+  return configTicks(world.config.values, world.config.values.commerce.reofferSeconds);
 }
 
 /** A fresh world past its first-tick `jobBoard` ask. */
@@ -65,7 +70,7 @@ describe("commerce: the sim never offers work on its own (D40)", () => {
 });
 
 describe("commerce: jobBoard is the ask (D40)", () => {
-  it("raises jobBoard on the first docked tick, with the port, and once per docking", () => {
+  it("raises jobBoard on the first docked tick, with the port, and not again within the cooldown", () => {
     const { world, kernel } = freightTestWorld();
     const first = kernel.advance(world, 1);
     expect(first.halt).toEqual({ kind: "hook" });
@@ -73,14 +78,38 @@ describe("commerce: jobBoard is the ask (D40)", () => {
       kind: "jobBoard",
       context: { portId: PORTS.a },
     });
-    expect(world.state.narrator.jobBoardHookRaisedAtPortId).toBe(PORTS.a);
+    expect(world.state.narrator.jobBoardLastAsk).toEqual({ portId: PORTS.a, tick: 1 });
     acknowledgePendingHook(kernel, world);
-    const after = kernel.advance(world, 2_000);
-    expect(after.halt).toEqual({ kind: "completed" });
+    const cooldownTicks = reofferTicks(world);
+    expect(cooldownTicks).toBeGreaterThan(100);
+    const during = kernel.advance(world, cooldownTicks - 50);
+    expect(during.halt).toEqual({ kind: "completed" });
     expect(world.state.narrator.pendingHook).toBeUndefined();
   });
 
-  it("stays quiet while an offer at this port is open", () => {
+  it("asks again after the cooldown while the captain is still idle here (D46)", () => {
+    const { world, kernel } = dockedWorldAfterFirstAsk();
+    const cooldownTicks = reofferTicks(world);
+    const again = kernel.advance(world, cooldownTicks + 100);
+    expect(again.halt).toEqual({ kind: "hook" });
+    expect(world.state.narrator.pendingHook).toMatchObject({
+      kind: "jobBoard",
+      context: { portId: PORTS.a },
+    });
+    expect(world.state.tick).toBeGreaterThanOrEqual(cooldownTicks);
+    expect(world.state.narrator.jobBoardLastAsk).toEqual({
+      portId: PORTS.a,
+      tick: world.state.tick,
+    });
+    acknowledgePendingHook(kernel, world);
+
+    // And a third time, as long as nothing is on.
+    const third = kernel.advance(world, cooldownTicks + 100);
+    expect(third.halt).toEqual({ kind: "hook" });
+    expect(world.state.narrator.pendingHook?.kind).toBe("jobBoard");
+  });
+
+  it("stays quiet while an offer at this port is open, even past the cooldown", () => {
     const { world, kernel } = dockedWorldAfterFirstAsk();
     kernel.enqueueCommand(
       world,
@@ -92,6 +121,15 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     const result = kernel.advance(world, 100);
     expect(result.halt).toEqual({ kind: "completed" });
     expect(world.state.narrator.pendingHook).toBeUndefined();
+
+    const job = Object.values(world.state.jobs)[0];
+    if (job === undefined) throw new Error("no job");
+    const ticksLeft = job.expiresAtTick - world.state.tick;
+    expect(ticksLeft).toBeGreaterThan(reofferTicks(world) + 100);
+    const later = kernel.advance(world, reofferTicks(world) + 100);
+    expect(later.halt).toEqual({ kind: "completed" });
+    expect(world.state.narrator.pendingHook).toBeUndefined();
+    expect(job.status).toBe("offered");
   });
 
   it("stays quiet while a job decision is queued, and while the accepted job plans a course", () => {
@@ -137,11 +175,7 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     if (job?.closedTick === undefined) throw new Error("declined job has no closedTick");
     forgetThisDockingsAsk(world);
 
-    const cooldownTicks = configTicks(
-      world.config.values,
-      world.config.values.commerce.reofferSeconds,
-    );
-    expect(cooldownTicks).toBeGreaterThan(100);
+    const cooldownTicks = reofferTicks(world);
     const during = kernel.advance(world, cooldownTicks - 50);
     expect(during.halt).toEqual({ kind: "completed" });
     expect(world.state.narrator.pendingHook).toBeUndefined();
@@ -164,8 +198,8 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     const untilApproach = kernel.advance(world, 1_000);
     expect(untilApproach.halt).toEqual({ kind: "hook" });
     expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
-    // Leaving port forgets the ask made at Alpha.
-    expect(world.state.narrator.jobBoardHookRaisedAtPortId).toBeUndefined();
+    // The record of the ask at Alpha stays; a different port asks at once regardless.
+    expect(world.state.narrator.jobBoardLastAsk).toEqual({ portId: PORTS.a, tick: 1 });
     acknowledgePendingHook(kernel, world);
 
     const untilBoard = kernel.advance(world, 1_000);
@@ -175,6 +209,9 @@ describe("commerce: jobBoard is the ask (D40)", () => {
       kind: "jobBoard",
       context: { portId: PORTS.b },
     });
-    expect(world.state.narrator.jobBoardHookRaisedAtPortId).toBe(PORTS.b);
+    expect(world.state.narrator.jobBoardLastAsk).toEqual({
+      portId: PORTS.b,
+      tick: world.state.tick,
+    });
   });
 });

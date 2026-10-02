@@ -102,6 +102,58 @@ describe("narrator", () => {
     expect(warn.mock.calls.filter((call) => call[0] === "[narrator] fallback")).toHaveLength(0);
   });
 
+  it("logs dropped intents as one warn line with kinds and reasons only (D46)", async () => {
+    const droppingNarrator: RunNarrator = async () => ({
+      response: {
+        commands: [],
+        callId: "dropped-call",
+        model: "test-model",
+        promptVersion: "v0.10",
+        notesUpdate: TEST_NOTES,
+        dropped: [
+          { intentIndex: 0, kind: "offerJob", reason: "offerJob: fromPort: unknown port" },
+          { intentIndex: 2, kind: "scheduleFault", reason: "scheduleFault: budget exhausted" },
+        ],
+      },
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { app } = buildTestApp({ runNarrator: droppingNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(narratorBody(game.id, 0, "quietTooLong")),
+    });
+    expect(res.status).toBe(200);
+
+    const droppedLines = warn.mock.calls.filter((call) => call[0] === "[narrator] dropped");
+    expect(droppedLines).toHaveLength(1);
+    expect(droppedLines[0]?.[1]).toEqual({
+      gameId: game.id,
+      hookKind: "quietTooLong",
+      dropped: [
+        { kind: "offerJob", reason: "offerJob: fromPort: unknown port" },
+        { kind: "scheduleFault", reason: "scheduleFault: budget exhausted" },
+      ],
+    });
+  });
+
+  it("does not warn about dropped intents when none were dropped", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { app } = buildTestApp({ runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(narratorBody(game.id)),
+    });
+    expect(res.status).toBe(200);
+    expect(warn.mock.calls.filter((call) => call[0] === "[narrator] dropped")).toHaveLength(0);
+  });
+
   it("calls the injected narrator and logs the call", async () => {
     const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });

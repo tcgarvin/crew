@@ -107,7 +107,7 @@
     "jobOfferTtlSeconds": 600,
     "dockingFee": 150,
     "haulEstimateSeconds": 5,
-    "reofferSeconds": 20,
+    "reofferSeconds": 90,
     "maxCratesPerJob": 6
   },
   "narrator": {

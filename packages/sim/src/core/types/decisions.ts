@@ -112,8 +112,10 @@ export interface NarratorState {
    */
   lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
   /**
-   * W6 addition: the port the `jobBoard` hook was last raised for while docked there, so it
-   * raises at most once per dock stay; cleared when travel leaves `docked`.
+   * D46: the last `jobBoard` ask, so the board re-asks at most once per
+   * `config.commerce.reofferSeconds` while the captain stays idle at that port. A different port
+   * asks at once. Replaces the W6 `jobBoardHookRaisedAtPortId` (once per docking); a stale key
+   * from an older save is ignored.
    */
-  jobBoardHookRaisedAtPortId?: PortDefId;
+  jobBoardLastAsk?: { portId: PortDefId; tick: Tick };
 }

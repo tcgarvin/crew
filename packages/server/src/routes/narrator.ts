@@ -161,6 +161,17 @@ export function registerNarratorRoutes(
         });
       }
 
+      if (response.dropped !== undefined && response.dropped.length > 0) {
+        // D46: an intent the translator dropped is otherwise only visible in the call log's
+        // response jsonb. Kinds and reasons only: the reasons are the translator's own text,
+        // never the model's prose or the request.
+        console.warn("[narrator] dropped", {
+          gameId,
+          hookKind: reqBody.hook.kind,
+          dropped: response.dropped.map((d) => ({ kind: d.kind, reason: d.reason })),
+        });
+      }
+
       // D43: in `error` mode a fallback is refused, never served. The call is logged as an
       // error with its reason; the client retries (the sim stays halted) or pauses the game.
       const failure = narratorFailure(outcome);

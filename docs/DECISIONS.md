@@ -277,3 +277,19 @@ Those fields are now plain strings where empty means none; only `card` (null whe
 decision) and the four-way intents union remain. A new schema compiles on first use (tens of
 seconds, longer than the 25 s call budget, so the first call after a schema change can fall back
 once) and is then cached by the provider for 24 hours from last use. Prompt v0.9.
+
+**D46. The narrator runs the pace.** Owner, after ten maintenance events in a row at a port where
+the narrator had offered no work: pacing is a prompt rule, not a state machine. The system prompt
+gains a "Pacing" block: the narrator judges from "What the captain has seen" (with ticks) and the
+ship's state whether the story needs forward motion (work, a thread beat, a consequence of an
+earlier choice), a breath, or nothing; an idle docked captain gets work first; faults are
+pressure, never filler, and never twice in a row. `quietTooLong` now asks for that judgement in
+order (offer work if idle at a port, advance a due thread, a minor crew card, a fault only if the
+story needs pressure, nothing) and for the choice in rationale. In the sim, `jobBoard` no longer
+fires once per docking: it re-asks after `commerce.reofferSeconds` for as long as the captain
+stays idle at the port (`narrator.jobBoardLastAsk` replaces `jobBoardHookRaisedAtPortId`), so an
+unanswered ask is not the end of work there. The server logs dropped intents (`[narrator]
+dropped`, kinds and reasons) so a plan the translator rejected is visible outside the call log.
+Prompt v0.10. Owner: "first there's an opportunity for work, then we pause, one or two small
+things happen, then we come back and move the story forward. The narrator ought to be able to
+govern that on its own."

@@ -39,22 +39,23 @@ function captainIsIdleAt(ctx: StepCtx, portId: PortDefId): boolean {
 }
 
 /**
- * `jobBoard` (D40): the captain looking for work. Raised once per docking, when the ship is
- * docked and `captainIsIdleAt` holds; the narrator (or the null narrator offline) answers it
- * with an offer. `jobBoardHookRaisedAtPortId` remembers the docking it fired in and is cleared
- * the moment travel leaves `docked`, so the next docking asks again. `approachingPort` is raised
+ * `jobBoard` (D40, D46): the captain looking for work. Raised when the ship is docked and
+ * `captainIsIdleAt` holds, and raised again, not more often than `config.commerce.reofferSeconds`,
+ * for as long as the captain stays idle there: an unanswered ask (the narrator offered nothing)
+ * must not leave the port without work until something else happens. `jobBoardLastAsk` records
+ * the port and tick of the last ask; a different port asks at once. `approachingPort` is raised
  * by travel before docking and is unaffected: an offer made there keeps the board quiet here.
  */
 export function raiseJobBoardHookIfNeeded(ctx: StepCtx): void {
   const travel = ctx.state.travel;
-  if (travel.stage !== "docked") {
-    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-    delete ctx.state.narrator.jobBoardHookRaisedAtPortId;
-    return;
+  if (travel.stage !== "docked") return;
+  const last = ctx.state.narrator.jobBoardLastAsk;
+  if (last !== undefined && last.portId === travel.portId) {
+    const cooldownTicks = configTicks(ctx.config, ctx.config.commerce.reofferSeconds);
+    if (ctx.tick - last.tick < cooldownTicks) return;
   }
-  if (ctx.state.narrator.jobBoardHookRaisedAtPortId === travel.portId) return;
   if (!captainIsIdleAt(ctx, travel.portId)) return;
   if (raiseHookIfIdle(ctx, "jobBoard", { portId: travel.portId })) {
-    ctx.state.narrator.jobBoardHookRaisedAtPortId = travel.portId;
+    ctx.state.narrator.jobBoardLastAsk = { portId: travel.portId, tick: ctx.tick };
   }
 }

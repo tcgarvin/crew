@@ -19,7 +19,7 @@ import {
 } from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
-import { STATIC_RULES } from "./prompts/index";
+import { HOOK_INSTRUCTIONS, STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
 import { runNarrator } from "./run";
 import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
@@ -583,7 +583,19 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.9");
+    expect(PROMPT_VERSION).toBe("v0.10");
+  });
+
+  it("tells the model it runs the pace (D46)", () => {
+    expect(STATIC_RULES).toContain("Pacing:");
+    expect(STATIC_RULES).toContain("You run the pace.");
+    expect(STATIC_RULES).toContain("Maintenance is not forward motion.");
+    expect(STATIC_RULES).toContain("Do not fill that wait with faults.");
+    expect(STATIC_RULES).toContain("A fault is a pressure, not a pastime.");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("using the Pacing rules");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("offer work if the captain is idle at a port");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("Say which you chose and why in rationale");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).not.toContain("Prefer advancing a thread");
   });
 });
 

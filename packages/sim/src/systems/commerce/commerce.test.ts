@@ -94,9 +94,9 @@ describe("commerce: decision perspective (D8)", () => {
 });
 
 describe("commerce: jobBoard hook", () => {
-  it("raises jobBoard when docked with nothing on, and does not raise it twice", () => {
-    // D40: the narrator is the only source of work, so a fresh world docked at its start port
-    // asks for an offer on the first tick, and asks once per docking.
+  it("raises jobBoard when docked with nothing on, and not again within the cooldown", () => {
+    // D40/D46: the narrator is the only source of work, so a fresh world docked at its start
+    // port asks for an offer on the first tick, and asks again only after reofferSeconds.
     const { world, kernel } = freightTestWorld();
 
     const first = kernel.advance(world, 1);
