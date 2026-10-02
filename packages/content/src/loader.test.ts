@@ -25,6 +25,25 @@ describe("loadBundle", () => {
     expect(new Set(voices).size).toBe(8);
   });
 
+  it("gives every port a market, well stocked at the Hub and bare at Green Meridian (D47)", () => {
+    const result = loadBundle();
+    if (!result.ok) throw new Error("content bundle failed validation");
+    const parts = (portId: string) =>
+      result.bundle.ports[portId as keyof typeof result.bundle.ports]?.market.find(
+        (line) => line.itemDefId === "item.spare_parts_stack",
+      );
+    expect(parts("port.crossroads_hub")).toMatchObject({ count: 4 });
+    expect(parts("port.kessler_drift")).toMatchObject({ count: 1 });
+    expect(parts("port.green_meridian")).toMatchObject({ count: 0 });
+    for (const port of Object.values(result.bundle.ports)) {
+      for (const line of port.market) {
+        expect(result.bundle.items[line.itemDefId]).toBeDefined();
+        expect(line.price).toBeGreaterThan(0);
+      }
+    }
+    expect(result.bundle.config.commerce.market.maxStockPerCommand).toBe(4);
+  });
+
   it("has all 8 crew, 10 traits and the default scenario", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;

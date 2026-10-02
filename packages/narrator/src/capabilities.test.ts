@@ -38,8 +38,27 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the four narrator levers", () => {
+  it("names exactly the five narrator levers (D47 added stockMarket)", () => {
     const levers = [...text.matchAll(/^## \d\. (\w+)/gm)].map((m) => m[1]);
-    expect(levers).toEqual(["offerJob", "spawnAtBoundary", "scheduleFault", "surfaceDecision"]);
+    expect(levers).toEqual([
+      "offerJob",
+      "spawnAtBoundary",
+      "scheduleFault",
+      "surfaceDecision",
+      "stockMarket",
+    ]);
+    expect(text).toContain("You have exactly five levers");
+  });
+
+  it("lists each port's market as items, counts and price tier words, no prices (D47)", () => {
+    for (const port of Object.values(content().ports)) {
+      for (const line of port.market) {
+        const name = content().items[line.itemDefId]?.name ?? "";
+        const entry = `${line.itemDefId} "${name}" x${line.count} (fair)`;
+        expect(text.includes(entry)).toBe(line.count > 0);
+        expect(text).not.toContain(`${line.price} cr`);
+      }
+    }
+    expect(text).toContain("The crew buy what a stalled repair needs themselves");
   });
 });

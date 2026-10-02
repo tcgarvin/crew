@@ -15,6 +15,18 @@
       "kind": "market"
     }
   ],
+  "market": [
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 1,
+      "price": 180
+    },
+    {
+      "itemDefId": "item.coolant_canister",
+      "count": 2,
+      "price": 75
+    }
+  ],
   "jobTemplates": [
     {
       "key": "ore_to_hub",

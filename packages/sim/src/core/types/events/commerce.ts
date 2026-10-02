@@ -1,6 +1,6 @@
 /** Commerce and custody events (W6). */
 import type { PhysicalLocation } from "../common";
-import type { EntityId, ItemId, JobId, TransactionId } from "../ids";
+import type { EntityId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 
 export interface CommerceEventPayloads {
@@ -22,6 +22,23 @@ export interface CommerceEventPayloads {
   };
   /** Anything created by a spawn command (boundary or scenario). */
   entitySpawned: { readonly entityId: EntityId; readonly defId: string };
+  /**
+   * D47: the crew bought `count` of `itemDefId` from the market at `portId` for `cost` credits in
+   * all. Subjects: the buyer, then the item(s) that landed aboard.
+   */
+  partsBought: {
+    readonly portId: PortDefId;
+    readonly itemDefId: ItemDefId;
+    readonly count: number;
+    readonly cost: number;
+  };
+  /** D47: a `stockMarket` command set a port's stock of one item (count 0 = withdrawn). */
+  marketStocked: {
+    readonly portId: PortDefId;
+    readonly itemDefId: ItemDefId;
+    readonly count: number;
+    readonly price: number;
+  };
 }
 
 export const COMMERCE_EVENT_SIGNIFICANCE = {
@@ -33,4 +50,8 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   contractCompleted: "narrative",
   paymentMade: "notable",
   entitySpawned: "trace",
+  // D47: a purchase is a story beat the narrator may react to; stocking is the narrator's own
+  // quiet hand and never reaches the ticker.
+  partsBought: "narrative",
+  marketStocked: "trace",
 } as const satisfies SignificanceCatalog<CommerceEventPayloads>;

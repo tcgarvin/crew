@@ -15,6 +15,7 @@ import {
  *   (`machineStatus` fact): ≥ `heatSurvivalAbove` → immediateSurvival, ≥ `heatContainmentAbove`
  *   → containment;
  * - `stationToStaff` → essentialOperation;
+ * - `partsNeeded` (D47) → the owner's base urgency (the repair it unblocks);
  * - `cargoToLoad`/`cargoToUnload`, symptom inspection (`machineSymptom`) and `maintenanceDue`
  *   → routineObligation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
@@ -120,6 +121,9 @@ export function taskUrgency(
       return "routineObligation";
     case "stationToStaff":
       return "essentialOperation";
+    case "partsNeeded":
+      // D47: the part gates a repair the owner already rated; buying it is as pressing as fixing.
+      return problem.baseUrgency;
   }
 }
 

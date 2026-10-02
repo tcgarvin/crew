@@ -125,6 +125,12 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
       maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
+      market: {
+        priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
+        maxStockPerCommand: 4,
+        defaultPrice: 100,
+        buySeconds: 3,
+      },
     },
     narrator: {
       quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
@@ -287,6 +293,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         name: "Alpha Station",
         description: "The home port.",
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        market: [],
         jobTemplates: [
           {
             key: "haulToBeta",
@@ -306,6 +313,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         name: "Beta Yard",
         description: "A midway yard.",
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        market: [],
         jobTemplates: [],
         routes: [
           { toPortId: PORTS.a, distance: 25 },
@@ -317,6 +325,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         name: "Gamma Ring",
         description: "The far ring.",
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        market: [],
         jobTemplates: [],
         routes: [
           { toPortId: PORTS.a, distance: 45 },

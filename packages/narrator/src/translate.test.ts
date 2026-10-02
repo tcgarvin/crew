@@ -193,6 +193,96 @@ describe("translateIntents: valid intents", () => {
     ]);
   });
 
+  it("stockMarket → the port's content price times the tier, count clamped, any item (D47)", () => {
+    const req = approachingPortRequest(content());
+    const config = req.snapshot.config;
+    const result = translateIntents(
+      plan([
+        {
+          kind: "stockMarket",
+          port: "port.green_meridian",
+          cargoItem: "item.spare_parts_stack",
+          count: "3",
+          priceTier: "dear",
+        },
+        {
+          kind: "stockMarket",
+          port: "port.kessler_drift",
+          cargoItem: "item.toolkit",
+          count: "0",
+          priceTier: "cheap",
+        },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.dropped).toEqual([]);
+    const meridianParts = content().ports["port.green_meridian" as PortDefId]?.market.find(
+      (l) => l.itemDefId === "item.spare_parts_stack",
+    );
+    if (meridianParts === undefined) throw new Error("content lost Green Meridian's parts line");
+    expect(result.commands[0]).toMatchObject({
+      kind: "stockMarket",
+      source: "narrator",
+      payload: {
+        portId: "port.green_meridian",
+        itemDefId: "item.spare_parts_stack",
+        count: 3,
+        price: Math.round(meridianParts.price * config.commerce.market.priceTiers.dear),
+      },
+    });
+    // A toolkit is sold nowhere in content, so the config default price applies, times "cheap".
+    expect(result.commands[1]).toMatchObject({
+      kind: "stockMarket",
+      payload: {
+        portId: "port.kessler_drift",
+        itemDefId: "item.toolkit",
+        count: 0,
+        price: Math.round(
+          config.commerce.market.defaultPrice * config.commerce.market.priceTiers.cheap,
+        ),
+      },
+    });
+  });
+
+  it("drops a stockMarket with an unknown port or item, with a pointer to What you can do", () => {
+    const req = approachingPortRequest(content());
+    const result = translateIntents(
+      plan([
+        {
+          kind: "stockMarket",
+          port: "port.nowhere",
+          cargoItem: "item.spare_parts_stack",
+          count: "1",
+          priceTier: "fair",
+        },
+        {
+          kind: "stockMarket",
+          port: "port.crossroads_hub",
+          cargoItem: "item.unobtainium",
+          count: "1",
+          priceTier: "fair",
+        },
+        {
+          kind: "stockMarket",
+          port: "port.crossroads_hub",
+          cargoItem: "item.spare_parts_stack",
+          count: "9",
+          priceTier: "fair",
+        },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.commands).toEqual([]);
+    expect(result.dropped.map((d) => d.kind)).toEqual([
+      "stockMarket",
+      "stockMarket",
+      "stockMarket",
+    ]);
+    expect(result.dropped[0]?.reason).toContain("What you can do");
+    expect(result.dropped[1]?.reason).toContain("What you can do");
+    expect(result.dropped[2]?.reason).toContain("stockMarket: invalid");
+  });
+
   it("scheduleFault → a window within config bounds", () => {
     const req = quietTooLongRequest(content());
     const generator = Object.values(req.snapshot.state.machines).find(

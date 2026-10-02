@@ -8,6 +8,7 @@ import { headNeedingNarration } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
+import { marketSeed } from "./markets";
 import { runStep } from "./pipeline";
 import type { KernelRegistry } from "./registry";
 import { isTickerEvent } from "./render";
@@ -48,6 +49,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     travel: { stage: "docked", portId: scenario.startPortId },
     jobs: {},
     money: { balance: 0, transactions: {} },
+    markets: {},
     decisions: { records: {}, queue: [] },
     narrator: {
       lastNarrativeTick: 0,
@@ -252,6 +254,13 @@ function seedInitialNeeds(
   }
 }
 
+/** D47: every port's market opens at its content position; purchases and `stockMarket` move it. */
+function seedMarkets(state: WorldState, content: ContentBundle): void {
+  for (const port of Object.values(content.ports)) {
+    state.markets[port.id] = marketSeed(port);
+  }
+}
+
 export function createWorld(
   registry: KernelRegistry,
   scenarioId: ScenarioDefId,
@@ -271,6 +280,7 @@ export function createWorld(
   }
 
   const state = emptyState(scenario, seed);
+  seedMarkets(state, content);
   const values = config.values;
   state.narrator.budget = {
     spawnsRemaining: values.narrator.spawnBudget,

@@ -128,6 +128,7 @@ const port = {
   name: "Port A",
   description: "",
   externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+  market: [{ itemDefId: "item.test.wrench", count: 2, price: 40 }],
   jobTemplates: [
     {
       key: "parts",
@@ -145,6 +146,7 @@ const portB = {
   name: "Port B",
   description: "",
   externalStores: [{ key: "warehouse", name: "Warehouse B", kind: "warehouse" }],
+  market: [],
   jobTemplates: [],
   routes: [{ toPortId: "port.test.a", distance: 40 }],
 };
@@ -233,6 +235,12 @@ const config = {
     haulEstimateSeconds: 5,
     reofferSeconds: 60,
     maxCratesPerJob: 6,
+    market: {
+      priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
+      maxStockPerCommand: 4,
+      defaultPrice: 100,
+      buySeconds: 3,
+    },
   },
   narrator: {
     quietTooLongSeconds: 180,
@@ -406,6 +414,35 @@ describe("bundle validation", () => {
         const issues = validateReferences(parsed.bundle);
         expect(issues.some((i) => i.message.includes("must start with"))).toBe(true);
       }
+    });
+
+    it("rejects a market line naming an unknown item, and a duplicate line (D47)", () => {
+      const badPort = {
+        ...port,
+        market: [
+          { itemDefId: "item.test.nothing", count: 1, price: 10 },
+          { itemDefId: "item.test.wrench", count: 1, price: 10 },
+          { itemDefId: "item.test.wrench", count: 2, price: 12 },
+        ],
+      };
+      const parsed = validateStructure({
+        ...bundle,
+        ports: { ...bundle.ports, [port.id]: badPort },
+      });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("item.test.nothing"))).toBe(true);
+        expect(issues.some((i) => i.message.includes("duplicate market item"))).toBe(true);
+      }
+      const negative = validateStructure({
+        ...bundle,
+        ports: {
+          ...bundle.ports,
+          [port.id]: { ...port, market: [{ itemDefId: "item.test.wrench", count: -1, price: 10 }] },
+        },
+      });
+      expect(negative.ok).toBe(false);
     });
 
     it("rejects a dangling item reference in a crew starting inventory", () => {

@@ -73,6 +73,10 @@ export const TOOL_KINDS = [
 ] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
+/** D47: the narrator's coarse price lever for `stockMarket`; `config.commerce.market.priceTiers` maps it. */
+export const MARKET_PRICE_TIERS = ["cheap", "fair", "dear"] as const;
+export type MarketPriceTier = (typeof MARKET_PRICE_TIERS)[number];
+
 /** Cargo pricing class; `config.commerce.priceBands` is keyed by this. */
 export const CARGO_CLASSES = ["general", "fragile", "perishable", "hazardous"] as const;
 export type CargoClass = (typeof CARGO_CLASSES)[number];
@@ -428,6 +432,12 @@ export interface PortDef {
   readonly description: string;
   readonly externalStores: readonly ExternalStoreDef[];
   /**
+   * D47: what the port sells. Seeds `WorldState.markets[portId]` at world creation; the live
+   * stock (and the price, once the narrator restocks) is state, so this is the opening position,
+   * not truth. A line with `count: 0` still carries the port's price for that item.
+   */
+  readonly market: readonly MarketLineDef[];
+  /**
    * Offline job templates (W6, D40): the null narrator draws from these when it answers an
    * `approachingPort` or `jobBoard` hook. Pay is not authored: it comes from price bands.
    */
@@ -443,6 +453,13 @@ export interface ExternalStoreDef {
   readonly key: LocalKey;
   readonly name: string;
   readonly kind: "warehouse" | "market" | "lounge";
+}
+
+/** D47: one item a port's market sells; `price` is integer credits per unit. */
+export interface MarketLineDef {
+  readonly itemDefId: ItemDefId;
+  readonly count: number;
+  readonly price: number;
 }
 
 export interface JobTemplateDef {
@@ -631,6 +648,17 @@ export interface ConfigDef {
      * a long single-actor slog.
      */
     readonly maxCratesPerJob: number;
+    /** D47: the parts market. */
+    readonly market: {
+      /** Multipliers over a port's content price for the narrator's `stockMarket` price tiers. */
+      readonly priceTiers: Readonly<Record<MarketPriceTier, number>>;
+      /** Most units one `stockMarket` command may put on a market. */
+      readonly maxStockPerCommand: number;
+      /** Per-unit price for an item no port's content market lists, when the narrator stocks it. */
+      readonly defaultPrice: number;
+      /** Seconds a crew member spends at the counter before a purchase commits. */
+      readonly buySeconds: Seconds;
+    };
   };
   readonly narrator: {
     /** Quiet-too-long hook fires after this many seconds without a narrative event. */

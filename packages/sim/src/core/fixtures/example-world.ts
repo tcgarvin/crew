@@ -342,6 +342,7 @@ export function exampleWorldState(): WorldState {
         cargoItemIds: [i3],
       },
     },
+    markets: {},
     money: {
       balance: 1200,
       transactions: { [n1]: { id: n1, tick: 0, amount: 1200, reason: "scenario" } },

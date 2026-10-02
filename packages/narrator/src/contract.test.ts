@@ -116,7 +116,7 @@ describe("NarratorPlan structured-output schema", () => {
     expect(unions).toBe(2);
     const text = JSON.stringify(json);
     expect(text).not.toContain("port.a");
-    expect(text).toContain('from \\"What you can do\\", copied exactly');
+    expect(text).toContain('from \\"What you can do\\"');
   });
 
   it("accepts an empty or named speaker on the card, never a missing one (D29, D45)", () => {

@@ -1,4 +1,4 @@
-import type { EventId, SimEvent } from "@crew/sim";
+import type { EventId, MachineId, ProblemId, SaveEnvelope, SimEvent } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
 import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
@@ -18,6 +18,67 @@ function manyEvents(n: number): SimEvent[] {
     payload: { machineId: "m3", faultKey: `fault_${i}` },
   })) as unknown as SimEvent[];
 }
+
+describe("buildDigest: parts market (D47)", () => {
+  function dockedWithShortfall(portId: string, balance = 5000) {
+    const req = approachingPortRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const state = snapshot.state;
+    state.travel = {
+      stage: "docked",
+      portId: portId as never,
+      plannedDestinationId: "port.crossroads_hub" as never,
+      holdForRepairs: true,
+    };
+    state.money.balance = balance;
+    const engine = Object.values(state.machines).find((m) => m.defId === "machine.engine");
+    if (engine === undefined) throw new Error("fixture: no engine");
+    const problemId = "p9" as ProblemId;
+    state.work.problems[problemId] = {
+      id: problemId,
+      kind: "partsNeeded",
+      payload: {
+        machineId: engine.id as MachineId,
+        itemDefId: "item.spare_parts_stack" as never,
+        count: 1,
+      },
+      owner: "equipment",
+      visibility: "public",
+      dedupeKey: `partsNeeded:${engine.id}:item.spare_parts_stack`,
+      status: "open",
+      createdTick: 10,
+      revision: 0,
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId: engine.id as MachineId },
+    };
+    return { ...req, snapshot, hook: undefined };
+  }
+
+  it("shows what the market here sells, with prices, and a hold's reason", () => {
+    const req = dockedWithShortfall("port.crossroads_hub");
+    const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), undefined);
+    expect(text).toContain("market here: ");
+    expect(text).toContain("Spare Parts x4 at 120 cr");
+    expect(text).toContain("departure held for repairs");
+    expect(text).toContain(
+      "the repair is waiting on parts: 1x Spare Parts (the crew are buying it here (Crossroads Hub))",
+    );
+    expect(text).toContain(
+      "- partsNeeded (public) since tick 10: Main Engine needs 1x Spare Parts; the crew are buying it here (Crossroads Hub)",
+    );
+  });
+
+  it("says when the part is not sold here, and when the ship cannot afford it", () => {
+    const bare = dockedWithShortfall("port.green_meridian");
+    expect(buildDigest(bare.snapshot, [], EMPTY_NOTES, content(), undefined).text).toContain(
+      "needs 1x Spare Parts; not available here (Green Meridian)",
+    );
+    const broke = dockedWithShortfall("port.crossroads_hub", 50);
+    expect(buildDigest(broke.snapshot, [], EMPTY_NOTES, content(), undefined).text).toContain(
+      "needs 1x Spare Parts; cannot afford it here (50 credits)",
+    );
+  });
+});
 
 describe("buildDigest", () => {
   it("is deterministic", () => {

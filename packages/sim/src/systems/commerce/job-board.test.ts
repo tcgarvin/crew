@@ -1,8 +1,9 @@
 /**
- * D40, D46: the narrator is the only source of work. The sim never offers a job on its own; the
- * `jobBoard` hook is the captain looking for work, raised when nothing is on and raised again,
- * not more often than `commerce.reofferSeconds`, while the captain stays idle at that port, and
- * not within that cooldown of a declined or expired offer there.
+ * D40 (D46 as amended): the narrator is the only source of work. The sim never offers a job on
+ * its own; the `jobBoard` hook is the captain looking for work, raised once per docking when
+ * nothing is on (and not within `commerce.reofferSeconds` of a declined or expired offer there).
+ * It is never re-raised on a timer: pacing is the narrator's judgement, so an unanswered ask
+ * stays unanswered until the next docking or a `quietTooLong` check-in.
  */
 import { describe, expect, it } from "vitest";
 import { configTicks } from "../../core/clock";
@@ -70,7 +71,7 @@ describe("commerce: the sim never offers work on its own (D40)", () => {
 });
 
 describe("commerce: jobBoard is the ask (D40)", () => {
-  it("raises jobBoard on the first docked tick, with the port, and not again within the cooldown", () => {
+  it("raises jobBoard on the first docked tick, with the port, and not again this docking", () => {
     const { world, kernel } = freightTestWorld();
     const first = kernel.advance(world, 1);
     expect(first.halt).toEqual({ kind: "hook" });
@@ -87,26 +88,13 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     expect(world.state.narrator.pendingHook).toBeUndefined();
   });
 
-  it("asks again after the cooldown while the captain is still idle here (D46)", () => {
+  it("does not ask again on a timer while the captain stays idle here (D46 as amended)", () => {
     const { world, kernel } = dockedWorldAfterFirstAsk();
     const cooldownTicks = reofferTicks(world);
-    const again = kernel.advance(world, cooldownTicks + 100);
-    expect(again.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook).toMatchObject({
-      kind: "jobBoard",
-      context: { portId: PORTS.a },
-    });
-    expect(world.state.tick).toBeGreaterThanOrEqual(cooldownTicks);
-    expect(world.state.narrator.jobBoardLastAsk).toEqual({
-      portId: PORTS.a,
-      tick: world.state.tick,
-    });
-    acknowledgePendingHook(kernel, world);
-
-    // And a third time, as long as nothing is on.
-    const third = kernel.advance(world, cooldownTicks + 100);
-    expect(third.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("jobBoard");
+    const later = kernel.advance(world, 3 * cooldownTicks);
+    expect(later.halt).toEqual({ kind: "completed" });
+    expect(world.state.narrator.pendingHook).toBeUndefined();
+    expect(world.state.narrator.jobBoardLastAsk).toEqual({ portId: PORTS.a, tick: 1 });
   });
 
   it("stays quiet while an offer at this port is open, even past the cooldown", () => {
@@ -198,8 +186,8 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     const untilApproach = kernel.advance(world, 1_000);
     expect(untilApproach.halt).toEqual({ kind: "hook" });
     expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
-    // The record of the ask at Alpha stays; a different port asks at once regardless.
-    expect(world.state.narrator.jobBoardLastAsk).toEqual({ portId: PORTS.a, tick: 1 });
+    // Leaving the dock forgets the ask, so the next docking anywhere (Alpha included) asks again.
+    expect(world.state.narrator.jobBoardLastAsk).toBeUndefined();
     acknowledgePendingHook(kernel, world);
 
     const untilBoard = kernel.advance(world, 1_000);

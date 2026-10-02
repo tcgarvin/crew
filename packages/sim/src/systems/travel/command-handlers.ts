@@ -17,7 +17,7 @@ import {
 } from "../../core/commands";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { MachineId, PortDefId } from "../../core/types/ids";
-import { beginDeparture, hasOpenCargoWork } from "./travel";
+import { beginDeparture, hasOpenCargoWork, requestRamps } from "./travel";
 
 function findRoute(
   ctx: Pick<ValidateCtx, "content">,
@@ -104,7 +104,22 @@ export const holdDepartureForRepairs: CommandHandler<"holdDepartureForRepairs", 
     return checkDeparturePlanned(ctx, command.payload.machineId, "holdDepartureForRepairs");
   },
   apply(ctx: ApplyCtx, command: CommandOfKind<"holdDepartureForRepairs">): AppliedCommand {
-    const travel = ctx.state.travel;
+    let travel = ctx.state.travel;
+    if (travel.stage === "preparingDeparture") {
+      // D47: "hold for repairs" means wait *docked* (D36): back to the dock with the course kept
+      // and the ramps open, so the crew can buy the part the repair is waiting on from the
+      // port's market. The hold lifts into `beginDeparture` again once nothing is impaired.
+      const { fromPortId, toPortId } = travel;
+      travel = { stage: "docked", portId: fromPortId, plannedDestinationId: toPortId };
+      ctx.state.travel = travel;
+      requestRamps(ctx, "open");
+      ctx.emit({
+        ...causedBy(command),
+        type: "travelStageChanged",
+        subjectIds: [],
+        payload: { from: "preparingDeparture", to: "docked" },
+      });
+    }
     travel.holdForRepairs = true;
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
     delete travel.departureRiskAccepted;

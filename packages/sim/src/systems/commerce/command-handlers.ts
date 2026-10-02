@@ -16,6 +16,7 @@ import {
 } from "../../core/commands";
 import { findCrewDef, findItemDef } from "../../core/defs";
 import { allocateId } from "../../core/ids";
+import { ensureMarket } from "../../core/markets";
 import type { BoundaryLocation, CommandOfKind, CommandRejection } from "../../core/types/commands";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { CrewDef, ItemDef } from "../../core/types/content";
@@ -174,6 +175,46 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       causeIds: [command.id],
       source: command.source,
       payload: { jobId: job.id },
+    });
+    return NO_TEMP_REFS;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// stockMarket (D47): what a port sells. Narrator and scenario only; never money, never aboard.
+// ---------------------------------------------------------------------------------------------
+
+export const stockMarket: CommandHandler<"stockMarket", null> = {
+  validate(ctx, command): Validation<null> {
+    const { portId, itemDefId, count, price } = command.payload;
+    if (ctx.content.ports[portId] === undefined) {
+      return reject("unknownEntity", `stockMarket: unknown port "${portId}"`);
+    }
+    if (findItemDef(ctx.content, ctx.state, itemDefId) === undefined) {
+      return reject("unknownEntity", `stockMarket: unknown item "${itemDefId}"`);
+    }
+    const max = ctx.config.commerce.market.maxStockPerCommand;
+    if (!Number.isInteger(count) || count < 0) {
+      return reject("invalidPayload", "stockMarket: count must be an integer >= 0");
+    }
+    if (count > max) {
+      return reject("outOfBounds", `stockMarket: count ${count} exceeds maxStockPerCommand ${max}`);
+    }
+    if (!Number.isInteger(price) || price < 1) {
+      return reject("invalidPayload", "stockMarket: price must be an integer >= 1");
+    }
+    return ok(null);
+  },
+  apply(ctx: ApplyCtx, command: CommandOfKind<"stockMarket">): AppliedCommand {
+    const { portId, itemDefId, count, price } = command.payload;
+    const market = ensureMarket(ctx.state, ctx.content, portId);
+    market[itemDefId] = { count, price };
+    ctx.emit({
+      ...causedBy(command),
+      type: "marketStocked",
+      subjectIds: [],
+      locationRef: { kind: "port", portId },
+      payload: { portId, itemDefId, count, price },
     });
     return NO_TEMP_REFS;
   },

@@ -112,10 +112,11 @@ export interface NarratorState {
    */
   lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
   /**
-   * D46: the last `jobBoard` ask, so the board re-asks at most once per
-   * `config.commerce.reofferSeconds` while the captain stays idle at that port. A different port
-   * asks at once. Replaces the W6 `jobBoardHookRaisedAtPortId` (once per docking); a stale key
-   * from an older save is ignored.
+   * The `jobBoard` ask of the current docking (port and tick), so the board asks once per
+   * docking; cleared the moment travel leaves `docked`, so the next docking at any port asks
+   * again. D46 briefly re-asked on a timer; the owner withdrew that (D46 amendment): pacing is
+   * the narrator's judgement, not a timer's. A stale `jobBoardHookRaisedAtPortId` from an older
+   * save is ignored.
    */
   jobBoardLastAsk?: { portId: PortDefId; tick: Tick };
 }

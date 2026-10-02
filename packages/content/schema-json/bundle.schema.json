@@ -1192,6 +1192,30 @@
               "additionalProperties": false
             }
           },
+          "market": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemDefId": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "price": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["itemDefId", "count", "price"],
+              "additionalProperties": false
+            }
+          },
           "jobTemplates": {
             "type": "array",
             "items": {
@@ -1262,7 +1286,15 @@
             }
           }
         },
-        "required": ["id", "name", "description", "externalStores", "jobTemplates", "routes"],
+        "required": [
+          "id",
+          "name",
+          "description",
+          "externalStores",
+          "market",
+          "jobTemplates",
+          "routes"
+        ],
         "additionalProperties": false
       }
     },
@@ -1935,6 +1967,46 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "market": {
+              "type": "object",
+              "properties": {
+                "priceTiers": {
+                  "type": "object",
+                  "properties": {
+                    "cheap": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "fair": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "dear": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": ["cheap", "fair", "dear"],
+                  "additionalProperties": false
+                },
+                "maxStockPerCommand": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "defaultPrice": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "buySeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["priceTiers", "maxStockPerCommand", "defaultPrice", "buySeconds"],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1943,7 +2015,8 @@
             "dockingFee",
             "haulEstimateSeconds",
             "reofferSeconds",
-            "maxCratesPerJob"
+            "maxCratesPerJob",
+            "market"
           ],
           "additionalProperties": false
         },

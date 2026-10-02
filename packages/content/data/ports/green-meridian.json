@@ -20,6 +20,18 @@
       "kind": "lounge"
     }
   ],
+  "market": [
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 0,
+      "price": 150
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 30,
+      "price": 6
+    }
+  ],
   "jobTemplates": [
     {
       "key": "rations_to_hub",

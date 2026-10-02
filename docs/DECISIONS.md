@@ -285,11 +285,40 @@ ship's state whether the story needs forward motion (work, a thread beat, a cons
 earlier choice), a breath, or nothing; an idle docked captain gets work first; faults are
 pressure, never filler, and never twice in a row. `quietTooLong` now asks for that judgement in
 order (offer work if idle at a port, advance a due thread, a minor crew card, a fault only if the
-story needs pressure, nothing) and for the choice in rationale. In the sim, `jobBoard` no longer
-fires once per docking: it re-asks after `commerce.reofferSeconds` for as long as the captain
-stays idle at the port (`narrator.jobBoardLastAsk` replaces `jobBoardHookRaisedAtPortId`), so an
-unanswered ask is not the end of work there. The server logs dropped intents (`[narrator]
-dropped`, kinds and reasons) so a plan the translator rejected is visible outside the call log.
-Prompt v0.10. Owner: "first there's an opportunity for work, then we pause, one or two small
-things happen, then we come back and move the story forward. The narrator ought to be able to
-govern that on its own."
+story needs pressure, nothing) and for the choice in rationale. The server logs dropped intents
+(`[narrator] dropped`, kinds and reasons) so a plan the translator rejected is visible outside
+the call log. Prompt v0.10. Owner: "first there's an opportunity for work, then we pause, one or
+two small things happen, then we come back and move the story forward. The narrator ought to be
+able to govern that on its own."
+*Amended the same day (prompt v0.11):* the first cut also made `jobBoard` re-ask on a timer
+(`commerce.reofferSeconds`) and had `quietTooLong` run through an ordered list that began with
+"offer work". The owner withdrew both: "I don't want the narrator to think we are asking it
+specifically to solve that problem." `jobBoard` asks once per docking (`narrator.jobBoardLastAsk`
+keeps the port and tick of that docking's ask and is cleared on leaving the dock); the quiet hook
+is a neutral periodic check-in that lists what is available and asks for a judgement; pacing is
+the narrator's judgement, not a timer's. The Pacing block in the system prompt stands.
+
+**D47. Parts market.** Owner, after a playtest in which the engine sat at zero integrity with an
+unrepairable fault (the repair step consumes `item.spare_parts_stack` and none was aboard) while
+the narrator narrated "the part came in and it's fixed" with no lever to make it true. Ports
+carry a market (`PortDef.market`: item, count, per-unit price in content; the live stock and price
+in `state.markets[portId]`, seeded at world creation and lazily from content for older saves;
+schema 3). A repair whose remaining steps consume a part the ship does not have aboard raises
+`partsNeeded {machineId, itemDefId, count}` (equipment, once per machine and item, revised
+against truth every tick). While docked at a port whose market has the item and the ship can pay,
+commerce derives a `buyParts` task: any crew member walks to a cargo transfer tile, spends
+`commerce.market.buySeconds` at the counter, and the `buy` step commits the purchase: the ship's
+money drops by the price (a `purchase` transaction, visible in the top bar and the ticker:
+"Bought spare parts at Crossroads Hub (120 cr)"), the market count drops, the units land on the
+deck at the ramp and every crew member is told where they are, `partsBought` (narrative) is
+emitted, and the repair resumes. Not a captain decision. If the market lacks the item or money
+is short the problem stays open and the digest says why ("not available here", "cannot
+afford"). A departure held for repairs (D36) now waits *docked* with the course kept, ramps open,
+so the crew can reach the market; the digest's hold line names the missing part and the reason,
+for a "leave anyway" card. The narrator gets a fifth lever, `stockMarket {port, item, count 0-4,
+priceTier cheap|fair|dear}` (owner-approved vocabulary change, D6/D11; `config.commerce.market`
+holds the tier multipliers, the per-command cap and a default price for an item no port lists),
+to make a part available, scarce or absent at this or another port; it never buys, delivers,
+repairs or pays, and must never narrate a repair, purchase or delivery the digest does not show:
+a card may state what someone intends or claims, never that it happened. No scheduled
+deliveries. Owner: "let's just deal with things that are already there." Prompt v0.11.

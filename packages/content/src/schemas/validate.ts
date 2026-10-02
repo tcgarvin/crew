@@ -361,6 +361,26 @@ function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue
     issues,
   );
 
+  // D47: a market line names a real item, once per port.
+  const marketItems = new Set<string>();
+  port.market.forEach((line, i) => {
+    if (!(line.itemDefId in bundle.items)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "market", i, "itemDefId"],
+          `unknown item "${line.itemDefId}"`,
+        ),
+      );
+    }
+    if (marketItems.has(line.itemDefId)) {
+      issues.push(
+        issue("referential", [...path, "market", i], `duplicate market item "${line.itemDefId}"`),
+      );
+    }
+    marketItems.add(line.itemDefId);
+  });
+
   port.jobTemplates.forEach((job, i) => {
     if (!(job.toPortId in bundle.ports)) {
       issues.push(

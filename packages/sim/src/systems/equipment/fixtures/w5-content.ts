@@ -258,6 +258,7 @@ export function w5Content(
         name: "W5 Dock",
         description: "A dock.",
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        market: [],
         jobTemplates: [],
         routes: [],
       },

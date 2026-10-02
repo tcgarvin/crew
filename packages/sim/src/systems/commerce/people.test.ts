@@ -119,6 +119,9 @@ describe("save migration 1 → 2 (D25)", () => {
     const { world } = freightTestWorld();
     const state = JSON.parse(JSON.stringify(world.state)) as Record<string, unknown>;
     state.schemaVersion = 1;
+    // A schema-1 save predates `markets` (D47, schema 3).
+    // biome-ignore lint/performance/noDelete: simulating an older save's shape.
+    delete state.markets;
     state.jobs = {
       j1: {
         id: "j1",
@@ -145,9 +148,12 @@ describe("save migration 1 → 2 (D25)", () => {
     const migrated = migrateState(schemaOneState(), 1) as {
       schemaVersion: number;
       jobs: Record<string, Job>;
+      markets: Record<string, unknown>;
     };
-    expect(SCHEMA_VERSION).toBe(2);
-    expect(migrated.schemaVersion).toBe(2);
+    // D47 (schema 3) added `markets`; a 1 → 3 upgrade passes through both migrations.
+    expect(SCHEMA_VERSION).toBe(3);
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.markets).toEqual({});
     expect(migrated.jobs.j1).toMatchObject({
       issuer: "Rendell Freight Co.",
       issuerPerson: { name: "Rendell Freight Co.", role: "shipper" },

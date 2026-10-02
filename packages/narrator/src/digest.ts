@@ -10,12 +10,17 @@ import {
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
+  type ItemDefId,
   type JobIssuer,
   type MachineId,
   type NarratorHook,
+  type PortDefId,
+  type Problem,
   type SimEvent,
   actionLabel,
   describeEvent,
+  effectiveMarket,
+  marketBlock,
   ticksToSeconds,
 } from "@crew/sim";
 import {
@@ -124,6 +129,15 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
     );
   }
   lines.push(`money: ${state.money.balance} credits`);
+  if (t.stage === "docked") {
+    // D47: what is on sale here, with prices (this is private to the model; cards carry no numbers).
+    lines.push(`market here: ${marketHereLine(state, content, t.portId)}`);
+    if (t.holdForRepairs === true) {
+      lines.push(
+        `departure held for repairs (the captain chose to wait); it lifts on its own once no engine or generator is impaired${partsShortfallNote(state, content)}`,
+      );
+    }
+  }
   const offerPort = offerPortNow(state);
   lines.push(
     offerPort === undefined
@@ -131,6 +145,57 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
       : `job offers possible now: fromPort ${offerPort}`,
   );
   return { heading: "Ship", lines, priority: Number.POSITIVE_INFINITY, trimFrom: "end" };
+}
+
+function itemName(content: ContentBundle, itemDefId: string): string {
+  return content.items[itemDefId as ItemDefId]?.name ?? itemDefId;
+}
+
+/** D47: "Spare Parts x4 at 120 cr, Coolant Canister x3 at 60 cr", or "nothing". */
+function marketHereLine(state: State, content: ContentBundle, portId: PortDefId): string {
+  const stock = effectiveMarket(state, content, portId);
+  const lines = Object.entries(stock)
+    .filter(([, line]) => line.count > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([itemDefId, line]) => `${itemName(content, itemDefId)} x${line.count} at ${line.price} cr`,
+    );
+  return lines.length === 0 ? "nothing" : lines.join(", ");
+}
+
+/** D47: why a `partsNeeded` problem is still open, in the words the prompt teaches. */
+function partsReason(state: State, content: ContentBundle, itemDefId: ItemDefId): string {
+  const block = marketBlock(state, content, itemDefId);
+  const t = state.travel;
+  const here = t.stage === "docked" ? portName(content, t.portId) : undefined;
+  switch (block) {
+    case "notDocked":
+      return "not at a port; only a port market sells it";
+    case "notSoldHere":
+      return `not available here (${here ?? "this port"})`;
+    case "cannotAfford":
+      return `cannot afford it here (${state.money.balance} credits)`;
+    case undefined:
+      return `the crew are buying it here (${here ?? "this port"})`;
+  }
+}
+
+function openPartsNeeded(state: State): DeepReadonly<Extract<Problem, { kind: "partsNeeded" }>>[] {
+  return Object.values(state.work.problems).filter(
+    (p): p is DeepReadonly<Extract<Problem, { kind: "partsNeeded" }>> =>
+      p.kind === "partsNeeded" && p.status === "open",
+  );
+}
+
+/** D47: appended to the hold line so the model can say why the ship is still here. */
+function partsShortfallNote(state: State, content: ContentBundle): string {
+  const open = openPartsNeeded(state);
+  if (open.length === 0) return "";
+  const parts = open.map(
+    (p) =>
+      `${p.payload.count}x ${itemName(content, p.payload.itemDefId)} (${partsReason(state, content, p.payload.itemDefId)})`,
+  );
+  return `; the repair is waiting on parts: ${parts.join("; ")}`;
 }
 
 function crewSection(state: State, content: ContentBundle): Section {
@@ -227,11 +292,21 @@ function machineSection(state: State, content: ContentBundle, tickRate: number):
   return { heading: "Machines", lines, priority: 8, trimFrom: "end" };
 }
 
-function problemSection(state: State): Section {
+function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBundle): string {
+  const base = `- ${p.kind} (${p.visibility}) since tick ${p.createdTick}`;
+  if (p.kind !== "partsNeeded") return base;
+  // D47: the stalled repair and what would unstick it, so the model can stock a market or tell
+  // the story of a part that is not here.
+  const machine = state.machines[p.payload.machineId];
+  const who = machine === undefined ? p.payload.machineId : machineName(content, machine);
+  return `${base}: ${who} needs ${p.payload.count}x ${itemName(content, p.payload.itemDefId)}; ${partsReason(state, content, p.payload.itemDefId)}`;
+}
+
+function problemSection(state: State, content: ContentBundle): Section {
   const lines = Object.values(state.work.problems)
     .filter((p) => p.status === "open")
     .sort((a, b) => a.createdTick - b.createdTick || a.id.localeCompare(b.id))
-    .map((p) => `- ${p.kind} (${p.visibility}) since tick ${p.createdTick}`);
+    .map((p) => problemLine(p, state, content));
   return { heading: "Open problems", lines, priority: 4, trimFrom: "end" };
 }
 
@@ -414,7 +489,7 @@ export function buildDigest(
     notesSection(notes),
     cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),
-    problemSection(state),
+    problemSection(state, content),
     eventSection(recentEvents, state, content),
   ];
 

@@ -41,11 +41,12 @@
 import { ticksToSeconds } from "../../core/clock";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
-import type { ConfigDef, MachineDef } from "../../core/types/content";
+import type { ConfigDef, ItemCount, MachineDef } from "../../core/types/content";
 import type { DerateCause, EventDraft } from "../../core/types/events";
-import type { CommandId, LocalKey } from "../../core/types/ids";
+import type { CommandId, ItemDefId, LocalKey } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
+import type { ProblemOfKind } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
 import { clamp } from "./util";
@@ -191,6 +192,79 @@ function ensureSymptomProblems(ctx: StepCtx, machine: Machine, def: MachineDef):
   }
 }
 
+/** Units of each item def physically aboard (on deck or in someone's hands), by def. */
+function unitsAboard(ctx: StepCtx): Map<ItemDefId, number> {
+  const aboard = new Map<ItemDefId, number>();
+  for (const item of Object.values(ctx.state.items)) {
+    const kind = item.location.kind;
+    if (kind !== "onDeck" && kind !== "carriedBy" && kind !== "equippedBy") continue;
+    const units = item.stacking === "stack" ? item.count : 1;
+    aboard.set(item.defId, (aboard.get(item.defId) ?? 0) + units);
+  }
+  return aboard;
+}
+
+/** What the diagnosed faults' remaining repair steps still consume, summed by item def. */
+function partsStillNeeded(machine: Machine, def: MachineDef): Map<ItemDefId, number> {
+  const needed = new Map<ItemDefId, number>();
+  for (const fault of machine.faults) {
+    if (!fault.diagnosed) continue;
+    const steps = def.faults.find((f) => f.key === fault.faultKey)?.repair.steps ?? [];
+    const consumes: readonly ItemCount[] = steps
+      .slice(fault.repairStepIndex)
+      .flatMap((s) => s.consumes);
+    for (const line of consumes) {
+      needed.set(line.itemDefId, (needed.get(line.itemDefId) ?? 0) + line.count);
+    }
+  }
+  return needed;
+}
+
+/**
+ * D47: a repair stalls for good when a step consumes a part the ship does not have, so the
+ * shortfall is a problem of its own (`partsNeeded`, one per machine and item) that commerce
+ * answers from the port market while docked. Raised and revised against truth every tick:
+ * aboard counts on deck and in hand, so a stack bought at the ramp or found in stores resolves
+ * it, and a fault repaired or still undiagnosed never needs anything.
+ */
+function updatePartsNeeded(ctx: StepCtx, machine: Machine, def: MachineDef): void {
+  const needed = partsStillNeeded(machine, def);
+  const aboard = needed.size === 0 ? undefined : unitsAboard(ctx);
+  const open = new Set<ItemDefId>();
+  for (const [itemDefId, count] of needed) {
+    const shortfall = count - (aboard?.get(itemDefId) ?? 0);
+    if (shortfall <= 0) continue;
+    open.add(itemDefId);
+    const dedupeKey = `partsNeeded:${machine.id}:${itemDefId}`;
+    const existing = Object.values(ctx.state.work.problems).find(
+      (p): p is ProblemOfKind<"partsNeeded"> =>
+        p.kind === "partsNeeded" && p.dedupeKey === dedupeKey && p.status === "open",
+    );
+    if (existing !== undefined) {
+      if (existing.payload.count !== shortfall) {
+        existing.payload = { ...existing.payload, count: shortfall };
+        existing.revision += 1;
+      }
+      continue;
+    }
+    const { event } = raiseProblem(ctx.state, ctx.tick, {
+      kind: "partsNeeded",
+      payload: { machineId: machine.id, itemDefId, count: shortfall },
+      dedupeKey,
+      visibility: "public",
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId: machine.id },
+    });
+    if (event !== undefined) ctx.emit(event);
+  }
+  for (const problem of Object.values(ctx.state.work.problems)) {
+    if (problem.kind !== "partsNeeded" || problem.status !== "open") continue;
+    if (problem.payload.machineId !== machine.id || open.has(problem.payload.itemDefId)) continue;
+    const event = resolveProblem(ctx.state, problem.dedupeKey);
+    if (event !== undefined) ctx.emit(event);
+  }
+}
+
 function fireScheduledFaults(ctx: StepCtx, machine: Machine, def: MachineDef): void {
   if (machine.scheduledFaults.length === 0) return;
   const due = machine.scheduledFaults.filter((sf) => sf.fireAtTick <= ctx.tick);
@@ -203,6 +277,7 @@ function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
   const def = ctx.defs.machine(machine.defId);
   fireScheduledFaults(ctx, machine, def);
   ensureSymptomProblems(ctx, machine, def);
+  updatePartsNeeded(ctx, machine, def);
 
   let inoperableFromFault = false;
   let faultOutputFactor = 1;

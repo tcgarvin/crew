@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   localKeySchema,
   nonNegative,
+  nonNegativeInt,
   positive,
   positiveInt,
   powerPrioritySchema,
@@ -92,6 +93,12 @@ export const configDefSchema = z.strictObject({
     haulEstimateSeconds: nonNegative,
     reofferSeconds: nonNegative,
     maxCratesPerJob: positiveInt,
+    market: z.strictObject({
+      priceTiers: z.strictObject({ cheap: positive, fair: positive, dear: positive }),
+      maxStockPerCommand: nonNegativeInt,
+      defaultPrice: positiveInt,
+      buySeconds: nonNegative,
+    }),
   }),
   narrator: z.strictObject({
     quietTooLongSeconds: positive,

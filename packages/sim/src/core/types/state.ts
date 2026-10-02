@@ -31,6 +31,7 @@ import type {
   JobId,
   MachineId,
   NextIdCounters,
+  PortDefId,
   ProblemId,
   ScenarioDefId,
   TaskId,
@@ -42,8 +43,18 @@ import type { Claim, Problem, Task } from "./work";
 /**
  * Bumped on any breaking change to this shape. Each bump ships a `Migration` from the previous
  * version (see save.ts). 2 (2026-09-30): jobs gained `issuerPerson`, `pitch` and `urgency` (D25).
+ * 3 (2026-10-01): `markets` (D47), seeded lazily from content for a port a save never visited.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+
+/** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
+export interface MarketLine {
+  count: number;
+  price: number;
+}
+
+/** D47: a port's live market, keyed by item def. Absent item = not sold here. */
+export type MarketStock = Record<ItemDefId, MarketLine>;
 
 /** Work slice (W4): problems are written by their owning systems, tasks/claims by work. */
 export interface WorkState {
@@ -94,6 +105,13 @@ export interface WorldState {
   jobs: Record<JobId, Job>;
   /** Owner: commerce (W6). Integer credits. */
   money: MoneyState;
+  /**
+   * Owner: commerce (D47). Per-port market stock, seeded from `PortDef.market` at world creation
+   * and changed by purchases and the narrator's `stockMarket`. A port with no entry reads as its
+   * content seed (`systems/commerce/market.ts` `effectiveMarket`), so an older save needs no
+   * backfill beyond the empty table.
+   */
+  markets: Record<PortDefId, MarketStock>;
   /** Owner: decisions. */
   decisions: DecisionsState;
   /** Owner: kernel core (quiet timer, budget) and decisions (pending hook). */

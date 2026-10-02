@@ -11,7 +11,7 @@
  *
  * 1. The *owning system* detects a condition and creates or revises a `Problem` row in
  *    `state.work.problems`. Equipment creates `machineSymptom` / `machineFault` /
- *    `maintenanceDue`; travel/commerce creates `cargoToLoad` / `cargoToUnload` /
+ *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload` /
  *    `stationToStaff`. Before creating, it looks up an open problem with the same `dedupeKey`
  *    and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for one fault).
  * 2. The *work system* (W4) derives tasks from problems through the `TaskDerivationTable`: one
@@ -45,6 +45,7 @@ import type {
   ActorId,
   ClaimId,
   DoorId,
+  ItemDefId,
   ItemId,
   JobId,
   LocalKey,
@@ -106,6 +107,12 @@ export interface ProblemPayloads {
   };
   /** A station must be crewed for the current travel stage (e.g. pilot for undock → dock). */
   stationToStaff: { machineId: MachineId };
+  /**
+   * D47: a diagnosed fault's remaining repair steps consume `count` more of `itemDefId` than the
+   * ship has aboard. Owner: equipment (it watches the shortfall); commerce derives the `buyParts`
+   * task while the ship is docked at a port whose market sells it and the ship can pay.
+   */
+  partsNeeded: { machineId: MachineId; itemDefId: ItemDefId; count: number };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -135,7 +142,14 @@ export type ProblemOfKind<K extends ProblemKind> = Extract<Problem, { kind: K }>
 // Tasks (SD §14.2)
 // ---------------------------------------------------------------------------------------------
 
-export const TASK_TYPES = ["inspect", "diagnose", "repair", "haul", "staffStation"] as const;
+export const TASK_TYPES = [
+  "inspect",
+  "diagnose",
+  "repair",
+  "haul",
+  "staffStation",
+  "buyParts",
+] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export type TaskStatus = "pending" | "claimed" | "active" | "blocked" | "completed" | "cancelled";
@@ -155,7 +169,9 @@ export type ProgressRef =
   | { kind: "maintenance"; machineId: MachineId }
   | { kind: "itemCustody"; itemId: ItemId }
   /** Staffing has no accumulated progress; it is satisfied while occupied. */
-  | { kind: "occupancy"; machineId: MachineId };
+  | { kind: "occupancy"; machineId: MachineId }
+  /** D47: a purchase has no accumulated progress; the units land aboard at the commit point. */
+  | { kind: "market"; portId: PortDefId; itemDefId: ItemDefId; count: number };
 
 /** SD §14.7 structured blockage reasons. */
 export const BLOCKAGE_REASONS = [
@@ -183,7 +199,9 @@ export type CompletionPredicate =
   | { kind: "problemResolved" }
   | { kind: "itemInZone"; itemId: ItemId; zoneKey: LocalKey }
   | { kind: "itemInStore"; itemId: ItemId; portId: PortDefId; storeKey: LocalKey }
-  | { kind: "stageReached"; stageKey: LocalKey };
+  | { kind: "stageReached"; stageKey: LocalKey }
+  /** D47: done once the plan's last step commits (a purchase); the owner settles its problem. */
+  | { kind: "stepsDone" };
 
 export type ClaimState = { kind: "unclaimed" } | { kind: "claimed"; claimIds: ClaimId[] };
 
@@ -333,7 +351,9 @@ export type WorkStageKey =
   /** Personal timed work (eating), `ticksDone`/`ticksNeeded` on the step. */
   | "eat"
   /** A recipe stage owned by equipment (W5): progress lives on the fault/machine. */
-  | "recipe";
+  | "recipe"
+  /** D47: time at a port market's counter before the `buy` commit step. */
+  | "buy";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
 export type HoldKind = "sleep" | "staff" | "rest" | "socialize";
@@ -352,6 +372,12 @@ export type ActivityStep =
   | { kind: "consume"; itemId: ItemId }
   /** Put a carried item down here (deck floor, or a port store across the cargo ramp). */
   | { kind: "putDown"; itemId: ItemId }
+  /**
+   * D47 commit point: buy up to `count` of `itemDefId` from the market of `portId` (the ship must
+   * be docked there and the actor on a cargo transfer tile); the units land on the deck at the
+   * actor's feet and the ship's money drops by the price.
+   */
+  | { kind: "buy"; portId: PortDefId; itemDefId: ItemDefId; count: number }
   | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
 
 /** W4a addition: the steps of one activity and the current index. */

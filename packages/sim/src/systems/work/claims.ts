@@ -97,6 +97,9 @@ export function isCompletionMet(
     case "problemResolved":
     case "stageReached":
       return state.work.problems[task.problemId]?.status === "resolved";
+    case "stepsDone":
+      // D47: the plan's last step was the commit (a purchase); running out of steps is the proof.
+      return true;
     case "itemInZone": {
       const location = state.items[completion.itemId]?.location;
       if (location?.kind !== "onDeck") return false;

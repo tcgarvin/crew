@@ -23,7 +23,7 @@ export { rotateOffset } from "./systems/spatial/geometry";
 
 /** Commerce (W6) is complete enough for hosts to register: the narrator package's own tests need
  * it to enqueue `spawnAtBoundary`/`offerJob`/etc. through a real kernel. */
-export { registerCommerce } from "./systems/commerce/index";
+export { affordableUnits, marketBlock, registerCommerce } from "./systems/commerce/index";
 
 /**
  * Integration 2: everything a host needs to build the full V1 registry (see

@@ -143,6 +143,21 @@ function itemViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
+/** D47: market stock is whole units at whole-credit prices, never negative. */
+function marketViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  for (const [portId, stock] of Object.entries(state.markets)) {
+    for (const [itemDefId, line] of Object.entries(stock)) {
+      const where = `markets.${portId}.${itemDefId}`;
+      if (!Number.isInteger(line.count) || line.count < 0)
+        out.push(`${where}.count is ${line.count}`);
+      if (!Number.isInteger(line.price) || line.price < 0)
+        out.push(`${where}.price is ${line.price}`);
+    }
+  }
+  return out;
+}
+
 function actorViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
   for (const actor of Object.values(state.actors)) {
@@ -221,6 +236,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...idViolations(state),
     ...itemViolations(state),
     ...actorViolations(state),
+    ...marketViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

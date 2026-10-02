@@ -7,13 +7,15 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
 
 /**
  * The V1 narrator vocabulary, exactly (PLAN §6 W9). Nothing here can set a body, need, position,
- * knowledge or money directly; no such command exists.
+ * knowledge or money directly; no such command exists. D47 (owner-approved vocabulary change,
+ * D6/D11): `stockMarket` sets what a port sells, never what the ship has or owes.
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
   "spawnAtBoundary",
   "scheduleFault",
   "surfaceDecision",
+  "stockMarket",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
@@ -61,5 +63,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "scheduleFault",
     "spawnAtBoundary",
     "surfaceDecision",
+    "stockMarket",
   ],
 };

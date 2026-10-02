@@ -4,7 +4,7 @@
  * `activity.label`; `core/render.ts` shows it verbatim.
  *
  * Vocabulary: "idle", "walking", "walking to <place>", "picking up <item>", "hauling <item>",
- * "stowing <item>", "eating", "asleep", "resting", "chatting", "inspecting <machine>",
+ * "stowing <item>", "buying <item>" (D47), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
  * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
@@ -12,7 +12,7 @@
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
-import type { CompartmentId, ItemId, MachineId } from "../../core/types/ids";
+import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/types/ids";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import type { ActivityStep, StepTarget, Task } from "../../core/types/work";
 import { compartmentAt } from "../spatial/geometry";
@@ -30,6 +30,13 @@ const lower = (name: string | undefined, fallback: string): string =>
 export function itemName(ctx: LabelCtx, itemId: ItemId): string {
   const item = ctx.state.items[itemId];
   return lower(item === undefined ? undefined : ctx.content.items[item.defId]?.name, "item");
+}
+
+export function itemDefName(ctx: LabelCtx, itemDefId: ItemDefId): string {
+  return lower(
+    (ctx.content.items[itemDefId] ?? ctx.state.defs.dynamic.items[itemDefId])?.name,
+    "parts",
+  );
 }
 
 export function machineName(ctx: LabelCtx, machineId: MachineId): string {
@@ -106,7 +113,15 @@ function taskStepLabel(
       return `picking up ${itemName(ctx, step.itemId)}`;
     case "putDown":
       return `stowing ${itemName(ctx, step.itemId)}`;
+    case "buy":
+      return `buying ${itemDefName(ctx, step.itemDefId)}`;
     case "work": {
+      if (step.stage === "buy") {
+        const ref = task?.progressRef;
+        return ref?.kind === "market"
+          ? `buying ${itemDefName(ctx, ref.itemDefId)}`
+          : "buying parts";
+      }
       if (task === undefined || task.target.kind !== "machine") return "working";
       const verb = RECIPE_VERB[task.derivationKey] ?? RECIPE_VERB[task.type] ?? "working on";
       return `${verb} ${machineName(ctx, task.target.machineId)}`;
@@ -141,6 +156,8 @@ function personalStepLabel(
     case "work":
     case "consume":
       return "eating";
+    case "buy":
+      return "buying";
     case "hold":
       return HOLD_LABEL[step.hold];
   }

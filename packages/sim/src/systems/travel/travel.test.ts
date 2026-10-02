@@ -319,12 +319,18 @@ describe("departure gate (D36)", () => {
     const holding = kernel.advance(world, 200);
     expect(holding.halt).toEqual({ kind: "completed" });
     expect(holding.events.some((e) => e.type === "departureHeld")).toBe(true);
-    expect(world.state.travel.stage).toBe("preparingDeparture");
-    expect(world.state.travel.holdForRepairs).toBe(true);
+    // D47: holding means waiting docked, course kept, so the crew can reach the port market.
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.a,
+      plannedDestinationId: PORTS.b,
+      holdForRepairs: true,
+    });
     expect(world.state.decisions.queue).toEqual([]); // no second ask while holding
 
     theEngine(world).faults = [];
-    const released = kernel.advance(world, 60);
+    // Docked again (D47), so the lift runs the whole prep/undock/depart sequence from the ramp.
+    const released = kernel.advance(world, 160);
     expect(released.halt).toEqual({ kind: "completed" });
     const lifted = released.events.find((e) => e.type === "departureHoldLifted");
     expect(lifted).toMatchObject({ significance: "narrative", payload: { toPortId: PORTS.b } });

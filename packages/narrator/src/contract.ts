@@ -19,6 +19,7 @@ import {
   type ContentBundle,
   type DeepReadonly,
   JOB_URGENCIES,
+  MARKET_PRICE_TIERS,
   type NarratorCommand,
   type NarratorHook,
   type SaveEnvelope,
@@ -148,7 +149,7 @@ export interface NarratorResponse {
  * translator validates every one against the snapshot and content, with a drop reason the model
  * sees next call.
  */
-const ID_HINT = 'from "What you can do", copied exactly';
+const ID_HINT = 'from "What you can do"';
 const idOf = (what: string) => z.string().describe(`${what} ${ID_HINT}.`);
 
 /**
@@ -165,16 +166,20 @@ export const PAY_TIERS = ["low", "standard", "generous"] as const;
 export const FAULT_WINDOWS = ["soon", "later", "muchLater"] as const;
 /** Coarse quantity; the translator maps it to a count within config limits. */
 export const QUANTITIES = ["one", "few", "several"] as const;
+/**
+ * D47: `stockMarket.count` as the model writes it. Structured outputs reject `minimum`/`maximum`
+ * (see `contract.test.ts`), so the bound is a five-value enum of digit strings, 0 withdrawing
+ * the item; the translator parses it and clamps again to `config.commerce.market.maxStockPerCommand`.
+ */
+export const STOCK_COUNTS = ["0", "1", "2", "3", "4"] as const;
 
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
-    label: z.string().describe("What the captain says or does in reply, two to six words."),
+    label: z.string().describe("What the captain says or does, two to six words."),
     /** Side effect when chosen; `setCourse` needs `coursePort`. */
     effect: z.enum(["none", "setCourse"]),
-    coursePort: z
-      .string()
-      .describe(`Port id ${ID_HINT} when effect is setCourse; otherwise empty.`),
+    coursePort: z.string().describe(`Port id ${ID_HINT} if effect is setCourse; else empty.`),
   });
 
   // D25: every offer comes from a named person who says something; D24: nobody talks pay.
@@ -183,9 +188,7 @@ export function buildNarratorPlanSchema() {
     issuerName: z.string().describe("Given and family name."),
     issuerRole: z.string().describe("What they do, lower case, e.g. 'shift foreman'."),
     issuerOrg: z.string().describe(`Who they work for; ${EMPTY_FOR_NONE}.`),
-    pitch: z
-      .string()
-      .describe("One line the issuer says to the captain, in their voice. Max 30 words. No pay."),
+    pitch: z.string().describe("One line the issuer says, in their voice. Max 30 words. No pay."),
     description: z.string().describe("One or two sentences about the job. No pay."),
     fromPort: port,
     toPort: port,
@@ -214,25 +217,30 @@ export function buildNarratorPlanSchema() {
     window: z.enum(FAULT_WINDOWS),
   });
 
+  // D47: what a port sells. The only way a part gets to a port; the crew buy it themselves.
+  const stockMarket = z.strictObject({
+    kind: z.literal("stockMarket"),
+    port: port,
+    cargoItem: idOf("Item id"),
+    count: z.enum(STOCK_COUNTS),
+    priceTier: z.enum(MARKET_PRICE_TIERS),
+  });
+
   // D26: shown for a moment after the choice, before the card closes.
-  const aftermath = z
-    .string()
-    .describe("What happens next on this side: one sentence, max 20 words, no numbers.");
+  const aftermath = z.string().describe("What happens next if chosen; max 20 words, no numbers.");
 
   // D29: a named person brings the card and speaks; empty only for an observed scene.
   const speaker = z
     .string()
-    .describe("Full name of who speaks, as the digest lists them; empty for an observed scene.");
+    .describe("Who speaks, full name as the digest lists them; empty if observed.");
   const situation = z
     .string()
-    .describe("A stage line, then what they say in quotes. 35 to 55 words, max 70. No numbers.");
+    .describe("A stage line, then their words in quotes. 35-55 words, max 70. No numbers.");
 
   // D39: a beat card foreshadows a thread without asking for a decision.
   const beatOfThread = z
     .string()
-    .describe(
-      "Empty for a normal card; for a beat card, the exact title of the thread it foreshadows (both sides effect none).",
-    );
+    .describe("Empty normally; for a beat card, the exact title of the thread it foreshadows.");
 
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
@@ -249,7 +257,9 @@ export function buildNarratorPlanSchema() {
   return z.strictObject({
     /** Private reasoning summary for the audit log; never shown to the player. */
     rationale: z.string(),
-    intents: z.array(z.union([offerJob, spawnAtBoundary, scheduleFault, surfaceDecision])),
+    intents: z.array(
+      z.union([offerJob, spawnAtBoundary, scheduleFault, surfaceDecision, stockMarket]),
+    ),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */
     card: z
       .strictObject({
@@ -277,7 +287,7 @@ export function buildNarratorPlanSchema() {
             stage: z.string().describe("Where it is now."),
             nextBeat: z
               .string()
-              .describe("What must be true before it returns, and roughly what happens then."),
+              .describe("What must be true before it returns, and roughly what then."),
           }),
         )
         .describe("Every open thread, rewritten in full; retire the moot ones."),
@@ -288,10 +298,10 @@ export function buildNarratorPlanSchema() {
             note: z.string(),
             portId: z
               .string()
-              .describe(`Port id ${ID_HINT} where the captain can find them; ${EMPTY_FOR_NONE}.`),
+              .describe(`Port id ${ID_HINT} where to find them; ${EMPTY_FOR_NONE}.`),
           }),
         )
-        .describe("Supporting characters, not the crew; keep those the captain has met."),
+        .describe("Supporting characters, not crew; keep those the captain has met."),
     }),
   });
 }

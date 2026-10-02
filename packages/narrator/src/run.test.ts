@@ -583,7 +583,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.10");
+    expect(PROMPT_VERSION).toBe("v0.11");
   });
 
   it("tells the model it runs the pace (D46)", () => {
@@ -592,10 +592,30 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("Maintenance is not forward motion.");
     expect(STATIC_RULES).toContain("Do not fill that wait with faults.");
     expect(STATIC_RULES).toContain("A fault is a pressure, not a pastime.");
-    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("using the Pacing rules");
-    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("offer work if the captain is idle at a port");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("Say which you chose and why in rationale");
     expect(HOOK_INSTRUCTIONS.quietTooLong).not.toContain("Prefer advancing a thread");
+  });
+
+  it("makes quietTooLong a neutral check-in, not a request for work (D46 as amended)", () => {
+    const quiet = HOOK_INSTRUCTIONS.quietTooLong;
+    expect(quiet).toContain("This is a check-in, not a request");
+    expect(quiet).toContain("read the Pacing rules");
+    expect(quiet).toContain("What is available to you");
+    expect(quiet).not.toContain("Take the first of these that fits");
+    expect(quiet).not.toContain("offer work if the captain is idle");
+  });
+
+  it("tells the model parts come only from a port market and it never narrates a repair the digest does not show (D47)", () => {
+    expect(STATIC_RULES).toContain("Parts come only from a port's market");
+    expect(STATIC_RULES).toContain("the crew buy it themselves, from the ship's money");
+    expect(STATIC_RULES).toContain("Your lever is stockMarket");
+    expect(STATIC_RULES).toContain("Scarcity is a story");
+    expect(STATIC_RULES).toContain(
+      "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
+    );
+    expect(STATIC_RULES).toContain("Only use the five levers");
+    expect(STATIC_RULES).toContain("surfaceDecision, stockMarket");
+    expect(STATIC_RULES).not.toContain("four levers");
   });
 });
 

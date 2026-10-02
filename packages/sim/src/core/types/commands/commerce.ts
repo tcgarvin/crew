@@ -2,7 +2,7 @@
  * Commerce commands (SD §17.3; review §D.3 `offerJob`).
  */
 import type { TextRef } from "../common";
-import type { JobId, PortDefId } from "../ids";
+import type { ItemDefId, JobId, PortDefId } from "../ids";
 import type { CargoLine, JobIssuer, JobUrgency } from "../travel";
 
 /**
@@ -35,4 +35,16 @@ export interface CommerceCommandPayloads {
   offerJob: { readonly job: JobDraft; readonly surface: boolean };
   acceptContract: { readonly jobId: JobId };
   declineJob: { readonly jobId: JobId };
+  /**
+   * D47: set what a port's market has of one item: `count` units (0 removes it from sale) at
+   * `price` integer credits per unit. The narrator's lever for "the part is here" or "not here";
+   * it never moves money or puts anything aboard, so the "narrator cannot mint money" rule holds.
+   * Bounded by `config.commerce.market.maxStockPerCommand`.
+   */
+  stockMarket: {
+    readonly portId: PortDefId;
+    readonly itemDefId: ItemDefId;
+    readonly count: number;
+    readonly price: number;
+  };
 }

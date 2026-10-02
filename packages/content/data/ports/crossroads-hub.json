@@ -20,6 +20,28 @@
       "kind": "lounge"
     }
   ],
+  "market": [
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 4,
+      "price": 120
+    },
+    {
+      "itemDefId": "item.coolant_canister",
+      "count": 3,
+      "price": 60
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 20,
+      "price": 8
+    },
+    {
+      "itemDefId": "item.med_kit",
+      "count": 2,
+      "price": 90
+    }
+  ],
   "jobTemplates": [
     {
       "key": "parts_to_mining",

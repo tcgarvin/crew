@@ -165,6 +165,7 @@ type Names = {
   machine(id: string): string | undefined;
   port(id: string): string;
   item(id: string): string;
+  itemDef(defId: string): string;
   faultName(machineId: string, faultKey: string): string;
   symptomName(machineId: string, symptomKey: string): string;
   job(id: string): { issuer: string; to: string } | undefined;
@@ -188,6 +189,11 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       const name = def?.name.toLowerCase() ?? "cargo";
       return item?.stacking === "stack" && item.count > 1 ? `${item.count}× ${name}` : name;
     },
+    itemDef: (defId) =>
+      (
+        content.items[defId as keyof ContentBundle["items"]] ??
+        state.defs.dynamic.items[defId as keyof ReadonlyWorldState["defs"]["dynamic"]["items"]]
+      )?.name.toLowerCase() ?? "parts",
     faultName: (machineId, faultKey) =>
       machineDef(machineId)
         ?.faults.find((f) => f.key === faultKey)
@@ -280,6 +286,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "paymentMade":
       return `Paid ${event.payload.amount} cr`;
+    case "partsBought": {
+      const { count, itemDefId, portId, cost } = event.payload;
+      const what = `${count > 1 ? `${count}× ` : ""}${n.itemDef(itemDefId)}`;
+      return `Bought ${what} at ${n.port(portId)} (${cost} cr)`;
+    }
     case "decisionResolved":
       return null;
     default:

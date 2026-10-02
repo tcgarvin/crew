@@ -4,7 +4,16 @@
  * sim cannot do. Static for a game (it changes only with content), so it sits in the cached
  * system prefix; per-call limits (budgets, current port) are in the digest.
  */
-import { type ConfigDef, type ContentBundle, type FaultEffect, JOB_URGENCIES } from "@crew/sim";
+import {
+  type ConfigDef,
+  type ContentBundle,
+  type FaultEffect,
+  JOB_URGENCIES,
+  MARKET_PRICE_TIERS,
+  type MarketPriceTier,
+  basePriceFor,
+  effectiveMarket,
+} from "@crew/sim";
 import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
@@ -33,6 +42,40 @@ function seconds(n: number): string {
   return `${Math.round(n)}s`;
 }
 
+/** D47: a live price as a tier word against the content price, never a number. */
+function priceTierWord(price: number, base: number, config: ConfigDef): MarketPriceTier {
+  const tiers = config.commerce.market.priceTiers;
+  let best: MarketPriceTier = "fair";
+  let gap = Number.POSITIVE_INFINITY;
+  for (const tier of MARKET_PRICE_TIERS) {
+    const d = Math.abs(price - base * tiers[tier]);
+    if (d < gap) {
+      gap = d;
+      best = tier;
+    }
+  }
+  return best;
+}
+
+/** D47: one port's market, item by item: "item.x "Name" x4 (fair)"; "nothing" when empty. */
+export function marketLine(
+  state: State,
+  content: ContentBundle,
+  config: ConfigDef,
+  portId: keyof ContentBundle["ports"],
+): string {
+  const stock = effectiveMarket(state, content, portId);
+  const lines = Object.entries(stock)
+    .filter(([, line]) => line.count > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([itemDefId, line]) => {
+      const name = content.items[itemDefId as keyof ContentBundle["items"]]?.name ?? itemDefId;
+      const base = basePriceFor(content, config, portId, itemDefId as keyof ContentBundle["items"]);
+      return `${itemDefId} "${name}" x${line.count} (${priceTierWord(line.price, base, config)})`;
+    });
+  return lines.length === 0 ? "nothing" : lines.join(", ");
+}
+
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
   const ports = Object.values(content.ports).sort((a, b) => a.id.localeCompare(b.id));
   const cargo = Object.values(content.items)
@@ -50,7 +93,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly four levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly five levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
   lines.push(
     "The ids below (ports, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -64,6 +107,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     const stores = port.externalStores.map((s) => `${s.key} (${s.kind})`).join(", ");
     lines.push(`- ${port.id} "${port.name}": ${port.description}`);
     lines.push(`  routes to: ${routes || "none"}; store keys: ${stores || "none"}`);
+    lines.push(`  market sells: ${marketLine(state, content, config, port.id)}`);
   }
   lines.push("");
   lines.push("## Cargo items and classes");
@@ -127,6 +171,14 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   );
   lines.push(
     "- leftAftermath / rightAftermath: what happens next on each side, shown to the captain for a moment after the choice.",
+  );
+  lines.push("");
+  lines.push("## 5. stockMarket: set what a port's market sells of one item");
+  lines.push(
+    `- port and cargoItem (any item id, including item ids not listed as cargo above, e.g. spare parts), count 0-${config.commerce.market.maxStockPerCommand} units on sale after this (0 withdraws it), priceTier ${MARKET_PRICE_TIERS.join(" | ")} against the port's usual price. The market line under each port above is what is on sale now.`,
+  );
+  lines.push(
+    "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; you never buy, deliver, repair or pay. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
   return lines.join("\n");
 }

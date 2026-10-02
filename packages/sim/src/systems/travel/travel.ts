@@ -72,7 +72,10 @@ function rampDoorIds(ctx: Pick<StepCtx, "state" | "content">): DoorId[] {
 }
 
 /** Request every ramp door to `state`; the door system (W3) drives the physical transition. */
-function requestRamps(ctx: StepCtx, state: "open" | "closed"): void {
+export function requestRamps(
+  ctx: Pick<StepCtx, "state" | "content">,
+  state: "open" | "closed",
+): void {
   for (const doorId of rampDoorIds(ctx)) {
     const door = ctx.state.doors[doorId];
     if (door !== undefined) door.requestedState = state;

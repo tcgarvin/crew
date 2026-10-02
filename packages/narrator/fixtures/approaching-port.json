@@ -124,7 +124,17 @@
         "dockingFee": 150,
         "haulEstimateSeconds": 5,
         "reofferSeconds": 20,
-        "maxCratesPerJob": 6
+        "maxCratesPerJob": 6,
+        "market": {
+          "priceTiers": {
+            "cheap": 0.6,
+            "fair": 1,
+            "dear": 1.6
+          },
+          "maxStockPerCommand": 4,
+          "defaultPrice": 100,
+          "buySeconds": 3
+        }
       },
       "narrator": {
         "quietTooLongSeconds": 40,
@@ -1386,7 +1396,8 @@
           "items": {},
           "crew": {}
         }
-      }
+      },
+      "markets": {}
     }
   },
   "recentEvents": [

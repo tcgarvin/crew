@@ -29,6 +29,18 @@ export function migrateJobsToPeople(raw: unknown): unknown {
   return raw;
 }
 
+/**
+ * 2 → 3 (D47): `markets` is a new slice. An empty table is enough: a port with no entry reads
+ * as its content seed (`core/markets.ts` `effectiveMarket`), so a save from before the market
+ * existed opens every port at its authored stock the first time anyone looks.
+ */
+export function addMarkets(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  if (!isRecord(raw.markets)) raw.markets = {};
+  return raw;
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
+  2: addMarkets,
 };

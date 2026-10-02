@@ -46,6 +46,7 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { buyFromMarket } from "../commerce/market";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
 import { isOnDuty } from "../needs/shifts";
@@ -193,8 +194,11 @@ function actionFor(
       return makeAction("putDown", "placing", tick, step.itemId);
     case "consume":
       return makeAction("eat", "eating", tick, step.itemId);
+    case "buy":
+      return makeAction("pickUp", "reaching", tick);
     case "work": {
       if (step.stage === "eat") return makeAction("eat", "eating", tick);
+      if (step.stage === "buy") return makeAction("wait", "waiting", tick);
       const task = activity.kind === "task" ? ctx.state.work.tasks[activity.taskId] : undefined;
       const kind = RECIPE_ACTION[task?.derivationKey ?? ""] ?? "repair";
       const machineId = task?.target.kind === "machine" ? task.target.machineId : undefined;
@@ -584,6 +588,19 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
   return "done";
 }
 
+/**
+ * D47 commit point: the purchase. Fails `rampClosed` if the ship is no longer docked at the
+ * market's port, `unreachableTarget` off the transfer tile, and `inaccessibleSupply` (task-level,
+ * so every candidate backs off) when the stock or the money ran out since the plan was made.
+ */
+function runBuy(ctx: StepCtx, actor: Actor, step: StepOf<"buy">): StepResult {
+  if (!dockedAt(ctx, step.portId)) return { fail: "rampClosed" };
+  if (!onTransferTile(ctx, actor)) return { fail: "unreachableTarget" };
+  const bought = buyFromMarket(ctx, actor, step.portId, step.itemDefId, step.count);
+  if (bought === undefined) return { fail: "inaccessibleSupply" };
+  return "done";
+}
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -623,6 +640,8 @@ function runStep(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: ActivityStep)
       return runConsume(ctx, actor, step);
     case "putDown":
       return runPutDown(ctx, actor, step);
+    case "buy":
+      return runBuy(ctx, actor, step);
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
   }

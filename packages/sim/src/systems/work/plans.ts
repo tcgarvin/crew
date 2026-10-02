@@ -209,8 +209,29 @@ function machineTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   ]);
 }
 
+/**
+ * D47: walk to a cargo transfer tile, spend `commerce.market.buySeconds` at the counter, then the
+ * `buy` commit step hands the units over the ramp. Only derived while docked at the market's port.
+ */
+function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
+  const ref = task.progressRef;
+  if (ref.kind !== "market") return blocked("unreachableTarget");
+  const deckId = actorDeck(actor);
+  const deck = deckId === undefined ? undefined : ctx.content.decks[deckId];
+  const tile = task.interactionTiles[0] ?? deck?.docking.cargoTransferTiles[0];
+  if (tile === undefined) return blocked("unreachableTarget");
+  const counterTicks = configTicks(ctx.config, ctx.config.commerce.market.buySeconds);
+  return planOf([
+    { kind: "moveTo", target: { x: tile.x, y: tile.y }, requested: false },
+    { kind: "work", stage: "buy", ticksDone: 0, ticksNeeded: counterTicks },
+    { kind: "buy", portId: ref.portId, itemDefId: ref.itemDefId, count: ref.count },
+  ]);
+}
+
 export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
-  return task.type === "haul" ? haulPlan(ctx, actor, task) : machineTaskPlan(ctx, actor, task);
+  if (task.type === "haul") return haulPlan(ctx, actor, task);
+  if (task.type === "buyParts") return buyPlan(ctx, actor, task);
+  return machineTaskPlan(ctx, actor, task);
 }
 
 /** Eat: get one unit (unless one is in hand), optionally carry it to `table`, eat, consume. */

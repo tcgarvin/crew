@@ -24,6 +24,7 @@ import {
   type PortDef,
   type PortDefId,
   type TempRef,
+  basePriceFor,
   configTicks,
 } from "@crew/sim";
 import {
@@ -453,6 +454,29 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   });
 }
 
+/**
+ * D47: `stockMarket`. Any existing item def (not only freight: spare parts are the point); count
+ * clamped to `config.commerce.market.maxStockPerCommand`; the price is the content price for
+ * that item at that port (or the dearest anywhere, or the config default) times the tier.
+ */
+function translateStock(env: Env, intent: Intent<"stockMarket">): Outcome<NarratorDraft> {
+  const { snapshot, content } = env;
+  const config = snapshot.config;
+  const known = knownPort(content, intent.port);
+  if (!known.ok) return no(`stockMarket: port: ${known.reason}`);
+  const item = content.items[intent.cargoItem as ItemDefId];
+  if (item === undefined)
+    return no(`stockMarket: cargoItem: ${unknownId("item", intent.cargoItem)}`);
+  const max = config.commerce.market.maxStockPerCommand;
+  const count = Math.max(0, Math.min(max, Number.parseInt(intent.count, 10)));
+  const base = basePriceFor(content, config, known.value.id, item.id);
+  const price = Math.max(1, Math.round(base * config.commerce.market.priceTiers[intent.priceTier]));
+  return ok({
+    kind: "stockMarket",
+    payload: { portId: known.value.id, itemDefId: item.id, count, price },
+  });
+}
+
 function translateOne(env: Env, intent: NarratorIntent): Outcome<NarratorDraft> {
   switch (intent.kind) {
     case "offerJob":
@@ -463,6 +487,8 @@ function translateOne(env: Env, intent: NarratorIntent): Outcome<NarratorDraft> 
       return translateFault(env, intent);
     case "surfaceDecision":
       return translateDecision(env, intent);
+    case "stockMarket":
+      return translateStock(env, intent);
   }
 }
 

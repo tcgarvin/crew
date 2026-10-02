@@ -11,6 +11,47 @@ import { content, emptyPlan } from "./test-support";
 import { translateIntents } from "./translate";
 
 describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
+  it("accepts a translated stockMarket and applies it to the port's market (D47)", () => {
+    const bundle = content();
+    const registry = createRegistry();
+    registerCommerce(registry);
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(FIXTURE_SCENARIO, 7, bundle, {
+      values: bundle.config,
+      hash: bundle.hash,
+    });
+    const ctx: TranslationCtx = {
+      snapshot: kernel.serialize(world),
+      content: bundle,
+      hookTick: world.state.tick,
+      callId: "call-stock",
+    };
+    const { commands, dropped } = translateIntents(
+      emptyPlan({
+        intents: [
+          {
+            kind: "stockMarket",
+            port: "port.green_meridian",
+            cargoItem: "item.spare_parts_stack",
+            count: "2",
+            priceTier: "fair",
+          },
+        ] as unknown as NarratorPlan["intents"],
+      }),
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    const [command] = commands;
+    if (command === undefined) throw new Error("no command");
+    expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    kernel.advance(world, 2);
+    expect(world.state.markets["port.green_meridian" as never]).toMatchObject({
+      "item.spare_parts_stack": { count: 2, price: 150 },
+    });
+    // Stocking a market never touches the ship's money or stores.
+    expect(world.state.money.balance).toBe(bundle.scenarios[FIXTURE_SCENARIO]?.startingMoney);
+  });
+
   it("accepts a translated spawnAtBoundary and surfaceDecision", () => {
     const bundle = content();
     const registry = createRegistry();
