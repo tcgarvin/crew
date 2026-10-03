@@ -164,7 +164,12 @@ extend it (also dev, tests, or `@hono/node-server`).
 
 The Vercel project is connected to `github.com/tcgarvin/crew` (private). A push to `main` builds
 and deploys production; any other branch or PR gets a preview deployment. Both run the same
-build command, so both run migrations against the database their environment points at. GitHub
+build command, so both run migrations against the database their environment points at:
+production uses Neon's `main` branch; each preview gets its own Neon branch,
+`preview/<git-branch>`, copied from `main` (the Neon integration's "Create Database Branch For
+Deployment: Preview" setting — Production must stay unchecked). Neon does not delete a preview
+branch when its git branch goes away; remove it with
+`neonctl branches delete preview/<git-branch> --project-id restless-voice-83603994`. GitHub
 Actions (`.github/workflows/ci.yml`) runs typecheck, lint, depcruise and tests on every push and
 PR, independently of the Vercel build. `vercel deploy` from a laptop still works but is no longer
 the normal path.
