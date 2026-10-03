@@ -412,7 +412,38 @@ export type ActivityStep =
     }
   /** D63: set down every carried unit of `itemDefId` here (bought parts, carried aboard). */
   | { kind: "stowBought"; itemDefId: ItemDefId }
+  /**
+   * D65: take `itemId` (a crate within reach) onto the hand truck `truckId` in the actor's hands:
+   * it goes `inContainer` the truck. A crate that is not there drops its leg of the batch.
+   */
+  | { kind: "loadTruck"; itemId: ItemId; truckId: ItemId }
+  /**
+   * D65: set `itemId` down off the truck here, and settle its haul task: completed if its custody
+   * predicate now holds, else released. The lead task (`Activity.taskId`) is settled at the end.
+   */
+  | { kind: "unloadTruck"; itemId: ItemId; truckId: ItemId }
+  /** D65: set the (empty) hand truck down here, aboard. */
+  | { kind: "parkTruck"; truckId: ItemId }
   | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
+
+/**
+ * D65: one more haul task a hand-truck trip holds, besides the activity's own (`taskId`, the
+ * lead, whose crate is set down last).
+ */
+export interface HaulLeg {
+  taskId: TaskId;
+  claimId: ClaimId;
+}
+
+/**
+ * D65: a haul activity moving several crates on the hand truck `truckId`. `legs` are the other
+ * tasks it holds claims on; each leaves when its crate is set down (or found missing). Using the
+ * truck is this record: nobody else plans with a truck that some activity names.
+ */
+export interface HaulBatch {
+  truckId: ItemId;
+  legs: HaulLeg[];
+}
 
 /** W4a addition: the steps of one activity and the current index. */
 export interface ActivityPlan {
@@ -439,6 +470,8 @@ export type Activity =
       sinceTick: Tick;
       label?: string;
       plan?: ActivityPlan;
+      /** D65: a hand-truck trip; absent for every other task, a one-crate haul included. */
+      haul?: HaulBatch;
     }
   | {
       kind: "personal";

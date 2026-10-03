@@ -292,6 +292,8 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `The dock crew brought ${event.payload.name} back aboard at ${n.port(event.payload.portId)}`;
     case "leftOnDock":
       return `Left ${n.item(event.payload.itemId)} on the dock at ${n.port(event.payload.portId)}`;
+    case "gearBroughtAboard":
+      return `The dock crew handed ${n.item(event.payload.itemId)} aboard at ${n.port(event.payload.portId)}`;
     case "jobOffered": {
       const job = n.job(event.payload.jobId);
       if (job === undefined) return "A job is on offer";
@@ -521,6 +523,22 @@ interface FreightCount {
 }
 
 /**
+ * Is this item in someone's hands, directly or in a container they hold (D65: a crate on the hand
+ * truck being pushed is not stowed yet)?
+ */
+function inHands(item: DeepReadonly<Item>, state: ReadonlyWorldState): boolean {
+  let location: DeepReadonly<PhysicalLocation> = item.location;
+  for (let depth = 0; depth < MAX_CONTAINER_DEPTH; depth++) {
+    if (location.kind === "carriedBy" || location.kind === "equippedBy") return true;
+    if (location.kind !== "inContainer") return false;
+    const container = state.items[location.containerId];
+    if (container === undefined) return false;
+    location = container.location;
+  }
+  return false;
+}
+
+/**
  * Progress over the manifests of the jobs with open `kind` problems, in units (a stack of two
  * crates is two): stowed aboard, set down rather than in someone's hands (load), or no longer
  * aboard (unload). D61: freight on the dock is not aboard, whether it lies there or someone
@@ -549,9 +567,8 @@ function freightProgress(
       const item = state.items[itemId];
       if (item === undefined) continue;
       const count = item.stacking === "stack" ? item.count : 1;
-      const where = item.location.kind;
       const onShip = isAboardShip(item, state, content);
-      if (onShip && (where === "onDeck" || where === "inContainer")) stowed += count;
+      if (onShip && !inHands(item, state)) stowed += count;
       if (onShip) aboard += count;
     }
     done += kind === "cargoToLoad" ? stowed : Math.max(0, units - aboard);

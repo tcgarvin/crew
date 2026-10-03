@@ -5,7 +5,7 @@
  */
 import { dockAreaTiles } from "./docks";
 import type { TileCoord } from "./types/common";
-import type { DockDefId } from "./types/ids";
+import type { DeckDefId, DockDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -151,9 +151,45 @@ export function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationCo
   return raw;
 }
 
-/** 3 → 4 (D61, D63): the dock alongside, then the freight on it. */
+/**
+ * 3 → 4, third part (D65): the ship carries a hand truck (the default scenario stows one in the
+ * cargo stowage zone). A save from before has none, so one is set down on the zone's first tile:
+ * the content's hand-truck item (a `handTruck` tool with a capacity), unless the save already
+ * has one. Its id comes from the save's own item counter. Crew learn where it is by looking.
+ */
+export function stowHandTruckOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+  if (!isRecord(raw) || !isRecord(raw.items) || !isRecord(raw.nextId) || !isRecord(raw.deck)) {
+    return raw;
+  }
+  const truck = Object.values(content.items).find(
+    (def) => def.toolKinds.includes("handTruck") && (def.capacityUnits ?? 0) >= 2,
+  );
+  if (truck === undefined) return raw;
+  if (Object.values(raw.items).some((item) => isRecord(item) && item.defId === truck.id)) {
+    return raw;
+  }
+  const deckIds = isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  const deck = deckIds.map((id) => content.decks[id as DeckDefId]).find((d) => d !== undefined);
+  const tile = deck?.zones.find((z) => z.tags.includes("cargoStowage"))?.tiles[0];
+  const counter = raw.nextId.item;
+  if (deck === undefined || tile === undefined) return raw;
+  if (typeof counter !== "number" || !Number.isInteger(counter) || counter < 1) return raw;
+  const id = `i${counter}`;
+  raw.nextId.item = counter + 1;
+  raw.items[id] = {
+    id,
+    defId: truck.id,
+    stacking: "unique",
+    condition: 1,
+    location: { kind: "onDeck", deckId: deck.id, x: tile.x + 0.5, y: tile.y + 0.5 },
+  };
+  return raw;
+}
+
+/** 3 → 4 (D61, D63, D65): the dock alongside, then the freight on it, then the hand truck. */
 function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
-  return stageLoadingFreightOnLoad(attachDockOnLoad(raw, context), context);
+  const docked = stageLoadingFreightOnLoad(attachDockOnLoad(raw, context), context);
+  return stowHandTruckOnLoad(docked, context);
 }
 
 export const migrations: MigrationRegistry = {

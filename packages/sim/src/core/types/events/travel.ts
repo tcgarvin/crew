@@ -22,6 +22,11 @@ export interface TravelEventPayloads {
   broughtAboard: { readonly actorId: ActorId; readonly name: string; readonly portId: PortDefId };
   /** D61: an item was still on the dock when it slid away; it stays at the port's warehouse. */
   leftOnDock: { readonly itemId: ItemId; readonly portId: PortDefId };
+  /**
+   * D65: a piece of the ship's own gear (the hand truck) was still on the dock when it went, so
+   * the dock crew handed it up the cargo ramp instead of leaving it at the warehouse.
+   */
+  gearBroughtAboard: { readonly itemId: ItemId; readonly portId: PortDefId };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -34,4 +39,5 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   departureHoldLifted: "narrative",
   broughtAboard: "notable",
   leftOnDock: "notable",
+  gearBroughtAboard: "notable",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

@@ -26,6 +26,10 @@ import { rebuildItemIndexes } from "../../core/caches";
  *   signal from travel if one is added.
  * - A route that ended early (`movement.routeFailure`, W3's "replan now") fails the step:
  *   `positionTaken` → `occupiedPosition`, anything else → `unreachableTarget`.
+ *
+ * D65: a haul may start as a hand-truck trip (`truck.ts`), one activity holding the claims of
+ * several hauls (`Activity.haul.legs`); renewal, expiry, validation and every way of stopping
+ * cover all of them, and a stopped trip sets the truck and its load down where the pusher is.
  */
 import { configTicks } from "../../core/clock";
 import { marketCounter } from "../../core/docks";
@@ -43,6 +47,7 @@ import type {
   Activity,
   ActivityStep,
   BlockageReason,
+  HaulLeg,
   Intent,
   StepTarget,
   Task,
@@ -59,7 +64,25 @@ import { claimTask, completeTask, isCompletionMet, releaseActorClaim, renewClaim
 import { claimantsOf, isTerminal } from "./derivation";
 import { directSight, writeFact } from "./facts";
 import { labelFor } from "./labels";
-import { believedLocation, buildPersonalPlan, buildTaskPlan, carriedItems, tileOf } from "./plans";
+import {
+  type PlanResult,
+  believedLocation,
+  buildPersonalPlan,
+  buildTaskPlan,
+  carriedItems,
+  tileOf,
+} from "./plans";
+import {
+  buildTruckPlan,
+  dropLeg,
+  dropTruckLoad,
+  heldTasks,
+  loadOntoTruck,
+  onTruck,
+  setDownHere,
+  settleHeld,
+  withinReach,
+} from "./truck";
 
 /** Drives recipe stages owned by equipment (W5). */
 export interface StageExecutor {
@@ -251,6 +274,12 @@ function actionFor(
       return makeAction("wait", "waiting", tick);
     case "stowBought":
       return makeAction("putDown", "placing", tick);
+    case "loadTruck":
+      return makeAction("pickUp", "reaching", tick, step.itemId);
+    case "unloadTruck":
+      return makeAction("putDown", "placing", tick, step.itemId);
+    case "parkTruck":
+      return makeAction("putDown", "placing", tick, step.truckId);
     case "work": {
       if (step.stage === "eat") return makeAction("eat", "eating", tick);
       if (step.stage === "buy") return makeAction("wait", "waiting", tick);
@@ -352,7 +381,11 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
   if (actor.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, actor.id);
   else releaseReservations(ctx.caches, actor.id);
   leaveHold(ctx, actor);
-  if (activity.kind === "task") {
+  if (activity.kind === "task" && activity.haul !== undefined) {
+    // D65: the truck and its load go down here; each held task is settled on where its crate is.
+    if (dropTruckLoad(ctx, actor, activity.haul.truckId)) touchInventory(ctx);
+    for (const held of heldTasks(activity)) settleHeld(ctx, actor, held.taskId, reason);
+  } else if (activity.kind === "task") {
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined) {
       dropHaulCargo(ctx, actor, task);
@@ -396,6 +429,10 @@ function blockTask(ctx: StepCtx, actor: Actor, task: Task, reason: BlockageReaso
 /** The plan ran out of steps. */
 function finishActivity(ctx: StepCtx, actor: Actor): void {
   const activity = actor.activity;
+  // D65: every leg settled as its crate came off the truck; anything left is settled now.
+  for (const leg of activity.kind === "task" ? (activity.haul?.legs ?? []) : []) {
+    settleHeld(ctx, actor, leg.taskId, "failed");
+  }
   if (activity.kind === "task") {
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined && !isTerminal(task)) {
@@ -693,6 +730,99 @@ function runStowBought(ctx: StepCtx, actor: Actor, step: StepOf<"stowBought">): 
   return set.length === 0 ? { fail: "inaccessibleSupply" } : "done";
 }
 
+/** The activity's hand-truck trip, if it is one (D65). */
+function haulBatch(actor: Actor) {
+  return actor.activity.kind === "task" ? actor.activity.haul : undefined;
+}
+
+/** The live haul task moving `itemId`, if any. */
+function haulTaskFor(ctx: StepCtx, itemId: ItemId): Task | undefined {
+  return Object.values(ctx.state.work.tasks).find(
+    (t) => !isTerminal(t) && t.target.kind === "item" && t.target.itemId === itemId,
+  );
+}
+
+/**
+ * D65: take a crate within reach onto the truck in hand. A leg's crate that is not where the
+ * actor thought drops that leg (noted, backed off, released) and the trip goes on; the lead's
+ * fails the trip as a hand haul would.
+ */
+function runLoadTruck(ctx: StepCtx, actor: Actor, step: StepOf<"loadTruck">): StepResult {
+  if (onTruck(ctx.state, step.itemId, step.truckId)) return "done";
+  const truck = ctx.state.items[step.truckId];
+  const held = truck?.location.kind === "carriedBy" && truck.location.actorId === actor.id;
+  if (!held) return { fail: "missingTool" };
+  const item = ctx.state.items[step.itemId];
+  if (item !== undefined && withinReach(actor, item)) {
+    loadOntoTruck(ctx, actor, item, step.truckId);
+    touchInventory(ctx);
+    return "done";
+  }
+  noteDiscrepancy(ctx, actor, step.itemId);
+  const batch = haulBatch(actor);
+  const leg = haulTaskFor(ctx, step.itemId);
+  if (batch === undefined || !dropLeg(ctx, actor, batch, step.itemId, "failed")) {
+    return { fail: "inaccessibleSupply" };
+  }
+  if (leg !== undefined) setBackoff(ctx, actor, backoffRef.task(leg.id));
+  dropUnloadStep(actor, step.itemId);
+  return "done";
+}
+
+/** Remove the later `unloadTruck` step of a dropped leg's crate from the plan. */
+function dropUnloadStep(actor: Actor, itemId: ItemId): void {
+  const activity = actor.activity;
+  if (activity.kind !== "task" || activity.plan === undefined) return;
+  const plan = activity.plan;
+  plan.steps = plan.steps.filter(
+    (s, i) => i <= plan.stepIndex || s.kind !== "unloadTruck" || s.itemId !== itemId,
+  );
+}
+
+/** D65: set a crate down off the truck here; a leg's task settles at once. */
+function runUnloadTruck(ctx: StepCtx, actor: Actor, step: StepOf<"unloadTruck">): StepResult {
+  const item = ctx.state.items[step.itemId];
+  if (item === undefined || !onTruck(ctx.state, step.itemId, step.truckId)) {
+    return { fail: "inaccessibleSupply" };
+  }
+  if (actor.location.kind !== "onDeck") return { fail: "unreachableTarget" };
+  setDownHere(ctx, actor, item);
+  touchInventory(ctx);
+  const batch = haulBatch(actor);
+  if (batch !== undefined) dropLeg(ctx, actor, batch, step.itemId, "failed");
+  return "done";
+}
+
+/** D65: the trip is over; set the empty truck down here, aboard. */
+function runParkTruck(ctx: StepCtx, actor: Actor, step: StepOf<"parkTruck">): StepResult {
+  const truck = ctx.state.items[step.truckId];
+  const location = truck?.location;
+  if (truck === undefined || location?.kind !== "carriedBy" || location.actorId !== actor.id) {
+    return { fail: "missingTool" };
+  }
+  if (actor.location.kind !== "onDeck") return { fail: "unreachableTarget" };
+  setDownHere(ctx, actor, truck);
+  touchInventory(ctx);
+  return "done";
+}
+
+/**
+ * D65: the truck was not where the actor thought. The trip becomes a hand haul of the lead's
+ * crate and the legs are let go. Returns false when even that cannot be planned.
+ */
+function singleHaulFallback(ctx: StepCtx, actor: Actor): boolean {
+  const activity = actor.activity;
+  if (activity.kind !== "task" || activity.haul === undefined) return false;
+  for (const leg of activity.haul.legs) settleHeld(ctx, actor, leg.taskId, "failed");
+  // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
+  delete activity.haul;
+  const task = ctx.state.work.tasks[activity.taskId];
+  const plan = task === undefined ? undefined : buildTaskPlan(ctx, actor, task);
+  if (plan === undefined || !plan.ok) return false;
+  activity.plan = plan.plan;
+  return true;
+}
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -738,6 +868,12 @@ function runStep(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: ActivityStep)
       return runThroughGate(ctx, actor, step);
     case "stowBought":
       return runStowBought(ctx, actor, step);
+    case "loadTruck":
+      return runLoadTruck(ctx, actor, step);
+    case "unloadTruck":
+      return runUnloadTruck(ctx, actor, step);
+    case "parkTruck":
+      return runParkTruck(ctx, actor, step);
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
   }
@@ -783,6 +919,14 @@ function advanceActivity(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
     const result = runStep(ctx, deps, actor, step);
     if (result === "wait") return;
     if (result !== "done") {
+      const truckMissing =
+        step.kind === "pickUp" &&
+        activity.kind === "task" &&
+        activity.haul?.truckId === step.itemId;
+      if (truckMissing && singleHaulFallback(ctx, actor)) {
+        refreshPresentation(ctx, actor);
+        continue;
+      }
       failActivity(ctx, actor, result.fail);
       return;
     }
@@ -831,7 +975,10 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
   if (task.blockage !== undefined && ctx.tick < task.blockage.retryAfterTick) return;
   abortActivity(ctx, actor, "interrupted");
   learnManifest(ctx, actor, task);
-  const plan = buildTaskPlan(ctx, actor, task);
+  // D65: a haul goes on the hand truck when the actor knows of a free one and of more to move.
+  const truck = buildTruckPlan(ctx, actor, task);
+  const plan: PlanResult =
+    truck === undefined ? buildTaskPlan(ctx, actor, task) : { ok: true, plan: truck.plan };
   if (!plan.ok) {
     setBackoff(ctx, actor, backoffRef.task(task.id));
     blockTask(ctx, actor, task, plan.reason);
@@ -847,6 +994,17 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
     action: makeAction("wait", "waiting", ctx.tick),
     sinceTick: ctx.tick,
     plan: plan.plan,
+    ...(truck === undefined
+      ? {}
+      : {
+          haul: {
+            truckId: truck.truckId,
+            legs: truck.legs.map((leg) => ({
+              taskId: leg.id,
+              claimId: claimTask(ctx, actor, leg),
+            })),
+          },
+        }),
   };
   activity.action = actionFor(ctx, activity, first);
   actor.activity = activity;
@@ -931,7 +1089,17 @@ function validateTaskActivity(ctx: StepCtx, actor: Actor): void {
     abortActivity(ctx, actor, "cancelled");
   } else if (ctx.state.work.claims[activity.claimId] === undefined) {
     abortActivity(ctx, actor, "failed");
+  } else if (activity.haul?.legs.some((leg) => !legLive(ctx, leg))) {
+    // D65: a leg's task went away under the trip; set it all down and plan afresh.
+    abortActivity(ctx, actor, "cancelled");
   }
+}
+
+function legLive(ctx: StepCtx, leg: HaulLeg): boolean {
+  const task = ctx.state.work.tasks[leg.taskId];
+  return (
+    task !== undefined && !isTerminal(task) && ctx.state.work.claims[leg.claimId] !== undefined
+  );
 }
 
 /** One crew actor's tick of work. */
@@ -950,7 +1118,9 @@ export function stepActor(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
   validateTaskActivity(ctx, actor);
   advanceActivity(ctx, deps, actor);
   const activity = actor.activity;
-  if (activity.kind === "task") renewClaim(ctx, activity.claimId);
+  if (activity.kind === "task") {
+    for (const held of heldTasks(activity)) renewClaim(ctx, held.claimId);
+  }
   refreshPresentation(ctx, actor);
 }
 
@@ -967,10 +1137,11 @@ export function expireClaims(ctx: StepCtx): void {
       source: "sim",
       payload: { taskId: claim.taskId },
     });
+    const activity = owner?.activity;
     if (
       owner !== undefined &&
-      owner.activity.kind === "task" &&
-      owner.activity.claimId === claim.id
+      activity?.kind === "task" &&
+      heldTasks(activity).some((held) => held.claimId === claim.id)
     ) {
       abortActivity(ctx, owner, "failed");
     }

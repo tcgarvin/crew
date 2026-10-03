@@ -494,6 +494,31 @@ describe("bundle validation", () => {
       }
     });
 
+    it("holds capacityUnits to hand trucks, and every hand truck to a load of two or more (D65)", () => {
+      const issuesFor = (bad: Record<string, unknown>) => {
+        const parsed = validateStructure({ ...bundle, items: { [item.id]: { ...item, ...bad } } });
+        if (!parsed.ok) throw new Error("structurally invalid");
+        return validateReferences(parsed.bundle).map((i) => i.message);
+      };
+      const truck = { toolKinds: ["handTruck"] };
+      expect(issuesFor({ ...truck, capacityUnits: 4 })).toEqual([]);
+      expect(issuesFor(truck).some((m) => m.includes("capacityUnits of at least 2"))).toBe(true);
+      expect(issuesFor({ ...truck, capacityUnits: 1 }).some((m) => m.includes("at least 2"))).toBe(
+        true,
+      );
+      expect(
+        issuesFor({ ...truck, capacityUnits: 4, stacking: "stackable", maxStack: 3 }).some((m) =>
+          m.includes("must be unique"),
+        ),
+      ).toBe(true);
+      expect(issuesFor({ capacityUnits: 4 }).some((m) => m.includes("only a handTruck tool"))).toBe(
+        true,
+      );
+      expect(
+        validateStructure({ ...bundle, items: { [item.id]: { ...item, capacityUnits: 0 } } }).ok,
+      ).toBe(false);
+    });
+
     it("rejects a port without character or with fewer than two cast seeds (spec §2.4)", () => {
       const { character: _dropped, ...noCharacter } = port;
       expect(portDefSchema.safeParse(noCharacter).success).toBe(false);

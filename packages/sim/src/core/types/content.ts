@@ -507,6 +507,11 @@ export interface ItemDef {
   readonly cargoClass?: CargoClass;
   /** Hunger removed per unit eaten (only with the `food` tag). */
   readonly nutrition?: number;
+  /**
+   * D65: units of freight it carries at once (only on a `handTruck` tool, which must have it). A
+   * crew member pushing it moves that many crates per trip instead of one in their hands.
+   */
+  readonly capacityUnits?: number;
 }
 
 // ---------------------------------------------------------------------------------------------

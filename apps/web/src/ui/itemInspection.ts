@@ -87,8 +87,18 @@ function where(
     case "carriedBy":
     case "equippedBy":
       return `carried by ${state.actors[location.actorId]?.name ?? "someone"}`;
-    case "inContainer":
-      return "packed in a container";
+    case "inContainer": {
+      // D65: freight rides on the hand truck while someone pushes it.
+      const container = state.items[location.containerId];
+      const def = container === undefined ? undefined : content.items[container.defId];
+      if (container === undefined || def?.toolKinds.includes("handTruck") !== true) {
+        return "packed in a container";
+      }
+      const held = container.location;
+      const pusher = held.kind === "carriedBy" ? state.actors[held.actorId]?.name : undefined;
+      const truck = `on the ${def.name.toLowerCase()}`;
+      return pusher === undefined ? truck : `${truck}, pushed by ${pusher}`;
+    }
     case "installedIn":
       return "installed in a machine";
     case "inExternalStore":

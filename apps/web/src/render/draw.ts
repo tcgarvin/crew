@@ -546,9 +546,50 @@ export function drawDeckItems(
   }
 }
 
+/** D65: what rides on each container in the frame (crates on a hand truck), by container id. */
+function containerLoads(frame: RenderFrame): Map<string, RenderItem[]> {
+  const loads = new Map<string, RenderItem[]>();
+  for (const item of frame.items) {
+    if (item.location.kind !== "container") continue;
+    const id = item.location.containerId;
+    loads.set(id, [...(loads.get(id) ?? []), item]);
+  }
+  return loads;
+}
+
+/**
+ * D65: a hand truck being pushed, beside its pusher's dot: an upright handle and a toe plate with
+ * the crates stacked on it (two to a row, at most two rows; a count tag says how many).
+ */
+function drawLoadedTruck(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  footY: number,
+  size: number,
+  load: readonly RenderItem[],
+): void {
+  const crate = size * 0.6;
+  const left = x - crate;
+  const base = footY + size * 0.45;
+  ctx.strokeStyle = "rgba(231, 237, 243, 0.9)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(left - 2, base - crate * 2 - 4);
+  ctx.lineTo(left - 2, base);
+  ctx.lineTo(left + crate * 2 + 1, base);
+  ctx.stroke();
+  load.slice(0, 4).forEach((item, i) => {
+    const cx = left + crate / 2 + (i % 2) * crate;
+    const cy = base - crate / 2 - 1 - Math.floor(i / 2) * crate;
+    drawCrate(ctx, cx, cy, crate, itemColor(item), false);
+  });
+  if (load.length > 1) drawBadge(ctx, left + crate * 2 + 2, base - crate * 2, load.length);
+}
+
 /**
  * A carried crate or tool as a smaller square riding its carrier's dot, up and to the right on
- * screen. Pocketed rations and the like are not drawn.
+ * screen; a hand truck with crates on it (D65) as the truck and its load. Pocketed rations and
+ * the like are not drawn.
  */
 export function drawCarriedItems(
   ctx: CanvasRenderingContext2D,
@@ -560,6 +601,7 @@ export function drawCarriedItems(
   const actorsById = new Map(frame.actors.map((a) => [a.id, a] as const));
   const dot = Math.max(MIN_DOT_RADIUS, t.scale * 0.22);
   const small = Math.max(8, t.scale * 0.36);
+  const loads = containerLoads(frame);
   for (const item of frame.items) {
     if (item.location.kind !== "carried") continue;
     if (item.kind !== "crate" && item.kind !== "tool") continue;
@@ -568,6 +610,11 @@ export function drawCarriedItems(
     const [ax, ay] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
     const x = ax + dot + small / 2;
     const y = ay - small * 0.35;
+    const load = loads.get(item.id);
+    if (load !== undefined) {
+      drawLoadedTruck(ctx, x, ay, small, load);
+      continue;
+    }
     drawCrate(ctx, x, y, small, itemColor(item), false);
     // A light rim so a carried crate stands out against dark floors and label plates.
     ctx.strokeStyle = "rgba(231, 237, 243, 0.9)";
