@@ -69,6 +69,9 @@ import portOssoryStation from "../data/ports/ossory-station.json";
 import portTernsRest from "../data/ports/terns-rest.json";
 import portVesperGate from "../data/ports/vesper-gate.json";
 
+// Docks (Dockside §3)
+import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
+
 // Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
 
@@ -137,6 +140,7 @@ const PORTS = [
   portVesperGate,
   portTernsRest,
 ];
+const DOCKS = [dockCrossroadsHub];
 const SCENARIOS = [scenarioDefault];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */
@@ -208,6 +212,7 @@ export function rawBundle(): Record<string, unknown> {
     ports: keyById(PORTS),
     scenarios: keyById(SCENARIOS),
     people: stripSchemaKey(peopleNameTable),
+    docks: keyById(DOCKS),
     config: stripSchemaKey(configDefault),
   };
   return { ...withoutHash, hash: hashOf(withoutHash) };

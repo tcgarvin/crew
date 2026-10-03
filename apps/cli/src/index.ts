@@ -4,13 +4,14 @@
  * `crew` CLI (W10): content validation, JSON Schema export and ASCII deck rendering.
  * Headless simulation running and offline generation scripts land here too as they're built.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ValidationIssue, contentJsonSchemas, loadBundle } from "@crew/content";
-import type { DeckDefId } from "@crew/sim";
+import { type ContentBundle, type DeckDefId, type DockDefId, checkDockFitsDeck } from "@crew/sim";
 import { runPacingCli } from "./pacing";
 import { renderDeck } from "./render-deck";
+import { renderDockReadme } from "./render-dock";
 
 export interface CliResult {
   readonly output: string;
@@ -35,10 +36,34 @@ function repoRoot(): string {
   return path.resolve(here, "../../..");
 }
 
+/**
+ * Graft every dock onto every deck with the sim's own nav builder, which `packages/content` may
+ * not call (types only). Content validation applies the same rules; this catches the two
+ * drifting apart, as the sim would throw at `attachDock`.
+ */
+export function dockGraftIssues(bundle: ContentBundle): string[] {
+  const out: string[] = [];
+  for (const dockId of Object.keys(bundle.docks ?? {}) as DockDefId[]) {
+    for (const deckId of Object.keys(bundle.decks) as DeckDefId[]) {
+      try {
+        checkDockFitsDeck(bundle, deckId, dockId);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        out.push(`  [graft] docks.${dockId} on ${deckId}: ${error.message}`);
+      }
+    }
+  }
+  return out;
+}
+
 export function runContentValidate(): CliResult {
   const result = loadBundle();
   if (result.ok) {
     const b = result.bundle;
+    const graft = dockGraftIssues(b);
+    if (graft.length > 0) {
+      return fail([`content validate: FAILED — ${graft.length} issue(s)`, ...graft].join("\n"));
+    }
     const counts = [
       `${Object.keys(b.decks).length} deck(s)`,
       `${Object.keys(b.machines).length} machine(s)`,
@@ -47,6 +72,7 @@ export function runContentValidate(): CliResult {
       `${Object.keys(b.traits).length} trait(s)`,
       `${Object.keys(b.ports).length} port(s)`,
       `${Object.keys(b.scenarios).length} scenario(s)`,
+      `${Object.keys(b.docks ?? {}).length} dock(s)`,
     ].join(", ");
     return ok(`content validate: OK — ${counts} (hash ${b.hash})`);
   }
@@ -85,6 +111,58 @@ export function runContentRenderDeck(deckId: string | undefined): CliResult {
   return ok(renderDeck(deck));
 }
 
+/** `dock.crossroads_hub` → `crossroads-hub`, the dock's file name under `data/docks/`. */
+export function dockFileStem(dockId: string): string {
+  return dockId.replace(/^dock\./, "").replaceAll("_", "-");
+}
+
+export function docksDir(): string {
+  return path.join(repoRoot(), "packages/content/data/docks");
+}
+
+/**
+ * Renders a dock with the ship composited and writes `<stem>.README.md` next to its JSON (or
+ * into `outDir`). Needs exactly one deck in the bundle, since maps are authored against one ship.
+ */
+export function runContentRenderDock(dockId: string | undefined, outDir?: string): CliResult {
+  if (dockId === undefined) {
+    return fail("content render-dock: missing <id>");
+  }
+  const result = loadBundle();
+  if (!result.ok) {
+    return fail(
+      ["content render-dock: content failed validation", ...result.issues.map(formatIssue)].join(
+        "\n",
+      ),
+    );
+  }
+  const bundle = result.bundle;
+  const dock = bundle.docks?.[dockId as DockDefId];
+  if (dock === undefined) {
+    return fail(`content render-dock: unknown dock "${dockId}"`);
+  }
+  const decks = Object.values(bundle.decks);
+  const deck = decks[0];
+  if (deck === undefined || decks.length !== 1) {
+    return fail(`content render-dock: needs exactly one deck to dock, found ${decks.length}`);
+  }
+  const port = bundle.ports[dock.portId];
+  if (port === undefined) {
+    return fail(`content render-dock: dock "${dockId}" names unknown port "${dock.portId}"`);
+  }
+  const stem = dockFileStem(dock.id);
+  const source = path.join(docksDir(), `${stem}.json`);
+  if (!existsSync(source)) {
+    return fail(`content render-dock: expected "${dock.id}" in ${source}`);
+  }
+  const readme = renderDockReadme(dock, deck, port, `${stem}.json`);
+  const dir = outDir ?? docksDir();
+  mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, `${stem}.README.md`);
+  writeFileSync(target, readme);
+  return ok(`${readme}\ncontent render-dock: wrote ${target}`);
+}
+
 function runContent(sub: string | undefined, rest: readonly string[]): CliResult {
   switch (sub) {
     case "validate":
@@ -93,8 +171,12 @@ function runContent(sub: string | undefined, rest: readonly string[]): CliResult
       return runContentSchemas();
     case "render-deck":
       return runContentRenderDeck(rest[0]);
+    case "render-dock":
+      return runContentRenderDock(rest[0]);
     case undefined:
-      return fail("crew content: no subcommand given (validate | schemas | render-deck <id>)");
+      return fail(
+        "crew content: no subcommand given (validate | schemas | render-deck <id> | render-dock <id>)",
+      );
     default:
       return fail(`crew content: unknown subcommand "${sub}"`);
   }

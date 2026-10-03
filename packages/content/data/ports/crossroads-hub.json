@@ -8,12 +8,14 @@
     {
       "name": "Hal Petrosyan",
       "role": "berth agent",
-      "note": "Runs the queue board from a kiosk by the ramps and treats a late departure as a personal insult."
+      "note": "Runs the queue board from a kiosk by the ramps and treats a late departure as a personal insult.",
+      "post": "queue_kiosk"
     },
     {
       "name": "Anneke Vos",
       "role": "night-market stallholder",
-      "note": "Sells rations, gossip and the occasional spare part, and knows which crews pay their tabs."
+      "note": "Sells rations, gossip and the occasional spare part, and knows which crews pay their tabs.",
+      "post": "night_stall"
     },
     {
       "name": "Fenwick Adair",

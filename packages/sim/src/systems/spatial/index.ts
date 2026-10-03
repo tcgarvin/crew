@@ -21,9 +21,12 @@ export {
 export { doorHasPower, doorWillOpen, doorsSystem, isPowerDomainLive } from "./doors";
 export { estimateTravelTicks, knownRoute } from "./estimates";
 export {
+  checkDockFitsDeck,
   compartmentAt,
   deckGeometry,
+  dockFloorMask,
   doorBetween,
+  isDockFloor,
   isDockTile,
   isWalkable,
   navCacheBuilder,

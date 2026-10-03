@@ -383,6 +383,7 @@ describe("bundle validation", () => {
     ports: { [port.id]: port, [portB.id]: portB },
     scenarios: { [scenario.id]: scenario },
     people,
+    docks: {},
     config,
     hash: "test",
   };

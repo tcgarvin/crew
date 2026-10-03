@@ -14,8 +14,8 @@
  */
 import type { CacheBuilder } from "../../core/registry";
 import type { EdgeSide, TileCoord, TileEdge } from "../../core/types/common";
-import type { ContentBundle, DeckDef, DockLayout, MachineDef } from "../../core/types/content";
-import type { CompartmentId, DeckDefId, DoorId, MachineId } from "../../core/types/ids";
+import type { ContentBundle, DeckDef, DockDef, MachineDef } from "../../core/types/content";
+import type { CompartmentId, DeckDefId, DockDefId, DoorId, MachineId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import {
   DOCK_FLOOR,
@@ -169,28 +169,73 @@ export interface GeometryInputs {
   /** Machine instance by placement key. */
   readonly machineIdByKey: ReadonlyMap<string, MachineId>;
   /** The dock to graft onto this deck, if one is alongside. */
-  readonly dock?: DockLayout;
+  readonly dock?: DockDef;
 }
 
-/** Deck-frame tiles of a dock layout's floor. Throws on a malformed layout. */
-export function dockFloorTiles(dock: DockLayout): TileCoord[] {
+const floorMasks = new WeakMap<DockDef, Uint8Array>();
+
+/**
+ * Walkable dock floor, row-major in the dock's own frame (`y * width + x`): a `floor` tile under
+ * no blocking prop. Content validation applies the same rule (`packages/content`
+ * `dockWalkableMask`); a CLI test holds the two together. Memoized per def (defs are immutable).
+ * Throws on a malformed map, which content validation makes impossible for authored docks.
+ */
+export function dockFloorMask(dock: DockDef): Uint8Array {
+  const cached = floorMasks.get(dock);
+  if (cached !== undefined) return cached;
   if (dock.rows.length !== dock.height) {
     throw new Error(`Dock "${dock.id}": ${dock.rows.length} rows, expected ${dock.height}`);
   }
-  const tiles: TileCoord[] = [];
+  const mask = new Uint8Array(dock.width * dock.height);
   dock.rows.forEach((row, y) => {
     if (row.length !== dock.width) {
       throw new Error(`Dock "${dock.id}": row ${y} is ${row.length} wide, expected ${dock.width}`);
     }
     for (let x = 0; x < row.length; x++) {
-      if (row[x] === ".") tiles.push({ x: x - dock.shipAt.x, y: y - dock.shipAt.y });
+      const ch = row[x] ?? "";
+      const kind = dock.legend[ch];
+      if (kind === undefined) throw new Error(`Dock "${dock.id}": "${ch}" is not in the legend`);
+      if (kind === "floor") mask[y * dock.width + x] = 1;
     }
   });
+  for (const prop of dock.props) {
+    if (!prop.blocking) continue;
+    const { x: px, y: py, w, h } = prop.rect;
+    for (let y = py; y < py + h; y++) {
+      for (let x = px; x < px + w; x++) {
+        if (x < 0 || y < 0 || x >= dock.width || y >= dock.height) {
+          throw new Error(`Dock "${dock.id}": prop "${prop.key}" reaches off the map`);
+        }
+        mask[y * dock.width + x] = 0;
+      }
+    }
+  }
+  floorMasks.set(dock, mask);
+  return mask;
+}
+
+/** Is dock-frame tile (x, y) walkable dock floor? False off the map. */
+export function isDockFloor(dock: DockDef, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= dock.width || y >= dock.height) return false;
+  return dockFloorMask(dock)[y * dock.width + x] === 1;
+}
+
+/** Deck-frame tiles of a dock's walkable floor. Throws on a malformed map. */
+export function dockFloorTiles(dock: DockDef): TileCoord[] {
+  const mask = dockFloorMask(dock);
+  const tiles: TileCoord[] = [];
+  for (let y = 0; y < dock.height; y++) {
+    for (let x = 0; x < dock.width; x++) {
+      if (mask[y * dock.width + x] === 1) {
+        tiles.push({ x: x - dock.shipAt.x, y: y - dock.shipAt.y });
+      }
+    }
+  }
   return tiles;
 }
 
 /** Bounds of the deck plus, if docked, the dock map (both in deck coordinates). */
-function gridBounds(deck: DeckDef, dock: DockLayout | undefined): Grid {
+function gridBounds(deck: DeckDef, dock: DockDef | undefined): Grid {
   if (dock === undefined) return { originX: 0, originY: 0, width: deck.width, height: deck.height };
   const originX = Math.min(0, -dock.shipAt.x);
   const originY = Math.min(0, -dock.shipAt.y);
@@ -352,7 +397,7 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
 }
 
 /** Where each ramp lands on the dock; throws if a ramp would open onto anything but dock floor. */
-function dockGraft(geometry: DeckGeometry, dock: DockLayout): NavDockGraft {
+function dockGraft(geometry: DeckGeometry, dock: DockDef): NavDockGraft {
   const landings = new Map<DoorId, TileCoord>();
   for (const nav of geometry.doors.values()) {
     if (nav.placement.kind !== "ramp") continue;
@@ -424,12 +469,12 @@ export function syncRampPassability(
   caches.dirty.navigation = true;
 }
 
-/** The dock layout grafted onto `deckId` in this state, if any; throws if content lacks it. */
+/** The dock map grafted onto `deckId` in this state, if any; throws if content lacks it. */
 export function dockLayoutFor(
   content: ContentBundle,
   state: ReadonlyWorldState,
   deckId: DeckDefId,
-): DockLayout | undefined {
+): DockDef | undefined {
   const presence = state.deck.dock;
   if (presence === undefined || presence.deckId !== deckId) return undefined;
   const layout = content.docks?.[presence.dockId];
@@ -451,6 +496,32 @@ export function checkDockGraft(
   const layout = content.docks?.[presence.dockId];
   if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
   buildDeckGeometry({ ...geometryInputs(deck, content, state), dock: layout });
+}
+
+/**
+ * The same check with no world, for content validation (`crew content validate`): graft the dock
+ * onto the bare deck def and throw as `attachDock` would. Instance ids are stood in by placement
+ * keys, which is all the builder uses them for.
+ */
+export function checkDockFitsDeck(
+  content: ContentBundle,
+  deckId: DeckDefId,
+  dockId: DockDefId,
+): void {
+  const deck = content.decks[deckId];
+  if (deck === undefined) throw new Error(`No deck "${deckId}" to dock against`);
+  const dock = content.docks?.[dockId];
+  if (dock === undefined) throw new Error(`No dock "${dockId}" in content`);
+  const byKey = <I>(keys: readonly { key: string }[]) =>
+    new Map(keys.map((k) => [k.key, k.key as unknown as I]));
+  buildDeckGeometry({
+    deck,
+    dock,
+    machineDefs: (id) => content.machines[id],
+    compartmentIdByKey: byKey<CompartmentId>(deck.compartments),
+    doorIdByKey: byKey<DoorId>(deck.doors),
+    machineIdByKey: byKey<MachineId>(deck.machines),
+  });
 }
 
 function geometryInputs(

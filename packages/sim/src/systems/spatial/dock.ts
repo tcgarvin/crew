@@ -9,13 +9,19 @@
  * calls them at the start of `docking` and the end of `undocking`.
  */
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
-import type { ContentBundle, DockLayout } from "../../core/types/content";
+import type { ContentBundle, DockDef } from "../../core/types/content";
 import type { DoorId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { DerivedCaches } from "../../core/types/pipeline";
 import type { DockPresence } from "../../core/types/ship";
 import type { WorldState } from "../../core/types/state";
-import { checkDockGraft, deckGeometry, isDockTile, rebuildGeometries } from "./geometry";
+import {
+  checkDockGraft,
+  deckGeometry,
+  isDockFloor,
+  isDockTile,
+  rebuildGeometries,
+} from "./geometry";
 
 /** What attaching or detaching needs: live state, the caches to rebuild, and content. */
 export interface DockHost {
@@ -25,12 +31,12 @@ export interface DockHost {
 }
 
 /** Dock-frame tile → deck-frame tile. */
-export function dockToDeck(layout: DockLayout, tile: TileCoord): TileCoord {
+export function dockToDeck(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
   return { x: tile.x - layout.shipAt.x, y: tile.y - layout.shipAt.y };
 }
 
 /** Deck-frame tile → dock-frame tile. */
-export function deckToDock(layout: DockLayout, tile: TileCoord): TileCoord {
+export function deckToDock(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
   return { x: tile.x + layout.shipAt.x, y: tile.y + layout.shipAt.y };
 }
 
@@ -50,7 +56,7 @@ export function isOnDock(
   const layout = content.docks?.[presence.dockId];
   if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
   const tile = deckToDock(layout, { x: Math.floor(location.x), y: Math.floor(location.y) });
-  return layout.rows[tile.y]?.[tile.x] === ".";
+  return isDockFloor(layout, tile.x, tile.y);
 }
 
 /** The dock floor tile (deck frame) a ramp door lands on; throws if no dock is attached there. */

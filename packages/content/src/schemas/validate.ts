@@ -11,7 +11,9 @@
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
- *   some item def.
+ *   some item def. Dock maps (`validate-dock.ts`): rows against the legend, the berth against
+ *   each deck's footprint, ramp landings on floor, posts and areas on floor and reachable from
+ *   both landings, the size cap.
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -28,15 +30,16 @@ import type {
   TraitDef,
 } from "@crew/sim";
 import { contentBundleSchema } from "./bundle";
+import {
+  type Path,
+  type ValidationIssue,
+  type ValidationLevel,
+  checkDuplicateLocalKeys,
+  issue,
+} from "./issues";
+import { checkCastSeedPosts, checkDockPhysical, checkDockReferences } from "./validate-dock";
 
-export type ValidationLevel = "structural" | "referential" | "physical";
-
-export interface ValidationIssue {
-  readonly level: ValidationLevel;
-  /** JSON path into the bundle, e.g. `["machines", "machine.pump.mk1", "faults", 0, "key"]`. */
-  readonly path: readonly (string | number)[];
-  readonly message: string;
-}
+export type { ValidationIssue, ValidationLevel };
 
 export type ValidationResult =
   | { readonly ok: true; readonly bundle: ContentBundle }
@@ -66,12 +69,6 @@ export function validateStructure(input: unknown): ValidationResult {
   };
 }
 
-type Path = readonly (string | number)[];
-
-function issue(level: ValidationLevel, path: Path, message: string): ValidationIssue {
-  return { level, path, message };
-}
-
 /** Namespace prefix each table's def IDs must use (or `gen.` for generated content). */
 const NAMESPACE_BY_TABLE: Record<string, string> = {
   decks: "deck",
@@ -81,6 +78,7 @@ const NAMESPACE_BY_TABLE: Record<string, string> = {
   traits: "trait",
   ports: "port",
   scenarios: "scenario",
+  docks: "dock",
 };
 
 function checkNamespaces(bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -106,21 +104,6 @@ function checkNamespaces(bundle: ContentBundle, issues: ValidationIssue[]): void
         );
       }
     }
-  }
-}
-
-function checkDuplicateLocalKeys(
-  keys: readonly string[],
-  path: Path,
-  kind: string,
-  issues: ValidationIssue[],
-): void {
-  const seen = new Set<string>();
-  for (const key of keys) {
-    if (seen.has(key)) {
-      issues.push(issue("referential", path, `duplicate ${kind} key "${key}"`));
-    }
-    seen.add(key);
   }
 }
 
@@ -560,7 +543,11 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   for (const item of Object.values(bundle.items)) checkItem(item, issues);
   for (const crew of Object.values(bundle.crew)) checkCrew(crew, bundle, issues);
   for (const trait of Object.values(bundle.traits)) checkTrait(trait, bundle, issues);
-  for (const port of Object.values(bundle.ports)) checkPort(port, bundle, issues);
+  for (const port of Object.values(bundle.ports)) {
+    checkPort(port, bundle, issues);
+    checkCastSeedPosts(port, bundle, issues);
+  }
+  checkDockReferences(bundle, issues);
   for (const scenario of Object.values(bundle.scenarios)) checkScenario(scenario, bundle, issues);
   checkPriceBands(bundle, issues);
   checkPeople(bundle, issues);
@@ -982,6 +969,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     checkDeckConnectivity(deck, index, issues);
     checkDeckZonesAndSpawns(deck, index, issues);
   }
+  for (const dock of Object.values(bundle.docks ?? {})) checkDockPhysical(dock, bundle, issues);
   checkRecipeToolsSatisfiable(bundle, issues);
 
   return issues;

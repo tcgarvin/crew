@@ -32,7 +32,7 @@ export type CrewDefId = Brand<string, "CrewDefId">;
 export type PortDefId = Brand<string, "PortDefId">;
 export type TraitDefId = Brand<string, "TraitDefId">;
 export type ScenarioDefId = Brand<string, "ScenarioDefId">;
-/** Dockside spike: a port's dock map (`DockDef` arrives with phase 2; `DockLayout` is its nav subset). */
+/** A port's dock map (`DockDef`, Dockside §3). */
 export type DockDefId = Brand<string, "DockDefId">;
 
 /** Any definition ID. Used where a reference may point at several def kinds (e.g. narrator digests). */
