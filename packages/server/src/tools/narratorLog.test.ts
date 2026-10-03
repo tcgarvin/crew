@@ -1,5 +1,5 @@
 import { loadBundle } from "@crew/content";
-import { approachingPortRequest } from "@crew/narrator";
+import { approachRequest } from "@crew/narrator";
 import { describe, expect, it } from "vitest";
 import { MemoryDb } from "../db/memory";
 import type { NarratorCallRow } from "../db/types";
@@ -268,7 +268,7 @@ describe("narrator-log", () => {
   it("digest: rebuilds the digest from a real stored request and the previous notes update", async () => {
     const result = loadBundle();
     if (!result.ok) throw new Error("content bundle invalid");
-    const request = approachingPortRequest(result.bundle);
+    const request = approachRequest(result.bundle);
     const db = new MemoryDb();
     const { game, save } = await seed(db);
     const call = await db.logNarratorCall({
@@ -287,7 +287,7 @@ describe("narrator-log", () => {
     });
     const out = await runNarratorLog(db, ["digest", call.id]);
     expect(out).toContain("## Why you were called");
-    expect(out).toContain("approachingPort: arriving at");
+    expect(out).toContain("quietTooLong: nothing story-worthy since tick");
     expect(out).toContain("The crew took a quiet ore run.");
     expect(out).toMatch(/notes source: notesUpdate of call /);
   });

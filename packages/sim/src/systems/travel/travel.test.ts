@@ -38,18 +38,14 @@ describe("travel state machine", () => {
       toPortId: PORTS.b,
     });
 
-    // transit: distance 25 / nominalSpeed 5 = 5s = 100 ticks, then approach raises the hook.
-    const untilHook = kernel.advance(world, 1000);
-    expect(untilHook.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    // transit: distance 25 / nominalSpeed 5 = 5s = 100 ticks, then the approach. A port with no
+    // dock map has no staging call (D66), so nothing halts on the way in.
+    const untilApproach = kernel.advance(world, 100);
+    expect(untilApproach).toMatchObject({ ticksAdvanced: 100, halt: { kind: "completed" } });
     expect(world.state.travel.stage).toBe("approaching");
+    expect(world.state.narrator.pendingHook).toBeUndefined();
 
-    const hookId = world.state.narrator.pendingHook?.id as HookId;
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
-    );
-    // Docking at B with nothing on raises `jobBoard` (D40); acknowledge that too.
+    // Docking at B with nothing on raises `jobBoard` (D40); acknowledge it.
     const after = advanceThroughHooks(kernel, world, 1000);
     expect(after.halt).toEqual({ kind: "completed" });
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
@@ -266,14 +262,13 @@ describe("departure gate (D36)", () => {
       name: "earlyHook",
       phase: "topology",
       run: (ctx) => {
-        if (ctx.tick === 1)
-          raiseHookIfIdle(ctx, "approachingPort", { portId: PORTS.a, etaTicks: 5 });
+        if (ctx.tick === 1) raiseHookIfIdle(ctx, "jobBoard", { portId: PORTS.a });
       },
     });
 
     const first = kernel.advance(world, 50);
     expect(first.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    expect(world.state.narrator.pendingHook?.kind).toBe("jobBoard");
     const gate = pendingGate(world);
     expect(gate).toBeDefined();
     expect(gate?.narratorHookId).toBeUndefined();
@@ -396,7 +391,8 @@ function advanceUntil(
   const hooks: string[] = [];
   let remaining = maxTicks;
   while (remaining > 0 && !done(world)) {
-    const result = kernel.advance(world, Math.min(remaining, 20));
+    // One tick at a time: `done` must see a docking that the next tick's departure would end.
+    const result = kernel.advance(world, 1);
     remaining -= result.ticksAdvanced;
     if (result.halt.kind === "decision") return { hooks, haltedOnDecision: true };
     if (result.halt.kind === "hook") {
@@ -502,13 +498,12 @@ describe("voyages: a destination beyond one hop (§2.3)", () => {
     expect(Object.values(world.state.jobs)[0]?.status).toBe("accepted");
   });
 
-  it("docks at the waypoint for real (fee, arrival, approach hook), then plans the next hop on its own and ends the voyage at its destination", () => {
+  it("docks at the waypoint for real (fee, arrival), then plans the next hop on its own and ends the voyage at its destination", () => {
     const { world, kernel } = freightTestWorld({ dockingFee: 5 });
     setCourseTo(kernel, world, PORTS.d);
 
     const toC = advanceUntil(kernel, world, dockedAt(PORTS.c));
     expect(toC.haltedOnDecision).toBe(false);
-    expect(toC.hooks).toContain("approachingPort");
     expect(world.state.money.balance).toBe(95);
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: PORTS.c });
     expect(world.state.travel.voyageDestinationId).toBe(PORTS.d);

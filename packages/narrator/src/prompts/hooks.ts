@@ -1,14 +1,16 @@
 /**
- * Per-hook instructions. All of them sit in the static, cached system prefix (so the prefix is
- * the same for every hook); the one for this call is repeated after the digest.
+ * Per-hook instructions for the story narrator. All of them sit in the static, cached system
+ * prefix (so the prefix is the same for every hook); the one for this call is repeated after the
+ * digest. D66: `stageDock` is not a story hook (it has its own call, `run.ts`), so it has none.
  */
 import type { NarratorHookKind } from "@crew/sim";
 
-export const HOOK_INSTRUCTIONS: Readonly<Record<NarratorHookKind, string>> = {
-  approachingPort:
-    'The ship is about to dock. You are the only source of work: if you offer nothing, there is no work at this port until the next call. Offer one job from this port (offerJob with fromPort set to it), and none while a job is in hand or this port is a waypoint of a voyage (the ship carries one job at a time, so an offer now would be dropped); routes and cargo must come from the capability list, and a job may be a passenger (passenger=true, roundTrip for there-and-back) when someone at this port has a reason to travel. Each offer comes from a named person with a pitch in their own voice; if someone under "People you know here" fits, bring them back rather than inventing someone new. You may surface it as the captain\'s card (surface=true) if it carries a hook or a complication worth a decision; it is shown once the ship has docked. Otherwise post it quietly. Offering nothing must be a deliberate story choice (say why in rationale) and should be rare. You may also stage cargo in a port store with spawnAtBoundary if it sets up a thread. Card is null.',
+/** The hooks the story narrator answers: every kind but the staging call (D66). */
+export type StoryHookKind = Exclude<NarratorHookKind, "stageDock">;
+
+export const HOOK_INSTRUCTIONS: Readonly<Record<StoryHookKind, string>> = {
   jobBoard:
-    "The ship is docked and the captain is looking for work; nothing is on offer here. You are the only source of work: if you offer nothing, there is no work at this port until the next call, so offering nothing must be a deliberate story choice (say why in rationale) and should be rare. Usually answer with an offer from someone who fits this port and your threads: one job from this port (offerJob with fromPort set to it), as for an arrival, from a named person with a pitch, people you know here first. A passenger (passenger=true, and roundTrip when they mean to come back) is an offer too, and a far port is where one tends to be bound; a passenger offer is always the surfaced card. At most one surfaced card. Card is null.",
+    "The ship is docked and the captain is looking for work; nothing is on offer here. You are the only source of work: if you offer nothing, there is no work at this port until the next call, so offering nothing must be a deliberate story choice (say why in rationale) and should be rare. Usually answer with an offer from someone who fits this port and your threads: one job from this port (offerJob with fromPort set to it), from a named person with a pitch, people you know here first. A passenger (passenger=true, and roundTrip when they mean to come back) is an offer too, and a far port is where one tends to be bound; a passenger offer is always the surfaced card. At most one surfaced card. Card is null.",
   quietTooLong:
     'Nothing story-worthy has happened for a while. This is a check-in, not a request: read the Pacing rules, "What the captain has seen" and the ship\'s state, and decide whether the story needs forward motion, a breath, or nothing. What is available to you: offer work (one offerJob from this port, from a named person with a pitch, people you know here first) when the captain is idle at a port with no job in hand; advance a thread whose nextBeat is true (a surfaceDecision from one of its people, or a beat card if it has had none); a minor crew card showing someone the captain has not seen on a card, in their own words (speaker set to their name); scheduleFault when the story needs pressure, never right after another fault; stockMarket when a stalled repair should find its part here or at the next port; or nothing. Say which you chose and why in rationale. Never a variation on a recent card. Card is null.',
   notableEvent:

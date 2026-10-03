@@ -125,6 +125,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
       recallAboardSeconds: 60,
+      localShuffleSeconds: 8,
+      dockHandGiveUpSeconds: 30,
     },
     commerce: {
       priceBands: {
@@ -445,6 +447,25 @@ export function freightTestWorld(overrides: FixtureConfigOverrides = {}): Fixtur
  * without reacting to every incidental hook. Stops early on a `decision` halt (the caller must
  * resolve it) or once `ticks` is exhausted.
  */
+/**
+ * Test helper: advance one tick at a time, acknowledging hooks, until travel is in `stage`
+ * (D66 retired `approachingPort`, which tests used to stop on). Throws on a decision halt or
+ * when `maxTicks` runs out, so a test never silently checks the wrong moment.
+ */
+export function advanceToStage(
+  kernel: Kernel,
+  world: World,
+  stage: World["state"]["travel"]["stage"],
+  maxTicks = 5_000,
+): void {
+  for (let i = 0; i < maxTicks; i++) {
+    if (world.state.travel.stage === stage) return;
+    const result = advanceThroughHooks(kernel, world, 1);
+    if (result.halt.kind === "decision") throw new Error(`decision halt before stage ${stage}`);
+  }
+  if (world.state.travel.stage !== stage) throw new Error(`never reached stage ${stage}`);
+}
+
 export function advanceThroughHooks(kernel: Kernel, world: World, ticks: number) {
   let remaining = ticks;
   for (;;) {

@@ -18,11 +18,12 @@ import { loadBundle } from "@crew/content";
 import {
   type ModelTransport,
   type NarratorRequest,
-  approachingPortRequest,
+  approachRequest,
   farJobBoardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
   runNarratorWithTrace,
+  stageDockRequest,
 } from "@crew/narrator";
 import type { CliResult } from "./index";
 
@@ -41,7 +42,8 @@ export function runNarratorFixtures(outDir?: string): CliResult {
   mkdirSync(dir, { recursive: true });
   const bundle = content();
   const fixtures: Record<string, NarratorRequest> = {
-    "approaching-port.json": approachingPortRequest(bundle),
+    "approach.json": approachRequest(bundle),
+    "stage-dock.json": stageDockRequest(bundle),
     "quiet-too-long-pump.json": quietTooLongRequest(bundle),
     "far-job-board.json": farJobBoardRequest(bundle),
     "passenger-overdue.json": passengerOverdueRequest(bundle),

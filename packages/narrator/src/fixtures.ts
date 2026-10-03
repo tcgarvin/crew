@@ -20,10 +20,14 @@ import {
   type World,
   type WorldState,
   allocateId,
+  clearDockside,
   configTicks,
   createKernel,
   createRegistry,
+  dockForPort,
+  dressDock,
   expectedDock,
+  floorSet,
 } from "@crew/sim";
 import type { NarratorRequest } from "./contract";
 
@@ -43,9 +47,12 @@ function alignDock(state: WorldState, content: ContentBundle): void {
   if (due === undefined || deckId === undefined) {
     // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
     delete state.deck.dock;
+    clearDockside(state);
     return;
   }
   state.deck.dock = { dockId: due.id, deckId };
+  // D66: the dock alongside comes with its floor set, as the sim dresses it.
+  dressDock(state, content, undefined, state.tick, 1);
 }
 
 function newWorld(content: ContentBundle, seed: number) {
@@ -106,8 +113,12 @@ function tireCrew(world: World): void {
   });
 }
 
-/** Approaching Kessler Drift from Crossroads Hub, no jobs yet. */
-export function approachingPortRequest(content: ContentBundle, seed = 11): NarratorRequest {
+/**
+ * Approaching Kessler Drift from Crossroads Hub, no jobs yet, on a `quietTooLong` check-in. D66
+ * retired `approachingPort`, which this fixture used to carry; the ship on approach is still the
+ * base the other fixtures build on.
+ */
+export function approachRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const { kernel, world } = newWorld(content, seed);
   const state = world.state;
   const tick = 1_800;
@@ -126,8 +137,8 @@ export function approachingPortRequest(content: ContentBundle, seed = 11): Narra
   tireCrew(world);
   const hook = {
     id: allocateId(state, "hook"),
-    kind: "approachingPort" as const,
-    context: { portId: DRIFT, etaTicks: 200 },
+    kind: "quietTooLong" as const,
+    context: { quietSinceTick: 900 },
     tick,
   };
   state.narrator.pendingHook = hook;
@@ -137,6 +148,46 @@ export function approachingPortRequest(content: ContentBundle, seed = 11): Narra
     event(2, 1_740, "travelStageChanged", { from: "transit", to: "approaching" }, "trace"),
   ];
   return { gameId: "fixture-approaching", hook, snapshot: kernel.serialize(world), recentEvents };
+}
+
+/**
+ * D66: the staging call for Kessler Drift, as the sim raises it: in transit from Crossroads Hub,
+ * `narrator.approachHookLeadSeconds` from the end of the route, the travel record `raised` for
+ * this hook, and the hook's context carrying the floor set (Kessler's posted regulars).
+ */
+export function stageDockRequest(content: ContentBundle, seed = 11): NarratorRequest {
+  const { kernel, world } = newWorld(content, seed);
+  const state = world.state;
+  const tick = 1_600;
+  state.tick = tick;
+  const lead = content.config.narrator.approachHookLeadSeconds * content.config.travel.nominalSpeed;
+  const dock = dockForPort(content, DRIFT);
+  if (dock === undefined) throw new Error("fixture content has no Kessler Drift dock");
+  const hook = {
+    id: allocateId(state, "hook"),
+    kind: "stageDock" as const,
+    context: { portId: DRIFT, dockId: dock.id, floorSet: floorSet(state, content, DRIFT) },
+    tick,
+  };
+  state.travel = {
+    stage: "transit",
+    fromPortId: HUB,
+    toPortId: DRIFT,
+    stageProgress: (25 - lead) / 25,
+    routeProgress: 25 - lead,
+    routeDistance: 25,
+    drifting: false,
+    stageStartedTick: tick - 200,
+    staging: { status: "raised", hookId: hook.id },
+  };
+  alignDock(state, content);
+  tireCrew(world);
+  state.narrator.pendingHook = hook;
+  state.narrator.lastNarrativeTick = tick;
+  const recentEvents = [
+    event(1, 900, "departed", { fromPortId: HUB, toPortId: DRIFT }, "narrative"),
+  ];
+  return { gameId: "fixture-stage-dock", hook, snapshot: kernel.serialize(world), recentEvents };
 }
 
 /**
@@ -216,7 +267,7 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
 
 /** Docked at Kessler Drift with nothing on offer, so the captain is looking for work (D40). */
 export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequest {
-  const base = approachingPortRequest(content, seed);
+  const base = approachRequest(content, seed);
   const tick = 2_400;
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
@@ -239,7 +290,7 @@ export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequ
  * ship never left the Hub.
  */
 export function farJobBoardRequest(content: ContentBundle, seed = 11): NarratorRequest {
-  const base = approachingPortRequest(content, seed);
+  const base = approachRequest(content, seed);
   const tick = 2_400;
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
@@ -500,7 +551,7 @@ export function notableEventRequest(content: ContentBundle, seed = 23): Narrator
  * the speaker in the template params, under a `policyDecision` hook naming the engine.
  */
 export function departureGateRequest(content: ContentBundle, seed = 11): NarratorRequest {
-  const base = approachingPortRequest(content, seed);
+  const base = approachRequest(content, seed);
   const snapshot = structuredClone(base.snapshot) as SaveEnvelope;
   const decisionId = "d9" as DecisionId;
   const actors = Object.values(snapshot.state.actors);

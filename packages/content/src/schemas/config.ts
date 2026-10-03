@@ -87,6 +87,8 @@ export const configDefSchema = z.strictObject({
     staffEstimateSeconds: nonNegative,
     departureMinOutput: unitInterval,
     recallAboardSeconds: positive,
+    localShuffleSeconds: positive,
+    dockHandGiveUpSeconds: positive,
   }),
   commerce: z.strictObject({
     priceBands: z.strictObject({

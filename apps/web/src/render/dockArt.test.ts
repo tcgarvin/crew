@@ -99,6 +99,8 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
       count: 2,
     })),
     headline: "",
+    locals: [],
+    dockProps: [],
     // D61: the sim names the dock alongside from the start of docking to the end of undocking.
     ...(ALONGSIDE.has(t.state) ? { dock: { dockId: dock.id, deckId: layout.deckId } } : {}),
   };

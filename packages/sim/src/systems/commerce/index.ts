@@ -29,7 +29,6 @@ export {
   acceptJob,
   offerStagingDock,
   stageOfferedFreight,
-  withdrawOfferedFreight,
   raiseUnloadProblems,
   payJobIfDue,
   expireStaleOffers,
@@ -47,4 +46,5 @@ export {
   sweepPassages,
 } from "./passage";
 export { commerceTaskDerivations } from "./tasks";
+export { errandFor, syncDockFreight } from "./dock-hands";
 export { affordableUnits, buyFromMarket, marketBlock, type MarketBlock } from "./market";

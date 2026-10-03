@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest, NarratorResponse } from "../contract";
 import {
-  approachingPortRequest,
+  approachRequest,
   departureGateRequest,
   farJobBoardRequest,
   jobBoardRequest,
@@ -97,14 +97,6 @@ function expectWorkOffered(run: NarratorRun): void {
 }
 
 suite(`live narrator (${model})${skipReason}`, () => {
-  it(
-    "approachingPort: the model answers with an offer",
-    async () => {
-      expectWorkOffered(await liveRun(approachingPortRequest(content())));
-    },
-    LIVE_TIMEOUT_MS,
-  );
-
   it(
     "jobBoard: the model answers with an offer",
     async () => {
@@ -194,9 +186,9 @@ suite(`live narrator (${model})${skipReason}`, () => {
   it(
     "prompt caching: a repeated call reads the system prefix from cache",
     async () => {
-      const first = await liveRun(approachingPortRequest(content()));
+      const first = await liveRun(approachRequest(content()));
       expectModelAnswered(first);
-      const second = await liveRun(approachingPortRequest(content()));
+      const second = await liveRun(approachRequest(content()));
       const response = expectModelAnswered(second);
       console.log("usage, first call:", JSON.stringify(first.response.usage));
       console.log("usage, second call:", JSON.stringify(response.usage));

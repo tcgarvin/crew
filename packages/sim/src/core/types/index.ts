@@ -9,6 +9,7 @@ export * from "./commands/authority";
 export * from "./common";
 export * from "./content";
 export * from "./decisions";
+export * from "./dockside";
 export * from "./events";
 export * from "./ids";
 export * from "./kernel";

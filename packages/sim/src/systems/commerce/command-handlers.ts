@@ -38,11 +38,8 @@ import {
   freightSpawnLocations,
   issuerLabel,
   normaliseIssuer,
-  offerStagingDock,
   spawnCargoItem,
-  stageOfferedFreight,
   surfaceOfferCard,
-  withdrawOfferedFreight,
 } from "./jobs";
 import { PASSENGER_CREW_DEF_ID, endPassageEarly, spawnPassenger } from "./passage";
 
@@ -141,9 +138,9 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       source: command.source,
       payload: { jobId },
     });
-    // D63: alongside the origin's dock, the freight is set out on its staging area at once; an
-    // offer made in flight is staged by commerce's sweep when that dock comes alongside.
-    if (offerStagingDock(ctx, job) !== undefined) stageOfferedFreight(ctx, job, causedBy(command));
+    // D63, D66: alongside the origin's dock, commerce's sweep this tick sends a dock hand out with
+    // the freight (or sets it out at once at a dock with no warehouse door); an offer made in
+    // flight is staged the same way when that dock comes alongside.
     if (surface) {
       // D42: the card can only be taken at the dock (`acceptContract` and `setCourse` need the
       // ship docked at the origin), so an offer surfaced on approach waits for it; commerce
@@ -231,7 +228,7 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       source: command.source,
       payload: { jobId: job.id },
     });
-    withdrawOfferedFreight(ctx, job);
+    // D66: commerce's sweep this tick sends a dock hand to cart the staged crates back in.
     return NO_TEMP_REFS;
   },
 };

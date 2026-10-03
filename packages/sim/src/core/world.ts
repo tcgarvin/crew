@@ -1,4 +1,5 @@
 import { emptyCaches, rebuildCaches } from "./caches";
+import { configTicks } from "./clock";
 /**
  * World creation and `advance` (SD §19.1). `createWorld` builds an empty `WorldState`,
  * instantiates the scenario deck, then spawns crew, stores and faults through the command path.
@@ -9,6 +10,7 @@ import { createDefLookup } from "./defs";
 import { dockForPort } from "./docks";
 import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
+import { dressDock } from "./locals";
 import { marketSeed } from "./markets";
 import { runStep } from "./pipeline";
 import type { KernelRegistry } from "./registry";
@@ -52,6 +54,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     jobs: {},
     money: { balance: 0, transactions: {} },
     markets: {},
+    dockside: { locals: {}, props: [] },
     decisions: { records: {}, queue: [] },
     narrator: {
       lastNarrativeTick: 0,
@@ -320,6 +323,10 @@ export function createWorld(
     applyCommandNow(registry, ctx, command);
   }
   seedInitialNeeds(state, values.needs.initialRange, rng);
+  // D66: the dock a game starts alongside has its regulars at their posts from tick 0.
+  if (state.deck.dock !== undefined) {
+    dressDock(state, content, undefined, 0, configTicks(values, values.travel.localShuffleSeconds));
+  }
   rebuildCaches(world, registry);
   return world;
 }

@@ -18,7 +18,7 @@ import type {
   QueuedCommand,
   RejectionCode,
 } from "./types/commands";
-import { AUTHORITY } from "./types/commands/authority";
+import { AUTHORITY, STAGING_COMMAND_KINDS } from "./types/commands/authority";
 import type { Tick } from "./types/common";
 import type { ConfigDef, ContentBundle } from "./types/content";
 import type { EventDraft } from "./types/events";
@@ -86,6 +86,33 @@ export function validateCtxOf(world: World, tick: Tick): ValidateCtx {
   };
 }
 
+/**
+ * D66: the staging call's window. A staging-only kind (`STAGING_COMMAND_KINDS`) from the
+ * narrator is valid only while a `stageDock` hook is pending, and while one is, no other
+ * narrator kind is: the staging call sets the stage and never moves the plot (D57). Narrator
+ * commands are applied at the hook tick + 1, ahead of the host's `acknowledgeHook` in the same
+ * tick, so both enqueue and apply see the hook still pending. A timing rule, so
+ * `preconditionFailed`, not `unauthorized`.
+ */
+function hookWindowRejection(
+  state: ReadonlyWorldState,
+  command: Command,
+): Validation<never> | undefined {
+  if (command.source !== "narrator") return undefined;
+  const staging = (STAGING_COMMAND_KINDS as readonly CommandKind[]).includes(command.kind);
+  const stagingHook = state.narrator.pendingHook?.kind === "stageDock";
+  if (staging && !stagingHook) {
+    return reject("preconditionFailed", `"${command.kind}" answers a stageDock hook only`);
+  }
+  if (!staging && stagingHook) {
+    return reject(
+      "preconditionFailed",
+      `"${command.kind}" cannot answer a stageDock hook: staging sets the stage only`,
+    );
+  }
+  return undefined;
+}
+
 /** Authority + handler lookup + validate: the pure part shared by enqueue and apply. */
 export function validateCommand(
   registry: KernelRegistry,
@@ -99,6 +126,8 @@ export function validateCommand(
   if (!allowed.includes(command.kind)) {
     return reject("unauthorized", `Source "${command.source}" may not issue "${command.kind}"`);
   }
+  const windowRejection = hookWindowRejection(ctx.state, command);
+  if (windowRejection !== undefined) return windowRejection;
   const handler = registry.commandHandler(command.kind);
   if (handler === undefined) {
     return reject("invalidPayload", `No handler is registered for command kind "${command.kind}"`);

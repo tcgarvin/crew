@@ -367,6 +367,19 @@ export async function runNarratorWithTrace(
   };
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
   const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
+  if (req.hook.kind === "stageDock") {
+    // D66: the staging call has its own prompt, schema and translator (Dockside §6.1), not yet
+    // built; until they are, it is answered without a model: an empty plan, so the dock is the
+    // sim's floor set, no notes are written and nothing story-shaped can come back.
+    return {
+      response: nullNarratorResponse({ ...req, snapshot }, { callId, content }),
+      trace: {
+        digest: digest.text,
+        capabilities,
+        prompt: { promptVersion: PROMPT_VERSION, system: [], user: "" },
+      },
+    };
+  }
   const prompt = buildPrompt(capabilities, digest, req.hook.kind);
   const baseTrace: NarratorTrace = { digest: digest.text, capabilities, prompt };
   const fallback = (reason: FallbackReason, error: string, trace = baseTrace): NarratorRun => ({

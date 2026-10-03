@@ -61,6 +61,8 @@ function frame(crates: number): RenderFrame {
     money: 0,
     items: [truck, ...Array.from({ length: crates }, (_, i) => crate(i + 1))],
     headline: "",
+    locals: [],
+    dockProps: [],
   };
 }
 

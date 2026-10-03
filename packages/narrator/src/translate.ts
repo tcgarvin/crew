@@ -24,6 +24,7 @@ import {
   type NarratorHook,
   type PortDef,
   type PortDefId,
+  STAGING_COMMAND_KINDS,
   type TempRef,
   basePriceFor,
   configTicks,
@@ -696,8 +697,12 @@ function kindOf(raw: unknown): string {
   return "unknown";
 }
 
+/** A story kind: the narrator vocabulary minus the staging call's (D66), which this never emits. */
 function isNarratorKind(kind: string): kind is NarratorCommand["kind"] {
-  return (NARRATOR_COMMAND_KINDS as readonly string[]).includes(kind);
+  return (
+    (NARRATOR_COMMAND_KINDS as readonly string[]).includes(kind) &&
+    !(STAGING_COMMAND_KINDS as readonly string[]).includes(kind)
+  );
 }
 
 export function commandIdFor(callId: string, n: number): CommandId {

@@ -55,6 +55,10 @@ export {
   postTile,
 } from "./docks";
 export { basePriceFor, effectiveMarket, ensureMarket, marketSeed } from "./markets";
+export { DOCK_HAND_ROLE, dockHandName, floorSet } from "./floor-set";
+export { clearDockside, dockNeedsDressing, dockPeople, dressDock, lookSeedOf } from "./locals";
+export { isNobodysFreight } from "./freight";
+export { renderDockProps, renderLocals } from "./render";
 export { raiseHookIfIdle } from "./hooks";
 export { createEventBuffer, type EventBuffer, isNotableOrAbove } from "./events";
 export {

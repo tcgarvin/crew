@@ -101,6 +101,8 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
       recallAboardSeconds: 60,
+      localShuffleSeconds: 8,
+      dockHandGiveUpSeconds: 30,
     },
     commerce: {
       priceBands: {

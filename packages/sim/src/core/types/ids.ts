@@ -77,6 +77,8 @@ export type HookId = Brand<string, "HookId">;
 export type ClaimId = Brand<string, "ClaimId">;
 export type TransactionId = Brand<string, "TransactionId">;
 export type EventId = Brand<string, "EventId">;
+/** D66: a local on the dock alongside (`state.dockside.locals`): a presence, not a crew member. */
+export type LocalId = Brand<string, "LocalId">;
 
 /**
  * Prefix per instance kind. The kernel's ID allocator (W2) is the only writer; it formats
@@ -97,6 +99,8 @@ export const ID_PREFIX = {
   claim: "l",
   transaction: "n",
   event: "e",
+  // D66: locals use `o` (onlooker); `l` is the claim lease.
+  local: "o",
 } as const;
 
 export type InstanceKind = keyof typeof ID_PREFIX;
@@ -116,6 +120,7 @@ export interface InstanceIdOf {
   claim: ClaimId;
   transaction: TransactionId;
   event: EventId;
+  local: LocalId;
 }
 
 /** Any kernel-allocated instance ID. */

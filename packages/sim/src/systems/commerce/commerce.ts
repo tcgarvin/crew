@@ -20,14 +20,8 @@
  */
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { raiseJobBoardHookIfNeeded } from "../travel/hooks";
-import {
-  cartDeliveredFreight,
-  expireStaleOffers,
-  payJobIfDue,
-  raiseUnloadProblems,
-  surfaceDeferredOffers,
-  syncStagedOffers,
-} from "./jobs";
+import { syncDockFreight } from "./dock-hands";
+import { expireStaleOffers, payJobIfDue, raiseUnloadProblems, surfaceDeferredOffers } from "./jobs";
 import { sweepPassages } from "./passage";
 
 function sweepJobs(ctx: StepCtx): void {
@@ -42,11 +36,11 @@ function sweepJobs(ctx: StepCtx): void {
     if (job.status === "accepted" || job.status === "inTransit" || job.status === "delivered") {
       payJobIfDue(ctx, job);
     }
-    // D63: after payment, so the bay is what is paid on; the crates then go into the store.
-    cartDeliveredFreight(ctx, job);
   }
   expireStaleOffers(ctx);
-  syncStagedOffers(ctx);
+  // D63, D66: after payment, so the bay is what is paid on; dock hands then cart the delivered
+  // crates in, and an offer's crates out or back.
+  syncDockFreight(ctx);
   surfaceDeferredOffers(ctx);
 }
 

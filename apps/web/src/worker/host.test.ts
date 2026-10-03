@@ -99,6 +99,8 @@ function makeFakeKernel(hookAtTick: number) {
         money: 0,
         items: [],
         headline: "",
+        locals: [],
+        dockProps: [],
       };
     },
     serialize: (world) =>

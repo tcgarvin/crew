@@ -7,10 +7,11 @@
  * crates are staged on the origin's staging area while the ship is alongside there (`docking` or
  * `docked`), owned by nobody: the job is still `offered`, so no `cargoToLoad` work exists and no
  * crew member touches them. Accepting raises the load work for the crates already there; a
- * declined, expired or departed-from offer has its crates withdrawn (they vanish until phase 3's
- * dock hands cart them). At the destination the crew carry the freight to the delivery bay; the
- * job is delivered when every crate is in the bay, and the crates are then carted into the
- * warehouse store. A port without a dock keeps the store and the transfer tiles.
+ * declined, expired or departed-from offer has its crates withdrawn. At the destination the crew
+ * carry the freight to the delivery bay; the job is delivered when every crate is in the bay,
+ * and the crates are then carted into the warehouse store. D66: the carting (out on offer, back
+ * on withdrawal, in after delivery) is a dock hand's walk, `dock-hands.ts`. A port without a dock
+ * keeps the store and the transfer tiles.
  */
 import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
@@ -286,7 +287,7 @@ export function spawnCargoItem(
  * D63: the staging area's tiles with the free ones first (no item lying there), so several
  * crates spread out before any two share a tile.
  */
-function stagingTilesFreeFirst(ctx: Pick<StepCtx, "state">, dock: DockDef): TileCoord[] {
+export function stagingTilesFreeFirst(ctx: Pick<StepCtx, "state">, dock: DockDef): TileCoord[] {
   const tiles = dockAreaTiles(dock, "freightStaging");
   const taken = new Set<string>();
   for (const item of Object.values(ctx.state.items)) {
@@ -361,42 +362,6 @@ export function stageOfferedFreight(ctx: ApplyCtx, job: Job, cause: Cause = SYST
     locationRef: { kind: "port", portId: job.fromPortId },
     payload: { jobId: job.id, portId: job.fromPortId, count: ids.length },
   });
-}
-
-/**
- * D63: an offer that was declined, expired, or left behind as the ship departs has its staged
- * crates carted back in: until phase 3's dock hands do it on foot, they simply leave the world.
- */
-export function withdrawOfferedFreight(ctx: ApplyCtx, job: Job): void {
-  if (job.cargoItemIds.length === 0) return;
-  for (const itemId of job.cargoItemIds) delete ctx.state.items[itemId];
-  job.cargoItemIds = [];
-  ctx.caches.dirty.inventory = true;
-  rebuildItemIndexes(ctx.state, ctx.caches.index);
-  ctx.emit({
-    type: "freightWithdrawn",
-    subjectIds: [job.id],
-    causeIds: [],
-    source: "sim",
-    locationRef: { kind: "port", portId: job.fromPortId },
-    payload: { jobId: job.id, portId: job.fromPortId },
-  });
-}
-
-/**
- * D63, every tick: an open offer's crates are on its origin's staging area exactly while
- * `offerStagingDock` says so, and a closed offer (declined, expired) has none.
- */
-export function syncStagedOffers(ctx: ApplyCtx): void {
-  for (const job of Object.values(ctx.state.jobs)) {
-    if (job.status === "offered") {
-      const staged = offerStagingDock(ctx, job) !== undefined;
-      if (staged && job.cargoItemIds.length === 0) stageOfferedFreight(ctx, job);
-      else if (!staged && job.cargoItemIds.length > 0) withdrawOfferedFreight(ctx, job);
-    } else if (job.status === "declined" || job.status === "expired") {
-      withdrawOfferedFreight(ctx, job);
-    }
-  }
 }
 
 /**
@@ -547,49 +512,6 @@ export function jobFulfilled(
   return job.cargoItemIds.length === 0 || deliveryComplete(state, content, job);
 }
 
-/**
- * D63: once every crate a job unloads at the port alongside (its unload work there all done) is
- * in the delivery bay, the port takes them in: they are carted through the warehouse door into
- * the warehouse store, the custody `deliveryComplete` already accepted. Runs after payment, so a
- * job is paid on the bay, not on the store. Until phase 3's dock hands walk them in, they simply
- * move. A put-off passenger's luggage (unloaded at a port that is not the job's destination)
- * goes the same way.
- */
-export function cartDeliveredFreight(ctx: ApplyCtx, job: Job): void {
-  // Whenever a dock is alongside, not only while `docked`: the last crate set down in the bay
-  // often ends the port call's work, so travel moves to `preparingDeparture` that same tick,
-  // before this runs, and the crates would sit in the bay until the dock's last-guard sweep.
-  const dock = dockAlongside(ctx.content, ctx.state);
-  if (dock === undefined) return;
-  const portId = dock.portId;
-  const inBay = job.cargoItemIds.filter((itemId) => {
-    const item = ctx.state.items[itemId];
-    return item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay");
-  });
-  if (inBay.length === 0) return;
-  const unloads = Object.values(ctx.state.work.problems).filter(
-    (p) => p.kind === "cargoToUnload" && p.payload.jobId === job.id && p.payload.portId === portId,
-  );
-  if (unloads.length === 0 || unloads.some((p) => p.status === "open")) return;
-  const store = portStoreLocation(ctx.defs.port(portId));
-  for (const itemId of inBay) {
-    const item = ctx.state.items[itemId];
-    if (item === undefined) continue;
-    const from = item.location;
-    item.location = store;
-    ctx.emit({
-      type: "cargoTransferred",
-      subjectIds: [itemId, job.id],
-      causeIds: [],
-      source: "sim",
-      locationRef: { kind: "port", portId },
-      payload: { itemId, from, to: store },
-    });
-  }
-  ctx.caches.dirty.inventory = true;
-  rebuildItemIndexes(ctx.state, ctx.caches.index);
-}
-
 /** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
 export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
   if (job.status === "paid" || job.paymentTransactionId !== undefined) return;
@@ -638,7 +560,7 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
         source: "sim",
         payload: { jobId: job.id },
       });
-      withdrawOfferedFreight(ctx, job);
+      // D66: its crates go back in by way of a dock hand (`dock-hands.ts`, the same tick).
     }
   }
 }

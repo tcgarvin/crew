@@ -10,7 +10,13 @@ import { configTicks } from "../../core/clock";
 import type { Command } from "../../core/types/commands";
 import type { CommandId, HookId, JobId } from "../../core/types/ids";
 import type { Kernel, World } from "../../core/types/kernel";
-import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "../travel/fixtures";
+import {
+  FIX,
+  PORTS,
+  advanceThroughHooks,
+  advanceToStage,
+  freightTestWorld,
+} from "../travel/fixtures";
 
 let counter = 0;
 function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
@@ -177,18 +183,15 @@ describe("commerce: jobBoard is the ask (D40)", () => {
     expect(world.state.tick - job.closedTick).toBeGreaterThanOrEqual(cooldownTicks);
   });
 
-  it("asks again at the next port, after approachingPort fires on the way in", () => {
+  it("asks again at the next port, having forgotten the ask on leaving", () => {
     const { world, kernel } = dockedWorldAfterFirstAsk();
     kernel.enqueueCommand(
       world,
       cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
     );
-    const untilApproach = kernel.advance(world, 1_000);
-    expect(untilApproach.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    advanceToStage(kernel, world, "approaching");
     // Leaving the dock forgets the ask, so the next docking anywhere (Alpha included) asks again.
     expect(world.state.narrator.jobBoardLastAsk).toBeUndefined();
-    acknowledgePendingHook(kernel, world);
 
     const untilBoard = kernel.advance(world, 1_000);
     expect(untilBoard.halt).toEqual({ kind: "hook" });

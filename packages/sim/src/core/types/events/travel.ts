@@ -1,5 +1,5 @@
 /** Travel events (W6). */
-import type { ActorId, ItemId, MachineId, PortDefId } from "../ids";
+import type { ActorId, DockDefId, ItemId, LocalId, MachineId, PortDefId } from "../ids";
 import type { TravelStage } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
@@ -27,6 +27,21 @@ export interface TravelEventPayloads {
    * the dock crew handed it up the cargo ramp instead of leaving it at the warehouse.
    */
   gearBroughtAboard: { readonly itemId: ItemId; readonly portId: PortDefId };
+  /**
+   * D66: the dock alongside was dressed: the floor set and the staging plan's people (`localIds`)
+   * and props. `unplaced` names anyone the dock had no room for near their post. `staged` is
+   * whether a staging plan was applied (false: the floor set alone).
+   */
+  dockDressed: {
+    readonly portId: PortDefId;
+    readonly dockId: DockDefId;
+    readonly localIds: readonly LocalId[];
+    readonly props: number;
+    readonly staged: boolean;
+    readonly unplaced: readonly string[];
+  };
+  /** D66: the staging plan's one line for the log as the dock comes alongside. */
+  dockAmbience: { readonly portId: PortDefId; readonly line: string };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -40,4 +55,7 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   broughtAboard: "notable",
   leftOnDock: "notable",
   gearBroughtAboard: "notable",
+  dockDressed: "trace",
+  // The staging call sets the stage and never moves the plot (D57): shown, never narrative.
+  dockAmbience: "notable",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

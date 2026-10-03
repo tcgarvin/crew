@@ -11,6 +11,7 @@ export { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 export { planJsonSchema, planSchemaFor } from "./plan";
 export {
   HOOK_INSTRUCTIONS,
+  type StoryHookKind,
   PROMPT_VERSION,
   STATIC_RULES,
   SYSTEM_PROMPT,
@@ -35,7 +36,7 @@ export {
 } from "./transport";
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";
 export {
-  approachingPortRequest,
+  approachRequest,
   FAR_FIXTURE_PORT,
   FIXTURE_PASSENGER,
   FIXTURE_SCENARIO,
@@ -44,5 +45,6 @@ export {
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  stageDockRequest,
 } from "./fixtures";
 export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";

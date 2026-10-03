@@ -33,7 +33,7 @@ async function createGame(app: ReturnType<typeof buildTestApp>["app"], token: st
   return (await res.json()) as { game: { id: string } };
 }
 
-function narratorBody(gameId: string, savedAtTick = 0, hookKind = "approachingPort") {
+function narratorBody(gameId: string, savedAtTick = 0, hookKind = "quietTooLong") {
   return {
     gameId,
     hook: { kind: hookKind },
@@ -77,7 +77,7 @@ describe("narrator", () => {
     const logged = fallbackLines[0]?.[1] as Record<string, unknown>;
     expect(logged).toMatchObject({
       gameId: game.id,
-      hookKind: "approachingPort",
+      hookKind: "quietTooLong",
       fallback: "apiError",
       model: "null-narrator",
       promptVersion: "v0.8",
@@ -198,6 +198,32 @@ describe("narrator", () => {
 
     const lastCall = await db.getLastNarratorCall(game.id);
     expect(lastCall?.status).toBe("budgetExceeded");
+  });
+
+  it("answers a stageDock hook with an empty plan, outside the budget, spacing and log (D66)", async () => {
+    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const story = vi.fn(echoNarrator);
+    const { app, db } = buildTestApp({ env, runNarrator: story });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const post = (body: unknown) =>
+      authed(app, token, `/api/games/${game.id}/narrator`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    expect((await post(narratorBody(game.id, 0))).status).toBe(200);
+    // Ten ticks after a story call: staging is never "too soon"...
+    const staged = await post(narratorBody(game.id, 10, "stageDock"));
+    expect(staged.status).toBe(200);
+    const body = await readJson(staged);
+    expect(body.commands).toEqual([]);
+    expect(body.notesUpdate).toBeUndefined();
+    expect(story).toHaveBeenCalledTimes(1);
+    expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("quietTooLong");
+    // ...and does not count as the last call for the next story call's spacing either.
+    expect((await post(narratorBody(game.id, 105))).status).toBe(200);
   });
 
   it("429s a call too soon after the last one, but not a policyDecision hook (D37)", async () => {
@@ -450,13 +476,13 @@ describe("narrator", () => {
     expect(call?.inputTokens).toBe(10);
   });
 
-  it("accepts the real approaching-port fixture posted without gameId (it's already in the path)", async () => {
+  it("accepts the real approach fixture posted without gameId (it's already in the path)", async () => {
     // Regression test: the fixture's shape is `{gameId, hook, snapshot, recentEvents}`, but a
     // caller posting to `/api/games/:id/narrator` may reasonably omit `gameId` from the body
     // since it's already in the URL. The schema used to require it unconditionally, which 400'd
     // this exact, legitimate request in production.
     const fixturePath = fileURLToPath(
-      new URL("../../../narrator/fixtures/approaching-port.json", import.meta.url),
+      new URL("../../../narrator/fixtures/approach.json", import.meta.url),
     );
     const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as {
       gameId: string;

@@ -153,8 +153,8 @@ describe("save migration 1 → 2 (D25)", () => {
       markets: Record<string, unknown>;
     };
     // D47 (schema 3) added `markets`; a 1 → 4 upgrade passes through every migration.
-    expect(SCHEMA_VERSION).toBe(4);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(SCHEMA_VERSION).toBe(5);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.markets).toEqual({});
     expect(migrated.jobs.j1).toMatchObject({
       issuer: "Rendell Freight Co.",

@@ -9,16 +9,14 @@
  * Everything that changes between calls (tick, digest, notes, which hook) is in the user turn,
  * after both breakpoints.
  */
-import type { NarratorHookKind } from "@crew/sim";
 import type { NarratorDigest } from "../digest";
-import { HOOK_INSTRUCTIONS } from "./hooks";
+import { HOOK_INSTRUCTIONS, type StoryHookKind } from "./hooks";
 import { PROMPT_VERSION, SYSTEM_PROMPT } from "./system";
 
-export { HOOK_INSTRUCTIONS } from "./hooks";
+export { HOOK_INSTRUCTIONS, type StoryHookKind } from "./hooks";
 export { PROMPT_VERSION, SYSTEM_PROMPT } from "./system";
 
-const HOOK_ORDER: readonly NarratorHookKind[] = [
-  "approachingPort",
+const HOOK_ORDER: readonly StoryHookKind[] = [
   "jobBoard",
   "quietTooLong",
   "notableEvent",
@@ -45,7 +43,7 @@ export interface NarratorPrompt {
 export function buildPrompt(
   capabilities: string,
   digest: NarratorDigest,
-  hookKind: NarratorHookKind,
+  hookKind: StoryHookKind,
 ): NarratorPrompt {
   return {
     promptVersion: PROMPT_VERSION,

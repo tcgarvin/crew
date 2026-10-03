@@ -92,6 +92,8 @@ function frameWith(actors: RenderActor[], items: RenderItem[], t: RenderTravel):
     money: 0,
     items,
     headline: "",
+    locals: [],
+    dockProps: [],
   };
 }
 

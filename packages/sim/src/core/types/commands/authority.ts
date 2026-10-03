@@ -16,9 +16,23 @@ export const NARRATOR_COMMAND_KINDS = [
   "scheduleFault",
   "surfaceDecision",
   "stockMarket",
+  "stageDock",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
+
+/**
+ * D66 (owner ruling D57, Dockside §6.1): the staging call sets the stage and never moves the
+ * plot. These kinds are valid from the narrator only while a `stageDock` hook is pending, and
+ * while one is, they are the only narrator kinds the kernel accepts (`hookWindowRejection`,
+ * `core/commands.ts`). A staging-only kind is never valid in answer to a story hook.
+ */
+export const STAGING_COMMAND_KINDS = [
+  "stageDock",
+] as const satisfies readonly NarratorCommandKind[];
+
+/** The story narrator's kinds: everything but staging. */
+export type StoryCommandKind = Exclude<NarratorCommandKind, (typeof STAGING_COMMAND_KINDS)[number]>;
 
 /** Commands the narrator may send. A strict subset of `Command`, always with source `narrator`. */
 export type NarratorCommand = {
@@ -67,5 +81,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "surfaceDecision",
     "stockMarket",
     "endPassage",
+    "stageDock",
   ],
 };

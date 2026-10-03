@@ -5,9 +5,15 @@
  * finishes loading, leaves with the dock cast off, and arrives with the next port's dock
  * alongside. The travel invariant holds every tick.
  *
- * D63 (Dockside §10, without locals): a full Hub → Kessler run with freight: staged on offer,
- * loaded by the crew from the staging area (in hand or on the hand truck, D65), delivered to the delivery bay, paid once. Every
- * invariant, the commerce one included, holds every tick.
+ * D63 (Dockside §10): a full Hub → Kessler run with freight: staged on offer, loaded by the crew
+ * from the staging area (in hand or on the hand truck, D65), delivered to the delivery bay, paid
+ * once. Every invariant, the commerce one included, holds every tick.
+ *
+ * D66 (Dockside phase 3): locals. A new game's Hub dock has its regulars at their posts (Hal
+ * Petrosyan at the queue kiosk); the offer's crates are carted out by a dock hand; the staging
+ * call is raised before every docking and no card comes up on the way in; Kessler's dock comes
+ * alongside with its regulars and the delivery's receiver, who carts the crates in; and back at
+ * the Hub, Hal is at his kiosk again.
  *
  * It lives here, not in `packages/sim`, for the same reason `fullSim.test.ts` does: the kernel
  * package may not depend on `@crew/content`.
@@ -42,6 +48,23 @@ import { createFullRegistry } from "./registry";
 
 const HUB = "port.crossroads_hub" as PortDefId;
 const HUB_DOCK = "dock.crossroads_hub";
+
+/** D66: the locals on the dock in the frame, by name, with their posts. */
+function localsByName(world: World): Map<string, { postKey: string; x: number; y: number }> {
+  return new Map(getRenderFrame(world).locals.map((l) => [l.name, l]));
+}
+
+/** D66: is this local standing at (or beside, when it was taken) that post on the dock? */
+function nearPost(world: World, local: { x: number; y: number }, postKey: string): boolean {
+  const dock = Object.values(world.content.docks ?? {}).find(
+    (d) => d.id === world.state.deck.dock?.dockId,
+  );
+  const post = dock?.posts.find((p) => p.key === postKey);
+  if (dock === undefined || post === undefined) return false;
+  const px = post.tile.x - dock.shipAt.x + 0.5;
+  const py = post.tile.y - dock.shipAt.y + 0.5;
+  return Math.abs(local.x - px) <= 2 && Math.abs(local.y - py) <= 2;
+}
 
 /** The stand-in narrator of `fullSim.test.ts`: one surfaced freight offer per `jobBoard`. */
 function answerHook(world: World, hook: NarratorHook): Omit<Command, "id"> | undefined {
@@ -158,6 +181,12 @@ function asSchema3(envelope: SaveEnvelope, content: ContentBundle): SaveEnvelope
       }
     }
   }
+  // Schema 3 had no locals (D66).
+  const raw = state as unknown as Record<string, unknown>;
+  // biome-ignore lint/performance/noDelete: a schema-3 save has no such key.
+  delete raw.dockside;
+  const { local: _local, ...nextId } = state.nextId;
+  raw.nextId = nextId;
   state.schemaVersion = 3;
   return { ...envelope, schemaVersion: 3, state };
 }
@@ -179,6 +208,13 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
     const ramps = Object.values(world.state.doors).filter((d) => d.kind === "ramp");
     expect(ramps.map((d) => d.physicalState)).toEqual(["open", "open"]);
     expect(travelViolations(world)).toEqual([]);
+    // D66: the regulars are at their posts from tick 0, and none of them is crew.
+    const locals = localsByName(world);
+    const hal = locals.get("Hal Petrosyan");
+    expect(hal?.postKey).toBe("queue_kiosk");
+    if (hal !== undefined) expect(nearPost(world, hal, "queue_kiosk")).toBe(true);
+    expect(locals.get("Anneke Vos")?.postKey).toBe("night_stall");
+    expect(frame.actors.some((a) => locals.has(a.name))).toBe(false);
   });
 
   it("restores a schema-3 save docked mid-loading, loads, casts off and docks at the next port", () => {
@@ -195,6 +231,8 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
     expect(inStore.length).toBeGreaterThan(0);
     const restored = kernel.restore(old, bundle);
     expect(restored.state.deck.dock?.dockId).toBe(HUB_DOCK);
+    // D66: migrated with an empty dockside; its first tick dresses the dock alongside.
+    expect(restored.state.dockside.locals).toEqual({});
     // D63: the freight waiting in the warehouse store is on the staging area now, and the crew
     // know it is there.
     for (const item of inStore) {
@@ -266,18 +304,30 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
           cargo: [{ itemDefId: CRATE as never, count: 3 }],
           pay: Math.ceil(band.min * 25 * 3),
         },
-        surface: true,
+        surface: false,
       },
     });
 
-    // The offer is applied on the first tick; its card halts the sim before anyone answers it.
+    // D66: the offer is applied on the first tick and a dock hand comes out of the warehouse
+    // door with its crates; they are on the staging area once the hand has walked there.
     const events: SimEvent[] = [];
     const first = kernel.advance(world, 1);
     events.push(...first.events);
     const [job] = Object.values(world.state.jobs);
     if (job === undefined) throw new Error("no job offered");
     expect(job.status).toBe("offered");
+    expect(job.cargoItemIds).toEqual([]);
+    const hand = Object.values(world.state.dockside.locals).find(
+      (l) => l.errand?.kind === "stageOffer" && l.errand.jobId === job.id,
+    );
+    expect(hand?.carrying).toHaveLength(3);
+    expect(getRenderFrame(world).locals.find((l) => l.id === hand?.id)?.carrying).toBe(3);
+    for (let i = 0; i < 20 * 30 && job.cargoItemIds.length === 0; i++) {
+      events.push(...kernel.advance(world, 1).events);
+      expect(commerceViolations(world)).toEqual([]);
+    }
     expect(job.cargoItemIds).toHaveLength(3);
+    expect(events.some((e) => e.type === "dockHandGaveUp")).toBe(false);
     const crates = new Map<ItemId, CrateLog>();
     for (const itemId of job.cargoItemIds) {
       const location = world.state.items[itemId]?.location;
@@ -300,12 +350,20 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
     const frameCrates = getRenderFrame(world).items.filter((i) => i.jobId === job.id);
     expect(frameCrates).toHaveLength(3);
     expect(frameCrates.every((i) => i.offered === true && i.location.kind === "deck")).toBe(true);
+    send({ source: "player", kind: "acceptContract", payload: { jobId: job.id } });
+    send({ source: "player", kind: "setCourse", payload: { destinationPortId: KESSLER } });
 
+    // D66: every hook on the way, every card, and what was on the dock as each one came in.
+    const hooksRaised: { kind: string; tick: number }[] = [];
+    const cardsQueued: number[] = [];
+    let kesslerLocals: Map<string, { postKey: string; x: number; y: number }> | undefined;
+    let receiverTookDelivery = false;
     let halt = first.halt;
     for (let i = 0; i < 20 * 600; i++) {
       if (halt.kind === "hook") {
         const hook = world.state.narrator.pendingHook;
         if (hook === undefined) throw new Error("hook halt without a pending hook");
+        hooksRaised.push({ kind: hook.kind, tick: world.state.tick });
         send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
       } else if (halt.kind === "decision") {
         const head = world.state.decisions.queue[0];
@@ -319,6 +377,18 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
       const result = kernel.advance(world, 1);
       events.push(...result.events);
       halt = result.halt;
+      for (const e of result.events) {
+        if (e.type === "decisionPending") cardsQueued.push(e.tick);
+        if (e.type === "dockDressed" && e.payload.portId === KESSLER) {
+          kesslerLocals = localsByName(world);
+        }
+        if (e.type === "cargoTransferred" && e.payload.to.kind === "inExternalStore") {
+          const carrier = Object.values(world.state.dockside.locals).find(
+            (l) => l.errand?.kind === "takeDelivery" && l.errand.jobId === job.id,
+          );
+          if (carrier?.origin.kind === "receiver") receiverTookDelivery = true;
+        }
+      }
       const violations = [
         ...checkInvariants(world.state),
         ...spatialViolations(world),
@@ -420,5 +490,46 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
       (t) => t.reason === "jobPayment" && t.jobId === job.id,
     );
     expect(pay.map((t) => t.amount)).toEqual([done?.pay]);
+
+    // D66: the staging call came before Kessler's dock did, and no card on the way in.
+    const kesslerArrival = events.find(
+      (e) => e.type === "arrived" && e.payload.portId === KESSLER,
+    )?.tick;
+    if (kesslerArrival === undefined) throw new Error("never arrived at Kessler");
+    const staging = hooksRaised.find((h) => h.kind === "stageDock");
+    expect(staging).toBeDefined();
+    expect(staging?.tick).toBeLessThan(kesslerArrival);
+    expect(cardsQueued.filter((t) => t >= (staging?.tick ?? 0) && t <= kesslerArrival)).toEqual([]);
+    // Kessler's dock came alongside with its regulars at their posts and the job's receiver,
+    // who carted the delivery in.
+    expect(kesslerLocals?.get("Greta Lindholm")?.postKey).toBe("shift_board");
+    expect(kesslerLocals?.get("Osric Tan")?.postKey).toBe("assay_window");
+    expect(receiverTookDelivery).toBe(true);
+    expect(events.some((e) => e.type === "dockHandGaveUp")).toBe(false);
+
+    // Back to the Hub: staged again on the way in, no card, Hal at the queue kiosk on arrival.
+    send({ source: "player", kind: "setCourse", payload: { destinationPortId: HUB } });
+    const home: SimEvent[] = [];
+    const homeHooks: { kind: string; tick: number }[] = [];
+    let atHub: Map<string, { postKey: string; x: number; y: number }> | undefined;
+    for (let i = 0; i < 20 * 300 && atHub === undefined; i++) {
+      const hook = world.state.narrator.pendingHook;
+      if (hook !== undefined) {
+        homeHooks.push({ kind: hook.kind, tick: world.state.tick });
+        send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
+      }
+      const result = kernel.advance(world, 1);
+      home.push(...result.events);
+      if (result.halt.kind === "decision") throw new Error("a card came up on the way home");
+      if (result.events.some((e) => e.type === "arrived" && e.payload.portId === HUB)) {
+        atHub = localsByName(world);
+      }
+    }
+    expect(homeHooks.map((h) => h.kind)).toContain("stageDock");
+    expect(home.some((e) => e.type === "decisionPending")).toBe(false);
+    const hal = atHub?.get("Hal Petrosyan");
+    expect(hal?.postKey).toBe("queue_kiosk");
+    if (hal !== undefined) expect(nearPost(world, hal, "queue_kiosk")).toBe(true);
+    expect(travelViolations(world)).toEqual([]);
   });
 });

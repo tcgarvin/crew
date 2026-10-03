@@ -39,6 +39,7 @@
  * Overheat is still the only thing that costs integrity.
  */
 import { ticksToSeconds } from "../../core/clock";
+import { isNobodysFreight } from "../../core/freight";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
 import type { ConfigDef, ItemCount, MachineDef } from "../../core/types/content";
@@ -203,8 +204,8 @@ function unitsAboard(ctx: StepCtx): Map<ItemDefId, number> {
   for (const item of Object.values(ctx.state.items)) {
     const kind = item.location.kind;
     if (kind !== "onDeck" && kind !== "carriedBy" && kind !== "equippedBy") continue;
-    // D63: freight staged on offer is on the dock but nobody's, least of all the ship's.
-    if (item.jobId !== undefined && ctx.state.jobs[item.jobId]?.status === "offered") continue;
+    // D63, D66: freight on offer (or on its way back in) is on the dock but nobody's.
+    if (isNobodysFreight(ctx.state, item)) continue;
     const units = item.stacking === "stack" ? item.count : 1;
     aboard.set(item.defId, (aboard.get(item.defId) ?? 0) + units);
   }

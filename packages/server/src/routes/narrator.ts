@@ -48,6 +48,8 @@ const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision"
 
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";
+/** D66: what an interim staging answer says made it (no model was called). */
+const STAGING_PLACEHOLDER_MODEL = "staging-floor-set";
 
 export function registerNarratorRoutes(
   app: Hono<NarratorRouteEnv>,
@@ -83,6 +85,21 @@ export function registerNarratorRoutes(
     // Shape-checked, not deep-validated against `@crew/sim`'s exact unions (see schema comment).
     // `gameId` always comes from the path, not the (optional) body field — see schema comment.
     const reqBody = { ...parsed.data, gameId } as unknown as NarratorRequest;
+
+    // D66 (interim): the staging call has no prompt yet, so it is acknowledged at once with an
+    // empty staging plan (the dock is the sim's floor set). It costs no model call, so it skips
+    // the budget, the spacing rule (in both directions: it must neither be refused as too soon
+    // nor make the next story call too soon) and the call log, and writes no notes. The staging
+    // prompt, its fallback to the floor set and its call logging replace this.
+    if (reqBody.hook.kind === "stageDock") {
+      const staged: NarratorResponse = {
+        commands: [],
+        callId: globalThis.crypto.randomUUID(),
+        model: STAGING_PLACEHOLDER_MODEL,
+        promptVersion: PROMPT_VERSION_PLACEHOLDER,
+      };
+      return c.json(staged);
+    }
 
     // Store the snapshot as a milestone save; it becomes this call's (and the next check's) basis.
     const snapshotBlob = gzipSync(Buffer.from(JSON.stringify(reqBody.snapshot), "utf8"));

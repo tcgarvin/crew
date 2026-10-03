@@ -594,7 +594,7 @@ export interface PortDef {
   readonly market: readonly MarketLineDef[];
   /**
    * Offline job templates (W6, D40): the null narrator draws from these when it answers an
-   * `approachingPort` or `jobBoard` hook. Pay is not authored: it comes from price bands.
+   * `jobBoard` hook. Pay is not authored: it comes from price bands.
    */
   readonly jobTemplates: readonly JobTemplateDef[];
   /**
@@ -799,6 +799,13 @@ export interface ConfigDef {
      * cannot (or will not) walk back.
      */
     readonly recallAboardSeconds: Seconds;
+    /** D66: how often a local standing at their post steps to a neighbouring tile and back. */
+    readonly localShuffleSeconds: Seconds;
+    /**
+     * D66: how long a dock hand's carting errand may take before the old instant behaviour (D63)
+     * does it instead, with a `dockHandGaveUp` event, so nothing waits forever on a blocked walk.
+     */
+    readonly dockHandGiveUpSeconds: Seconds;
   };
   readonly commerce: {
     /**
@@ -851,7 +858,10 @@ export interface ConfigDef {
   readonly narrator: {
     /** Quiet-too-long hook fires after this many seconds without a narrative event. */
     readonly quietTooLongSeconds: Seconds;
-    /** `approachingPort` hook fires this long before docking begins. */
+    /**
+     * D66: the `stageDock` hook is raised this long (as a distance at `travel.nominalSpeed`)
+     * before the end of the route; transit holds at the end until it is answered.
+     */
     readonly approachHookLeadSeconds: Seconds;
     readonly maxSpawnsPerCommand: number;
     /** Upper bound on `scheduleFault` window length. */

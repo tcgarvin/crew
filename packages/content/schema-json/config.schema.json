@@ -404,6 +404,14 @@
         "recallAboardSeconds": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "localShuffleSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dockHandGiveUpSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
       "required": [
@@ -415,7 +423,9 @@
         "nominalSpeed",
         "staffEstimateSeconds",
         "departureMinOutput",
-        "recallAboardSeconds"
+        "recallAboardSeconds",
+        "localShuffleSeconds",
+        "dockHandGiveUpSeconds"
       ],
       "additionalProperties": false
     },

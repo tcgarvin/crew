@@ -31,6 +31,8 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     money: 0,
     items: [],
     headline: "",
+    locals: [],
+    dockProps: [],
   };
 }
 

@@ -1,12 +1,13 @@
 /**
- * D40: the null narrator is the only offline source of work. For `approachingPort` and
- * `jobBoard` it answers with one templated `offerJob` through the real translator; for other
- * hooks it keeps its old behaviour (no commands; a template card for a policy decision).
+ * D40: the null narrator is the only offline source of work. For `jobBoard` it answers with one
+ * templated `offerJob` through the real translator; for other hooks it keeps its old behaviour
+ * (no commands; a template card for a policy decision). D66: it stages nothing, so a dock is
+ * the sim's floor set, and it never offers on the way in.
  */
 import type { ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
-import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
+import { approachRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
 import { payFor, routeDistance } from "./lookups";
 import { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 import { content } from "./test-support";
@@ -15,7 +16,7 @@ const DRIFT = "port.kessler_drift" as PortDefId;
 
 /** Docked at Kessler Drift with nothing on, the sim asking for work. */
 function jobBoardRequest(tick = 2_400): NarratorRequest {
-  const base = approachingPortRequest(content());
+  const base = approachRequest(content());
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: DRIFT };
@@ -38,11 +39,20 @@ function offerOf(req: NarratorRequest) {
 }
 
 describe("null narrator offers work (D40)", () => {
-  it.each([
-    ["approachingPort", () => approachingPortRequest(content())],
-    ["jobBoard", () => jobBoardRequest()],
-  ])("answers %s with one translated, surfaced offerJob from the port's templates", (_k, make) => {
-    const req = make();
+  it("answers stageDock with an empty plan and nothing else: the floor set alone (D66)", () => {
+    const res = nullNarratorResponse(stageDockRequest(content()), { content: content() });
+    expect(res.commands).toEqual([]);
+    expect(res.card).toBeUndefined();
+    expect(res.notesUpdate).toBeUndefined();
+  });
+
+  it("offers nothing on the way in (D66: arrival is the staging call's)", () => {
+    const res = nullNarratorResponse(approachRequest(content()), { content: content() });
+    expect(res.commands).toEqual([]);
+  });
+
+  it("answers jobBoard with one translated, surfaced offerJob from the port's templates", () => {
+    const req = jobBoardRequest();
     const { res, command } = offerOf(req);
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
     expect(command).toMatchObject({
@@ -105,7 +115,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("never offers passages: passenger and roundTrip are false on every offline offer (§4.4)", () => {
-    for (const req of [approachingPortRequest(content()), jobBoardRequest()]) {
+    for (const req of [jobBoardRequest(), jobBoardRequest(3_000)]) {
       const { job } = offerOf(req).command.payload;
       expect(job.passenger ?? false).toBe(false);
       expect(job.roundTrip ?? false).toBe(false);

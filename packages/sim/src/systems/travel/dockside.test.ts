@@ -322,6 +322,8 @@ describe("the travel invariant (D61)", () => {
     delete world.state.deck.dock;
     expect(travelViolations(world)).toEqual([
       `no dock alongside in stage docked; "${HOME_DOCK.id}" is due`,
+      // D66: its locals are still dressed for it, which is the same fault seen from dockside.
+      "dockside dressed with no dock alongside",
     ]);
     world.state.deck.dock = presence;
     world.state.travel = {

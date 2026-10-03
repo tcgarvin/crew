@@ -3,7 +3,7 @@
  * no provider-side size cap), so it must stay small and game-independent: no per-game enums.
  */
 import { describe, expect, it } from "vitest";
-import { approachingPortRequest } from "./fixtures";
+import { approachRequest } from "./fixtures";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { content } from "./test-support";
 
@@ -23,7 +23,7 @@ function enumArrays(node: unknown, found: unknown[][] = []): unknown[][] {
 
 describe("plan JSON schema size (D45, D53)", () => {
   it("stays under the prompt budget for the real content bundle and a fixture snapshot", () => {
-    const req = approachingPortRequest(content());
+    const req = approachRequest(content());
     expect(req.snapshot.state.machines).not.toEqual({});
     const json = planJsonSchema(planSchemaFor());
     const text = JSON.stringify(json);

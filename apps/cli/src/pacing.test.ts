@@ -53,10 +53,11 @@ describe("crew pacing: there-and-back voyage", () => {
   );
 
   it(
-    "raises approachingPort at every docking and jobBoard at the hub and the far port only",
+    "raises stageDock at every docking and jobBoard at the hub and the far port only",
     () => {
       const { slow } = results();
-      expect(slow.hooksByKind.approachingPort).toBe(4);
+      // D66: the staging call is guaranteed, waypoints included.
+      expect(slow.hooksByKind.stageDock).toBe(4);
       // Waypoint dockings do not ask the job board (§2.3).
       expect(slow.hooksByKind.jobBoard).toBe(2);
       expect(slow.totalCalls).toBeGreaterThanOrEqual(6);

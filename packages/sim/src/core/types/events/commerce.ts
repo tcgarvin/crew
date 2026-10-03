@@ -1,6 +1,15 @@
 /** Commerce and custody events (W6). */
 import type { PhysicalLocation } from "../common";
-import type { ActorId, EntityId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "../ids";
+import type {
+  ActorId,
+  EntityId,
+  ItemDefId,
+  ItemId,
+  JobId,
+  LocalId,
+  PortDefId,
+  TransactionId,
+} from "../ids";
 import type { PassageEndReason } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
@@ -28,6 +37,17 @@ export interface CommerceEventPayloads {
   freightStaged: { readonly jobId: JobId; readonly portId: PortDefId; readonly count: number };
   /** D63: a declined, expired or departed-from offer's staged crates went back in. */
   freightWithdrawn: { readonly jobId: JobId; readonly portId: PortDefId };
+  /**
+   * D66: a dock hand's carting errand could not be walked (no route, or it ran past
+   * `travel.dockHandGiveUpSeconds`, or the dock was cast off first), so the D63 instant
+   * behaviour did it: crates set out, withdrawn or taken in at once.
+   */
+  dockHandGaveUp: {
+    readonly localId: LocalId;
+    readonly jobId: JobId;
+    readonly errand: "stageOffer" | "withdrawOffer" | "takeDelivery";
+    readonly reason: "noRoute" | "timeout" | "castOff";
+  };
   /** Anything created by a spawn command (boundary or scenario). */
   entitySpawned: { readonly entityId: EntityId; readonly defId: string };
   /**
@@ -76,12 +96,13 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   // D63: the offer and its card already carry the story; the crates appearing is scenery.
   freightStaged: "trace",
   freightWithdrawn: "trace",
+  dockHandGaveUp: "trace",
   // D47: a purchase is a story beat the narrator may react to; stocking is the narrator's own
   // quiet hand and never reaches the ticker.
   partsBought: "narrative",
   marketStocked: "trace",
   // Passengers §3.5: boarding follows the offer card by seconds and going ashore is already
-  // covered by `approachingPort`, so neither is hook-worthy; the return and the ending are.
+  // covered by the arrival, so neither is hook-worthy; the return and the ending are.
   passengerBoarded: "notable",
   passengerAshore: "notable",
   passengerReturned: "narrative",

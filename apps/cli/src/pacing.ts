@@ -26,7 +26,7 @@
  *   While the sim is halted the viewer keeps playing into the lead; the stall per call is
  *   therefore `max(0, latency − lead / speed)`, where `lead` is the sim-seconds in hand when the
  *   hook fired (60 s if the sim had been unhindered for ~1.5 s of wall time; less when hooks
- *   fall close together, e.g. `approachingPort` then `jobBoard` at one docking). With a 60 s
+ *   fall close together, e.g. `stageDock` then `jobBoard` at one docking). With a 60 s
  *   lead and 25 s latency: 0 s at 1x and 2x, 10 s at 4x, 17.5 s at 8x: spec §2.2.
  * - The viewer starts playing when the sim has produced its first tick. The `jobBoard` hook of
  *   the initial docking fires at tick 0, before any lead exists, so its latency is paid in full
@@ -613,12 +613,7 @@ function hookColumns(results: readonly PacingResult[]): NarratorHook["kind"][] {
   for (const r of results) {
     for (const kind of Object.keys(r.hooksByKind) as NarratorHook["kind"][]) kinds.add(kind);
   }
-  const order: NarratorHook["kind"][] = [
-    "approachingPort",
-    "jobBoard",
-    "quietTooLong",
-    "notableEvent",
-  ];
+  const order: NarratorHook["kind"][] = ["stageDock", "jobBoard", "quietTooLong", "notableEvent"];
   return order.filter((k) => kinds.has(k));
 }
 

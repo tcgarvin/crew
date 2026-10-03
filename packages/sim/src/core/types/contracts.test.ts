@@ -11,9 +11,16 @@ describe("W0 contracts", () => {
     expect(JSON.parse(JSON.stringify(state))).toStrictEqual(state);
   });
 
-  it("narrator authority is exactly the five V1 command kinds (D47 added stockMarket)", () => {
+  it("narrator authority is the V1 kinds plus stockMarket (D47) and staging-only stageDock (D66)", () => {
     expect([...AUTHORITY.narrator].sort()).toEqual(
-      ["offerJob", "scheduleFault", "spawnAtBoundary", "stockMarket", "surfaceDecision"].sort(),
+      [
+        "offerJob",
+        "scheduleFault",
+        "spawnAtBoundary",
+        "stageDock",
+        "stockMarket",
+        "surfaceDecision",
+      ].sort(),
     );
     expect(AUTHORITY.narrator).toBe(NARRATOR_COMMAND_KINDS);
   });

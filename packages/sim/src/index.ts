@@ -42,6 +42,7 @@ export {
   jobBlockingAcceptance,
   nextHop,
   registerTravel,
+  stagingAnswered,
   shortestPath,
   travelTaskDerivations,
   waitingForPassenger,

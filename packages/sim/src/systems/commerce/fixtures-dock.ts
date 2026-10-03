@@ -20,7 +20,13 @@ import { createKernel } from "../../core/kernel";
 import { createRegistry } from "../../core/registry";
 import type { Command } from "../../core/types/commands";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
-import type { ConfigDef, ContentBundle, DockDef, MachineDef } from "../../core/types/content";
+import type {
+  CastSeedDef,
+  ConfigDef,
+  ContentBundle,
+  DockDef,
+  MachineDef,
+} from "../../core/types/content";
 import type { CommandId, CrewDefId, ItemDefId, JobId, PortDefId } from "../../core/types/ids";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerEquipmentSystems } from "../equipment/register";
@@ -60,18 +66,25 @@ export const QUAY_WORK = {
   cargoRampTop: { x: 2, y: 6 },
 } as const satisfies Record<string, TileCoord | readonly TileCoord[]>;
 
-function furnished(dock: DockDef, stall: boolean): DockDef {
+/** The quay's warehouse door: where dock hands come and go (D66). */
+export const WAREHOUSE_DOOR = { x: 15 - 2, y: 11 - 1 } as const;
+
+function furnished(dock: DockDef, stall: boolean, door: boolean): DockDef {
   return {
     ...dock,
     posts: [
       { key: "gate", kind: "gate", name: "the gate", tile: { x: 0, y: 11 }, facing: "e" },
-      {
-        key: "door",
-        kind: "warehouseDoor",
-        name: "the warehouse door",
-        tile: { x: 15, y: 11 },
-        facing: "w",
-      },
+      ...(door
+        ? [
+            {
+              key: "door",
+              kind: "warehouseDoor" as const,
+              name: "the warehouse door",
+              tile: { x: 15, y: 11 },
+              facing: "w" as const,
+            },
+          ]
+        : []),
       ...(stall
         ? [
             {
@@ -98,6 +111,13 @@ export interface DockWorkOptions {
   readonly partsStock?: number;
   /** D65: put a hand truck of this capacity in the hold (default: no truck). */
   readonly truck?: number;
+  /**
+   * D66: give both quays a warehouse door, so dock hands cart the freight on foot (default
+   * false: no door, so the D63 instant carting these tests were written against).
+   */
+  readonly dockHands?: boolean;
+  /** D66: regulars per port (`castSeed`, with posts on the quay: "gate", "door", "stall"). */
+  readonly castSeed?: Readonly<Record<string, readonly CastSeedDef[]>>;
 }
 
 /** A misfire whose repair consumes one `PARTS`, as the D47 market test has it. */
@@ -121,8 +141,9 @@ export function dockWorkContent(
   config: ConfigDef = docksideConfig(),
 ): ContentBundle {
   const base = docksideContent(config);
-  const home = furnished(HOME_DOCK, options.homeStall ?? true);
-  const far = furnished(FAR_DOCK, false);
+  const doors = options.dockHands === true;
+  const home = furnished(HOME_DOCK, options.homeStall ?? true, doors);
+  const far = furnished(FAR_DOCK, false, doors);
   const engine = base.machines[CREW.engine];
   const mara = base.crew[TINY.mara];
   const scenario = base.scenarios[CREW.scenario2];
@@ -131,7 +152,10 @@ export function dockWorkContent(
   }
   const market = [{ itemDefId: PARTS, count: options.partsStock ?? 2, price: PARTS_PRICE }];
   const ports = Object.fromEntries(
-    Object.entries(base.ports).map(([id, port]) => [id, { ...port, market }]),
+    Object.entries(base.ports).map(([id, port]) => [
+      id,
+      { ...port, market, castSeed: options.castSeed?.[id] ?? port.castSeed },
+    ]),
   ) as ContentBundle["ports"];
   return {
     ...base,
@@ -187,8 +211,10 @@ export function dockWorkContent(
 }
 
 /** Spatial, equipment, travel, commerce, needs, work and the planner, on `dockWorkContent`. */
-export function dockWorkWorld(options: DockWorkOptions = {}): TestWorld {
-  const config = docksideConfig();
+export function dockWorkWorld(
+  options: DockWorkOptions = {},
+  config: ConfigDef = docksideConfig(),
+): TestWorld {
   const registry = createRegistry();
   registerSpatial(registry);
   registerEquipmentSystems(registry);

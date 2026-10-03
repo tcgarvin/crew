@@ -74,6 +74,7 @@ export function exampleWorldState(): WorldState {
       claim: 2,
       transaction: 2,
       event: 57,
+      local: 1,
     },
     actors: {
       [a1]: {
@@ -343,6 +344,7 @@ export function exampleWorldState(): WorldState {
       },
     },
     markets: {},
+    dockside: { locals: {}, props: [] },
     money: {
       balance: 1200,
       transactions: { [n1]: { id: n1, tick: 0, amount: 1200, reason: "scenario" } },

@@ -282,6 +282,22 @@ describe(
         expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
       }
       expect(checkInvariants(world.state)).toEqual([]);
+
+      // D66: every dock came alongside with somebody on it, and no dock hand had to give up a
+      // walk (only the dock leaving may cut one short).
+      const dressed = log.events.filter(
+        (e): e is Extract<SimEvent, { type: "dockDressed" }> => e.type === "dockDressed",
+      );
+      expect(dressed.length).toBeGreaterThanOrEqual(2);
+      for (const e of dressed) {
+        expect(e.payload.localIds.length).toBeGreaterThan(0);
+        expect(e.payload.unplaced).toEqual([]);
+      }
+      const gaveUp = log.events.filter(
+        (e) => e.type === "dockHandGaveUp" && e.payload.reason !== "castOff",
+      );
+      expect(gaveUp).toEqual([]);
+      expect(log.hooks.filter((h) => h === "stageDock").length).toBeGreaterThanOrEqual(2);
     }, 30_000);
 
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {

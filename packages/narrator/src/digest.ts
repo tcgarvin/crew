@@ -136,8 +136,8 @@ function hookLine(
   content: ContentBundle,
 ): string {
   switch (hook.kind) {
-    case "approachingPort":
-      return `approachingPort: arriving at ${portName(content, hook.context.portId)} (${hook.context.portId}) shortly`;
+    case "stageDock":
+      return `stageDock: dressing the dock at ${portName(content, hook.context.portId)} (${hook.context.portId}) before the ship comes alongside`;
     case "jobBoard":
       return `jobBoard: docked at ${portName(content, hook.context.portId)} (${hook.context.portId}) with no job offers`;
     case "quietTooLong":

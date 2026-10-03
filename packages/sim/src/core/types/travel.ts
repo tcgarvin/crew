@@ -4,7 +4,17 @@
  */
 import type { TextRef, Tick } from "./common";
 import type { CargoClass } from "./content";
-import type { ActorId, CommandId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "./ids";
+import type { StagingPlan } from "./dockside";
+import type {
+  ActorId,
+  CommandId,
+  HookId,
+  ItemDefId,
+  ItemId,
+  JobId,
+  PortDefId,
+  TransactionId,
+} from "./ids";
 
 /** SD §17.1 exterior state machine, in order. */
 export const TRAVEL_STAGES = [
@@ -76,8 +86,30 @@ export type TravelState =
        * later stage builds a fresh object without it.
        */
       recallSinceTick?: Tick;
+      /**
+       * D66, `transit` and `approaching` only: the staging call for `toPortId`'s dock, from the
+       * transit lead point until the dock comes alongside at the start of `docking`, where the
+       * plan is spent (the `docking` object is built without it). Absent before the lead point,
+       * and always at a port with no dock map.
+       */
+      staging?: DockStaging;
     } & DepartureGateFlags &
       VoyageFields);
+
+/**
+ * D66: where the guaranteed `stageDock` hook stands. `due`: the lead point has passed while
+ * another hook was pending, so travel raises it the first tick none is. `raised`: the hook was
+ * raised as `hookId`; while it is still `narrator.pendingHook` a `stageDock` command may set
+ * `plan`, and once it is not (acknowledged) the call is answered and transit may end.
+ */
+export type DockStaging =
+  | { status: "due" }
+  | {
+      status: "raised";
+      hookId: HookId;
+      /** The narrator's staging plan; absent when it staged nothing (the floor set only). */
+      plan?: StagingPlan;
+    };
 
 // ---------------------------------------------------------------------------------------------
 // Jobs

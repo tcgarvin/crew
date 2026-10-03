@@ -29,6 +29,7 @@ import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipel
 import type { Machine } from "../../core/types/ship";
 import type {
   DepartureGateFlags,
+  DockStaging,
   TravelStage,
   TravelState,
   VoyageFields,
@@ -40,6 +41,11 @@ import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
 import { raiseHookIfIdle } from "./hooks";
+import { dismissLocals, dressDockAlongside } from "./locals";
+import { stageDockIfDue, stagingAnswered } from "./staging";
+import { portStoreLocation } from "./stores";
+
+export { portStoreLocation } from "./stores";
 
 // ---------------------------------------------------------------------------------------------
 // Propulsion
@@ -252,17 +258,6 @@ function emitStageChanged(
 
 function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
   return port.routes.find((r) => r.toPortId === toPortId)?.distance;
-}
-
-function warehouseStore(port: PortDef): ExternalStoreDef | undefined {
-  return port.externalStores.find((s) => s.kind === "warehouse") ?? port.externalStores[0];
-}
-
-/** Spawn location for freight at a port on arrival/accept: its warehouse (or first) store. */
-export function portStoreLocation(port: PortDef): PhysicalLocation {
-  const store = warehouseStore(port);
-  if (store === undefined) throw new Error(`Port "${port.id}" has no external store`);
-  return { kind: "inExternalStore", portId: port.id, storeKey: store.key };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -543,7 +538,12 @@ function advanceTravel(ctx: StepCtx): void {
     );
     travel.stageProgress =
       travel.routeDistance === 0 ? 1 : travel.routeProgress / travel.routeDistance;
+    // D66: the staging call is raised before the end-of-route check, so a leg that starts inside
+    // the lead distance (or has none) raises it this tick rather than costing one.
+    stageDockIfDue(ctx, travel);
     if (travel.routeProgress < travel.routeDistance) return;
+    // D66: held at the end of the route until the staging call has been answered.
+    if (!stagingAnswered(ctx.state, ctx.content, travel)) return;
     advanceStage(ctx);
     return;
   }
@@ -569,18 +569,28 @@ function advanceStageTimer(
  * transfer tiles), grafted onto the ship's deck. Its ramps are still up, so nobody can walk onto
  * it until `docked` lowers them.
  */
-function bringDockAlongside(ctx: StepCtx, portId: PortDefId): void {
+function bringDockAlongside(
+  ctx: StepCtx,
+  portId: PortDefId,
+  staging: DockStaging | undefined,
+): void {
   const dock = dockForPort(ctx.content, portId);
   if (dock === undefined) return;
   attachDock(ctx, { dockId: dock.id, deckId: theDeckId(ctx) });
+  // D66: the dock slides in with its people already at their posts: the floor set, and the
+  // staging call's plan if it gave one.
+  dressDockAlongside(ctx, staging?.status === "raised" ? staging.plan : undefined);
 }
 
 /**
  * D61: the dock leaves at the end of `undocking`. Prep has brought everyone aboard and raised
  * the ramps; `clearDock` leaves anything still lying there at the port, then the graft goes.
+ * D66: the locals go first, with the dock, never aboard: they are not in `actors`, so neither the
+ * call aboard nor `clearDock` ever sees them; a dock hand's open errand is finished on the spot.
  */
 function castOffDock(ctx: StepCtx, portId: PortDefId): void {
   if (ctx.state.deck.dock === undefined) return;
+  dismissLocals(ctx, portId);
   clearDock(ctx, portId, portStoreLocation(ctx.defs.port(portId)));
   detachDock(ctx);
 }
@@ -644,8 +654,10 @@ function advanceStage(ctx: StepCtx): void {
     drifting: travel.drifting,
     stageStartedTick: ctx.tick,
     ...carriedVoyageFields(travel),
+    // D66: the staging record rides from transit into the approach and is spent at docking.
+    ...(to === "approaching" && travel.staging !== undefined ? { staging: travel.staging } : {}),
   };
-  if (to === "docking") bringDockAlongside(ctx, travel.toPortId);
+  if (to === "docking") bringDockAlongside(ctx, travel.toPortId, travel.staging);
   emitStageChanged(ctx, from, to);
   if (from === "undocking" && to === "departing") {
     ctx.emit({
@@ -654,12 +666,6 @@ function advanceStage(ctx: StepCtx): void {
       causeIds: [],
       source: "sim",
       payload: { fromPortId: travel.fromPortId, toPortId: travel.toPortId },
-    });
-  }
-  if (to === "approaching") {
-    raiseHookIfIdle(ctx, "approachingPort", {
-      portId: travel.toPortId,
-      etaTicks: stageDurationTicks(ctx, "approaching") + stageDurationTicks(ctx, "docking"),
     });
   }
 }

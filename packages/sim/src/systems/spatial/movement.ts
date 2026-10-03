@@ -228,6 +228,16 @@ function isOverlapping(actor: Actor, location: OnDeckLocation, actors: readonly 
   return false;
 }
 
+function nearLocal(location: OnDeckLocation, locals: WorldState["dockside"]["locals"]): boolean {
+  for (const local of Object.values(locals)) {
+    if (local.location.deckId !== location.deckId) continue;
+    const dx = local.location.x - location.x;
+    const dy = local.location.y - location.y;
+    if (dx * dx + dy * dy < 0.25) return true;
+  }
+  return false;
+}
+
 export function effectiveSpeed(
   ctx: StepCtx,
   actor: Actor,
@@ -242,7 +252,10 @@ export function effectiveSpeed(
   );
   let trait = 1;
   for (const traitId of actor.traits) trait *= ctx.defs.trait(traitId).modifiers.walkSpeed ?? 1;
-  const overlap = isOverlapping(actor, location, actors) ? overlapSpeedFactor(ctx.config) : 1;
+  // D66: a local on the dock is a body in the way like anyone else.
+  const crowded =
+    isOverlapping(actor, location, actors) || nearLocal(location, ctx.state.dockside.locals);
+  const overlap = crowded ? overlapSpeedFactor(ctx.config) : 1;
   return movement.walkSpeed * clamp01(actor.capacities.movement) * fatigue * load * trait * overlap;
 }
 

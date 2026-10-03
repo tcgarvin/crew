@@ -750,3 +750,93 @@ empty at their first look, and D63's `briefCrew` writes freight facts at accepta
 come first (the opening offer is taken at tick 1–2); such a crew member never learns where the
 ship's stores are, the truck included, until they walk past them. In the full sim the pilot
 never knows where the rations are.
+
+**D66. Phase 3 of Dockside, sim side: locals, the floor set, dock hands and the guaranteed
+staging call.** Plan items 1–5 and 8–10 (design §5, §6.1; contract for the narrator, server and
+renderer work in `docs/design/dockside-phase3-contract.md`).
+*Locals are their own table, not actors.* `state.dockside.locals` (ids `o<n>`): name, role, a
+palette seed from the name, an optional new face's look line, an origin (regular, receiver,
+left-behind passenger, staged, dock hand), a post, a label, a position on the dock floor and one
+scripted behaviour (`atPost` with a shuffle every `travel.localShuffleSeconds`, `walkTo`,
+`leave`). An `Actor` flag was rejected: some twenty loops over `actors` (needs, planner,
+perception, staffing, the call aboard, the dock's last guard, door occupants, ambient chat,
+roster, render) would each need to skip them, and an actor would carry needs, knowledge and
+skills that are lies. A separate table is excluded from all of them by construction. Locals walk
+the crew's nav grid with the crew's A* under a policy where every door is impassable (the only
+doors on the graft are the ramps, so they never set foot aboard), at `movement.walkSpeed`, and
+the corridor-passing slowdown counts locals for the crew and crew for locals. The planner sees
+nothing of them: the `AgentView` is unchanged, since the planner never treats other people as
+obstacles either; "visible only as obstacles" is the movement system's passing rule. Props the
+staging call places are presentation records, never items, so nobody can eat or fit them. Travel
+invariants: no local, prop or dressing without the dock alongside; every local (and every tile
+of its walk) on that dock's floor.
+*The dock's people come and go with it.* The dock is dressed when it attaches at the start of
+`docking` (and at world creation; a restored save with an undressed dock is dressed on its first
+tick, so the 4 → 5 migration places nobody), and at the end of `undocking` the locals and props
+go with it without walking (design §4: "slides away with them"), before `clearDock`, which never
+sees them. Departure never waits for a local: nothing about them is cargo work or "ashore".
+*The floor set* (`core/floor-set.ts`) is pure over state and content, with no rng draw (a dock
+hand's name is a hash of the save's seed and the job into the content name table), so the hook
+can show the narrator exactly who will be there: posted regulars; a receiver dock hand by the
+warehouse door for freight bound here; a passenger left behind or put off here, on the bench. The
+issuer of a job finished here is never at the destination (freight is issued at its origin; a
+round trip's issuer is the passenger, aboard), so the design's second half of item 2 adds no one.
+A passenger due back already appears at the gate as an actor (D63), not as a local.
+*Dock hands* (`systems/commerce/dock-hands.ts`) take over D63's appear, vanish and move points:
+an offer's crates come out of the warehouse door on a hand's trolley (the job is offered with no
+crates until the hand sets them down); a withdrawn offer's crates are walked back in (they stay on
+the staging area, still nobody's, until picked up); a delivery's crates are taken in by the
+receiver, or a new hand, once every unload is done and the job is paid on the bay. Carried crates
+are presentation (`Local.carrying`), never items on a local, so custody stays one location per
+item. An errand with no route, or past `travel.dockHandGiveUpSeconds` (30 s), does the instant
+D63 behaviour and emits `dockHandGaveUp` (trace); one still open when the dock is cast off is
+finished the same way (reason `castOff`). A dock with no warehouse-door post (hand-built test
+docks) has no dock hands. Accepting an offer mid-walk stages its crates at once, as before; the
+hand's errand is then moot and they go back in. The commerce invariant allows the walk:
+no crates while a hand brings them out, crates still on the dock while a hand fetches them back.
+Equipment and the frame treat a closed offer's waiting crates as nobody's, like an open offer's.
+*The staging call is guaranteed.* `stageDock` (context: port, dock, floor set) is raised in
+`transit` once the route left is within `narrator.approachHookLeadSeconds` at nominal speed (a
+drift delays it, a short leg raises it on its first tick), at every docking whose port has a dock
+map, waypoints included. The record rides on the `transit` and `approaching` stage objects
+(`TravelState.staging`, owned by travel) and is spent at `docking`, so it never outlives its
+leg, and travel derives "answered" from the hook no longer being pending, so core's
+`acknowledgeHook` is unchanged. If another hook is pending at the lead point the record waits as
+`due` and travel raises it through `raiseHookIfIdle` the first tick none is; travel runs before
+commerce, `notableEvent`, the policy hook and the quiet timer, so it is first in line after the
+other's acknowledgement. Transit holds at the end of the route until the call is answered; the
+approach needs no engine, so a drift during the hold does not hold the ship further. Raising it
+re-arms the quiet timer like any hook.
+*The stageDock command* is the kernel half of the staging plan: up to three people (port seed by
+name, cast member, or new face with role and look) at posts of that dock with an optional label,
+up to three props (catalogue items, 1–4 units, on the staging area or by a post) and one ambience
+line, validated whole (posts exist on the dock, text non-blank, no control characters or
+template braces, length caps, seeds exist, nobody aboard placed, no name twice, one plan per
+call). It is in the narrator vocabulary as staging-only (D57 is the owner's ruling for this
+vocabulary change): `validateCommand` refuses it from the narrator outside a pending `stageDock`
+hook and refuses every other narrator kind while one is pending (`preconditionFailed`). The
+ambience line reaches the ticker as a notable `dockAmbience`, never narrative.
+*`approachingPort` is retired, not renamed:* `stageDock` has a different context, authority and
+answer, and nothing about offers on approach survives (design §6.3). Offers no longer arrive in
+flight from an arrival hook; the null narrator answers `stageDock` with an empty plan and offers
+only at `jobBoard`; the narrator fixtures' in-flight base (`approachRequest`) carries a
+`quietTooLong` hook now. Prompt v0.17 (the hook's instructions and two "on approach" phrases
+removed from the static rules).
+*Interim narrator and server* (until the staging prompt lands): `runNarrator` and the route
+answer `stageDock` with an empty plan without a model call; the route skips the budget, the call
+log, notes and the spacing rule in both directions for it, since a staging answer within 100
+ticks of a story call would otherwise be refused (and the floor set used) or make the next story
+call "too soon".
+*Save schema 5:* `dockside` (empty), `nextId.local`, and a pending `approachingPort` dropped as
+answered (its id joins `recentHookIds`); a docked save is dressed on its first tick.
+*Tests:* the hook at the lead point, the same-tick hold at the end of the route, `due` behind
+another hook, a drift during the hold, save and restore with the call pending and a plan stored;
+the command's window, refusals and placement; locals leaving with the dock; dock hands staging,
+withdrawing, giving up and being cast off mid-pickup; the floor set and the 4 → 5 migration. The
+real-content integration run now checks Hal Petrosyan at the queue kiosk on a new game and on
+arriving back at the Hub, Kessler's regulars and receiver on arrival there, the receiver carting
+the delivery in, a staging call before each docking and no card on the way in. The full-sim run
+checks that every dock came alongside dressed and no dock hand gave up a walk.
+*Found, not changed:* `notableEvent` only looks one tick back, so a narrative event in the tick a
+`stageDock` is raised loses its hook (true of any hook raised by travel first; now it happens on
+every leg).

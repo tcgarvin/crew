@@ -54,8 +54,8 @@ function captainIsIdleAt(ctx: StepCtx, portId: PortDefId): boolean {
  * the moment travel leaves `docked`, so the next docking at any port asks again. It is never
  * re-raised on a timer: the owner withdrew D46's re-ask so no clock pushes the narrator toward
  * "offer work now"; pacing is its own judgement, and `quietTooLong` is the only recurring hook.
- * `approachingPort` is raised by travel before docking and is unaffected: an offer made there
- * keeps the board quiet here.
+ * D66: `stageDock` (the staging call before docking) offers nothing, so it never keeps the board
+ * quiet; an offer made in flight by a story hook does.
  */
 export function raiseJobBoardHookIfNeeded(ctx: StepCtx): void {
   const travel = ctx.state.travel;

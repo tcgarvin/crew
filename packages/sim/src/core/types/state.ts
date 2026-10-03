@@ -20,6 +20,7 @@ import type { CommandsState } from "./commands";
 import type { RngStreamName, Sfc32State, Tick } from "./common";
 import type { CrewDef, ItemDef } from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
+import type { DocksideState } from "./dockside";
 import type {
   ActorId,
   ClaimId,
@@ -46,8 +47,10 @@ import type { Claim, Problem, Task } from "./work";
  * 3 (2026-10-01): `markets` (D47), seeded lazily from content for a port a save never visited.
  * 4 (2026-10-03): `deck.dock` is set from the start of `docking` to the end of `undocking` at a
  * port with a dock map (D61), so a save docked at one gets it on load.
+ * 5 (2026-10-03): `dockside` (locals and props on the dock alongside), `narrator.staging` and the
+ * `stageDock` hook, which replaces `approachingPort` (D66).
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
 export interface MarketLine {
@@ -114,6 +117,11 @@ export interface WorldState {
    * backfill beyond the empty table.
    */
   markets: Record<PortDefId, MarketStock>;
+  /**
+   * Owner: travel (the dock's people and props come and go with it) and commerce (dock-hand
+   * errands). D66. Empty whenever no dock is alongside.
+   */
+  dockside: DocksideState;
   /** Owner: decisions. */
   decisions: DecisionsState;
   /** Owner: kernel core (quiet timer, budget) and decisions (pending hook). */

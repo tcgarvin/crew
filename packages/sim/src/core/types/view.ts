@@ -30,6 +30,7 @@ import type {
   ItemDefId,
   ItemId,
   JobId,
+  LocalId,
   LocalKey,
   MachineDefId,
   MachineId,
@@ -278,6 +279,7 @@ export interface RenderItem {
   readonly jobId?: JobId;
   /**
    * D63: freight on offer, staged on the dock: its job is not taken yet, so it is nobody's.
+   * D66: also a closed offer's crates still on the dock while a dock hand fetches them back.
    * Absent for anything else (accepted freight, stores, parts).
    */
   readonly offered?: true;
@@ -322,6 +324,49 @@ export interface RenderDock {
 }
 
 /**
+ * D66: a local on the dock alongside: not crew, never in `actors`. Always on the dock, so always
+ * drawn with the dock layer (as `onDock` actors are). Drawn as a dot in its own style from
+ * `lookSeed`; tappable for name, role and post.
+ */
+export interface RenderLocal {
+  readonly id: LocalId;
+  readonly name: string;
+  /** Lower case: "queue clerk", "dock hand". */
+  readonly role: string;
+  readonly deckId: DeckDefId;
+  /** Continuous tile-unit position in the deck's frame (on the dock, so outside the deck). */
+  readonly x: number;
+  readonly y: number;
+  /** Radians, 0 = east. */
+  readonly facing: number;
+  /** A uint32 palette seed, stable for the person (a hash of the name). */
+  readonly lookSeed: number;
+  /** The post they belong to (`DockDef.posts[].key`), for "at the queue kiosk". */
+  readonly postKey: LocalKey;
+  /** Short activity label ("waiting for a delivery", "bringing out 3 crates"); absent = none. */
+  readonly label?: string;
+  /** A narrator-invented face's one-line look; absent otherwise. */
+  readonly look?: string;
+  /** Crates on a dock hand's trolley right now (0 for anyone else). */
+  readonly carrying: number;
+}
+
+/**
+ * D66: a staged prop on the dock: set dressing drawn like the item it names, never an item
+ * (nobody can pick it up), so it has no id. Its tile, deck frame, as a tile centre.
+ */
+export interface RenderDockProp {
+  readonly defId: ItemDefId;
+  readonly name: string;
+  readonly kind: RenderItemKind;
+  readonly cargoClass?: CargoClass;
+  readonly count: number;
+  readonly deckId: DeckDefId;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
  * W0 decision: frames also carry `money` (HUD) and actor `name` (labels) beyond the minimum.
@@ -342,6 +387,10 @@ export interface RenderFrame {
   readonly items: readonly RenderItem[];
   /** D61: the dock alongside; absent while no dock is (in flight, or at a port without one). */
   readonly dock?: RenderDock;
+  /** D66: the locals on the dock alongside; empty with no dock. */
+  readonly locals: readonly RenderLocal[];
+  /** D66: the staging plan's props on the dock alongside; empty with no dock. */
+  readonly dockProps: readonly RenderDockProp[];
   /**
    * Polish A (D27): one plain-language line of what the ship is doing right now, e.g.
    * "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".

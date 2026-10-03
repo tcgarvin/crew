@@ -5,7 +5,7 @@
  * interpolation math is unit-testable; `runPlaybackLoop` is the thin `requestAnimationFrame`
  * driver used in the browser.
  */
-import type { RenderActor, RenderFrame, RenderTravel } from "@crew/sim";
+import type { RenderActor, RenderFrame, RenderLocal, RenderTravel } from "@crew/sim";
 
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -60,7 +60,28 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     tickerEvents: next.tickerEvents,
     items: next.items,
     headline: next.headline,
+    locals: interpolateLocals(prev.locals, next.locals, clamped),
+    dockProps: next.dockProps,
   };
+}
+
+/** D66: locals walk too, so they glide between frames like the crew; newcomers snap in. */
+function interpolateLocals(
+  prev: readonly RenderLocal[],
+  next: readonly RenderLocal[],
+  t: number,
+): RenderLocal[] {
+  const prevById = new Map(prev.map((l) => [l.id, l] as const));
+  return next.map((nl) => {
+    const pl = prevById.get(nl.id);
+    if (pl === undefined) return nl;
+    return {
+      ...nl,
+      x: lerp(pl.x, nl.x, t),
+      y: lerp(pl.y, nl.y, t),
+      facing: lerpAngle(pl.facing, nl.facing, t),
+    };
+  });
 }
 
 /**

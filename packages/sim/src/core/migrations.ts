@@ -192,8 +192,36 @@ function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
   return stowHandTruckOnLoad(docked, context);
 }
 
+/**
+ * 4 → 5 (D66): locals and the staging call.
+ * - `dockside` is a new slice, empty; a save with a dock alongside has it dressed with the floor
+ *   set on its first tick (`systems/travel/locals.ts`), so the migration places nobody.
+ * - `nextId.local` starts at 1.
+ * - `approachingPort` is retired. A save halted on one has it dropped as answered (its id joins
+ *   `recentHookIds`), so the game runs on: a save past the transit lead point simply docks
+ *   without staging, and one before it raises `stageDock` as usual.
+ */
+export function addDockside(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  if (!isRecord(raw.dockside)) raw.dockside = { locals: {}, props: [] };
+  if (isRecord(raw.nextId) && typeof raw.nextId.local !== "number") raw.nextId.local = 1;
+  const narrator = raw.narrator;
+  if (isRecord(narrator) && isRecord(narrator.pendingHook)) {
+    const hook = narrator.pendingHook;
+    if (hook.kind === "approachingPort") {
+      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+      delete narrator.pendingHook;
+      if (Array.isArray(narrator.recentHookIds) && typeof hook.id === "string") {
+        narrator.recentHookIds.push(hook.id);
+      }
+    }
+  }
+  return raw;
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
   3: migrateToDockside,
+  4: addDockside,
 };

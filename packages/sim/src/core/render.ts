@@ -5,6 +5,7 @@
  * alongside, with everyone and everything on it flagged `onDock`.
  */
 import { isOnDock } from "./docks";
+import { isNobodysFreight } from "./freight";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation } from "./types/common";
 import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
@@ -17,10 +18,12 @@ import type { PassageEndReason, TravelState } from "./types/travel";
 import type {
   RenderActor,
   RenderDock,
+  RenderDockProp,
   RenderFrame,
   RenderItem,
   RenderItemKind,
   RenderItemLocation,
+  RenderLocal,
   RenderMachine,
   RenderMachineState,
   RenderTravel,
@@ -292,6 +295,8 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `The dock crew brought ${event.payload.name} back aboard at ${n.port(event.payload.portId)}`;
     case "leftOnDock":
       return `Left ${n.item(event.payload.itemId)} on the dock at ${n.port(event.payload.portId)}`;
+    case "dockAmbience":
+      return event.payload.line;
     case "gearBroughtAboard":
       return `The dock crew handed ${n.item(event.payload.itemId)} aboard at ${n.port(event.payload.portId)}`;
     case "jobOffered": {
@@ -368,7 +373,7 @@ export function tickerLine(
 // ---------------------------------------------------------------------------------------------
 
 function itemDef(
-  item: DeepReadonly<Item>,
+  item: Pick<DeepReadonly<Item>, "defId">,
   state: ReadonlyWorldState,
   content: ContentBundle,
 ): DeepReadonly<ItemDef> | undefined {
@@ -481,9 +486,7 @@ export function renderItems(state: ReadonlyWorldState, content: ContentBundle): 
       kind: itemKind(def),
       ...(def?.cargoClass === undefined ? {} : { cargoClass: def.cargoClass }),
       ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
-      ...(item.jobId !== undefined && state.jobs[item.jobId]?.status === "offered"
-        ? { offered: true as const }
-        : {}),
+      ...(isNobodysFreight(state, item) ? { offered: true as const } : {}),
       location,
       count: item.stacking === "stack" ? item.count : 1,
     });
@@ -749,6 +752,48 @@ export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionP
   }
 }
 
+/** D66: the locals on the dock alongside, in id order. */
+export function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
+  return Object.values(state.dockside.locals)
+    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }))
+    .map((local) => ({
+      id: local.id,
+      name: local.name,
+      role: local.role,
+      deckId: local.location.deckId,
+      x: local.location.x,
+      y: local.location.y,
+      facing: local.facing,
+      lookSeed: local.lookSeed,
+      postKey: local.postKey,
+      ...(local.label === undefined ? {} : { label: local.label }),
+      ...(local.look === undefined ? {} : { look: local.look }),
+      carrying: local.carrying.length,
+    }));
+}
+
+/** D66: the staging plan's props on the dock alongside. */
+export function renderDockProps(
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+): RenderDockProp[] {
+  const deckId = state.deck.dock?.deckId;
+  if (deckId === undefined) return [];
+  return state.dockside.props.map((prop) => {
+    const def = itemDef({ defId: prop.itemDefId }, state, content);
+    return {
+      defId: prop.itemDefId,
+      name: def?.name ?? "Crate",
+      kind: itemKind(def),
+      ...(def?.cargoClass === undefined ? {} : { cargoClass: def.cargoClass }),
+      count: prop.count,
+      deckId,
+      x: prop.tile.x + 0.5,
+      y: prop.tile.y + 0.5,
+    };
+  });
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors: RenderActor[] = [];
@@ -789,6 +834,8 @@ export function getRenderFrame(world: World): RenderFrame {
     money: state.money.balance,
     items: renderItems(state, content),
     ...(dock === undefined ? {} : { dock }),
+    locals: renderLocals(state),
+    dockProps: renderDockProps(state, content),
     headline: shipHeadline(state, content, world.config.values.travel.nominalSpeed),
   };
 }

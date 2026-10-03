@@ -7,7 +7,13 @@ import { describe, expect, it } from "vitest";
 import type { Command } from "../../core/types/commands";
 import type { CommandId, HookId, JobId } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
-import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "../travel/fixtures";
+import {
+  FIX,
+  PORTS,
+  advanceThroughHooks,
+  advanceToStage,
+  freightTestWorld,
+} from "../travel/fixtures";
 import { jobBlockingAcceptance } from "../travel/in-hand";
 
 let counter = 0;
@@ -203,16 +209,9 @@ describe("commerce: full freight loop", () => {
       world,
       cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
     );
-    const untilHook = kernel.advance(world, 1000);
-    expect(untilHook.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    advanceToStage(kernel, world, "approaching");
     // D52: freight under way is the one job in hand until the ship docks at its destination.
     expect(jobBlockingAcceptance(world.state)?.id).toBe(jobId);
-    const hookId = world.state.narrator.pendingHook?.id as HookId;
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
-    );
     // Docking at B with nothing on raises `jobBoard` (D40); acknowledge that too.
     advanceThroughHooks(kernel, world, 1000);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
@@ -267,27 +266,25 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
     return { ...jobDraft(pay), fromPortId, toPortId };
   }
 
-  /** Drive the ship from A toward B and stop at the `approachingPort` hook. */
+  /**
+   * Drive the ship from A toward B and stop on approach, with no hook pending: an offer made in
+   * flight (D42) now comes from a story hook such as `quietTooLong`, never from the arrival
+   * (D66 retired `approachingPort`; the fixture's ports have no dock map, so no `stageDock`).
+   */
   function approachB() {
     const { world, kernel } = freightTestWorld();
     kernel.enqueueCommand(
       world,
       cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
     );
-    // `advanceThroughHooks` would acknowledge the approach hook too; stop on it by hand,
-    // acknowledging only the incidental `jobBoard` raised at the start port.
-    for (let guard = 0; guard < 10; guard++) {
-      const result = kernel.advance(world, 2000);
-      expect(result.halt).toEqual({ kind: "hook" });
-      const hook = world.state.narrator.pendingHook;
-      if (hook === undefined) throw new Error("hook halt without a pending hook");
-      if (hook.kind === "approachingPort") break;
+    advanceToStage(kernel, world, "approaching");
+    if (world.state.narrator.pendingHook !== undefined) {
+      const hookId = world.state.narrator.pendingHook.id;
       kernel.enqueueCommand(
         world,
-        cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } }),
+        cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
       );
     }
-    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
     expect(world.state.travel.stage).toBe("approaching");
     return { world, kernel };
   }
@@ -303,11 +300,6 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
       }),
     );
     expect(offer.status).toBe("accepted");
-    const hookId = world.state.narrator.pendingHook?.id as HookId;
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
-    );
     kernel.advance(world, 1);
 
     const job = Object.values(world.state.jobs)[0];
@@ -355,11 +347,6 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
         kind: "offerJob",
         payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: true },
       }),
-    );
-    const hookId = world.state.narrator.pendingHook?.id as HookId;
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId } }),
     );
     kernel.advance(world, 1);
     const job = Object.values(world.state.jobs)[0];

@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
 import {
   FIXTURE_PASSENGER,
-  approachingPortRequest,
+  approachRequest,
   farJobBoardRequest,
   passengerAboardRequest,
   passengerOverdueRequest,
@@ -44,7 +44,7 @@ function manyEvents(n: number): SimEvent[] {
 
 describe("buildDigest: parts market (D47)", () => {
   function dockedWithShortfall(portId: string, balance = 5000) {
-    const req = approachingPortRequest(content());
+    const req = approachRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     const state = snapshot.state;
     state.travel = {
@@ -120,7 +120,7 @@ describe("buildDigest", () => {
   });
 
   it("stays within the default budget with a long event history", () => {
-    const req = approachingPortRequest(content());
+    const req = approachRequest(content());
     const digest = buildDigest(req.snapshot, manyEvents(500), EMPTY_NOTES, content(), req.hook);
     expect(digest.text.length).toBeLessThanOrEqual(DIGEST_MAX_CHARS);
     expect(digest.approxTokens).toBeLessThanOrEqual(2_500);
@@ -444,7 +444,7 @@ describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
   const HUB = "port.crossroads_hub" as never;
 
   it("says the ship is under way on a leg and bound for the voyage destination, with hops left", () => {
-    const req = approachingPortRequest(content());
+    const req = approachRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     const t = snapshot.state.travel;
     if (t.stage === "docked") throw new Error("fixture: expected a leg");
@@ -456,7 +456,7 @@ describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
   });
 
   it("says the ship is stopping at a waypoint on the way, and plain docked otherwise", () => {
-    const req = approachingPortRequest(content());
+    const req = approachRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     snapshot.state.travel = {
       stage: "docked",

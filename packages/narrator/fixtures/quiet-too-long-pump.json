@@ -9,10 +9,10 @@
     "tick": 4000
   },
   "snapshot": {
-    "schemaVersion": 3,
+    "schemaVersion": 5,
     "simVersion": "0.1.0",
-    "contentHash": "de0741efe6e8056c",
-    "configHash": "de0741efe6e8056c",
+    "contentHash": "844cca8af4a9f89c",
+    "configHash": "844cca8af4a9f89c",
     "savedAtTick": 4000,
     "config": {
       "time": {
@@ -30,7 +30,8 @@
         "openSeconds": 0.75,
         "closeSeconds": 0.75,
         "autoCloseAfterSeconds": 3,
-        "manualOpenSeconds": 4
+        "manualOpenSeconds": 4,
+        "rampOpenSeconds": 2
       },
       "needs": {
         "hungerPerSecond": 0.000833,
@@ -98,7 +99,10 @@
         "dockSeconds": 5,
         "nominalSpeed": 1,
         "staffEstimateSeconds": 0,
-        "departureMinOutput": 0.5
+        "departureMinOutput": 0.5,
+        "recallAboardSeconds": 60,
+        "localShuffleSeconds": 8,
+        "dockHandGiveUpSeconds": 30
       },
       "commerce": {
         "priceBands": {
@@ -205,7 +209,7 @@
       }
     },
     "state": {
-      "schemaVersion": 3,
+      "schemaVersion": 5,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 23,
       "tick": 4000,
@@ -220,7 +224,7 @@
       "nextId": {
         "actor": 9,
         "machine": 18,
-        "item": 11,
+        "item": 12,
         "door": 11,
         "compartment": 9,
         "task": 1,
@@ -230,7 +234,8 @@
         "hook": 2,
         "claim": 1,
         "transaction": 2,
-        "event": 1
+        "event": 1,
+        "local": 3
       },
       "actors": {
         "a1": {
@@ -686,8 +691,8 @@
           "deckId": "deck.freighter_mk1",
           "placementKey": "personnel_ramp",
           "kind": "ramp",
-          "physicalState": "closed",
-          "requestedState": "closed",
+          "physicalState": "open",
+          "requestedState": "open",
           "transitionProgress": 0,
           "integrity": 1,
           "sealQuality": 1,
@@ -798,8 +803,8 @@
           "deckId": "deck.freighter_mk1",
           "placementKey": "cargo_ramp",
           "kind": "ramp",
-          "physicalState": "closed",
-          "requestedState": "closed",
+          "physicalState": "open",
+          "requestedState": "open",
           "transitionProgress": 0,
           "integrity": 1,
           "sealQuality": 1,
@@ -1357,6 +1362,18 @@
           },
           "count": 3,
           "reserved": 0
+        },
+        "i11": {
+          "id": "i11",
+          "defId": "item.hand_truck",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "condition": 1
         }
       },
       "work": {
@@ -1513,6 +1530,10 @@
             "price": 130
           }
         }
+      },
+      "dockside": {
+        "locals": {},
+        "props": []
       },
       "decisions": {
         "records": {},

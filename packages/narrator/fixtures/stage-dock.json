@@ -1,0 +1,1584 @@
+{
+  "gameId": "fixture-stage-dock",
+  "hook": {
+    "id": "k1",
+    "kind": "stageDock",
+    "context": {
+      "portId": "port.kessler_drift",
+      "dockId": "dock.kessler_drift",
+      "floorSet": [
+        {
+          "name": "Greta Lindholm",
+          "role": "shift foreman",
+          "postKey": "shift_board",
+          "reason": {
+            "kind": "regular"
+          }
+        },
+        {
+          "name": "Osric Tan",
+          "role": "assay clerk",
+          "postKey": "assay_window",
+          "reason": {
+            "kind": "regular"
+          }
+        }
+      ]
+    },
+    "tick": 1600
+  },
+  "snapshot": {
+    "schemaVersion": 5,
+    "simVersion": "0.1.0",
+    "contentHash": "844cca8af4a9f89c",
+    "configHash": "844cca8af4a9f89c",
+    "savedAtTick": 1600,
+    "config": {
+      "time": {
+        "tickRate": 20
+      },
+      "movement": {
+        "walkSpeed": 2,
+        "passDelaySeconds": 0.3,
+        "blockedRerouteSeconds": 2,
+        "fatigueSpeedFloor": 0.6,
+        "loadSpeedPerKg": 0.01,
+        "loadSpeedFloor": 0.5
+      },
+      "doors": {
+        "openSeconds": 0.75,
+        "closeSeconds": 0.75,
+        "autoCloseAfterSeconds": 3,
+        "manualOpenSeconds": 4,
+        "rampOpenSeconds": 2
+      },
+      "needs": {
+        "hungerPerSecond": 0.000833,
+        "fatiguePerSecondAwake": 0.000556,
+        "fatiguePerSecondWorking": 0.000833,
+        "fatigueRecoveryPerSecondAsleep": 0.00833,
+        "comfortPerSecond": 0.000556,
+        "comfortRecoveryPerSecondResting": 0.0167,
+        "socialPerSecond": 0.000417,
+        "socialRecoveryPerSecondChatting": 0.00833,
+        "seekThreshold": 0.5,
+        "mealSeconds": 15,
+        "sleepMinSeconds": 90,
+        "wakeBelow": 0.15,
+        "initialRange": {
+          "hunger": {
+            "min": 0.2,
+            "max": 0.6
+          },
+          "fatigue": {
+            "min": 0.1,
+            "max": 0.5
+          },
+          "comfort": {
+            "min": 0,
+            "max": 0.3
+          },
+          "social": {
+            "min": 0.1,
+            "max": 0.5
+          }
+        }
+      },
+      "work": {
+        "reconsiderEveryTicks": 10,
+        "switchCooldownSeconds": 2,
+        "claimLeaseSeconds": 4,
+        "timeBucketSeconds": 1,
+        "retryBackoffSeconds": 5,
+        "skillGainPerSecond": 0.0002,
+        "workSpeedPerSkillLevel": 0.08
+      },
+      "urgency": {
+        "needEssentialAbove": 0.7,
+        "needSurvivalAbove": 0.9,
+        "heatContainmentAbove": 0.7,
+        "heatSurvivalAbove": 0.9,
+        "routineAgingSeconds": 90
+      },
+      "equipment": {
+        "hazardScale": 1,
+        "overheatDamagePerSecond": 0.02,
+        "maintenanceConditionBelow": 0.3,
+        "integrityDerateBelow": 0.5,
+        "integrityInoperableBelow": 0.15
+      },
+      "power": {
+        "priorityOrder": ["lifeSupport", "criticalCooling", "propulsion", "domestic", "cargo"]
+      },
+      "travel": {
+        "prepareDepartureSeconds": 5,
+        "undockSeconds": 4,
+        "departSeconds": 5,
+        "approachSeconds": 8,
+        "dockSeconds": 5,
+        "nominalSpeed": 1,
+        "staffEstimateSeconds": 0,
+        "departureMinOutput": 0.5,
+        "recallAboardSeconds": 60,
+        "localShuffleSeconds": 8,
+        "dockHandGiveUpSeconds": 30
+      },
+      "commerce": {
+        "priceBands": {
+          "general": {
+            "min": 2,
+            "max": 5
+          },
+          "fragile": {
+            "min": 4,
+            "max": 9
+          },
+          "perishable": {
+            "min": 3,
+            "max": 7
+          },
+          "hazardous": {
+            "min": 6,
+            "max": 14
+          },
+          "passenger": {
+            "min": 6,
+            "max": 12
+          }
+        },
+        "jobOfferTtlSeconds": 600,
+        "dockingFee": 150,
+        "haulEstimateSeconds": 5,
+        "reofferSeconds": 90,
+        "maxCratesPerJob": 6,
+        "passage": {
+          "ashoreSecondsMin": 60,
+          "ashoreSecondsMax": 180,
+          "overdueSeconds": 120
+        },
+        "market": {
+          "priceTiers": {
+            "cheap": 0.6,
+            "fair": 1,
+            "dear": 1.6
+          },
+          "maxStockPerCommand": 4,
+          "defaultPrice": 100,
+          "buySeconds": 3
+        }
+      },
+      "narrator": {
+        "quietTooLongSeconds": 60,
+        "approachHookLeadSeconds": 10,
+        "maxSpawnsPerCommand": 3,
+        "maxFaultWindowSeconds": 90,
+        "spawnBudget": 3,
+        "faultBudget": 2,
+        "budgetRefillSeconds": 300,
+        "hookOnEvents": [
+          "driftingChanged",
+          "contractCompleted",
+          "departureRiskAccepted",
+          "departureHoldLifted",
+          "passengerReturned"
+        ]
+      },
+      "host": {
+        "runAheadCapSeconds": 60,
+        "snapshotRingSeconds": 90,
+        "snapshotEverySeconds": 1,
+        "localSaveEverySeconds": 10,
+        "remoteSaveEverySeconds": 60,
+        "frameEveryTicks": 2
+      },
+      "shifts": {
+        "cycleSeconds": 1200,
+        "shifts": [
+          {
+            "key": "alpha",
+            "workWindows": [[0, 600]]
+          },
+          {
+            "key": "beta",
+            "workWindows": [[600, 1200]]
+          },
+          {
+            "key": "gamma",
+            "workWindows": [[300, 900]]
+          }
+        ]
+      },
+      "social": {
+        "chatRadiusTiles": 2,
+        "chatCooldownSeconds": 45,
+        "templateLines": [
+          "{a} joked about the food",
+          "{b} complained about the docking fee",
+          "{a} asked {b} whether the coolant pump always sounds like that",
+          "{a} and {b} argued about the fastest route home",
+          "{a} told {b} a story about an old captain",
+          "{a} and {b} swapped gossip from the last port",
+          "{b} laughed at {a}'s joke about the engine",
+          "{a} wondered aloud what the next job pays"
+        ]
+      },
+      "events": {
+        "tickerMaxEntries": 30,
+        "traceRingSize": 1000
+      }
+    },
+    "state": {
+      "schemaVersion": 5,
+      "scenarioId": "scenario.default_freighter_run",
+      "seed": 11,
+      "tick": 1600,
+      "rng": {
+        "setup": [579729197, 3804436575, 2292900567, 2642480714],
+        "failures": [1582426525, 2602999351, 3919693342, 331545566],
+        "perception": [2529467439, 2466509179, 3806309496, 3389621],
+        "social": [4013384287, 356094304, 665230829, 3499190074],
+        "commerce": [2132857224, 449436560, 669363701, 3920415277],
+        "narrator": [1572061940, 3810428864, 2213785050, 3003456367]
+      },
+      "nextId": {
+        "actor": 9,
+        "machine": 18,
+        "item": 12,
+        "door": 11,
+        "compartment": 9,
+        "task": 1,
+        "problem": 1,
+        "job": 1,
+        "decision": 1,
+        "hook": 2,
+        "claim": 1,
+        "transaction": 2,
+        "event": 1,
+        "local": 3
+      },
+      "actors": {
+        "a1": {
+          "id": "a1",
+          "defId": "crew.mara_osei",
+          "name": "Mara Osei",
+          "roleTags": ["captain"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 2.5,
+            "y": 3.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0,
+            "fatigue": 0,
+            "comfort": 0.1,
+            "social": 0
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "piloting": 6,
+            "cargo": 2,
+            "engineering": 2,
+            "electrical": 1,
+            "medical": 1,
+            "cooking": 1
+          },
+          "traits": [],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "alpha"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a2": {
+          "id": "a2",
+          "defId": "crew.dane_whitcross",
+          "name": "Dane Whitcross",
+          "roleTags": ["firstOfficer"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 1.5,
+            "y": 2.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.13,
+            "fatigue": 0.21,
+            "comfort": 0.1,
+            "social": 0.17
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "piloting": 4,
+            "cargo": 2,
+            "engineering": 4,
+            "electrical": 3,
+            "medical": 2,
+            "cooking": 1
+          },
+          "traits": ["trait.steady", "trait.methodical"],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "beta"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a3": {
+          "id": "a3",
+          "defId": "crew.priya_kessler",
+          "name": "Priya Kessler",
+          "roleTags": ["engineer"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 26.5,
+            "y": 5.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.26,
+            "fatigue": 0.42,
+            "comfort": 0.1,
+            "social": 0.34
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "engineering": 8,
+            "electrical": 6,
+            "cargo": 2,
+            "piloting": 1,
+            "medical": 1,
+            "cooking": 1
+          },
+          "traits": ["trait.night_owl"],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "alpha"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a4": {
+          "id": "a4",
+          "defId": "crew.tomas_ruiz",
+          "name": "Tomas Ruiz",
+          "roleTags": ["engineer", "deckhand"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 28.5,
+            "y": 7.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.39,
+            "fatigue": 0.63,
+            "comfort": 0.1,
+            "social": 0.51
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "engineering": 5,
+            "electrical": 3,
+            "cargo": 4,
+            "piloting": 1,
+            "medical": 1,
+            "cooking": 1
+          },
+          "traits": ["trait.brisk_walker"],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "beta"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a5": {
+          "id": "a5",
+          "defId": "crew.jax_okonkwo",
+          "name": "Jax Okonkwo",
+          "roleTags": ["pilot"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 2.5,
+            "y": 1.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.52,
+            "fatigue": 0.84,
+            "comfort": 0.1,
+            "social": 0.68
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "piloting": 8,
+            "cargo": 2,
+            "engineering": 2,
+            "electrical": 1,
+            "medical": 1,
+            "cooking": 1
+          },
+          "traits": [],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "alpha"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a6": {
+          "id": "a6",
+          "defId": "crew.bettina_solheim",
+          "name": "Bettina Solheim",
+          "roleTags": ["cook"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 15.5,
+            "y": 3.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.65,
+            "fatigue": 0.10000000000000009,
+            "comfort": 0.1,
+            "social": 0.050000000000000044
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "cooking": 8,
+            "cargo": 2,
+            "medical": 2,
+            "engineering": 1,
+            "electrical": 1,
+            "piloting": 1
+          },
+          "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "gamma"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a7": {
+          "id": "a7",
+          "defId": "crew.oyelaran_abiodun",
+          "name": "Oyelaran Abiodun",
+          "roleTags": ["medic"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 22.5,
+            "y": 2.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.78,
+            "fatigue": 0.31000000000000005,
+            "comfort": 0.1,
+            "social": 0.21999999999999997
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "medical": 8,
+            "cargo": 2,
+            "cooking": 2,
+            "engineering": 1,
+            "electrical": 1,
+            "piloting": 2
+          },
+          "traits": [],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "gamma"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a8": {
+          "id": "a8",
+          "defId": "crew.sunniva_park",
+          "name": "Sunniva Park",
+          "roleTags": ["deckhand"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 12.5,
+            "y": 14.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.010000000000000009,
+            "fatigue": 0.52,
+            "comfort": 0.1,
+            "social": 0.3900000000000001
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "cargo": 8,
+            "engineering": 2,
+            "electrical": 1,
+            "medical": 1,
+            "cooking": 2,
+            "piloting": 1
+          },
+          "traits": [],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "beta"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        }
+      },
+      "compartments": {
+        "c1": {
+          "id": "c1",
+          "deckId": "deck.freighter_mk1",
+          "key": "bridge"
+        },
+        "c2": {
+          "id": "c2",
+          "deckId": "deck.freighter_mk1",
+          "key": "quarters"
+        },
+        "c3": {
+          "id": "c3",
+          "deckId": "deck.freighter_mk1",
+          "key": "galley"
+        },
+        "c4": {
+          "id": "c4",
+          "deckId": "deck.freighter_mk1",
+          "key": "infirmary"
+        },
+        "c5": {
+          "id": "c5",
+          "deckId": "deck.freighter_mk1",
+          "key": "engineering"
+        },
+        "c6": {
+          "id": "c6",
+          "deckId": "deck.freighter_mk1",
+          "key": "corridor"
+        },
+        "c7": {
+          "id": "c7",
+          "deckId": "deck.freighter_mk1",
+          "key": "cargoHold"
+        },
+        "c8": {
+          "id": "c8",
+          "deckId": "deck.freighter_mk1",
+          "key": "airlock"
+        }
+      },
+      "deck": {
+        "tiles": {
+          "deck.freighter_mk1": {}
+        },
+        "geometryRevision": 0
+      },
+      "doors": {
+        "d1": {
+          "id": "d1",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bridge_corridor",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d2": {
+          "id": "d2",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "personnel_ramp",
+          "kind": "ramp",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d3": {
+          "id": "d3",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "airlock_corridor",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d4": {
+          "id": "d4",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "quarters_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d5": {
+          "id": "d5",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "galley_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d6": {
+          "id": "d6",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "infirmary_corridor",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d7": {
+          "id": "d7",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "cargo_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d8": {
+          "id": "d8",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "engineering_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d9": {
+          "id": "d9",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "engineering_cargo",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d10": {
+          "id": "d10",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "cargo_ramp",
+          "kind": "ramp",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        }
+      },
+      "machines": {
+        "m1": {
+          "id": "m1",
+          "defId": "machine.bridge_console",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bridge_console_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.3029078997703903
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m2": {
+          "id": "m2",
+          "defId": "machine.engine",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "engine_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.38818549807361946
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m3": {
+          "id": "m3",
+          "defId": "machine.coolant_pump",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "coolant_pump_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.245587889675136
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m4": {
+          "id": "m4",
+          "defId": "machine.generator",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "generator_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 2.3739367507623608
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m5": {
+          "id": "m5",
+          "defId": "machine.battery_bank",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "battery_bank_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.1258116178592146
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "battery",
+            "storedKj": 36000
+          }
+        },
+        "m6": {
+          "id": "m6",
+          "defId": "machine.life_support",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "life_support_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.012435517521922904
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m7": {
+          "id": "m7",
+          "defId": "machine.galley_stove",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "galley_stove_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.13215645659348862
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m8": {
+          "id": "m8",
+          "defId": "machine.medbay_bed",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "medbay_bed_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.9848733404677422
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m9": {
+          "id": "m9",
+          "defId": "machine.cargo_crane",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "cargo_crane_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.9853492473151182
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m10": {
+          "id": "m10",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.8491935846448486
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m11": {
+          "id": "m11",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_2",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.07078346163140382
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m12": {
+          "id": "m12",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_3",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.1963123983014428
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m13": {
+          "id": "m13",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_4",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.2295634331868562
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m14": {
+          "id": "m14",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_5",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 2.1621322974281796
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m15": {
+          "id": "m15",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_6",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.17054418643246777
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m16": {
+          "id": "m16",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_7",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.21379056914568695
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m17": {
+          "id": "m17",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk1",
+          "placementKey": "bunk_8",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.48081646570250086
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        }
+      },
+      "power": {
+        "domains": {
+          "main": {
+            "key": "main",
+            "supplyKw": 0,
+            "demandKw": 0,
+            "batteryFlowKw": 0,
+            "tripped": false
+          }
+        }
+      },
+      "items": {
+        "i1": {
+          "id": "i1",
+          "defId": "item.old_photograph",
+          "stacking": "unique",
+          "location": {
+            "kind": "carriedBy",
+            "actorId": "a1"
+          },
+          "condition": 1
+        },
+        "i2": {
+          "id": "i2",
+          "defId": "item.toolkit",
+          "stacking": "unique",
+          "location": {
+            "kind": "carriedBy",
+            "actorId": "a3"
+          },
+          "condition": 1
+        },
+        "i3": {
+          "id": "i3",
+          "defId": "item.harmonica",
+          "stacking": "unique",
+          "location": {
+            "kind": "carriedBy",
+            "actorId": "a6"
+          },
+          "condition": 1
+        },
+        "i4": {
+          "id": "i4",
+          "defId": "item.toolkit",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "condition": 1
+        },
+        "i5": {
+          "id": "i5",
+          "defId": "item.toolkit",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 9.5,
+            "y": 12.5
+          },
+          "condition": 1
+        },
+        "i6": {
+          "id": "i6",
+          "defId": "item.spare_parts_stack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "count": 10,
+          "reserved": 0
+        },
+        "i7": {
+          "id": "i7",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i8": {
+          "id": "i8",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 9.5,
+            "y": 12.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i9": {
+          "id": "i9",
+          "defId": "item.coolant_canister",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "count": 4,
+          "reserved": 0
+        },
+        "i10": {
+          "id": "i10",
+          "defId": "item.med_kit",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "count": 3,
+          "reserved": 0
+        },
+        "i11": {
+          "id": "i11",
+          "defId": "item.hand_truck",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk1",
+            "x": 8.5,
+            "y": 12.5
+          },
+          "condition": 1
+        }
+      },
+      "work": {
+        "problems": {},
+        "tasks": {},
+        "claims": {},
+        "plannerRotation": 0
+      },
+      "travel": {
+        "stage": "transit",
+        "fromPortId": "port.crossroads_hub",
+        "toPortId": "port.kessler_drift",
+        "stageProgress": 0.6,
+        "routeProgress": 15,
+        "routeDistance": 25,
+        "drifting": false,
+        "stageStartedTick": 1400,
+        "staging": {
+          "status": "raised",
+          "hookId": "k1"
+        }
+      },
+      "jobs": {},
+      "money": {
+        "balance": 5000,
+        "transactions": {
+          "n1": {
+            "id": "n1",
+            "tick": 0,
+            "amount": 5000,
+            "reason": "scenario"
+          }
+        }
+      },
+      "markets": {
+        "port.crossroads_hub": {
+          "item.spare_parts_stack": {
+            "count": 4,
+            "price": 120
+          },
+          "item.coolant_canister": {
+            "count": 3,
+            "price": 60
+          },
+          "item.ration_pack": {
+            "count": 20,
+            "price": 8
+          },
+          "item.med_kit": {
+            "count": 2,
+            "price": 90
+          }
+        },
+        "port.kessler_drift": {
+          "item.spare_parts_stack": {
+            "count": 1,
+            "price": 180
+          },
+          "item.coolant_canister": {
+            "count": 2,
+            "price": 75
+          }
+        },
+        "port.green_meridian": {
+          "item.spare_parts_stack": {
+            "count": 0,
+            "price": 150
+          },
+          "item.ration_pack": {
+            "count": 30,
+            "price": 6
+          }
+        },
+        "port.ossory_station": {
+          "item.spare_parts_stack": {
+            "count": 6,
+            "price": 70
+          },
+          "item.welder_torch": {
+            "count": 1,
+            "price": 220
+          },
+          "item.coolant_canister": {
+            "count": 0,
+            "price": 110
+          },
+          "item.ration_pack": {
+            "count": 6,
+            "price": 14
+          }
+        },
+        "port.vesper_gate": {
+          "item.med_kit": {
+            "count": 5,
+            "price": 55
+          },
+          "item.ration_pack": {
+            "count": 12,
+            "price": 9
+          },
+          "item.spare_parts_stack": {
+            "count": 0,
+            "price": 240
+          }
+        },
+        "port.terns_rest": {
+          "item.ration_pack": {
+            "count": 10,
+            "price": 12
+          },
+          "item.coolant_canister": {
+            "count": 1,
+            "price": 95
+          },
+          "item.spare_parts_stack": {
+            "count": 1,
+            "price": 210
+          },
+          "item.med_kit": {
+            "count": 1,
+            "price": 130
+          }
+        }
+      },
+      "dockside": {
+        "locals": {},
+        "props": []
+      },
+      "decisions": {
+        "records": {},
+        "queue": []
+      },
+      "narrator": {
+        "lastNarrativeTick": 1600,
+        "budget": {
+          "spawnsRemaining": 3,
+          "faultsRemaining": 2
+        },
+        "recentHookIds": [],
+        "pendingHook": {
+          "id": "k1",
+          "kind": "stageDock",
+          "context": {
+            "portId": "port.kessler_drift",
+            "dockId": "dock.kessler_drift",
+            "floorSet": [
+              {
+                "name": "Greta Lindholm",
+                "role": "shift foreman",
+                "postKey": "shift_board",
+                "reason": {
+                  "kind": "regular"
+                }
+              },
+              {
+                "name": "Osric Tan",
+                "role": "assay clerk",
+                "postKey": "assay_window",
+                "reason": {
+                  "kind": "regular"
+                }
+              }
+            ]
+          },
+          "tick": 1600
+        }
+      },
+      "commands": {
+        "queue": [],
+        "recentIds": ["cmd:scenario:scenario.default_freighter_run:0"],
+        "nextSeq": 1
+      },
+      "defs": {
+        "dynamic": {
+          "items": {},
+          "crew": {}
+        }
+      }
+    }
+  },
+  "recentEvents": [
+    {
+      "id": "evt1",
+      "tick": 900,
+      "seq": 0,
+      "type": "departed",
+      "subjectIds": [],
+      "causeIds": [],
+      "source": "sim",
+      "significance": "narrative",
+      "payload": {
+        "fromPortId": "port.crossroads_hub",
+        "toPortId": "port.kessler_drift"
+      }
+    }
+  ]
+}

@@ -5,7 +5,17 @@ import type { CommandDraft } from "./commands";
  * W2 wires `resolveDecision` through the command path).
  */
 import type { TextRef, Tick } from "./common";
-import type { ActorId, DecisionId, EventId, HookId, JobId, MachineId, PortDefId } from "./ids";
+import type { FloorSetEntry } from "./dockside";
+import type {
+  ActorId,
+  DecisionId,
+  DockDefId,
+  EventId,
+  HookId,
+  JobId,
+  MachineId,
+  PortDefId,
+} from "./ids";
 
 // ---------------------------------------------------------------------------------------------
 // Decisions
@@ -68,7 +78,15 @@ export interface DecisionsState {
 
 /** Per-kind context the kernel attaches so the narrator digest knows why it was called. */
 export interface HookContexts {
-  approachingPort: { portId: PortDefId; etaTicks: number };
+  /**
+   * D66 (replaces `approachingPort`): the staging call, raised `narrator.approachHookLeadSeconds`
+   * before transit ends at a port with a dock map, and guaranteed: travel holds at the end of the
+   * route until it is acknowledged. Its only story-free answer is one `stageDock` command
+   * (`STAGING_COMMAND_KINDS`); the kernel rejects every other narrator command while it is
+   * pending. `floorSet` is who the sim will place on its own (`core/floor-set.ts`), as it stands
+   * at the raise tick.
+   */
+  stageDock: { portId: PortDefId; dockId: DockDefId; floorSet: FloorSetEntry[] };
   jobBoard: { portId: PortDefId };
   quietTooLong: { quietSinceTick: Tick };
   notableEvent: { eventIds: EventId[] };

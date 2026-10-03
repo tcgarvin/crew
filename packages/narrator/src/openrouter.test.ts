@@ -6,7 +6,7 @@
 import type { CommandId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
-import { approachingPortRequest } from "./fixtures";
+import { approachRequest } from "./fixtures";
 import { openRouterTransport, schemaInstruction, systemContentParts } from "./openrouter";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { STATIC_RULES } from "./prompts/index";
@@ -37,8 +37,9 @@ function recordingFetch() {
 
 /** The same game later on: docked, time moved on, a fault scheduled, different notes and hook. */
 function laterInTheSameGame(req: NarratorRequest): NarratorRequest {
-  if (req.hook.kind !== "approachingPort") throw new Error("expected an arrival fixture");
-  const portId = req.hook.context.portId;
+  const travel = req.snapshot.state.travel;
+  if (travel.stage === "docked") throw new Error("expected an approach fixture");
+  const portId = travel.toPortId;
   const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
   const state = snapshot.state;
   state.tick += 2_400;
@@ -65,7 +66,7 @@ describe("OpenRouter prompt caching", () => {
   it("two calls for the same game share the system prefix byte for byte", async () => {
     const { bodies, fetch } = recordingFetch();
     const transport = openRouterTransport({ apiKey: "test", fetch });
-    const first = approachingPortRequest(content());
+    const first = approachRequest(content());
     const second = laterInTheSameGame(first);
     const notes = {
       summary: "They owe the Guild a favour.",
@@ -94,7 +95,7 @@ describe("OpenRouter prompt caching", () => {
 
   it("puts the game-independent rules first, then the game's capability list", async () => {
     const { bodies, fetch } = recordingFetch();
-    await runNarrator(approachingPortRequest(content()), {
+    await runNarrator(approachRequest(content()), {
       gameId: "g1",
       content: content(),
       transport: openRouterTransport({ apiKey: "test", fetch }),
@@ -123,7 +124,7 @@ describe("OpenRouter prompt caching", () => {
 describe("OpenRouter plan schema (D53)", () => {
   it("sends the schema as the last cached system block, not as a response_format grammar", async () => {
     const { bodies, fetch } = recordingFetch();
-    await runNarrator(approachingPortRequest(content()), {
+    await runNarrator(approachRequest(content()), {
       gameId: "g1",
       content: content(),
       transport: openRouterTransport({ apiKey: "test", fetch }),
