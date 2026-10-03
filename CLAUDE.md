@@ -29,9 +29,16 @@ Claude owns deployment and environment setup; the user supplies logins and API k
 IDs, new-machine setup, common commands, and what needs the user are in the "Operations
 reference" section of `docs/DEPLOYMENT.md` — read it before any deploy or database work.
 
+Delegate routine ops to the `ops` subagent (`.claude/agents/ops.md`, Haiku) rather than running
+them in the main conversation: pushing committed work and verifying CI, the Vercel deploy, and the
+health check; status checks; pruning preview databases. Call it yourself once work is committed
+and checks pass — don't ask the user to. Tell it the branch, and say explicitly when a push to
+`main` (production) is intended. Relay its report, including any failure.
+
 - Vercel project `crew` (team `tims-projects-6bc94f1b`), linked in `.vercel/` and Git-connected to
   `github.com/tcgarvin/crew`: push to `main` = production deploy, other branches = previews,
-  each on its own Neon branch `preview/<git-branch>` (delete it with `neonctl` when the branch is done). Build steps
+  each on its own Neon branch `preview/<git-branch>` (`scripts/prune-preview-dbs.sh` finds and
+  deletes the stale ones). Build steps
   are in `vercel.json` and explained in `docs/DEPLOYMENT.md`. Migrations run in the Vercel build,
   which is the only path that changes the prod schema.
 - Neon Postgres, provisioned through the Vercel Marketplace. Its env vars are marked sensitive
