@@ -9,12 +9,14 @@
     {
       "name": "Greta Lindholm",
       "role": "shift foreman",
-      "note": "Big, tired and fair; she decides which hauler loads first and nobody argues twice."
+      "note": "Big, tired and fair; she decides which hauler loads first and nobody argues twice.",
+      "post": "shift_board"
     },
     {
       "name": "Osric Tan",
       "role": "assay clerk",
-      "note": "Precise to the gram, keeps a private ledger of who shorted whom, and will share it for a favour."
+      "note": "Precise to the gram, keeps a private ledger of who shorted whom, and will share it for a favour.",
+      "post": "assay_window"
     },
     {
       "name": "Marisol Kemp",

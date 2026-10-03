@@ -10,7 +10,7 @@
  * normalised units where 1.0 is the machine's failure temperature. The kernel converts seconds
  * to ticks with ceil.
  */
-import type { Rotation, Seconds, TileCoord, TileEdge } from "./common";
+import type { EdgeSide, Rotation, Seconds, TileCoord, TileEdge } from "./common";
 import type {
   CrewDefId,
   DeckDefId,
@@ -210,26 +210,136 @@ export interface DockingInterfaceDef {
   readonly personnelTransferTiles: readonly TileCoord[];
 }
 
+// ---------------------------------------------------------------------------------------------
+// Dock maps (Dockside §3, docs/design/dockside.md)
+// ---------------------------------------------------------------------------------------------
+
+/** What a dock map tile is. Only `floor` is walkable, and only where no blocking prop stands. */
+export const DOCK_TILE_KINDS = ["floor", "wall", "void", "berth"] as const;
+export type DockTileKind = (typeof DOCK_TILE_KINDS)[number];
+
+/** Where a local stands. The gate and warehouse door are the edge of the simulated world. */
+export const DOCK_POST_KINDS = [
+  "gate",
+  "warehouseDoor",
+  "marketStall",
+  "kiosk",
+  "loungeDoor",
+  "bench",
+] as const;
+export type DockPostKind = (typeof DOCK_POST_KINDS)[number];
+
+/** Freight on offer waits on `freightStaging`; a delivery is complete once it is all in `deliveryBay`. */
+export const DOCK_AREA_KINDS = ["freightStaging", "deliveryBay"] as const;
+export type DockAreaKind = (typeof DOCK_AREA_KINDS)[number];
+
+/** Set dressing on the dock floor; the renderer draws each kind procedurally. */
+export const DOCK_PROP_KINDS = [
+  "crates",
+  "container",
+  "crane",
+  "hullSection",
+  "planter",
+  "conveyor",
+  "bollard",
+  "lamp",
+  "barrels",
+  "rock",
+] as const;
+export type DockPropKind = (typeof DOCK_PROP_KINDS)[number];
+
+/** Drawn over the deck, semi-transparent where it crosses the ship (Dockside §2.3, layer 7). */
+export const DOCK_FOREGROUND_KINDS = [
+  "bayWall",
+  "gantry",
+  "terminalEdge",
+  "awning",
+  "rockWall",
+] as const;
+export type DockForegroundKind = (typeof DOCK_FOREGROUND_KINDS)[number];
+
+export const DOCK_SETTINGS = ["station", "planet"] as const;
+export type DockSetting = (typeof DOCK_SETTINGS)[number];
+
+/** A tile rectangle in the dock map's frame: `w` × `h` tiles from (x, y). */
+export interface DockRect {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** CSS hex colours (`#rrggbb`). `sky` is required for a planet and absent for a station. */
+export interface DockPaletteDef {
+  readonly floor: string;
+  readonly wall: string;
+  readonly accent: string;
+  readonly sky?: string;
+}
+
+export interface DockPostDef {
+  readonly key: LocalKey;
+  readonly kind: DockPostKind;
+  /** What the inspector and narrator call it: "the queue-board kiosk". */
+  readonly name: string;
+  /** The floor tile a local stands on. */
+  readonly tile: TileCoord;
+  /** Which way someone at the post faces. */
+  readonly facing: EdgeSide;
+}
+
+export interface DockAreaDef {
+  readonly key: LocalKey;
+  readonly kind: DockAreaKind;
+  /** Every tile is walkable floor. */
+  readonly rect: DockRect;
+}
+
+export interface DockPropDef {
+  readonly key: LocalKey;
+  readonly kind: DockPropKind;
+  readonly rect: DockRect;
+  /** Drawing orientation only; `rect` is the tiles the prop covers. */
+  readonly rot: Rotation;
+  /** A blocking prop's tiles are not walkable, whatever the legend says beneath it. */
+  readonly blocking: boolean;
+}
+
+export interface DockForegroundDef {
+  readonly kind: DockForegroundKind;
+  readonly rect: DockRect;
+}
+
 /**
- * Dockside spike (docs/design/dockside-spike.md): the part of a port's dock map that navigation
- * needs. Phase 2's `DockDef` (rows + legend, posts, areas, props, palette) is the authored form;
- * this is derived from it. Coordinates are in the dock map's own frame.
+ * A port's dock map (Dockside §3.1): `packages/content/data/docks/<port>.json`. Coordinates are
+ * in the map's own frame; the sim grafts the map onto the ship's deck at `shipAt`
+ * (`systems/spatial/dock.ts`, docs/design/dockside-spike.md), so dock tile (x, y) is deck tile
+ * (x − shipAt.x, y − shipAt.y). Walkable dock floor is a `floor` tile under no blocking prop
+ * (`dockFloorMask` in `systems/spatial/geometry.ts`; content validation applies the same rule).
  *
- * Ramp landings are not listed: the dock is grafted into the deck's frame at `shipAt`, so each
- * ramp door lands on the dock tile across its hull edge (`systems/spatial/dock.ts`
- * `rampLandings`), and the nav builder throws if that tile is not dock floor.
+ * Ramp landings are not listed: each ramp door lands on the dock tile across its hull edge, and
+ * both content validation and the nav builder require that tile to be walkable floor. Maps are
+ * authored against Freighter Mk1's footprint and ramps; other ship classes are deferred (§3.1).
  */
-export interface DockLayout {
+export interface DockDef {
   readonly id: DockDefId;
+  readonly portId: PortDefId;
+  readonly name: string;
+  readonly setting: DockSetting;
+  readonly palette: DockPaletteDef;
   readonly width: number;
   readonly height: number;
-  /**
-   * `height` rows of `width` characters: `.` is walkable dock floor; anything else (wall, void,
-   * berth, blocking prop) is not. Dock floor may not overlap the ship's floor.
-   */
+  /** `height` rows of `width` characters, each a key of `legend`. */
   readonly rows: readonly string[];
-  /** Dock tile under deck tile (0,0): deck (x, y) is dock (x + shipAt.x, y + shipAt.y). */
+  readonly legend: Readonly<Record<string, DockTileKind>>;
+  /** Dock tile under deck tile (0,0). The `berth` tiles are exactly the ship's floor from there. */
   readonly shipAt: TileCoord;
+  readonly posts: readonly DockPostDef[];
+  readonly areas: readonly DockAreaDef[];
+  readonly props: readonly DockPropDef[];
+  readonly foreground: readonly DockForegroundDef[];
+  /** One line the narrator sees about the place. */
+  readonly ambience: string;
 }
 
 export interface SpawnPointDef {
@@ -495,6 +605,8 @@ export interface CastSeedDef {
   readonly role: string;
   /** One sentence: what they are like or what they are after. */
   readonly note: string;
+  /** Dockside §5.2: the key of the post on this port's dock map where they stand when you land. */
+  readonly post?: LocalKey;
 }
 
 export interface ExternalStoreDef {
@@ -831,10 +943,10 @@ export interface ContentBundle {
    */
   readonly people?: PeopleTableDef;
   /**
-   * Dockside spike: walkable dock layouts by id. Optional and unused by authored content until
-   * phase 2 adds `DockDef` (whose nav subset this is); see docs/design/dockside-spike.md.
+   * Dockside §3: dock maps by id, at most one per port. Optional so hand-built test bundles need
+   * not carry any; a port without one keeps the transfer-tile behaviour.
    */
-  readonly docks?: Readonly<Record<DockDefId, DockLayout>>;
+  readonly docks?: Readonly<Record<DockDefId, DockDef>>;
   readonly config: ConfigDef;
   readonly hash: string;
 }

@@ -10,8 +10,10 @@ export { VIEW_PLACEHOLDER } from "./view/index";
  * make this file's build depend on their in-progress state. Add names here as a host needs them.
  */
 export {
+  checkDockFitsDeck,
   compartmentAt,
   deckGeometry,
+  dockFloorMask,
   isWalkable,
   registerSpatial,
   requestMove,

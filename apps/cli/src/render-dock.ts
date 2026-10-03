@@ -1,0 +1,152 @@
+/**
+ * ASCII rendering for a `DockDef` with the ship composited at `shipAt` (used by
+ * `crew content render-dock`, which writes it into the README next to each dock file under
+ * `packages/content/data/docks/`).
+ */
+import type { DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
+
+const BASE_CHAR: Readonly<Record<string, string>> = {
+  floor: ".",
+  wall: "#",
+  void: " ",
+  berth: "=",
+};
+
+const AREA_CHAR: Readonly<Record<DockDef["areas"][number]["kind"], string>> = {
+  freightStaging: "s",
+  deliveryBay: "d",
+};
+
+const POST_CHARS = "123456789abcefghijklmnopqrtuwyz";
+
+function rectTiles(rect: DockRect): TileCoord[] {
+  const tiles: TileCoord[] = [];
+  for (let y = rect.y; y < rect.y + rect.h; y++) {
+    for (let x = rect.x; x < rect.x + rect.w; x++) tiles.push({ x, y });
+  }
+  return tiles;
+}
+
+function rectText(rect: DockRect): string {
+  return `(${rect.x},${rect.y}) ${rect.w} x ${rect.h}`;
+}
+
+/** Dock-frame landing tile of each ramp door on the deck. */
+export function rampLandings(dock: DockDef, deck: DeckDef): { key: string; tile: TileCoord }[] {
+  const delta = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
+  return deck.doors
+    .filter((door) => door.kind === "ramp")
+    .map((door) => {
+      const [dx, dy] = delta[door.edge.side];
+      return {
+        key: door.key,
+        tile: { x: door.edge.x + dx + dock.shipAt.x, y: door.edge.y + dy + dock.shipAt.y },
+      };
+    });
+}
+
+/** The map grid with the ship, areas, props, landings and posts drawn in, plus rulers. */
+function compositeMap(dock: DockDef, deck: DeckDef): string[] {
+  const grid = dock.rows.map((row) =>
+    [...row].map((ch) => BASE_CHAR[dock.legend[ch] ?? ""] ?? "?"),
+  );
+  const put = (t: TileCoord, ch: string) => {
+    const row = grid[t.y];
+    if (row !== undefined && t.x >= 0 && t.x < row.length) row[t.x] = ch;
+  };
+  deck.tiles.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (ch !== " ") put({ x: x + dock.shipAt.x, y: y + dock.shipAt.y }, ch);
+    });
+  });
+  for (const area of dock.areas) {
+    for (const t of rectTiles(area.rect)) put(t, AREA_CHAR[area.kind]);
+  }
+  for (const prop of dock.props) {
+    for (const t of rectTiles(prop.rect)) put(t, prop.blocking ? "%" : ":");
+  }
+  for (const landing of rampLandings(dock, deck)) put(landing.tile, "v");
+  dock.posts.forEach((post, i) => put(post.tile, POST_CHARS[i] ?? "*"));
+
+  const xs = [...Array(dock.width).keys()];
+  const tens = xs.map((x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : " ")).join("");
+  const units = xs.map((x) => String(x % 10)).join("");
+  return [
+    `   ${tens}`.trimEnd(),
+    `   ${units}`,
+    ...grid.map((row, y) => `${String(y).padStart(2, " ")} ${row.join("")}`.trimEnd()),
+  ];
+}
+
+/** Renders the dock map with the ship docked, and every post, area, prop and landing listed. */
+export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string {
+  const lines: string[] = [];
+  lines.push(`${dock.name} (${dock.id})`);
+  lines.push(`${dock.setting} dock for ${port.name} (${port.id})`);
+  lines.push(
+    `${dock.width} x ${dock.height} tiles; ${deck.name} (${deck.id}) docked at (${dock.shipAt.x},${dock.shipAt.y})`,
+  );
+  lines.push("");
+  lines.push(...compositeMap(dock, deck));
+  lines.push("");
+  lines.push("Key:");
+  lines.push("  .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)");
+  lines.push("  v  ramp landing     s  freight staging     d  delivery bay");
+  lines.push("  %  blocking prop    :  prop you can walk past    1-9  posts (below)");
+  lines.push("");
+  lines.push(`Posts (${dock.posts.length}):`);
+  dock.posts.forEach((post, i) => {
+    const regulars = port.castSeed.filter((seed) => seed.post === post.key).map((s) => s.name);
+    const who = regulars.length > 0 ? `; regular: ${regulars.join(", ")}` : "";
+    lines.push(
+      `  ${POST_CHARS[i] ?? "*"}  ${post.key}: ${post.kind}, ${post.name}, at (${post.tile.x},${post.tile.y}) facing ${post.facing}${who}`,
+    );
+  });
+  lines.push("");
+  lines.push("Ramp landings:");
+  for (const landing of rampLandings(dock, deck)) {
+    lines.push(`  ${landing.key}: (${landing.tile.x},${landing.tile.y})`);
+  }
+  lines.push("");
+  lines.push(`Areas (${dock.areas.length}):`);
+  for (const area of dock.areas) {
+    lines.push(`  ${area.key}: ${area.kind} ${rectText(area.rect)}`);
+  }
+  lines.push("");
+  lines.push(`Props (${dock.props.length}):`);
+  for (const prop of dock.props) {
+    const blocking = prop.blocking ? ", blocking" : "";
+    lines.push(`  ${prop.key}: ${prop.kind} ${rectText(prop.rect)} rot=${prop.rot}${blocking}`);
+  }
+  lines.push("");
+  lines.push(`Foreground (${dock.foreground.length}):`);
+  for (const fg of dock.foreground) lines.push(`  ${fg.kind} ${rectText(fg.rect)}`);
+  lines.push("");
+  const p = dock.palette;
+  const sky = p.sky !== undefined ? `, sky ${p.sky}` : "";
+  lines.push(`Palette: floor ${p.floor}, wall ${p.wall}, accent ${p.accent}${sky}`);
+  return lines.join("\n");
+}
+
+/** The README written next to the dock's JSON file. */
+export function renderDockReadme(
+  dock: DockDef,
+  deck: DeckDef,
+  port: PortDef,
+  fileName: string,
+): string {
+  return [
+    `# ${dock.name}: dock map`,
+    "",
+    `Generated by \`crew content render-dock ${dock.id}\` from \`${fileName}\`; do not edit by hand.`,
+    "Regenerate after any change to the map or the deck (a CLI test fails while this is stale).",
+    "West (low x) is fore. The ship's ramps open on its south flank onto the quay.",
+    "",
+    `> ${dock.ambience}`,
+    "",
+    "```",
+    renderDock(dock, deck, port),
+    "```",
+    "",
+  ].join("\n");
+}

@@ -89,9 +89,9 @@
     {
       "key": "personnel_ramp",
       "edge": {
-        "x": 0,
-        "y": 13,
-        "side": "w"
+        "x": 2,
+        "y": 17,
+        "side": "s"
       },
       "kind": "ramp",
       "powerDomain": "main",
@@ -647,8 +647,8 @@
     ],
     "personnelTransferTiles": [
       {
-        "x": 1,
-        "y": 13
+        "x": 2,
+        "y": 16
       }
     ]
   },
@@ -720,8 +720,8 @@
     {
       "key": "spawn_passenger_1",
       "tile": {
-        "x": 1,
-        "y": 13
+        "x": 2,
+        "y": 16
       },
       "tags": ["passenger"]
     },

@@ -1,0 +1,253 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.crossroads_hub",
+  "portId": "port.crossroads_hub",
+  "name": "Crossroads Hub, Bay 14",
+  "setting": "station",
+  "palette": {
+    "floor": "#3a4150",
+    "wall": "#1d222c",
+    "accent": "#f2a93b"
+  },
+  "width": 38,
+  "height": 28,
+  "rows": [
+    "######################################",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "......................................",
+    "......................................",
+    "......................................",
+    "......................................",
+    "......................................",
+    "......................................",
+    "......................................",
+    "...............#...............#......",
+    "######################################"
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "B": "berth"
+  },
+  "shipAt": {
+    "x": 3,
+    "y": 1
+  },
+  "posts": [
+    {
+      "key": "queue_kiosk",
+      "kind": "kiosk",
+      "name": "the queue-board kiosk",
+      "tile": {
+        "x": 10,
+        "y": 21
+      },
+      "facing": "n"
+    },
+    {
+      "key": "night_stall",
+      "kind": "marketStall",
+      "name": "the night-market stall",
+      "tile": {
+        "x": 1,
+        "y": 24
+      },
+      "facing": "e"
+    },
+    {
+      "key": "lounge_gate",
+      "kind": "gate",
+      "name": "the transit lounge gate",
+      "tile": {
+        "x": 6,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "dispatch",
+      "kind": "warehouseDoor",
+      "name": "the Co-op dispatch window",
+      "tile": {
+        "x": 24,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "bench",
+      "kind": "bench",
+      "name": "the bench by the lounge gate",
+      "tile": {
+        "x": 10,
+        "y": 26
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [
+    {
+      "key": "staging",
+      "kind": "freightStaging",
+      "rect": {
+        "x": 19,
+        "y": 22,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "key": "delivery",
+      "kind": "deliveryBay",
+      "rect": {
+        "x": 26,
+        "y": 22,
+        "w": 4,
+        "h": 3
+      }
+    }
+  ],
+  "props": [
+    {
+      "key": "crates_aft",
+      "kind": "crates",
+      "rect": {
+        "x": 32,
+        "y": 21,
+        "w": 3,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "crates_corner",
+      "kind": "crates",
+      "rect": {
+        "x": 35,
+        "y": 24,
+        "w": 2,
+        "h": 2
+      },
+      "rot": 90,
+      "blocking": true
+    },
+    {
+      "key": "container_aft",
+      "kind": "container",
+      "rect": {
+        "x": 33,
+        "y": 25,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "drums",
+      "kind": "barrels",
+      "rect": {
+        "x": 13,
+        "y": 24,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "bollard_fore",
+      "kind": "bollard",
+      "rect": {
+        "x": 0,
+        "y": 19,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "bollard_aft",
+      "kind": "bollard",
+      "rect": {
+        "x": 37,
+        "y": 19,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "lamp_stall",
+      "kind": "lamp",
+      "rect": {
+        "x": 0,
+        "y": 26,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    }
+  ],
+  "foreground": [
+    {
+      "kind": "bayWall",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 38,
+        "h": 1
+      }
+    },
+    {
+      "kind": "gantry",
+      "rect": {
+        "x": 12,
+        "y": 0,
+        "w": 1,
+        "h": 19
+      }
+    },
+    {
+      "kind": "gantry",
+      "rect": {
+        "x": 28,
+        "y": 0,
+        "w": 1,
+        "h": 19
+      }
+    },
+    {
+      "kind": "terminalEdge",
+      "rect": {
+        "x": 0,
+        "y": 27,
+        "w": 38,
+        "h": 1
+      }
+    }
+  ],
+  "ambience": "Announcements every ninety seconds, the queue board flickering amber over the ramps, and somebody else's freight stacked wherever it fits."
+}

@@ -81,6 +81,11 @@ nav cache, and the code that equates `onDeck` with aboard has to be swept (§4).
 
 ### 3.1 Data shapes
 
+Since the spike, phase 2 replaced `DockLayout` with the authored `DockDef` itself:
+`ContentBundle.docks` holds `DockDef`s, and the graft reads walkability through
+`dockFloorMask(def)` (a `floor` legend tile under no blocking prop) instead of `.` rows. The
+shapes below are as the spike built them.
+
 ```ts
 // core/types/content.ts — the nav subset of phase 2's DockDef, in the dock's own frame
 interface DockLayout {

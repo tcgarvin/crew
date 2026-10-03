@@ -8,6 +8,7 @@ import { contentBundleSchema } from "./bundle";
 import { configDefSchema } from "./config";
 import { crewDefSchema, traitDefSchema } from "./crew";
 import { deckDefSchema } from "./deck";
+import { dockDefSchema } from "./dock";
 import { itemDefSchema } from "./item";
 import { machineDefSchema } from "./machine";
 import { peopleTableDefSchema } from "./people";
@@ -18,6 +19,7 @@ export * from "./bundle";
 export * from "./config";
 export * from "./crew";
 export * from "./deck";
+export * from "./dock";
 export * from "./item";
 export * from "./machine";
 export * from "./people";
@@ -25,6 +27,7 @@ export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
 export * from "./validate";
+export { DOCK_MAX_HEIGHT, DOCK_MAX_WIDTH, dockOfPort, dockWalkableMask } from "./validate-dock";
 
 /** Every def schema by name; the JSON Schema export and tests iterate this. */
 export const DEF_SCHEMAS = {
@@ -37,6 +40,7 @@ export const DEF_SCHEMAS = {
   scenario: scenarioDefSchema,
   people: peopleTableDefSchema,
   config: configDefSchema,
+  dock: dockDefSchema,
   bundle: contentBundleSchema,
 } as const;
 

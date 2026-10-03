@@ -531,3 +531,17 @@ raising them. Dock layouts carry no ramp landings; each ramp lands on the dock t
 hull edge. A multi-deck ship would still want portals between decks; this does not preclude
 them. Departure prep runs its 5 s clock while the ramps retract and only waits on them if it would
 otherwise end with one still down, since they used to be shut long before prep began.
+
+**D60. A dock map is authored content the sim reads directly.** `DockDef` (one per port,
+`packages/content/data/docks/`) replaces the spike's `DockLayout`: there is no separate nav
+layout and no conversion step. Walkable means a `floor` legend tile under no blocking prop. Areas,
+props and foreground are rects; props and foreground use closed kind vocabularies so the renderer
+knows what it must draw. Content validates the geometry as plain grid checks (berth tiles are
+exactly the ship's floor at `shipAt`, ramps land on walkable floor outside any area, every post
+and area is reachable from every landing, one gate, warehouse door, staging area and delivery bay,
+at most one stall, a 48×36 cap); because content may only import types from sim, the walkable
+rule is written twice, so `crew content validate` also grafts each dock with the sim's own
+builder and a test keeps the two masks identical. `castSeed[].post` names a post on the port's
+dock; every port has at least one posted regular. The personnel ramp moved to the airlock's south
+wall at (2,17), so both ramps face the quay. Kessler Drift has no stall (its market is through the
+gate); Vesper Gate's chapel doors are its gate.

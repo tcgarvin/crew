@@ -15,10 +15,13 @@ import { DECK12, JON, MARA, place } from "./fixtures/deck-12x8";
 import { DOCK, dockedWorld, rampDeckWorld, rampIds, setRamps } from "./fixtures/dock";
 import { stepChecked } from "./fixtures/helpers";
 import {
+  checkDockFitsDeck,
   compartmentAt,
   deckGeometry,
+  dockFloorMask,
   doorBetween,
   hasWall,
+  isDockFloor,
   isDockTile,
   isStaticFloor,
 } from "./geometry";
@@ -155,6 +158,34 @@ describe("dock graft geometry", () => {
       expect(test.world.state.deck.geometryRevision).toBe(revision);
       expect(deckGeometry(test.world.caches, DECK12.deck).width).toBe(12);
     }
+  });
+
+  it("treats a tile under a blocking prop as no floor, and one under a passable prop as floor", () => {
+    const test = dockedWorld();
+    const geometry = deckGeometry(test.world.caches, DECK12.deck);
+    const quay = test.world.content.docks?.[DOCK.id];
+    if (quay === undefined) throw new Error("fixture lost the quay");
+    // The crate stack covers dock (6..8, 10): deck (4..6, 9).
+    expect(isDockFloor(quay, 7, 10)).toBe(false);
+    expect(isDockTile(geometry, 5, 9)).toBe(false);
+    expect(isDockTile(geometry, 7, 9)).toBe(true);
+    const lamp = {
+      ...quay,
+      props: quay.props.map((p) => ({ ...p, blocking: false })),
+    };
+    expect(isDockFloor(lamp, 7, 10)).toBe(true);
+    expect(dockFloorMask(lamp)[10 * quay.width + 7]).toBe(1);
+  });
+
+  it("checks a dock against a bare deck def, with no world, as content validation does", () => {
+    const content = rampDeckWorld().world.content;
+    expect(() => checkDockFitsDeck(content, DECK12.deck, DOCK.id)).not.toThrow();
+    const quay = content.docks?.[DOCK.id];
+    if (quay === undefined) throw new Error("fixture lost the quay");
+    const blind = { ...quay, rows: quay.rows.map((r, y) => (y === 8 ? "#".repeat(16) : r)) };
+    expect(() =>
+      checkDockFitsDeck({ ...content, docks: { [DOCK.id]: blind } }, DECK12.deck, DOCK.id),
+    ).toThrow(/ramp "cargoRamp" does not open onto dock floor/);
   });
 });
 

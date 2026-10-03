@@ -39,6 +39,10 @@
           "note": {
             "type": "string",
             "minLength": 1
+          },
+          "post": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
           }
         },
         "required": ["name", "role", "note"],

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { configDefSchema } from "./config";
 import { crewDefSchema, traitDefSchema } from "./crew";
 import { deckDefSchema } from "./deck";
+import { dockDefSchema } from "./dock";
 import { itemDefSchema } from "./item";
 import { machineDefSchema } from "./machine";
 import { peopleTableDefSchema } from "./people";
@@ -11,6 +12,7 @@ import { portDefSchema } from "./port";
 import {
   crewDefIdSchema,
   deckDefIdSchema,
+  dockDefIdSchema,
   itemDefIdSchema,
   machineDefIdSchema,
   portDefIdSchema,
@@ -29,6 +31,8 @@ export const contentBundleSchema = z.strictObject({
   scenarios: z.record(scenarioDefIdSchema, scenarioDefSchema),
   /** D25: required for authored content; the sim type is optional for hand-built test bundles. */
   people: peopleTableDefSchema,
+  /** Dockside §3: required for authored content (it may be empty); optional in the sim type. */
+  docks: z.record(dockDefIdSchema, dockDefSchema),
   config: configDefSchema,
   /** SHA-256 hex of the canonical bundle, filled in by the bundle compiler. */
   hash: z.string(),

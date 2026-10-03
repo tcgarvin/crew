@@ -25,6 +25,8 @@ export const portDefSchema = z.strictObject({
         name: z.string().min(1),
         role: z.string().min(1),
         note: z.string().min(1),
+        /** Dockside §5.2: a post key on this port's dock map (checked at L2). */
+        post: localKeySchema.exactOptional(),
       }),
     )
     .min(2)

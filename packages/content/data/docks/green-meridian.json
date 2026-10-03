@@ -1,0 +1,205 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.green_meridian",
+  "portId": "port.green_meridian",
+  "name": "Green Meridian, field pad 2",
+  "setting": "planet",
+  "palette": {
+    "floor": "#a29a80",
+    "wall": "#5e4b35",
+    "accent": "#7fb069",
+    "sky": "#cdd98c"
+  },
+  "width": 38,
+  "height": 28,
+  "rows": [
+    "                                      ",
+    " .................................... ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    " .................................... ",
+    " .................................... ",
+    " .................................... ",
+    " .................................... ",
+    " .................................... ",
+    " .........................#######.... ",
+    " .........................#######.... ",
+    "                                      "
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "B": "berth"
+  },
+  "shipAt": {
+    "x": 3,
+    "y": 2
+  },
+  "posts": [
+    {
+      "key": "produce_shed",
+      "kind": "warehouseDoor",
+      "name": "the produce shed doors",
+      "tile": {
+        "x": 28,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "coop_stall",
+      "kind": "marketStall",
+      "name": "the growers' co-op stall",
+      "tile": {
+        "x": 8,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "pad_gate",
+      "kind": "gate",
+      "name": "the lane up to the Greenhouse Lounge",
+      "tile": {
+        "x": 1,
+        "y": 26
+      },
+      "facing": "e"
+    },
+    {
+      "key": "pad_bench",
+      "kind": "bench",
+      "name": "the bench under the awning",
+      "tile": {
+        "x": 12,
+        "y": 24
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [
+    {
+      "key": "staging",
+      "kind": "freightStaging",
+      "rect": {
+        "x": 19,
+        "y": 22,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "key": "delivery",
+      "kind": "deliveryBay",
+      "rect": {
+        "x": 30,
+        "y": 21,
+        "w": 4,
+        "h": 3
+      }
+    }
+  ],
+  "props": [
+    {
+      "key": "planter_fore",
+      "kind": "planter",
+      "rect": {
+        "x": 1,
+        "y": 2,
+        "w": 1,
+        "h": 3
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "planter_aft",
+      "kind": "planter",
+      "rect": {
+        "x": 36,
+        "y": 2,
+        "w": 1,
+        "h": 3
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "planters_pad",
+      "kind": "planter",
+      "rect": {
+        "x": 1,
+        "y": 21,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "produce_crates",
+      "kind": "crates",
+      "rect": {
+        "x": 23,
+        "y": 25,
+        "w": 2,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "water_drums",
+      "kind": "barrels",
+      "rect": {
+        "x": 34,
+        "y": 25,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "pad_lamp",
+      "kind": "lamp",
+      "rect": {
+        "x": 17,
+        "y": 24,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    }
+  ],
+  "foreground": [
+    {
+      "kind": "awning",
+      "rect": {
+        "x": 6,
+        "y": 23,
+        "w": 8,
+        "h": 2
+      }
+    }
+  ],
+  "ambience": "Warm wind off the fields, a sprinkler line ticking somewhere past the shed, and the smell of cut stalks over the pad."
+}

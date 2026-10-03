@@ -9,6 +9,7 @@ import type {
   CargoClass,
   CrewDefId,
   DeckDefId,
+  DockDefId,
   ItemDefId,
   ItemTag,
   MachineDefId,
@@ -50,6 +51,7 @@ export const crewDefIdSchema = defId<CrewDefId>();
 export const portDefIdSchema = defId<PortDefId>();
 export const traitDefIdSchema = defId<TraitDefId>();
 export const scenarioDefIdSchema = defId<ScenarioDefId>();
+export const dockDefIdSchema = defId<DockDefId>();
 
 /** Keys local to one def (compartment, fault, zone keys). */
 export const localKeySchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/);

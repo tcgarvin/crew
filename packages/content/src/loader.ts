@@ -69,6 +69,14 @@ import portOssoryStation from "../data/ports/ossory-station.json";
 import portTernsRest from "../data/ports/terns-rest.json";
 import portVesperGate from "../data/ports/vesper-gate.json";
 
+// Docks (Dockside §3)
+import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
+import dockGreenMeridian from "../data/docks/green-meridian.json";
+import dockKesslerDrift from "../data/docks/kessler-drift.json";
+import dockOssoryStation from "../data/docks/ossory-station.json";
+import dockTernsRest from "../data/docks/terns-rest.json";
+import dockVesperGate from "../data/docks/vesper-gate.json";
+
 // Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
 
@@ -136,6 +144,14 @@ const PORTS = [
   portOssoryStation,
   portVesperGate,
   portTernsRest,
+];
+const DOCKS = [
+  dockCrossroadsHub,
+  dockKesslerDrift,
+  dockGreenMeridian,
+  dockOssoryStation,
+  dockVesperGate,
+  dockTernsRest,
 ];
 const SCENARIOS = [scenarioDefault];
 
@@ -208,6 +224,7 @@ export function rawBundle(): Record<string, unknown> {
     ports: keyById(PORTS),
     scenarios: keyById(SCENARIOS),
     people: stripSchemaKey(peopleNameTable),
+    docks: keyById(DOCKS),
     config: stripSchemaKey(configDefault),
   };
   return { ...withoutHash, hash: hashOf(withoutHash) };
