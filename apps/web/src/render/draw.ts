@@ -20,7 +20,7 @@ import type { DeckLayout } from "./deckLayout";
 import { dockOrigin, dockSlide, withDockSlide } from "./dock";
 import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
-import { dockShape } from "./dockShape";
+import { dockShape, dockSurface } from "./dockShape";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
 import { drawRamps } from "./ramps";
 import type { Scene } from "./scene";
@@ -686,8 +686,7 @@ export function drawFrame(
   selected?: DrawSelection,
 ): void {
   const { scene, hull, dock } = scenery;
-  const shown =
-    dock === undefined ? frame : withDockSlide(frame, layout, dockSlide(scene, layout.width));
+  const shown = dock === undefined ? frame : withDockSlide(frame, dockSlide(scene, layout.width));
   ctx.clearRect(0, 0, viewportWidth, viewportHeight);
   ctx.fillStyle = scene.skyColor;
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -726,6 +725,7 @@ export function drawFrame(
           origin: dockOrigin(dock, scene, layout.width),
           alpha: scene.portAlpha,
           clamps: scenery.clamps,
+          setting: scene.setting,
           px: sceneryFrame.px,
           view: sceneryFrame.view,
           enclosure: scene.cameraT,
@@ -736,7 +736,12 @@ export function drawFrame(
     if (dock === undefined || dockPaint === undefined) {
       drawBerth(ctx, scene, sceneryFrame);
     } else {
-      drawPlanetBelow(ctx, scene, sceneryFrame, dockShape(dock).overSky);
+      drawPlanetBelow(
+        ctx,
+        scene,
+        sceneryFrame,
+        dockSurface(dockShape(dock), scene.setting).overSky,
+      );
       drawDock(ctx, dock, dockPaint);
     }
     drawPlume(ctx, hull, scenery.plume, scenery.flicker);

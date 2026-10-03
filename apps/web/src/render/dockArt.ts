@@ -20,11 +20,18 @@ import type {
   DockPostKind,
   DockRect,
   EdgeSide,
+  PortSetting,
   TileCoord,
 } from "@crew/sim";
 import { BLACK, WHITE, hash01, mixHex, rgba } from "./color";
 import { type PropLook, drawProp } from "./dockProps";
-import { type DockShape, type TileRun, dockShape } from "./dockShape";
+import {
+  type DockShape,
+  type FloorPattern,
+  type TileRun,
+  dockShape,
+  dockSurface,
+} from "./dockShape";
 import { type Bounds, HULL_RIM } from "./hull";
 
 /** What the dock layer needs besides the map. */
@@ -35,6 +42,8 @@ export interface DockPaint {
   readonly alpha: number;
   /** Docking clamps, 0 retracted to 1 engaged. */
   readonly clamps: number;
+  /** The dock's port is a station or a planet (D61: the setting is the port's, not the map's). */
+  readonly setting: PortSetting;
   /** One CSS pixel in tile units. */
   readonly px: number;
   /** The visible area, deck tile units. */
@@ -61,9 +70,10 @@ function drawVoidAndBerth(
   ctx: CanvasRenderingContext2D,
   dock: DockDef,
   shape: DockShape,
+  setting: PortSetting,
   px: number,
 ) {
-  if (dock.setting === "station") {
+  if (setting === "station") {
     ctx.fillStyle = pitColor(dock);
     fillRuns(ctx, shape.runs.void, px);
     if (shape.berthStyle === "open") fillRuns(ctx, shape.runs.berth, px);
@@ -88,7 +98,13 @@ function drawVoidAndBerth(
 }
 
 /** Floor surface detail, by pattern; strokes batched per pass. */
-function drawFloor(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockShape, px: number) {
+function drawFloor(
+  ctx: CanvasRenderingContext2D,
+  dock: DockDef,
+  shape: DockShape,
+  pattern: FloorPattern,
+  px: number,
+) {
   const { floor } = dock.palette;
   ctx.fillStyle = floor;
   fillRuns(ctx, shape.runs.floor, px);
@@ -105,7 +121,7 @@ function drawFloor(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockShap
   ctx.strokeStyle = seam;
   ctx.lineWidth = px;
   ctx.beginPath();
-  switch (shape.floorPattern) {
+  switch (pattern) {
     case "plates":
       // Deck plates two tiles square, with a rivet line every tile.
       for (const run of shape.runs.floor) {
@@ -248,10 +264,11 @@ function drawClamps(
   ctx: CanvasRenderingContext2D,
   dock: DockDef,
   shape: DockShape,
+  setting: PortSetting,
   engaged: number,
   px: number,
 ) {
-  if (dock.setting !== "station") return;
+  if (setting !== "station") return;
   const arm = mixHex(dock.palette.wall, "#9aa6b2", 0.5);
   for (const edge of shape.quay) {
     const length = Math.hypot(edge.x2 - edge.x1, edge.y2 - edge.y1);
@@ -536,7 +553,7 @@ export function drawDock(ctx: CanvasRenderingContext2D, dock: DockDef, paint: Do
   const shape = dockShape(dock);
   const { px } = paint;
   ctx.save();
-  if (dock.setting === "station" && paint.enclosure > 0) {
+  if (paint.setting === "station" && paint.enclosure > 0) {
     // Inside the bay: its darkness closes in around the whole view as the camera settles, so
     // the station's outer structure and open space don't show past the map's edges.
     ctx.globalAlpha = paint.alpha * paint.enclosure;
@@ -546,16 +563,16 @@ export function drawDock(ctx: CanvasRenderingContext2D, dock: DockDef, paint: Do
   }
   ctx.globalAlpha = paint.alpha;
   ctx.translate(paint.origin.x, paint.origin.y);
-  drawVoidAndBerth(ctx, dock, shape, px);
-  drawFloor(ctx, dock, shape, px);
+  drawVoidAndBerth(ctx, dock, shape, paint.setting, px);
+  drawFloor(ctx, dock, shape, dockSurface(shape, paint.setting).floorPattern, px);
   drawWalls(ctx, dock, shape, px);
   drawAreas(ctx, dock, px);
   drawQuayEdge(ctx, dock, shape, px);
-  drawClamps(ctx, dock, shape, paint.clamps, px);
+  drawClamps(ctx, dock, shape, paint.setting, paint.clamps, px);
   for (const post of dock.posts) {
     drawPostFloor(ctx, dock, post, px, post.key === paint.selectedPostKey);
   }
-  const look: PropLook = { palette: dock.palette, setting: dock.setting, px };
+  const look: PropLook = { palette: dock.palette, setting: paint.setting, px };
   for (const prop of dock.props) drawProp(ctx, prop, look);
   ctx.restore();
 }

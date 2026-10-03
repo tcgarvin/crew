@@ -57,7 +57,7 @@ function travel(
   return { state, progress, fromPortId: from, toPortId: to, drifting: false };
 }
 
-function actor(id: string, x: number, y: number): RenderActor {
+function actor(id: string, x: number, y: number, onDock = false): RenderActor {
   return {
     id: id as ActorId,
     name: id,
@@ -66,16 +66,17 @@ function actor(id: string, x: number, y: number): RenderActor {
     y,
     actionLabel: "standing",
     passenger: false,
+    onDock,
   };
 }
 
-function crate(id: string, x: number, y: number): RenderItem {
+function crate(id: string, x: number, y: number, onDock = false): RenderItem {
   return {
     id: id as ItemId,
     defId: "item.crate" as ItemDefId,
     name: "crate",
     kind: "crate",
-    location: { kind: "deck", deckId: layout.deckId, x, y },
+    location: { kind: "deck", deckId: layout.deckId, x, y, onDock },
     count: 1,
   };
 }
@@ -115,10 +116,23 @@ describe("dockInView (the render-frame seam)", () => {
     expect(dockInView({ travel: travel("docked", 0, HUB, HUB) }, {})).toBeUndefined();
   });
 
+  it("prefers the dock the frame says is alongside, and refuses one content lacks", () => {
+    const drift = dockOf(DRIFT);
+    // The frame's dock is the sim's truth; it wins over the port lookup.
+    const alongside = { dockId: drift.id, deckId: layout.deckId };
+    expect(dockInView({ travel: travel("docked", 0, HUB, HUB), dock: alongside }, docks)).toBe(
+      drift,
+    );
+    const unknown = { dockId: "dock.nowhere" as DockDefId, deckId: layout.deckId };
+    expect(() =>
+      dockInView({ travel: travel("docked", 0, HUB, HUB), dock: unknown }, docks),
+    ).toThrow(/unknown dock/);
+  });
+
   it("refuses content with two maps for one port", () => {
     const twin = { ...hubDock, id: "dock.twin" as DockDefId };
     const table = { [hubDock.id]: hubDock, [twin.id]: twin };
-    expect(() => dockInView({ travel: travel("docked", 0, HUB, HUB) }, table)).toThrow(/Two dock/);
+    expect(() => dockInView({ travel: travel("docked", 0, HUB, HUB) }, table)).toThrow(/dock maps/);
   });
 });
 
@@ -151,14 +165,14 @@ describe("withDockSlide", () => {
   const atStall = onDeck(hubDock, stall.tile.x, stall.tile.y);
   const t = travel("docking", 0.5, DRIFT, HUB);
   const frame = frameWith(
-    [actor("aboard", 10.5, 5.5), actor("local", atStall.x, atStall.y)],
-    [crate("hold", 12.5, 14.5), crate("staged", atStall.x + 1, atStall.y)],
+    [actor("aboard", 10.5, 5.5), actor("local", atStall.x, atStall.y, true)],
+    [crate("hold", 12.5, 14.5), crate("staged", atStall.x + 1, atStall.y, true)],
     t,
   );
 
   it("moves people and crates on the dock with it, and nobody aboard", () => {
     expect(atStall.x).toBeLessThan(0);
-    const slid = withDockSlide(frame, layout, -7.5);
+    const slid = withDockSlide(frame, -7.5);
     expect(slid.actors[0]).toEqual(frame.actors[0]);
     expect(slid.actors[1]?.x).toBeCloseTo(atStall.x - 7.5);
     expect(slid.actors[1]?.y).toBe(atStall.y);
@@ -168,7 +182,7 @@ describe("withDockSlide", () => {
   });
 
   it("returns the frame untouched when nothing slides (every docked frame)", () => {
-    expect(withDockSlide(frame, layout, 0)).toBe(frame);
+    expect(withDockSlide(frame, 0)).toBe(frame);
   });
 });
 

@@ -8,13 +8,13 @@
  * dock (and everyone on it) slides in from the fore while docking and drifts aft while undocking,
  * exactly as the phase 1 berth did. The ship's own tiles never move.
  */
-import type {
-  DockDef,
-  DockDefId,
-  PortDefId,
-  RenderFrame,
-  RenderTravel,
-  TileCoord,
+import {
+  type DockDef,
+  type DockDefId,
+  type RenderFrame,
+  type RenderTravel,
+  type TileCoord,
+  dockForPort,
 } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
 import type { Bounds } from "./hull";
@@ -22,37 +22,26 @@ import { type Scene, portInView, smooth } from "./scene";
 
 export type DockTable = Readonly<Record<DockDefId, DockDef>>;
 
-const byPortCache = new WeakMap<DockTable, ReadonlyMap<PortDefId, DockDef>>();
-
-function docksByPort(docks: DockTable): ReadonlyMap<PortDefId, DockDef> {
-  const cached = byPortCache.get(docks);
-  if (cached !== undefined) return cached;
-  const index = new Map<PortDefId, DockDef>();
-  for (const dock of Object.values(docks)) {
-    if (index.has(dock.portId)) {
-      throw new Error(`Two dock maps for port "${dock.portId}"; content allows at most one`);
-    }
-    index.set(dock.portId, dock);
-  }
-  byPortCache.set(docks, index);
-  return index;
-}
-
 /**
- * THE SEAM (phase 2, item 10): which dock map the frame shows. Until the sim's `RenderFrame`
- * carries the attached dock, this derives it from content: the dock whose `portId` is the port in
- * view (the one being left until transit, then the destination), so the dock is drawn sliding in
- * during `approaching`/`docking` and away during `undocking`/`departing` as well as docked. The
- * sim's field will only name a dock from the start of `docking` to the end of `undocking`; prefer
- * it when present and keep this lookup for the stages either side.
+ * Which dock map the frame shows. From the start of `docking` to the end of `undocking` the sim
+ * names the dock alongside (`RenderFrame.dock`, D61) and that is the one drawn. Either side of that
+ * window (`approaching`, `departing`) nothing is alongside, but the port's dock is still in view,
+ * sliding in or falling astern, so it comes from content: the dock whose `portId` is the port in
+ * view. During `transit` that is the destination's, drawn nowhere (the scene's `portAlpha` is 0).
  *
- * `undefined` means the port has no dock map: the caller draws the phase 1 stand-in berth.
+ * `undefined` means the port has no dock map: the caller draws the phase 1 stand-in berth. Throws
+ * if the frame names a dock the content lacks: the worker runs the same bundle, so that is a bug.
  */
 export function dockInView(
-  frame: { readonly travel: Pick<RenderTravel, "state" | "fromPortId" | "toPortId"> },
+  frame: Pick<RenderFrame, "travel" | "dock">,
   docks: DockTable,
 ): DockDef | undefined {
-  return docksByPort(docks).get(portInView(frame.travel));
+  if (frame.dock !== undefined) {
+    const alongside = docks[frame.dock.dockId];
+    if (alongside === undefined) throw new Error(`dockInView: unknown dock "${frame.dock.dockId}"`);
+    return alongside;
+  }
+  return dockForPort({ docks }, portInView(frame.travel));
 }
 
 /**
@@ -96,28 +85,22 @@ export function isShipTile(
 }
 
 /**
- * The frame as drawn: people and loose items standing on dock tiles move with the dock while it
- * slides (they are in the grafted frame, so their positions already assume it is alongside);
+ * The frame as drawn: people and loose items on the dock (`onDock`, D61) move with it while it
+ * slides (their positions are in the grafted frame, so they already assume it is alongside);
  * everyone aboard stays put. Carried items ride their carrier, so they follow. Returns the frame
  * itself when nothing slides, which is every docked frame.
  *
  * Nobody crosses a ramp while the dock slides (ramps open only once `docked` and are up again
- * before `undocking`), so the split by tile never makes anyone jump.
+ * before `undocking`), so the split never makes anyone jump.
  */
-export function withDockSlide(
-  frame: RenderFrame,
-  layout: Pick<DeckLayout, "deckId" | "width" | "height" | "tiles">,
-  slide: number,
-): RenderFrame {
+export function withDockSlide(frame: RenderFrame, slide: number): RenderFrame {
   if (slide === 0) return frame;
-  const onDock = (deckId: string, x: number, y: number) =>
-    deckId === layout.deckId && !isShipTile(layout, x, y);
   return {
     ...frame,
-    actors: frame.actors.map((a) => (onDock(a.deckId, a.x, a.y) ? { ...a, x: a.x + slide } : a)),
+    actors: frame.actors.map((a) => (a.onDock ? { ...a, x: a.x + slide } : a)),
     items: frame.items.map((item) => {
       const loc = item.location;
-      if (loc.kind !== "deck" || !onDock(loc.deckId, loc.x, loc.y)) return item;
+      if (loc.kind !== "deck" || !loc.onDock) return item;
       return { ...item, location: { ...loc, x: loc.x + slide } };
     }),
   };

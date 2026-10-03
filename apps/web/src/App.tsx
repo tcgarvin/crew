@@ -491,8 +491,7 @@ export function App() {
       } else if (next.kind === "item") {
         pendingRequests.current.set(requestId, (msg) => {
           if (msg.type === "snapshot") {
-            const dock = frame === undefined ? undefined : dockInView(frame, docks);
-            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout, dock);
+            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout);
             setInspectorData(item === undefined ? undefined : { kind: "item", item });
           } else if (msg.type === "error") {
             setInspectorData(undefined);

@@ -210,7 +210,7 @@ export function DeckCanvas({
         sizeRef.current.width,
       );
       // Hit what is on screen: people and crates on the dock where the sliding dock put them.
-      const shown = withDockSlide(frame, layout, slide);
+      const shown = withDockSlide(frame, slide);
 
       let best: Selection | undefined;
       let bestDist = HIT_RADIUS_TILES;

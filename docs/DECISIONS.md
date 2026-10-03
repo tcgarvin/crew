@@ -577,3 +577,26 @@ preparing to depart or undocking at a port with a dock map, asking a docked save
 freight in a port store stays where it is. Restore now also fills config keys a save predates from
 the loaded content, with a warning, because a save from before D58 had no
 `doors.rampOpenSeconds` and its ramps would never have finished moving.
+
+**D62. Phase 2 of Dockside, renderer: the dock map is drawn alongside, and the camera zooms to
+it.** The renderer draws the dock the frame names (`RenderFrame.dock`, D61) from the start of
+`docking` to the end of `undocking`, and on either side of that window, when nothing is alongside
+but the port is still in view (`approaching`, `departing`), the dock content holds for that port
+(`dockInView`, `apps/web/src/render/dock.ts`). It sits at `−shipAt` plus the scene's berth offset,
+so it slides in during `docking` and away during `undocking` and `departing` as the phase 1 berth
+did; a port without a map keeps the stand-in. People and loose items with `onDock` set are drawn
+moved by the same slide and nobody aboard is, which is safe because no one crosses a ramp while
+the dock slides. The look is derived from the map and its port's setting, not authored: stations
+get deck plates and a dark bay pit that fills the view as the camera settles; a planet berth
+surrounded by quay is a pad among fields hazed in the dock's sky colour; an open planet berth is
+a pier of planks over a sea of cloud. Station quays get a clamp near each end of the ship that
+engages over the last fifth of `docking` and releases over the first fifth of `undocking`.
+Structural foreground (bay walls, terminal edge, rock) stands only on non-floor tiles, so posts
+in wall gaps show; the doors at gates and warehouse doors are drawn above it, and no foreground
+piece is more than 0.3 opaque over the ship. The camera interpolates each edge from hull plus a
+tile to hull plus map plus a quarter tile by `cameraT`, under reduced motion too, where only the
+slide becomes a fade; on a 390×700 phone the docked scale is 12.8–14.4 px a tile, so machine
+labels hide while docked and compartment labels stay, and actor labels are kept on screen.
+Tapping a post or bare dock floor opens a place card from content (no snapshot); the item
+inspector describes an item on the dock (`isOnDock` on the snapshot) by its area or nearest post,
+and no longer indexes the deck's tiles with an off-ship coordinate.

@@ -1,10 +1,10 @@
 /**
  * Dockside §3.1 (phase 2): what the renderer reads off a dock map once, memoized per def: the tile
  * grid as row runs per kind, the berth's box, the edges where the berth meets the quay and where
- * walls meet floor, and two derived looks (how the berth and the floor are drawn). Pure; dock
- * frame (tile (0,0) is the map's top-left).
+ * walls meet floor, and how the berth is drawn; `dockSurface` adds the floor's look once the
+ * port's setting is known. Pure; dock frame (tile (0,0) is the map's top-left).
  */
-import type { DockDef, DockTileKind } from "@crew/sim";
+import type { DockDef, DockTileKind, PortSetting } from "@crew/sim";
 import type { Bounds } from "./hull";
 
 /** `y` row, tiles `x0` to `x1` (exclusive). */
@@ -44,16 +44,10 @@ export interface DockShape {
   /** Tile box of the berth tiles (exclusive max). */
   readonly berth: Bounds;
   readonly berthStyle: BerthStyle;
-  readonly floorPattern: FloorPattern;
   /** Where the berth meets floor: the quay's edge, hazard-striped. */
   readonly quay: readonly FloorEdge[];
   /** Where a wall meets floor: the wall's lit lip and its shadow on the floor. */
   readonly lips: readonly FloorEdge[];
-  /**
-   * A planet map whose berth is open: the ship hangs beside a pier with open sky below, so the
-   * ground far beneath is cloud rather than fields.
-   */
-  readonly overSky: boolean;
 }
 
 const shapes = new WeakMap<DockDef, DockShape>();
@@ -188,20 +182,37 @@ export function dockShape(dock: DockDef): DockShape {
   const kinds = tileKinds(dock);
   const runs = rowRuns(kinds, width, height);
   const berth = berthBox(kinds, width, dock.id);
-  const berthStyle: BerthStyle = quayShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open";
-  const overSky = dock.setting === "planet" && berthStyle === "open";
   const shape: DockShape = {
     kinds,
     runs,
     berth,
-    berthStyle,
-    floorPattern: dock.setting === "station" ? "plates" : overSky ? "planks" : "slabs",
+    berthStyle: quayShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
     quay: edgesToFloor(kinds, width, height, "berth"),
     lips: edgesToFloor(kinds, width, height, "wall"),
-    overSky,
   };
   shapes.set(dock, shape);
   return shape;
+}
+
+/** How a dock's ground reads, which depends on its port being a station or a planet (D61). */
+export interface DockSurface {
+  readonly floorPattern: FloorPattern;
+  /**
+   * A planet map whose berth is open: the ship hangs beside a pier with open sky below, so the
+   * ground far beneath is cloud rather than fields.
+   */
+  readonly overSky: boolean;
+}
+
+export function dockSurface(
+  shape: Pick<DockShape, "berthStyle">,
+  setting: PortSetting,
+): DockSurface {
+  const overSky = setting === "planet" && shape.berthStyle === "open";
+  return {
+    floorPattern: setting === "station" ? "plates" : overSky ? "planks" : "slabs",
+    overSky,
+  };
 }
 
 /** The tile kind at dock tile (x, y), or `void` off the map. */

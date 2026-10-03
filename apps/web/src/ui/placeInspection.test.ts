@@ -66,21 +66,26 @@ describe("dockWhere (items on the dock)", () => {
     expect(dockWhere(hub, p.x, p.y)).toBe(`on the dock by ${stall.name}`);
     // Indexing the deck's tiles by y * width + x would wrap a negative x into the row above
     // and name a room; an item there is on the dock.
-    const state = {
-      items: {
-        i1: {
-          defId: "item.unknown",
-          location: { kind: "onDeck", deckId: layout.deckId, x: p.x, y: p.y },
-          stacking: "unique",
+    const snapshot = (dock: { dockId: string; deckId: string } | undefined) =>
+      ({
+        items: {
+          i1: {
+            defId: "item.unknown",
+            location: { kind: "onDeck", deckId: layout.deckId, x: p.x, y: p.y },
+            stacking: "unique",
+          },
         },
-      },
-      defs: { dynamic: { items: {} } },
-      jobs: {},
-      actors: {},
-    } as unknown as DeepReadonly<WorldState>;
-    const item = inspectItem(state, "i1" as ItemId, bundle, layout, hub);
-    expect(item?.where).toBe(`on the dock by ${stall.name}`);
-    expect(inspectItem(state, "i1" as ItemId, bundle, layout, undefined)?.where).toBe("on deck");
+        deck: dock === undefined ? {} : { dock },
+        defs: { dynamic: { items: {} } },
+        jobs: {},
+        actors: {},
+      }) as unknown as DeepReadonly<WorldState>;
+    const alongside = snapshot({ dockId: hub.id, deckId: layout.deckId });
+    expect(inspectItem(alongside, "i1" as ItemId, bundle, layout)?.where).toBe(
+      `on the dock by ${stall.name}`,
+    );
+    // With no dock in the snapshot the point is nowhere on the ship: plain words, not a room.
+    expect(inspectItem(snapshot(undefined), "i1" as ItemId, bundle, layout)?.where).toBe("on deck");
   });
 
   it("falls back to plain words in the open", () => {

@@ -6,7 +6,15 @@
  * the dock, at coordinates outside the ship (negative ones included); it is described by the
  * dock's areas and posts rather than looked up as a room.
  */
-import type { ContentBundle, DeepReadonly, DockDef, ItemId, WorldState } from "@crew/sim";
+import {
+  type ContentBundle,
+  type DeepReadonly,
+  type DockDef,
+  type ItemId,
+  type PhysicalLocation,
+  type WorldState,
+  isOnDock,
+} from "@crew/sim";
 import type { DeckLayout } from "../render/deckLayout";
 import { isShipTile } from "../render/dock";
 import type { ItemInspection } from "./Inspector";
@@ -39,25 +47,43 @@ export function dockWhere(dock: DockDef, deckX: number, deckY: number): string {
   return nearest === undefined ? "on the dock" : `on the dock by ${nearest.name}`;
 }
 
+/** Where an `onDeck` item is: on the dock alongside (from the snapshot's truth, D61), or a room. */
+function whereOnDeck(
+  state: DeepReadonly<WorldState>,
+  location: { readonly x: number; readonly y: number },
+  content: ContentBundle,
+  layout: DeckLayout,
+  onDock: boolean,
+): string {
+  const presence = state.deck.dock;
+  if (onDock && presence !== undefined) {
+    const dock = content.docks?.[presence.dockId];
+    if (dock === undefined) throw new Error(`inspectItem: unknown dock "${presence.dockId}"`);
+    return dockWhere(dock, location.x, location.y);
+  }
+  // Bounds first: indexing by y * width + x would wrap an off-ship tile into another row's room.
+  if (!isShipTile(layout, location.x, location.y)) return "on deck";
+  const tile = layout.tiles[Math.floor(location.y) * layout.width + Math.floor(location.x)];
+  const room =
+    tile?.compartmentKey === undefined ? undefined : layout.compartmentNames[tile.compartmentKey];
+  return room === undefined ? "on deck" : `in the ${room.toLowerCase()}`;
+}
+
 function where(
   state: DeepReadonly<WorldState>,
   location: DeepReadonly<WorldState["items"][ItemId]["location"]>,
   content: ContentBundle,
   layout: DeckLayout,
-  dock: DockDef | undefined,
 ): string {
   switch (location.kind) {
-    case "onDeck": {
-      if (!isShipTile(layout, location.x, location.y)) {
-        return dock === undefined ? "on deck" : dockWhere(dock, location.x, location.y);
-      }
-      const tile = layout.tiles[Math.floor(location.y) * layout.width + Math.floor(location.x)];
-      const room =
-        tile?.compartmentKey === undefined
-          ? undefined
-          : layout.compartmentNames[tile.compartmentKey];
-      return room === undefined ? "on deck" : `in the ${room.toLowerCase()}`;
-    }
+    case "onDeck":
+      return whereOnDeck(
+        state,
+        location,
+        content,
+        layout,
+        isOnDock(content, state, location as PhysicalLocation),
+      );
     case "carriedBy":
     case "equippedBy":
       return `carried by ${state.actors[location.actorId]?.name ?? "someone"}`;
@@ -70,16 +96,11 @@ function where(
   }
 }
 
-/**
- * `dock` is the dock map alongside (`dockInView`), or `undefined` when the port has none or the
- * ship is between ports.
- */
 export function inspectItem(
   state: DeepReadonly<WorldState>,
   itemId: ItemId,
   content: ContentBundle,
   layout: DeckLayout,
-  dock: DockDef | undefined,
 ): ItemInspection | undefined {
   const item = state.items[itemId];
   if (item === undefined) return undefined;
@@ -89,7 +110,7 @@ export function inspectItem(
   return {
     name: def?.name ?? "Cargo",
     count: item.stacking === "stack" ? item.count : 1,
-    where: where(state, item.location, content, layout, dock),
+    where: where(state, item.location, content, layout),
     ...(job === undefined
       ? {}
       : {

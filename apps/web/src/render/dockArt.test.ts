@@ -6,6 +6,7 @@ import {
   type DockPropDef,
   type LocalKey,
   type PortDefId,
+  type PortSetting,
   type RenderFrame,
   type RenderTravel,
   type TravelStage,
@@ -17,7 +18,7 @@ import { buildDeckLayout } from "./deckLayout";
 import { clampEngagement, dockInView } from "./dock";
 import { drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
-import { dockShape } from "./dockShape";
+import { dockShape, dockSurface } from "./dockShape";
 import { computeFitTransform, drawFrame, shouldRotate } from "./draw";
 import { hullGeometry } from "./hull";
 import { sceneAt, withDockSky } from "./scene";
@@ -34,6 +35,19 @@ const hull = hullGeometry(layout);
 const stars = buildStarField();
 const docks = bundle.docks ?? {};
 const allDocks: DockDef[] = Object.values(docks);
+
+const ALONGSIDE: ReadonlySet<TravelStage> = new Set([
+  "docking",
+  "docked",
+  "preparingDeparture",
+  "undocking",
+]);
+
+function settingOf(dock: DockDef): PortSetting {
+  const port = bundle.ports[dock.portId];
+  if (port === undefined) throw new Error(`no port ${dock.portId}`);
+  return port.setting;
+}
 
 function travel(state: TravelStage, progress: number, from: string, to: string): RenderTravel {
   return {
@@ -57,6 +71,7 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
       ...at(post.tile.x, post.tile.y),
       actionLabel: "waiting",
       passenger: false,
+      onDock: true,
     })),
     machines: [],
     doors: layout.doors.map((d) => ({
@@ -75,10 +90,17 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
       name: "crate",
       kind: "crate" as const,
       cargoClass: "general" as const,
-      location: { kind: "deck" as const, deckId: layout.deckId, ...at(area.rect.x, area.rect.y) },
+      location: {
+        kind: "deck" as const,
+        deckId: layout.deckId,
+        ...at(area.rect.x, area.rect.y),
+        onDock: true,
+      },
       count: 2,
     })),
     headline: "",
+    // D61: the sim names the dock alongside from the start of docking to the end of undocking.
+    ...(ALONGSIDE.has(t.state) ? { dock: { dockId: dock.id, deckId: layout.deckId } } : {}),
   };
 }
 
@@ -162,6 +184,7 @@ describe("dock layers on their own", () => {
         px: 0.05,
         view: { minX: -10, minY: -10, maxX: 60, maxY: 40 },
         enclosure: 1,
+        setting: settingOf(dock),
       };
       const drawn = mockCanvas();
       drawDock(drawn.ctx, dock, paint);
@@ -196,7 +219,7 @@ describe("dock layers on their own", () => {
             blocking: rot !== 90,
           };
           const { ctx, calls } = mockCanvas();
-          drawProp(ctx, prop, { palette: hub.palette, setting: hub.setting, px: 0.05 });
+          drawProp(ctx, prop, { palette: hub.palette, setting: settingOf(hub), px: 0.05 });
           expect(calls.size, `${kind} ${rot}`).toBeGreaterThan(0);
         }
       }
@@ -228,6 +251,7 @@ describe("dock layers on their own", () => {
       px: 0.05,
       view: { minX: -10, minY: -10, maxX: 60, maxY: 40 },
       enclosure: 0.5,
+      setting: settingOf(dock),
     };
     const { ctx } = mockCanvas();
     expect(() => {
@@ -254,7 +278,8 @@ describe("dockShape", () => {
     const byPort = (port: string) => {
       const dock = allDocks.find((d) => d.portId === port);
       if (dock === undefined) throw new Error(port);
-      return dockShape(dock);
+      const shape = dockShape(dock);
+      return { ...shape, ...dockSurface(shape, settingOf(dock)) };
     };
     // A farming world's pad set into the field; a pier out into open sky.
     expect(byPort("port.green_meridian")).toMatchObject({

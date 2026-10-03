@@ -5,12 +5,12 @@
  * are; a crate prop must not read as cargo. `rot` orients the drawing: 0 or 180 runs the prop's
  * length along x, 90 or 270 along y.
  */
-import type { DockPaletteDef, DockPropDef, DockPropKind, DockRect, DockSetting } from "@crew/sim";
+import type { DockPaletteDef, DockPropDef, DockPropKind, DockRect, PortSetting } from "@crew/sim";
 import { BLACK, WHITE, hash01, hashKey, mixHex, rgba } from "./color";
 
 export interface PropLook {
   readonly palette: DockPaletteDef;
-  readonly setting: DockSetting;
+  readonly setting: PortSetting;
   /** One CSS pixel in tile units. */
   readonly px: number;
 }
