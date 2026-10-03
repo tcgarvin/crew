@@ -671,8 +671,10 @@ stopped the ship-familiarity brief and they never learned where the stores were.
 *Narrator.* The translator drops `offerJob` by the kernel's own rule (`jobBlockingAcceptance`)
 rather than a stricter copy, so an offer made while freight is unloading at its destination, or
 on approach, goes through; the null narrator never offered a second job before (every docking
-after the first sat idle on `quietTooLong`). Open: the kernel's `jobInHand` does not count
-freight under way, though D52 says it does, so a second job can be taken mid-voyage. Left as is.
+after the first sat idle on `quietTooLong`). The kernel's rule itself had let freight under way
+slip (it filtered on `jobInHand`, which counts only passages once they leave), so a second job
+could be taken mid-voyage; it now blocks until the ship docks at the freight's destination, as
+D52 says.
 *Phone.* Rotation is decided by the window, not the canvas: at 390×700 the canvas is nearly
 square and the drawing flipped 90° whenever the headline wrapped to two lines.
 Not changed: docking often waits 10–20 s "for someone at the helm" because the pilot wanders off

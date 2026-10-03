@@ -55,10 +55,11 @@ export function passageBound(
  */
 export function jobBlockingAcceptance(state: JobsAndTravel): ReadonlyJob | undefined {
   return Object.values(state.jobs).find((job) => {
-    if (!jobInHand(job)) return false;
     if (job.status === "accepted") return true;
-    if (job.passage !== undefined) return passageBound(state, job) !== undefined;
-    return !dockedAt(state, job.toPortId);
+    if (job.passage !== undefined) return jobInHand(job) && passageBound(state, job) !== undefined;
+    // Freight under way blocks until the ship is at its destination (D52); `jobInHand` counts
+    // only passages once they leave, so it is not the test here.
+    return job.status === "inTransit" && !dockedAt(state, job.toPortId);
   });
 }
 

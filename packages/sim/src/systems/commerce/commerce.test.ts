@@ -8,6 +8,7 @@ import type { Command } from "../../core/types/commands";
 import type { CommandId, HookId, JobId } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
 import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "../travel/fixtures";
+import { jobBlockingAcceptance } from "../travel/in-hand";
 
 let counter = 0;
 function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
@@ -205,6 +206,8 @@ describe("commerce: full freight loop", () => {
     const untilHook = kernel.advance(world, 1000);
     expect(untilHook.halt).toEqual({ kind: "hook" });
     expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
+    // D52: freight under way is the one job in hand until the ship docks at its destination.
+    expect(jobBlockingAcceptance(world.state)?.id).toBe(jobId);
     const hookId = world.state.narrator.pendingHook?.id as HookId;
     kernel.enqueueCommand(
       world,
@@ -214,6 +217,7 @@ describe("commerce: full freight loop", () => {
     advanceThroughHooks(kernel, world, 1000);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
     expect(job.status).toBe("inTransit");
+    expect(jobBlockingAcceptance(world.state)).toBeUndefined();
 
     // Arrival raised cargoToUnload; another tick to be sure.
     kernel.advance(world, 1);
