@@ -6,5 +6,6 @@
   "maxStack": 1,
   "tags": ["tool"],
   "toolKinds": ["handTruck"],
-  "mass": 6.0
+  "mass": 6.0,
+  "capacityUnits": 4
 }

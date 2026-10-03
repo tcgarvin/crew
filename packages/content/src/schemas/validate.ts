@@ -294,6 +294,24 @@ function checkItem(item: ItemDef, issues: ValidationIssue[]): void {
       ),
     );
   }
+  // D65: a hand truck is one unique thing with a load it can carry, and only a hand truck has one.
+  const truck = item.toolKinds.includes("handTruck");
+  const path: Path = ["items", item.id, "capacityUnits"];
+  if (truck && (item.capacityUnits === undefined || item.capacityUnits < 2)) {
+    issues.push(
+      issue("physical", path, `hand truck "${item.id}" needs capacityUnits of at least 2`),
+    );
+  }
+  if (truck && item.stacking !== "unique") {
+    issues.push(
+      issue("physical", ["items", item.id, "stacking"], `hand truck "${item.id}" must be unique`),
+    );
+  }
+  if (!truck && item.capacityUnits !== undefined) {
+    issues.push(
+      issue("referential", path, `only a handTruck tool has capacityUnits ("${item.id}")`),
+    );
+  }
 }
 
 function checkCrew(crew: CrewDef, bundle: ContentBundle, issues: ValidationIssue[]): void {

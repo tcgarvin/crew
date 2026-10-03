@@ -23,6 +23,7 @@ import {
   checkInvariants,
   commerceViolations,
   createKernel,
+  isOnDock,
   spatialViolations,
   travelViolations,
   workViolations,
@@ -92,6 +93,11 @@ interface RunLog {
    * so looking this up after the run is over finds nothing (item 4's haul-claim check needs it).
    */
   readonly loadClaims: HaulClaim[];
+  /**
+   * Ticks of `preparingDeparture` with someone on the dock: D61's call aboard (the last hauler
+   * walking back from the delivery bay), which holds prep but is not the pilot's walk.
+   */
+  readonly prepAshoreTicks: Set<number>;
 }
 
 function runFullSim(seed: number, ticks: number, policy: Policy): { world: World; log: RunLog } {
@@ -105,6 +111,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     hooks: [],
     stages: new Set([world.state.travel.stage]),
     loadClaims: [],
+    prepAshoreTicks: new Set(),
   };
   let n = 0;
   const send = (command: Omit<Command, "id">) => {
@@ -137,6 +144,14 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     const result = kernel.advance(world, 1);
     log.events.push(...result.events);
     log.stages.add(world.state.travel.stage);
+    if (
+      world.state.travel.stage === "preparingDeparture" &&
+      Object.values(world.state.actors).some((a) =>
+        isOnDock(world.content, world.state, a.location),
+      )
+    ) {
+      log.prepAshoreTicks.add(world.state.tick);
+    }
     for (const e of result.events) {
       if (e.type !== "taskClaimed") continue;
       const task = world.state.work.tasks[e.payload.taskId];
@@ -192,18 +207,20 @@ const count = (log: RunLog, type: SimEvent["type"]) =>
 /**
  * D63: port work is physical, so a port call with freight both ways takes longer than when the
  * crates jumped aboard at the ramp; the crew's-day case runs until the ship has left its second
- * port (the pilot only gets up from the helm once it is under way again).
+ * port (the pilot only gets up from the helm once it is under way again). D65: with the hand
+ * truck the second call is shorter and the ship is at a third port by seven minutes, the pilot
+ * back at the helm before anything else came up; by eight it has left that one too.
  */
-const SEVEN_MINUTES = TICK_RATE * 420;
+const EIGHT_MINUTES = TICK_RATE * 480;
 
-// Each case simulates five to seven minutes of the whole ship on real content; several sit near
+// Each case simulates five to eight minutes of the whole ship on real content; several sit near
 // vitest's default 5 s, so the suite gets headroom rather than flaking on a slow runner.
 describe(
   "full sim: real content, every system, auto-accept (Integration 2)",
   { timeout: 20_000 },
   () => {
-    it("runs the freight loop and the crew's day for seven sim-minutes", () => {
-      const { world, log } = runFullSim(20260930, SEVEN_MINUTES, autoAccept);
+    it("runs the freight loop and the crew's day for eight sim-minutes", () => {
+      const { world, log } = runFullSim(20260930, EIGHT_MINUTES, autoAccept);
       if (process.env.FULLSIM_DEBUG) {
         for (const e of log.events) {
           if (e.significance === "trace") continue;
@@ -251,7 +268,8 @@ describe(
       );
       expect(loadProblems.some((p) => p.status === "resolved")).toBe(true);
       expect([...log.stages].some((stage) => stage !== "docked")).toBe(true);
-      expect(log.decisions).toBeLessThanOrEqual(3);
+      // One offer card per port call (three in eight minutes, D65) and at most the departure gate.
+      expect(log.decisions).toBeLessThanOrEqual(4);
 
       // Ship systems: the fault injected at 30 s is found and fixed.
       expect(count(log, "faultOccurred")).toBeGreaterThanOrEqual(1);
@@ -287,8 +305,12 @@ describe(
           (e) => e.tick > start.tick && e.payload.from === "preparingDeparture",
         );
         expect(next).toBeDefined();
-        const elapsedSeconds = ((next?.tick ?? start.tick) - start.tick) / tickRate;
+        const end = next?.tick ?? start.tick;
+        let ashore = 0;
+        for (const tick of log.prepAshoreTicks) if (tick > start.tick && tick <= end) ashore += 1;
+        const elapsedSeconds = (end - start.tick - ashore) / tickRate;
         // The fixed prep time plus a small (≤ 2 s) allowance, not the extra walk the bug added.
+        // D61's call aboard (someone still on the dock as prep begins) is not counted here.
         expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
       }
     });

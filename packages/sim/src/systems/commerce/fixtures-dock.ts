@@ -35,6 +35,8 @@ import { registerCommerce } from "./index";
 import { PASSENGER_CREW_DEF_ID } from "./passage";
 
 export const PARTS = "item.test.parts" as ItemDefId;
+/** D65: the test hand truck, stowed in the hold zone (deck (10,6)) when `truck` is set. */
+export const TRUCK = "item.test.hand_truck" as ItemDefId;
 export const PARTS_PRICE = 120;
 
 /** Deck-frame tiles of the furnished quays. */
@@ -94,6 +96,8 @@ export interface DockWorkOptions {
   readonly homeStall?: boolean;
   readonly money?: number;
   readonly partsStock?: number;
+  /** D65: put a hand truck of this capacity in the hold (default: no truck). */
+  readonly truck?: number;
 }
 
 /** A misfire whose repair consumes one `PARTS`, as the D47 market test has it. */
@@ -144,6 +148,16 @@ export function dockWorkContent(
         toolKinds: [],
         mass: 0.5,
       },
+      [TRUCK]: {
+        id: TRUCK,
+        name: "Hand Truck",
+        stacking: "unique",
+        maxStack: 1,
+        tags: ["tool"],
+        toolKinds: ["handTruck"],
+        mass: 6,
+        capacityUnits: options.truck ?? 4,
+      },
     },
     crew: {
       ...base.crew,
@@ -159,7 +173,14 @@ export function dockWorkContent(
     ports,
     scenarios: {
       ...base.scenarios,
-      [CREW.scenario2]: { ...scenario, startingMoney: options.money ?? 5000 },
+      [CREW.scenario2]: {
+        ...scenario,
+        startingMoney: options.money ?? 5000,
+        startingItems: [
+          ...scenario.startingItems,
+          ...(options.truck === undefined ? [] : [{ itemDefId: TRUCK, count: 1, zoneKey: "hold" }]),
+        ],
+      },
     },
     hash: "dock-work-v1",
   };

@@ -677,3 +677,67 @@ freight under way, though D52 says it does, so a second job can be taken mid-voy
 square and the drawing flipped 90° whenever the headline wrapped to two lines.
 Not changed: docking often waits 10–20 s "for someone at the helm" because the pilot wanders off
 in transit; a ship out of spares far from a market drifts until the narrator acts.
+
+**D65. The hand truck: several crates per trip, one activity holding several claims.** Dockside
+§4 ("several per trip"); D63 had deferred it. *Content.* `ItemDef.capacityUnits` (Zod: positive
+integer) is how many units of freight a hand truck carries; validation requires it, at least 2,
+on every `handTruck` tool (which must be unique) and allows it nowhere else. The hand truck
+carries 4, and the default scenario stows one on the cargo stowage zone's first tile (8,12), in
+the hold.
+*Planning.* The planner is unchanged: it picks one haul as before, through the `AgentView`. When
+work starts that haul (`startTask`), `systems/work/truck.ts` plans it as a trip if the actor
+believes a free truck lies on deck (free: no activity names it, the same public bookkeeping as
+claims) and knows of more open, unclaimed, unblocked hauls the same way (load with load, unload
+with unload, to the same zone or dock area) whose crates they believe lie on deck, up to the
+truck's capacity, nearest first. A haul with nothing to add (or none of this) is one crate in the
+hands, as before; freight in a port store (a port with no dock map) never goes on the truck.
+*One activity, several claims.* The planner's task stays the activity's own (`taskId`, the lead);
+the others are `Activity.haul = { truckId, legs: [{ taskId, claimId }] }`, an optional field
+present only on a trip. Every held claim is renewed each tick, expires like any other (ending
+the trip), shows its owner to other planners and keeps its task from being pruned. Steps: fetch
+the truck (`pickUp`), `loadTruck` each crate within reach (it goes `inContainer` the truck),
+`unloadTruck` each at its own destination tile (hold zone when loading, its bay tile when
+unloading), and `parkTruck`: where the last crate went if that is aboard, else at the top of the
+cargo ramp. A leg settles the moment its crate is set down (completed if its custody predicate
+holds, else released); the lead's crate goes down last and the lead settles when the plan ends,
+after the truck is parked. So the cargo work, and with it departure (`hasOpenCargoWork`), waits
+for the truck to come back aboard; D61's call aboard never starts on a pusher mid-trip, since it
+only starts once loading is done.
+*Stopping early.* Interrupted (a need or emergency the selector lets through, `bringAboard`),
+failed, or incapacitated, the pusher sets the truck and every crate
+on it down where they stand and knows where they are; every held task whose crate already made
+it is completed, the rest released. Nothing rides on a truck nobody is pushing
+(`workViolations` checks it, with one trip per truck and only its pusher holding it). The crates
+are ordinary on-deck freight again, picked up by hand or by the next trip, which fetches the
+truck from wherever its pusher believes it is, the dock included. A truck that is not where the
+actor believed turns the trip into a hand haul of the lead (legs released, nothing blocked); a
+leg's crate that is not where they believed drops that leg (backed off, released) and the trip
+goes on. A truck still lying on the dock when it goes (abandoned with no haul left to fetch it)
+is handed up the cargo ramp by the dock crew (`gearBroughtAboard`, notable), not left at the
+warehouse like other things on the dock (`leftOnDock`, unchanged for everything else).
+*Render.* No projection change: the frame already carries the truck as `carried` and the crates
+on it as `container` items. The canvas draws a pushed truck with crates as a handle and toe plate
+with up to four crates stacked on it and a count tag (`drawCarriedItems`); the item inspector says
+"on the hand truck, pushed by <name>". The headline no longer counts a crate on a pushed truck as
+stowed. Labels: "fetching the hand truck", "loading <crate>", "hauling <n> crates", "unloading
+<crate>", "returning the hand truck", "parking the hand truck".
+*Save.* No schema bump: `Activity.haul` and the three steps are additive plain data, and a save
+mid-trip restores and finishes it identically. Folded into 3 → 4 (production is still on 3): a
+save with no hand truck gets the content's one on the stowage zone's first tile, its id from the
+save's item counter; `MigrationContext.content` now includes `items`.
+*Measured* (seed 20260930, real content, stand-in narrator). The full-sim port call at Green
+Meridian (unload six, load six) runs docked → preparing 91.7 s against 190.4 s by hand, and the
+opening Hub call (load six) start → preparing 63.8 s against 90.8 s. A six-crate Hub → Green
+Meridian job alone:
+loading 56.2 s against 90.5 s, unloading 48.6 s against 100.7 s. `crew pacing` freight round
+trip (two crates): 508.9 sim-s against 567.8, 10 narrator calls against 11 (the plain trip is
+unchanged at 434.8). The full-sim crew's-day case now runs eight sim-minutes: with the shorter
+call the ship is at a third port by seven and the pilot back at the helm before anything else
+came up; it allows one more offer card (four decisions). Its prep-time case no longer counts
+time someone is on the dock during prep (D61's call aboard, the last hauler walking back from
+the bay), which is not the pilot's walk it guards.
+*Found, not changed:* the W4a "ship familiarity" brief only runs for an actor whose knowledge is
+empty at their first look, and D63's `briefCrew` writes freight facts at acceptance, which can
+come first (the opening offer is taken at tick 1–2); such a crew member never learns where the
+ship's stores are, the truck included, until they walk past them. In the full sim the pilot
+never knows where the rations are.

@@ -29,10 +29,10 @@ export const SIM_VERSION = "0.1.0";
 
 /**
  * What a migration may read besides the save: the content it is being restored against (D61:
- * which dock map belongs to the port a save is docked at).
+ * which dock map belongs to the port a save is docked at; D65: which item is the hand truck).
  */
 export interface MigrationContext {
-  readonly content: Pick<ContentBundle, "decks" | "docks">;
+  readonly content: Pick<ContentBundle, "decks" | "docks" | "items">;
 }
 
 /**

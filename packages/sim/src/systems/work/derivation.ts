@@ -169,7 +169,11 @@ function settleClosedProblem(ctx: StepCtx, problem: Problem, tasks: readonly Tas
 function referencedTaskIds(ctx: StepCtx): Set<TaskId> {
   const ids = new Set<TaskId>();
   for (const actor of Object.values(ctx.state.actors)) {
-    if (actor.activity.kind === "task") ids.add(actor.activity.taskId);
+    const activity = actor.activity;
+    if (activity.kind !== "task") continue;
+    ids.add(activity.taskId);
+    // D65: a hand-truck trip's other tasks are referenced too.
+    for (const leg of activity.haul?.legs ?? []) ids.add(leg.taskId);
   }
   return ids;
 }

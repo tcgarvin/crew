@@ -11,8 +11,10 @@
  *   once, and once the call has run `travel.recallAboardSeconds` everyone still on the dock is
  *   (`bringAboardStragglers`). Both emit `broughtAboard`, which the ticker shows.
  * - At the end of `undocking` the dock is cleared before it detaches (`clearDock`): anything
- *   still on it is left at the port's warehouse (`leftOnDock`), and anyone still on it (prep
- *   makes that impossible; this is the last guard) is brought aboard.
+ *   still on it is left at the port's warehouse (`leftOnDock`), except the ship's own gear (D65:
+ *   a hand truck dropped there mid-trip), which the dock crew hand up the cargo ramp
+ *   (`gearBroughtAboard`); anyone still on it (prep makes that impossible; this is the last
+ *   guard) is brought aboard.
  * - D63: a buyer out through the gate on a market errand (`throughGate`, off ship) counts as
  *   ashore: the ramps stay down for them and the call waits for them to come back on their own;
  *   only an overdue call (or the last guard) fetches them, ending the errand at the gate.
@@ -23,6 +25,7 @@ import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { DoorId, PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
+import type { Item } from "../../core/types/ship";
 import type { TravelStage, TravelState } from "../../core/types/travel";
 import { dockRamps, rampLanding, rampTop } from "../spatial/dock";
 import { deckGeometry } from "../spatial/geometry";
@@ -30,6 +33,7 @@ import { centre } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
 import { backoffRef, isBackingOff, isOutThroughGate } from "../work/activity";
 import { abortActivity } from "../work/execute";
+import { truckCapacity } from "../work/truck";
 
 type Ctx = StepCtx;
 
@@ -182,6 +186,33 @@ export function endRecall(travel: PrepTravel): void {
   delete travel.recallSinceTick;
 }
 
+/** D65: the ship's own hand truck (equipment, not freight: no job owns it). */
+function isShipsGear(ctx: Ctx, item: Item): boolean {
+  return item.jobId === undefined && truckCapacity(ctx, item) > 0;
+}
+
+/**
+ * D65: the ship's gear left lying on the dock (a hand truck set down by someone stopped mid-trip)
+ * is handed up the cargo ramp by the dock crew, as people are, and set down at its top.
+ */
+function handAboard(ctx: Ctx, item: Item, portId: PortDefId): void {
+  const location = item.location;
+  if (location.kind !== "onDeck") return;
+  const top = ctx.content.decks[location.deckId]?.docking.cargoTransferTiles[0];
+  if (top === undefined)
+    throw new Error(`handAboard: deck "${location.deckId}" has no cargo ramp top`);
+  item.location = { kind: "onDeck", deckId: location.deckId, ...centre(top) };
+  ctx.dirty.inventory = true;
+  ctx.emit({
+    type: "gearBroughtAboard",
+    subjectIds: [item.id],
+    locationRef: { kind: "port", portId },
+    causeIds: [],
+    source: "sim",
+    payload: { itemId: item.id, portId },
+  });
+}
+
 /**
  * Clear the dock before it detaches at the end of `undocking`: anyone still on it is brought
  * aboard, and anything still on it stays at the port, in `store` (its warehouse).
@@ -193,6 +224,10 @@ export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation):
   }
   for (const item of Object.values(ctx.state.items)) {
     if (!isOnDock(ctx.content, ctx.state, item.location)) continue;
+    if (isShipsGear(ctx, item)) {
+      handAboard(ctx, item, portId);
+      continue;
+    }
     item.location = store;
     ctx.dirty.inventory = true;
     ctx.emit({

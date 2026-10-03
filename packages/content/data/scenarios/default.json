@@ -40,6 +40,11 @@
       "itemDefId": "item.med_kit",
       "count": 3,
       "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.hand_truck",
+      "count": 1,
+      "zoneKey": "cargo_stow"
     }
   ],
   "initialFaults": []

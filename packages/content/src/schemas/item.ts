@@ -21,4 +21,5 @@ export const itemDefSchema = z.strictObject({
   mass: nonNegative,
   cargoClass: cargoClassSchema.exactOptional(),
   nutrition: positive.exactOptional(),
+  capacityUnits: positiveInt.exactOptional(),
 }) satisfies z.ZodType<ItemDef>;

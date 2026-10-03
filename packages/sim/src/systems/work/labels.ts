@@ -5,7 +5,9 @@
  *
  * Vocabulary: "idle", "walking", "walking to <place>", "going ashore", "walking on the dock",
  * "coming aboard" (D61), "picking up <item>", "hauling <item>",
- * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
+ * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "fetching the hand truck",
+ * "loading <item>", "hauling <n> crates", "unloading <item>", "returning the hand truck",
+ * "parking the hand truck" (D65), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
  * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
@@ -131,6 +133,12 @@ function taskStepLabel(
       return `ashore buying ${marketItemName(ctx, task)}`;
     case "stowBought":
       return `stowing ${itemDefName(ctx, step.itemDefId)}`;
+    case "loadTruck":
+      return `loading ${itemName(ctx, step.itemId)}`;
+    case "unloadTruck":
+      return `unloading ${itemName(ctx, step.itemId)}`;
+    case "parkTruck":
+      return "parking the hand truck";
     case "work": {
       if (step.stage === "buy") return `buying ${marketItemName(ctx, task)}`;
       if (task === undefined || task.target.kind !== "machine") return "working";
@@ -172,9 +180,35 @@ function personalStepLabel(
       return "buying";
     case "stowBought":
       return `putting down ${itemDefName(ctx, step.itemDefId)}`;
+    case "loadTruck":
+    case "unloadTruck":
+    case "parkTruck":
+      return "moving crates";
     case "hold":
       return HOLD_LABEL[step.hold];
   }
+}
+
+/**
+ * D65: a hand-truck trip's walks say what is on the truck: fetching it, pushing a load, or taking
+ * it back aboard empty; its other steps are labelled as any task's.
+ */
+function truckWalkLabel(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  truckId: ItemId,
+  steps: readonly DeepReadonly<ActivityStep>[],
+  target: StepTarget,
+): string {
+  if (!carrying(ctx, actor, truckId)) return "fetching the hand truck";
+  const load = Object.values(ctx.state.items).filter(
+    (i) => i.location.kind === "inContainer" && i.location.containerId === truckId,
+  );
+  const [only] = load;
+  if (load.length === 1 && only !== undefined) return `hauling ${itemName(ctx, only.id)}`;
+  if (load.length > 1) return `hauling ${load.length} crates`;
+  const loadingLeft = steps.some((s) => s.kind === "loadTruck");
+  return loadingLeft ? placeLabel(ctx, actor, target) : "returning the hand truck";
 }
 
 /** The label for an actor's current activity and step. */
@@ -184,6 +218,11 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   const step = currentStep(activity);
   if (step === undefined) return "idle";
   if (activity.kind === "task") {
+    const haul = activity.haul;
+    if (haul !== undefined && step.kind === "moveTo" && activity.plan !== undefined) {
+      const rest = activity.plan.steps.slice(activity.plan.stepIndex);
+      return truckWalkLabel(ctx, actor, haul.truckId, rest, step.target);
+    }
     return taskStepLabel(ctx, actor, ctx.state.work.tasks[activity.taskId], step);
   }
   return personalStepLabel(ctx, actor, step);
