@@ -3,7 +3,7 @@
  * narrator package holds no provider SDK or endpoint and tests never touch the network.
  *
  * W9 decision: OpenRouter transport (owner). The concrete OpenRouter implementation
- * (chat completions + `response_format: json_schema`, strict) is not in this package yet; see the
+ * (chat completions, the plan schema in the prompt since D53) is not in this package yet; see the
  * W9 report. Until one is supplied, `runNarrator` answers with the null fallback
  * (`fallback: "notConfigured"`).
  */

@@ -419,3 +419,21 @@ off, so `jobBoard` never fires in that gap. A due return waits while the overdue
 unanswered, since no decision can be withdrawn. A passenger who is left behind or put off drops
 off the roster and the digest's Aboard line and appears in the narrator's people section at
 that port; the server places their cast entry there from state. Prompt v0.14.
+
+## 2026-10-03 — The plan schema leaves the grammar
+
+**D53. The plan schema rides in the prompt, not in a grammar.** The passenger booleans on
+`offerJob` pushed the strict-output schema past the provider's grammar cap again ("compiled
+grammar is too large" on every call; the third time after D45 and D47). A direct probe showed the
+schema at 6098 bytes failing and any one of several 400-byte cuts compiling, so the plan sat on
+the cap and every new lever would have cost a schema redesign. OpenRouter sends a `json_schema`
+response format to Anthropic as a grammar even with `strict: false`, so the transport now sends
+no `response_format` at all: the JSON schema is the last system block (`schemaInstruction` in
+`openrouter.ts`; game-independent, so it stays in the cached prefix) and `runNarrator`'s zod
+validation, which already ran on every reply, is the only check; a reply that fails it falls back
+`schemaInvalid` and the client retries (D43). Sonnet 4.6 returned a valid plan in 11 of 11 calls
+(3 probes, 8 live tests) and GPT-6 Luna in 14 of 14, prompt caching intact on both. This also ends
+the first-call fallback while a new grammar compiled (D45). The schema-size test stays, as a
+prompt-token budget (8 KiB, was 6) and to keep per-game ids out of the cached prefix. Tool use
+with one tool per intent was the owner's general preference and is the likely next shape; not
+worth the rewrite now.

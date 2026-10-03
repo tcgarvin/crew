@@ -1,7 +1,11 @@
 /**
  * OpenRouter implementation of `ModelTransport` (D15).
  *
- * One OpenAI-compatible chat completion with `response_format: json_schema` (strict). The
+ * One OpenAI-compatible chat completion. D53: the plan schema rides in the prompt as the last
+ * system block (`schemaInstruction`), not as `response_format: json_schema`: strict structured
+ * output compiles the schema into a grammar whose provider-side size cap the plan outgrew three
+ * times (D45, D47, passengers), and OpenRouter sends a json_schema to Anthropic as a grammar even
+ * with `strict: false`. `runNarrator` validates the reply against the zod schema either way. The
  * system parts are sent as separate text content parts with Anthropic-style `cache_control`
  * (`systemContentParts`); OpenRouter forwards that to providers that support prompt caching and
  * ignores it elsewhere. `fetch` is injectable so tests never touch the network.
@@ -66,10 +70,25 @@ export function systemContentParts(system: readonly string[]) {
   );
 }
 
+/**
+ * The schema block. It depends only on the plan schema, never on the game state, so it stays in
+ * the cached static prefix.
+ */
+export function schemaInstruction(jsonSchema: Readonly<Record<string, unknown>>): string {
+  return [
+    "Answer with one JSON object and nothing else: no prose, no code fence.",
+    "It must validate against this JSON Schema (every property is required):",
+    JSON.stringify(jsonSchema),
+  ].join("\n");
+}
+
 export function openRouterTransport(options: OpenRouterOptions): ModelTransport {
   const doFetch = options.fetch ?? fetch;
   return async (request: ModelRequest): Promise<ModelResult> => {
-    const systemParts = systemContentParts(request.system);
+    const systemParts = systemContentParts([
+      ...request.system,
+      schemaInstruction(request.jsonSchema),
+    ]);
     const body = {
       model: request.model,
       max_tokens: request.maxTokens,
@@ -77,10 +96,6 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
         { role: "system", content: systemParts },
         { role: "user", content: request.user },
       ],
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: request.schemaName, strict: true, schema: request.jsonSchema },
-      },
     };
 
     let response: Response;

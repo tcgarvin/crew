@@ -1,13 +1,13 @@
 /**
- * D45: strict structured output compiles the schema into a grammar with a provider-side size
- * limit, so the serialized schema must stay small and must not embed per-game enums.
+ * D45, D53: the schema rides in the cached system prefix of every call (no longer a grammar, so
+ * no provider-side size cap), so it must stay small and game-independent: no per-game enums.
  */
 import { describe, expect, it } from "vitest";
 import { approachingPortRequest } from "./fixtures";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { content } from "./test-support";
 
-const MAX_SCHEMA_BYTES = 6 * 1024;
+const MAX_SCHEMA_BYTES = 8 * 1024;
 const MAX_ENUM_ENTRIES = 8;
 
 function enumArrays(node: unknown, found: unknown[][] = []): unknown[][] {
@@ -21,8 +21,8 @@ function enumArrays(node: unknown, found: unknown[][] = []): unknown[][] {
   return found;
 }
 
-describe("plan JSON schema size (D45)", () => {
-  it("stays under the grammar budget for the real content bundle and a fixture snapshot", () => {
+describe("plan JSON schema size (D45, D53)", () => {
+  it("stays under the prompt budget for the real content bundle and a fixture snapshot", () => {
     const req = approachingPortRequest(content());
     expect(req.snapshot.state.machines).not.toEqual({});
     const json = planJsonSchema(planSchemaFor());

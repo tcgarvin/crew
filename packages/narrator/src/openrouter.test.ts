@@ -7,7 +7,8 @@ import type { CommandId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { approachingPortRequest } from "./fixtures";
-import { openRouterTransport, systemContentParts } from "./openrouter";
+import { openRouterTransport, schemaInstruction, systemContentParts } from "./openrouter";
+import { planJsonSchema, planSchemaFor } from "./plan";
 import { STATIC_RULES } from "./prompts/index";
 import { runNarrator } from "./run";
 import { content, emptyPlan } from "./test-support";
@@ -116,5 +117,25 @@ describe("OpenRouter prompt caching", () => {
     expect(systemContentParts(["only"])).toEqual([
       { type: "text", text: "only", cache_control: { type: "ephemeral" } },
     ]);
+  });
+});
+
+describe("OpenRouter plan schema (D53)", () => {
+  it("sends the schema as the last cached system block, not as a response_format grammar", async () => {
+    const { bodies, fetch } = recordingFetch();
+    await runNarrator(approachingPortRequest(content()), {
+      gameId: "g1",
+      content: content(),
+      transport: openRouterTransport({ apiKey: "test", fetch }),
+    });
+    const body = bodies[0];
+    if (body === undefined) throw new Error("expected a request");
+    expect(body).not.toHaveProperty("response_format");
+    const system = body.messages[0].content;
+    expect(system.at(-1)).toEqual({
+      type: "text",
+      text: schemaInstruction(planJsonSchema(planSchemaFor())),
+      cache_control: { type: "ephemeral" },
+    });
   });
 });

@@ -57,7 +57,7 @@ after the slice, driven by what playtesting shows is boring or broken.
   deterministic job + template card so the game runs offline and in tests.
 - **Narrator digest** is projected server-side from the uploaded snapshot by a pure function in
   `packages/narrator` (truth section + recent events + Neon narrative state). Prompt-cached
-  static prefix. Structured output via `output_config.format`.
+  static prefix. The plan schema rides in the prompt and the reply is validated (D53; was strict structured output, D45).
 - **Decision** is sim state: `{origin, perspectiveActorId, left, right, nextDecisionId?}`; host
   pauses while one is pending; `ResolveDecision` applies the chosen side's commands.
 
