@@ -1,13 +1,16 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
 import { actorSubtitle, rosterRole } from "./actorWords";
+import type { LocalInspection } from "./localInspection";
 import type { PlaceInspection } from "./placeInspection";
 
 export type InspectorData =
   | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
   | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
   | { readonly kind: "item"; readonly item: ItemInspection }
-  /** Dockside phase 2: a dock post, or the dock itself. */
+  /** Dockside phase 2: a dock post, or the dock itself; phase 3 (D68): a staged prop. */
   | { readonly kind: "place"; readonly place: PlaceInspection }
+  /** Dockside phase 3 (D68): one of the dock's own people. */
+  | { readonly kind: "local"; readonly local: LocalInspection }
   | { readonly kind: "loading" };
 
 /** Polish A: what the inspector shows for a tapped crate (or any item on deck). */
@@ -56,6 +59,7 @@ export function Inspector({ data, onClose }: InspectorProps) {
         {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
         {data.kind === "item" && <ItemInspector item={data.item} />}
         {data.kind === "place" && <PlaceInspector place={data.place} />}
+        {data.kind === "local" && <LocalInspector local={data.local} />}
       </aside>
     </div>
   );
@@ -142,6 +146,32 @@ function PlaceInspector({ place }: { place: PlaceInspection }) {
       <h2>{place.title}</h2>
       <p className="inspector-subtitle">{place.subtitle}</p>
       <p>{place.text}</p>
+    </div>
+  );
+}
+
+function LocalInspector({ local }: { local: LocalInspection }) {
+  return (
+    <div>
+      <h2>{local.name}</h2>
+      <p className="inspector-subtitle">{local.role}</p>
+      {local.look !== undefined && <p>{local.look}</p>}
+      <dl className="inspector-grid">
+        <dt>Where</dt>
+        <dd>{local.where}</dd>
+        {local.post !== undefined && (
+          <>
+            <dt>Post</dt>
+            <dd>{local.post}</dd>
+          </>
+        )}
+        {local.doing !== undefined && (
+          <>
+            <dt>Doing</dt>
+            <dd>{local.doing}</dd>
+          </>
+        )}
+      </dl>
     </div>
   );
 }

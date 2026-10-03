@@ -75,3 +75,42 @@ describe("Inspector item sheet", () => {
     expect(html).not.toContain("nobody loads it");
   });
 });
+
+describe("Inspector local sheet (D68)", () => {
+  it("shows a regular's name, role and post", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "local",
+          local: { name: "Hal Petrosyan", role: "berth agent", where: "at the queue-board kiosk" },
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<h2>Hal Petrosyan</h2>");
+    expect(html).toContain('class="inspector-subtitle">berth agent<');
+    expect(html).toContain("<dd>at the queue-board kiosk</dd>");
+    expect(html).not.toContain("Doing");
+    expect(html).not.toContain("Post");
+  });
+
+  it("adds what a busy local is doing, and their post when they are away from it", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "local",
+          local: {
+            name: "Ilse Brandt",
+            role: "dock hand",
+            where: "in the freight staging area on the dock",
+            post: "the Co-op dispatch window",
+            doing: "bringing out 3 crates",
+          },
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<dt>Doing</dt><dd>bringing out 3 crates</dd>");
+    expect(html).toContain("<dt>Post</dt><dd>the Co-op dispatch window</dd>");
+  });
+});

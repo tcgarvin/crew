@@ -171,3 +171,43 @@ describe("FramePlayback", () => {
     expect(playback.bufferedFrameCount).toBe(1);
   });
 });
+
+describe("interpolateFrame and the dock's locals (D66)", () => {
+  function withLocals(base: RenderFrame, locals: { id: string; x: number; facing: number }[]) {
+    return {
+      ...base,
+      locals: locals.map((l) => ({
+        id: l.id as never,
+        name: `Local ${l.id}`,
+        role: "dock hand",
+        deckId: "deck" as never,
+        x: l.x,
+        y: 2,
+        facing: l.facing,
+        lookSeed: 7,
+        postKey: "dispatch" as never,
+        carrying: 0,
+      })),
+    };
+  }
+
+  it("glides a local between frames by id and snaps a newcomer in", () => {
+    const prev = withLocals(frame(0, 0, 0), [{ id: "o1", x: 0, facing: 0 }]);
+    const next = withLocals(frame(2, 0, 0), [
+      { id: "o1", x: 2, facing: Math.PI / 2 },
+      { id: "o2", x: 9, facing: 0 },
+    ]);
+    const mid = interpolateFrame(prev, next, 0.5);
+    expect(mid.locals.map((l) => l.id)).toEqual(["o1", "o2"]);
+    expect(mid.locals[0]?.x).toBeCloseTo(1);
+    expect(mid.locals[0]?.y).toBe(2);
+    expect(mid.locals[0]?.facing).toBeCloseTo(Math.PI / 4);
+    expect(mid.locals[1]?.x).toBe(9);
+  });
+
+  it("drops a local who left in the next frame", () => {
+    const prev = withLocals(frame(0, 0, 0), [{ id: "o1", x: 0, facing: 0 }]);
+    const next = withLocals(frame(2, 0, 0), []);
+    expect(interpolateFrame(prev, next, 0.5).locals).toEqual([]);
+  });
+});

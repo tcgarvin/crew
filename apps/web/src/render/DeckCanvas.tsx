@@ -19,18 +19,17 @@ import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { cameraBounds } from "./camera";
 import { type DockTable, clampEngagement, dockInView, dockSlide, withDockSlide } from "./dock";
-import { dockTargetAt } from "./dockHit";
 import {
   type DeckLayout,
   type DrawSelection,
   type ViewTransform,
   computeFitTransform,
-  deckPiles,
   drawFrame,
   screenToWorld,
   shouldRotate,
 } from "./draw";
 import { engineOutput, hullGeometry } from "./hull";
+import { pickAt } from "./pick";
 import { sceneAt, withDockSky } from "./scene";
 import { StarScroll, buildStarField } from "./stars";
 
@@ -48,10 +47,6 @@ export interface DeckCanvasProps {
   readonly selected: Selection | undefined;
   readonly onSelect: (selection: Selection | undefined) => void;
 }
-
-const HIT_RADIUS_TILES = 0.8;
-/** Crates sit on a tile; tapping anywhere near its square selects the pile's top item. */
-const ITEM_HIT_RADIUS_TILES = 0.5;
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -215,47 +210,7 @@ export function DeckCanvas({
       // Hit what is on screen: people and crates on the dock where the sliding dock put them.
       const shown = withDockSlide(frame, slide);
 
-      let best: Selection | undefined;
-      let bestDist = HIT_RADIUS_TILES;
-      for (const actor of shown.actors) {
-        const d = Math.hypot(actor.x - worldX, actor.y - worldY);
-        if (d < bestDist) {
-          bestDist = d;
-          best = { kind: "actor", id: actor.id };
-        }
-      }
-      if (!best) {
-        let bestItem = ITEM_HIT_RADIUS_TILES;
-        for (const pile of deckPiles(shown, layout.deckId)) {
-          const d = Math.hypot(pile.x - worldX, pile.y - worldY);
-          if (d < bestItem) {
-            bestItem = d;
-            best = { kind: "item", id: pile.top.id };
-          }
-        }
-      }
-      if (!best) {
-        const machineByKey = new Map(
-          frame.machines
-            .filter((m) => m.deckId === layout.deckId)
-            .map((m) => [m.placementKey, m.id] as const),
-        );
-        for (const m of layout.machines) {
-          const d = Math.hypot(m.center.x - worldX, m.center.y - worldY);
-          if (d < HIT_RADIUS_TILES + m.footprint.length * 0.4) {
-            const id = machineByKey.get(m.placementKey);
-            if (id !== undefined) {
-              best = { kind: "machine", id };
-              break;
-            }
-          }
-        }
-      }
-      if (!best) {
-        const dock = dockInView(frame, docks);
-        if (dock !== undefined) best = dockTargetAt(dock, layout, worldX - slide, worldY);
-      }
-      onSelect(best);
+      onSelect(pickAt(shown, layout, dockInView(frame, docks), slide, worldX, worldY));
     },
     [frame, layout, docks, onSelect],
   );

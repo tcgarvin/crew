@@ -840,3 +840,43 @@ checks that every dock came alongside dressed and no dock hand gave up a walk.
 *Found, not changed:* `notableEvent` only looks one tick back, so a narrative event in the tick a
 `stageDock` is raised loses its hook (true of any hook raised by travel first; now it happens on
 every leg).
+
+**D68. Phase 3 of Dockside, renderer and inspector: the dock's own people and props.** Plan item
+10 (design §5.1; the frame's shapes in `docs/design/dockside-phase3-contract.md` §6). The canvas
+reads only `RenderFrame.locals`, `RenderFrame.dockProps` and the content's dock map; no sim change.
+*Look.* A local is a dot the crew's size in one of eight muted mid-light hues picked by
+`lookSeed % 8` (`localLook`, `apps/web/src/render/locals.ts`), with a rim of the same hue
+darkened: never crew gold, never the passenger's pale fill and blue rim (a test holds every hue
+at least 80 RGB units from both). A dock hand carting crates pushes a trolley drawn like the
+crew's hand truck (D65), its crates in general freight's colour since the frame carries only a
+count. Locals and props are on the dock by construction, so `withDockSlide` moves all of them.
+*Props* are drawn as their item would be (`itemColor` by kind and class), muted 40% toward grey,
+as that many small crates set out on the tile and never with freight's count tag, so set dressing
+does not read as cargo the crew can handle or as an offer (D64's dashed outline).
+*Labels.* A local is labelled only while doing something (`label` present), by first name
+("Hal — waiting by three crates", up to 34 characters), in a dimmer text colour than the crew's,
+and stacked with the crew's labels so the two never overlap. A regular standing at their post
+says nothing a tap does not, and the docked phone view (D62) was already crowded; in the
+playthrough the only local labels on screen were the dock hand carting and the receiver waiting,
+so no zoom threshold was needed. The check also found every multi-crate hand truck's count tag
+printed over its pusher's label ("Priya Kessler — ×3 hauling"): the tag now hangs below the toe
+plate, and the label of anyone pushing a loaded truck or trolley is lifted clear of its handle.
+*Tapping.* `pickAt` (`render/pick.ts`, moved out of `DeckCanvas`) tries people first, crew and
+locals together, the nearest within 0.8 tiles; then the ship's items, the staged props, machines,
+and last a post or bare dock floor, so a tap on a regular at their post opens the person. A prop
+has no id, so it is selected by its index in the frame (props are set once at dressing and gone
+with the dock, and a position would change as the dock slides). Both open from the frame and
+content without a snapshot, like a post (`ui/dockInspection.ts`): a local shows name, role,
+"Where" ("at the queue-board kiosk" within two tiles of their post, else the dock area or nearest
+post, with their post on its own line), "Doing" when labelled, and a new face's look line; a
+prop shows its name, "on the dock" and "Three of them, in the freight staging area on the dock.
+The port's, not the ship's." A local gone from the frame between the draw and the tap opens
+nothing. Shared screen-space pieces moved out of `draw.ts` into `screen.ts` (the transform,
+`toScreenPx`, dot and carried sizes) and `crates.ts` (crate, badge, truck), re-exported where
+callers used them.
+*Verified* in the real app (null narrator, landscape 1280×800 and 390×700): Hal at the queue
+kiosk and Anneke at the night stall on a new game, a dock hand bringing the opening offer's
+crates out on a trolley, the receiver waiting at Kessler's ore-store lock, each tapped.
+Playback's interpolation of locals by id (D66) is now tested.
+*Found, not changed:* Kessler Drift's ore conveyor is drawn with round yellow rollers that read
+like crew dots at phone scale (phase 2 prop art).

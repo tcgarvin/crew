@@ -7,21 +7,21 @@
  * state/door state still come from the live `RenderFrame`.
  */
 import type {
-  CargoClass,
   DockDef,
   DoorPhysicalState,
   RenderActor,
   RenderFrame,
   RenderItem,
-  RenderItemKind,
   RenderMachineState,
 } from "@crew/sim";
+import { drawBadge, drawCrate, drawLoadedTruck, itemColor, loadedTruckRise } from "./crates";
 import type { DeckLayout } from "./deckLayout";
 import { dockOrigin, dockSlide, withDockSlide } from "./dock";
 import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
+import { drawDockProps, drawLocalDots, drawLocalTrolleys, localLabelText } from "./locals";
 import { drawRamps } from "./ramps";
 import type { Scene } from "./scene";
 import {
@@ -32,13 +32,11 @@ import {
   drawPlanetBelow,
   drawSky,
 } from "./scenery";
+import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
 import { type StarLayer, drawStars } from "./stars";
 
-export interface ViewTransform {
-  readonly scale: number;
-  readonly offsetX: number;
-  readonly offsetY: number;
-}
+export { CARGO_COLORS, itemColor } from "./crates";
+export { type ViewTransform, toScreenPx } from "./screen";
 
 /**
  * Whether the deck's drawing should be rotated 90° to fill a portrait viewport (task item 5:
@@ -76,28 +74,6 @@ export function computeFitTransform(
   return { scale, offsetX, offsetY };
 }
 
-function toPx(t: ViewTransform, x: number, y: number): readonly [number, number] {
-  return [t.offsetX + x * t.scale, t.offsetY + y * t.scale];
-}
-
-/**
- * Map a point in the transform's local ("fit") space to real screen pixels, applying the same
- * 90° rotation `drawFrame` applies to the canvas — used to place text after `ctx.restore()` so
- * labels stay upright (task item 5).
- */
-export function toScreenPx(
-  t: ViewTransform,
-  x: number,
-  y: number,
-  rotated: boolean,
-  viewportWidth: number,
-): readonly [number, number] {
-  const [lx, ly] = toPx(t, x, y);
-  if (!rotated) return [lx, ly];
-  // Matches the canvas transform in `drawFrame`: translate(viewportWidth, 0); rotate(90deg).
-  return [viewportWidth - ly, lx];
-}
-
 const DEFAULT_ROOM = { fill: "#1b2430", label: "#a9b8c8" } as const;
 
 /**
@@ -127,7 +103,6 @@ export function roomStyle(tags: readonly string[] | undefined): { fill: string; 
 const WALL_COLOR = "#8095ab";
 const HULL_COLOR = "#a9bbcd";
 const VOID_FILL = "#05070a";
-const TEXT_COLOR = "#e7edf3";
 const LABEL_BG = "rgba(10, 14, 20, 0.72)";
 const ROOM_PLATE_BG = "rgba(5, 7, 10, 0.55)";
 
@@ -145,26 +120,6 @@ const MACHINE_COLORS: Record<RenderMachineState, string> = {
   failed: "#c0392b",
   off: "#5b6b7a",
 };
-
-/** Polish A (D28): crate colour per freight class; other kinds get one colour each. */
-export const CARGO_COLORS: Readonly<Record<CargoClass, string>> = {
-  general: "#d8ab6c",
-  fragile: "#8cc4f2",
-  perishable: "#bd9cf2",
-  hazardous: "#f27f3d",
-};
-
-const ITEM_COLORS: Readonly<Record<RenderItemKind, string>> = {
-  crate: CARGO_COLORS.general,
-  tool: "#cfd8e3",
-  food: "#e8cf6a",
-  other: "#9aa7b5",
-};
-
-export function itemColor(item: Pick<RenderItem, "kind" | "cargoClass">): string {
-  if (item.kind === "crate" && item.cargoClass !== undefined) return CARGO_COLORS[item.cargoClass];
-  return ITEM_COLORS[item.kind];
-}
 
 export function drawCompartments(
   ctx: CanvasRenderingContext2D,
@@ -374,16 +329,14 @@ export function drawMachineLabels(
   ctx.textAlign = "left";
 }
 
-const MIN_DOT_RADIUS = 4; // >= 8px diameter at 390px width, per the brief
-
-const CREW_DOT_COLOR = "#f2c14e";
+export const CREW_DOT_COLOR = "#f2c14e";
 /**
  * Passengers §3.2: a paying passenger is a person aboard but not crew, so their dot is a pale
  * one with a blue rim rather than crew yellow. Pale rather than another hue so it never reads as
  * a crate or a machine state on a phone.
  */
-const PASSENGER_DOT_COLOR = "#dfe9f3";
-const PASSENGER_RIM_COLOR = "#5b86b8";
+export const PASSENGER_DOT_COLOR = "#dfe9f3";
+export const PASSENGER_RIM_COLOR = "#5b86b8";
 
 export function actorDotColor(actor: Pick<RenderActor, "passenger">): string {
   return actor.passenger ? PASSENGER_DOT_COLOR : CREW_DOT_COLOR;
@@ -397,7 +350,7 @@ export function drawActorDots(
   viewportWidth: number,
   selectedId?: string,
 ): void {
-  const radius = Math.max(MIN_DOT_RADIUS, t.scale * 0.22);
+  const radius = dotRadius(t);
   for (const actor of frame.actors) {
     const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
     ctx.fillStyle = actorDotColor(actor);
@@ -478,67 +431,6 @@ export function deckPiles(frame: RenderFrame, deckId: string): ItemPile[] {
   return piles;
 }
 
-/** A small count tag hung off a crate's top-right corner, so it never hides the crate. */
-function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, count: number): void {
-  const text = `×${count}`;
-  ctx.font = "700 9px system-ui, sans-serif";
-  const w = ctx.measureText(text).width + 4;
-  const h = 11;
-  ctx.fillStyle = "rgba(5, 7, 10, 0.85)";
-  ctx.fillRect(x, y - h, w, h);
-  ctx.fillStyle = TEXT_COLOR;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, x + 2, y - h / 2 + 0.5);
-}
-
-/** How strongly an offered crate (D63) is filled: enough to show its class, clearly not solid. */
-const OFFERED_FILL_ALPHA = 0.3;
-
-function drawCrate(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  size: number,
-  color: string,
-  selected: boolean,
-  offered = false,
-): void {
-  const x = cx - size / 2;
-  const y = cy - size / 2;
-  ctx.save();
-  if (offered) ctx.globalAlpha *= OFFERED_FILL_ALPHA;
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, size, size);
-  ctx.restore();
-  if (offered) {
-    // Freight on offer is nobody's yet: a dashed outline in its class colour reads as
-    // "available" rather than as cargo the crew are handling, or as the dock's own crates.
-    ctx.save();
-    ctx.setLineDash([3, 2]);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x + 0.75, y + 0.75, size - 1.5, size - 1.5);
-    ctx.restore();
-  } else {
-    ctx.strokeStyle = "rgba(10, 14, 20, 0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x, y, size, size);
-    if (size >= 9) {
-      // A strap across the lid, so it reads as a crate rather than a machine tile.
-      ctx.beginPath();
-      ctx.moveTo(x, cy);
-      ctx.lineTo(x + size, cy);
-      ctx.stroke();
-    }
-  }
-  if (selected) {
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x - 3, y - 3, size + 6, size + 6);
-  }
-}
-
 /**
  * Items on deck (Polish A, D28), in screen space so badges stay upright: one filled square per
  * tile pile with a count badge.
@@ -586,35 +478,6 @@ function containerLoads(frame: RenderFrame): Map<string, RenderItem[]> {
 }
 
 /**
- * D65: a hand truck being pushed, beside its pusher's dot: an upright handle and a toe plate with
- * the crates stacked on it (two to a row, at most two rows; a count tag says how many).
- */
-function drawLoadedTruck(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  footY: number,
-  size: number,
-  load: readonly RenderItem[],
-): void {
-  const crate = size * 0.6;
-  const left = x - crate;
-  const base = footY + size * 0.45;
-  ctx.strokeStyle = "rgba(231, 237, 243, 0.9)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(left - 2, base - crate * 2 - 4);
-  ctx.lineTo(left - 2, base);
-  ctx.lineTo(left + crate * 2 + 1, base);
-  ctx.stroke();
-  load.slice(0, 4).forEach((item, i) => {
-    const cx = left + crate / 2 + (i % 2) * crate;
-    const cy = base - crate / 2 - 1 - Math.floor(i / 2) * crate;
-    drawCrate(ctx, cx, cy, crate, itemColor(item), false);
-  });
-  if (load.length > 1) drawBadge(ctx, left + crate * 2 + 2, base - crate * 2, load.length);
-}
-
-/**
  * A carried crate or tool as a smaller square riding its carrier's dot, up and to the right on
  * screen; a hand truck with crates on it (D65) as the truck and its load. Pocketed rations and
  * the like are not drawn.
@@ -627,8 +490,8 @@ export function drawCarriedItems(
   viewportWidth: number,
 ): void {
   const actorsById = new Map(frame.actors.map((a) => [a.id, a] as const));
-  const dot = Math.max(MIN_DOT_RADIUS, t.scale * 0.22);
-  const small = Math.max(8, t.scale * 0.36);
+  const dot = dotRadius(t);
+  const small = carriedSize(t);
   const loads = containerLoads(frame);
   for (const item of frame.items) {
     if (item.location.kind !== "carried") continue;
@@ -640,7 +503,13 @@ export function drawCarriedItems(
     const y = ay - small * 0.35;
     const load = loads.get(item.id);
     if (load !== undefined) {
-      drawLoadedTruck(ctx, x, ay, small, load);
+      drawLoadedTruck(
+        ctx,
+        x,
+        ay,
+        small,
+        load.map((crate) => itemColor(crate)),
+      );
       continue;
     }
     drawCrate(ctx, x, y, small, itemColor(item), false);
@@ -657,9 +526,60 @@ function truncateLabel(label: string, maxChars: number): string {
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
+/** One label over a person's dot, deck frame. */
+interface PersonLabel {
+  readonly x: number;
+  readonly y: number;
+  readonly text: string;
+  /** The dock's own people (D68) are labelled in a dimmer colour, so the crew read first. */
+  readonly local: boolean;
+  /** Pushing a loaded hand truck or trolley, drawn beside the dot: the label clears its handle. */
+  readonly pushing: boolean;
+}
+
+/** Ids of the people pushing a hand truck with something on it (D65). */
+function truckPushers(frame: RenderFrame): Set<string> {
+  const loads = containerLoads(frame);
+  const pushers = new Set<string>();
+  for (const item of frame.items) {
+    if (item.location.kind === "carried" && loads.has(item.id)) {
+      pushers.add(item.location.actorId);
+    }
+  }
+  return pushers;
+}
+
+const LOCAL_TEXT_COLOR = "#b9c4cf";
+
+/** The crew's labels, then the labels of locals doing something (`localLabelText`). */
+function personLabels(frame: RenderFrame): PersonLabel[] {
+  const pushers = truckPushers(frame);
+  const labels: PersonLabel[] = frame.actors.map((actor) => ({
+    x: actor.x,
+    y: actor.y,
+    text: truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26),
+    local: false,
+    pushing: pushers.has(actor.id),
+  }));
+  for (const local of frame.locals) {
+    const text = localLabelText(local);
+    if (text !== undefined) {
+      labels.push({
+        x: local.x,
+        y: local.y,
+        text: truncateLabel(text, 34),
+        local: true,
+        pushing: local.carrying > 0,
+      });
+    }
+  }
+  return labels;
+}
+
 /**
- * Actor name/action labels, drawn in real screen space (after any rotation is undone) so text
- * always reads upright, per task item 5.
+ * Name/action labels for the crew and passengers, and for the dock's locals while they are doing
+ * something (D68), drawn in real screen space (after any rotation is undone) so text always reads
+ * upright, per task item 5. Overlapping labels stack upward.
  */
 export function drawActorLabels(
   ctx: CanvasRenderingContext2D,
@@ -668,21 +588,22 @@ export function drawActorLabels(
   rotated: boolean,
   viewportWidth: number,
 ): void {
-  const radius = Math.max(MIN_DOT_RADIUS, t.scale * 0.22);
+  const radius = dotRadius(t);
   const fontPx = Math.max(MIN_LABEL_FONT_PX, t.scale * 0.32);
   ctx.font = `${fontPx}px system-ui, sans-serif`;
   ctx.textBaseline = "middle";
 
-  const sorted = [...frame.actors].sort((a, b) => a.x - b.x);
+  const sorted = personLabels(frame).sort((a, b) => a.x - b.x);
   const placed: { x: number; y: number; w: number }[] = [];
+  // A label sits radius + 6 above the dot's centre; a truck's handle rises higher (D68 check).
+  const truckLift = Math.max(0, loadedTruckRise(carriedSize(t)) + fontPx / 2 + 4 - radius - 6);
 
-  for (const actor of sorted) {
-    const [dotX, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
-    const label = truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26);
-    const labelW = ctx.measureText(label).width + 8;
+  for (const entry of sorted) {
+    const [dotX, cy] = toScreenPx(t, entry.x, entry.y, rotated, viewportWidth);
+    const labelW = ctx.measureText(entry.text).width + 8;
     // Kept on screen: the docked camera puts people on the dock's far edges.
     const cx = Math.max(labelW / 2 + 2, Math.min(viewportWidth - labelW / 2 - 2, dotX));
-    let labelY = cy - radius - 6;
+    let labelY = cy - radius - 6 - (entry.pushing ? truckLift : 0);
     for (const p of placed) {
       if (Math.abs(p.x - cx) < (p.w + labelW) / 2 && Math.abs(p.y - labelY) < fontPx + 4) {
         labelY = p.y - (fontPx + 4);
@@ -692,9 +613,9 @@ export function drawActorLabels(
 
     ctx.fillStyle = LABEL_BG;
     ctx.fillRect(cx - labelW / 2, labelY - fontPx / 2 - 2, labelW, fontPx + 4);
-    ctx.fillStyle = TEXT_COLOR;
+    ctx.fillStyle = entry.local ? LOCAL_TEXT_COLOR : TEXT_COLOR;
     ctx.textAlign = "center";
-    ctx.fillText(label, cx, labelY);
+    ctx.fillText(entry.text, cx, labelY);
     ctx.textAlign = "left";
   }
 }
@@ -719,9 +640,14 @@ export interface Scenery {
   readonly clamps: number;
 }
 
-/** What a tap can select: the frame's people, items and machines, or a dock post or the dock. */
+/**
+ * What a tap can select: the frame's people, items and machines, the dock's own people (`local`,
+ * by id) and staged props (`dockProp`, by `dockPropKey`), or a dock post or the dock.
+ */
 export type DrawSelection =
   | { readonly kind: "actor" | "machine" | "item"; readonly id: string }
+  | { readonly kind: "local"; readonly id: string }
+  | { readonly kind: "dockProp"; readonly id: string }
   | DockTarget;
 
 /** The fit-space rectangle the canvas shows, in tile units. */
@@ -840,6 +766,14 @@ export function drawFrame(
   // They sit above the foreground too, so bay walls and clouds never hide the crew.
   drawCompartmentLabels(ctx, t, layout, rotated, viewportWidth);
   drawMachineLabels(ctx, t, layout, rotated, viewportWidth);
+  drawDockProps(
+    ctx,
+    t,
+    shown.dockProps,
+    rotated,
+    viewportWidth,
+    selected?.kind === "dockProp" ? selected.id : undefined,
+  );
   drawDeckItems(
     ctx,
     t,
@@ -848,6 +782,14 @@ export function drawFrame(
     rotated,
     viewportWidth,
     selected?.kind === "item" ? selected.id : undefined,
+  );
+  drawLocalDots(
+    ctx,
+    t,
+    shown.locals,
+    rotated,
+    viewportWidth,
+    selected?.kind === "local" ? selected.id : undefined,
   );
   drawActorDots(
     ctx,
@@ -860,6 +802,7 @@ export function drawFrame(
   drawActorLabels(ctx, t, shown, rotated, viewportWidth);
   // After the labels: a label plate sits just above the dot and would hide the load.
   drawCarriedItems(ctx, t, shown, rotated, viewportWidth);
+  drawLocalTrolleys(ctx, t, shown.locals, rotated, viewportWidth);
 }
 
 /**

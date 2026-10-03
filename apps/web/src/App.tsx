@@ -37,7 +37,7 @@ import {
 } from "./host/saves";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
-import { type DockTable, dockInView } from "./render/dock";
+import type { DockTable } from "./render/dock";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Headline } from "./ui/Headline";
 import { Inspector, type InspectorData } from "./ui/Inspector";
@@ -48,6 +48,7 @@ import { Toast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
+import { dockInspection } from "./ui/dockInspection";
 import { inspectItem } from "./ui/itemInspection";
 import {
   type CardEntry,
@@ -57,7 +58,6 @@ import {
   appendTicker,
   visibleLog,
 } from "./ui/log";
-import { inspectPlace } from "./ui/placeInspection";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
@@ -456,12 +456,15 @@ export function App() {
         setInspectorData(undefined);
         return;
       }
-      if (next.kind === "post" || next.kind === "dock") {
-        // Content only: the dock map the canvas drew, so no snapshot is needed.
-        const dock = frame === undefined ? undefined : dockInView(frame, docks);
-        setInspectorData(
-          dock === undefined ? undefined : { kind: "place", place: inspectPlace(dock, next) },
-        );
+      if (
+        next.kind === "post" ||
+        next.kind === "dock" ||
+        next.kind === "local" ||
+        next.kind === "dockProp"
+      ) {
+        // Content and the frame only (the dock map the canvas drew, its people and props), so no
+        // snapshot is needed.
+        setInspectorData(frame === undefined ? undefined : dockInspection(frame, docks, next));
         return;
       }
       setInspectorData({ kind: "loading" });

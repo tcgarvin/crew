@@ -87,7 +87,8 @@ export function isShipTile(
 /**
  * The frame as drawn: people and loose items on the dock (`onDock`, D61) move with it while it
  * slides (their positions are in the grafted frame, so they already assume it is alongside);
- * everyone aboard stays put. Carried items ride their carrier, so they follow. Returns the frame
+ * everyone aboard stays put. The dock's own people and props (D66) are always on it, so they all
+ * move. Carried items ride their carrier, so they follow. Returns the frame
  * itself when nothing slides, which is every docked frame.
  *
  * Nobody crosses a ramp while the dock slides (ramps open only once `docked` and are up again
@@ -103,6 +104,8 @@ export function withDockSlide(frame: RenderFrame, slide: number): RenderFrame {
       if (loc.kind !== "deck" || !loc.onDock) return item;
       return { ...item, location: { ...loc, x: loc.x + slide } };
     }),
+    locals: frame.locals.map((local) => ({ ...local, x: local.x + slide })),
+    dockProps: frame.dockProps.map((prop) => ({ ...prop, x: prop.x + slide })),
   };
 }
 
