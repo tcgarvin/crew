@@ -474,3 +474,18 @@ finds nothing to close and is dropped with a reason. The title goes on the card'
 as `closesThread`, and the ship's log marks the card "✓ Story closed: <title>". Thread titles
 are private notes, so a title that fails the player-text checks closes as plain "Story closed".
 Still one kind of card, as D54 decided: this is a label on a card, not a card type. Prompt v0.16.
+
+## 2026-10-03 — Dockside
+
+**D57. Ports get a place, arrival gets a stage, and the captain goes looking for work.** Design in
+`docs/design/dockside.md`, plan in `docs/design/dockside-plan.md`. Owner rulings: one authored
+dock map per port; the captain walks ashore to look for work and that walk triggers narration
+(replacing `jobBoard`); the narration that decides who is on the dock when the ship lands sets the
+stage only (no card, no arc or note changes, but aware of the story); stars stream past in transit.
+Delegated calls taken in the design (§8 there): the ship never moves on screen and port-bound
+scenery is a pure function of travel stage and progress; both ramps on the south flank; Green
+Meridian becomes a planet beside Tern's Rest; offered freight is physically staged; locals are
+scripted presences; the staging hook is guaranteed and gates arrival, and its failure falls back
+to the sim's floor set instead of pausing the game (an exception to D43); cards are delivered
+where the captain meets the speaker, superseding D42's wait-for-dock. Each phase records its own
+entries as it lands.
