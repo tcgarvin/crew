@@ -181,8 +181,12 @@ describe("doors", () => {
     const ramp = door(world, "doorB");
     expect(ramp.kind).toBe("ramp");
     ramp.requestedState = "open";
-    // Open, then the powered auto-close shuts it again: both legs take the ramp's time.
-    const changes = doorChanges(stepChecked(test, 400));
+    // Ramps never auto-close (travel raises them), so it stays down until asked up; both legs
+    // take the ramp's time.
+    const opened = doorChanges(stepChecked(test, 400));
+    expect(opened.map((c) => `${c.from}>${c.to}`)).toEqual(["closed>opening", "opening>open"]);
+    ramp.requestedState = "closed";
+    const changes = [...opened, ...doorChanges(stepChecked(test, 400))];
     expect(changes.map((c) => `${c.from}>${c.to}`)).toEqual([
       "closed>opening",
       "opening>open",

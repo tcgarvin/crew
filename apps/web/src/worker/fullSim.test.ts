@@ -185,109 +185,115 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
 const count = (log: RunLog, type: SimEvent["type"]) =>
   log.events.filter((e) => e.type === type).length;
 
-describe("full sim: real content, every system, auto-accept (Integration 2)", () => {
-  it("runs the freight loop and the crew's day for five sim-minutes", () => {
-    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
-    if (process.env.FULLSIM_DEBUG) {
-      for (const e of log.events) {
-        if (e.significance === "trace") continue;
+// Each case simulates five minutes of the whole ship on real content; several sit near vitest's
+// default 5 s, so the suite gets headroom rather than flaking on a slow runner.
+describe(
+  "full sim: real content, every system, auto-accept (Integration 2)",
+  { timeout: 20_000 },
+  () => {
+    it("runs the freight loop and the crew's day for five sim-minutes", () => {
+      const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+      if (process.env.FULLSIM_DEBUG) {
+        for (const e of log.events) {
+          if (e.significance === "trace") continue;
+          console.log(
+            e.tick,
+            e.type,
+            JSON.stringify(e.payload).slice(0, 140),
+            e.subjectIds.join(","),
+          );
+        }
+        console.log("hooks", log.hooks, "decisions", log.decisions, "stages", [...log.stages]);
+        for (const [id, l] of log.labels) console.log(id, [...l].join(" | "));
         console.log(
-          e.tick,
-          e.type,
-          JSON.stringify(e.payload).slice(0, 140),
-          e.subjectIds.join(","),
+          JSON.stringify(world.state.travel),
+          JSON.stringify(Object.values(world.state.jobs)),
         );
+        console.log(
+          Object.values(world.state.work.problems)
+            .map((p) => `${p.kind}:${p.status}:${p.visibility}:${JSON.stringify(p.payload)}`)
+            .join("\n"),
+        );
+        console.log(
+          Object.values(world.state.work.tasks)
+            .map(
+              (t) =>
+                `${t.type}:${JSON.stringify(t.claimState)}:${JSON.stringify(t.blockage ?? null)}`,
+            )
+            .join("\n"),
+        );
+        for (const m of Object.values(world.state.machines))
+          console.log(
+            m.id,
+            m.defId,
+            m.actualMode,
+            m.output.toFixed(2),
+            m.temperature.toFixed(2),
+            JSON.stringify(m.faults),
+          );
       }
-      console.log("hooks", log.hooks, "decisions", log.decisions, "stages", [...log.stages]);
-      for (const [id, l] of log.labels) console.log(id, [...l].join(" | "));
-      console.log(
-        JSON.stringify(world.state.travel),
-        JSON.stringify(Object.values(world.state.jobs)),
+
+      // Freight: a job is taken, its cargo is hauled aboard by the crew, the ship leaves port.
+      expect(count(log, "jobAccepted")).toBeGreaterThanOrEqual(1);
+      const loadProblems = Object.values(world.state.work.problems).filter(
+        (p) => p.kind === "cargoToLoad",
       );
-      console.log(
-        Object.values(world.state.work.problems)
-          .map((p) => `${p.kind}:${p.status}:${p.visibility}:${JSON.stringify(p.payload)}`)
-          .join("\n"),
+      expect(loadProblems.some((p) => p.status === "resolved")).toBe(true);
+      expect([...log.stages].some((stage) => stage !== "docked")).toBe(true);
+      expect(log.decisions).toBeLessThanOrEqual(3);
+
+      // Ship systems: the fault injected at 30 s is found and fixed.
+      expect(count(log, "faultOccurred")).toBeGreaterThanOrEqual(1);
+      expect(count(log, "faultDiagnosed")).toBeGreaterThanOrEqual(1);
+      expect(count(log, "faultRepaired")).toBeGreaterThanOrEqual(1);
+
+      // The crew's day: everyone does at least three different things.
+      expect(log.labels.size).toBe(8);
+      for (const [actorId, labels] of log.labels) {
+        expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
+      }
+      expect(checkInvariants(world.state)).toEqual([]);
+    }, 30_000);
+
+    it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
+      // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
+      // began, so the pilot did not start walking to the console until every crate was aboard —
+      // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. `travel.ts`
+      // now raises `stationToStaff` as soon as a course is planned, so the pilot (idle, with
+      // nothing else essential to do) walks there while the crew is still loading; by the time
+      // `preparingDeparture` starts the console should already be staffed.
+      const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+      const stageChanges = log.events.filter(
+        (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
+          e.type === "travelStageChanged",
       );
-      console.log(
-        Object.values(world.state.work.tasks)
-          .map(
-            (t) =>
-              `${t.type}:${JSON.stringify(t.claimState)}:${JSON.stringify(t.blockage ?? null)}`,
-          )
-          .join("\n"),
-      );
-      for (const m of Object.values(world.state.machines))
-        console.log(
-          m.id,
-          m.defId,
-          m.actualMode,
-          m.output.toFixed(2),
-          m.temperature.toFixed(2),
-          JSON.stringify(m.faults),
+      const prepStarts = stageChanges.filter((e) => e.payload.to === "preparingDeparture");
+      expect(prepStarts.length).toBeGreaterThanOrEqual(1);
+      const prepSeconds = world.config.values.travel.prepareDepartureSeconds;
+      const tickRate = world.config.values.time.tickRate;
+      for (const start of prepStarts) {
+        const next = stageChanges.find(
+          (e) => e.tick > start.tick && e.payload.from === "preparingDeparture",
         );
-    }
+        expect(next).toBeDefined();
+        const elapsedSeconds = ((next?.tick ?? start.tick) - start.tick) / tickRate;
+        // The fixed prep time plus a small (≤ 2 s) allowance, not the extra walk the bug added.
+        expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
+      }
+    });
 
-    // Freight: a job is taken, its cargo is hauled aboard by the crew, the ship leaves port.
-    expect(count(log, "jobAccepted")).toBeGreaterThanOrEqual(1);
-    const loadProblems = Object.values(world.state.work.problems).filter(
-      (p) => p.kind === "cargoToLoad",
-    );
-    expect(loadProblems.some((p) => p.status === "resolved")).toBe(true);
-    expect([...log.stages].some((stage) => stage !== "docked")).toBe(true);
-    expect(log.decisions).toBeLessThanOrEqual(3);
-
-    // Ship systems: the fault injected at 30 s is found and fixed.
-    expect(count(log, "faultOccurred")).toBeGreaterThanOrEqual(1);
-    expect(count(log, "faultDiagnosed")).toBeGreaterThanOrEqual(1);
-    expect(count(log, "faultRepaired")).toBeGreaterThanOrEqual(1);
-
-    // The crew's day: everyone does at least three different things.
-    expect(log.labels.size).toBe(8);
-    for (const [actorId, labels] of log.labels) {
-      expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
-    }
-    expect(checkInvariants(world.state)).toEqual([]);
-  }, 30_000);
-
-  it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
-    // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
-    // began, so the pilot did not start walking to the console until every crate was aboard —
-    // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. `travel.ts`
-    // now raises `stationToStaff` as soon as a course is planned, so the pilot (idle, with
-    // nothing else essential to do) walks there while the crew is still loading; by the time
-    // `preparingDeparture` starts the console should already be staffed.
-    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
-    const stageChanges = log.events.filter(
-      (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
-        e.type === "travelStageChanged",
-    );
-    const prepStarts = stageChanges.filter((e) => e.payload.to === "preparingDeparture");
-    expect(prepStarts.length).toBeGreaterThanOrEqual(1);
-    const prepSeconds = world.config.values.travel.prepareDepartureSeconds;
-    const tickRate = world.config.values.time.tickRate;
-    for (const start of prepStarts) {
-      const next = stageChanges.find(
-        (e) => e.tick > start.tick && e.payload.from === "preparingDeparture",
+    it("hauls a multi-crate job with more than one actor", () => {
+      // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`),
+      // a job with several units should give several idle cargo-skilled crew independent haul
+      // tasks to claim, not one actor working through the whole stack alone.
+      const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+      const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 3);
+      expect(bigJob).toBeDefined();
+      if (bigJob === undefined) return;
+      const haulers = new Set(
+        log.loadClaims.filter((c) => c.jobId === bigJob.id).map((c) => c.actorId),
       );
-      expect(next).toBeDefined();
-      const elapsedSeconds = ((next?.tick ?? start.tick) - start.tick) / tickRate;
-      // The fixed prep time plus a small (≤ 2 s) allowance, not the extra walk the bug added.
-      expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
-    }
-  });
-
-  it("hauls a multi-crate job with more than one actor", () => {
-    // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`),
-    // a job with several units should give several idle cargo-skilled crew independent haul
-    // tasks to claim, not one actor working through the whole stack alone.
-    const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
-    const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 3);
-    expect(bigJob).toBeDefined();
-    if (bigJob === undefined) return;
-    const haulers = new Set(
-      log.loadClaims.filter((c) => c.jobId === bigJob.id).map((c) => c.actorId),
-    );
-    expect(haulers.size).toBeGreaterThanOrEqual(2);
-  });
-});
+      expect(haulers.size).toBeGreaterThanOrEqual(2);
+    });
+  },
+);

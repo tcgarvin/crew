@@ -507,6 +507,27 @@ progress within one stage so the berth slides smoothly between 10 Hz frames. The
 drawn under the dots and labels, so walls and clouds never hide a person. In flight the camera
 frames the whole hull plus a tile; on a portrait phone the deck is about 15% smaller than
 before. No offscreen caching: a frame measured under 1 ms on desktop; revisit after the phone
-playtest. Powered ramps still auto-close a few seconds after opening, as all powered doors do, so
-docked ramps lower and retract rather than staying down; that is phase 2's to settle with the
-dock.
+playtest. Ramps had been closing themselves 3 s after docking like any powered door; D59 stops
+that, so docked ramps stay down.
+
+**D59.The dock is grafted onto the deck's grid, not joined by portals.** The phase 2 spike
+(`docs/design/dockside-spike.md`) reverses the design's recommendation (dockside §3.4). While a
+dock is alongside (`state.deck.dock`, set by `attachDock` at the start of `docking` and cleared
+by `detachDock` at the end of `undocking`), its floor is stamped into the ship deck's nav grid
+in the deck's own frame: one grid, one coordinate frame, one `deckId`. A person on the dock is
+an ordinary `onDeck` location whose tile is dock floor, possibly at negative coordinates. Dock
+floor is in no compartment and the hull walls it off except at the ramp doors. Portals would
+have kept a separate area per dock, and every bare `TileCoord` outside `systems/spatial`
+(routes, tasks, claims, plan steps, `AgentView`, the planner's estimates) would then need an area
+tag, a change the compiler cannot find for us; portals in a shared frame avoid that but add a
+second grid for no gain. Grafting costs a grid origin and a rebuild on attach/detach inside
+`systems/spatial`, and one cost outside it: `onDeck` no longer means aboard, so "aboard" checks
+use `isOnDock`. Ramps are now owned by travel alone: they no longer auto-close (until now they
+closed 3 s after docking), actors never request them, and planning treats a ramp as passable
+only while it is fully open and travel still wants it open, from truth, since everyone knows
+whether the ramps are down. `detachDock` refuses while a ramp is down or anyone or anything is on
+the dock, so departure must bring everyone aboard, and keep the ramps down until it has, before
+raising them. Dock layouts carry no ramp landings; each ramp lands on the dock tile across its
+hull edge. A multi-deck ship would still want portals between decks; this does not preclude
+them. Departure prep runs its 5 s clock while the ramps retract and only waits on them if it would
+otherwise end with one still down, since they used to be shut long before prep began.

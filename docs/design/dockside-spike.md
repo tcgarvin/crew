@@ -395,7 +395,7 @@ portals with their own coordinates. §2 now covers that variant.
 
 ## 9. Draft decision entry
 
-To be numbered and merged into `docs/DECISIONS.md` by the lead (another agent is adding D58).
+Merged as D59 in `docs/DECISIONS.md`.
 
 > **D5x. The dock is grafted onto the deck's grid, not joined by portals.** The phase 2 spike
 > (`docs/design/dockside-spike.md`) reverses the design's recommendation (dockside §3.4). While a

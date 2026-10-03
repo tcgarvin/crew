@@ -457,7 +457,13 @@ function advanceTravel(ctx: StepCtx): void {
     const openCargo = Object.values(ctx.state.work.problems).some(
       (p) => p.kind === "cargoToLoad" && p.status === "open",
     );
-    if (openCargo || !rampsClosed(ctx) || !staffed) return; // stalled: preconditions unmet
+    if (openCargo || !staffed) return; // stalled: preconditions unmet
+    // Ramps retract during prep (Dockside §2.4), so their closing runs alongside the timer; the
+    // stage only waits on them if it would otherwise end with a ramp still down.
+    if (!rampsClosed(ctx)) {
+      advanceStageTimer(ctx, travel, travel.stage);
+      return;
+    }
   }
 
   if (travel.stage === "docking") {
@@ -493,10 +499,19 @@ function advanceTravel(ctx: StepCtx): void {
   }
 
   // Timer-driven stages: preparingDeparture, undocking, departing, approaching, docking.
-  const durationTicks = stageDurationTicks(ctx, travel.stage);
+  if (advanceStageTimer(ctx, travel, travel.stage) >= 1) advanceStage(ctx);
+}
+
+/** Run the current timed stage's clock; returns the new progress (capped at 1). */
+function advanceStageTimer(
+  ctx: StepCtx,
+  travel: Extract<TravelState, { stage: Exclude<TravelStage, "docked"> }>,
+  stage: Exclude<TravelStage, "docked" | "transit">,
+): number {
+  const durationTicks = stageDurationTicks(ctx, stage);
   const increment = durationTicks === 0 ? 1 : ctx.elapsedTicks / durationTicks;
   travel.stageProgress = Math.min(1, travel.stageProgress + increment);
-  if (travel.stageProgress >= 1) advanceStage(ctx);
+  return travel.stageProgress;
 }
 
 function advanceStage(ctx: StepCtx): void {
