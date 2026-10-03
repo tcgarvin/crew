@@ -25,7 +25,9 @@ are authoritative.
 1. `git status` must be clean and the four checks must pass:
    `pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`. If either fails, stop.
 2. `git push` (add `-u origin <branch>` for a new branch).
-3. CI: `gh run list --branch <branch> --limit 1`, then `gh run watch <id> --exit-status`.
+3. CI: find the run for the pushed commit, `gh run list --commit $(git rev-parse HEAD) --limit 1`
+   (it can take a few seconds to appear; an older run on the branch is not this push's result),
+   then `gh run watch <id> --exit-status`.
 4. Deploy: find the deployment for the pushed commit with `vercel ls crew`, then
    `vercel inspect <url> --wait`. If it fails, pull the error from `vercel inspect <url> --logs`
    (migration output is in there).
