@@ -283,6 +283,13 @@ function notesFrom(
   state: State,
 ): NarratorNotes {
   const { commands, dropped } = translated;
+  const cardsShown = recordCardsFromCall(
+    previous.cardsShown,
+    tick,
+    translated.card,
+    commands,
+    translated.closedThread,
+  );
   return boundNotes({
     summary: plan.notes.summary,
     threads: mergeThreads(
@@ -291,8 +298,9 @@ function notesFrom(
       tick,
       textsShown(translated),
       translated.beatCardThread,
+      cardsShown.flatMap((c) => (c.closedThread === null ? [] : [c.closedThread])),
     ),
-    cardsShown: recordCardsFromCall(previous.cardsShown, tick, translated.card, commands),
+    cardsShown,
     cast: placeEndedPassengers(
       mergeCast(castWritten(plan, content), previous.cast, issuersMet(commands, content), tick),
       state,

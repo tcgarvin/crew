@@ -231,6 +231,10 @@ body {
   font-weight: 600;
   color: var(--accent);
 }
+.log-card-closed {
+  font-size: 11px;
+  color: var(--ok);
+}
 .log-card-answer {
   font-size: 12px;
   color: var(--text);

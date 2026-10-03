@@ -52,6 +52,12 @@ function LoggedCard({
     <>
       <span className="log-card-kicker">{card.speaker ?? "Card"}</span>
       <span className="log-card-title">{card.title}</span>
+      {card.closesThread === undefined ? null : (
+        // D56: the narrator ended a story thread with this card.
+        <span className="log-card-closed">
+          ✓ Story closed{card.closesThread === "" ? "" : `: ${card.closesThread}`}
+        </span>
+      )}
     </>
   );
   if (entry.answer === undefined) {

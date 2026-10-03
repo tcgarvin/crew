@@ -256,3 +256,24 @@ describe("passenger overdue card templates (passengers §3.3)", () => {
     expect(card.situation).toMatch(/^Our passenger went ashore at another port/);
   });
 });
+
+describe("narrator card templates", () => {
+  function narratorCard(params: Decision["prompt"]["params"]): Decision {
+    return {
+      ...offer({}),
+      prompt: { key: "narrator.decision", params, prose: "Dane signs the manifest." },
+    };
+  }
+
+  it("carries the thread a closing card ends (D56)", () => {
+    const card = templateCard(
+      narratorCard({ title: "Fenwick's handoff", closesThread: "Fenwick" }),
+    );
+    expect(card.closesThread).toBe("Fenwick");
+  });
+
+  it("keeps an unnamed close, and leaves an ordinary card without one (D56)", () => {
+    expect(templateCard(narratorCard({ title: "t", closesThread: "" })).closesThread).toBe("");
+    expect(templateCard(narratorCard({ title: "t" })).closesThread).toBeUndefined();
+  });
+});

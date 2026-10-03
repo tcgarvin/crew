@@ -252,6 +252,11 @@ export function buildNarratorPlanSchema() {
     .string()
     .describe("Empty, or for a beat card the exact title of the thread it foreshadows.");
 
+  // D56: a closing card names the thread it ends; the server retires that thread.
+  const closesThread = z
+    .string()
+    .describe("Empty, or for a closing card the exact title of the thread it ends.");
+
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
     title: z.string().describe("Card heading, two to six words."),
@@ -262,6 +267,7 @@ export function buildNarratorPlanSchema() {
     leftAftermath: aftermath,
     rightAftermath: aftermath,
     beatOfThread,
+    closesThread,
   });
 
   return z.strictObject({
@@ -354,6 +360,11 @@ export interface TranslationResult {
    * surfaced card was a beat card; the notes merge sets `beatCardShown` on it.
    */
   readonly beatCardThread?: string;
+  /**
+   * D56: the title (as stored in notes) of the thread this call's closing card ends; the notes
+   * merge retires it and the card history records it.
+   */
+  readonly closedThread?: string;
 }
 
 /**

@@ -64,6 +64,7 @@ const stranger = {
   leftAftermath: "Dane waves her aboard.",
   rightAftermath: "Dane sends her back down the ramp.",
   beatOfThread: "",
+  closesThread: "",
 };
 
 function event(
@@ -494,6 +495,7 @@ describe("what the captain has seen (D31)", () => {
         leftLabel: "Bring her up.",
         rightLabel: "Not this run.",
         chosen: null,
+        closedThread: null,
       },
     ]);
     expect(res.notesUpdate?.threads[0]?.lastBeatTick).toBe(req.hook.tick);
@@ -545,6 +547,34 @@ describe("what the captain has seen (D31)", () => {
     expect(again.notesUpdate?.threads[0]?.beatCardShown).toBe(true);
   });
 
+  it("retires the thread a closing card ends and refuses to close it again (D56)", async () => {
+    const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
+    const closing = { ...stranger, closesThread: "the stranger" };
+    // The model keeps writing the thread; the server retires it anyway.
+    const plan = emptyPlan({
+      intents: [closing] as never,
+      notes: { summary: "s", threads: [thread], cast: [] },
+    });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const stored = {
+      ...EMPTY_NOTES,
+      threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
+    };
+    const res = await runNarrator(req, { ...ctx(transport), notes: stored });
+    expect(res.dropped).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.notesUpdate?.threads).toEqual([]);
+    expect(res.notesUpdate?.cardsShown[0]?.closedThread).toBe("The stranger");
+    // Next call: the digest shows the card as closing it, a second closing card is refused, and
+    // the thread stays retired even though the model writes it back again.
+    const again = await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    expect(transport.calls.at(-1)?.user).toContain('(closed thread "The stranger")');
+    expect(again.commands).toEqual([]);
+    expect(again.notesUpdate?.lastRejections[0]).toMatch(/matches no open thread/);
+    expect(again.notesUpdate?.threads).toEqual([]);
+  });
+
   it("records the policy card prose with the pending decision's id", async () => {
     const card = {
       title: "Hub Co-op wants a runner",
@@ -568,6 +598,7 @@ describe("what the captain has seen (D31)", () => {
         leftLabel: "Sign it",
         rightLabel: "Not today",
         chosen: null,
+        closedThread: null,
       },
     ]);
   });
@@ -596,6 +627,7 @@ describe("what the captain has seen (D31)", () => {
           leftLabel: "Take the job",
           rightLabel: "Pass on it",
           chosen: null,
+          closedThread: null,
         },
       ],
     };
@@ -628,6 +660,7 @@ describe("what the captain has seen (D31)", () => {
       leftLabel: "Take the job",
       rightLabel: "Pass on it",
       chosen: null,
+      closedThread: null,
     };
     const notes = {
       summary: "s",
@@ -676,6 +709,7 @@ describe("what the captain has seen (D31)", () => {
         leftLabel: "Take the job",
         rightLabel: "Pass on it",
         chosen: null,
+        closedThread: null,
       },
     ]);
   });
@@ -693,6 +727,7 @@ describe("what the captain has seen (D31)", () => {
       leftLabel: "l",
       rightLabel: "r",
       chosen: "left" as const,
+      closedThread: null,
     }));
     const notes = { summary: "s", threads: [], cast: [], lastUpdatedTick: 11, cardsShown };
     const res = await runNarrator(req, { ...ctx(transport), notes });
@@ -744,7 +779,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.15");
+    expect(PROMPT_VERSION).toBe("v0.16");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -769,9 +804,10 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("the left side waits, the right side leaves without them");
   });
 
-  it("tells the model to end each arc on a closing card before dropping it (D54)", () => {
+  it("tells the model to end each arc on a closing card that names it (D54, D56)", () => {
     expect(STATIC_RULES).toContain("Arcs end on a card.");
-    expect(STATIC_RULES).toContain("Only once that card has been shown");
+    expect(STATIC_RULES).toContain("Set closesThread to that thread's exact title");
+    expect(STATIC_RULES).toContain("A thread is closed once");
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("this is the moment for its closing card");
   });
 

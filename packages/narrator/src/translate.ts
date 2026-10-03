@@ -153,12 +153,16 @@ interface Tally {
   cardUsed: boolean;
   /** D39: the thread this call's beat card was attributed to. */
   beatCardThread: string | undefined;
+  /** D56: the stored thread this call's closing card ends. */
+  closedThread: string | undefined;
 }
 
 /** D39: what the translator needs to know about a thread to accept a beat card for it. */
 interface KnownThread {
   readonly title: string;
   readonly beatCardShown: boolean;
+  /** D56: in the stored notes (not started by this plan), so it can be closed. */
+  readonly stored: boolean;
 }
 
 interface Env {
@@ -500,6 +504,35 @@ function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string
   return ok(thread.title);
 }
 
+/**
+ * D56: a closing card must name a stored thread (one the digest showed); the server retires it
+ * once the card goes up, so a second closing card for the same thread finds nothing to close.
+ * A card cannot both foreshadow and close.
+ */
+function closingThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
+  const raw = intent.closesThread;
+  if (raw.trim() === "") return ok(undefined);
+  if (intent.beatOfThread.trim() !== "") {
+    return no("a card cannot both foreshadow a thread (beatOfThread) and close one (closesThread)");
+  }
+  const wanted = raw.trim().toLowerCase();
+  const thread = env.threads.find((t) => t.stored && t.title.trim().toLowerCase() === wanted);
+  if (thread === undefined) {
+    return no(
+      `closesThread "${raw.trim()}" matches no open thread in your notes; it may already be closed`,
+    );
+  }
+  return ok(thread.title);
+}
+
+/**
+ * D56: the closed thread's title as the card shows it. Thread titles are private notes, so one
+ * that would give something away shows as a bare "story closed" (an empty label).
+ */
+function closedLabel(env: Env, title: string): string {
+  return textProblem(title, env.secrets) === undefined ? title : "";
+}
+
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
   if (env.hook?.kind === "policyDecision") {
     return no("surfaceDecision: a policy decision is pending; dress it with `card` instead");
@@ -507,6 +540,8 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   if (env.tally.cardUsed) return no("surfaceDecision: only one card per call");
   const beat = beatThread(env, intent);
   if (!beat.ok) return no(`surfaceDecision: ${beat.reason}`);
+  const closing = closingThread(env, intent);
+  if (!closing.ok) return no(`surfaceDecision: ${closing.reason}`);
   const title = clipChars(intent.title, TITLE_MAX_CHARS);
   const situation = clipWords(intent.situation, CARD_SITUATION_MAX_WORDS);
   const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
@@ -526,6 +561,7 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   }
   env.tally.cardUsed = true;
   env.tally.beatCardThread = beat.value;
+  env.tally.closedThread = closing.value;
   const sideSpec = (s: SideCommands, aftermath: string) => ({
     label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
     commands: s.commands,
@@ -541,7 +577,13 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
         // the prompt params, where `templateCard` picks them up.
         prompt: {
           key: NARRATOR_TEXT_KEYS.situation,
-          params: { title, ...(speaker.value === undefined ? {} : { speaker: speaker.value }) },
+          params: {
+            title,
+            ...(speaker.value === undefined ? {} : { speaker: speaker.value }),
+            ...(closing.value === undefined
+              ? {}
+              : { closesThread: closedLabel(env, closing.value) }),
+          },
           prose: situation,
         },
         left: sideSpec(left.value, leftAftermath.value),
@@ -694,9 +736,11 @@ export const translateIntents: TranslateIntents = (
     // D39: a thread the plan starts this call can be foreshadowed, but only stored threads can
     // already have had their beat card.
     threads: [
-      ...(ctx.threads ?? []),
+      ...(ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
       ...written.flatMap((t) =>
-        typeof t.title === "string" ? [{ title: t.title, beatCardShown: false }] : [],
+        typeof t.title === "string"
+          ? [{ title: t.title, beatCardShown: false, stored: false }]
+          : [],
       ),
     ],
     captainName: captainName(snapshot, ctx.content),
@@ -705,6 +749,7 @@ export const translateIntents: TranslateIntents = (
       faults: 0,
       cardUsed: snapshot.state.decisions.queue.length > 0,
       beatCardThread: undefined,
+      closedThread: undefined,
     },
     notes: [],
   };
@@ -751,11 +796,13 @@ export const translateIntents: TranslateIntents = (
 
   const card = policyCard(env, plan, dropped);
   const beat = env.tally.beatCardThread;
+  const closed = env.tally.closedThread;
   return {
     commands,
     dropped,
     notes: env.notes,
     ...(card === undefined ? {} : { card }),
     ...(beat === undefined ? {} : { beatCardThread: beat }),
+    ...(closed === undefined ? {} : { closedThread: closed }),
   };
 };

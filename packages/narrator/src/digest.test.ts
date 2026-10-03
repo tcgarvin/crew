@@ -228,6 +228,7 @@ describe("buildDigest", () => {
       leftLabel: "Take it",
       rightLabel: "Leave it",
       chosen: null,
+      closedThread: null,
     };
     const notes = {
       ...EMPTY_NOTES,
@@ -248,12 +249,22 @@ describe("buildDigest", () => {
           speaker: "Mara Osei",
           gist: "Someone at the ramp.",
         },
+        {
+          ...base,
+          tick: 30,
+          title: "Fenwick's handoff",
+          speaker: "Dane Whitcross",
+          gist: "A clean run.",
+          chosen: "left" as const,
+          closedThread: "Fenwick's manifest",
+        },
       ],
     };
     const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
     const section = text.split("## What the captain has seen\n")[1]?.split("\n\n")[0];
     expect(section).toBe(
       [
+        '- t30 "Fenwick\'s handoff" (Dane Whitcross): A clean run. → chose "Take it" (closed thread "Fenwick\'s manifest")',
         '- t20 "A stranger" (Mara Osei): Someone at the ramp. → unresolved',
         '- t10 "Resupply" (observed): Mara wants more seals. → chose "Leave it"',
       ].join("\n"),
@@ -276,6 +287,7 @@ describe("buildDigest", () => {
         leftLabel: "l",
         rightLabel: "r",
         chosen: null,
+        closedThread: null,
       })),
     };
     const small = buildDigest(req.snapshot, manyEvents(20), notes, content(), req.hook, 1_500);

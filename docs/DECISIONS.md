@@ -459,3 +459,18 @@ the captain was shown form one feed, newest on top, scrolling in both orientatio
 logged at the tick it was raised and shows "waiting" until answered; tapping it then brings the
 card back up. Once answered it shows the choice, and expands to the full text and aftermath. The
 log is not saved and starts empty after a reload, as the ticker did.
+
+**D56. A closing card names its thread, and the server retires it.** Under D54 a closing card
+was not tied to any thread, and the thread stayed in the notes until the model saw the card
+under "What the captain has seen" and dropped it itself. A model that kept the thread a call
+too long saw an open story and closed it again (a playtest showed "Manifest Closed" and then
+"Fenwick's Handoff" for one job). `surfaceDecision` gains `closesThread` beside `beatOfThread`
+(D39): empty, or the exact title of a stored thread; one written only by this call's notes
+does not count, and a card cannot both foreshadow and close. When the card goes up the
+server retires the thread whatever the model wrote, records the title on the card's history
+entry (`CardShown.closedThread`; the digest marks it `(closed thread "...")`), and keeps
+retiring any thread whose closing card is still in that history, so a second closing card
+finds nothing to close and is dropped with a reason. The title goes on the card's prompt params
+as `closesThread`, and the ship's log marks the card "✓ Story closed: <title>". Thread titles
+are private notes, so a title that fails the player-text checks closes as plain "Story closed".
+Still one kind of card, as D54 decided: this is a label on a card, not a card type. Prompt v0.16.

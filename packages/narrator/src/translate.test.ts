@@ -66,6 +66,7 @@ const decision = {
   leftAftermath: "We set course for the Hub with the crate aboard.",
   rightAftermath: "The foreman nods and goes looking for another ship.",
   beatOfThread: "",
+  closesThread: "",
 };
 
 /** D39: a foreshadowing card; both sides are the captain's attitude. */
@@ -80,6 +81,7 @@ const beatCard = {
   leftAftermath: "Dane nods and adds it to his watch list.",
   rightAftermath: "Dane files it and goes back to his rounds.",
   beatOfThread: "the aft sensor",
+  closesThread: "",
 };
 
 const sensorThread = {
@@ -461,6 +463,56 @@ describe("translateIntents: beat cards (D39)", () => {
     );
   });
 
+  it("puts a closing card's thread on the card and reports it (D56)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const closing = { ...decision, closesThread: "the aft sensor" };
+    const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.dropped).toEqual([]);
+    expect(result.closedThread).toBe("The aft sensor");
+    const command = result.commands[0];
+    expect(command?.kind).toBe("surfaceDecision");
+    if (command?.kind !== "surfaceDecision") return;
+    expect(command.payload.card.prompt.params.closesThread).toBe("The aft sensor");
+  });
+
+  it("closes a thread whose title is not fit to show, without naming it (D56)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const priced = { ...sensorThread, title: "The 200 credit favour" };
+    const closing = { ...decision, closesThread: "The 200 credit favour" };
+    const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [priced] });
+    expect(result.dropped).toEqual([]);
+    expect(result.closedThread).toBe("The 200 credit favour");
+    const command = result.commands[0];
+    if (command?.kind !== "surfaceDecision") throw new Error("expected a surfaced card");
+    expect(command.payload.card.prompt.params.closesThread).toBe("");
+  });
+
+  it("drops a closing card for a thread that is not open in the stored notes (D56)", () => {
+    const req = docked(approachingPortRequest(content()));
+    const { lastBeatTick: _t, beatCardShown: _b, ...written } = sensorThread;
+    // Written back by the model this call, but already retired from the stored notes.
+    const rewritten = emptyPlan({
+      intents: [{ ...decision, closesThread: "the aft sensor" }] as never,
+      notes: { summary: "s", threads: [written], cast: [] },
+    });
+    const result = translateIntents(rewritten, { ...ctxOf(req), threads: [] });
+    expect(result.commands).toEqual([]);
+    expect(result.closedThread).toBeUndefined();
+    expect(result.dropped[0]?.reason).toBe(
+      'surfaceDecision: closesThread "the aft sensor" matches no open thread in your notes; it may already be closed',
+    );
+  });
+
+  it("drops a card that both foreshadows and closes (D56)", () => {
+    const req = quietTooLongRequest(content());
+    const both = { ...beatCard, closesThread: "the aft sensor" };
+    const result = translateIntents(plan([both]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: a card cannot both foreshadow a thread (beatOfThread) and close one (closesThread)",
+    );
+  });
+
   it("a normal card (beatOfThread null) attributes no beat", () => {
     const req = docked(approachingPortRequest(content()));
     const result = translateIntents(plan([decision]), { ...ctxOf(req), threads: [sensorThread] });
@@ -712,6 +764,7 @@ describe("translateIntents: malicious plans (N6)", () => {
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
+      closesThread: "",
     },
   ];
 

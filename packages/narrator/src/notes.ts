@@ -65,6 +65,8 @@ export interface CardShown {
   readonly leftLabel: string;
   readonly rightLabel: string;
   readonly chosen: "left" | "right" | null;
+  /** D56: the title of the thread this card closed (server-kept); null for any other card. */
+  readonly closedThread: string | null;
 }
 
 export interface NarratorNotes {
@@ -123,6 +125,8 @@ const storedCardSchema = z.object({
   leftLabel: z.string(),
   rightLabel: z.string(),
   chosen: z.enum(["left", "right"]).nullable(),
+  /** Cards stored before D56 closed nothing. */
+  closedThread: z.string().nullable().optional(),
 });
 
 const storedNotesSchema = z.object({
@@ -191,6 +195,7 @@ function boundCard(card: CardShown): CardShown {
     leftLabel: clip(card.leftLabel, 48),
     rightLabel: clip(card.rightLabel, 48),
     chosen: card.chosen,
+    closedThread: card.closedThread === null ? null : clip(card.closedThread, 80),
   };
 }
 
@@ -278,7 +283,7 @@ export function parseNotes(raw: unknown): NarratorNotes {
     threads:
       threads?.map((t) => ({ ...t, beatCardShown: t.beatCardShown ?? false })) ??
       (openThreads ?? []).map(threadFromLegacy),
-    cardsShown: cardsShown ?? [],
+    cardsShown: (cardsShown ?? []).map((c) => ({ ...c, closedThread: c.closedThread ?? null })),
     // Notes stored before D25 have no port or sighting for their cast.
     cast: parsed.data.cast.map((c) => ({
       name: c.name,
@@ -302,6 +307,10 @@ export type WrittenThread = Omit<Thread, "lastBeatTick" | "beatCardShown">;
  * D39: `beatCardShown` is carried by title too, and set when this call's beat card named the
  * thread (`beatCardThread`, the title as the translator matched it). A beat card is a card, so
  * it also stamps `lastBeatTick`.
+ *
+ * D56: a closed thread is retired by the server, whatever the model wrote: the one this call's
+ * closing card ended, and any whose closing card is still in the card history (so a model that
+ * keeps writing a finished thread cannot reopen it and close it again).
  */
 export function mergeThreads(
   written: readonly WrittenThread[],
@@ -311,6 +320,8 @@ export function mergeThreads(
   textsThisCall: readonly string[],
   /** Title of the thread this call's beat card was attributed to, if any. */
   beatCardThread: string | undefined = undefined,
+  /** Titles of threads closed by a card: this call's and those in the card history. */
+  closedThreads: readonly string[] = [],
 ): Thread[] {
   const key = (s: string) => s.trim().toLowerCase();
   const before = new Map(previous.map((t) => [key(t.title), t]));
@@ -320,14 +331,17 @@ export function mergeThreads(
     return k !== "" && lowered.some((text) => text.includes(k));
   };
   const beatKey = beatCardThread === undefined ? undefined : key(beatCardThread);
-  return written.map((t) => {
-    const earlier = before.get(key(t.title));
-    const foreshadowedNow = beatKey !== undefined && key(t.title) === beatKey;
-    return {
-      ...t,
-      lastBeatTick:
-        t.people.some(named) || foreshadowedNow ? tick : (earlier?.lastBeatTick ?? null),
-      beatCardShown: foreshadowedNow || (earlier?.beatCardShown ?? false),
-    };
-  });
+  const closed = new Set(closedThreads.map(key));
+  return written
+    .filter((t) => !closed.has(key(t.title)))
+    .map((t) => {
+      const earlier = before.get(key(t.title));
+      const foreshadowedNow = beatKey !== undefined && key(t.title) === beatKey;
+      return {
+        ...t,
+        lastBeatTick:
+          t.people.some(named) || foreshadowedNow ? tick : (earlier?.lastBeatTick ?? null),
+        beatCardShown: foreshadowedNow || (earlier?.beatCardShown ?? false),
+      };
+    });
 }

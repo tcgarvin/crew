@@ -83,6 +83,7 @@ describe("NarratorPlan structured-output schema", () => {
           leftAftermath: "She comes aboard and we plot for Port B.",
           rightAftermath: "She walks back into the crowd.",
           beatOfThread: "",
+          closesThread: "",
         },
       ],
       card: null,
@@ -140,6 +141,7 @@ describe("NarratorPlan structured-output schema", () => {
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
+      closesThread: "",
     };
     const plan = { ...base, intents: [passage, putOff] };
     expect(schema.parse(plan)).toEqual(plan);

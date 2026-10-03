@@ -20,6 +20,7 @@ const card = {
   leftLabel: "Take them",
   rightLabel: "Not this run",
   chosen: "left" as const,
+  closedThread: null,
 };
 
 describe("parseNotes", () => {

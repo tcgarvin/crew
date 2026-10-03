@@ -38,6 +38,11 @@ export interface DecisionCardText {
    * absent for an observed scene.
    */
   readonly speaker?: string;
+  /**
+   * D56 (additive, 2026-10-03): present on a narrator card that closes a story thread; the
+   * thread's title, or empty when the title is not fit to show the captain.
+   */
+  readonly closesThread?: string;
 }
 
 /** Template keys used by narrator-authored cards; prose is always present on these. */
@@ -249,6 +254,10 @@ export function templateCard(
   const rightAftermath = decision.right.aftermath;
   const speaker = SPEAKERS[decision.prompt.key]?.(decision.prompt.params);
   const passage = decision.prompt.key === "job.offer" && isPassage(decision.prompt.params);
+  const closes =
+    decision.prompt.key === NARRATOR_TEXT_KEYS.situation
+      ? decision.prompt.params.closesThread
+      : undefined;
   const side = (ref: DeepReadonly<TextRef>): string => {
     const text = passage ? PASSAGE_SIDE_TEXT[ref.key] : undefined;
     const hasProse = ref.prose !== undefined && ref.prose.trim() !== "";
@@ -258,6 +267,7 @@ export function templateCard(
     decisionId: decision.id,
     title: TITLES[decision.prompt.key]?.(decision.prompt.params) ?? GENERIC_TITLE,
     ...(speaker === undefined || speaker.trim() === "" ? {} : { speaker }),
+    ...(closes === undefined ? {} : { closesThread: String(closes) }),
     situation: renderTextRef(decision.prompt, content),
     leftLabel: side(decision.left.label),
     rightLabel: side(decision.right.label),

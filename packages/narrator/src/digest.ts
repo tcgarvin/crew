@@ -643,7 +643,9 @@ function cardsSeenSection(
         c.chosen === null
           ? "unresolved"
           : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
-      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}`;
+      // D56: the thread is retired; this is how the model knows it is finished.
+      const closed = c.closedThread === null ? "" : ` (closed thread "${c.closedThread}")`;
+      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}${closed}`;
     });
   return { heading: "What the captain has seen", lines, priority: 8.5, trimFrom: "start" };
 }

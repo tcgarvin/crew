@@ -37,6 +37,7 @@ function fromRecord(
     leftLabel: text.leftLabel,
     rightLabel: text.rightLabel,
     chosen: record.chosen ?? null,
+    closedThread: null,
   };
 }
 
@@ -131,10 +132,15 @@ function fromCard(card: DecisionCardProse, tick: number): CardShown {
     leftLabel: card.leftLabel,
     rightLabel: card.rightLabel,
     chosen: null,
+    closedThread: null,
   };
 }
 
-function fromSurfaced(command: NarratorCommand, tick: number): CardShown | undefined {
+function fromSurfaced(
+  command: NarratorCommand,
+  tick: number,
+  closedThread: string | undefined,
+): CardShown | undefined {
   if (command.kind !== "surfaceDecision") return undefined;
   const { prompt, left, right } = command.payload.card;
   const params = prompt.params as Record<string, unknown>;
@@ -147,6 +153,7 @@ function fromSurfaced(command: NarratorCommand, tick: number): CardShown | undef
     leftLabel: left.label.prose ?? "",
     rightLabel: right.label.prose ?? "",
     chosen: null,
+    closedThread: closedThread ?? null,
   };
 }
 
@@ -160,6 +167,8 @@ export function recordCardsFromCall(
   tick: number,
   card: DecisionCardProse | undefined,
   commands: readonly NarratorCommand[],
+  /** D56: the thread this call's surfaced card closed; there is at most one surfaced card. */
+  closedThread: string | undefined = undefined,
 ): CardShown[] {
   const next = [...cards];
   if (card !== undefined) {
@@ -170,7 +179,7 @@ export function recordCardsFromCall(
     else next[known] = { ...entry, tick: previous.tick, chosen: previous.chosen };
   }
   for (const command of commands) {
-    const entry = fromSurfaced(command, tick);
+    const entry = fromSurfaced(command, tick, closedThread);
     if (entry !== undefined) next.push(entry);
   }
   return cap(next);
