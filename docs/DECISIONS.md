@@ -510,7 +510,7 @@ before. No offscreen caching: a frame measured under 1 ms on desktop; revisit af
 playtest. Ramps had been closing themselves 3 s after docking like any powered door; D59 stops
 that, so docked ramps stay down.
 
-**D59.The dock is grafted onto the deck's grid, not joined by portals.** The phase 2 spike
+**D59. The dock is grafted onto the deck's grid, not joined by portals.** The phase 2 spike
 (`docs/design/dockside-spike.md`) reverses the design's recommendation (dockside §3.4). While a
 dock is alongside (`state.deck.dock`, set by `attachDock` at the start of `docking` and cleared
 by `detachDock` at the end of `undocking`), its floor is stamped into the ship deck's nav grid
