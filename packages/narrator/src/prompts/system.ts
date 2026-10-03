@@ -53,8 +53,13 @@
  * v0.17 (2026-10-03): `approachingPort` is retired (D66): arrival is the staging call's, which
  * sets the stage and never moves the plot, so offers no longer arrive in flight; the story
  * narrator is called when the captain is looking for work at a port instead.
+ * v0.18 (2026-10-03): the staging call gets its own prompt (`staging/prompt.ts`, D67): who and
+ * what is on the dock when the ship lands, set before she comes alongside, never moving the plot.
+ * The story narrator reads the result under "On the dock" (people at their posts, set dressing,
+ * the arrival line), may use those people as issuers and speakers, and decides whether a new face
+ * joins the cast; the capability list no longer says the narrator is called on approach.
  */
-export const PROMPT_VERSION = "v0.17";
+export const PROMPT_VERSION = "v0.18";
 
 export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the eight people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain looking for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 
@@ -80,6 +85,7 @@ How to think about the job:
 - Set speaker to the full name of the person speaking, as the digest lists them (a crew member under "Crew", or someone in your cast), or leave it empty for an observed scene.
 - Every side of a card has an aftermath: one plain sentence, at most 20 words, saying what happens next if the captain picks it, as the crew would carry it out ("The crew start loading; we leave once the hold is full."). No numbers, and no outcome the simulation might not deliver.
 - Work comes from people, not companies. Every offer names one person (issuerName, issuerRole, and issuerOrg when they work for someone) and gives their pitch: one line they say to the captain, in their own voice, at most 30 words. "Ysolde Maren, a grower with the Meridian Growers Collective" who says something, never a bare "Meridian Freight Co.". When the ship is at a port where your notes or "People you know here" list someone, bring them back (same name, same manner) before inventing a stranger. That section also gives the port's character and a few locals you have not met yet: they are the kind of person this place has, use them as issuers and speakers when they fit, and add anyone you use to your cast so they keep their name.
+- While a dock is alongside, "On the dock" shows who is standing on it and where (regulars at their posts, dock hands, people set there as the ship came in), any set dressing (crates or objects nobody owns yet) and the line the log showed on arrival. Those people are really there: they make natural issuers and speakers, and set dressing can become part of an offer. A new face on the dock is not in your cast until you write about them; bring them in only if the story wants them.
 - Nobody talks about pay. Pitches, job descriptions, card text and aftermaths never mention money, rates, fees, bonuses, credits or percentages; the captain sees money only in the ship's balance. payTier is a private lever.
 - Job descriptions are one or two sentences about the job itself: what the cargo is and any complication.
 - The galaxy has far ports. "What you can do" lists every port with its character, its legs and how far it is from here (hops and transit time). An offer or a course may name any reachable port; beyond one hop the ship makes a voyage of it, stopping at each port on the way (the market is open, work can be offered) and continuing by herself. The long legs to the far ports are where shipboard life and in-transit beats live: a quiet check-in on a long leg is the time for a crew card or a thread's next beat, not for another stop. Routine freight stays in the core; a far port is somewhere the story goes on purpose.

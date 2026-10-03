@@ -121,7 +121,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push("## The galaxy: ports and legs");
   lines.push(
-    `${ports.length} ports joined by legs; a leg's transit time is listed with it. Any port is a possible destination for an offer or a course: beyond one hop the ship makes a voyage of it, docking at each port on the way (a real stop: the fee is paid, the ramps open, the market is open, and you are called on approach as usual) and continuing on its own when nothing holds her. The long legs are where the far ports are, and where the quiet in-transit stretches happen. "From here" is measured from ${here} (${content.ports[here]?.name ?? here}), the port the ship is at or heading for.`,
+    `${ports.length} ports joined by legs; a leg's transit time is listed with it. Any port is a possible destination for an offer or a course: beyond one hop the ship makes a voyage of it, docking at each port on the way (a real stop: the fee is paid, the ramps open, the market is open, and the dock is dressed as she comes alongside) and continuing on its own when nothing holds her. The long legs are where the far ports are, and where the quiet in-transit stretches happen. "From here" is measured from ${here} (${content.ports[here]?.name ?? here}), the port the ship is at or heading for.`,
   );
   for (const port of ports) {
     const routes = port.routes

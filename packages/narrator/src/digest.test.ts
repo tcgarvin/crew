@@ -252,8 +252,11 @@ describe("buildDigest", () => {
     job("j903", "inTransit", HUB_PORT, ["i904"]);
     const { text } = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook);
     const section = text.split(`## On the dock (${dock.name})\n`)[1]?.split("\n\n")[0];
-    expect(section?.split("\n")).toEqual([
-      `the place: ${dock.ambience}`,
+    const lines = section?.split("\n") ?? [];
+    expect(lines[0]).toBe(`the place: ${dock.ambience}`);
+    // D67: the people on the dock come first; the freight follows under its own line.
+    expect(lines.slice(lines.indexOf("freight:"))).toEqual([
+      "freight:",
       "- on offer: 2 crates staged for j901 (Hal Petrosyan (queue clerk), to Kessler Drift); not taken",
       "- waiting to be loaded: 1 crate for j902 (Hal Petrosyan (queue clerk), to Green Meridian)",
       "- delivered: 1 crate for j903 (Hal Petrosyan (queue clerk), to Crossroads Hub) in the delivery bay",

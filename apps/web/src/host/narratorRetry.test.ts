@@ -9,6 +9,7 @@ import {
   type RetryState,
   nextRetryAction,
   resetRetry,
+  stagingRetryAction,
 } from "./narratorRetry";
 
 const timeout: NarratorFailure = { kind: "retryable", reason: "timeout", message: "timed out" };
@@ -80,5 +81,31 @@ describe("nextRetryAction (D43)", () => {
     const fresh = nextRetryAction(resetRetry(), timeout);
     expect(fresh).toMatchObject({ type: "retry", delayMs: 2_000, attempt: 2 });
     expect(resetRetry()).toEqual(INITIAL_RETRY_STATE);
+  });
+});
+
+describe("stagingRetryAction (D67)", () => {
+  it("retries a staging call on the D43 schedule, then falls back to the floor set, never the panel", () => {
+    const actions: RetryAction[] = [];
+    let state = INITIAL_RETRY_STATE;
+    for (let i = 0; i < 100; i += 1) {
+      const action = stagingRetryAction(state, timeout);
+      actions.push(action);
+      if (action.type !== "retry") break;
+      state = action.state;
+    }
+    const retries = actions.filter((a) => a.type === "retry");
+    expect(retries.map((a) => a.delayMs)).toEqual([...RETRY_DELAYS_MS]);
+    expect(actions.at(-1)).toEqual({ type: "floorSet", reason: "timeout", message: "timed out" });
+    expect(actions.some((a) => a.type === "fail")).toBe(false);
+  });
+
+  it("falls back at once where a story call would fail at once, and still honours spacing", () => {
+    expect(stagingRetryAction(INITIAL_RETRY_STATE, notConfigured)).toEqual({
+      type: "floorSet",
+      reason: "notConfigured",
+      message: "no key",
+    });
+    expect(stagingRetryAction(INITIAL_RETRY_STATE, spacing)).toEqual({ type: "acknowledge" });
   });
 });

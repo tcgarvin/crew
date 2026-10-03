@@ -13,6 +13,12 @@ function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): num
   return n;
 }
 
+/** An OpenRouter model slug from `name`; unset or empty = `fallback`. */
+function readModel(source: NodeJS.ProcessEnv, name: string, fallback: string): string {
+  const raw = source[name];
+  return raw === undefined || raw === "" ? fallback : raw;
+}
+
 /**
  * Integration 2: the model used when `CREW_NARRATOR_MODEL` is unset — cheaper than the
  * narrator package's own default for the first live runs; the owner can raise it via env.
@@ -46,6 +52,11 @@ export interface Env {
   /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; unset = `DEFAULT_SERVER_NARRATOR_MODEL`. */
   readonly narratorModel: string;
   /**
+   * D67: `CREW_STAGING_MODEL`, the model for the staging call (`stageDock`); unset = the story
+   * model, so the staging call can move to a cheaper model without touching the story's.
+   */
+  readonly stagingModel: string;
+  /**
    * `CREW_NARRATOR_FALLBACK` (D43): `"error"` or `"null"`; unset = `"error"` when
    * `NODE_ENV=production`, `"null"` otherwise (local dev without a key and the test suite).
    */
@@ -72,14 +83,13 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     );
   }
 
+  const narratorModel = readModel(source, "CREW_NARRATOR_MODEL", DEFAULT_SERVER_NARRATOR_MODEL);
   return {
     databaseUrl,
     useMemoryDb,
     openRouterApiKey: source.OPENROUTER_API_KEY,
-    narratorModel:
-      source.CREW_NARRATOR_MODEL === undefined || source.CREW_NARRATOR_MODEL === ""
-        ? DEFAULT_SERVER_NARRATOR_MODEL
-        : source.CREW_NARRATOR_MODEL,
+    narratorModel,
+    stagingModel: readModel(source, "CREW_STAGING_MODEL", narratorModel),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 30),

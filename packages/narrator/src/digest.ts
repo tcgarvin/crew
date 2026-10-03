@@ -22,13 +22,11 @@ import {
   actionLabel,
   configTicks,
   describeEvent,
-  dockAlongside,
   effectiveMarket,
-  isInDockArea,
-  isOnDock,
   marketBlock,
   ticksToSeconds,
 } from "@crew/sim";
+import { onDockLines, personLine, stagingDockLines } from "./dockside-digest";
 import {
   type Snapshot,
   type State,
@@ -494,52 +492,22 @@ function jobSection(state: State, content: ContentBundle): Section {
   return { heading: "Jobs", lines, priority: 7, trimFrom: "end" };
 }
 
-/**
- * D63: what freight of one job lies on the dock, and in what standing: an offer's crates staged
- * and nobody's yet, a taken job's crates still waiting to go aboard, or a delivery set down in
- * the delivery bay (the port takes it in from there).
- */
-function dockFreightLine(
-  state: State,
-  content: ContentBundle,
-  job: DeepReadonly<Job>,
-  itemIds: readonly string[],
-): string {
-  const inBay = itemIds.filter((id) => {
-    const item = state.items[id as keyof State["items"]];
-    return item !== undefined && isInDockArea(content, state, item.location, "deliveryBay");
-  }).length;
-  const n = itemIds.length;
-  const crates = `${n} ${n === 1 ? "crate" : "crates"}`;
-  const whose = `${job.id} (${personLine(job.issuerPerson)}, to ${portName(content, job.toPortId)})`;
-  if (job.status === "offered") return `- on offer: ${crates} staged for ${whose}; not taken`;
-  if (job.status === "accepted") return `- waiting to be loaded: ${crates} for ${whose}`;
-  if (inBay === n) return `- delivered: ${crates} for ${whose} in the delivery bay`;
-  return `- unloading: ${crates} for ${whose} on the dock, ${inBay} in the delivery bay`;
-}
-
-/**
- * D63: the dock alongside, read-only: its name, the one line of ambience the map gives the
- * narrator, and the freight lying on it, by job. None with no dock alongside.
- */
+/** D63, D67: "On the dock" with a dock alongside; none in flight. */
 function dockSections(state: State, content: ContentBundle): Section[] {
-  const dock = dockAlongside(content, state);
-  if (dock === undefined) return [];
-  const byJob = new Map<string, string[]>();
-  for (const item of Object.values(state.items)) {
-    if (item.jobId === undefined || !isOnDock(content, state, item.location)) continue;
-    byJob.set(item.jobId, [...(byJob.get(item.jobId) ?? []), item.id]);
-  }
-  const lines = [`the place: ${dock.ambience}`];
-  for (const [jobId, itemIds] of [...byJob].sort(([a], [b]) => a.localeCompare(b))) {
-    const job = state.jobs[jobId as keyof State["jobs"]];
-    if (job !== undefined) lines.push(dockFreightLine(state, content, job, itemIds));
-  }
-  return [{ heading: `On the dock (${dock.name})`, lines, priority: 6, trimFrom: "end" }];
+  const dock = onDockLines(state, content);
+  return dock === undefined ? [] : [{ ...dock, priority: 6, trimFrom: "end" }];
 }
 
-function personLine(person: DeepReadonly<JobIssuer>): string {
-  return `${person.name} (${person.org === undefined ? person.role : `${person.role}, ${person.org}`})`;
+/** D67: the staging call's own section, the dock it is dressing; never trimmed. */
+function stagingSections(content: ContentBundle, hook: DeepReadonly<NarratorHook>): Section[] {
+  if (hook.kind !== "stageDock") return [];
+  return [
+    {
+      ...stagingDockLines(content, hook),
+      priority: Number.POSITIVE_INFINITY,
+      trimFrom: "end",
+    },
+  ];
 }
 
 /**
@@ -720,10 +688,13 @@ export function buildDigest(
     priority: Number.POSITIVE_INFINITY,
     trimFrom: "end",
   };
+  // D67: the staging call has no story levers, so it is not shown the story budget.
+  const staging = hook?.kind === "stageDock";
   const sections: Section[] = [
     hookSection,
+    ...(hook === undefined ? [] : stagingSections(content, hook)),
     shipSection(snapshot, content),
-    budgetSection(state),
+    ...(staging ? [] : [budgetSection(state)]),
     decisionSection(state, content),
     machineSection(state, content, snapshot.config.time.tickRate),
     jobSection(state, content),

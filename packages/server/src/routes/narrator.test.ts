@@ -200,32 +200,6 @@ describe("narrator", () => {
     expect(lastCall?.status).toBe("budgetExceeded");
   });
 
-  it("answers a stageDock hook with an empty plan, outside the budget, spacing and log (D66)", async () => {
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
-    const story = vi.fn(echoNarrator);
-    const { app, db } = buildTestApp({ env, runNarrator: story });
-    const { token } = await mintUser(app);
-    const { game } = await createGame(app, token);
-    const post = (body: unknown) =>
-      authed(app, token, `/api/games/${game.id}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-    expect((await post(narratorBody(game.id, 0))).status).toBe(200);
-    // Ten ticks after a story call: staging is never "too soon"...
-    const staged = await post(narratorBody(game.id, 10, "stageDock"));
-    expect(staged.status).toBe(200);
-    const body = await readJson(staged);
-    expect(body.commands).toEqual([]);
-    expect(body.notesUpdate).toBeUndefined();
-    expect(story).toHaveBeenCalledTimes(1);
-    expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("quietTooLong");
-    // ...and does not count as the last call for the next story call's spacing either.
-    expect((await post(narratorBody(game.id, 105))).status).toBe(200);
-  });
-
   it("429s a call too soon after the last one, but not a policyDecision hook (D37)", async () => {
     const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });

@@ -10,8 +10,11 @@ export function planSchemaFor(): NarratorPlanSchema {
   return buildNarratorPlanSchema();
 }
 
-/** JSON Schema for the API. `$schema` is dropped: the API wants the bare schema object. */
-export function planJsonSchema(schema: NarratorPlanSchema): Record<string, unknown> {
+/**
+ * JSON Schema for the prompt (D53): the story plan's, or the staging plan's (D67). `$schema` is
+ * dropped: the API wants the bare schema object.
+ */
+export function planJsonSchema(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _ignored, ...rest } = z.toJSONSchema(schema, { io: "input" }) as Record<
     string,
     unknown

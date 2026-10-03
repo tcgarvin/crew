@@ -4,7 +4,8 @@
  * output, Zod-validates and translates it, and returns commands, card prose and the rewritten
  * notes. Any failure (no transport, provider error, timeout, refusal, truncation, invalid
  * output) falls back to the deterministic null response with `fallback` set, so a hook never
- * blocks the game (review N3).
+ * blocks the game (review N3). D67: a `stageDock` hook goes to the staging call instead
+ * (`staging/run.ts`), over the same digest, with its own prompt, schema and translator.
  */
 import { loadBundle } from "@crew/content";
 import {
@@ -30,6 +31,7 @@ import type {
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
 import type { State } from "./lookups";
+import { FallbackError, callModel, contentOf, parseJsonReply, schemaIssue } from "./model-call";
 import {
   type MetIssuer,
   type NarratorCastEntry,
@@ -42,8 +44,10 @@ import {
 import { nullNarratorResponse } from "./null";
 import { planJsonSchema, planSchemaFor } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
+import type { StagingEnvelope } from "./staging/plan";
+import { runStaging } from "./staging/run";
 import { translateIntents } from "./translate";
-import { type ModelResult, type ModelTransport, TransportError } from "./transport";
+import type { ModelTransport } from "./transport";
 
 /** Default model slug (owner); override with `CREW_NARRATOR_MODEL` via `ctx.model`. */
 export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
@@ -61,6 +65,10 @@ export interface RunNarratorCtx {
   readonly transport?: ModelTransport;
   /** Stored `games.narrative_notes` (raw jsonb); parsed tolerantly. */
   readonly notes?: unknown;
+  /**
+   * The model for this call. The server passes its staging model for a `stageDock` hook and its
+   * story model otherwise (D67); absent = `DEFAULT_NARRATOR_MODEL`.
+   */
   readonly model?: string;
   /** Test/eval override; defaults to the validated bundle from `@crew/content`. */
   readonly content?: ContentBundle;
@@ -74,7 +82,8 @@ export interface NarratorTrace {
   readonly capabilities: string;
   readonly prompt: NarratorPrompt;
   readonly rawContent?: string;
-  readonly plan?: NarratorPlan;
+  /** The story plan, or for a `stageDock` call the staging plan as parsed (D67). */
+  readonly plan?: NarratorPlan | StagingEnvelope;
 }
 
 export interface NarratorRun {
@@ -99,49 +108,39 @@ function defaultContent(): ContentBundle {
   return cachedBundle;
 }
 
-class FallbackError extends Error {
-  constructor(
-    readonly reason: FallbackReason,
-    message: string,
-  ) {
-    super(message);
-    this.name = "FallbackError";
-  }
+/**
+ * D67: live runs saw the model copy `surfaceDecision`'s `beatOfThread` and `closesThread` onto
+ * `card` (the overdue-passenger policy card), which then failed the strict schema and fell back.
+ * They mean nothing on a policy card, so they are taken off before validation and the correction
+ * is fed back to the model with the drop reasons.
+ */
+const CARD_STRAY_KEYS = ["beatOfThread", "closesThread"] as const;
+
+interface ParsedPlan {
+  readonly plan: NarratorPlan;
+  readonly corrections: readonly string[];
 }
 
-function contentOf(result: ModelResult): string {
-  if (result.finish === "refusal") {
-    throw new FallbackError("refusal", result.refusal ?? "model refused");
+function withoutStrayCardKeys(json: unknown): { json: unknown; corrections: string[] } {
+  if (json === null || typeof json !== "object" || !("card" in json)) {
+    return { json, corrections: [] };
   }
-  if (result.finish === "length") throw new FallbackError("truncated", "output hit max tokens");
-  if (result.content === null || result.content.trim() === "") {
-    throw new FallbackError("schemaInvalid", "empty model output");
-  }
-  return result.content;
+  const card = json.card;
+  if (card === null || typeof card !== "object") return { json, corrections: [] };
+  const stray: string[] = CARD_STRAY_KEYS.filter((key) => key in card);
+  if (stray.length === 0) return { json, corrections: [] };
+  const kept = Object.fromEntries(Object.entries(card).filter(([key]) => !stray.includes(key)));
+  return {
+    json: { ...json, card: kept },
+    corrections: [`card: ${stray.join(" and ")} ignored; they belong on surfaceDecision only`],
+  };
 }
 
-/** Some providers wrap JSON in a code fence even in JSON mode; accept that one variation. */
-function stripFence(content: string): string {
-  const fenced = /^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/.exec(content);
-  return fenced?.[1] ?? content;
-}
-
-function parsePlan(content: string, schema: NarratorPlanSchema): NarratorPlan {
-  let json: unknown;
-  try {
-    json = JSON.parse(stripFence(content));
-  } catch {
-    throw new FallbackError("schemaInvalid", "model output is not JSON");
-  }
+function parsePlan(content: string, schema: NarratorPlanSchema): ParsedPlan {
+  const { json, corrections } = withoutStrayCardKeys(parseJsonReply(content));
   const result = schema.safeParse(json);
-  if (!result.success) {
-    const issue = result.error.issues[0];
-    throw new FallbackError(
-      "schemaInvalid",
-      `plan failed validation at ${issue?.path.join(".") ?? "?"}: ${issue?.message ?? ""}`,
-    );
-  }
-  return result.data;
+  if (!result.success) throw schemaIssue("plan", result.error.issues);
+  return { plan: result.data, corrections };
 }
 
 /**
@@ -325,32 +324,6 @@ function currentSnapshot(snapshot: SaveEnvelope, content: ContentBundle): SaveEn
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, state };
 }
 
-async function callTransport(
-  transport: ModelTransport,
-  ctx: RunNarratorCtx,
-  prompt: NarratorPrompt,
-  schema: NarratorPlanSchema,
-): Promise<ModelResult> {
-  try {
-    return await transport({
-      model: ctx.model ?? DEFAULT_NARRATOR_MODEL,
-      system: prompt.system,
-      user: prompt.user,
-      schemaName: "narrator_plan",
-      jsonSchema: planJsonSchema(schema),
-      maxTokens: NARRATOR_MAX_TOKENS,
-      signal: AbortSignal.timeout(ctx.timeoutMs ?? NARRATOR_TIMEOUT_MS),
-    });
-  } catch (err) {
-    if (err instanceof TransportError) throw new FallbackError(err.kind, err.message);
-    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
-      throw new FallbackError("timeout", "narrator call timed out");
-    }
-    // A transport that throws anything else is still a provider failure, not a game failure.
-    throw new FallbackError("apiError", err instanceof Error ? err.message : String(err));
-  }
-}
-
 /** `runNarrator` plus the intermediate artefacts, for the eval harness. */
 export async function runNarratorWithTrace(
   req: NarratorRequest,
@@ -366,20 +339,35 @@ export async function runNarratorWithTrace(
     cardsShown: applyDecisionEvents(stored.cardsShown, req.recentEvents, snapshot.state, content),
   };
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
-  const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
+  const timeoutMs = ctx.timeoutMs ?? NARRATOR_TIMEOUT_MS;
+  const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
   if (req.hook.kind === "stageDock") {
-    // D66: the staging call has its own prompt, schema and translator (Dockside §6.1), not yet
-    // built; until they are, it is answered without a model: an empty plan, so the dock is the
-    // sim's floor set, no notes are written and nothing story-shaped can come back.
+    // D67: the staging call has its own prompt, schema and translator, over the same digest.
+    const staged = await runStaging({
+      req,
+      hook: req.hook,
+      snapshot,
+      notes,
+      digest,
+      content,
+      callId,
+      transport: ctx.transport,
+      model,
+      timeoutMs,
+    });
     return {
-      response: nullNarratorResponse({ ...req, snapshot }, { callId, content }),
+      response: staged.response,
       trace: {
         digest: digest.text,
-        capabilities,
-        prompt: { promptVersion: PROMPT_VERSION, system: [], user: "" },
+        capabilities: staged.catalogue,
+        prompt: staged.prompt,
+        ...(staged.rawContent === undefined ? {} : { rawContent: staged.rawContent }),
+        ...(staged.plan === undefined ? {} : { plan: staged.plan }),
       },
+      ...(staged.error === undefined ? {} : { error: staged.error }),
     };
   }
+  const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
   const prompt = buildPrompt(capabilities, digest, req.hook.kind);
   const baseTrace: NarratorTrace = { digest: digest.text, capabilities, prompt };
   const fallback = (reason: FallbackReason, error: string, trace = baseTrace): NarratorRun => ({
@@ -394,10 +382,18 @@ export async function runNarratorWithTrace(
   const schema = planSchemaFor();
   let rawContent: string | undefined;
   try {
-    const result = await callTransport(ctx.transport, ctx, prompt, schema);
+    const result = await callModel(ctx.transport, {
+      model,
+      system: prompt.system,
+      user: prompt.user,
+      schemaName: "narrator_plan",
+      jsonSchema: planJsonSchema(schema),
+      maxTokens: NARRATOR_MAX_TOKENS,
+      timeoutMs,
+    });
     rawContent = contentOf(result);
-    const plan = parsePlan(rawContent, schema);
-    const translated = translateIntents(plan, {
+    const { plan, corrections } = parsePlan(rawContent, schema);
+    const translatedIntents = translateIntents(plan, {
       snapshot,
       content,
       hookTick: req.hook.tick,
@@ -405,6 +401,10 @@ export async function runNarratorWithTrace(
       hook: req.hook,
       threads: notes.threads,
     });
+    const translated: TranslationResult = {
+      ...translatedIntents,
+      notes: [...corrections, ...translatedIntents.notes],
+    };
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
