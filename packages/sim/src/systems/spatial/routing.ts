@@ -9,28 +9,49 @@
  * - Tile obstructions are planned from truth: V1 has no hidden obstructions (nothing but
  *   scenarios creates them, and they are visible objects), and obstruction facts would need a
  *   per-tile subject ID the contract does not have. Execution still re-checks every tile.
+ *
+ * Dockside spike: ramps are planned from truth too, and both policies agree on them: a fully open
+ * ramp costs nothing, any other ramp is impassable. Travel alone opens and closes ramps (actors
+ * never request one), and whether the ramps are down is something the whole ship knows.
  */
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly } from "../../core/types/common";
 import type { ConfigDef } from "../../core/types/content";
 import type { DoorId } from "../../core/types/ids";
-import type { DeckGeometry } from "../../core/types/nav";
+import type { DeckGeometry, NavDoor } from "../../core/types/nav";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import { schematicDoorSeconds } from "./doors";
+import { indexAt } from "./grid";
 import type { PathPolicy } from "./pathfind";
 
-function schematicDoorCost(geometry: DeckGeometry, doorId: DoorId, config: ConfigDef) {
+/**
+ * Seconds planning expects a door to cost, or null if it will not let anyone through: a ramp is
+ * free while open and impassable otherwise; any other door is its schematic opening time.
+ */
+export function plannedDoorSeconds(
+  geometry: DeckGeometry,
+  nav: NavDoor,
+  config: ConfigDef,
+): number | null {
+  if (nav.placement.kind === "ramp") return geometry.openRamps.has(nav.id) ? 0 : null;
+  return schematicDoorSeconds(nav, config);
+}
+
+function plannedDoorCost(geometry: DeckGeometry, doorId: DoorId, config: ConfigDef) {
   const nav = geometry.doors.get(doorId);
   if (nav === undefined) return null;
-  const seconds = schematicDoorSeconds(nav, config);
+  const seconds = plannedDoorSeconds(geometry, nav, config);
   return seconds === null ? null : seconds * config.movement.walkSpeed;
 }
 
-/** The static schematic every crew member knows (SD §13.5): no facts, no dynamic state. */
+/**
+ * The static schematic every crew member knows (SD §13.5): no facts, no dynamic state except
+ * whether the ramps are open.
+ */
 export function schematicPolicy(geometry: DeckGeometry, config: ConfigDef): PathPolicy {
   return {
     key: "schematic",
-    doorCost: (doorId) => schematicDoorCost(geometry, doorId, config),
+    doorCost: (doorId) => plannedDoorCost(geometry, doorId, config),
     tileBlocked: () => false,
   };
 }
@@ -55,11 +76,14 @@ export function actorPolicy(
         ? `s${revision}`
         : `a${actor.id}:${actor.navigationKnowledgeRevision}:${revision}`,
     doorCost(doorId) {
+      if (geometry.doors.get(doorId)?.placement.kind === "ramp") {
+        return plannedDoorCost(geometry, doorId, config);
+      }
       const belief = beliefs.get(doorId);
       if (belief === "jammed") return null;
       if (belief === "open") return 0;
-      return schematicDoorCost(geometry, doorId, config);
+      return plannedDoorCost(geometry, doorId, config);
     },
-    tileBlocked: (x, y) => geometry.obstructed[y * geometry.width + x] === 1,
+    tileBlocked: (x, y) => geometry.obstructed[indexAt(geometry, x, y)] === 1,
   };
 }

@@ -1,15 +1,15 @@
 /**
  * Planner-facing travel estimates over the static schematic (SD §13.5: every crew member knows
- * the layout). Pure: no state, no facts, no dynamic doors. The AgentView builder (W4a) can wrap
- * these for the planner, which may not import `systems/**` itself.
+ * the layout). Pure: no state, no facts, no dynamic doors except ramps, which are open or not as
+ * the geometry last saw them (Dockside spike: a dock tile is reachable only across an open ramp).
+ * The AgentView builder (W4a) can wrap these for the planner, which may not import `systems/**`.
  */
 import type { TileCoord } from "../../core/types/common";
 import type { ConfigDef } from "../../core/types/content";
 import type { DeckGeometry } from "../../core/types/nav";
-import { schematicDoorSeconds } from "./doors";
 import { doorBetween } from "./geometry";
 import { findPath, pathLength } from "./pathfind";
-import { schematicPolicy } from "./routing";
+import { plannedDoorSeconds, schematicPolicy } from "./routing";
 
 /** Route the schematic suggests from `from` to `to`, or null if the layout has none. */
 export function knownRoute(
@@ -38,7 +38,7 @@ export function estimateTravelTicks(
   for (let i = 1; i < route.length; i++) {
     const doorId = doorBetween(geometry, route[i - 1] as TileCoord, route[i] as TileCoord);
     const nav = doorId === undefined ? undefined : geometry.doors.get(doorId);
-    if (nav !== undefined) seconds += schematicDoorSeconds(nav, config) ?? 0;
+    if (nav !== undefined) seconds += plannedDoorSeconds(geometry, nav, config) ?? 0;
   }
   return Math.ceil(seconds * config.time.tickRate - 1e-9);
 }

@@ -13,6 +13,7 @@ import type { TileCoord } from "../../core/types/common";
 import type { ActorId, DeckDefId } from "../../core/types/ids";
 import type { DeckGeometry, NavInteractionPosition } from "../../core/types/nav";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
+import { inBounds, tileIndex } from "./grid";
 
 export function reservationKey(deckId: DeckDefId, tile: TileCoord): string {
   return `${deckId}:${tile.x},${tile.y}`;
@@ -23,7 +24,8 @@ export function interactionsAt(
   geometry: DeckGeometry,
   tile: TileCoord,
 ): readonly NavInteractionPosition[] {
-  return geometry.interactionByTile.get(tile.y * geometry.width + tile.x) ?? [];
+  if (!inBounds(geometry, tile.x, tile.y)) return [];
+  return geometry.interactionByTile.get(tileIndex(geometry, tile)) ?? [];
 }
 
 /**

@@ -8,12 +8,23 @@ import { navCacheBuilder } from "./geometry";
 import { movementSystem } from "./movement";
 import { navRefreshSystem } from "./topology";
 
+export {
+  attachDock,
+  deckToDock,
+  detachDock,
+  type DockHost,
+  dockToDeck,
+  isOnDock,
+  occupantsOfDock,
+  rampLanding,
+} from "./dock";
 export { doorHasPower, doorWillOpen, doorsSystem, isPowerDomainLive } from "./doors";
 export { estimateTravelTicks, knownRoute } from "./estimates";
 export {
   compartmentAt,
   deckGeometry,
   doorBetween,
+  isDockTile,
   isWalkable,
   navCacheBuilder,
   rebuildNav,

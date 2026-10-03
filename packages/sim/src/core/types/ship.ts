@@ -14,6 +14,7 @@ import type {
   CommandId,
   CompartmentId,
   DeckDefId,
+  DockDefId,
   DoorId,
   ItemDefId,
   ItemId,
@@ -48,8 +49,24 @@ export interface TileState {
 export interface DeckState {
   /** Per deck, sparse per-tile overrides keyed `${x},${y}`. */
   tiles: Record<DeckDefId, Record<TileKey, TileState>>;
-  /** Bumped on any geometry-affecting change (door jam, obstruction); invalidates nav caches. */
+  /**
+   * Bumped on any geometry-affecting change (door jam, obstruction, a ramp opening or closing, a
+   * dock attaching or detaching); invalidates nav caches.
+   */
   geometryRevision: number;
+  /**
+   * Dockside spike (see docs/design/dockside-spike.md): the dock currently alongside, if any. Its
+   * walkable tiles are grafted into `deckId`'s nav grid in the deck's own coordinate frame, so dock
+   * tiles are ordinary `onDeck` positions on that deck (possibly negative or past the deck's
+   * authored bounds). Set and cleared through `systems/spatial/dock.ts`.
+   */
+  dock?: DockPresence;
+}
+
+/** Which dock layout is grafted onto which deck. Layout geometry comes from content. */
+export interface DockPresence {
+  readonly dockId: DockDefId;
+  readonly deckId: DeckDefId;
 }
 
 // ---------------------------------------------------------------------------------------------
