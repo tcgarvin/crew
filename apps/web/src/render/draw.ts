@@ -8,6 +8,7 @@
  */
 import type {
   CargoClass,
+  DockDef,
   DoorPhysicalState,
   RenderActor,
   RenderFrame,
@@ -16,10 +17,21 @@ import type {
   RenderMachineState,
 } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
+import { dockOrigin, dockSlide, withDockSlide } from "./dock";
+import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
+import type { DockTarget } from "./dockHit";
+import { dockShape } from "./dockShape";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
 import { drawRamps } from "./ramps";
 import type { Scene } from "./scene";
-import { type SceneryFrame, drawBerth, drawFarScenery, drawForeground, drawSky } from "./scenery";
+import {
+  type SceneryFrame,
+  drawBerth,
+  drawFarScenery,
+  drawForeground,
+  drawPlanetBelow,
+  drawSky,
+} from "./scenery";
 import { type StarLayer, drawStars } from "./stars";
 
 export interface ViewTransform {
@@ -64,23 +76,6 @@ export function computeFitTransform(
   return { scale, offsetX, offsetY };
 }
 
-/** Margin around the hull in flight, tiles: room for scenery to show past the ship (D58). */
-export const FLIGHT_MARGIN_TILES = 1;
-
-/**
- * Dockside §2.7: in flight the camera frames the whole hull, nose to bells, with a margin. The
- * docked fit (ship plus dock map) waits for phase 2, so phase 1 always uses this one.
- */
-export function flightBounds(hull: Pick<HullGeometry, "bounds">): Bounds {
-  const { minX, minY, maxX, maxY } = hull.bounds;
-  return {
-    minX: minX - FLIGHT_MARGIN_TILES,
-    minY: minY - FLIGHT_MARGIN_TILES,
-    maxX: maxX + FLIGHT_MARGIN_TILES,
-    maxY: maxY + FLIGHT_MARGIN_TILES,
-  };
-}
-
 function toPx(t: ViewTransform, x: number, y: number): readonly [number, number] {
   return [t.offsetX + x * t.scale, t.offsetY + y * t.scale];
 }
@@ -90,7 +85,7 @@ function toPx(t: ViewTransform, x: number, y: number): readonly [number, number]
  * 90° rotation `drawFrame` applies to the canvas — used to place text after `ctx.restore()` so
  * labels stay upright (task item 5).
  */
-function toScreenPx(
+export function toScreenPx(
   t: ViewTransform,
   x: number,
   y: number,
@@ -607,9 +602,11 @@ export function drawActorLabels(
   const placed: { x: number; y: number; w: number }[] = [];
 
   for (const actor of sorted) {
-    const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
+    const [dotX, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
     const label = truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26);
     const labelW = ctx.measureText(label).width + 8;
+    // Kept on screen: the docked camera puts people on the dock's far edges.
+    const cx = Math.max(labelW / 2 + 2, Math.min(viewportWidth - labelW / 2 - 2, dotX));
     let labelY = cy - radius - 6;
     for (const p of placed) {
       if (Math.abs(p.x - cx) < (p.w + labelW) / 2 && Math.abs(p.y - labelY) < fontPx + 4) {
@@ -638,7 +635,19 @@ export interface Scenery {
   readonly plume: number;
   /** -1..1 wobble for the plume (0 under reduced motion). */
   readonly flicker: number;
+  /**
+   * Phase 2: the dock map for the port in view (`dockInView`), or `undefined` when the port has
+   * none, which draws the phase 1 stand-in berth and bay walls instead.
+   */
+  readonly dock: DockDef | undefined;
+  /** Docking clamps, 0 retracted to 1 engaged (`clampEngagement`). */
+  readonly clamps: number;
 }
+
+/** What a tap can select: the frame's people, items and machines, or a dock post or the dock. */
+export type DrawSelection =
+  | { readonly kind: "actor" | "machine" | "item"; readonly id: string }
+  | DockTarget;
 
 /** The fit-space rectangle the canvas shows, in tile units. */
 function visibleTiles(t: ViewTransform, fitW: number, fitH: number): Bounds {
@@ -660,9 +669,10 @@ function inTileSpace(ctx: CanvasRenderingContext2D, t: ViewTransform, draw: () =
 }
 
 /**
- * One canvas frame, back to front (dockside §2.3): sky, stars, far scenery, the berth, plume and
- * hull, the deck (rooms, walls, ramps, doors, machines), the foreground; then, upright in screen
- * space, labels, items and people. The portrait rotation applies to every layer.
+ * One canvas frame, back to front (dockside §2.3): sky, stars, far scenery, the dock map (or the
+ * stand-in berth), plume and hull, the deck (rooms, walls, ramps, doors, machines), the
+ * foreground; then, upright in screen space, labels, items and people, those on the dock moved
+ * with it while it slides (`withDockSlide`). The portrait rotation applies to every layer.
  */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
@@ -673,9 +683,11 @@ export function drawFrame(
   viewportHeight: number,
   rotated: boolean,
   scenery: Scenery,
-  selected?: { kind: "actor" | "machine" | "item"; id: string },
+  selected?: DrawSelection,
 ): void {
-  const { scene, hull } = scenery;
+  const { scene, hull, dock } = scenery;
+  const shown =
+    dock === undefined ? frame : withDockSlide(frame, layout, dockSlide(scene, layout.width));
   ctx.clearRect(0, 0, viewportWidth, viewportHeight);
   ctx.fillStyle = scene.skyColor;
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
@@ -707,9 +719,26 @@ export function drawFrame(
     scene.starSpeed,
     scene.starAlpha,
   );
+  const dockPaint: DockPaint | undefined =
+    dock === undefined
+      ? undefined
+      : {
+          origin: dockOrigin(dock, scene, layout.width),
+          alpha: scene.portAlpha,
+          clamps: scenery.clamps,
+          px: sceneryFrame.px,
+          view: sceneryFrame.view,
+          enclosure: scene.cameraT,
+          ...(selected?.kind === "post" ? { selectedPostKey: selected.id } : {}),
+        };
   inTileSpace(ctx, t, () => {
     drawFarScenery(ctx, scene, sceneryFrame);
-    drawBerth(ctx, scene, sceneryFrame);
+    if (dock === undefined || dockPaint === undefined) {
+      drawBerth(ctx, scene, sceneryFrame);
+    } else {
+      drawPlanetBelow(ctx, scene, sceneryFrame, dockShape(dock).overSky);
+      drawDock(ctx, dock, dockPaint);
+    }
     drawPlume(ctx, hull, scenery.plume, scenery.flicker);
     drawHull(ctx, hull, sceneryFrame.px);
     drawRamps(ctx, layout, frame, sceneryFrame.px);
@@ -718,7 +747,12 @@ export function drawFrame(
   drawWalls(ctx, t, layout);
   drawDoors(ctx, t, layout, frame);
   drawMachines(ctx, t, layout, frame, selected?.kind === "machine" ? selected.id : undefined);
-  inTileSpace(ctx, t, () => drawForeground(ctx, scene, sceneryFrame));
+  inTileSpace(ctx, t, () => {
+    if (dock !== undefined && dockPaint !== undefined) {
+      drawDockForeground(ctx, dock, dockPaint, hull.bounds, sceneryFrame.view);
+    }
+    drawForeground(ctx, scene, sceneryFrame, dock === undefined);
+  });
   ctx.restore();
 
   // Everything with text (and the dots and crates that text and badges sit on) is drawn after
@@ -730,7 +764,7 @@ export function drawFrame(
     ctx,
     t,
     layout,
-    frame,
+    shown,
     rotated,
     viewportWidth,
     selected?.kind === "item" ? selected.id : undefined,
@@ -738,14 +772,14 @@ export function drawFrame(
   drawActorDots(
     ctx,
     t,
-    frame,
+    shown,
     rotated,
     viewportWidth,
     selected?.kind === "actor" ? selected.id : undefined,
   );
-  drawActorLabels(ctx, t, frame, rotated, viewportWidth);
+  drawActorLabels(ctx, t, shown, rotated, viewportWidth);
   // After the labels: a label plate sits just above the dot and would hide the load.
-  drawCarriedItems(ctx, t, frame, rotated, viewportWidth);
+  drawCarriedItems(ctx, t, shown, rotated, viewportWidth);
 }
 
 /**

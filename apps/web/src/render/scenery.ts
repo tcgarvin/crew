@@ -1,8 +1,9 @@
 /**
- * Dockside §2.3–2.4 (D58): port scenery without dock maps. Everything here draws in deck tile
+ * Dockside §2.3–2.4 (D58): port scenery around the dock map. Everything here draws in deck tile
  * units (the caller sets a tile-space transform inside the portrait rotation) from a `Scene`, so
- * it is a pure picture of the stage and progress. Phase 2's dock maps replace the stand-in berth
- * and palettes; the layering stays.
+ * it is a pure picture of the stage and progress. Where a port has a dock map (phase 2,
+ * `dockArt.ts`), the map replaces the stand-in berth and bay walls here; ports without one keep
+ * the stand-in.
  *
  * - Far: the station's outer structure, or the planet's disc, growing ahead and receding astern.
  * - Berth (behind the hull): the station bay's floor, or the planet's fields and landing pad.
@@ -37,6 +38,8 @@ const WALL_DEPTH = 8;
 const GANTRY_ALPHA = 0.2;
 const CLOUD_ALPHA = 0.35;
 const DUST_ALPHA = 0.45;
+/** Sky-coloured haze over the fields around a planet's dock. */
+const FIELD_HAZE = 0.3;
 
 /** The planet's ground scale for an altitude: full size landed, a third at the top of the sky. */
 export function groundScale(altitude: number): number {
@@ -170,14 +173,18 @@ function drawBayFloor(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFra
   ctx.setLineDash([]);
 }
 
-function drawGround(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
+/** How much of the planet's ground shows at this altitude (it fades as the ship climbs). */
+function groundVisible(scene: Scene): number {
+  return 1 - smooth((scene.altitude - 0.35) / 0.6);
+}
+
+/**
+ * Fields: crop strips along the travel axis. They scale with height (far below looks small) and
+ * slide with the berth at that scale. The caller sets the alpha.
+ */
+function drawFields(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
   const { palette } = scene;
-  const visible = 1 - smooth((scene.altitude - 0.35) / 0.6);
-  if (visible <= 0) return;
-  ctx.globalAlpha *= visible;
   const offset = scene.portOffset * f.width;
-  // Fields: crop strips along the travel axis. They scale with height (far below looks small)
-  // and slide with the berth at that scale.
   const scale = groundScale(scene.altitude);
   ctx.save();
   ctx.translate(f.width / 2 + offset * scale, f.height / 2);
@@ -196,12 +203,76 @@ function drawGround(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame
     rect(ctx, x0 + jog, y, x1, y + 1.6);
   }
   ctx.restore();
+}
+
+function drawGround(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
+  const { palette } = scene;
+  const visible = groundVisible(scene);
+  if (visible <= 0) return;
+  ctx.globalAlpha *= visible;
+  drawFields(ctx, scene, f);
   // The pad slides in under the ship at full size, so it visibly arrives and stops.
+  const offset = scene.portOffset * f.width;
   ctx.fillStyle = palette.pad;
   rect(ctx, offset - 2.2, -1.6, offset + f.width + 2.6, f.height + 1.6);
   ctx.strokeStyle = palette.marking;
   ctx.lineWidth = 0.18;
   ctx.strokeRect(offset - 1.6, -1.0, f.width + 3.6, f.height + 2.0);
+}
+
+/** Cloud tops far below a pier that runs out into open sky; they scale with height like fields. */
+const CLOUD_SEA: readonly Puff[] = [
+  { x: 0.1, y: 0.2, radius: 0.5, opacity: 0.7 },
+  { x: 0.35, y: 0.75, radius: 0.6, opacity: 0.6 },
+  { x: 0.55, y: 0.3, radius: 0.45, opacity: 0.55 },
+  { x: 0.8, y: 0.8, radius: 0.55, opacity: 0.7 },
+  { x: 0.95, y: 0.15, radius: 0.5, opacity: 0.6 },
+  { x: 0.25, y: 1.15, radius: 0.55, opacity: 0.65 },
+  { x: 0.7, y: 1.3, radius: 0.6, opacity: 0.6 },
+];
+
+function drawCloudSea(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
+  const offset = scene.portOffset * f.width;
+  const scale = groundScale(scene.altitude);
+  ctx.save();
+  ctx.translate(f.width / 2 + offset * scale, f.height / 2);
+  ctx.scale(scale, scale);
+  ctx.translate(-f.width / 2, -f.height / 2);
+  for (let period = -1; period <= 1; period++) {
+    for (const cloud of CLOUD_SEA) {
+      const ry = cloud.radius * f.height;
+      const x = (cloud.x + period) * f.width * 1.6;
+      const y = (cloud.y - 0.2) * f.height * 1.4;
+      puff(ctx, x, y, ry * 2.2, ry, scene.palette.cloudRgb, 0.5 * cloud.opacity);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Behind a planet's dock map (phase 2): the ground far below, without the stand-in pad, which the
+ * dock replaces. A map with open sky beside it (a pier) has cloud tops below instead of fields.
+ */
+export function drawPlanetBelow(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  f: SceneryFrame,
+  overSky: boolean,
+): void {
+  if (scene.setting !== "planet" || scene.portAlpha <= 0) return;
+  const visible = groundVisible(scene);
+  if (visible <= 0) return;
+  ctx.globalAlpha = scene.portAlpha * visible;
+  if (overSky) {
+    drawCloudSea(ctx, scene, f);
+  } else {
+    drawFields(ctx, scene, f);
+    // Haze in the dock's sky colour (a farming world's green-gold), so the fields sit under it.
+    ctx.globalAlpha = scene.portAlpha * visible * FIELD_HAZE;
+    ctx.fillStyle = scene.palette.sky;
+    rect(ctx, f.view.minX, f.view.minY, f.view.maxX, f.view.maxY);
+  }
+  ctx.globalAlpha = 1;
 }
 
 /** Behind the hull: the bay floor, or the fields and pad. Faded by `portAlpha`. */
@@ -323,10 +394,18 @@ function drawDust(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame):
   }
 }
 
-/** Over the deck: bay walls and gantries, or clouds and dust. */
-export function drawForeground(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
+/**
+ * Over the deck: the stand-in bay walls and gantries (`standIn`: no dock map for this port; a map
+ * brings its own foreground), or clouds and dust.
+ */
+export function drawForeground(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  f: SceneryFrame,
+  standIn: boolean,
+): void {
   if (scene.setting === "station") {
-    if (scene.portAlpha > 0) drawBayWalls(ctx, scene, f);
+    if (standIn && scene.portAlpha > 0) drawBayWalls(ctx, scene, f);
     return;
   }
   drawDust(ctx, scene, f);

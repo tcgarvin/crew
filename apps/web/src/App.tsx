@@ -37,6 +37,7 @@ import {
 } from "./host/saves";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
+import { type DockTable, dockInView } from "./render/dock";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Headline } from "./ui/Headline";
 import { Inspector, type InspectorData } from "./ui/Inspector";
@@ -56,6 +57,7 @@ import {
   appendTicker,
   visibleLog,
 } from "./ui/log";
+import { inspectPlace } from "./ui/placeInspection";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
@@ -118,6 +120,7 @@ export function App() {
     return deckDef;
   }, [bundle, scenarioId]);
   const layout = useMemo(() => buildDeckLayout(deck, bundle), [deck, bundle]);
+  const docks: DockTable = useMemo(() => bundle.docks ?? {}, [bundle]);
 
   const connectionRef = useRef<SimConnection | undefined>(undefined);
   const playbackRef = useRef(new FramePlayback(tickRate));
@@ -453,6 +456,14 @@ export function App() {
         setInspectorData(undefined);
         return;
       }
+      if (next.kind === "post" || next.kind === "dock") {
+        // Content only: the dock map the canvas drew, so no snapshot is needed.
+        const dock = frame === undefined ? undefined : dockInView(frame, docks);
+        setInspectorData(
+          dock === undefined ? undefined : { kind: "place", place: inspectPlace(dock, next) },
+        );
+        return;
+      }
       setInspectorData({ kind: "loading" });
       const connection = connectionRef.current;
       if (!connection) return;
@@ -480,7 +491,8 @@ export function App() {
       } else if (next.kind === "item") {
         pendingRequests.current.set(requestId, (msg) => {
           if (msg.type === "snapshot") {
-            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout);
+            const dock = frame === undefined ? undefined : dockInView(frame, docks);
+            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout, dock);
             setInspectorData(item === undefined ? undefined : { kind: "item", item });
           } else if (msg.type === "error") {
             setInspectorData(undefined);
@@ -508,7 +520,7 @@ export function App() {
         connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
       }
     },
-    [frame, runAhead.viewTick, bundle, layout],
+    [frame, runAhead.viewTick, bundle, layout, docks],
   );
 
   const onCloseInspector = useCallback(() => {
@@ -595,6 +607,7 @@ export function App() {
         <DeckCanvas
           layout={layout}
           ports={bundle.ports}
+          docks={docks}
           frame={frame}
           paused={paused}
           selected={selection}

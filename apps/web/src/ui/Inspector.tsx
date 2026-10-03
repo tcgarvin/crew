@@ -1,10 +1,13 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
 import { actorSubtitle, rosterRole } from "./actorWords";
+import type { PlaceInspection } from "./placeInspection";
 
 export type InspectorData =
   | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
   | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
   | { readonly kind: "item"; readonly item: ItemInspection }
+  /** Dockside phase 2: a dock post, or the dock itself. */
+  | { readonly kind: "place"; readonly place: PlaceInspection }
   | { readonly kind: "loading" };
 
 /** Polish A: what the inspector shows for a tapped crate (or any item on deck). */
@@ -52,6 +55,7 @@ export function Inspector({ data, onClose }: InspectorProps) {
         {data.kind === "actor" && <ActorInspector view={data.view} label={data.label} />}
         {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
         {data.kind === "item" && <ItemInspector item={data.item} />}
+        {data.kind === "place" && <PlaceInspector place={data.place} />}
       </aside>
     </div>
   );
@@ -131,6 +135,16 @@ const JOB_STATUS_WORDS: Readonly<Record<string, string>> = {
   paid: "delivered and paid",
   failed: "failed",
 };
+
+function PlaceInspector({ place }: { place: PlaceInspection }) {
+  return (
+    <div>
+      <h2>{place.title}</h2>
+      <p className="inspector-subtitle">{place.subtitle}</p>
+      <p>{place.text}</p>
+    </div>
+  );
+}
 
 function ItemInspector({ item }: { item: ItemInspection }) {
   return (

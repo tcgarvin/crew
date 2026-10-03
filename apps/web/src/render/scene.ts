@@ -7,7 +7,8 @@
  * Distances along the ship are in deck lengths, positive aft (east, +x in deck coordinates): the
  * ship never moves on screen, so the world flows fore to aft past it and arrival never reverses.
  */
-import type { PortDef, PortDefId, PortSetting, RenderTravel } from "@crew/sim";
+import type { DockDef, PortDef, PortDefId, PortSetting, RenderTravel } from "@crew/sim";
+import { mixHex } from "./color";
 
 /** Stand-in colours per setting until phase 2's dock maps bring a palette per port. */
 export interface ScenePalette {
@@ -101,7 +102,7 @@ export interface Scene {
   readonly dust: number;
   /** Engine plume before the engines' own state is applied, 0 to 1. */
   readonly plume: number;
-  /** 0 flight framing to 1 docked framing. Phase 1 keeps the camera on the ship (D58). */
+  /** 0 flight framing to 1 docked framing (ship plus dock map; `camera.ts`). */
   readonly cameraT: number;
 }
 
@@ -297,7 +298,9 @@ function reduceMotion(stage: RenderTravel["state"], p: number, c: Channels): Cha
 }
 
 /** The port whose scenery is in view: the one being left until transit, then the destination. */
-function portInView(travel: RenderTravel): PortDefId {
+export function portInView(
+  travel: Pick<RenderTravel, "state" | "fromPortId" | "toPortId">,
+): PortDefId {
   switch (travel.state) {
     case "preparingDeparture":
     case "undocking":
@@ -337,4 +340,16 @@ export function sceneAt(
     palette,
     skyColor: mixColor(palette.space, palette.sky, c.sky),
   };
+}
+
+/**
+ * Phase 2: a planet's dock map brings its own sky colour (`palette.sky`); the scene's sky
+ * gradient and blend use it in place of the per-setting stand-in. A station map changes nothing
+ * here: its bay is drawn by the map itself.
+ */
+export function withDockSky(scene: Scene, dock: Pick<DockDef, "palette"> | undefined): Scene {
+  const sky = dock?.palette.sky;
+  if (scene.setting !== "planet" || sky === undefined) return scene;
+  const palette: ScenePalette = { ...scene.palette, sky, skyLow: mixHex(sky, "#2e4a5a", 0.4) };
+  return { ...scene, palette, skyColor: mixColor(palette.space, palette.sky, scene.sky) };
 }

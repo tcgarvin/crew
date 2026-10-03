@@ -11,31 +11,37 @@ import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
  * Dockside (D58): the canvas runs its own animation loop, because the stars stream and the plume
  * flickers between sim frames. It redraws only while something moves (stars, plume) or when the
  * frame, selection or size changes, so a paused game at the dock costs nothing.
+ *
+ * Dockside phase 2: the dock map for the port in view is drawn alongside, and the camera eases
+ * from the flight framing to ship plus dock (`cameraBounds`) with the scene's `cameraT`, so the
+ * fit is recomputed every drawn frame rather than on resize alone.
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { cameraBounds } from "./camera";
+import { type DockTable, clampEngagement, dockInView, dockSlide, withDockSlide } from "./dock";
+import { dockTargetAt } from "./dockHit";
 import {
   type DeckLayout,
+  type DrawSelection,
   type ViewTransform,
   computeFitTransform,
   deckPiles,
   drawFrame,
-  flightBounds,
   screenToWorld,
   shouldRotate,
 } from "./draw";
 import { engineOutput, hullGeometry } from "./hull";
-import { sceneAt } from "./scene";
+import { sceneAt, withDockSky } from "./scene";
 import { StarScroll, buildStarField } from "./stars";
 
-export interface Selection {
-  readonly kind: "actor" | "machine" | "item";
-  readonly id: string;
-}
+export type Selection = DrawSelection;
 
 export interface DeckCanvasProps {
   readonly layout: DeckLayout;
   /** The content's ports, for each one's setting (station or planet). */
   readonly ports: Readonly<Record<PortDefId, PortDef>>;
+  /** The content's dock maps (empty when it has none: every port draws the stand-in berth). */
+  readonly docks: DockTable;
   readonly frame: RenderFrame | undefined;
   /** The game is paused: the stars and plume hold still with it. */
   readonly paused: boolean;
@@ -58,10 +64,25 @@ function plumeFlicker(nowMs: number): number {
   return Math.sin(nowMs / 37) * 0.6 + Math.sin(nowMs / 13) * 0.4;
 }
 
-export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }: DeckCanvasProps) {
+/** The last picture drawn, so a tap hits what is on screen. */
+interface Drawn {
+  readonly transform: ViewTransform;
+  /** How far the dock (and everyone on it) was drawn from its grafted place, tiles. */
+  readonly slide: number;
+}
+
+export function DeckCanvas({
+  layout,
+  ports,
+  docks,
+  frame,
+  paused,
+  selected,
+  onSelect,
+}: DeckCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const transformRef = useRef<ViewTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
+  const drawnRef = useRef<Drawn>({ transform: { scale: 1, offsetX: 0, offsetY: 0 }, slide: 0 });
   const sizeRef = useRef({ width: 0, height: 0 });
   const rotatedRef = useRef(false);
   const hull = useMemo(() => hullGeometry(layout), [layout]);
@@ -91,14 +112,8 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rotatedRef.current = shouldRotate(width, height, layout);
-    transformRef.current = computeFitTransform(
-      width,
-      height,
-      flightBounds(hull),
-      rotatedRef.current,
-    );
     dirtyRef.current = true;
-  }, [layout, hull]);
+  }, [layout]);
 
   useEffect(() => {
     resize();
@@ -128,7 +143,8 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
       last = now;
       const { frame: current, selected: chosen, paused: still } = latest.current;
       if (current !== undefined) {
-        const scene = sceneAt(current.travel, ports, { reducedMotion });
+        const dock = dockInView(current, docks);
+        const scene = withDockSky(sceneAt(current.travel, ports, { reducedMotion }), dock);
         const streaming = !still && scene.starSpeed > 0 && scene.starAlpha > 0;
         const plume = scene.plume * engineOutput(current, layout);
         const flickering = !still && !reducedMotion && plume > 0.01;
@@ -136,9 +152,19 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
         if (streaming || flickering || dirtyRef.current) {
           dirtyRef.current = false;
           const { width, height } = sizeRef.current;
+          const transform = computeFitTransform(
+            width,
+            height,
+            cameraBounds(hull, dock, scene.cameraT),
+            rotatedRef.current,
+          );
+          drawnRef.current = {
+            transform,
+            slide: dock === undefined ? 0 : dockSlide(scene, layout.width),
+          };
           drawFrame(
             ctx,
-            transformRef.current,
+            transform,
             layout,
             current,
             width,
@@ -151,6 +177,8 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
               starScrollPx: scrollRef.current.offsetPx,
               plume,
               flicker: flickering ? plumeFlicker(now) : 0,
+              dock,
+              clamps: clampEngagement(current.travel),
             },
             chosen,
           );
@@ -163,7 +191,7 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
       cancelAnimationFrame(raf);
       media.removeEventListener("change", onMotionChange);
     };
-  }, [layout, ports, hull, stars]);
+  }, [layout, ports, docks, hull, stars]);
 
   const handlePointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -173,18 +201,20 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
       const rect = canvas.getBoundingClientRect();
       const px = event.clientX - rect.left;
       const py = event.clientY - rect.top;
-      const t = transformRef.current;
+      const { transform, slide } = drawnRef.current;
       const { x: worldX, y: worldY } = screenToWorld(
-        t,
+        transform,
         px,
         py,
         rotatedRef.current,
         sizeRef.current.width,
       );
+      // Hit what is on screen: people and crates on the dock where the sliding dock put them.
+      const shown = withDockSlide(frame, layout, slide);
 
       let best: Selection | undefined;
       let bestDist = HIT_RADIUS_TILES;
-      for (const actor of frame.actors) {
+      for (const actor of shown.actors) {
         const d = Math.hypot(actor.x - worldX, actor.y - worldY);
         if (d < bestDist) {
           bestDist = d;
@@ -193,7 +223,7 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
       }
       if (!best) {
         let bestItem = ITEM_HIT_RADIUS_TILES;
-        for (const pile of deckPiles(frame, layout.deckId)) {
+        for (const pile of deckPiles(shown, layout.deckId)) {
           const d = Math.hypot(pile.x - worldX, pile.y - worldY);
           if (d < bestItem) {
             bestItem = d;
@@ -218,9 +248,13 @@ export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }:
           }
         }
       }
+      if (!best) {
+        const dock = dockInView(frame, docks);
+        if (dock !== undefined) best = dockTargetAt(dock, layout, worldX - slide, worldY);
+      }
       onSelect(best);
     },
-    [frame, layout, onSelect],
+    [frame, layout, docks, onSelect],
   );
 
   return (
