@@ -56,8 +56,9 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter 
 | `OPENROUTER_API_KEY` | For the real narrator (W9) | Passed through as `NarratorCtx.openRouterApiKey`. Without it the narrator falls back with reason `notConfigured`: in `CREW_NARRATOR_FALLBACK=error` mode the route answers 503, otherwise the deterministic null narrator answers the hook. |
 | `CREW_NARRATOR_FALLBACK` | No (default `error` when `NODE_ENV=production`, `null` otherwise) | D43: what the narrator route does when the model cannot answer. `error`: no key → 503 `narratorUnavailable` (`reason: "notConfigured"`, not retryable); any model failure (`apiError`, `timeout`, `refusal`, `truncated`, `schemaInvalid`) → 502 `narratorUnavailable` with the reason and `retryable: true`; the call is logged with status `error`, and the client retries with backoff then pauses the game on an error panel. `null`: the deterministic template narrator answers instead (tests, local dev without a key, explicit offline use). Players must never get the null narrator, so leave this unset in production (Vercel sets `NODE_ENV=production` for the function runtime) or set it to `error` explicitly. Any other value fails startup. |
 | `CREW_NARRATOR_MODEL` | No (default `anthropic/claude-sonnet-4.6`, `DEFAULT_SERVER_NARRATOR_MODEL` in `src/env.ts`) | OpenRouter model slug for the narrator. The model that actually answered is recorded in `narrator_calls.model`. |
+| `CREW_STAGING_MODEL` | No (default: whatever `CREW_NARRATOR_MODEL` resolves to) | D67: OpenRouter model slug for the staging call (`stageDock`, who and what is on the dock when the ship lands), so it can move to a cheaper model without touching the story's. Staging calls are the `narrator_calls` rows with `hook_kind = 'stageDock'`. |
 | `CREW_SAVE_MAX_BYTES` | No (default 4 MiB) | Max accepted save size, measured on the **gzipped** blob. Vercel functions cap request bodies at 4.5 MB, so leave headroom above this for base64 + JSON overhead if raising it. |
-| `CREW_NARRATOR_MAX_CALLS_PER_HOUR` | No (default 30) | Per-game narrator call budget (rolling wall-clock hour); a there-and-back passage to a far port is about ten calls as measured by `crew pacing` (D51; the spec's estimate was eight, passengers-and-galaxy §2.2, §8.6). A second budget knob — minimum sim ticks between calls — is currently a constant in `src/routes/narrator.ts` (`MIN_TICKS_BETWEEN_NARRATOR_CALLS`), not yet an env var. |
+| `CREW_NARRATOR_MAX_CALLS_PER_HOUR` | No (default 30) | Per-game narrator call budget (rolling wall-clock hour), counted separately for story calls and staging calls (D67: each kind gets this many); a there-and-back passage to a far port is about ten calls as measured by `crew pacing` (D51; the spec's estimate was eight, passengers-and-galaxy §2.2, §8.6). A second budget knob — minimum sim ticks between calls — is currently a constant in `src/routes/narrator.ts` (`MIN_TICKS_BETWEEN_NARRATOR_CALLS`), not yet an env var. |
 
 `env.ts`'s `loadEnv()` throws immediately if `DATABASE_URL` is missing and `NODE_ENV=production`
 and `CREW_DB` isn't `memory` — fail fast rather than silently falling back in prod.
@@ -126,7 +127,8 @@ OPENROUTER_API_KEY=sk-or-...
 ```
 
 Without a key the whole file is skipped (reported as 6 skipped tests), never failed, so a
-checkout without credentials still runs it cleanly. `CREW_NARRATOR_MODEL` overrides the model;
+checkout without credentials still runs it cleanly. `CREW_NARRATOR_MODEL` overrides the model
+(and `CREW_STAGING_MODEL` the staging case's, D67);
 the default is the narrator package's `DEFAULT_NARRATOR_MODEL`, which may differ from the
 server's `DEFAULT_SERVER_NARRATOR_MODEL`, so set it to the production slug to test what
 production sends. The key is never printed.

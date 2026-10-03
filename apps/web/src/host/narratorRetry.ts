@@ -35,7 +35,9 @@ export type RetryAction =
       readonly state: RetryState;
     }
   | { readonly type: "fail"; readonly reason: string; readonly message: string }
-  | { readonly type: "acknowledge" };
+  | { readonly type: "acknowledge" }
+  /** D67: give up on a staging call: acknowledge with no plan, so the dock is the floor set. */
+  | { readonly type: "floorSet"; readonly reason: string; readonly message: string };
 
 /** Attempts made so far, counting the first call. */
 export function attemptsMade(state: RetryState): number {
@@ -72,6 +74,17 @@ export function nextRetryAction(state: RetryState, failure: NarratorFailure): Re
     default:
       return { type: "fail", reason: failure.reason, message: failure.message };
   }
+}
+
+/**
+ * D67 (D57's exception to D43): the staging call (`stageDock`) retries exactly as a story call
+ * does, but never ends on the error panel. Where a story call would give up, the hook is
+ * acknowledged with no plan and the dock is the sim's floor set: staging is not story.
+ */
+export function stagingRetryAction(state: RetryState, failure: NarratorFailure): RetryAction {
+  const action = nextRetryAction(state, failure);
+  if (action.type !== "fail") return action;
+  return { type: "floorSet", reason: action.reason, message: action.message };
 }
 
 /** The Retry button: start the whole sequence over from attempt 1. */

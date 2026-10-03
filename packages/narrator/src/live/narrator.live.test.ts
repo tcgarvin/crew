@@ -23,6 +23,7 @@ import {
   notableEventRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  stageDockRequest,
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
 import { openRouterTransport } from "../openrouter";
@@ -42,6 +43,8 @@ function loadApiKey(): string | undefined {
 
 const apiKey = loadApiKey();
 const model = process.env.CREW_NARRATOR_MODEL ?? DEFAULT_NARRATOR_MODEL;
+/** D67: the staging call can run on its own (cheaper) model, as the server's `CREW_STAGING_MODEL`. */
+const stagingModel = process.env.CREW_STAGING_MODEL ?? model;
 /** One real call can take a while on a cold cache; the transport itself times out at 25 s. */
 const LIVE_TIMEOUT_MS = 60_000;
 
@@ -51,16 +54,51 @@ const skipReason =
     ? " (skipped: no OPENROUTER_API_KEY in the environment or packages/narrator/.env.local)"
     : "";
 
-async function liveRun(req: NarratorRequest): Promise<NarratorRun> {
+async function liveRun(
+  req: NarratorRequest,
+  options: { readonly model?: string; readonly notes?: unknown } = {},
+): Promise<NarratorRun> {
   if (apiKey === undefined) throw new Error("no API key");
   return runNarratorWithTrace(req, {
     gameId: req.gameId,
     content: content(),
     transport: openRouterTransport({ apiKey, appTitle: "Crew live tests" }),
-    model,
-    notes: undefined,
+    model: options.model ?? model,
+    notes: options.notes,
   });
 }
+
+/**
+ * D67: notes for the staging case, so the story gives the set dresser something to stage for: a
+ * thread due at Kessler Drift and a cast member placed there.
+ */
+const STAGING_NOTES = {
+  summary:
+    "The crew took a rush ore-sample run from the Drift last time and jumped Greta Lindholm's loading queue to make it.",
+  threads: [
+    {
+      title: "Greta's queue",
+      scale: "episode",
+      people: ["Greta Lindholm", "Ilse Brandt"],
+      stage: "Greta thinks the ship jumped her queue on the last visit, and has not forgotten.",
+      nextBeat:
+        "Next time the ship is at Kessler Drift, Greta makes them wait, and Ilse offers a way round her.",
+      lastBeatTick: 600,
+      beatCardShown: false,
+    },
+  ],
+  cardsShown: [],
+  cast: [
+    {
+      name: "Ilse Brandt",
+      note: "ore buyer at the Drift; owes the captain a favour and hates Greta's queue",
+      portId: "port.kessler_drift",
+      lastSeenTick: 600,
+    },
+  ],
+  lastUpdatedTick: 600,
+  lastRejections: [],
+};
 
 /** The checks every hook shares: the model answered, the plan parsed, nothing fell back. */
 function expectModelAnswered(run: NarratorRun): NarratorResponse {
@@ -96,7 +134,45 @@ function expectWorkOffered(run: NarratorRun): void {
   }
 }
 
-suite(`live narrator (${model})${skipReason}`, () => {
+suite(`live narrator (${model}; staging ${stagingModel})${skipReason}`, () => {
+  it(
+    "stageDock: a staging-only plan that names a real post of the dock (D67)",
+    async () => {
+      const request = stageDockRequest(content());
+      if (request.hook.kind !== "stageDock") throw new Error("fixture hook kind");
+      const started = Date.now();
+      const run = await liveRun(request, { model: stagingModel, notes: STAGING_NOTES });
+      const { response } = run;
+      expect(
+        response.fallback,
+        `staging fell back (${response.fallback ?? "?"}): ${run.error ?? "no error recorded"}`,
+      ).toBeUndefined();
+      console.log(
+        `staging (${response.model}, ${Date.now() - started} ms, usage ${JSON.stringify(response.usage)}):`,
+        JSON.stringify(run.trace.plan, null, 2),
+      );
+      if (response.dropped !== undefined && response.dropped.length > 0) {
+        console.log("staging dropped:", JSON.stringify(response.dropped, null, 2));
+      }
+      // Staging only: at most one command, and it is stageDock; no notes, no card.
+      expect(response.notesUpdate).toBeUndefined();
+      expect(response.card).toBeUndefined();
+      expect(response.commands.length).toBeLessThanOrEqual(1);
+      const command = response.commands[0];
+      expect(command?.kind, "no stageDock command").toBe("stageDock");
+      if (command?.kind !== "stageDock") return;
+      const dock = content().docks?.[request.hook.context.dockId];
+      const posts = new Set(dock?.posts.map((p) => p.key));
+      const named = [
+        ...command.payload.place.map((p) => p.postKey),
+        ...command.payload.props.flatMap((p) => (p.at.kind === "post" ? [p.at.postKey] : [])),
+      ];
+      expect(named.length, "the plan names no post").toBeGreaterThan(0);
+      for (const key of named) expect(posts.has(key), `"${key}" is not a post`).toBe(true);
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
   it(
     "jobBoard: the model answers with an offer",
     async () => {

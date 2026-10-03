@@ -2,12 +2,20 @@
  * `POST /api/games/:id/narrator` (W8). Validates the request, enforces per-game budgets, stores
  * the snapshot as a milestone save (its id is the `basis_save_id` for this call and for the next
  * budget check), calls the injected `runNarrator`, logs the call, and persists `notesUpdate`.
+ *
+ * D67: a `stageDock` hook is a staging call. It runs on the staging model, has its own hourly
+ * budget, is never spaced (in either direction: it is neither refused as too soon nor counted as
+ * the last call when a story call is spaced), and never writes notes. A staging failure is
+ * answered like a story failure in `error` mode (502/503, so the client retries per D43); the
+ * client then acknowledges with the floor set instead of pausing the game (D57's exception to
+ * D43). In `null` mode the server answers with the floor set itself and logs
+ * `[narrator] staging fallback <reason>`.
  */
 import { gzipSync } from "node:zlib";
 import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
 import type { Hono } from "hono";
 import { z } from "zod";
-import type { Db } from "../db/types";
+import { type Db, narratorCallKind } from "../db/types";
 import type { Env } from "../env";
 import { type RunNarrator, isRetryableFailure, narratorFailure } from "../narrator";
 import { saveEnvelopeSchema } from "../validation";
@@ -48,8 +56,6 @@ const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision"
 
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";
-/** D66: what an interim staging answer says made it (no model was called). */
-const STAGING_PLACEHOLDER_MODEL = "staging-floor-set";
 
 export function registerNarratorRoutes(
   app: Hono<NarratorRouteEnv>,
@@ -86,20 +92,8 @@ export function registerNarratorRoutes(
     // `gameId` always comes from the path, not the (optional) body field — see schema comment.
     const reqBody = { ...parsed.data, gameId } as unknown as NarratorRequest;
 
-    // D66 (interim): the staging call has no prompt yet, so it is acknowledged at once with an
-    // empty staging plan (the dock is the sim's floor set). It costs no model call, so it skips
-    // the budget, the spacing rule (in both directions: it must neither be refused as too soon
-    // nor make the next story call too soon) and the call log, and writes no notes. The staging
-    // prompt, its fallback to the floor set and its call logging replace this.
-    if (reqBody.hook.kind === "stageDock") {
-      const staged: NarratorResponse = {
-        commands: [],
-        callId: globalThis.crypto.randomUUID(),
-        model: STAGING_PLACEHOLDER_MODEL,
-        promptVersion: PROMPT_VERSION_PLACEHOLDER,
-      };
-      return c.json(staged);
-    }
+    const kind = narratorCallKind(reqBody.hook.kind);
+    const staging = kind === "staging";
 
     // Store the snapshot as a milestone save; it becomes this call's (and the next check's) basis.
     const snapshotBlob = gzipSync(Buffer.from(JSON.stringify(reqBody.snapshot), "utf8"));
@@ -131,18 +125,20 @@ export function registerNarratorRoutes(
 
     // The 429 body says which rule fired (D43): the client waits out the hourly cap but treats
     // spacing as a deliberate "no narration this time", not a failure.
-    const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS);
+    const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS, kind);
     if (callsInWindow >= env.narratorMaxCallsPerHour) {
       const message = `Hourly narrator call budget (${env.narratorMaxCallsPerHour}) exceeded for this game.`;
       await logRejection("budgetExceeded", message);
       return c.json({ error: { code: "budgetExceeded", reason: "hourly", message } }, 429);
     }
 
-    // Spacing is measured from the last call the model answered: a failed attempt narrated
-    // nothing, so the client's retry of the same hook (D43) must not be refused as "too soon".
-    const [lastCall] = SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
-      ? []
-      : await db.listNarratorCalls({ gameId, status: "ok", limit: 1 });
+    // Spacing is measured from the last story call the model answered: a failed attempt narrated
+    // nothing, so the client's retry of the same hook (D43) must not be refused as "too soon",
+    // and a staging call (D67) is not story, so it neither is spaced nor spaces the next one.
+    const [lastCall] =
+      staging || SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
+        ? []
+        : await db.listNarratorCalls({ gameId, status: "ok", kind: "story", limit: 1 });
     if (lastCall) {
       const lastBasis = await db.getSave(lastCall.basisSaveId);
       const lastTick = lastBasis?.savedAtTick ?? 0;
@@ -159,11 +155,22 @@ export function registerNarratorRoutes(
         openRouterApiKey: env.openRouterApiKey,
         gameId,
         notes: game.narrativeNotes,
-        model: env.narratorModel,
+        model: staging ? env.stagingModel : env.narratorModel,
       });
       const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;
-      if (response.fallback !== undefined) {
+      const failure = narratorFailure(outcome);
+      if (failure !== undefined && staging && env.narratorFallback === "null") {
+        // D67: the server answers with the floor set (the null narrator's empty plan) and says
+        // so; never an error panel for staging.
+        console.warn(`[narrator] staging fallback ${failure.reason}`, {
+          gameId,
+          model: response.model,
+          promptVersion: response.promptVersion,
+          latencyMs,
+          error: failure.message,
+        });
+      } else if (response.fallback !== undefined) {
         // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
         // the API key: `error` is the narrator's own failure text (for a transport failure,
         // `OpenRouter <status>: <response body>`), never the request or its headers.
@@ -190,8 +197,8 @@ export function registerNarratorRoutes(
       }
 
       // D43: in `error` mode a fallback is refused, never served. The call is logged as an
-      // error with its reason; the client retries (the sim stays halted) or pauses the game.
-      const failure = narratorFailure(outcome);
+      // error with its reason; the client retries (the sim stays halted) or pauses the game, or
+      // for a staging call (D67) acknowledges the hook with the floor set once it gives up.
       if (failure !== undefined && env.narratorFallback === "error") {
         await db.logNarratorCall({
           gameId,
@@ -238,7 +245,9 @@ export function registerNarratorRoutes(
           response,
           error: null,
         });
-        if (response.notesUpdate !== undefined) {
+        // D67: the staging call never writes notes (the narrator sends none for it; the
+        // route does not take its word for that).
+        if (!staging && response.notesUpdate !== undefined) {
           await db.updateNotes(gameId, response.notesUpdate);
         }
       });

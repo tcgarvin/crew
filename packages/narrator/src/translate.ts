@@ -101,7 +101,8 @@ type NarratorDraft = {
 /** GDD §22: no numeric consequences on cards (credits, percentages, +/- deltas). */
 const NUMERIC_CONSEQUENCE = /[+-]\s?\d|\d[\d,.]*\s*(credits?\b|cr\b|%|percent\b)/i;
 
-function clipChars(text: string, max: number): string {
+/** Whitespace collapsed, and clipped to `max` characters with an ellipsis. */
+export function clipChars(text: string, max: number): string {
   const t = text.trim().replace(/\s+/g, " ");
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
@@ -135,7 +136,11 @@ export function secretPhrases(snapshot: Snapshot, content: ContentBundle): reado
   return [...phrases].sort();
 }
 
-function textProblem(text: string, secrets: readonly string[]): string | undefined {
+/**
+ * Why player-facing text cannot go out (empty, a numeric consequence, a secret), or undefined.
+ * Shared with the staging translator (D67).
+ */
+export function textProblem(text: string, secrets: readonly string[]): string | undefined {
   if (text.trim() === "") return "empty text";
   if (NUMERIC_CONSEQUENCE.test(text)) return "player-facing text states a numeric consequence";
   const lower = text.toLowerCase();

@@ -9,11 +9,13 @@ import {
   type GameRow,
   type LogNarratorCallInput,
   type NarratorCallFilter,
+  type NarratorCallKind,
   type NarratorCallRow,
   type PutSaveInput,
   type SaveRow,
   type UserRow,
   assertIdPrefix,
+  narratorCallKind,
 } from "./types";
 
 const ROLLING_SAVES_KEPT = 5;
@@ -131,11 +133,16 @@ export class MemoryDb implements Db {
     return row;
   }
 
-  async countNarratorCallsSince(gameId: string, sinceMs: number): Promise<number> {
+  async countNarratorCallsSince(
+    gameId: string,
+    sinceMs: number,
+    kind: NarratorCallKind,
+  ): Promise<number> {
     const cutoff = Date.now() - sinceMs;
     let count = 0;
     for (const call of this.narratorCalls.values()) {
       if (call.status === "budgetExceeded") continue; // rejections never reached the model (D43)
+      if (narratorCallKind(call.hookKind) !== kind) continue; // D67: one budget per kind
       if (call.gameId === gameId && call.createdAt.getTime() >= cutoff) count += 1;
     }
     return count;
@@ -176,7 +183,8 @@ export class MemoryDb implements Db {
         (c) =>
           (filter.gameId === undefined || c.gameId === filter.gameId) &&
           (filter.hookKind === undefined || c.hookKind === filter.hookKind) &&
-          (filter.status === undefined || c.status === filter.status),
+          (filter.status === undefined || c.status === filter.status) &&
+          (filter.kind === undefined || narratorCallKind(c.hookKind) === filter.kind),
       )
       .sort(byNewest)
       .slice(0, filter.limit);

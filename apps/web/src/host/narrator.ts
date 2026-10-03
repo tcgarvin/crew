@@ -5,7 +5,9 @@
  * modal (presentation only, W9 decision 39). A failure is classified here (`NarratorFailure`)
  * for the retry scheduler in `./narratorRetry.ts`: the hook stays unacknowledged while the
  * client retries, and the game pauses on an error if it keeps failing. Only the spacing rule
- * (429 `spacing`) acknowledges a hook without an answer: that is a rate rule, not a failure.
+ * (429 `spacing`) acknowledges a hook without an answer: that is a rate rule, not a failure. The
+ * one exception (D67) is the staging call: once its retries are spent it is acknowledged with no
+ * plan, so the dock is the sim's floor set and the game never pauses for it.
  *
  * `apps/web/src` may not import `@crew/narrator` (dependency-cruiser `web-no-secrets`); the
  * response shape used here is restated structurally from its `NarratorResponse`.

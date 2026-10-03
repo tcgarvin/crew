@@ -147,7 +147,11 @@ Locals are always on the dock, so draw them with the dock layer (as `onDock` act
 already interpolates `locals` by id (`apps/web/src/host/playback.ts`). `RenderItem.offered` now
 also marks a closed offer's crates still waiting for a dock hand.
 
-## 7. Interim server behaviour (to be replaced)
+## 7. Interim server behaviour (replaced by D67)
+
+*Replaced:* the staging call now runs (D67): its own prompt, schema and translator in
+`packages/narrator/src/staging/`, the route's staging model, budget and call log, and the
+client's fallback to the floor set. What follows is the interim behaviour as the sim side left it.
 
 `POST /api/games/:id/narrator` answers a `stageDock` hook at once with `{ commands: [] }` (model
 `staging-floor-set`), skipping the budget, the spacing rule (both ways), the call log and notes;

@@ -425,6 +425,35 @@ describe("runNarrator", () => {
     const res = await runNarrator(policyRequest(), ctx(transport));
     expect(res.card).toEqual({ decisionId: "d1", ...card });
   });
+
+  it("ignores surfaceDecision's beat and closing fields copied onto card, and says so (D67)", async () => {
+    const card = {
+      title: "Hub Co-op wants a runner",
+      speaker: "Noor Sadler",
+      situation: "A co-op clerk leans in the hatch with a manifest and a tired smile.",
+      leftLabel: "Sign it",
+      rightLabel: "Not today",
+      leftAftermath: "The clerk hands over the manifest and the crew start on it.",
+      rightAftermath: "The clerk shrugs and heads back down the ramp.",
+    };
+    const plan = { ...emptyPlan(), card: { ...card, beatOfThread: "", closesThread: "" } };
+    const res = await runNarrator(
+      policyRequest(),
+      ctx(fakeTransport(okResult(JSON.stringify(plan)))),
+    );
+    expect(res.fallback).toBeUndefined();
+    expect(res.card).toEqual({ decisionId: "d1", ...card });
+    expect(res.notesUpdate?.lastRejections).toContain(
+      "card: beatOfThread and closesThread ignored; they belong on surfaceDecision only",
+    );
+    // Anything else unknown on the card still fails the schema.
+    const odd = { ...emptyPlan(), card: { ...card, mood: "tense" } };
+    const failed = await runNarrator(
+      policyRequest(),
+      ctx(fakeTransport(okResult(JSON.stringify(odd)))),
+    );
+    expect(failed.fallback).toBe("schemaInvalid");
+  });
 });
 
 describe("policy decisions are narrated (D37)", () => {
@@ -779,7 +808,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.17");
+    expect(PROMPT_VERSION).toBe("v0.18");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -849,15 +878,6 @@ describe("prompt text (D29, D31, D32)", () => {
 });
 
 describe("the null path hands out work (D40)", () => {
-  it("answers stageDock with an empty plan and never calls the model (D66, interim)", async () => {
-    const transport = fakeTransport(new TransportError("apiError", "must not be called"));
-    const res = await runNarrator(stageDockRequest(content()), ctx(transport));
-    expect(transport.calls).toHaveLength(0);
-    expect(res.fallback).toBeUndefined();
-    expect(res.commands).toEqual([]);
-    expect(res.notesUpdate).toBeUndefined();
-  });
-
   it("still offers a job at the board after a provider error", async () => {
     const transport = fakeTransport(new TransportError("apiError", "HTTP 502"));
     const res = await runNarrator(jobBoardRequest(content()), ctx(transport));

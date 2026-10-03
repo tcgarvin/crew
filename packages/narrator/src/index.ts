@@ -10,6 +10,15 @@ export { EMPTY_NOTES, boundNotes, mergeThreads, parseNotes } from "./notes";
 export { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 export { planJsonSchema, planSchemaFor } from "./plan";
 export {
+  STAGING_INTENT_KINDS,
+  type StagingEnvelope,
+  type StagingModelPlan,
+  buildStagingPlanSchema,
+} from "./staging/plan";
+export { STAGING_RULES, buildStagingCatalogue } from "./staging/prompt";
+export { STAGING_MAX_TOKENS } from "./staging/run";
+export { type StagingTranslation, translateStaging } from "./staging/translate";
+export {
   HOOK_INSTRUCTIONS,
   type StoryHookKind,
   PROMPT_VERSION,

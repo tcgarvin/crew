@@ -20,6 +20,19 @@ describe("loadEnv", () => {
   });
 });
 
+describe("loadEnv staging model (D67)", () => {
+  it("follows the story model unless CREW_STAGING_MODEL is set", () => {
+    expect(loadEnv({}).stagingModel).toBe(DEFAULT_SERVER_NARRATOR_MODEL);
+    expect(loadEnv({ CREW_NARRATOR_MODEL: "a/story" }).stagingModel).toBe("a/story");
+    expect(loadEnv({ CREW_NARRATOR_MODEL: "a/story", CREW_STAGING_MODEL: "" }).stagingModel).toBe(
+      "a/story",
+    );
+    const env = loadEnv({ CREW_NARRATOR_MODEL: "a/story", CREW_STAGING_MODEL: "b/cheap" });
+    expect(env.stagingModel).toBe("b/cheap");
+    expect(env.narratorModel).toBe("a/story");
+  });
+});
+
 describe("loadEnv narrator budget", () => {
   it("defaults the hourly call cap to 30, enough for a passage (passengers-and-galaxy §8.6)", () => {
     expect(loadEnv({}).narratorMaxCallsPerHour).toBe(30);

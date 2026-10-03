@@ -841,6 +841,59 @@ checks that every dock came alongside dressed and no dock hand gave up a walk.
 `stageDock` is raised loses its hook (true of any hook raised by travel first; now it happens on
 every leg).
 
+**D67. Phase 3 of Dockside, narrator and server: the staging call runs.** Plan items 6, 7, 9 and 11
+(design §6.1, §6.3; the sim's contract in `docs/design/dockside-phase3-contract.md`).
+*Its own call.* `packages/narrator/src/staging/`: a system prompt that only sets the stage (place
+up to three people, a port seed, a cast member or a new face with role and look, at a post with
+an optional label; up to three catalogue props on the staging area or by a post; one ambience
+line; never offers, cards, faults, markets or notes), the item catalogue as the second cached
+system block, and its own schema in the D53 style (`rationale` plus `placePerson`, `placeProp`,
+`setAmbience` intents, schema in the prompt). The reply is parsed with the intents left raw, so a
+story intent in it is dropped with a reason by the staging translator rather than failing the
+call; a reply with anything beside `rationale` and `intents` (notes, a card) is `schemaInvalid`.
+The translator makes at most one `stageDock`, checks each part against the kernel's rules (posts
+of this dock, the port's seeds by name with content's spelling, cast names against the stored
+notes, nobody aboard, no name twice, catalogue items, the `STAGING_LIMITS` caps, control
+characters and braces) plus `textProblem` (numbers, undiscovered faults), clips labels, looks and
+the ambience line to their caps and refuses over-long names and roles, and drops each bad part
+alone, so the kernel never refuses a whole plan for one placement. It reads the notes and never
+writes them: the response has no `notesUpdate`, and the route would not store one for this kind.
+*The digest.* The staging call reads the story's digest, minus the story budget, plus "The dock
+you are dressing": the dock's ambience, its posts by key, its areas and the floor set from the
+hook. Every call made with a dock alongside, story calls included, gets the fuller "On the dock":
+the place, the line the log showed on arrival, each local (name, role, post, label, and why they
+are there: a regular, a dock hand and their errand, a passenger the ship left, one of this port's
+people, in your cast, or a new face with their look, "not in your cast until you write about
+them"), the props by where they stand, then D63's freight. The story prompt gains one rule: those
+people are really there and make natural issuers and speakers; a new face is cast only if the
+story wants them. Prompt v0.18 (also drops the capability list's "called on approach").
+*Server.* `runNarrator` and the route run the call for real. Model: `CREW_STAGING_MODEL`, defaulting
+to the story model, so a cheaper model is one env var. The kind is `narrator_calls.hook_kind =
+'stageDock'` (`narratorCallKind`), not a new column, so there is no migration. Each kind has its
+own hourly budget of `CREW_NARRATOR_MAX_CALLS_PER_HOUR`, staging is never refused by the spacing
+rule, and the story rule is measured from the last answered story call, so a staging answer
+never makes the next story call too soon. Every staging call (ok, error, budget) is logged with
+its basis save, as story calls are.
+*Failure (D57's exception to D43).* The retries stay the client's, on D43's schedule: in `error`
+mode a staging failure is a 502/503 like a story one, so a transient failure costs nothing.
+Where a story call would end on the error panel, `stagingRetryAction` instead acknowledges the
+hook with no plan (the floor set) and the host logs `[narrator] staging fallback <reason>`; the
+game never pauses for staging. In `null` mode the server answers with the floor set itself and
+logs the same line. A staging answer does not clear the host's recent-events buffer, since the
+next story call has not seen them.
+*Null narrator* stages nothing (unchanged from D66, verified).
+*Found and fixed:* the live overdue-passenger case fell back `schemaInvalid` in four of six runs
+because the model copied `surfaceDecision`'s `beatOfThread` and `closesThread` onto `card`. Those
+two keys are now taken off `card` before validation and the correction is fed back with the drop
+reasons; any other stray key still fails. It failed three of three with v0.18 and one of three
+without the new "On the dock" rule, so the rule may make it likelier but did not cause it; the fix
+is unit-tested, not yet live.
+*Live (Sonnet 4.6, the production default):* the staging case passed: 8.7 s, 3570 input and 386
+output tokens, two people at real posts (the cast member a due thread names at the canteen hatch,
+the seed whose grudge it is at her board, both with labels), two crates on the staging area and
+one ambience line, nothing dropped. The other story cases passed but the overdue one above. A
+cheaper staging model was not tried: the OpenRouter key hit its weekly limit mid-run.
+
 **D68. Phase 3 of Dockside, renderer and inspector: the dock's own people and props.** Plan item
 10 (design §5.1; the frame's shapes in `docs/design/dockside-phase3-contract.md` §6). The canvas
 reads only `RenderFrame.locals`, `RenderFrame.dockProps` and the content's dock map; no sim change.

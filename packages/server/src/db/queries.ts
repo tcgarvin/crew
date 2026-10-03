@@ -13,12 +13,21 @@ import {
   type GameRow,
   type LogNarratorCallInput,
   type NarratorCallFilter,
+  type NarratorCallKind,
   type NarratorCallRow,
   type PutSaveInput,
+  STAGING_HOOK_KIND,
   type SaveRow,
   type UserRow,
   assertIdPrefix,
 } from "./types";
+
+/** D67: a staging call is a `stageDock` hook; every other hook kind is a story call. */
+function kindCondition(kind: NarratorCallKind): SQL {
+  return kind === "staging"
+    ? eq(narratorCalls.hookKind, STAGING_HOOK_KIND)
+    : ne(narratorCalls.hookKind, STAGING_HOOK_KIND);
+}
 
 const ROLLING_SAVES_KEPT = 5;
 
@@ -171,7 +180,11 @@ export class DrizzleDb implements Db {
     return toNarratorCallRow(row);
   }
 
-  async countNarratorCallsSince(gameId: string, sinceMs: number): Promise<number> {
+  async countNarratorCallsSince(
+    gameId: string,
+    sinceMs: number,
+    kind: NarratorCallKind,
+  ): Promise<number> {
     const cutoff = new Date(Date.now() - sinceMs);
     const rows = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -182,6 +195,7 @@ export class DrizzleDb implements Db {
           gte(narratorCalls.createdAt, cutoff),
           // Rejections never reach the model, so they must not keep the window full (D43).
           ne(narratorCalls.status, "budgetExceeded"),
+          kindCondition(kind),
         ),
       );
     return rows[0]?.count ?? 0;
@@ -241,6 +255,7 @@ export class DrizzleDb implements Db {
     if (filter.gameId !== undefined) conditions.push(eq(narratorCalls.gameId, filter.gameId));
     if (filter.hookKind !== undefined) conditions.push(eq(narratorCalls.hookKind, filter.hookKind));
     if (filter.status !== undefined) conditions.push(eq(narratorCalls.status, filter.status));
+    if (filter.kind !== undefined) conditions.push(kindCondition(filter.kind));
     const rows = await this.db
       .select()
       .from(narratorCalls)

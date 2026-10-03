@@ -24,7 +24,7 @@ import {
   callNarrator,
   hookAnswer,
 } from "./host/narrator";
-import { nextRetryAction, resetRetry } from "./host/narratorRetry";
+import { nextRetryAction, resetRetry, stagingRetryAction } from "./host/narratorRetry";
 import { FramePlayback, runPlaybackLoop } from "./host/playback";
 import {
   ServerSaves,
@@ -263,9 +263,11 @@ export function App() {
      * D5/D43: call the narrator for a hook and apply its answer. On failure the hook stays
      * unacknowledged (the sim stays halted) while the client retries with backoff; when the
      * scheduler gives up, the game pauses on the error panel, whose Retry calls this again.
-     * Only the spacing rule acknowledges a hook without an answer.
+     * Only the spacing rule acknowledges a hook without an answer, and (D67) a staging call the
+     * scheduler gave up on, which leaves the dock to the sim's floor set instead of pausing.
      */
     async function answerHook(hook: NarratorHook, tick: Tick): Promise<void> {
+      const staging = hook.kind === "stageDock";
       setPendingHook({ hookId: hook.id, tick });
       setNarratorRetry(undefined);
       // Every entry (first hook, or the error panel's Retry) starts the sequence from attempt 1.
@@ -274,7 +276,8 @@ export function App() {
         const outcome = await attemptNarrator(hook);
         if (disposed) return;
         if (outcome.ok) {
-          recentEventsRef.current.length = 0;
+          // D67: the staging call is not story; the next story call still needs these events.
+          if (!staging) recentEventsRef.current.length = 0;
           // D37: a `policyDecision` hook halts before its decision does, so this prose is in
           // the map before `decisionPending` arrives and the modal opens dressed.
           const card = outcome.reply.card;
@@ -283,9 +286,16 @@ export function App() {
           break;
         }
         const { failure } = outcome;
-        const action = nextRetryAction(retry, failure);
+        const action = staging
+          ? stagingRetryAction(retry, failure)
+          : nextRetryAction(retry, failure);
         console.warn(`[narrator] ${failure.reason}: ${failure.message}`, action);
         if (action.type === "acknowledge") {
+          for (const command of hookAnswer(hook, tick, undefined)) send(command);
+          break;
+        }
+        if (action.type === "floorSet") {
+          console.warn(`[narrator] staging fallback ${action.reason}`, action.message);
           for (const command of hookAnswer(hook, tick, undefined)) send(command);
           break;
         }

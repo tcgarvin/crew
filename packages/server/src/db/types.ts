@@ -38,6 +38,17 @@ export interface SaveRow {
 
 export type NarratorCallStatus = "ok" | "error" | "budgetExceeded";
 
+/**
+ * D67: the two kinds of narrator call. A staging call is exactly a `stageDock` hook, so the kind
+ * is read from `hook_kind` rather than stored twice: no column, no migration.
+ */
+export type NarratorCallKind = "story" | "staging";
+export const STAGING_HOOK_KIND = "stageDock";
+
+export function narratorCallKind(hookKind: string): NarratorCallKind {
+  return hookKind === STAGING_HOOK_KIND ? "staging" : "story";
+}
+
 export interface NarratorCallRow {
   readonly id: string;
   readonly gameId: string;
@@ -87,6 +98,8 @@ export interface NarratorCallFilter {
   readonly gameId?: string;
   readonly hookKind?: string;
   readonly status?: NarratorCallStatus;
+  /** D67: story calls only, or staging calls only. */
+  readonly kind?: NarratorCallKind;
   /** Upper bound on rows returned; newest first. */
   readonly limit: number;
 }
@@ -121,8 +134,11 @@ export interface Db {
   updateNotes(gameId: string, narrativeNotes: unknown): Promise<void>;
 
   logNarratorCall(input: LogNarratorCallInput): Promise<NarratorCallRow>;
-  /** Narrator calls for a game within the last `sinceMs` milliseconds (wall clock), for the hourly budget. */
-  countNarratorCallsSince(gameId: string, sinceMs: number): Promise<number>;
+  /**
+   * Narrator calls of one kind for a game within the last `sinceMs` milliseconds (wall clock),
+   * for the hourly budget; rejections are not counted. D67: each kind has its own budget.
+   */
+  countNarratorCallsSince(gameId: string, sinceMs: number, kind: NarratorCallKind): Promise<number>;
   /** Most recent narrator call for a game, if any, for the min-ticks-between-calls check. */
   getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined>;
 
