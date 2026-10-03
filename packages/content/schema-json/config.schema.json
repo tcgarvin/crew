@@ -400,6 +400,10 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "recallAboardSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
       "required": [
@@ -410,7 +414,8 @@
         "dockSeconds",
         "nominalSpeed",
         "staffEstimateSeconds",
-        "departureMinOutput"
+        "departureMinOutput",
+        "recallAboardSeconds"
       ],
       "additionalProperties": false
     },

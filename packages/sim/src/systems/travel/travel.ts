@@ -4,8 +4,14 @@
  * `docked -> preparingDeparture -> undocking -> departing -> transit -> approaching -> docking ->
  * docked`. Runs every tick in the "equipment" phase (PHASES[3]) alongside power/equipment, since
  * travel progress depends on the engine's output the same way a machine's does.
+ *
+ * Dockside (D61): travel owns the dock's lifetime. The port's dock map (if content has one) is
+ * grafted alongside at the start of `docking` and cast off at the end of `undocking`; departure
+ * prep keeps the ramps down and calls everyone on the dock aboard before raising them
+ * (`ashore.ts`).
  */
 import { configTicks } from "../../core/clock";
+import { dockForPort } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import { affordableUnits } from "../../core/markets";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -28,7 +34,9 @@ import type {
   VoyageFields,
 } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
+import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
+import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
 import { raiseHookIfIdle } from "./hooks";
@@ -447,17 +455,26 @@ function advanceTravel(ctx: StepCtx): void {
   const machineDefs = machineTagsByDefId(ctx);
 
   if (travel.stage === "preparingDeparture") {
-    requestRamps(ctx, "closed");
-    const console_ = bridgeConsole(ctx);
-    const staffed = isStaffed(ctx);
-    if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
-    // D36: a course set with no cargo work enters this stage straight from `setCourse`, so the
-    // departure gate is also checked here; a hold stalls the stage like any other precondition.
-    if (!departureCleared(ctx)) return;
     const openCargo = Object.values(ctx.state.work.problems).some(
       (p) => p.kind === "cargoToLoad" && p.status === "open",
     );
+    // D61: the ramps stay down while anyone is on the dock (or walking onto it), and while
+    // freight is still being loaded with a dock alongside; otherwise they come up. Under the
+    // ramp rules (D59) nobody else ever lowers them, so raising one early strands whoever is out.
+    const ashore = peopleAshore(ctx);
+    const holdRamps = ashore.length > 0 || (openCargo && ctx.state.deck.dock !== undefined);
+    requestRamps(ctx, holdRamps ? "open" : "closed");
+    const console_ = bridgeConsole(ctx);
+    const staffed = isStaffed(ctx);
+    if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
+    // Loading crew may be out on the dock fetching freight; the call waits for the cargo.
+    if (ashore.length === 0) endRecall(travel);
+    else if (!openCargo) recallAshore(ctx, travel, ashore);
+    // D36: a course set with no cargo work enters this stage straight from `setCourse`, so the
+    // departure gate is also checked here; a hold stalls the stage like any other precondition.
+    if (!departureCleared(ctx)) return;
     if (openCargo || !staffed) return; // stalled: preconditions unmet
+    if (ashore.length > 0) return; // stalled: waiting for everyone to come aboard (D61)
     // Ramps retract during prep (Dockside §2.4), so their closing runs alongside the timer; the
     // stage only waits on them if it would otherwise end with a ramp still down.
     if (!rampsClosed(ctx)) {
@@ -514,6 +531,27 @@ function advanceStageTimer(
   return travel.stageProgress;
 }
 
+/**
+ * D61: the port's dock comes alongside at the start of `docking` (a port without one keeps the
+ * transfer tiles), grafted onto the ship's deck. Its ramps are still up, so nobody can walk onto
+ * it until `docked` lowers them.
+ */
+function bringDockAlongside(ctx: StepCtx, portId: PortDefId): void {
+  const dock = dockForPort(ctx.content, portId);
+  if (dock === undefined) return;
+  attachDock(ctx, { dockId: dock.id, deckId: theDeckId(ctx) });
+}
+
+/**
+ * D61: the dock leaves at the end of `undocking`. Prep has brought everyone aboard and raised
+ * the ramps; `clearDock` leaves anything still lying there at the port, then the graft goes.
+ */
+function castOffDock(ctx: StepCtx, portId: PortDefId): void {
+  if (ctx.state.deck.dock === undefined) return;
+  clearDock(ctx, portId, portStoreLocation(ctx.defs.port(portId)));
+  detachDock(ctx);
+}
+
 function advanceStage(ctx: StepCtx): void {
   const travel = ctx.state.travel as Extract<
     TravelState,
@@ -521,6 +559,7 @@ function advanceStage(ctx: StepCtx): void {
   >;
   const from = travel.stage;
   const to = nextStage(from);
+  if (from === "undocking") castOffDock(ctx, travel.fromPortId);
 
   if (to === "docked") {
     const portId = travel.toPortId;
@@ -573,6 +612,7 @@ function advanceStage(ctx: StepCtx): void {
     stageStartedTick: ctx.tick,
     ...carriedVoyageFields(travel),
   };
+  if (to === "docking") bringDockAlongside(ctx, travel.toPortId);
   emitStageChanged(ctx, from, to);
   if (from === "undocking" && to === "departing") {
     ctx.emit({

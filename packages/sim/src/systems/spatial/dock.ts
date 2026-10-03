@@ -5,58 +5,40 @@
  * (`isDockTile`). The hull walls the dock off everywhere except across the ramp doors, and a
  * ramp is passable only while fully open.
  *
- * `attachDock`/`detachDock` are the only writers of `state.deck.dock`. Phase 2's travel system
- * calls them at the start of `docking` and the end of `undocking`.
+ * `attachDock`/`detachDock` are the only writers of `state.deck.dock` once a world is running
+ * (world creation and the 3 → 4 save migration set it directly, before any cache exists). The
+ * travel system calls them at the start of `docking` and the end of `undocking` (D61).
  */
-import type { PhysicalLocation, TileCoord } from "../../core/types/common";
-import type { ContentBundle, DockDef } from "../../core/types/content";
+import type { EdgeSide, TileCoord } from "../../core/types/common";
+import type { ContentBundle } from "../../core/types/content";
 import type { DoorId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { DerivedCaches } from "../../core/types/pipeline";
 import type { DockPresence } from "../../core/types/ship";
 import type { WorldState } from "../../core/types/state";
 import {
+  SIDES,
   checkDockGraft,
   deckGeometry,
-  isDockFloor,
+  doorOnEdge,
   isDockTile,
   rebuildGeometries,
 } from "./geometry";
+
+export { deckToDock, dockToDeck, isOnDock } from "../../core/docks";
+
+const STEP: Readonly<Record<EdgeSide, TileCoord>> = {
+  n: { x: 0, y: -1 },
+  e: { x: 1, y: 0 },
+  s: { x: 0, y: 1 },
+  w: { x: -1, y: 0 },
+};
 
 /** What attaching or detaching needs: live state, the caches to rebuild, and content. */
 export interface DockHost {
   readonly state: WorldState;
   readonly caches: DerivedCaches;
   readonly content: ContentBundle;
-}
-
-/** Dock-frame tile → deck-frame tile. */
-export function dockToDeck(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
-  return { x: tile.x - layout.shipAt.x, y: tile.y - layout.shipAt.y };
-}
-
-/** Deck-frame tile → dock-frame tile. */
-export function deckToDock(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
-  return { x: tile.x + layout.shipAt.x, y: tile.y + layout.shipAt.y };
-}
-
-/**
- * Is this location on the dock alongside? Pure over state and content (no nav cache), for code
- * that must tell "aboard" from "ashore" without caches: the render projection, commerce custody,
- * departure checks. With the graft, `onDeck` alone no longer means aboard.
- */
-export function isOnDock(
-  content: Pick<ContentBundle, "docks">,
-  state: { readonly deck: { readonly dock?: DockPresence } },
-  location: PhysicalLocation,
-): boolean {
-  const presence = state.deck.dock;
-  if (presence === undefined || location.kind !== "onDeck") return false;
-  if (location.deckId !== presence.deckId) return false;
-  const layout = content.docks?.[presence.dockId];
-  if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
-  const tile = deckToDock(layout, { x: Math.floor(location.x), y: Math.floor(location.y) });
-  return isDockFloor(layout, tile.x, tile.y);
 }
 
 /** The dock floor tile (deck frame) a ramp door lands on; throws if no dock is attached there. */
@@ -66,6 +48,25 @@ export function rampLanding(geometry: DeckGeometry, rampId: DoorId): TileCoord {
     throw new Error(`Ramp ${rampId} has no landing on deck "${geometry.deckId}" (no dock?)`);
   }
   return landing;
+}
+
+/**
+ * The ship tile at the top of a ramp (deck frame): the tile across the ramp door from its
+ * landing. Throws if no dock is attached there.
+ */
+export function rampTop(geometry: DeckGeometry, rampId: DoorId): TileCoord {
+  const landing = rampLanding(geometry, rampId);
+  for (const side of SIDES) {
+    if (doorOnEdge(geometry, landing, side) !== rampId) continue;
+    const delta = STEP[side];
+    return { x: landing.x + delta.x, y: landing.y + delta.y };
+  }
+  throw new Error(`Ramp ${rampId} is not on an edge of its landing ${landing.x},${landing.y}`);
+}
+
+/** Every ramp on the deck that has a landing on the dock alongside. */
+export function dockRamps(geometry: DeckGeometry): DoorId[] {
+  return [...(geometry.dock?.landings.keys() ?? [])];
 }
 
 /**

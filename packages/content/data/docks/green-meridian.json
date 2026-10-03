@@ -3,7 +3,6 @@
   "id": "dock.green_meridian",
   "portId": "port.green_meridian",
   "name": "Green Meridian, field pad 2",
-  "setting": "planet",
   "palette": {
     "floor": "#a29a80",
     "wall": "#5e4b35",

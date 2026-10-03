@@ -82,7 +82,7 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
 export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string {
   const lines: string[] = [];
   lines.push(`${dock.name} (${dock.id})`);
-  lines.push(`${dock.setting} dock for ${port.name} (${port.id})`);
+  lines.push(`${port.setting} dock for ${port.name} (${port.id})`);
   lines.push(
     `${dock.width} x ${dock.height} tiles; ${deck.name} (${deck.id}) docked at (${dock.shipAt.x},${dock.shipAt.y})`,
   );

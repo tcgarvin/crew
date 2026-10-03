@@ -1,5 +1,5 @@
 /** Travel events (W6). */
-import type { MachineId, PortDefId } from "../ids";
+import type { ActorId, ItemId, MachineId, PortDefId } from "../ids";
 import type { TravelStage } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
@@ -14,6 +14,14 @@ export interface TravelEventPayloads {
   departureRiskAccepted: { readonly machineId: MachineId };
   /** D36: a hold ended because no engine/generator is impaired any more; departure proceeds. */
   departureHoldLifted: { readonly toPortId: PortDefId };
+  /**
+   * D61: someone on the dock could not walk back aboard while the ship was leaving (they cannot
+   * move, or their walk failed), so the dock crew brought them up the ramp. The departure is never
+   * held forever, and never silently.
+   */
+  broughtAboard: { readonly actorId: ActorId; readonly name: string; readonly portId: PortDefId };
+  /** D61: an item was still on the dock when it slid away; it stays at the port's warehouse. */
+  leftOnDock: { readonly itemId: ItemId; readonly portId: PortDefId };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -24,4 +32,6 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   departureHeld: "narrative",
   departureRiskAccepted: "narrative",
   departureHoldLifted: "narrative",
+  broughtAboard: "notable",
+  leftOnDock: "notable",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

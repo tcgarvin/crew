@@ -72,7 +72,9 @@ describe("serialize / restore", () => {
     expect(() =>
       restore({ ...envelope, schemaVersion: SCHEMA_VERSION + 1 }, world.content, registry),
     ).toThrow(/newer than this build supports/);
-    expect(() => migrateState({}, SCHEMA_VERSION - 1, {})).toThrow(SaveCompatibilityError);
+    expect(() => migrateState({}, SCHEMA_VERSION - 1, { content: world.content }, {})).toThrow(
+      SaveCompatibilityError,
+    );
   });
 
   it("restores a save made with other content, with a warning", () => {

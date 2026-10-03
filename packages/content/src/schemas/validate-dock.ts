@@ -126,7 +126,7 @@ function checkComposition(dock: DockDef, issues: ValidationIssue[]): void {
   }
 }
 
-/** L2 for every dock: port, one dock per port, unique keys, composition, sky. */
+/** L2 for every dock: port, one dock per port, unique keys, composition, sky (by the port's setting). */
 export function checkDockReferences(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const dockByPort = new Map<string, string>();
   for (const dock of Object.values(bundle.docks ?? {})) {
@@ -160,10 +160,12 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
       issues,
     );
     checkComposition(dock, issues);
-    if (dock.setting === "planet" && dock.palette.sky === undefined) {
+    // D61: the dock takes its setting from its port rather than repeating it.
+    const setting = bundle.ports[dock.portId]?.setting;
+    if (setting === "planet" && dock.palette.sky === undefined) {
       issues.push(issue("referential", [...path, "palette"], "a planet dock needs palette.sky"));
     }
-    if (dock.setting === "station" && dock.palette.sky !== undefined) {
+    if (setting === "station" && dock.palette.sky !== undefined) {
       issues.push(
         issue("referential", [...path, "palette", "sky"], "a station dock has no sky colour"),
       );

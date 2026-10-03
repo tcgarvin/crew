@@ -376,7 +376,9 @@ function snapshotOf(request: unknown): SaveEnvelope {
   }
   if (schemaVersion === SCHEMA_VERSION) return snapshot as unknown as SaveEnvelope;
   // Same upgrade `runNarrator` applies, so an old request still renders through today's digest.
-  const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), schemaVersion);
+  const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), schemaVersion, {
+    content: contentBundle(),
+  });
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, state } as unknown as SaveEnvelope;
 }
 

@@ -12,6 +12,7 @@
  * the hull walls it off from the ship everywhere except across the ramp doors. The grid then has
  * a non-zero origin and larger bounds; every index goes through `indexAt`/`tileAtIndex`.
  */
+import { dockFloorMask } from "../../core/docks";
 import type { CacheBuilder } from "../../core/registry";
 import type { EdgeSide, TileCoord, TileEdge } from "../../core/types/common";
 import type { ContentBundle, DeckDef, DockDef, MachineDef } from "../../core/types/content";
@@ -31,6 +32,7 @@ import { type Grid, inBounds, indexAt, tileIndex } from "./grid";
 import { rebuildReservations } from "./reservations";
 
 export { inBounds, indexAt, tileAtIndex, tileIndex } from "./grid";
+export { dockFloorMask, isDockFloor } from "../../core/docks";
 
 export const SIDE_BIT: Readonly<Record<EdgeSide, number>> = { n: 1, e: 2, s: 4, w: 8 };
 
@@ -170,54 +172,6 @@ export interface GeometryInputs {
   readonly machineIdByKey: ReadonlyMap<string, MachineId>;
   /** The dock to graft onto this deck, if one is alongside. */
   readonly dock?: DockDef;
-}
-
-const floorMasks = new WeakMap<DockDef, Uint8Array>();
-
-/**
- * Walkable dock floor, row-major in the dock's own frame (`y * width + x`): a `floor` tile under
- * no blocking prop. Content validation applies the same rule (`packages/content`
- * `dockWalkableMask`); a CLI test holds the two together. Memoized per def (defs are immutable).
- * Throws on a malformed map, which content validation makes impossible for authored docks.
- */
-export function dockFloorMask(dock: DockDef): Uint8Array {
-  const cached = floorMasks.get(dock);
-  if (cached !== undefined) return cached;
-  if (dock.rows.length !== dock.height) {
-    throw new Error(`Dock "${dock.id}": ${dock.rows.length} rows, expected ${dock.height}`);
-  }
-  const mask = new Uint8Array(dock.width * dock.height);
-  dock.rows.forEach((row, y) => {
-    if (row.length !== dock.width) {
-      throw new Error(`Dock "${dock.id}": row ${y} is ${row.length} wide, expected ${dock.width}`);
-    }
-    for (let x = 0; x < row.length; x++) {
-      const ch = row[x] ?? "";
-      const kind = dock.legend[ch];
-      if (kind === undefined) throw new Error(`Dock "${dock.id}": "${ch}" is not in the legend`);
-      if (kind === "floor") mask[y * dock.width + x] = 1;
-    }
-  });
-  for (const prop of dock.props) {
-    if (!prop.blocking) continue;
-    const { x: px, y: py, w, h } = prop.rect;
-    for (let y = py; y < py + h; y++) {
-      for (let x = px; x < px + w; x++) {
-        if (x < 0 || y < 0 || x >= dock.width || y >= dock.height) {
-          throw new Error(`Dock "${dock.id}": prop "${prop.key}" reaches off the map`);
-        }
-        mask[y * dock.width + x] = 0;
-      }
-    }
-  }
-  floorMasks.set(dock, mask);
-  return mask;
-}
-
-/** Is dock-frame tile (x, y) walkable dock floor? False off the map. */
-export function isDockFloor(dock: DockDef, x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= dock.width || y >= dock.height) return false;
-  return dockFloorMask(dock)[y * dock.width + x] === 1;
 }
 
 /** Deck-frame tiles of a dock's walkable floor. Throws on a malformed map. */

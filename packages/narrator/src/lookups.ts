@@ -9,11 +9,13 @@ import {
   type Job,
   type Machine,
   type MachineFault,
+  type PhysicalLocation,
   type PortDefId,
   type SaveEnvelope,
   type WorldState,
   configTicks,
   hopCount,
+  isOnDock,
   shortestPath,
 } from "@crew/sim";
 
@@ -39,6 +41,21 @@ export function compartmentNameAt(
   const symbol = deck?.tiles[Math.floor(y)]?.[Math.floor(x)];
   if (deck === undefined || symbol === undefined || symbol === " ") return undefined;
   return deck.compartments.find((c) => c.symbol === symbol)?.name;
+}
+
+/**
+ * Where someone is, as a phrase to append: " in Galley & Mess", " on the dock" (D61: dock floor is
+ * in no compartment), "" on deck between rooms, or " in <location kind>" off the deck.
+ */
+export function placePhrase(
+  content: ContentBundle,
+  state: State,
+  location: DeepReadonly<PhysicalLocation>,
+): string {
+  if (location.kind !== "onDeck") return ` in ${location.kind}`;
+  if (isOnDock(content, state, location)) return " on the dock";
+  const name = compartmentNameAt(content, location.deckId, location.x, location.y);
+  return name === undefined ? "" : ` in ${name}`;
 }
 
 export function machineCompartment(

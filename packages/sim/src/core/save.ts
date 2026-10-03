@@ -8,7 +8,12 @@ import { migrations } from "./migrations";
 import type { KernelRegistry } from "./registry";
 import type { ContentBundle } from "./types/content";
 import type { RestoredWorld, World } from "./types/kernel";
-import { type MigrationRegistry, SIM_VERSION, type SaveEnvelope } from "./types/save";
+import {
+  type MigrationContext,
+  type MigrationRegistry,
+  SIM_VERSION,
+  type SaveEnvelope,
+} from "./types/save";
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
 
 /**
@@ -45,6 +50,7 @@ export function serialize(world: World): SaveEnvelope {
 export function migrateState(
   raw: unknown,
   fromVersion: number,
+  context: MigrationContext,
   registry: MigrationRegistry = migrations,
   targetVersion: number = SCHEMA_VERSION,
 ): unknown {
@@ -64,12 +70,38 @@ export function migrateState(
         `No migration from schema version ${version} to ${version + 1}; this save cannot be loaded`,
       );
     }
-    state = migration(state);
+    state = migration(state, context);
     if (typeof state === "object" && state !== null) {
       (state as { schemaVersion: number }).schemaVersion = version + 1;
     }
   }
   return state;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The saved config with every key it lacks taken from `defaults` (the loaded content's config),
+ * recursing into objects; `filled` collects the paths taken. A save keeps the config it was made
+ * with (SD §20.1), but a key added since (D58's `doors.rampOpenSeconds`, D61's
+ * `travel.recallAboardSeconds`) would otherwise read as `undefined` and turn timers into NaN.
+ * Values the save does have always win.
+ */
+function withMissingConfig<T>(saved: T, defaults: T, path: string, filled: string[]): T {
+  if (!isPlainObject(saved) || !isPlainObject(defaults)) return saved;
+  const out: Record<string, unknown> = { ...saved };
+  for (const [key, value] of Object.entries(defaults)) {
+    const here = `${path}.${key}`;
+    if (!(key in out)) {
+      out[key] = deepCopy(value);
+      filled.push(here);
+    } else {
+      out[key] = withMissingConfig(out[key], value, here, filled);
+    }
+  }
+  return out as T;
 }
 
 export interface RestoreOptions {
@@ -103,6 +135,7 @@ export function restore(
   const migrated = migrateState(
     deepCopy(envelope.state),
     envelope.schemaVersion,
+    { content },
     options.migrations ?? migrations,
   );
   if (typeof migrated !== "object" || migrated === null) {
@@ -115,11 +148,18 @@ export function restore(
       `Save state is invalid:\n  ${violations.slice(0, 20).join("\n  ")}`,
     );
   }
+  const filled: string[] = [];
+  const values = withMissingConfig(deepCopy(envelope.config), content.config, "config", filled);
+  if (filled.length > 0) {
+    warnings.push(
+      `Save's config predates ${filled.join(", ")}; restored with the loaded content's values`,
+    );
+  }
   const world: World = {
     state,
     caches: emptyCaches(),
     content,
-    config: { values: deepCopy(envelope.config), hash: envelope.configHash },
+    config: { values, hash: envelope.configHash },
   };
   rebuildCaches(world, registry);
   return { ...world, warnings };

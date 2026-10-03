@@ -3,7 +3,6 @@
   "id": "dock.kessler_drift",
   "portId": "port.kessler_drift",
   "name": "Kessler Drift, ore berth 3",
-  "setting": "station",
   "palette": {
     "floor": "#4a4640",
     "wall": "#2b2724",

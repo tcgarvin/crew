@@ -23,6 +23,7 @@ import {
   checkInvariants,
   createKernel,
   spatialViolations,
+  travelViolations,
   workViolations,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
@@ -151,6 +152,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
       ...checkInvariants(world.state),
       ...spatialViolations(world),
       ...workViolations(world),
+      ...travelViolations(world),
     ];
     if (violations.length > 0) {
       throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);

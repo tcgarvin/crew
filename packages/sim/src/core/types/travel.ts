@@ -70,6 +70,12 @@ export type TravelState =
       /** Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed). */
       drifting: boolean;
       stageStartedTick: Tick;
+      /**
+       * D61, `preparingDeparture` only: the tick prep first called someone on the dock aboard.
+       * `travel.recallAboardSeconds` later, whoever is still there is brought aboard. Every
+       * later stage builds a fresh object without it.
+       */
+      recallSinceTick?: Tick;
     } & DepartureGateFlags &
       VoyageFields);
 

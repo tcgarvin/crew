@@ -1531,10 +1531,6 @@
             "type": "string",
             "minLength": 1
           },
-          "setting": {
-            "type": "string",
-            "enum": ["station", "planet"]
-          },
           "palette": {
             "type": "object",
             "properties": {
@@ -1821,7 +1817,6 @@
           "id",
           "portId",
           "name",
-          "setting",
           "palette",
           "width",
           "height",
@@ -2238,6 +2233,10 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "recallAboardSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
             }
           },
           "required": [
@@ -2248,7 +2247,8 @@
             "dockSeconds",
             "nominalSpeed",
             "staffEstimateSeconds",
-            "departureMinOutput"
+            "departureMinOutput",
+            "recallAboardSeconds"
           ],
           "additionalProperties": false
         },

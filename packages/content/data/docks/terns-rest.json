@@ -3,7 +3,6 @@
   "id": "dock.terns_rest",
   "portId": "port.terns_rest",
   "name": "Tern's Rest, the long pier",
-  "setting": "planet",
   "palette": {
     "floor": "#8b6f4e",
     "wall": "#4e3b2a",

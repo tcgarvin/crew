@@ -3,7 +3,7 @@
  * untrusted JSON and must tolerate missing or odd fields: anything it does not recognise is left
  * for the invariants to judge.
  */
-import type { MigrationRegistry } from "./types/save";
+import type { MigrationContext, MigrationRegistry } from "./types/save";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,7 +40,54 @@ export function addMarkets(raw: unknown): unknown {
   return raw;
 }
 
+/** The port whose dock is alongside at a saved travel stage (D61), read from untrusted JSON. */
+function portAlongside(travel: Record<string, unknown>): string | undefined {
+  const field =
+    travel.stage === "docked"
+      ? "portId"
+      : travel.stage === "docking"
+        ? "toPortId"
+        : travel.stage === "preparingDeparture" || travel.stage === "undocking"
+          ? "fromPortId"
+          : undefined;
+  const value = field === undefined ? undefined : travel[field];
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * 3 → 4 (D61): the dock alongside is state (`deck.dock`) from the start of `docking` to the end
+ * of `undocking`. A save in one of those stages at a port whose dock map is in the content it is
+ * restored against gets it set, with the geometry revision bumped; restore's cache build then
+ * grafts it. A docked save also has its ramps asked down (docked means ramps down, D59; saves
+ * from before D59 had them close by themselves), and the door system lowers them. Nothing else
+ * moves: freight in a port store stays there (loading still runs through the transfer tiles), and
+ * anyone on the old personnel-ramp transfer tile is still on ship floor. A port with no dock map,
+ * or a save already carrying a dock, is left alone.
+ */
+export function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+  if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
+  if (raw.deck.dock !== undefined) return raw;
+  const portId = portAlongside(raw.travel);
+  if (portId === undefined) return raw;
+  const dock = Object.values(content.docks ?? {}).find((d) => d.portId === portId);
+  if (dock === undefined) return raw;
+  const deckIds = isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  const deckId = deckIds.find((id) => id in content.decks);
+  if (deckId === undefined) return raw;
+  raw.deck.dock = { dockId: dock.id, deckId };
+  if (typeof raw.deck.geometryRevision === "number") raw.deck.geometryRevision += 1;
+  if (raw.travel.stage === "docked" && isRecord(raw.doors)) {
+    for (const door of Object.values(raw.doors)) {
+      if (isRecord(door) && door.kind === "ramp" && door.deckId === deckId) {
+        door.requestedState = "open";
+      }
+    }
+  }
+  return raw;
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
+  3: attachDockOnLoad,
 };

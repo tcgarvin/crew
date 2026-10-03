@@ -3,7 +3,6 @@
   "id": "dock.crossroads_hub",
   "portId": "port.crossroads_hub",
   "name": "Crossroads Hub, Bay 14",
-  "setting": "station",
   "palette": {
     "floor": "#3a4150",
     "wall": "#1d222c",

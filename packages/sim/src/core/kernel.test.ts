@@ -80,6 +80,7 @@ describe("kernel integration", () => {
         deckId: TINY.deck,
         x: 1.5,
         y: 1.5,
+        onDock: false,
         facing: 0,
         actionLabel: "idle",
         passenger: false,

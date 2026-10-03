@@ -23,6 +23,7 @@ import {
   configTicks,
   createKernel,
   createRegistry,
+  expectedDock,
 } from "@crew/sim";
 import type { NarratorRequest } from "./contract";
 
@@ -31,6 +32,21 @@ const HUB = "port.crossroads_hub" as PortDefId;
 const DRIFT = "port.kessler_drift" as PortDefId;
 const MERIDIAN = "port.green_meridian" as PortDefId;
 const OSSORY = "port.ossory_station" as PortDefId;
+
+/**
+ * D61: the dock alongside follows the travel stage. A fixture that writes the stage by hand calls
+ * this after, so the snapshot never has the start port's dock alongside in flight.
+ */
+function alignDock(state: WorldState, content: ContentBundle): void {
+  const due = expectedDock(content, state.travel);
+  const deckId = Object.keys(state.deck.tiles)[0] as keyof WorldState["deck"]["tiles"] | undefined;
+  if (due === undefined || deckId === undefined) {
+    // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
+    delete state.deck.dock;
+    return;
+  }
+  state.deck.dock = { dockId: due.id, deckId };
+}
 
 function newWorld(content: ContentBundle, seed: number) {
   const kernel = createKernel(createRegistry());
@@ -106,6 +122,7 @@ export function approachingPortRequest(content: ContentBundle, seed = 11): Narra
     drifting: false,
     stageStartedTick: tick - 40,
   };
+  alignDock(state, content);
   tireCrew(world);
   const hook = {
     id: allocateId(state, "hook"),
@@ -141,6 +158,7 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
     drifting: false,
     stageStartedTick: 3_300,
   };
+  alignDock(state, content);
   tireCrew(world);
   const pumpId = machineByDef(world, "machine.coolant_pump");
   const pump = state.machines[pumpId];
@@ -203,6 +221,7 @@ export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequ
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: DRIFT };
+  alignDock(snapshot.state, content);
   const hook = {
     id: allocateId(snapshot.state, "hook"),
     kind: "jobBoard" as const,
@@ -225,6 +244,7 @@ export function farJobBoardRequest(content: ContentBundle, seed = 11): NarratorR
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: HUB };
+  alignDock(snapshot.state, content);
   const hook = {
     id: allocateId(snapshot.state, "hook"),
     kind: "jobBoard" as const,
@@ -334,6 +354,7 @@ export function passengerAboardRequest(content: ContentBundle, seed = 29): Narra
     stageStartedTick: 3_300,
     voyageDestinationId: OSSORY,
   };
+  alignDock(state, content);
   tireCrew(world);
   const passenger = boardPassenger(state, content, FIXTURE_PASSENGER);
   const jobId = roundTripPassage(state, passenger.id, 2_900);
@@ -373,6 +394,7 @@ export function passengerOverdueRequest(content: ContentBundle, seed = 29): Narr
     plannedDestinationId: DRIFT,
     voyageDestinationId: HUB,
   };
+  alignDock(state, content);
   tireCrew(world);
   const passenger = boardPassenger(state, content, FIXTURE_PASSENGER);
   passenger.availability = "offShip";
@@ -454,6 +476,7 @@ export function notableEventRequest(content: ContentBundle, seed = 23): Narrator
   state.tick = tick;
   if (state.travel.stage === "docked") throw new Error("fixture: expected the ship in transit");
   state.travel = { ...state.travel, drifting: true };
+  alignDock(state, content);
   const drifted = event(4, 4_100, "driftingChanged", { drifting: true }, "narrative");
   const hook = {
     id: allocateId(state, "hook"),

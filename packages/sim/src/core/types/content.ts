@@ -258,9 +258,6 @@ export const DOCK_FOREGROUND_KINDS = [
 ] as const;
 export type DockForegroundKind = (typeof DOCK_FOREGROUND_KINDS)[number];
 
-export const DOCK_SETTINGS = ["station", "planet"] as const;
-export type DockSetting = (typeof DOCK_SETTINGS)[number];
-
 /** A tile rectangle in the dock map's frame: `w` × `h` tiles from (x, y). */
 export interface DockRect {
   readonly x: number;
@@ -269,7 +266,10 @@ export interface DockRect {
   readonly h: number;
 }
 
-/** CSS hex colours (`#rrggbb`). `sky` is required for a planet and absent for a station. */
+/**
+ * CSS hex colours (`#rrggbb`). `sky` is required when the port's `setting` is `planet` and absent
+ * for a `station`.
+ */
 export interface DockPaletteDef {
   readonly floor: string;
   readonly wall: string;
@@ -315,7 +315,8 @@ export interface DockForegroundDef {
  * in the map's own frame; the sim grafts the map onto the ship's deck at `shipAt`
  * (`systems/spatial/dock.ts`, docs/design/dockside-spike.md), so dock tile (x, y) is deck tile
  * (x − shipAt.x, y − shipAt.y). Walkable dock floor is a `floor` tile under no blocking prop
- * (`dockFloorMask` in `systems/spatial/geometry.ts`; content validation applies the same rule).
+ * (`dockFloorMask` in `core/docks.ts`; content validation applies the same rule). Whether it is a
+ * station or a planet is the port's `setting` (D61: the dock does not repeat it).
  *
  * Ramp landings are not listed: each ramp door lands on the dock tile across its hull edge, and
  * both content validation and the nav builder require that tile to be walkable floor. Maps are
@@ -325,7 +326,6 @@ export interface DockDef {
   readonly id: DockDefId;
   readonly portId: PortDefId;
   readonly name: string;
-  readonly setting: DockSetting;
   readonly palette: DockPaletteDef;
   readonly width: number;
   readonly height: number;
@@ -788,6 +788,12 @@ export interface ConfigDef {
      * counts as impaired, and the departure gate asks the captain before leaving.
      */
     readonly departureMinOutput: number;
+    /**
+     * D61: how long departure prep calls people on the dock to come aboard before the dock crew
+     * bring up whoever is still there, so a departure is never held forever by someone who
+     * cannot (or will not) walk back.
+     */
+    readonly recallAboardSeconds: Seconds;
   };
   readonly commerce: {
     /**

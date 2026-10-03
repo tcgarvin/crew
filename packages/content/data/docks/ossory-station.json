@@ -3,7 +3,6 @@
   "id": "dock.ossory_station",
   "portId": "port.ossory_station",
   "name": "Ossory Station, breaker's slip 9",
-  "setting": "station",
   "palette": {
     "floor": "#4d4a45",
     "wall": "#2a2522",
