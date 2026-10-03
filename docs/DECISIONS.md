@@ -437,3 +437,25 @@ the first-call fallback while a new grammar compiled (D45). The schema-size test
 prompt-token budget (8 KiB, was 6) and to keep per-game ids out of the cached prefix. Tool use
 with one tool per intent was the owner's general preference and is the likely next shape; not
 worth the rewrite now.
+
+## 2026-10-03 — The log keeps time, and arcs end on a card
+
+**D54. The narrator ends its own arcs, on an ordinary card.** Threads used to leave the notes
+silently, so the captain never learned a story was over. Prompt v0.15: when a thread is over (its
+payoff landed, the job it rode on is done, or events made it moot), the narrator puts one closing
+card in front of the captain that makes plain the story is finished and how it came out. This is
+a normal `surfaceDecision`, usually with two effect-none sides for how the captain takes it.
+Only after it shows under "What the captain has seen" does the thread leave the notes. The
+`notableEvent` hook names `contractCompleted` and `passageEnded` (both already hook) as the
+moment for a job's closing card, or the next call if a card is already waiting. A separate
+"job done" or "story's end" card type was tried and rejected: there is one kind of card, and the
+narrator is responsible for its own arcs.
+
+**D55. One ship's log, in playback time.** The ticker was fed when the worker produced a frame,
+so with run-ahead (D14) it told the viewer about things the deck had not shown yet. It is now
+the ship's log (`apps/web/src/ui/log.ts`): every entry is stamped with its sim tick, kept in tick
+order (200 entries), and shown only once playback reaches that tick. Event lines and the cards
+the captain was shown form one feed, newest on top, scrolling in both orientations. A card is
+logged at the tick it was raised and shows "waiting" until answered; tapping it then brings the
+card back up. Once answered it shows the choice, and expands to the full text and aftermath. The
+log is not saved and starts empty after a reload, as the ticker did.

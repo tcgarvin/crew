@@ -14,7 +14,6 @@ import type {
   SaveEnvelope,
   SimEvent,
   Tick,
-  TickerEntry,
 } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type SimConnection, createSimConnection } from "./host/connection";
@@ -41,20 +40,27 @@ import { buildDeckLayout } from "./render/deckLayout";
 import { DecisionModal, DecisionPill } from "./ui/DecisionModal";
 import { Headline } from "./ui/Headline";
 import { Inspector, type InspectorData } from "./ui/Inspector";
+import { Log } from "./ui/Log";
 import { NarratorErrorPanel } from "./ui/NarratorErrorPanel";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
-import { Ticker } from "./ui/Ticker";
 import { Toast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
 import { inspectItem } from "./ui/itemInspection";
+import {
+  type CardEntry,
+  type LogEntry,
+  answerDecision,
+  appendDecision,
+  appendTicker,
+  visibleLog,
+} from "./ui/log";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
 type HealthState = "checking" | "ok" | "error";
 
-const TICKER_LIMIT = 6;
 /** Wall-clock cadence of routine server saves (PLAN §3: "Neon every ~60 s"). */
 const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
@@ -128,7 +134,8 @@ export function App() {
   const [speed, setSpeedState] = useState(1);
   const [paused, setPausedState] = useState(false);
   const [runAhead, setRunAhead] = useState({ simTick: 0, viewTick: 0, buffered: 0 });
-  const [ticker, setTicker] = useState<TickerEntry[]>([]);
+  /** D55: everything received, stamped by tick; shown only as far as playback has reached. */
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [selection, setSelection] = useState<Selection>();
   const [inspectorData, setInspectorData] = useState<InspectorData>();
   const [pendingHook, setPendingHook] = useState<PendingHook>();
@@ -309,11 +316,8 @@ export function App() {
       switch (message.type) {
         case "frame": {
           playback.push(message.frame);
-          if (message.frame.tickerEvents.length > 0) {
-            setTicker((prev) =>
-              [...message.frame.tickerEvents].reverse().concat(prev).slice(0, TICKER_LIMIT),
-            );
-          }
+          const { tickerEvents } = message.frame;
+          if (tickerEvents.length > 0) setLog((prev) => appendTicker(prev, tickerEvents));
           if (message.frame.tick - lastSaveTickRef.current >= saveEveryTicks) {
             lastSaveTickRef.current = message.frame.tick;
             save("none");
@@ -339,6 +343,7 @@ export function App() {
         case "decisionPending":
           setDecision(message.decision);
           setDecisionHidden(false);
+          setLog((prev) => appendDecision(prev, message.decision));
           save("none");
           return;
         case "commandResult": {
@@ -528,11 +533,9 @@ export function App() {
       // D26: keep the answered card up for a moment with a line on what happens next. The sim
       // resumes behind it straight away; only the card lingers.
       const narrated = prose[decision.id];
-      setClosingCard({
-        card: narrated ?? templateCard(decision, bundle),
-        side,
-        caption: aftermathCaption(decision, side, narrated, bundle),
-      });
+      const caption = aftermathCaption(decision, side, narrated, bundle);
+      setClosingCard({ card: narrated ?? templateCard(decision, bundle), side, caption });
+      setLog((prev) => answerDecision(prev, decision.id, { side, caption }));
       clearTimeout(closingTimer.current);
       closingTimer.current = setTimeout(() => setClosingCard(undefined), AFTERMATH_MS);
       setDecision(undefined);
@@ -560,6 +563,13 @@ export function App() {
   const showCard = card !== undefined && decisionDue && !decisionHidden && !thinking;
   const runAheadSeconds = runAhead.buffered / tickRate;
 
+  // D55: the log follows playback, not the worker.
+  const visible = useMemo(() => visibleLog(log, viewTick), [log, viewTick]);
+  const logCardText = useCallback(
+    (entry: CardEntry) => prose[entry.decision.id] ?? templateCard(entry.decision, bundle),
+    [prose, bundle],
+  );
+
   return (
     <div className="app">
       <TopBar
@@ -583,7 +593,11 @@ export function App() {
       )}
       <div className="main-area">
         <DeckCanvas layout={layout} frame={frame} selected={selection} onSelect={onSelect} />
-        <Ticker entries={ticker} />
+        <Log
+          entries={visible}
+          cardText={logCardText}
+          onOpenDecision={() => setDecisionHidden(false)}
+        />
       </div>
       <Inspector data={inspectorData} onClose={onCloseInspector} />
       {narratorError !== undefined ? (

@@ -67,7 +67,7 @@ export function TopBar({
           title={`API health: ${health}`}
           aria-label={`API health: ${health}`}
         />
-        {/* Polish A: in the bar rather than floating, so it never covers the ticker column. */}
+        {/* Polish A: in the bar rather than floating, so it never covers the log column. */}
         <button type="button" className="new-game-button" onClick={onNewGame}>
           New game
         </button>

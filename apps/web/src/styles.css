@@ -119,8 +119,8 @@ body {
 /* ---------------------------------------------------------------- main area */
 
 /*
- * Polish A: the ticker never overlays the deck. Landscape: a column on the right, and the canvas
- * (which fits itself to its container) shrinks to make room. Portrait: a three-line strip below.
+ * Polish A: the log never overlays the deck. Landscape: a column on the right, and the canvas
+ * (which fits itself to its container) shrinks to make room. Portrait: a scrolling strip below.
  */
 .main-area {
   position: relative;
@@ -142,23 +142,41 @@ body {
   touch-action: none;
 }
 
-/* ---------------------------------------------------------------- ticker */
+/* ---------------------------------------------------------------- log (D55) */
 
-.ticker {
+/*
+ * One feed, newest on top: event lines and the cards the captain was shown. It scrolls; nothing
+ * in it fades out.
+ */
+.log {
   flex: 0 0 auto;
-  width: clamp(200px, 28vw, 320px);
+  width: clamp(220px, 30vw, 340px);
   list-style: none;
   margin: 0;
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
+  gap: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--panel);
   border-left: 1px solid var(--panel-border);
 }
 
-.ticker-entry {
+.log-item {
+  flex: 0 0 auto;
+  animation: log-in 0.3s ease-out;
+}
+
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.log-line {
+  margin: 0;
   background: rgba(27, 36, 48, 0.6);
   border-left: 3px solid var(--accent);
   padding: 4px 8px;
@@ -166,35 +184,81 @@ body {
   font-size: 12px;
   line-height: 16px;
 }
-.ticker-entry.ticker-notable {
-  border-left-color: var(--accent);
-}
-.ticker-entry.ticker-narrative {
+.log-line-narrative {
   border-left-color: #6ab0ff;
 }
-.ticker-entry.ticker-trace {
+.log-line-trace {
   border-left-color: var(--text-dim);
+  color: var(--text-dim);
+}
+
+/* A card the captain was shown: same face as the modal, small. */
+.log-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: #151d29;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.log-card summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+.log-card summary::-webkit-details-marker {
+  display: none;
+}
+.log-card-waiting {
+  border-color: var(--accent);
+  cursor: pointer;
+}
+.log-card-kicker {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.log-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.log-card-answer {
+  font-size: 12px;
+  color: var(--text);
+}
+.log-card-waiting .log-card-answer {
+  color: var(--accent);
+}
+.log-card-prose,
+.log-card-aftermath {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.log-card-aftermath {
+  font-style: italic;
+  color: var(--text-dim);
 }
 
 @media (orientation: portrait) {
   .main-area {
     flex-direction: column;
   }
-  .ticker {
+  .log {
     width: auto;
-    /* Three one-line entries. */
-    height: calc(3 * 24px + 2 * 4px + 12px);
+    height: clamp(110px, 28vh, 220px);
     padding: 6px 8px;
     border-left: none;
     border-top: 1px solid var(--panel-border);
-  }
-  .ticker-entry {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .ticker-entry:nth-child(n + 4) {
-    display: none;
   }
 }
 

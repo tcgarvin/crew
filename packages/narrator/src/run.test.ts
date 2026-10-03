@@ -744,7 +744,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.14");
+    expect(PROMPT_VERSION).toBe("v0.15");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -767,6 +767,12 @@ describe("prompt text (D29, D31, D32)", () => {
       "For an overdue passenger (commerce.passengerOverdue) the first officer brings it",
     );
     expect(STATIC_RULES).toContain("the left side waits, the right side leaves without them");
+  });
+
+  it("tells the model to end each arc on a closing card before dropping it (D54)", () => {
+    expect(STATIC_RULES).toContain("Arcs end on a card.");
+    expect(STATIC_RULES).toContain("Only once that card has been shown");
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain("this is the moment for its closing card");
   });
 
   it("tells the model it runs the pace (D46)", () => {
