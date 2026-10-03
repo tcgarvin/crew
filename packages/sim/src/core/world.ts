@@ -6,6 +6,7 @@ import { emptyCaches, rebuildCaches } from "./caches";
 import { type ApplyCtx, applyCommandNow } from "./commands";
 import { headNeedingNarration } from "./decisions";
 import { createDefLookup } from "./defs";
+import { dockForPort } from "./docks";
 import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
 import { marketSeed } from "./markets";
@@ -22,6 +23,7 @@ import type {
   CompartmentId,
   LocalKey,
   MachineId,
+  PortDefId,
   ScenarioDefId,
   TempRef,
 } from "./types/ids";
@@ -289,6 +291,7 @@ export function createWorld(
   const world: World = { state, caches: emptyCaches(), content, config };
   const rng = createRngApi(state);
   instantiateDeck(state, deck, content, rng);
+  startAlongside(state, deck, content, scenario.startPortId);
 
   if (scenario.startingMoney > 0) {
     const id = allocateId(state, "transaction");
@@ -319,6 +322,27 @@ export function createWorld(
   seedInitialNeeds(state, values.needs.initialRange, rng);
   rebuildCaches(world, registry);
   return world;
+}
+
+/**
+ * D61: a scenario starts docked, so its port's dock (if content has one) is alongside from tick
+ * 0, ramps already down, since docked means ramps down (D59). Set in state before any cache
+ * exists; the nav cache builder grafts it.
+ */
+function startAlongside(
+  state: WorldState,
+  deck: DeckDef,
+  content: ContentBundle,
+  portId: PortDefId,
+): void {
+  const dock = dockForPort(content, portId);
+  if (dock === undefined) return;
+  state.deck.dock = { dockId: dock.id, deckId: deck.id };
+  for (const door of Object.values(state.doors)) {
+    if (door.deckId !== deck.id || door.kind !== "ramp") continue;
+    door.physicalState = "open";
+    door.requestedState = "open";
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -13,7 +13,6 @@ export {
   checkDockFitsDeck,
   compartmentAt,
   deckGeometry,
-  dockFloorMask,
   isWalkable,
   registerSpatial,
   requestMove,
@@ -57,5 +56,6 @@ export {
 } from "./systems/work/index";
 export { workViolations } from "./systems/work/invariants";
 export { spatialViolations } from "./systems/spatial/invariants";
+export { travelViolations } from "./systems/travel/invariants";
 export { registerPlannerDefaults } from "./planner/index";
 export { registerAgentView, toAgentViewSnapshot } from "./view/index";

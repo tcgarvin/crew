@@ -23,12 +23,16 @@ export function lerpAngle(a: number, b: number, t: number): number {
 /**
  * Interpolate between two frames at `t` in [0, 1]. Actors are matched by id; an actor present in
  * only one of the two frames (spawned/despawned) is passed through unchanged rather than
- * interpolated. Non-positional fields (machines, doors, ticker, money, items, headline) snap to
- * `next` at t > 0, matching D7 (truth, not a smoothed guess). Travel progress is positional for
- * the scenery (D58), so it is interpolated within one stage of one leg and snaps otherwise.
+ * interpolated. Non-positional fields (machines, doors, ticker, money, items, headline, and the
+ * dock alongside, D61) snap to `next` at t > 0, matching D7 (truth, not a smoothed guess). Travel
+ * progress is positional for the scenery (D58), so it is interpolated within one stage of one leg
+ * and snaps otherwise.
  */
 export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number): RenderFrame {
   const clamped = Math.max(0, Math.min(1, t));
+  // D61: the dock comes and goes with a stage change, so it snaps to `next` like the doors; an
+  // optional field cannot ride the base spread, which would keep `prev`'s dock for a frame.
+  const { dock: _prevDock, ...base } = clamped >= 1 ? next : prev;
   const prevById = new Map(prev.actors.map((a) => [a.id, a] as const));
   const actors: RenderActor[] = next.actors.map((na) => {
     const pa = prevById.get(na.id);
@@ -45,7 +49,8 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     };
   });
   return {
-    ...(clamped >= 1 ? next : prev),
+    ...base,
+    ...(next.dock === undefined ? {} : { dock: next.dock }),
     tick: Math.round(lerp(prev.tick, next.tick, clamped)),
     actors,
     machines: next.machines,

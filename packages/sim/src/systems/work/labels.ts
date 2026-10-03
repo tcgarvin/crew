@@ -3,7 +3,8 @@
  * The work system computes a label whenever an activity's step changes and stores it on
  * `activity.label`; `core/render.ts` shows it verbatim.
  *
- * Vocabulary: "idle", "walking", "walking to <place>", "picking up <item>", "hauling <item>",
+ * Vocabulary: "idle", "walking", "walking to <place>", "going ashore", "walking on the dock",
+ * "coming aboard" (D61), "picking up <item>", "hauling <item>",
  * "stowing <item>", "buying <item>" (D47), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
  * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
@@ -15,7 +16,7 @@ import type { ContentBundle } from "../../core/types/content";
 import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/types/ids";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import type { ActivityStep, StepTarget, Task } from "../../core/types/work";
-import { compartmentAt } from "../spatial/geometry";
+import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { currentStep } from "./activity";
 
 export interface LabelCtx {
@@ -73,6 +74,11 @@ function placeLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>, target: StepTarge
   if (location.kind !== "onDeck" || tile === undefined) return "walking";
   const geometry = ctx.caches.nav.decks[location.deckId];
   if (geometry === undefined) return "walking";
+  // D61: dock floor is in no compartment; say which way across the ramp the walk goes.
+  const toDock = isDockTile(geometry, tile.x, tile.y);
+  const onDock = isDockTile(geometry, location.x, location.y);
+  if (toDock) return onDock ? "walking on the dock" : "going ashore";
+  if (onDock) return "coming aboard";
   const to = compartmentAt(geometry, tile.x + 0.5, tile.y + 0.5);
   const here = compartmentAt(geometry, location.x, location.y);
   if ("machineId" in target && to === here)

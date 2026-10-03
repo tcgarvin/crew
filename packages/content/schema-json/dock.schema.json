@@ -14,10 +14,6 @@
       "type": "string",
       "minLength": 1
     },
-    "setting": {
-      "type": "string",
-      "enum": ["station", "planet"]
-    },
     "palette": {
       "type": "object",
       "properties": {
@@ -304,7 +300,6 @@
     "id",
     "portId",
     "name",
-    "setting",
     "palette",
     "width",
     "height",

@@ -12,6 +12,7 @@ import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
 import {
   FIXTURE_PASSENGER,
   approachingPortRequest,
+  farJobBoardRequest,
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
@@ -176,6 +177,21 @@ describe("buildDigest", () => {
     for (const line of crewLines ?? []) expect(line).toMatch(/\. .+ voice: .+/);
     const dane = content().crew["crew.dane_whitcross" as keyof ReturnType<typeof content>["crew"]];
     expect(text).toContain(`${dane?.bio} voice: ${dane?.voice}`);
+  });
+
+  it("says a crew member on the dock alongside is on the dock (D61)", () => {
+    const req = farJobBoardRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    expect(snapshot.state.deck.dock?.dockId).toBe("dock.crossroads_hub");
+    const mara = Object.values(snapshot.state.actors).find((a) => a.name === "Mara Osei");
+    if (mara === undefined || mara.location.kind !== "onDeck") throw new Error("fixture: no Mara");
+    // The personnel ramp's landing: deck (2,18), just outside the airlock's south wall.
+    mara.location = { ...mara.location, x: 2.5, y: 18.5 };
+    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
+    const line = text.split("\n").find((l) => l.startsWith("- Mara Osei"));
+    expect(line).toMatch(
+      /: this is the captain, the player; never a speaker\. \w+ on the dock; needs/,
+    );
   });
 
   it("lists the captain first, as the player and never a speaker, with her voice (D41)", () => {

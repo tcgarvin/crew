@@ -29,12 +29,12 @@ import {
 import {
   type Snapshot,
   type State,
-  compartmentNameAt,
   faultDiscovery,
   machineCompartment,
   machineName,
   offerPortNow,
   pathBetween,
+  placePhrase,
   portName,
   voyageAhead,
 } from "./lookups";
@@ -296,13 +296,10 @@ function aboardLine(
         : "";
     return `- Aboard: ${actor.name}, passenger, ${bound}; ashore at ${portName(content, job.toPortId)}, ${back}${overdue}.${purpose}`;
   }
-  const loc = actor.location;
-  const where =
-    loc.kind === "onDeck" ? compartmentNameAt(content, loc.deckId, loc.x, loc.y) : loc.kind;
   const now =
     actor.disembarking === true
       ? "going down the ramp"
-      : `${actionLabel(actor, state, content)}${where ? ` in ${where}` : ""}`;
+      : `${actionLabel(actor, state, content)}${placePhrase(content, state, actor.location)}`;
   return `- Aboard: ${actor.name}, passenger, ${bound}; now ${now}.${purpose}`;
 }
 
@@ -358,15 +355,13 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
       })
       .filter((n) => n !== undefined)
       .join(", ");
-    const loc = actor.location;
-    const where =
-      loc.kind === "onDeck" ? compartmentNameAt(content, loc.deckId, loc.x, loc.y) : loc.kind;
+    const where = placePhrase(content, state, actor.location);
     const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
     const def = content.crew[actor.defId];
     const bio = def?.bio;
     // D38: the voice line is how this person sounds on every card.
     const voice = def?.voice;
-    const doing = `${actionLabel(actor, state, content)}${where ? ` in ${where}` : ""}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}`;
+    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}`;
     if (isCaptain(actor)) {
       // D41: the captain's voice is how they come across, for how others react to them.
       return `- ${actor.name}${roles}${status}: this is the captain, the player; never a speaker. ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;

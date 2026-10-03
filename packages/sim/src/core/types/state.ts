@@ -44,8 +44,10 @@ import type { Claim, Problem, Task } from "./work";
  * Bumped on any breaking change to this shape. Each bump ships a `Migration` from the previous
  * version (see save.ts). 2 (2026-09-30): jobs gained `issuerPerson`, `pitch` and `urgency` (D25).
  * 3 (2026-10-01): `markets` (D47), seeded lazily from content for a port a save never visited.
+ * 4 (2026-10-03): `deck.dock` is set from the start of `docking` to the end of `undocking` at a
+ * port with a dock map (D61), so a save docked at one gets it on load.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
 export interface MarketLine {

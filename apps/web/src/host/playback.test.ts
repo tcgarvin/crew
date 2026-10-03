@@ -12,6 +12,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
         deckId: "deck" as never,
         x,
         y,
+        onDock: false,
         facing,
         actionLabel: "walking",
         passenger: false,

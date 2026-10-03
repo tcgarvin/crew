@@ -9,7 +9,6 @@ import type {
   DockForegroundKind,
   DockPostKind,
   DockPropKind,
-  DockSetting,
   DockTileKind,
 } from "@crew/sim";
 import { z } from "zod";
@@ -24,7 +23,6 @@ import {
   tileCoordSchema,
 } from "./primitives";
 
-export const dockSettingSchema = z.enum(["station", "planet"]);
 export const dockTileKindSchema = z.enum(["floor", "wall", "void", "berth"]);
 export const dockPostKindSchema = z.enum([
   "gate",
@@ -68,12 +66,11 @@ export const dockDefSchema = z.strictObject({
   id: dockDefIdSchema,
   portId: portDefIdSchema,
   name: z.string().min(1),
-  setting: dockSettingSchema,
   palette: z.strictObject({
     floor: hexColour,
     wall: hexColour,
     accent: hexColour,
-    /** Required for a planet, absent for a station (L2). */
+    /** Required when the port is a planet, absent for a station (L2; D61). */
     sky: hexColour.exactOptional(),
   }),
   width: positiveInt,
@@ -117,10 +114,9 @@ export const dockDefSchema = z.strictObject({
 
 // Drift guards against the sim vocabularies: each must resolve to `true`.
 export const DOCK_VOCABULARY_IN_SYNC: [
-  AssertEqual<z.infer<typeof dockSettingSchema>, DockSetting>,
   AssertEqual<z.infer<typeof dockTileKindSchema>, DockTileKind>,
   AssertEqual<z.infer<typeof dockPostKindSchema>, DockPostKind>,
   AssertEqual<z.infer<typeof dockAreaKindSchema>, DockAreaKind>,
   AssertEqual<z.infer<typeof dockPropKindSchema>, DockPropKind>,
   AssertEqual<z.infer<typeof dockForegroundKindSchema>, DockForegroundKind>,
-] = [true, true, true, true, true, true];
+] = [true, true, true, true, true];

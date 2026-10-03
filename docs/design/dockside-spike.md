@@ -325,7 +325,8 @@ this change, so they are close to the timeout on main regardless.
   addressed by tile. Not needed until the stall (phase 2 item 7) or locals (phase 3).
   `detachDock`'s sweep of reservations on dock tiles exists for them; today it never finds any.
 - **Perception on the dock**, the **"aboard" sweep**, the **two-way ramp rule in travel** and the
-  **`wentAshore` event** (all §4).
+  **`wentAshore` event** (all §4). Done in D61, with the dock's lifetime, the travel invariant and
+  migration 3 → 4.
 - **Saves coupled to dock maps** (§4, save/migrations).
 - **Ramp timing.** Phase 1 adds `doors.rampOpenSeconds`. The door system's `opening` branch
   picks the seconds, right next to this spike's no-auto-close change in `doors.ts`; expect a

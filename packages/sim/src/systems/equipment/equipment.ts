@@ -192,7 +192,12 @@ function ensureSymptomProblems(ctx: StepCtx, machine: Machine, def: MachineDef):
   }
 }
 
-/** Units of each item def physically aboard (on deck or in someone's hands), by def. */
+/**
+ * Units of each item def physically aboard (on deck or in someone's hands), by def. D61: a part
+ * lying on the dock alongside counts too: it is the ship's and within reach while docked, so
+ * buying another would be waste. One still there when the dock slides away is left at the port
+ * (`leftOnDock`) and the shortfall comes back.
+ */
 function unitsAboard(ctx: StepCtx): Map<ItemDefId, number> {
   const aboard = new Map<ItemDefId, number>();
   for (const item of Object.values(ctx.state.items)) {

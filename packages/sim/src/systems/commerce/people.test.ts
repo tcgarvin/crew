@@ -145,14 +145,16 @@ describe("save migration 1 → 2 (D25)", () => {
   }
 
   it("turns an old issuer string into a person and keeps it as the label", () => {
-    const migrated = migrateState(schemaOneState(), 1) as {
+    const migrated = migrateState(schemaOneState(), 1, {
+      content: freightTestWorld().world.content,
+    }) as {
       schemaVersion: number;
       jobs: Record<string, Job>;
       markets: Record<string, unknown>;
     };
-    // D47 (schema 3) added `markets`; a 1 → 3 upgrade passes through both migrations.
-    expect(SCHEMA_VERSION).toBe(3);
-    expect(migrated.schemaVersion).toBe(3);
+    // D47 (schema 3) added `markets`; a 1 → 4 upgrade passes through every migration.
+    expect(SCHEMA_VERSION).toBe(4);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.markets).toEqual({});
     expect(migrated.jobs.j1).toMatchObject({
       issuer: "Rendell Freight Co.",

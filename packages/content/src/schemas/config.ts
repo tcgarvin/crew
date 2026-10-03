@@ -86,6 +86,7 @@ export const configDefSchema = z.strictObject({
     nominalSpeed: positive,
     staffEstimateSeconds: nonNegative,
     departureMinOutput: unitInterval,
+    recallAboardSeconds: positive,
   }),
   commerce: z.strictObject({
     priceBands: z.strictObject({

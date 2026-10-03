@@ -545,3 +545,35 @@ builder and a test keeps the two masks identical. `castSeed[].post` names a post
 dock; every port has at least one posted regular. The personnel ramp moved to the airlock's south
 wall at (2,17), so both ramps face the quay. Kessler Drift has no stall (its market is through the
 gate); Vesper Gate's chapel doors are its gate.
+
+**D61. The dock exists in the sim from docking to undocking, and nobody is left on it.** Phase 2,
+part A (spike build order 4–5 and the save migration). Travel grafts the port's dock at the start
+of `docking` and casts it off at the end of `undocking`; a new game starts with its port's dock
+alongside and the ramps already down; a port with no dock map keeps the transfer tiles. A travel
+invariant (`travelViolations`) holds the dock to exactly that window. Departure prep keeps the
+ramps down while anyone is on the dock or walking onto it, and while freight is still being
+loaded with a dock alongside (part B's staging needs it), and its clock does not run while anyone
+is out: it calls them aboard with `comeAboard`, a personal activity the planner never chooses, a
+walk at essential-operation urgency to the top of the nearest ramp. The headline reads "Waiting
+for <name> to come aboard", and "raising the ramps" if prep's clock has run out with a ramp still
+moving. The waiting happens in prep, not at the docked → prep gate. A departure is never held
+forever, and never silently: someone on the dock who cannot walk (not available, not crew, or
+whose walk failed) is brought up the ramp by the dock crew at once, and everyone still out is once
+the call has run `travel.recallAboardSeconds` (60 s); both emit `broughtAboard`, which the ticker
+shows. A passenger walking off is never called back. Anything still lying on the dock when it
+goes is left at the port's warehouse (`leftOnDock`), and anyone still on it is brought aboard as a
+last guard before `detachDock`'s own checks. The "aboard" sweep, site by site: the render frame
+draws the dock and everything on it (`RenderFrame.dock`, `onDock` on actors and on-deck items);
+loading counts freight on the dock as not aboard, and so does a put-off passenger's luggage; a
+passenger standing on the dock is still the ship's to walk off; a part on the dock counts towards
+`partsNeeded`, since it is within reach while docked; the roster, `AgentView`, needs and ambient
+chat are unchanged. Someone on the dock looks around the dock (items and people; dock floor is in
+no compartment), walks are labelled "going ashore", "walking on the dock" and "coming aboard",
+movement emits `wentAshore` and `cameAboard` (trace) when a step crosses a ramp, and the narrator
+digest says "on the dock". `DockDef.setting` is dropped: a dock is a station or a planet because
+its port is, and the sky colour is checked against the port. Save schema 4: migrations now
+receive the content they restore against, and 3 → 4 sets `deck.dock` for a save docked, docking,
+preparing to depart or undocking at a port with a dock map, asking a docked save's ramps down;
+freight in a port store stays where it is. Restore now also fills config keys a save predates from
+the loaded content, with a warning, because a save from before D58 had no
+`doors.rampOpenSeconds` and its ramps would never have finished moving.

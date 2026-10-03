@@ -124,6 +124,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       nominalSpeed: 5,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      recallAboardSeconds: 60,
     },
     commerce: {
       priceBands: {

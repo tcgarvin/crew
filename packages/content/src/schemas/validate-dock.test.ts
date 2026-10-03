@@ -151,11 +151,23 @@ describe("dock map validation", () => {
     );
   });
 
-  it("needs a sky colour for a planet dock", () => {
-    const messages = messagesAfter((dock) => {
-      dock.setting = "planet";
+  it("needs a sky colour for a planet port's dock, and none for a station's (D61)", () => {
+    const planet = messagesAfter((_dock, raw) => {
+      const port = raw.ports?.[HUB_PORT] as { setting: string };
+      port.setting = "planet";
     });
-    expect(messages).toContainEqual(expect.stringContaining("a planet dock needs palette.sky"));
+    expect(planet).toContainEqual(expect.stringContaining("a planet dock needs palette.sky"));
+    const station = messagesAfter((dock) => {
+      dock.palette = { ...dock.palette, sky: "#88aacc" };
+    });
+    expect(station).toContainEqual(expect.stringContaining("a station dock has no sky colour"));
+  });
+
+  it("refuses a dock that repeats its port's setting (D61)", () => {
+    const messages = messagesAfter((dock) => {
+      (dock as unknown as Record<string, unknown>).setting = "station";
+    });
+    expect(messages.join("\n")).toMatch(/setting/);
   });
 
   it("checks castSeed posts against the port's dock", () => {

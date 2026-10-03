@@ -24,6 +24,7 @@ import type {
   ActorId,
   CompartmentId,
   DeckDefId,
+  DockDefId,
   DoorId,
   EntityId,
   ItemDefId,
@@ -191,9 +192,17 @@ export interface RenderActor {
   readonly id: ActorId;
   readonly name: string;
   readonly deckId: DeckDefId;
-  /** Continuous tile-unit position (tile centre = x + 0.5). */
+  /**
+   * Continuous tile-unit position (tile centre = x + 0.5), in the deck's frame. On the dock
+   * (D59, D61) it lies outside the deck's authored bounds, possibly negative.
+   */
   readonly x: number;
   readonly y: number;
+  /**
+   * D61: standing on the dock alongside (`RenderFrame.dock`), not aboard, so the renderer can draw
+   * the person with the dock layer as it slides in and out. Always false with no dock.
+   */
+  readonly onDock: boolean;
   /** Radians, 0 = east. */
   readonly facing?: number;
   /** Short present-tense verb phrase for the label: "repairing pump", "sleeping", "walking". */
@@ -235,8 +244,9 @@ export interface RenderDoor {
 export type RenderItemKind = "crate" | "tool" | "food" | "other";
 
 /**
- * Where a rendered item is. Only ship-side custody reaches the frame: port stores are ashore and
- * installed components are drawn as their machine.
+ * Where a rendered item is. Only what is on the map reaches the frame: the deck, the dock
+ * alongside (D61), and anyone's hands there. Port stores are off the map and installed
+ * components are drawn as their machine.
  */
 export type RenderItemLocation =
   | {
@@ -245,13 +255,18 @@ export type RenderItemLocation =
       /** Continuous tile-unit position, as `OnDeckLocation`. */
       readonly x: number;
       readonly y: number;
+      /** D61: lying on the dock alongside rather than aboard, as `RenderActor.onDock`. */
+      readonly onDock: boolean;
     }
   /** Carried or equipped: drawn riding the actor's dot. */
   | { readonly kind: "carried"; readonly actorId: ActorId }
   /** Inside a container that is itself on deck or carried. */
   | { readonly kind: "container"; readonly containerId: ItemId };
 
-/** Polish A (D28): an item that is aboard, so cargo loading is visible on the map. */
+/**
+ * Polish A (D28): an item on the map, so cargo loading is visible. Since D61 that includes the
+ * dock alongside; `location.onDock` (or the carrier's) tells it from cargo aboard.
+ */
 export interface RenderItem {
   readonly id: ItemId;
   readonly defId: ItemDefId;
@@ -289,6 +304,19 @@ export interface RenderTravel {
 }
 
 /**
+ * D61: the dock alongside, from the start of `docking` to the end of `undocking`. The map itself
+ * is content (`ContentBundle.docks[dockId]`, a `DockDef`): its tile (x, y) is deck tile
+ * (x − shipAt.x, y − shipAt.y), so the renderer draws it at `−shipAt` in deck coordinates plus
+ * the scenery's berth offset. Actors and items standing on it are in the frame's ordinary lists
+ * with `onDock` set.
+ */
+export interface RenderDock {
+  readonly dockId: DockDefId;
+  /** The deck it is grafted onto (there is one). */
+  readonly deckId: DeckDefId;
+}
+
+/**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
  * W0 decision: frames also carry `money` (HUD) and actor `name` (labels) beyond the minimum.
@@ -302,8 +330,13 @@ export interface RenderFrame {
   /** Notable/narrative events since the previous frame, already rendered to text. */
   readonly tickerEvents: readonly TickerEntry[];
   readonly money: number;
-  /** Polish A (D28): items aboard (on deck, carried, or in a container that is). */
+  /**
+   * Polish A (D28): items on the map (on the deck or the dock, carried, or in a container that
+   * is). D61: dock items have `onDock` set.
+   */
   readonly items: readonly RenderItem[];
+  /** D61: the dock alongside; absent while no dock is (in flight, or at a port without one). */
+  readonly dock?: RenderDock;
   /**
    * Polish A (D27): one plain-language line of what the ship is doing right now, e.g.
    * "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".

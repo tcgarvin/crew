@@ -100,6 +100,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       nominalSpeed: 1,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      recallAboardSeconds: 60,
     },
     commerce: {
       priceBands: {

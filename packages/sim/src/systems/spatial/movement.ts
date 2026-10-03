@@ -36,7 +36,14 @@ import type { DerivedCaches, StepCtx, System } from "../../core/types/pipeline";
 import type { Door } from "../../core/types/ship";
 import type { WorldState } from "../../core/types/state";
 import { doorWillOpen } from "./doors";
-import { compartmentAt, doorBetween, inBounds, isStaticWalkable, isWalkable } from "./geometry";
+import {
+  compartmentAt,
+  doorBetween,
+  inBounds,
+  isDockTile,
+  isStaticWalkable,
+  isWalkable,
+} from "./geometry";
 import { cachedPath, pathLength, stepLength } from "./pathfind";
 import { holdsReservation, releaseReservations, tileCapacity, tryReserve } from "./reservations";
 import { actorPolicy } from "./routing";
@@ -402,6 +409,32 @@ function arrive(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, tile: TileCo
   });
 }
 
+/**
+ * D61: a finished step between ship floor and dock floor went down or up a ramp (the hull walls
+ * every other edge between them). Movement is the only place that sees the crossing, so it says
+ * so: `wentAshore` / `cameAboard`, for the narrator digest and the captain-ashore hook to come.
+ */
+function crossedRamp(
+  ctx: StepCtx,
+  actor: Actor,
+  geometry: DeckGeometry,
+  a: TileCoord,
+  b: TileCoord,
+): void {
+  const fromDock = isDockTile(geometry, a.x, a.y);
+  if (fromDock === isDockTile(geometry, b.x, b.y)) return;
+  const rampId = doorBetween(geometry, a, b);
+  if (rampId === undefined) throw new Error(`Step ${a.x},${a.y}→${b.x},${b.y} crossed the hull`);
+  ctx.emit({
+    type: fromDock ? "cameAboard" : "wentAshore",
+    subjectIds: [actor.id, rampId],
+    locationRef: { kind: "tile", deckId: geometry.deckId, x: b.x, y: b.y },
+    causeIds: [],
+    source: "sim",
+    payload: { rampId },
+  });
+}
+
 /** Walk one actor up to `budget` tiles this tick. */
 function advanceActor(
   ctx: StepCtx,
@@ -456,6 +489,7 @@ function advanceActor(
     actor.facing = Math.atan2(b.y - a.y, b.x - a.x);
     const completed = movement.segmentDistanceTravelled >= length - EPS;
     if (completed) {
+      if (geometry.dock !== undefined) crossedRamp(ctx, actor, geometry, a, b);
       movement.segmentIndex += 1;
       movement.segmentDistanceTravelled = 0;
       // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).

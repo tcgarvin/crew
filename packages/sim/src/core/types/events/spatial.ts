@@ -1,4 +1,4 @@
-/** Spatial events (W3): movement and doors. */
+/** Spatial events (W3): movement and doors; crossing a ramp to or from the dock (D61). */
 import type { TileCoord } from "../common";
 import type { CompartmentId, DoorId } from "../ids";
 import type { DoorPhysicalState } from "../ship";
@@ -19,6 +19,10 @@ export interface SpatialEventPayloads {
   routeBlocked: { readonly tile: TileCoord; readonly doorId?: DoorId };
   /** W3 addition: a route completed; the actor stands at the centre of `tile`. */
   reachedTile: { readonly tile: TileCoord };
+  /** Dockside (D61): a step down `rampId` from the ship onto the dock alongside. */
+  wentAshore: { readonly rampId: DoorId };
+  /** Dockside (D61): a step up `rampId` from the dock back aboard. */
+  cameAboard: { readonly rampId: DoorId };
 }
 
 export const SPATIAL_EVENT_SIGNIFICANCE = {
@@ -27,4 +31,6 @@ export const SPATIAL_EVENT_SIGNIFICANCE = {
   doorJammed: "notable",
   routeBlocked: "trace",
   reachedTile: "trace",
+  wentAshore: "trace",
+  cameAboard: "trace",
 } as const satisfies SignificanceCatalog<SpatialEventPayloads>;

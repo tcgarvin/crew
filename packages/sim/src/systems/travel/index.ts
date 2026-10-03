@@ -30,3 +30,4 @@ export {
   worstImpairment,
 } from "./departure-gate";
 export { travelTaskDerivations } from "./tasks";
+export { travelViolations } from "./invariants";

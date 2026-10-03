@@ -317,12 +317,11 @@ function notesFrom(
  * kernel's save migrations before anything reads it, so the digest and translator only ever see
  * the current state shape.
  */
-function currentSnapshot(snapshot: SaveEnvelope): SaveEnvelope {
+function currentSnapshot(snapshot: SaveEnvelope, content: ContentBundle): SaveEnvelope {
   if (snapshot.schemaVersion === SCHEMA_VERSION) return snapshot;
-  const state = migrateState(
-    JSON.parse(JSON.stringify(snapshot.state)),
-    snapshot.schemaVersion,
-  ) as SaveEnvelope["state"];
+  const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), snapshot.schemaVersion, {
+    content,
+  }) as SaveEnvelope["state"];
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, state };
 }
 
@@ -359,7 +358,7 @@ export async function runNarratorWithTrace(
 ): Promise<NarratorRun> {
   const content = ctx.content ?? defaultContent();
   const callId = ctx.callId ?? globalThis.crypto.randomUUID();
-  const snapshot = currentSnapshot(req.snapshot);
+  const snapshot = currentSnapshot(req.snapshot, content);
   const stored = parseNotes(ctx.notes);
   // D31: fold the kernel's decision events in before the digest, so the model sees what was chosen.
   const notes: NarratorNotes = {

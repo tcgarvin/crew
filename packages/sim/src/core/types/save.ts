@@ -2,7 +2,7 @@
  * Save envelope and migrations (SD §20.1, PLAN §3 "Saves").
  */
 import type { Tick } from "./common";
-import type { ConfigDef } from "./content";
+import type { ConfigDef, ContentBundle } from "./content";
 import type { WorldState } from "./state";
 
 /**
@@ -27,8 +27,19 @@ export interface SaveEnvelope {
 /** Kernel build identifier. Bump when pipeline order or system semantics change. */
 export const SIM_VERSION = "0.1.0";
 
-/** Upgrades raw state from schema version N to N+1. Pure; input is untrusted JSON. */
-export type Migration = (state: unknown) => unknown;
+/**
+ * What a migration may read besides the save: the content it is being restored against (D61:
+ * which dock map belongs to the port a save is docked at).
+ */
+export interface MigrationContext {
+  readonly content: Pick<ContentBundle, "decks" | "docks">;
+}
+
+/**
+ * Upgrades raw state from schema version N to N+1. Pure over its inputs; the state is untrusted
+ * JSON.
+ */
+export type Migration = (state: unknown, context: MigrationContext) => unknown;
 
 /**
  * Keyed by the version a migration upgrades *from*. `restore()` applies them in sequence up to

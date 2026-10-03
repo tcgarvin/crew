@@ -50,7 +50,6 @@ export const QUAY: DockDef = {
   id: DOCK.id,
   portId: "port.test.quayside" as PortDefId,
   name: "Test quay",
-  setting: "station",
   palette: { floor: "#444444", wall: "#222222", accent: "#ffaa00" },
   width: 16,
   height: 12,

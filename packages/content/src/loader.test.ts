@@ -152,7 +152,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
         port.id,
       ).toBe(true);
     }
-    const planets = docks.filter((d) => d.setting === "planet").map((d) => d.portId);
+    const planets = docks.filter((d) => ports[d.portId]?.setting === "planet").map((d) => d.portId);
     expect(planets.sort()).toEqual(["port.green_meridian", "port.terns_rest"]);
   });
 

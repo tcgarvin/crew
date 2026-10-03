@@ -335,7 +335,18 @@ export type Action = { [K in ActionKind]: ActionBase<K> }[ActionKind];
 // Activity: what an actor is doing, tying intent to action
 // ---------------------------------------------------------------------------------------------
 
-export const PERSONAL_ACTIVITIES = ["eat", "sleep", "rest", "socialize", "wander"] as const;
+/**
+ * `comeAboard` (D61) is never planned: departure prep gives it to someone on the dock, a walk
+ * back up the nearest ramp, so a stroll on the quay cannot hold the ship.
+ */
+export const PERSONAL_ACTIVITIES = [
+  "eat",
+  "sleep",
+  "rest",
+  "socialize",
+  "wander",
+  "comeAboard",
+] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
 /**

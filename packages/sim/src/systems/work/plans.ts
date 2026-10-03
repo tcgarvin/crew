@@ -277,13 +277,14 @@ export function buildPersonalPlan(
     }
     case "rest":
     case "socialize":
-    case "wander": {
+    case "wander":
+    case "comeAboard": {
       const tile = intent.tile;
       const steps: ActivityStep[] =
         tile === undefined
           ? []
           : [{ kind: "moveTo", target: { x: tile.x, y: tile.y }, requested: false }];
-      if (intent.activity !== "wander") {
+      if (intent.activity === "rest" || intent.activity === "socialize") {
         steps.push({ kind: "hold", hold: intent.activity, sinceTick: ctx.tick });
       }
       return steps.length === 0 ? blocked("unreachableTarget") : planOf(steps);

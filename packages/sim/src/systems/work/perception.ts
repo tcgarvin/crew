@@ -11,6 +11,9 @@
  *   (symptoms are audible/visible on the spot), emitting `problemObserved` when new or revised;
  * - `actorStatus` (availability, asleep, tile, idle) for other people in the compartment.
  *
+ * D61: someone on the dock alongside (in no compartment) looks around the dock instead: its items
+ * and people, as above; there are no machines or problems on a dock.
+ *
  * W4a decision ("ship familiarity"): an actor with an empty knowledge table (a freshly spawned
  * crew member) is briefed once with `reported` locations of every on-deck item, standing in for
  * having loaded the ship's stores. Without it nobody would know where the rations are until they
@@ -19,11 +22,11 @@
 import { dueActors } from "../../core/pipeline";
 import type { Actor } from "../../core/types/actor";
 import type { OnDeckLocation } from "../../core/types/common";
-import type { CompartmentId, ItemId, MachineId } from "../../core/types/ids";
+import type { ActorId, CompartmentId, ItemId, MachineId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
-import { compartmentAt } from "../spatial/geometry";
+import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { isAsleep } from "./activity";
 import { directSight, writeFact } from "./facts";
 import { tileOf } from "./plans";
@@ -52,13 +55,16 @@ function brief(ctx: StepCtx, actor: Actor, deckId: OnDeckLocation["deckId"]): vo
   }
 }
 
-function seeItems(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, here: CompartmentId): void {
+/** What one look covers: a compartment, or (D61) the dock alongside. */
+type InView = (x: number, y: number) => boolean;
+
+function seeItems(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, inView: InView): void {
   const seen = new Set<ItemId>();
   const sight = directSight(actor, ctx.tick);
   for (const item of Object.values(ctx.state.items)) {
     const location = item.location;
     if (location.kind !== "onDeck" || location.deckId !== geometry.deckId) continue;
-    if (compartmentAt(geometry, location.x, location.y) !== here) continue;
+    if (!inView(location.x, location.y)) continue;
     seen.add(item.id);
     writeFact(actor, item.id, "itemLocation", { location }, sight);
   }
@@ -67,7 +73,7 @@ function seeItems(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, here: Comp
     const believed = fact.value.location;
     if (believed.kind !== "onDeck" || believed.deckId !== geometry.deckId) continue;
     const itemId = fact.subjectId as ItemId;
-    if (seen.has(itemId) || compartmentAt(geometry, believed.x, believed.y) !== here) continue;
+    if (seen.has(itemId) || !inView(believed.x, believed.y)) continue;
     writeFact(actor, itemId, "itemLocation", { location: believed, absent: true }, sight);
   }
 }
@@ -117,9 +123,9 @@ function seeMachinesAndProblems(ctx: StepCtx, actor: Actor, here: CompartmentId)
   }
 }
 
-function seePeople(ctx: StepCtx, actor: Actor, here: CompartmentId): void {
+function seePeople(ctx: StepCtx, actor: Actor, others: Iterable<ActorId>): void {
   const sight = directSight(actor, ctx.tick);
-  for (const otherId of ctx.caches.index.actorsByCompartment[here] ?? []) {
+  for (const otherId of others) {
     const other = ctx.state.actors[otherId];
     if (other === undefined || other.id === actor.id || other.location.kind !== "onDeck") continue;
     writeFact(
@@ -137,7 +143,23 @@ function seePeople(ctx: StepCtx, actor: Actor, here: CompartmentId): void {
   }
 }
 
-/** One actor's look around their compartment. */
+/** D61: everyone standing on the dock floor of this deck's graft. */
+function peopleOnDock(ctx: StepCtx, geometry: DeckGeometry): ActorId[] {
+  const out: ActorId[] = [];
+  for (const other of Object.values(ctx.state.actors)) {
+    const l = other.location;
+    if (l.kind === "onDeck" && l.deckId === geometry.deckId && isDockTile(geometry, l.x, l.y)) {
+      out.push(other.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * One actor's look around their compartment, or around the dock if they stand on it (D61): dock
+ * floor is in no compartment, and the dock is one open region with no machines, so someone there
+ * sees the items and people on it. The hull stands between the dock and the ship both ways.
+ */
 export function observe(ctx: StepCtx, actor: Actor): void {
   const location = actor.location;
   if (location.kind !== "onDeck") return;
@@ -145,10 +167,15 @@ export function observe(ctx: StepCtx, actor: Actor): void {
   if (geometry === undefined) return;
   if (Object.keys(actor.knowledge).length === 0) brief(ctx, actor, location.deckId);
   const here = compartmentAt(geometry, location.x, location.y);
-  if (here === undefined) return;
-  seeItems(ctx, actor, geometry, here);
+  if (here === undefined) {
+    if (!isDockTile(geometry, location.x, location.y)) return;
+    seeItems(ctx, actor, geometry, (x, y) => isDockTile(geometry, x, y));
+    seePeople(ctx, actor, peopleOnDock(ctx, geometry));
+    return;
+  }
+  seeItems(ctx, actor, geometry, (x, y) => compartmentAt(geometry, x, y) === here);
   seeMachinesAndProblems(ctx, actor, here);
-  seePeople(ctx, actor, here);
+  seePeople(ctx, actor, ctx.caches.index.actorsByCompartment[here] ?? []);
 }
 
 /**

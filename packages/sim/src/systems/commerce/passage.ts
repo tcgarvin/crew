@@ -27,6 +27,7 @@ import { newActor } from "../../core/command-handlers";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
 import { findCrewDef } from "../../core/defs";
+import { isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -402,11 +403,16 @@ function sweepBack(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor): v
   endPassageWith(ctx, job, passage, actor, "completed", job.fromPortId);
 }
 
-/** The job's luggage that is physically aboard (stowed, or in a crew member's hands). */
+/**
+ * The job's luggage that is physically aboard (stowed, or in a crew member's hands). D61: luggage
+ * lying on the dock is already ashore and needs no unloading.
+ */
 function luggageAboard(ctx: StepCtx, job: Job): ItemId[] {
   return job.cargoItemIds.filter((itemId) => {
-    const kind = ctx.state.items[itemId]?.location.kind;
-    return kind === "onDeck" || kind === "carriedBy" || kind === "equippedBy";
+    const location = ctx.state.items[itemId]?.location;
+    if (location === undefined) return false;
+    if (location.kind === "onDeck") return !isOnDock(ctx.content, ctx.state, location);
+    return location.kind === "carriedBy" || location.kind === "equippedBy";
   });
 }
 
@@ -468,6 +474,8 @@ export function endPassageEarly(
   const actor = ctx.state.actors[passage.actorId];
   const travel = ctx.state.travel;
   const portId = travel.stage === "docked" ? travel.portId : travel.toPortId;
+  // "Aboard" here means on the map, the dock included (D61): a passenger standing on the dock is
+  // still the ship's to walk off, so they are put off and leave through the sweep like anyone else.
   const aboard = actor !== undefined && actor.location.kind === "onDeck";
   const reason: PassageEndReason = passage.leg === "ashore" || !aboard ? "leftBehind" : "putOff";
   // Docked: they walk off here, and travel (which runs before the sweep) must not leave first.

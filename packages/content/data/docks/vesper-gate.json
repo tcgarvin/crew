@@ -3,7 +3,6 @@
   "id": "dock.vesper_gate",
   "portId": "port.vesper_gate",
   "name": "Vesper Gate, quiet berth",
-  "setting": "station",
   "palette": {
     "floor": "#2e2b36",
     "wall": "#17151c",

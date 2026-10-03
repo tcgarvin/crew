@@ -33,6 +33,17 @@ export {
   raisePolicyDecisionHookIfDue,
 } from "./decisions";
 export { createDefLookup, findCrewDef, findItemDef } from "./defs";
+export {
+  deckToDock,
+  dockedPortOf,
+  dockFloorMask,
+  dockForPort,
+  dockToDeck,
+  expectedDock,
+  isDockFloor,
+  isDockPoint,
+  isOnDock,
+} from "./docks";
 export { basePriceFor, effectiveMarket, ensureMarket, marketSeed } from "./markets";
 export { raiseHookIfIdle } from "./hooks";
 export { createEventBuffer, type EventBuffer, isNotableOrAbove } from "./events";
