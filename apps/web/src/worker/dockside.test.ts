@@ -6,7 +6,7 @@
  * alongside. The travel invariant holds every tick.
  *
  * D63 (Dockside §10, without locals): a full Hub → Kessler run with freight: staged on offer,
- * loaded by hand from the staging area, delivered to the delivery bay, paid once. Every
+ * loaded by the crew from the staging area (in hand or on the hand truck, D65), delivered to the delivery bay, paid once. Every
  * invariant, the commerce one included, holds every tick.
  *
  * It lives here, not in `packages/sim`, for the same reason `fullSim.test.ts` does: the kernel
@@ -240,7 +240,7 @@ interface CrateLog {
 }
 
 describe("port work is physical on real content (D63)", { timeout: 20_000 }, () => {
-  it("runs Hub → Kessler freight: staged on offer, loaded by hand, delivered to the bay, paid once", () => {
+  it("runs Hub → Kessler freight: staged on offer, carried aboard, delivered to the bay, paid once", () => {
     const { bundle, config, scenarioId } = loadWebContent();
     const kernel = createKernel(createFullRegistry());
     const world = kernel.createWorld(scenarioId, 20261003, bundle, config);
@@ -334,11 +334,24 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
         const location = world.state.items[itemId]?.location;
         if (location === undefined) throw new Error(`crate ${itemId} vanished`);
         if (location.kind === "inExternalStore" && !delivered) log.inStoreBeforeDelivery = true;
-        if (location.kind === "carriedBy") {
-          const carrier = world.state.actors[location.actorId];
+        // In someone's hands, or (D65) on the hand truck someone is pushing.
+        const container =
+          location.kind === "inContainer" ? world.state.items[location.containerId] : undefined;
+        const held = container?.location ?? location;
+        if (held.kind === "carriedBy") {
+          const carrier = world.state.actors[held.actorId];
           if (carrier !== undefined && isOnDock(bundle, world.state, carrier.location)) {
             log.carriedOnDock = true;
           }
+        }
+      }
+      // D65: off the hand truck a crate lies in the bay before its haul completes (the trip's own
+      // haul settles once the truck is parked), so the bay is read off positions too.
+      for (const [itemId, log] of crates) {
+        const location = world.state.items[itemId]?.location;
+        if (location === undefined || log.firstInBayTick !== undefined) continue;
+        if (isInDockArea(bundle, world.state, location, "deliveryBay")) {
+          log.firstInBayTick = world.state.tick;
         }
       }
       // The last crate is set down, paid on and carted in within one tick, so the bay is read off
@@ -379,7 +392,8 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
     const done = world.state.jobs[job.id];
     expect(done?.status).toBe("paid");
     for (const [itemId, log] of crates) {
-      // Loaded by hand: carried by someone standing on the dock, never through a store.
+      // Carried aboard by someone standing on the dock (in hand or on the truck), never
+      // through a store.
       expect(log.carriedOnDock, `${itemId} carried on the dock`).toBe(true);
       expect(log.inStoreBeforeDelivery, `${itemId} never in a store before delivery`).toBe(false);
       expect(log.aboardAtUndock, `${itemId} aboard when the ship left the Hub`).toBe(true);

@@ -735,7 +735,14 @@ unchanged at 434.8). The full-sim crew's-day case now runs eight sim-minutes: wi
 call the ship is at a third port by seven and the pilot back at the helm before anything else
 came up; it allows one more offer card (four decisions). Its prep-time case no longer counts
 time someone is on the dock during prep (D61's call aboard, the last hauler walking back from
-the bay), which is not the pilot's walk it guards.
+the bay), which is not the pilot's walk it guards. With D64 on top (fresh crew briefed, so they
+know the truck from the start): `crew pacing` freight 494.7 sim-s, plain 430.0. One deckhand
+now takes the opening six-crate load in two trips (4 + 2) while the rest of the crew eat and
+chat, so the full-sim multi-crate case asserts what the truck should do rather than "two or
+more haulers": no single claim set beyond the truck's capacity, never the whole stack at once,
+the rest open to anyone free. The Hub → Kessler integration case reads "set down in the bay" off
+crate positions, since the trip's lead haul only completes once the truck is parked, and counts
+a crate on a truck pushed across the dock as carried there.
 *Found, not changed:* the W4a "ship familiarity" brief only runs for an actor whose knowledge is
 empty at their first look, and D63's `briefCrew` writes freight facts at acceptance, which can
 come first (the opening offer is taken at tick 1–2); such a crew member never learns where the

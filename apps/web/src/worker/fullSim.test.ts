@@ -315,18 +315,33 @@ describe(
       }
     });
 
-    it("hauls a multi-crate job with more than one actor", () => {
+    it("never lets one actor claim a multi-crate job's whole stack at once", () => {
       // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`),
-      // a job with several units should give several idle cargo-skilled crew independent haul
-      // tasks to claim, not one actor working through the whole stack alone.
+      // a job with several units gives several crew independent haul tasks to claim, not one
+      // actor working through the whole stack alone. D65: with the hand truck one actor moves up
+      // to its capacity per trip, and what is beyond one trip's worth stays open for anyone free
+      // (on this seed nobody else is free while the first trip runs, so the pusher comes back).
       const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
-      const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 3);
+      const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 6);
       expect(bigJob).toBeDefined();
       if (bigJob === undefined) return;
-      const haulers = new Set(
-        log.loadClaims.filter((c) => c.jobId === bigJob.id).map((c) => c.actorId),
-      );
-      expect(haulers.size).toBeGreaterThanOrEqual(2);
+      const capacity =
+        Object.values(world.content.items).find((i) => i.toolKinds.includes("handTruck"))
+          ?.capacityUnits ?? 0;
+      expect(capacity).toBe(4);
+      const claims = log.loadClaims.filter((c) => c.jobId === bigJob.id);
+      expect(claims).toHaveLength(bigJob.cargoItemIds.length);
+      // Claims one actor makes in one tick are one trip: more than one crate, never more than the
+      // truck carries, so never the lot.
+      const trips = new Map<string, number>();
+      for (const c of claims) {
+        const key = `${c.tick}:${c.actorId}`;
+        trips.set(key, (trips.get(key) ?? 0) + 1);
+      }
+      const biggest = Math.max(...trips.values());
+      expect(biggest).toBeGreaterThan(1);
+      expect(biggest).toBeLessThanOrEqual(capacity);
+      expect(trips.size).toBeGreaterThanOrEqual(2);
     });
   },
 );
