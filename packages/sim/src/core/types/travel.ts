@@ -143,9 +143,10 @@ export interface JobPassage {
 }
 
 /**
- * A commercial job (SD §17.3). Accepting spawns the cargo as real items in the origin port's
- * warehouse store (boundary custody) and raises `cargoToLoad` problems; delivery checks actual
- * custody in the destination store, then pays exactly once (`paymentTransactionId`).
+ * A commercial job (SD §17.3). Its cargo is real items: staged on the origin's dock while on
+ * offer there (D63), or spawned in the origin's warehouse store on acceptance at a port without
+ * a dock. Accepting raises `cargoToLoad` problems; delivery checks actual custody (the
+ * destination's delivery bay, or its store), then pays exactly once (`paymentTransactionId`).
  */
 export interface Job {
   id: JobId;
@@ -172,7 +173,11 @@ export interface Job {
   status: JobStatus;
   offeredTick: Tick;
   expiresAtTick: Tick;
-  /** Spawned freight, once accepted. */
+  /**
+   * The job's freight items. D63: while `offered`, the crates staged on the origin's dock (owned
+   * by nobody: no work exists for them; empty whenever the offer is not staged); once accepted,
+   * the manifest. Empty for a closed offer and for a passage without luggage.
+   */
   cargoItemIds: ItemId[];
   paymentTransactionId?: TransactionId;
   /**

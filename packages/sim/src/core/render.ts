@@ -479,6 +479,9 @@ export function renderItems(state: ReadonlyWorldState, content: ContentBundle): 
       kind: itemKind(def),
       ...(def?.cargoClass === undefined ? {} : { cargoClass: def.cargoClass }),
       ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
+      ...(item.jobId !== undefined && state.jobs[item.jobId]?.status === "offered"
+        ? { offered: true as const }
+        : {}),
       location,
       count: item.stacking === "stack" ? item.count : 1,
     });

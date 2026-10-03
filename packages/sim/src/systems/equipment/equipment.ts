@@ -203,6 +203,8 @@ function unitsAboard(ctx: StepCtx): Map<ItemDefId, number> {
   for (const item of Object.values(ctx.state.items)) {
     const kind = item.location.kind;
     if (kind !== "onDeck" && kind !== "carriedBy" && kind !== "equippedBy") continue;
+    // D63: freight staged on offer is on the dock but nobody's, least of all the ship's.
+    if (item.jobId !== undefined && ctx.state.jobs[item.jobId]?.status === "offered") continue;
     const units = item.stacking === "stack" ? item.count : 1;
     aboard.set(item.defId, (aboard.get(item.defId) ?? 0) + units);
   }

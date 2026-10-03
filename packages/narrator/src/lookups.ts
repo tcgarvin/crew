@@ -45,13 +45,17 @@ export function compartmentNameAt(
 
 /**
  * Where someone is, as a phrase to append: " in Galley & Mess", " on the dock" (D61: dock floor is
- * in no compartment), "" on deck between rooms, or " in <location kind>" off the deck.
+ * in no compartment), "" on deck between rooms, " ashore at <port>" in a port store, or
+ * " in <location kind>" anywhere else off the deck.
  */
 export function placePhrase(
   content: ContentBundle,
   state: State,
   location: DeepReadonly<PhysicalLocation>,
 ): string {
+  // D63: a buyer out through the gate is in the port's market store for a few seconds.
+  if (location.kind === "inExternalStore")
+    return ` ashore at ${portName(content, location.portId)}`;
   if (location.kind !== "onDeck") return ` in ${location.kind}`;
   if (isOnDock(content, state, location)) return " on the dock";
   const name = compartmentNameAt(content, location.deckId, location.x, location.y);

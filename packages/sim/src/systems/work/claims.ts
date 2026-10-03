@@ -9,10 +9,11 @@
  * the view builder.
  */
 import { configTicks } from "../../core/clock";
+import { isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
 import type { TaskReleaseReason } from "../../core/types/events";
-import type { ActorId, ClaimId } from "../../core/types/ids";
+import type { ActorId, ClaimId, ItemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Task } from "../../core/types/work";
 
@@ -116,6 +117,26 @@ export function isCompletionMet(
         location.storeKey === completion.storeKey
       );
     }
+    case "itemInDockArea": {
+      const location = state.items[completion.itemId]?.location;
+      if (location === undefined || state.deck.dock?.dockId !== completion.dockId) return false;
+      return isInDockArea(content, state, location, completion.area);
+    }
+  }
+}
+
+/** Custody completions: the haul's completion is the custody change itself (see below). */
+function custodyHaul(
+  completion: Task["completion"],
+): { readonly itemId: ItemId; readonly to: "ship" | "port" } | undefined {
+  switch (completion.kind) {
+    case "itemInZone":
+      return { itemId: completion.itemId, to: "ship" };
+    case "itemInStore":
+    case "itemInDockArea":
+      return { itemId: completion.itemId, to: "port" };
+    default:
+      return undefined;
   }
 }
 
@@ -134,13 +155,7 @@ export function completeTask(ctx: StepCtx, task: Task): void {
   }
   task.status = "completed";
   task.claimState = { kind: "unclaimed" };
-  const completion = task.completion;
-  const haul =
-    completion.kind === "itemInZone"
-      ? { itemId: completion.itemId, to: "ship" as const }
-      : completion.kind === "itemInStore"
-        ? { itemId: completion.itemId, to: "port" as const }
-        : undefined;
+  const haul = custodyHaul(task.completion);
   ctx.emit({
     type: "taskCompleted",
     subjectIds: [task.id, task.problemId, ...workers],
@@ -149,8 +164,7 @@ export function completeTask(ctx: StepCtx, task: Task): void {
     payload: { taskId: task.id, ...(haul === undefined ? {} : { haul }) },
   });
   const problem = ctx.state.work.problems[task.problemId];
-  const custody = task.completion.kind === "itemInZone" || task.completion.kind === "itemInStore";
-  if (custody && problem !== undefined && problem.status === "open") {
+  if (haul !== undefined && problem !== undefined && problem.status === "open") {
     problem.status = "resolved";
     ctx.emit({
       type: "problemResolved",

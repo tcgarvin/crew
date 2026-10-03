@@ -7,6 +7,7 @@
  * commit (consume, putDown).
  */
 import { configTicks } from "../../core/clock";
+import { marketCounter } from "../../core/docks";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ItemId, MachineId } from "../../core/types/ids";
@@ -212,19 +213,48 @@ function machineTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 /**
  * D47: walk to a cargo transfer tile, spend `commerce.market.buySeconds` at the counter, then the
  * `buy` commit step hands the units over the ramp. Only derived while docked at the market's port.
+ *
+ * D63, with the port's dock alongside: walk to its market stall, spend the time at the counter,
+ * take the units in hand, and carry them aboard to the top of the cargo ramp (a cargo transfer
+ * tile, where D47 always set them down). A dock with no stall has its market through the gate:
+ * walk to the gate, go out (`throughGate`, off ship for the same time), come back with the units
+ * and carry them aboard the same way.
  */
 function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const ref = task.progressRef;
   if (ref.kind !== "market") return blocked("unreachableTarget");
   const deckId = actorDeck(actor);
   const deck = deckId === undefined ? undefined : ctx.content.decks[deckId];
-  const tile = task.interactionTiles[0] ?? deck?.docking.cargoTransferTiles[0];
-  if (tile === undefined) return blocked("unreachableTarget");
   const counterTicks = configTicks(ctx.config, ctx.config.commerce.market.buySeconds);
+  const counter = marketCounter(ctx.content, ctx.state, ref.portId);
+  const aboard = deck?.docking.cargoTransferTiles[0];
+  const purchase = { portId: ref.portId, itemDefId: ref.itemDefId, count: ref.count };
+  if (counter.kind === "transferTile") {
+    const tile = task.interactionTiles[0] ?? aboard;
+    if (tile === undefined) return blocked("unreachableTarget");
+    return planOf([
+      { kind: "moveTo", target: { x: tile.x, y: tile.y }, requested: false },
+      { kind: "work", stage: "buy", ticksDone: 0, ticksNeeded: counterTicks },
+      { kind: "buy", ...purchase },
+    ]);
+  }
+  if (aboard === undefined) return blocked("unreachableTarget");
+  const atCounter: ActivityStep =
+    counter.kind === "stall"
+      ? { kind: "work", stage: "buy", ticksDone: 0, ticksNeeded: counterTicks }
+      : {
+          kind: "throughGate",
+          portId: ref.portId,
+          gate: { x: counter.tile.x, y: counter.tile.y },
+          ticksDone: 0,
+          ticksNeeded: counterTicks,
+        };
   return planOf([
-    { kind: "moveTo", target: { x: tile.x, y: tile.y }, requested: false },
-    { kind: "work", stage: "buy", ticksDone: 0, ticksNeeded: counterTicks },
-    { kind: "buy", portId: ref.portId, itemDefId: ref.itemDefId, count: ref.count },
+    { kind: "moveTo", target: { x: counter.tile.x, y: counter.tile.y }, requested: false },
+    atCounter,
+    { kind: "buy", ...purchase, intoHands: true },
+    { kind: "moveTo", target: { x: aboard.x, y: aboard.y }, requested: false },
+    { kind: "stowBought", itemDefId: ref.itemDefId },
   ]);
 }
 

@@ -276,6 +276,11 @@ export interface RenderItem {
   readonly cargoClass?: CargoClass;
   /** The contract this freight belongs to, if any. */
   readonly jobId?: JobId;
+  /**
+   * D63: freight on offer, staged on the dock: its job is not taken yet, so it is nobody's.
+   * Absent for anything else (accepted freight, stores, parts).
+   */
+  readonly offered?: true;
   readonly location: RenderItemLocation;
   /** Stack size; 1 for unique items. */
   readonly count: number;

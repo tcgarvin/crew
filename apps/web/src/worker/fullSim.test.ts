@@ -21,6 +21,7 @@ import type {
 import {
   actionLabel,
   checkInvariants,
+  commerceViolations,
   createKernel,
   spatialViolations,
   travelViolations,
@@ -153,6 +154,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
       ...spatialViolations(world),
       ...workViolations(world),
       ...travelViolations(world),
+      ...commerceViolations(world),
     ];
     if (violations.length > 0) {
       throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
@@ -187,14 +189,21 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
 const count = (log: RunLog, type: SimEvent["type"]) =>
   log.events.filter((e) => e.type === type).length;
 
-// Each case simulates five minutes of the whole ship on real content; several sit near vitest's
-// default 5 s, so the suite gets headroom rather than flaking on a slow runner.
+/**
+ * D63: port work is physical, so a port call with freight both ways takes longer than when the
+ * crates jumped aboard at the ramp; the crew's-day case runs until the ship has left its second
+ * port (the pilot only gets up from the helm once it is under way again).
+ */
+const SEVEN_MINUTES = TICK_RATE * 420;
+
+// Each case simulates five to seven minutes of the whole ship on real content; several sit near
+// vitest's default 5 s, so the suite gets headroom rather than flaking on a slow runner.
 describe(
   "full sim: real content, every system, auto-accept (Integration 2)",
   { timeout: 20_000 },
   () => {
-    it("runs the freight loop and the crew's day for five sim-minutes", () => {
-      const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+    it("runs the freight loop and the crew's day for seven sim-minutes", () => {
+      const { world, log } = runFullSim(20260930, SEVEN_MINUTES, autoAccept);
       if (process.env.FULLSIM_DEBUG) {
         for (const e of log.events) {
           if (e.significance === "trace") continue;

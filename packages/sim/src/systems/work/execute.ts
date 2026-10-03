@@ -28,11 +28,12 @@ import { rebuildItemIndexes } from "../../core/caches";
  *   `positionTaken` → `occupiedPosition`, anything else → `unreachableTarget`.
  */
 import { configTicks } from "../../core/clock";
+import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { TaskReleaseReason } from "../../core/types/events";
-import type { ActorId, ItemId, MachineId, TaskId } from "../../core/types/ids";
+import type { ActorId, ItemId, MachineId, PortDefId, TaskId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type {
@@ -46,14 +47,14 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
-import { buyFromMarket } from "../commerce/market";
+import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
 import { isOnDuty } from "../needs/shifts";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove, stopMovement } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
-import { backoffRef, currentHold, currentStep } from "./activity";
+import { backoffRef, currentHold, currentStep, isOutThroughGate } from "./activity";
 import { claimTask, completeTask, isCompletionMet, releaseActorClaim, renewClaim } from "./claims";
 import { claimantsOf, isTerminal } from "./derivation";
 import { directSight, writeFact } from "./facts";
@@ -118,6 +119,56 @@ function onTransferTile(ctx: StepCtx, actor: Actor): boolean {
 
 function dockedAt(ctx: StepCtx, portId: string): boolean {
   return ctx.state.travel.stage === "docked" && ctx.state.travel.portId === portId;
+}
+
+type StepOf<K extends ActivityStep["kind"]> = Extract<ActivityStep, { kind: K }>;
+
+/** D47/D63: is the actor where `portId`'s market is dealt with (`marketCounter`)? */
+function atMarketCounter(ctx: StepCtx, actor: Actor, portId: PortDefId): boolean {
+  const counter = marketCounter(ctx.content, ctx.state, portId);
+  if (counter.kind === "transferTile") return onTransferTile(ctx, actor);
+  const here = actorTile(actor);
+  return here !== undefined && near(here, counter.tile);
+}
+
+/** The step the actor is on is a walk out through the gate (D63), and they are out now. */
+function gateErrand(actor: Actor): StepOf<"throughGate"> | undefined {
+  const step = currentStep(actor.activity);
+  return step?.kind === "throughGate" && isOutThroughGate(actor)
+    ? (step as StepOf<"throughGate">)
+    : undefined;
+}
+
+/**
+ * D63: out through the gate on a market errand. The buyer leaves the map into the port's market
+ * store and is off ship (so the planner, needs and the dock leave them be) until the step brings
+ * them back.
+ */
+function stepOutThroughGate(ctx: StepCtx, actor: Actor, portId: PortDefId): void {
+  releaseReservations(ctx.caches, actor.id);
+  actor.movement = { kind: "stationary" };
+  actor.location = marketStoreLocation(ctx.defs.port(portId));
+  actor.availability = "offShip";
+}
+
+/**
+ * Back through the gate onto the dock at `gate`. Travel never casts the dock off while someone is
+ * out on an errand (it waits for them, or ends the errand first, `systems/travel/ashore.ts`), so
+ * the dock is there to come back to; anything else is a broken invariant.
+ */
+export function stepBackThroughGate(ctx: StepCtx, actor: Actor, gate: TileCoord): void {
+  const presence = ctx.state.deck.dock;
+  if (presence === undefined) {
+    throw new Error(`${actor.id} is out through the gate with no dock alongside to come back to`);
+  }
+  actor.location = { kind: "onDeck", deckId: presence.deckId, x: gate.x + 0.5, y: gate.y + 0.5 };
+  actor.availability = "available";
+}
+
+/** End a gate errand early (recall, abort): the buyer comes straight back to the gate. */
+export function endGateErrand(ctx: StepCtx, actor: Actor): void {
+  const errand = gateErrand(actor);
+  if (errand !== undefined) stepBackThroughGate(ctx, actor, errand.gate);
 }
 
 function backoffTicks(ctx: StepCtx): number {
@@ -196,6 +247,10 @@ function actionFor(
       return makeAction("eat", "eating", tick, step.itemId);
     case "buy":
       return makeAction("pickUp", "reaching", tick);
+    case "throughGate":
+      return makeAction("wait", "waiting", tick);
+    case "stowBought":
+      return makeAction("putDown", "placing", tick);
     case "work": {
       if (step.stage === "eat") return makeAction("eat", "eating", tick);
       if (step.stage === "buy") return makeAction("wait", "waiting", tick);
@@ -248,8 +303,19 @@ function refreshPresentation(ctx: StepCtx, actor: Actor): void {
 // Ending activities
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * D63: a buyer stopped while carrying bought units aboard sets them down where they stand
+ * (possibly on the dock, where they still count as within reach while docked).
+ */
+function dropBought(ctx: StepCtx, actor: Actor, task: Task): void {
+  if (task.type !== "buyParts" || task.progressRef.kind !== "market") return;
+  if (actor.location.kind !== "onDeck") return;
+  setDownBought(ctx, actor, task.progressRef.itemDefId);
+}
+
 /** Put hauled cargo down exactly where the actor is (SD §14.6: no teleporting). */
 function dropHaulCargo(ctx: StepCtx, actor: Actor, task: Task): void {
+  dropBought(ctx, actor, task);
   if (task.type !== "haul" || task.target.kind !== "item") return;
   const item = ctx.state.items[task.target.itemId];
   if (
@@ -281,6 +347,8 @@ function leaveHold(ctx: StepCtx, actor: Actor): void {
 export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseReason): void {
   const activity = actor.activity;
   if (activity.kind === "idle") return;
+  // D63: nobody is left out through the gate by an errand that stopped.
+  endGateErrand(ctx, actor);
   if (actor.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, actor.id);
   else releaseReservations(ctx.caches, actor.id);
   leaveHold(ctx, actor);
@@ -341,8 +409,6 @@ function finishActivity(ctx: StepCtx, actor: Actor): void {
 // ---------------------------------------------------------------------------------------------
 // Steps
 // ---------------------------------------------------------------------------------------------
-
-type StepOf<K extends ActivityStep["kind"]> = Extract<ActivityStep, { kind: K }>;
 
 function runMove(ctx: StepCtx, actor: Actor, step: StepOf<"moveTo">): StepResult {
   const tile = resolveTile(ctx, actor, step.target);
@@ -595,10 +661,36 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
  */
 function runBuy(ctx: StepCtx, actor: Actor, step: StepOf<"buy">): StepResult {
   if (!dockedAt(ctx, step.portId)) return { fail: "rampClosed" };
-  if (!onTransferTile(ctx, actor)) return { fail: "unreachableTarget" };
-  const bought = buyFromMarket(ctx, actor, step.portId, step.itemDefId, step.count);
+  if (!atMarketCounter(ctx, actor, step.portId)) return { fail: "unreachableTarget" };
+  const handover = step.intoHands === true ? "hands" : "feet";
+  const bought = buyFromMarket(ctx, actor, step.portId, step.itemDefId, step.count, handover);
   if (bought === undefined) return { fail: "inaccessibleSupply" };
   return "done";
+}
+
+/**
+ * D63: the market is through the gate. Standing at the gate, step out (off ship) and spend the
+ * counter time there; then come back to the gate tile. Fails `rampClosed` if the ship is no longer
+ * docked at the port before stepping out, and `unreachableTarget` away from the gate.
+ */
+function runThroughGate(ctx: StepCtx, actor: Actor, step: StepOf<"throughGate">): StepResult {
+  if (actor.location.kind === "onDeck") {
+    if (!dockedAt(ctx, step.portId)) return { fail: "rampClosed" };
+    const here = actorTile(actor);
+    if (here === undefined || !near(here, step.gate)) return { fail: "unreachableTarget" };
+    stepOutThroughGate(ctx, actor, step.portId);
+  }
+  step.ticksDone += 1;
+  if (step.ticksDone < step.ticksNeeded) return "wait";
+  stepBackThroughGate(ctx, actor, step.gate);
+  return "done";
+}
+
+/** D63: the bought units are aboard; set them down here. Nothing in hand is a lost purchase. */
+function runStowBought(ctx: StepCtx, actor: Actor, step: StepOf<"stowBought">): StepResult {
+  if (actor.location.kind !== "onDeck") return { fail: "unreachableTarget" };
+  const set = setDownBought(ctx, actor, step.itemDefId);
+  return set.length === 0 ? { fail: "inaccessibleSupply" } : "done";
 }
 
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
@@ -642,6 +734,10 @@ function runStep(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: ActivityStep)
       return runPutDown(ctx, actor, step);
     case "buy":
       return runBuy(ctx, actor, step);
+    case "throughGate":
+      return runThroughGate(ctx, actor, step);
+    case "stowBought":
+      return runStowBought(ctx, actor, step);
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
   }
@@ -841,7 +937,8 @@ function validateTaskActivity(ctx: StepCtx, actor: Actor): void {
 /** One crew actor's tick of work. */
 export function stepActor(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
   pruneBackoff(ctx, actor);
-  if (actor.availability !== "available") {
+  // D63: a buyer out through the gate is off ship but still on the errand, which brings them back.
+  if (actor.availability !== "available" && !isOutThroughGate(actor)) {
     abortActivity(ctx, actor, "incapacitated");
     if (actor.pendingIntent !== undefined) {
       // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).

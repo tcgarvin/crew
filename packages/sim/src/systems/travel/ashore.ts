@@ -13,6 +13,9 @@
  * - At the end of `undocking` the dock is cleared before it detaches (`clearDock`): anything
  *   still on it is left at the port's warehouse (`leftOnDock`), and anyone still on it (prep
  *   makes that impossible; this is the last guard) is brought aboard.
+ * - D63: a buyer out through the gate on a market errand (`throughGate`, off ship) counts as
+ *   ashore: the ramps stay down for them and the call waits for them to come back on their own;
+ *   only an overdue call (or the last guard) fetches them, ending the errand at the gate.
  */
 import { configTicks } from "../../core/clock";
 import { isDockPoint, isOnDock } from "../../core/docks";
@@ -25,7 +28,7 @@ import { dockRamps, rampLanding, rampTop } from "../spatial/dock";
 import { deckGeometry } from "../spatial/geometry";
 import { centre } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
-import { backoffRef, isBackingOff } from "../work/activity";
+import { backoffRef, isBackingOff, isOutThroughGate } from "../work/activity";
 import { abortActivity } from "../work/execute";
 
 type Ctx = StepCtx;
@@ -56,13 +59,13 @@ function onDock(ctx: Ctx, actor: Actor): boolean {
 }
 
 /**
- * Everyone the ramps must stay down for, in id order: on the dock, or aboard and walking onto it.
- * Empty with no dock alongside.
+ * Everyone the ramps must stay down for, in id order: on the dock, aboard and walking onto it,
+ * or (D63) out through the gate on a market errand. Empty with no dock alongside.
  */
 export function peopleAshore(ctx: Ctx): Actor[] {
   if (ctx.state.deck.dock === undefined) return [];
   return Object.values(ctx.state.actors)
-    .filter((actor) => onDock(ctx, actor) || headedAshore(ctx, actor))
+    .filter((actor) => onDock(ctx, actor) || headedAshore(ctx, actor) || isOutThroughGate(actor))
     .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
 }
 
@@ -120,10 +123,16 @@ function callAboard(ctx: Ctx, ashore: readonly Actor[]): void {
   }
 }
 
-/** The dock crew carry or walk someone up the nearest ramp: they stand at its top, idle. */
+/**
+ * The dock crew carry or walk someone up the nearest ramp: they stand at its top, idle. A buyer
+ * out through the gate (D63) is fetched back first: their errand ends at the gate.
+ */
 function bringAboard(ctx: Ctx, actor: Actor, portId: PortDefId): void {
+  if (isOutThroughGate(actor)) abortActivity(ctx, actor, "interrupted");
   const location = actor.location;
-  if (location.kind !== "onDeck") return;
+  if (location.kind !== "onDeck") {
+    throw new Error(`bringAboard: ${actor.id} is not on the map (${location.kind})`);
+  }
   const tile = nearestRampTop(ctx, actor);
   releaseReservations(ctx.caches, actor.id);
   actor.movement = { kind: "stationary" };
@@ -154,7 +163,13 @@ export function recallAshore(ctx: Ctx, travel: PrepTravel, ashore: readonly Acto
   const limit = configTicks(ctx.config, ctx.config.travel.recallAboardSeconds);
   const overdue = ctx.tick - travel.recallSinceTick >= limit;
   for (const actor of ashore) {
-    if (actor.disembarking === true || !onDock(ctx, actor)) continue;
+    if (actor.disembarking === true) continue;
+    // D63: a buyer out through the gate comes back on their own; only an overdue call fetches them.
+    if (isOutThroughGate(actor)) {
+      if (overdue) bringAboard(ctx, actor, travel.fromPortId);
+      continue;
+    }
+    if (!onDock(ctx, actor)) continue;
     if (overdue || !canWalkAboard(ctx, actor)) bringAboard(ctx, actor, travel.fromPortId);
   }
   callAboard(ctx, ashore);
@@ -174,7 +189,7 @@ export function endRecall(travel: PrepTravel): void {
 export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation): void {
   if (ctx.state.deck.dock === undefined) return;
   for (const actor of Object.values(ctx.state.actors)) {
-    if (onDock(ctx, actor)) bringAboard(ctx, actor, portId);
+    if (onDock(ctx, actor) || isOutThroughGate(actor)) bringAboard(ctx, actor, portId);
   }
   for (const item of Object.values(ctx.state.items)) {
     if (!isOnDock(ctx.content, ctx.state, item.location)) continue;

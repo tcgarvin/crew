@@ -1,13 +1,23 @@
 /**
  * Job lifecycle (SD §17.3, PLAN §6 W6 item 3): `offered -> accepted -> inTransit -> delivered ->
- * paid | declined | expired | failed`. Accepting spawns the manifest into the origin port's
- * store and raises `cargoToLoad` problems; a per-tick sweep here pays a job exactly once
- * (`Job.paymentTransactionId` guard) once every line is confirmed in the destination store.
+ * paid | declined | expired | failed`. A per-tick sweep here pays a job exactly once
+ * (`Job.paymentTransactionId` guard) once every line is confirmed delivered.
+ *
+ * D63 (Dockside phase 2): at a port with a dock map, freight is physical on the dock. An offer's
+ * crates are staged on the origin's staging area while the ship is alongside there (`docking` or
+ * `docked`), owned by nobody: the job is still `offered`, so no `cargoToLoad` work exists and no
+ * crew member touches them. Accepting raises the load work for the crates already there; a
+ * declined, expired or departed-from offer has its crates withdrawn (they vanish until phase 3's
+ * dock hands cart them). At the destination the crew carry the freight to the delivery bay; the
+ * job is delivered when every crate is in the bay, and the crates are then carted into the
+ * warehouse store. A port without a dock keeps the store and the transfer tiles.
  */
+import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
+import { dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
-import type { PhysicalLocation } from "../../core/types/common";
-import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
+import type { PhysicalLocation, TileCoord } from "../../core/types/common";
+import type { CargoClass, DockDef, ExternalStoreDef, PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
 import type {
   DecisionId,
@@ -23,6 +33,7 @@ import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
 import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
+import { writeFact } from "../work/facts";
 
 // ---------------------------------------------------------------------------------------------
 // Issuers (D25)
@@ -191,23 +202,24 @@ export function cargoStowageZoneKey(ctx: Pick<StepCtx, "content">): string | und
   return deck?.zones.find((z) => z.tags.includes("cargoStowage"))?.key;
 }
 
+type Cause = Pick<EventDraft, "causeIds" | "source">;
+
+/** The unattributed system cause `acceptJob` has always used. */
+const SYSTEM_CAUSE: Cause = { causeIds: [], source: "system" };
+
 /**
- * Spawn one manifest item into a job's origin-port store and open its `cargoToLoad` problem
- * (owner: commerce). The "kernel spawn path": allocate-and-insert directly, the same pattern
- * `scenarioSpawn`'s `apply()` uses; there is no separate boundary-spawn command for commerce to
- * call into for a job's own manifest. Shared by `acceptJob` and `spawnAtBoundary`'s `jobManifest`
- * location, so freight added to an already-accepted job after acceptance loads the same way.
+ * Create one freight item of `job` at `location` (owner: commerce), with no work attached. The
+ * "kernel spawn path": allocate-and-insert directly, the same pattern `scenarioSpawn`'s `apply()`
+ * uses. Staging an offer (D63) stops here; `spawnCargoItem` also opens the load work.
  */
-export function spawnCargoItem(
+function spawnFreightItem(
   ctx: ApplyCtx,
-  job: Pick<Job, "id" | "fromPortId">,
+  job: Pick<Job, "id">,
   def: { readonly id: ItemDefId },
   count: number,
   stacking: "unique" | "stackable",
   location: PhysicalLocation,
-  stowageZoneKey: string,
-  /** Event attribution; defaults to the unattributed system cause `acceptJob` has always used. */
-  cause: Pick<EventDraft, "causeIds" | "source"> = { causeIds: [], source: "system" },
+  cause: Cause,
 ): ItemId {
   const id = allocateId(ctx.state, "item");
   const item: Item =
@@ -222,33 +234,215 @@ export function spawnCargoItem(
     ...cause,
     payload: { entityId: id, defId: def.id },
   });
+  return id;
+}
+
+/** Open the `cargoToLoad` problem for one freight item of an accepted job (owner: commerce). */
+function raiseLoadProblem(
+  ctx: ApplyCtx,
+  job: Pick<Job, "id" | "fromPortId">,
+  itemId: ItemId,
+  stowageZoneKey: string,
+): void {
   const problemId = allocateId(ctx.state, "problem") as ProblemId;
   ctx.state.work.problems[problemId] = {
     id: problemId,
     kind: "cargoToLoad",
-    payload: { jobId: job.id, itemId: id, stowageZoneKey },
+    payload: { jobId: job.id, itemId, stowageZoneKey },
     owner: "commerce",
     visibility: "public",
-    dedupeKey: `cargoToLoad:${job.id}:${id}`,
+    dedupeKey: `cargoToLoad:${job.id}:${itemId}`,
     status: "open",
     createdTick: ctx.tick,
     revision: 1,
     baseUrgency: "routineObligation",
     location: { kind: "port", portId: job.fromPortId },
   };
+}
+
+/**
+ * Spawn one manifest item at `location` and open its `cargoToLoad` problem. Shared by
+ * `acceptJob` (ports without a dock) and `spawnAtBoundary`'s `jobManifest` location, so freight
+ * added to an already-accepted job after acceptance loads the same way.
+ */
+export function spawnCargoItem(
+  ctx: ApplyCtx,
+  job: Pick<Job, "id" | "fromPortId">,
+  def: { readonly id: ItemDefId },
+  count: number,
+  stacking: "unique" | "stackable",
+  location: PhysicalLocation,
+  stowageZoneKey: string,
+  /** Event attribution; defaults to the unattributed system cause `acceptJob` has always used. */
+  cause: Cause = SYSTEM_CAUSE,
+): ItemId {
+  const id = spawnFreightItem(ctx, job, def, count, stacking, location, cause);
+  raiseLoadProblem(ctx, job, id, stowageZoneKey);
   return id;
 }
 
 /**
- * Spawn a job's whole manifest into the origin port's store on acceptance, one item per cargo
- * unit (owner feedback 2026-09-30: loading must read as one crate at a time, not one stack of N
- * appearing all at once). Item defs may still be `"stackable"` for other purposes (e.g. rations in
- * ship's stores); a job's own manifest items are simply spawned with `count: 1` each here.
+ * D63: the staging area's tiles with the free ones first (no item lying there), so several
+ * crates spread out before any two share a tile.
+ */
+function stagingTilesFreeFirst(ctx: Pick<StepCtx, "state">, dock: DockDef): TileCoord[] {
+  const tiles = dockAreaTiles(dock, "freightStaging");
+  const taken = new Set<string>();
+  for (const item of Object.values(ctx.state.items)) {
+    if (item.location.kind !== "onDeck") continue;
+    taken.add(`${Math.floor(item.location.x)},${Math.floor(item.location.y)}`);
+  }
+  const free = tiles.filter((t) => !taken.has(`${t.x},${t.y}`));
+  return [...free, ...tiles.filter((t) => taken.has(`${t.x},${t.y}`))];
+}
+
+/**
+ * Where `count` new crates of a job leaving `fromPortId` appear: on the staging area of the
+ * origin's dock when it is alongside (D63), else in the origin's warehouse store.
+ */
+export function freightSpawnLocations(
+  ctx: Pick<StepCtx, "state" | "content" | "defs">,
+  fromPortId: PortDefId,
+  count: number,
+): PhysicalLocation[] {
+  const dock = dockAlongsideAt(ctx.content, ctx.state, fromPortId);
+  const presence = ctx.state.deck.dock;
+  const tiles = dock === undefined ? [] : stagingTilesFreeFirst(ctx, dock);
+  if (dock === undefined || presence === undefined || tiles.length === 0) {
+    const store = portStoreLocation(ctx.defs.port(fromPortId));
+    return Array.from({ length: count }, () => store);
+  }
+  return Array.from({ length: count }, (_, i) => {
+    const tile = tiles[i % tiles.length] as TileCoord;
+    return { kind: "onDeck", deckId: presence.deckId, x: tile.x + 0.5, y: tile.y + 0.5 };
+  });
+}
+
+/**
+ * D63: where an offered job's crates belong right now: staged on its origin's dock while that
+ * dock is alongside and the offer can still be taken there (`docking` or `docked`); nowhere
+ * otherwise. Undefined for anything but an open offer.
+ */
+export function offerStagingDock(
+  ctx: Pick<StepCtx, "state" | "content">,
+  job: Readonly<Job>,
+): DockDef | undefined {
+  if (job.status !== "offered") return undefined;
+  const stage = ctx.state.travel.stage;
+  if (stage !== "docking" && stage !== "docked") return undefined;
+  const dock = dockAlongsideAt(ctx.content, ctx.state, job.fromPortId);
+  // A hand-built dock with no staging area stages nothing; acceptance then uses the store.
+  return dock !== undefined && dockAreaTiles(dock, "freightStaging").length > 0 ? dock : undefined;
+}
+
+/**
+ * D63: stage an offer's freight on the origin's staging area, one crate per unit, owned by
+ * nobody: the job stays `offered`, so no work is raised. Records the crates on the job.
+ */
+export function stageOfferedFreight(ctx: ApplyCtx, job: Job, cause: Cause = SYSTEM_CAUSE): void {
+  if (job.cargoItemIds.length > 0) return;
+  const units = totalCargoUnits(job.cargo);
+  if (units === 0) return;
+  const locations = freightSpawnLocations(ctx, job.fromPortId, units);
+  const ids: ItemId[] = [];
+  for (const line of job.cargo) {
+    const def = ctx.defs.item(line.itemDefId);
+    for (let i = 0; i < line.count; i++) {
+      const location = locations[ids.length] as PhysicalLocation;
+      ids.push(spawnFreightItem(ctx, job, def, 1, def.stacking, location, cause));
+    }
+  }
+  job.cargoItemIds = ids;
+  ctx.emit({
+    ...cause,
+    type: "freightStaged",
+    subjectIds: [job.id, ...ids],
+    locationRef: { kind: "port", portId: job.fromPortId },
+    payload: { jobId: job.id, portId: job.fromPortId, count: ids.length },
+  });
+}
+
+/**
+ * D63: an offer that was declined, expired, or left behind as the ship departs has its staged
+ * crates carted back in: until phase 3's dock hands do it on foot, they simply leave the world.
+ */
+export function withdrawOfferedFreight(ctx: ApplyCtx, job: Job): void {
+  if (job.cargoItemIds.length === 0) return;
+  for (const itemId of job.cargoItemIds) delete ctx.state.items[itemId];
+  job.cargoItemIds = [];
+  ctx.caches.dirty.inventory = true;
+  rebuildItemIndexes(ctx.state, ctx.caches.index);
+  ctx.emit({
+    type: "freightWithdrawn",
+    subjectIds: [job.id],
+    causeIds: [],
+    source: "sim",
+    locationRef: { kind: "port", portId: job.fromPortId },
+    payload: { jobId: job.id, portId: job.fromPortId },
+  });
+}
+
+/**
+ * D63, every tick: an open offer's crates are on its origin's staging area exactly while
+ * `offerStagingDock` says so, and a closed offer (declined, expired) has none.
+ */
+export function syncStagedOffers(ctx: ApplyCtx): void {
+  for (const job of Object.values(ctx.state.jobs)) {
+    if (job.status === "offered") {
+      const staged = offerStagingDock(ctx, job) !== undefined;
+      if (staged && job.cargoItemIds.length === 0) stageOfferedFreight(ctx, job);
+      else if (!staged && job.cargoItemIds.length > 0) withdrawOfferedFreight(ctx, job);
+    } else if (job.status === "declined" || job.status === "expired") {
+      withdrawOfferedFreight(ctx, job);
+    }
+  }
+}
+
+/**
+ * Every crew member (not passengers) is told where the freight they are about to load lies, as
+ * a report, the way the market briefs them on a purchase: the planner can then cost the walk out
+ * to the staging area before anyone has looked.
+ */
+function briefCrew(ctx: ApplyCtx, itemIds: readonly ItemId[]): void {
+  const source = { tick: ctx.tick, evidence: "report", certainty: "reported" } as const;
+  for (const actor of Object.values(ctx.state.actors)) {
+    if (!actor.crew || actor.passenger === true) continue;
+    for (const itemId of itemIds) {
+      const item = ctx.state.items[itemId];
+      if (item === undefined) continue;
+      writeFact(
+        actor,
+        itemId,
+        "itemLocation",
+        { location: item.location },
+        {
+          ...source,
+          sourceId: actor.id,
+        },
+      );
+    }
+  }
+}
+
+/**
+ * Accept a job's manifest, one item per cargo unit (owner feedback 2026-09-30: loading must read
+ * as one crate at a time). D63: at a port with a dock the crates are already staged (staged now if
+ * the offer was taken before the sweep got to it), and accepting opens their `cargoToLoad` work
+ * and briefs the crew where they lie. Without a dock the manifest spawns into the origin's
+ * warehouse store, loaded through the transfer tiles as before.
  */
 export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
-  const fromPort = ctx.defs.port(job.fromPortId);
-  const location = portStoreLocation(fromPort);
   const stowageZoneKey = cargoStowageZoneKey(ctx) ?? "cargoHold";
+  const dock = dockAlongsideAt(ctx.content, ctx.state, job.fromPortId);
+  if (dock !== undefined && dockAreaTiles(dock, "freightStaging").length > 0) {
+    stageOfferedFreight(ctx, job);
+  }
+  if (job.cargoItemIds.length > 0) {
+    for (const itemId of job.cargoItemIds) raiseLoadProblem(ctx, job, itemId, stowageZoneKey);
+    briefCrew(ctx, job.cargoItemIds);
+    return [...job.cargoItemIds];
+  }
+  const location = portStoreLocation(ctx.defs.port(job.fromPortId));
   const spawnedIds: ItemId[] = [];
   for (const line of job.cargo) {
     const def = ctx.defs.item(line.itemDefId);
@@ -300,41 +494,101 @@ export function raiseUnloadProblems(
 // Delivery and payment
 // ---------------------------------------------------------------------------------------------
 
-/** Pure: every manifest item is physically in an external store at the job's destination port. */
-export function deliveryComplete(
-  state: Pick<ReadonlyWorldState, "items">,
-  job: Pick<Job, "cargoItemIds" | "toPortId">,
+type CustodyState = Pick<ReadonlyWorldState, "items" | "deck">;
+
+/**
+ * Pure: is this item in `portId`'s custody? In one of its stores, or (D63) set down in the
+ * delivery bay of its dock while that dock is alongside: custody is checked in the bay.
+ */
+function inPortCustody(
+  state: CustodyState,
+  content: Pick<StepCtx["content"], "docks">,
+  itemId: ItemId,
+  portId: PortDefId,
 ): boolean {
-  if (job.cargoItemIds.length === 0) return false;
-  return job.cargoItemIds.every((itemId) => {
-    const item = state.items[itemId];
-    return (
-      item !== undefined &&
-      item.location.kind === "inExternalStore" &&
-      item.location.portId === job.toPortId
-    );
-  });
+  const location = state.items[itemId]?.location;
+  if (location === undefined) return false;
+  if (location.kind === "inExternalStore") return location.portId === portId;
+  return (
+    dockAlongsideAt(content, state, portId) !== undefined &&
+    isInDockArea(content, state, location, "deliveryBay")
+  );
 }
 
 /**
- * Pure: what a job must have done to earn its pay. Freight: every manifest item in the
- * destination store. A passage (§3.4): the passenger's journey ended `completed`, plus the
+ * Pure: every manifest item is delivered at the job's destination: in one of its stores, or in
+ * the delivery bay of its dock while alongside (D63).
+ */
+export function deliveryComplete(
+  state: CustodyState,
+  content: Pick<StepCtx["content"], "docks">,
+  job: Pick<Job, "cargoItemIds" | "toPortId">,
+): boolean {
+  if (job.cargoItemIds.length === 0) return false;
+  return job.cargoItemIds.every((itemId) => inPortCustody(state, content, itemId, job.toPortId));
+}
+
+/**
+ * Pure: what a job must have done to earn its pay. Freight: every manifest item delivered
+ * (`deliveryComplete`). A passage (§3.4): the passenger's journey ended `completed`, plus the
  * luggage delivered when there is any.
  */
 export function jobFulfilled(
-  state: Pick<ReadonlyWorldState, "items">,
+  state: CustodyState,
+  content: Pick<StepCtx["content"], "docks">,
   job: Pick<Job, "cargoItemIds" | "toPortId" | "passage">,
 ): boolean {
-  if (job.passage === undefined) return deliveryComplete(state, job);
+  if (job.passage === undefined) return deliveryComplete(state, content, job);
   if (job.passage.endReason !== "completed") return false;
-  return job.cargoItemIds.length === 0 || deliveryComplete(state, job);
+  return job.cargoItemIds.length === 0 || deliveryComplete(state, content, job);
+}
+
+/**
+ * D63: once every crate a job unloads at the port alongside (its unload work there all done) is
+ * in the delivery bay, the port takes them in: they are carted through the warehouse door into
+ * the warehouse store, the custody `deliveryComplete` already accepted. Runs after payment, so a
+ * job is paid on the bay, not on the store. Until phase 3's dock hands walk them in, they simply
+ * move. A put-off passenger's luggage (unloaded at a port that is not the job's destination)
+ * goes the same way.
+ */
+export function cartDeliveredFreight(ctx: ApplyCtx, job: Job): void {
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked") return;
+  const portId = travel.portId;
+  if (dockAlongsideAt(ctx.content, ctx.state, portId) === undefined) return;
+  const inBay = job.cargoItemIds.filter((itemId) => {
+    const item = ctx.state.items[itemId];
+    return item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay");
+  });
+  if (inBay.length === 0) return;
+  const unloads = Object.values(ctx.state.work.problems).filter(
+    (p) => p.kind === "cargoToUnload" && p.payload.jobId === job.id && p.payload.portId === portId,
+  );
+  if (unloads.length === 0 || unloads.some((p) => p.status === "open")) return;
+  const store = portStoreLocation(ctx.defs.port(portId));
+  for (const itemId of inBay) {
+    const item = ctx.state.items[itemId];
+    if (item === undefined) continue;
+    const from = item.location;
+    item.location = store;
+    ctx.emit({
+      type: "cargoTransferred",
+      subjectIds: [itemId, job.id],
+      causeIds: [],
+      source: "sim",
+      locationRef: { kind: "port", portId },
+      payload: { itemId, from, to: store },
+    });
+  }
+  ctx.caches.dirty.inventory = true;
+  rebuildItemIndexes(ctx.state, ctx.caches.index);
 }
 
 /** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
 export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
   if (job.status === "paid" || job.paymentTransactionId !== undefined) return;
   if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") return;
-  if (!jobFulfilled(ctx.state, job)) return;
+  if (!jobFulfilled(ctx.state, ctx.content, job)) return;
   job.status = "delivered";
   const txId: TransactionId = allocateId(ctx.state, "transaction");
   ctx.state.money.balance += job.pay;
@@ -378,6 +632,7 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
         source: "sim",
         payload: { jobId: job.id },
       });
+      withdrawOfferedFreight(ctx, job);
     }
   }
 }

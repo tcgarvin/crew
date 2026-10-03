@@ -35,10 +35,14 @@ import {
   checkPriceBand,
   clampCargoToMaxCrates,
   dockedAtOrigin,
+  freightSpawnLocations,
   issuerLabel,
   normaliseIssuer,
+  offerStagingDock,
   spawnCargoItem,
+  stageOfferedFreight,
   surfaceOfferCard,
+  withdrawOfferedFreight,
 } from "./jobs";
 import { PASSENGER_CREW_DEF_ID, endPassageEarly, spawnPassenger } from "./passage";
 
@@ -137,6 +141,9 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       source: command.source,
       payload: { jobId },
     });
+    // D63: alongside the origin's dock, the freight is set out on its staging area at once; an
+    // offer made in flight is staged by commerce's sweep when that dock comes alongside.
+    if (offerStagingDock(ctx, job) !== undefined) stageOfferedFreight(ctx, job, causedBy(command));
     if (surface) {
       // D42: the card can only be taken at the dock (`acceptContract` and `setCourse` need the
       // ship docked at the origin), so an offer surfaced on approach waits for it; commerce
@@ -224,6 +231,7 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       source: command.source,
       payload: { jobId: job.id },
     });
+    withdrawOfferedFreight(ctx, job);
     return NO_TEMP_REFS;
   },
 };
@@ -475,6 +483,8 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
     } else {
       job = state.jobs[plan.location.jobId];
       if (job === undefined) throw new Error("validated job vanished");
+      // An npc never spawns into a manifest (validated), so this is only where a manifest npc
+      // would have gone; manifest items get their own spots below.
       physicalLocation = portStoreLocation(ctx.defs.port(job.fromPortId));
       stowageZoneKey = cargoStowageZoneKey(ctx) ?? "cargoHold";
     }
@@ -488,19 +498,12 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
           // Owner feedback 2026-09-30: a narrator manifest spawn is `spawn.count` individual
           // crates, not one stack, so loading reads one unit at a time (see `jobs.ts` `acceptJob`,
           // which spawns the same way for the deterministic job source's manifests).
+          // D63: on the origin's staging area when its dock is alongside, else in its store.
+          const locations = freightSpawnLocations(ctx, job.fromPortId, spawn.count);
           const ids: ItemId[] = [];
-          for (let i = 0; i < spawn.count; i++) {
+          for (const location of locations) {
             ids.push(
-              spawnCargoItem(
-                ctx,
-                job,
-                def,
-                1,
-                def.stacking,
-                physicalLocation,
-                stowageZoneKey,
-                cause,
-              ),
+              spawnCargoItem(ctx, job, def, 1, def.stacking, location, stowageZoneKey, cause),
             );
           }
           job.cargoItemIds.push(...ids);

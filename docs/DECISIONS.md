@@ -600,3 +600,52 @@ labels hide while docked and compartment labels stay, and actor labels are kept 
 Tapping a post or bare dock floor opens a place card from content (no snapshot); the item
 inspector describes an item on the dock (`isOnDock` on the snapshot) by its area or nearest post,
 and no longer indexes the deck's tiles with an off-ship coordinate.
+
+**D63. Port work is physical on the dock.** Phase 2, part B (plan items 7, 8, 9 and 11; design
+§4). At a port with a dock map, freight, purchases and passengers move across the dock on foot;
+a port without one (hand-built tests) keeps the stores and transfer tiles.
+*Offers.* An offer's crates (one per unit, in `Job.cargoItemIds`) are set out on the origin
+dock's staging area while that dock is alongside and the offer can still be taken there
+(`docking` or `docked`): at `offerJob` when docked there, else by commerce's sweep on the tick
+the dock comes alongside, so an offer made in flight slides in with its crates. "Owned by
+nobody" is the job still being `offered`: no `cargoToLoad` exists, so no task, no crew member
+touches them, equipment does not count them as parts aboard, and the render frame marks them
+`offered`. Declined, expired, or still open when departure prep begins, they are withdrawn
+(deleted, `freightWithdrawn`) until phase 3's dock hands cart them in. `commerceViolations` (new,
+for tests) holds the rule. Accepting raises the load work for the crates already there and tells
+the crew where they lie.
+*Loading* is an ordinary on-deck pickup down the cargo ramp, one crate per trip. The hand truck
+is an item def with a `handTruck` tool kind that no scenario places and no code reads; several
+crates per trip needs one activity holding several tasks' claims, so it is deferred. Measured
+cost: `crew pacing`'s freight round trip (Hub → Ossory → Hub) runs 568 sim-s instead of 491, and
+11 narrator calls instead of 10 (one more quiet check-in); the full-sim crew's-day case now runs
+seven sim-minutes, since the pilot holds the helm through a longer second port call.
+*Delivery.* With the destination's dock alongside, `cargoToUnload` derives a haul to the delivery
+bay (completion `itemInDockArea`, each crate aiming at its own bay tile first);
+`deliveryComplete` accepts the bay or the store. Once all of a job's unload work at the port is
+done, commerce pays (`contractCompleted` and payment unchanged, once) and then carts the crates
+from the bay into the warehouse store (`cargoTransferred`); a put-off passenger's luggage too.
+*Parts* (D47): `marketCounter` sends the buyer to the stall's counter (the floor tile the post
+faces, which keeps the post tile for its local), where the units go into their hands, and they
+carry them up to the top of the cargo ramp (`stowBought`). With no stall (Kessler Drift) the
+buyer walks to the gate and steps through (`throughGate`: off ship, in the port's market store,
+for `buySeconds`), comes back to the gate with the units and carries them aboard the same way.
+A claimed `buyParts` task outlives its resolved `partsNeeded` until the units are set down, as a
+claimed `staffStation` does. Travel counts a buyer out through the gate as ashore; an overdue
+call, or the dock's last-guard clear, ends the errand at the gate. Stock and prices unchanged.
+*Passengers* appear at the gate when booked or back from ashore and walk aboard (a `comeAboard`
+walk to the passenger spawn point, handed out every tick like the departure call); walking off,
+they go out through the gate. A walk across a ramp still lowering waits instead of stepping off
+at once. `passengerBoarded` still fires at booking.
+*Departure.* Cargo work also covers freight of a job taken at this port that still lies on the
+dock, whatever its work says: it holds a docked departure and keeps prep's ramps down, and the
+call aboard still starts only once loading is done.
+*Narrator.* While a dock is alongside the digest has an "On the dock (<name>)" section: the map's
+ambience line and the freight on it by job (on offer, waiting to be loaded, delivered to the bay,
+unloading). Prompt text unchanged; `pnpm test:live` 8 of 8.
+*Save.* Folded into 3 → 4, since production is still on schema 3: a save docked or preparing to
+depart has a taken job's freight waiting in that port's store moved onto the staging area, with
+the crew's beliefs moved too, and its open unloads there revised so they re-derive to the bay.
+*Speed.* Planner travel estimates now go through the nav path cache under the schematic key
+(ramp changes and geometry rebuilds already clear it); the dock's long walks had made uncached
+A* the planner's main cost. The three full-sim cases take 13.3 s against 14.8 s before.
