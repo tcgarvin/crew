@@ -7,6 +7,9 @@ Engineering is reachable two ways — via the central corridor (`engineering_cor
 the cargo hold (`engineering_cargo`) — so a single jammed door cannot isolate it. The bridge has
 exactly one door (`bridge_corridor`).
 
+Both ramps open in the south hull (`personnel_ramp` from the airlock, `cargo_ramp` from the
+cargo hold), so a dock map can treat the ship's south flank as the quay (Dockside §3.2).
+
 ```
 Freighter Mk1 (deck.freighter_mk1)
 32 x 18 tiles
@@ -42,7 +45,7 @@ Legend:
 
 Doors (10):
   bridge_corridor: (2,8) side n, interior, closed
-  personnel_ramp: (0,13) side w, ramp, closed, power=main
+  personnel_ramp: (2,17) side s, ramp, closed, power=main
   airlock_corridor: (2,10) side n, interior, closed
   quarters_corridor: (8,8) side n, interior, open
   galley_corridor: (16,8) side n, interior, open
