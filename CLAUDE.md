@@ -26,6 +26,8 @@ when narrator prompts or plan parsing change.
 ## Deployment and environment
 
 Claude owns deployment and environment setup; the user supplies logins and API keys only.
+IDs, new-machine setup, common commands, and what needs the user are in the "Operations
+reference" section of `docs/DEPLOYMENT.md` — read it before any deploy or database work.
 
 - Vercel project `crew` (team `tims-projects-6bc94f1b`), linked in `.vercel/` and Git-connected to
   `github.com/tcgarvin/crew`: push to `main` = production deploy, other branches = previews,
@@ -38,5 +40,7 @@ Claude owns deployment and environment setup; the user supplies logins and API k
   gitignored `.env.local`). For anything that writes, make a Neon branch of prod with `neonctl`
   and point `DATABASE_URL` at the branch; delete the branch afterwards.
 - `psql` runs in Docker (`postgres:17-alpine`) via `scripts/psql.sh`; there is no local install.
+- `.claude/settings.json` pre-approves checks and read-only ops commands; anything that deploys
+  outside a git push or writes to prod should be surfaced to the user.
 - Never put a prod connection string in a variable named `DATABASE_URL` locally — the dev server
   and `drizzle-kit` read that name.

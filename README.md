@@ -39,6 +39,9 @@ pnpm --filter @crew/server dev   # Hono API on :3001
 pnpm --filter @crew/web dev      # Vite dev server, proxies /api to :3001
 ```
 
+Pushing to `main` deploys production; other branches get previews with their own database
+branch. See `docs/DEPLOYMENT.md` ("Shipping" and "Operations reference").
+
 ## Toolchain notes
 
 - **Module/resolution**: `tsconfig.base.json` uses `"module": "ESNext"` with

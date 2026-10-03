@@ -173,3 +173,57 @@ branch when its git branch goes away; remove it with
 Actions (`.github/workflows/ci.yml`) runs typecheck, lint, depcruise and tests on every push and
 PR, independently of the Vercel build. `vercel deploy` from a laptop still works but is no longer
 the normal path.
+
+## Operations reference
+
+Claude owns deployment and environment work for this project; the user provides interactive
+logins, API keys, and anything only a human can approve (below). Set up on 2026-10-03.
+
+### Where things live
+
+| What | Identifier |
+| --- | --- |
+| GitHub repo | `github.com/tcgarvin/crew` (private), remote `origin` |
+| Vercel team / project | `tims-projects-6bc94f1b` (`team_zOyNZQQhuDYkeBpNBe0myKWl`) / `crew` (`prj_HEmbFJNcNZ39YYpDQ122FL6ViFdv`) |
+| Production URL | `https://crew-neon-omega.vercel.app` |
+| Neon org / project | `org-aged-lab-13621729` ("Vercel: Tim's projects") / `neon-crew` (`restless-voice-83603994`), aws-us-east-1, Postgres 18 |
+| Prod database | branch `main` (`br-winter-water-b7iyn7oz`), database `neondb`, owner `neondb_owner` |
+| Read-only role | `claude_ro`; URL in `.env.local` as `PROD_RO_DATABASE_URL` |
+| Neon integration settings | Vercel dashboard → Storage → `neon-crew` → connected project `crew` |
+
+### Tooling on a new machine
+
+- `vercel` CLI (`npm i -g vercel@latest`), then `vercel login`; `vercel link` if `.vercel/` is
+  missing.
+- `neonctl` (`npm i -g neonctl`), then `neonctl auth` (browser login). Pass
+  `--org-id org-aged-lab-13621729` to `neonctl projects list`; the project is not in the
+  personal org.
+- `gh` logged in as `tcgarvin`.
+- Docker, for `scripts/psql.sh` (no local `psql` needed).
+- `.env.local` (gitignored) with `OPENROUTER_API_KEY` and `PROD_RO_DATABASE_URL`. To recreate the
+  latter, the user runs `scripts/create-readonly-role.sh`.
+
+### Common tasks
+
+- Query prod: `scripts/psql.sh PROD_RO_DATABASE_URL -c '...'`. The role has `SELECT` only and
+  sessions default to read-only; writes fail with `permission denied`.
+- Check a deploy: `vercel ls crew`, then
+  `vercel inspect <url> --wait` and `vercel inspect <url> --logs` (migration output is in the
+  build log). Deployments are behind Vercel Authentication, so smoke-test with
+  `vercel curl /api/health --deployment <url>`; the production alias answers plain `curl`.
+- Vercel REST calls without handling tokens: `vercel api <path>` (e.g. `/v9/projects/crew`).
+- Test against real data with writes: `neonctl branches create --project-id
+  restless-voice-83603994 --name <name>` (copies `main`), get its URL with
+  `neonctl connection-string <name> --project-id restless-voice-83603994`, run with that as
+  `DATABASE_URL`, then delete the branch.
+- Clean up preview databases: `neonctl branches list --project-id restless-voice-83603994` and
+  delete `preview/*` branches whose git branch is gone.
+
+### What needs the user
+
+- Interactive logins (`vercel login`, `neonctl auth`, `gh auth login`).
+- Changes to the production database or its roles: Claude Code's safety checks block Claude from
+  running these, so Claude writes the script or command and the user runs it.
+- Settings that live only in a dashboard: the Neon integration (preview branching, env prefix),
+  GitHub app access for Vercel, Vercel account login connections.
+- Edits to Claude's own permissions in `.claude/settings.json` / `settings.local.json`.
