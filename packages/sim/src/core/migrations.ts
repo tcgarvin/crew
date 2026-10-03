@@ -3,6 +3,9 @@
  * untrusted JSON and must tolerate missing or odd fields: anything it does not recognise is left
  * for the invariants to judge.
  */
+import { dockAreaTiles } from "./docks";
+import type { TileCoord } from "./types/common";
+import type { DockDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,10 +62,10 @@ function portAlongside(travel: Record<string, unknown>): string | undefined {
  * of `undocking`. A save in one of those stages at a port whose dock map is in the content it is
  * restored against gets it set, with the geometry revision bumped; restore's cache build then
  * grafts it. A docked save also has its ramps asked down (docked means ramps down, D59; saves
- * from before D59 had them close by themselves), and the door system lowers them. Nothing else
- * moves: freight in a port store stays there (loading still runs through the transfer tiles), and
- * anyone on the old personnel-ramp transfer tile is still on ship floor. A port with no dock map,
- * or a save already carrying a dock, is left alone.
+ * from before D59 had them close by themselves), and the door system lowers them. Anyone on the
+ * old personnel-ramp transfer tile is still on ship floor. Freight waiting in the port store is
+ * moved onto the dock by `stageLoadingFreightOnLoad` (D63), which runs next. A port with no dock
+ * map, or a save already carrying a dock, is left alone.
  */
 export function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
@@ -86,8 +89,75 @@ export function attachDockOnLoad(raw: unknown, { content }: MigrationContext): u
   return raw;
 }
 
+/**
+ * 3 → 4, second half (D63): with the dock alongside, freight is physical on it. A save docked (or
+ * preparing to depart) mid-loading at a port with a dock map has its accepted freight still in
+ * that port's store, where schema 3 spawned it; it moves to the dock's staging area, one crate per
+ * tile in order, and every actor who believed it in the store now believes it there. A save
+ * mid-unloading has its open `cargoToUnload` problems at that port revised, so their tasks
+ * re-derive towards the delivery bay. Runs after `attachDockOnLoad`, which set `deck.dock`.
+ */
+export function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+  if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
+  const stage = raw.travel.stage;
+  if (stage !== "docked" && stage !== "preparingDeparture") return raw;
+  const presence = raw.deck.dock;
+  if (!isRecord(presence) || typeof presence.deckId !== "string") return raw;
+  const dock =
+    typeof presence.dockId === "string" ? content.docks?.[presence.dockId as DockDefId] : undefined;
+  if (dock === undefined) return raw;
+  const portId = dock.portId;
+  const tiles = dockAreaTiles(dock, "freightStaging");
+  if (tiles.length > 0 && isRecord(raw.jobs) && isRecord(raw.items)) {
+    let next = 0;
+    const moved = new Map<string, Record<string, unknown>>();
+    for (const job of Object.values(raw.jobs)) {
+      if (!isRecord(job) || job.status !== "accepted" || job.fromPortId !== portId) continue;
+      if (!Array.isArray(job.cargoItemIds)) continue;
+      for (const itemId of job.cargoItemIds) {
+        const item = typeof itemId === "string" ? raw.items[itemId] : undefined;
+        if (!isRecord(item) || !isRecord(item.location)) continue;
+        if (item.location.kind !== "inExternalStore" || item.location.portId !== portId) continue;
+        const tile = tiles[next % tiles.length] as TileCoord;
+        next += 1;
+        const location = {
+          kind: "onDeck",
+          deckId: presence.deckId,
+          x: tile.x + 0.5,
+          y: tile.y + 0.5,
+        };
+        item.location = location;
+        moved.set(itemId as string, location);
+      }
+    }
+    if (moved.size > 0 && isRecord(raw.actors)) {
+      for (const actor of Object.values(raw.actors)) {
+        if (!isRecord(actor) || !isRecord(actor.knowledge)) continue;
+        for (const [itemId, location] of moved) {
+          const fact = actor.knowledge[`${itemId}/itemLocation`];
+          if (isRecord(fact)) fact.value = { location: { ...location } };
+        }
+      }
+    }
+  }
+  if (isRecord(raw.work) && isRecord(raw.work.problems)) {
+    for (const problem of Object.values(raw.work.problems)) {
+      if (!isRecord(problem) || problem.kind !== "cargoToUnload" || problem.status !== "open")
+        continue;
+      if (!isRecord(problem.payload) || problem.payload.portId !== portId) continue;
+      if (typeof problem.revision === "number") problem.revision += 1;
+    }
+  }
+  return raw;
+}
+
+/** 3 → 4 (D61, D63): the dock alongside, then the freight on it. */
+function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
+  return stageLoadingFreightOnLoad(attachDockOnLoad(raw, context), context);
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
-  3: attachDockOnLoad,
+  3: migrateToDockside,
 };

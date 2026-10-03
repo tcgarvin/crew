@@ -11,7 +11,7 @@
  * (`ashore.ts`).
  */
 import { configTicks } from "../../core/clock";
-import { dockForPort } from "../../core/docks";
+import { dockForPort, dockedPortOf, isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import { affordableUnits } from "../../core/markets";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -269,10 +269,41 @@ export function portStoreLocation(port: PortDef): PhysicalLocation {
 // The system
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * D63: freight of a job taken at the port alongside (`accepted`, or `inTransit` once departure
+ * prep has begun) still lying on the dock, i.e. not yet loaded. Its `cargoToLoad` is normally
+ * open too; this holds the ship even if that work were gone, since a crate on the dock is left
+ * behind when the dock goes.
+ */
+export function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  const portId = dockedPortOf(ctx.state.travel);
+  if (ctx.state.deck.dock === undefined || portId === undefined) return false;
+  return Object.values(ctx.state.jobs).some(
+    (job) =>
+      (job.status === "accepted" || job.status === "inTransit") &&
+      job.fromPortId === portId &&
+      job.cargoItemIds.some((itemId) => {
+        const location = ctx.state.items[itemId]?.location;
+        return location !== undefined && isOnDock(ctx.content, ctx.state, location);
+      }),
+  );
+}
+
+/** Freight still to load: open `cargoToLoad` work, or accepted freight on the dock (D63). */
+function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return (
+    Object.values(ctx.state.work.problems).some(
+      (p) => p.kind === "cargoToLoad" && p.status === "open",
+    ) || acceptedFreightOnDock(ctx)
+  );
+}
+
 /** Open freight work (either direction) that must finish before the ship may leave. */
-export function hasOpenCargoWork(ctx: Pick<StepCtx, "state">): boolean {
-  return Object.values(ctx.state.work.problems).some(
-    (p) => (p.kind === "cargoToLoad" || p.kind === "cargoToUnload") && p.status === "open",
+export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return (
+    Object.values(ctx.state.work.problems).some(
+      (p) => (p.kind === "cargoToLoad" || p.kind === "cargoToUnload") && p.status === "open",
+    ) || acceptedFreightOnDock(ctx)
   );
 }
 
@@ -455,12 +486,14 @@ function advanceTravel(ctx: StepCtx): void {
   const machineDefs = machineTagsByDefId(ctx);
 
   if (travel.stage === "preparingDeparture") {
-    const openCargo = Object.values(ctx.state.work.problems).some(
-      (p) => p.kind === "cargoToLoad" && p.status === "open",
-    );
-    // D61: the ramps stay down while anyone is on the dock (or walking onto it), and while
-    // freight is still being loaded with a dock alongside; otherwise they come up. Under the
-    // ramp rules (D59) nobody else ever lowers them, so raising one early strands whoever is out.
+    // D63: loading includes accepted freight still lying on the dock (cargo work, so it blocks
+    // as cargo work does), and the call aboard waits until it is done: the loading crew are out
+    // on the dock fetching it and must not be called back from it.
+    const openCargo = hasOpenLoading(ctx);
+    // D61: the ramps stay down while anyone is on the dock (or walking onto it, or out through
+    // the gate, D63), and while freight is still being loaded with a dock alongside; otherwise
+    // they come up. Under the ramp rules (D59) nobody else ever lowers them, so raising one early
+    // strands whoever is out.
     const ashore = peopleAshore(ctx);
     const holdRamps = ashore.length > 0 || (openCargo && ctx.state.deck.dock !== undefined);
     requestRamps(ctx, holdRamps ? "open" : "closed");

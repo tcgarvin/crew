@@ -1,0 +1,239 @@
+/**
+ * D63 test fixture: the D61 dockside world (`travel/fixtures-dock.ts`: the crew deck with two
+ * south ramps and the spike's quay at both `TINY.port` and `TINY.port2`) with the quays furnished
+ * for port work, and commerce, equipment and travel registered alongside spatial, needs, work
+ * and the planner.
+ *
+ * Both quays, in the dock's own frame (shipAt (2,1), so deck = dock − (2,1)):
+ *
+ *   dx 0123456789ABCDEF
+ *    8 ................   ramps land at dock (4,8) cargo and (11,8) personnel
+ *    9 ..........bbb...   b = delivery bay, deck (8..10, 8)
+ *   10 ...sss.ccc..^...   s = staging, deck (1..3, 9..10); ^ = the stall's counter (12,10)
+ *   11 G..sss......S..W   G = gate deck (−2, 10); S = market stall (home only); W = warehouse door
+ *
+ * The far quay has no stall, so its market is through the gate.
+ */
+import type { TestWorld } from "../../core/fixtures/test-world";
+import { TINY, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
+import { createKernel } from "../../core/kernel";
+import { createRegistry } from "../../core/registry";
+import type { Command } from "../../core/types/commands";
+import type { PhysicalLocation, TileCoord } from "../../core/types/common";
+import type { ConfigDef, ContentBundle, DockDef, MachineDef } from "../../core/types/content";
+import type { CommandId, CrewDefId, ItemDefId, JobId, PortDefId } from "../../core/types/ids";
+import { registerPlannerDefaults } from "../../planner/index";
+import { registerEquipmentSystems } from "../equipment/register";
+import { registerNeeds } from "../needs/index";
+import { DECK12 } from "../spatial/fixtures/deck-12x8";
+import { registerSpatial } from "../spatial/index";
+import { FAR_DOCK, HOME_DOCK, docksideConfig, docksideContent } from "../travel/fixtures-dock";
+import { registerTravel } from "../travel/index";
+import { ALL_DERIVATIONS, CREW } from "../work/fixtures/crew-deck";
+import { registerWork } from "../work/index";
+import { registerCommerce } from "./index";
+import { PASSENGER_CREW_DEF_ID } from "./passage";
+
+export const PARTS = "item.test.parts" as ItemDefId;
+export const PARTS_PRICE = 120;
+
+/** Deck-frame tiles of the furnished quays. */
+export const QUAY_WORK = {
+  gate: { x: -2, y: 10 },
+  stallCounter: { x: 10, y: 9 },
+  staging: [
+    { x: 1, y: 9 },
+    { x: 2, y: 9 },
+    { x: 3, y: 9 },
+    { x: 1, y: 10 },
+    { x: 2, y: 10 },
+    { x: 3, y: 10 },
+  ],
+  bay: [
+    { x: 8, y: 8 },
+    { x: 9, y: 8 },
+    { x: 10, y: 8 },
+  ],
+  /** The cargo ramp's top, aboard: where bought parts are set down. */
+  cargoRampTop: { x: 2, y: 6 },
+} as const satisfies Record<string, TileCoord | readonly TileCoord[]>;
+
+function furnished(dock: DockDef, stall: boolean): DockDef {
+  return {
+    ...dock,
+    posts: [
+      { key: "gate", kind: "gate", name: "the gate", tile: { x: 0, y: 11 }, facing: "e" },
+      {
+        key: "door",
+        kind: "warehouseDoor",
+        name: "the warehouse door",
+        tile: { x: 15, y: 11 },
+        facing: "w",
+      },
+      ...(stall
+        ? [
+            {
+              key: "stall",
+              kind: "marketStall" as const,
+              name: "the stall",
+              tile: { x: 12, y: 11 },
+              facing: "n" as const,
+            },
+          ]
+        : []),
+    ],
+    areas: [
+      { key: "staging", kind: "freightStaging", rect: { x: 3, y: 10, w: 3, h: 2 } },
+      { key: "bay", kind: "deliveryBay", rect: { x: 10, y: 9, w: 3, h: 1 } },
+    ],
+  };
+}
+
+export interface DockWorkOptions {
+  /** Whether the home quay has a market stall (default true). */
+  readonly homeStall?: boolean;
+  readonly money?: number;
+  readonly partsStock?: number;
+}
+
+/** A misfire whose repair consumes one `PARTS`, as the D47 market test has it. */
+function hungryEngine(engine: MachineDef): MachineDef {
+  return {
+    ...engine,
+    faults: engine.faults.map((fault) => ({
+      ...fault,
+      repair: {
+        steps: fault.repair.steps.map((step) => ({
+          ...step,
+          consumes: [{ itemDefId: PARTS, count: 1 }],
+        })),
+      },
+    })),
+  };
+}
+
+export function dockWorkContent(
+  options: DockWorkOptions = {},
+  config: ConfigDef = docksideConfig(),
+): ContentBundle {
+  const base = docksideContent(config);
+  const home = furnished(HOME_DOCK, options.homeStall ?? true);
+  const far = furnished(FAR_DOCK, false);
+  const engine = base.machines[CREW.engine];
+  const mara = base.crew[TINY.mara];
+  const scenario = base.scenarios[CREW.scenario2];
+  if (engine === undefined || mara === undefined || scenario === undefined) {
+    throw new Error("dockside fixture changed");
+  }
+  const market = [{ itemDefId: PARTS, count: options.partsStock ?? 2, price: PARTS_PRICE }];
+  const ports = Object.fromEntries(
+    Object.entries(base.ports).map(([id, port]) => [id, { ...port, market }]),
+  ) as ContentBundle["ports"];
+  return {
+    ...base,
+    docks: { [home.id]: home, [far.id]: far },
+    machines: { ...base.machines, [CREW.engine]: hungryEngine(engine) },
+    items: {
+      ...base.items,
+      [PARTS]: {
+        id: PARTS,
+        name: "Engine Parts",
+        stacking: "stackable",
+        maxStack: 10,
+        tags: ["spare"],
+        toolKinds: [],
+        mass: 0.5,
+      },
+    },
+    crew: {
+      ...base.crew,
+      [PASSENGER_CREW_DEF_ID]: {
+        ...mara,
+        id: PASSENGER_CREW_DEF_ID as CrewDefId,
+        name: "Passenger",
+        roleTags: [],
+        skills: {},
+        startingInventory: [],
+      },
+    },
+    ports,
+    scenarios: {
+      ...base.scenarios,
+      [CREW.scenario2]: { ...scenario, startingMoney: options.money ?? 5000 },
+    },
+    hash: "dock-work-v1",
+  };
+}
+
+/** Spatial, equipment, travel, commerce, needs, work and the planner, on `dockWorkContent`. */
+export function dockWorkWorld(options: DockWorkOptions = {}): TestWorld {
+  const config = docksideConfig();
+  const registry = createRegistry();
+  registerSpatial(registry);
+  registerEquipmentSystems(registry);
+  registerTravel(registry);
+  registerCommerce(registry);
+  registerNeeds(registry);
+  registerWork(registry, { derivations: ALL_DERIVATIONS });
+  registerPlannerDefaults(registry);
+  const kernel = createKernel(registry);
+  const world = kernel.createWorld(
+    CREW.scenario2,
+    11,
+    dockWorkContent(options, config),
+    tinyEffectiveConfig(config),
+  );
+  return { registry, kernel, world };
+}
+
+let n = 0;
+
+export function send(test: TestWorld, command: Omit<Command, "id">): void {
+  n += 1;
+  const result = test.kernel.enqueueCommand(test.world, {
+    ...command,
+    id: `cmd:dock-work:${n}` as CommandId,
+  } as Command);
+  if (result.status !== "accepted") {
+    throw new Error(`${command.kind} rejected: ${JSON.stringify(result)}`);
+  }
+}
+
+/** Offer `count` crates from `from` to `to` (no card), returning the new job's id. */
+export function offerFreight(
+  test: TestWorld,
+  from: PortDefId = TINY.port,
+  to: PortDefId = TINY.port2,
+  count = 3,
+): JobId {
+  const before = new Set(Object.keys(test.world.state.jobs));
+  send(test, {
+    source: "scenario",
+    kind: "offerJob",
+    payload: {
+      job: {
+        issuer: { name: "Test Shipper", role: "shipper" },
+        description: { key: "test.job", params: {} },
+        fromPortId: from,
+        toPortId: to,
+        cargo: [{ itemDefId: TINY.crate, count }],
+        pay: 30 * count * 2,
+      },
+      surface: false,
+    },
+  });
+  test.kernel.advance(test.world, 1);
+  const id = Object.keys(test.world.state.jobs).find((jobId) => !before.has(jobId));
+  if (id === undefined) throw new Error("offerJob made no job");
+  return id as JobId;
+}
+
+/** Deck-frame tile of an on-deck location; undefined anywhere else. */
+export function tileAt(location: PhysicalLocation | undefined): TileCoord | undefined {
+  if (location?.kind !== "onDeck" || location.deckId !== DECK12.deck) return undefined;
+  return { x: Math.floor(location.x), y: Math.floor(location.y) };
+}
+
+/** Was this tile one of `tiles`? */
+export const onTile = (tiles: readonly TileCoord[], tile: TileCoord | undefined): boolean =>
+  tile !== undefined && tiles.some((t) => t.x === tile.x && t.y === tile.y);

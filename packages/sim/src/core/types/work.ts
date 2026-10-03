@@ -36,6 +36,7 @@ import type { DeepReadonly, LocationRef, Seconds, Tick, TileCoord } from "./comm
 import type {
   ConfigDef,
   ContentBundle,
+  DockAreaKind,
   ItemCount,
   RecipeActionKind,
   SkillRequirement,
@@ -44,6 +45,7 @@ import type {
 import type {
   ActorId,
   ClaimId,
+  DockDefId,
   DoorId,
   ItemDefId,
   ItemId,
@@ -199,6 +201,11 @@ export type CompletionPredicate =
   | { kind: "problemResolved" }
   | { kind: "itemInZone"; itemId: ItemId; zoneKey: LocalKey }
   | { kind: "itemInStore"; itemId: ItemId; portId: PortDefId; storeKey: LocalKey }
+  /**
+   * D63: the item lies in the `area` of dock `dockId` while that dock is alongside (freight
+   * delivered to the delivery bay). Custody, like the other two item kinds.
+   */
+  | { kind: "itemInDockArea"; itemId: ItemId; dockId: DockDefId; area: DockAreaKind }
   | { kind: "stageReached"; stageKey: LocalKey }
   /** D47: done once the plan's last step commits (a purchase); the owner settles its problem. */
   | { kind: "stepsDone" };
@@ -385,10 +392,26 @@ export type ActivityStep =
   | { kind: "putDown"; itemId: ItemId }
   /**
    * D47 commit point: buy up to `count` of `itemDefId` from the market of `portId` (the ship must
-   * be docked there and the actor on a cargo transfer tile); the units land on the deck at the
-   * actor's feet and the ship's money drops by the price.
+   * be docked there and the actor at the counter: a cargo transfer tile, or since D63 the dock's
+   * market stall or its gate); the ship's money drops by the price. The units land on the deck
+   * at the actor's feet, or with `intoHands` (D63, on the dock) in the buyer's hands, to be
+   * carried aboard by the plan's `stowBought` step.
    */
-  | { kind: "buy"; portId: PortDefId; itemDefId: ItemDefId; count: number }
+  | { kind: "buy"; portId: PortDefId; itemDefId: ItemDefId; count: number; intoHands?: true }
+  /**
+   * D63: a dock with no market stall has its market through the gate. Standing at the gate, the
+   * buyer goes out (`availability: offShip`, in the port's market store) for `ticksNeeded`, then
+   * comes back to the gate tile `gate`.
+   */
+  | {
+      kind: "throughGate";
+      portId: PortDefId;
+      gate: TileCoord;
+      ticksDone: number;
+      ticksNeeded: number;
+    }
+  /** D63: set down every carried unit of `itemDefId` here (bought parts, carried aboard). */
+  | { kind: "stowBought"; itemDefId: ItemDefId }
   | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
 
 /** W4a addition: the steps of one activity and the current index. */

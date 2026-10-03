@@ -35,14 +35,24 @@ export {
 export { createDefLookup, findCrewDef, findItemDef } from "./defs";
 export {
   deckToDock,
+  dockAlongside,
+  dockAlongsideAt,
+  dockAreaTiles,
+  dockPost,
   dockedPortOf,
   dockFloorMask,
   dockForPort,
   dockToDeck,
   expectedDock,
   isDockFloor,
+  gateTileAt,
   isDockPoint,
+  isInDockArea,
   isOnDock,
+  type MarketCounter,
+  marketCounter,
+  postServiceTile,
+  postTile,
 } from "./docks";
 export { basePriceFor, effectiveMarket, ensureMarket, marketSeed } from "./markets";
 export { raiseHookIfIdle } from "./hooks";

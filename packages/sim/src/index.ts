@@ -57,5 +57,6 @@ export {
 export { workViolations } from "./systems/work/invariants";
 export { spatialViolations } from "./systems/spatial/invariants";
 export { travelViolations } from "./systems/travel/invariants";
+export { commerceViolations } from "./systems/commerce/invariants";
 export { registerPlannerDefaults } from "./planner/index";
 export { registerAgentView, toAgentViewSnapshot } from "./view/index";

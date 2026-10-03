@@ -14,7 +14,8 @@
  * - when a problem is resolved its live tasks complete (cancelled → cancel), releasing claims.
  *   Exception: a claimed `staffStation` task outlives its resolved problem until the staffer's
  *   hold ends (see `execute.ts`), otherwise the pilot would leave the helm the moment the
- *   station counts as staffed and travel would immediately re-raise the problem;
+ *   station counts as staffed and travel would immediately re-raise the problem; likewise a
+ *   claimed `buyParts` task (D63) until the buyer has carried the units aboard;
  * - terminal tasks whose problem is no longer open and that no activity references are pruned so
  *   `state.work.tasks` stays small.
  *
@@ -153,8 +154,12 @@ function settleClosedProblem(ctx: StepCtx, problem: Problem, tasks: readonly Tas
   for (const task of tasks) {
     if (isTerminal(task)) continue;
     if (problem.status === "resolved") {
-      const heldStation = task.type === "staffStation" && task.claimState.kind === "claimed";
-      if (!heldStation) completeTask(ctx, task);
+      // D63: a buyer's purchase resolves `partsNeeded` while the units are still in their hands
+      // on the dock; their task lives until they have carried them aboard (its plan's end).
+      const held =
+        (task.type === "staffStation" || task.type === "buyParts") &&
+        task.claimState.kind === "claimed";
+      if (!held) completeTask(ctx, task);
     } else {
       cancelTask(ctx, task);
     }

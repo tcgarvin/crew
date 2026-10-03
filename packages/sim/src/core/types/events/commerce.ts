@@ -21,6 +21,13 @@ export interface CommerceEventPayloads {
     readonly amount: number;
     readonly jobId?: JobId;
   };
+  /**
+   * D63: an offer's crates were set out on the staging area of its origin's dock (on offer, or
+   * when the dock came alongside). Nobody's until the job is accepted.
+   */
+  freightStaged: { readonly jobId: JobId; readonly portId: PortDefId; readonly count: number };
+  /** D63: a declined, expired or departed-from offer's staged crates went back in. */
+  freightWithdrawn: { readonly jobId: JobId; readonly portId: PortDefId };
   /** Anything created by a spawn command (boundary or scenario). */
   entitySpawned: { readonly entityId: EntityId; readonly defId: string };
   /**
@@ -66,6 +73,9 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   contractCompleted: "narrative",
   paymentMade: "notable",
   entitySpawned: "trace",
+  // D63: the offer and its card already carry the story; the crates appearing is scenery.
+  freightStaged: "trace",
+  freightWithdrawn: "trace",
   // D47: a purchase is a story beat the narrator may react to; stocking is the narrator's own
   // quiet hand and never reaches the ticker.
   partsBought: "narrative",

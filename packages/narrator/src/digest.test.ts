@@ -1,11 +1,17 @@
 import {
   type EventId,
+  type ItemDefId,
+  type ItemId,
+  type Job,
+  type JobId,
   type MachineId,
   type PortDefId,
   type ProblemId,
   type SaveEnvelope,
   type SimEvent,
   configTicks,
+  dockAlongside,
+  dockAreaTiles,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
@@ -19,6 +25,8 @@ import {
 } from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { content } from "./test-support";
+
+const HUB_PORT = "port.crossroads_hub";
 
 function manyEvents(n: number): SimEvent[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -191,6 +199,69 @@ describe("buildDigest", () => {
     const line = text.split("\n").find((l) => l.startsWith("- Mara Osei"));
     expect(line).toMatch(
       /: this is the captain, the player; never a speaker\. \w+ on the dock; needs/,
+    );
+  });
+
+  it("describes the dock alongside: its ambience and the freight on it, by standing (D63)", () => {
+    const bundle = content();
+    const req = farJobBoardRequest(bundle);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const state = snapshot.state;
+    const dock = dockAlongside(bundle, state);
+    if (dock === undefined || state.deck.dock === undefined) throw new Error("fixture: no dock");
+    const deckId = state.deck.dock.deckId;
+    const staging = dockAreaTiles(dock, "freightStaging");
+    const bay = dockAreaTiles(dock, "deliveryBay");
+    const crate = (id: string, jobId: string, tile: { x: number; y: number } | undefined) => {
+      if (tile === undefined) throw new Error("fixture: dock area too small");
+      state.items[id as ItemId] = {
+        id: id as ItemId,
+        defId: "item.crate_general" as ItemDefId,
+        stacking: "unique",
+        condition: 1,
+        jobId: jobId as JobId,
+        location: { kind: "onDeck", deckId, x: tile.x + 0.5, y: tile.y + 0.5 },
+      };
+    };
+    const job = (id: string, status: Job["status"], toPortId: string, itemIds: string[]) => {
+      state.jobs[id as JobId] = {
+        id: id as JobId,
+        origin: "narrator",
+        issuer: "Hal Petrosyan, queue clerk",
+        issuerPerson: { name: "Hal Petrosyan", role: "queue clerk" },
+        pitch: { key: "job.pitch.default", params: {} },
+        urgency: "relaxed",
+        description: { key: "test.job", params: {} },
+        fromPortId: (status === "inTransit" ? "port.green_meridian" : HUB_PORT) as PortDefId,
+        toPortId: toPortId as PortDefId,
+        cargo: [{ itemDefId: "item.crate_general" as ItemDefId, count: itemIds.length }],
+        cargoClass: "general",
+        pay: 100,
+        status,
+        offeredTick: 0,
+        expiresAtTick: 99_999,
+        cargoItemIds: itemIds as ItemId[],
+      };
+    };
+    crate("i901", "j901", staging[0]);
+    crate("i902", "j901", staging[1]);
+    job("j901", "offered", "port.kessler_drift", ["i901", "i902"]);
+    crate("i903", "j902", staging[2]);
+    job("j902", "accepted", "port.green_meridian", ["i903"]);
+    crate("i904", "j903", bay[0]);
+    job("j903", "inTransit", HUB_PORT, ["i904"]);
+    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook);
+    const section = text.split(`## On the dock (${dock.name})\n`)[1]?.split("\n\n")[0];
+    expect(section?.split("\n")).toEqual([
+      `the place: ${dock.ambience}`,
+      "- on offer: 2 crates staged for j901 (Hal Petrosyan (queue clerk), to Kessler Drift); not taken",
+      "- waiting to be loaded: 1 crate for j902 (Hal Petrosyan (queue clerk), to Green Meridian)",
+      "- delivered: 1 crate for j903 (Hal Petrosyan (queue clerk), to Crossroads Hub) in the delivery bay",
+    ]);
+    // In flight there is no dock, and no section.
+    const quiet = quietTooLongRequest(bundle);
+    expect(buildDigest(quiet.snapshot, [], EMPTY_NOTES, bundle, quiet.hook).text).not.toContain(
+      "## On the dock",
     );
   });
 

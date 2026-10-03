@@ -271,7 +271,7 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
     estimateTravelTicks: (to: TileCoord, from?: TileCoord) => {
       const start = from ?? self.tile;
       if (start === undefined) return null;
-      return estimateTravelTicks(geometry, start, to, world.config.values);
+      return estimateTravelTicks(geometry, start, to, world.config.values, 1, world.caches);
     },
   };
 }

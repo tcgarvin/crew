@@ -7,18 +7,28 @@
 import type { TileCoord } from "../../core/types/common";
 import type { ConfigDef } from "../../core/types/content";
 import type { DeckGeometry } from "../../core/types/nav";
+import type { DerivedCaches } from "../../core/types/pipeline";
 import { doorBetween } from "./geometry";
-import { findPath, pathLength } from "./pathfind";
+import { cachedPath, findPath, pathLength } from "./pathfind";
 import { plannedDoorSeconds, schematicPolicy } from "./routing";
 
-/** Route the schematic suggests from `from` to `to`, or null if the layout has none. */
+/**
+ * Route the schematic suggests from `from` to `to`, or null if the layout has none. With
+ * `caches`, through the nav path cache (`cachedPath`, schematic key): the schematic changes only
+ * with the geometry or a ramp, and both clear that cache. D63: the dock's long walks made these
+ * uncached searches the planner's main cost.
+ */
 export function knownRoute(
   geometry: DeckGeometry,
   from: TileCoord,
   to: TileCoord,
   config: ConfigDef,
+  caches?: DerivedCaches,
 ): readonly TileCoord[] | null {
-  return findPath(geometry, from, to, schematicPolicy(geometry, config));
+  const policy = schematicPolicy(geometry, config);
+  return caches === undefined
+    ? findPath(geometry, from, to, policy)
+    : cachedPath(caches, geometry, from, to, policy);
 }
 
 /**
@@ -31,8 +41,9 @@ export function estimateTravelTicks(
   to: TileCoord,
   config: ConfigDef,
   speedFactor = 1,
+  caches?: DerivedCaches,
 ): number | null {
-  const route = knownRoute(geometry, from, to, config);
+  const route = knownRoute(geometry, from, to, config, caches);
   if (route === null) return null;
   let seconds = pathLength(route) / (config.movement.walkSpeed * speedFactor);
   for (let i = 1; i < route.length; i++) {

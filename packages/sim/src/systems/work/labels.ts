@@ -5,7 +5,7 @@
  *
  * Vocabulary: "idle", "walking", "walking to <place>", "going ashore", "walking on the dock",
  * "coming aboard" (D61), "picking up <item>", "hauling <item>",
- * "stowing <item>", "buying <item>" (D47), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
+ * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
  * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
@@ -91,6 +91,12 @@ function carrying(ctx: LabelCtx, actor: DeepReadonly<Actor>, itemId: ItemId): bo
   return location?.kind === "carriedBy" && location.actorId === actor.id;
 }
 
+/** What a `buyParts` task is buying, for its labels ("parts" for anything else). */
+function marketItemName(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
+  const ref = task?.progressRef;
+  return ref?.kind === "market" ? itemDefName(ctx, ref.itemDefId) : "parts";
+}
+
 const RECIPE_VERB: Readonly<Record<string, string>> = {
   inspect: "inspecting",
   maintain: "servicing",
@@ -121,13 +127,12 @@ function taskStepLabel(
       return `stowing ${itemName(ctx, step.itemId)}`;
     case "buy":
       return `buying ${itemDefName(ctx, step.itemDefId)}`;
+    case "throughGate":
+      return `ashore buying ${marketItemName(ctx, task)}`;
+    case "stowBought":
+      return `stowing ${itemDefName(ctx, step.itemDefId)}`;
     case "work": {
-      if (step.stage === "buy") {
-        const ref = task?.progressRef;
-        return ref?.kind === "market"
-          ? `buying ${itemDefName(ctx, ref.itemDefId)}`
-          : "buying parts";
-      }
+      if (step.stage === "buy") return `buying ${marketItemName(ctx, task)}`;
       if (task === undefined || task.target.kind !== "machine") return "working";
       const verb = RECIPE_VERB[task.derivationKey] ?? RECIPE_VERB[task.type] ?? "working on";
       return `${verb} ${machineName(ctx, task.target.machineId)}`;
@@ -163,7 +168,10 @@ function personalStepLabel(
     case "consume":
       return "eating";
     case "buy":
+    case "throughGate":
       return "buying";
+    case "stowBought":
+      return `putting down ${itemDefName(ctx, step.itemDefId)}`;
     case "hold":
       return HOLD_LABEL[step.hold];
   }

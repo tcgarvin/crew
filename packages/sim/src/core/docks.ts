@@ -8,8 +8,14 @@
  * `shipAt`, so dock tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y). Everything in state
  * is in the deck frame.
  */
-import type { PhysicalLocation, TileCoord } from "./types/common";
-import type { ContentBundle, DockDef } from "./types/content";
+import type { EdgeSide, PhysicalLocation, TileCoord } from "./types/common";
+import type {
+  ContentBundle,
+  DockAreaKind,
+  DockDef,
+  DockPostDef,
+  DockPostKind,
+} from "./types/content";
 import type { PortDefId } from "./types/ids";
 import type { DockPresence } from "./types/ship";
 import type { TravelState } from "./types/travel";
@@ -146,4 +152,139 @@ export function isOnDock(
   if (presence === undefined || location.kind !== "onDeck") return false;
   if (location.deckId !== presence.deckId) return false;
   return isDockPoint(content, state, location.x, location.y);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Posts and areas (D63): where port work happens on the dock, in the deck frame
+// ---------------------------------------------------------------------------------------------
+
+/** The dock alongside right now (`state.deck.dock`), if any. Throws if content lost its map. */
+export function dockAlongside(
+  content: Pick<ContentBundle, "docks">,
+  state: { readonly deck: { readonly dock?: DockPresence } },
+): DockDef | undefined {
+  const presence = state.deck.dock;
+  if (presence === undefined) return undefined;
+  const dock = content.docks?.[presence.dockId];
+  if (dock === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
+  return dock;
+}
+
+/** The dock alongside if it is `portId`'s, else undefined (no dock, or another port's). */
+export function dockAlongsideAt(
+  content: Pick<ContentBundle, "docks">,
+  state: { readonly deck: { readonly dock?: DockPresence } },
+  portId: PortDefId,
+): DockDef | undefined {
+  const dock = dockAlongside(content, state);
+  return dock?.portId === portId ? dock : undefined;
+}
+
+/**
+ * Every tile of the dock's first area of `kind`, deck frame, row by row. Empty when the map has
+ * none (content validation requires one staging area and one delivery bay per authored dock).
+ */
+export function dockAreaTiles(dock: DockDef, kind: DockAreaKind): TileCoord[] {
+  const area = dock.areas.find((a) => a.kind === kind);
+  if (area === undefined) return [];
+  const tiles: TileCoord[] = [];
+  const { x, y, w, h } = area.rect;
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) tiles.push(dockToDeck(dock, { x: x + dx, y: y + dy }));
+  }
+  return tiles;
+}
+
+/** Is deck-frame point (x, y) inside the dock's first area of `kind`? */
+export function inDockArea(dock: DockDef, kind: DockAreaKind, x: number, y: number): boolean {
+  const area = dock.areas.find((a) => a.kind === kind);
+  if (area === undefined) return false;
+  const tile = deckToDock(dock, { x: Math.floor(x), y: Math.floor(y) });
+  const { rect } = area;
+  return (
+    tile.x >= rect.x && tile.x < rect.x + rect.w && tile.y >= rect.y && tile.y < rect.y + rect.h
+  );
+}
+
+/**
+ * Is this location in the `kind` area of the dock alongside? Pure over state and content: the
+ * delivery bay's custody check (D63) and the narrator's "On the dock" lines read it.
+ */
+export function isInDockArea(
+  content: Pick<ContentBundle, "docks">,
+  state: { readonly deck: { readonly dock?: DockPresence } },
+  location: PhysicalLocation,
+  kind: DockAreaKind,
+): boolean {
+  if (location.kind !== "onDeck") return false;
+  const presence = state.deck.dock;
+  if (presence === undefined || location.deckId !== presence.deckId) return false;
+  const dock = dockAlongside(content, state);
+  return dock !== undefined && inDockArea(dock, kind, location.x, location.y);
+}
+
+/** The dock's first post of `kind`, if it has one (a dock may have no market stall). */
+export function dockPost(dock: DockDef, kind: DockPostKind): DockPostDef | undefined {
+  return dock.posts.find((p) => p.kind === kind);
+}
+
+const FACING_STEP: Readonly<Record<EdgeSide, TileCoord>> = {
+  n: { x: 0, y: -1 },
+  e: { x: 1, y: 0 },
+  s: { x: 0, y: 1 },
+  w: { x: -1, y: 0 },
+};
+
+/**
+ * Where a visitor stands to deal with a post, deck frame: the floor tile the post faces (the
+ * counter's customer side), or the post's own tile if that one is not walkable. Keeps the post
+ * tile itself free for whoever works there (locals, phase 3).
+ */
+export function postServiceTile(dock: DockDef, post: DockPostDef): TileCoord {
+  const step = FACING_STEP[post.facing];
+  const front = { x: post.tile.x + step.x, y: post.tile.y + step.y };
+  return dockToDeck(dock, isDockFloor(dock, front.x, front.y) ? front : post.tile);
+}
+
+/** A post's own tile, deck frame (the gate: where someone walks out of the simulated world). */
+export function postTile(dock: DockDef, post: DockPostDef): TileCoord {
+  return dockToDeck(dock, post.tile);
+}
+
+/** The gate tile of the dock alongside at `portId`, deck frame, if that dock has a gate. */
+export function gateTileAt(
+  content: Pick<ContentBundle, "docks">,
+  state: { readonly deck: { readonly dock?: DockPresence } },
+  portId: PortDefId,
+): TileCoord | undefined {
+  const dock = dockAlongsideAt(content, state, portId);
+  const gate = dock === undefined ? undefined : dockPost(dock, "gate");
+  return dock === undefined || gate === undefined ? undefined : postTile(dock, gate);
+}
+
+/**
+ * Where a port's market is dealt with (D47, D63):
+ * - `stall`: the dock's market stall, standing at its counter (`tile`); the units are handed over
+ *   there and carried aboard;
+ * - `gate`: a dock with no stall has its market through the gate (`tile`): the buyer walks out,
+ *   is off ship for the purchase, and comes back with the units;
+ * - `transferTile`: no dock alongside (or a hand-built dock with neither post; content validation
+ *   requires a gate): the units come over the ramp to a cargo transfer tile, as before.
+ */
+export type MarketCounter =
+  | { readonly kind: "stall"; readonly tile: TileCoord }
+  | { readonly kind: "gate"; readonly tile: TileCoord }
+  | { readonly kind: "transferTile" };
+
+export function marketCounter(
+  content: Pick<ContentBundle, "docks">,
+  state: { readonly deck: { readonly dock?: DockPresence } },
+  portId: PortDefId,
+): MarketCounter {
+  const dock = dockAlongsideAt(content, state, portId);
+  if (dock === undefined) return { kind: "transferTile" };
+  const stall = dockPost(dock, "marketStall");
+  if (stall !== undefined) return { kind: "stall", tile: postServiceTile(dock, stall) };
+  const gate = gateTileAt(content, state, portId);
+  return gate === undefined ? { kind: "transferTile" } : { kind: "gate", tile: gate };
 }
