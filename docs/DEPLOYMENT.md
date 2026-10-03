@@ -159,3 +159,12 @@ Nothing about auth, saves, or narrator routing needs Vercel-specific code; the o
 piece is `src/waitUntil.ts`, which probes for `@vercel/functions`'s `waitUntil` at runtime and
 falls back to awaiting inline when it isn't present (dev, tests) or there's no request context to
 extend it (also dev, tests, or `@hono/node-server`).
+
+## Shipping
+
+The Vercel project is connected to `github.com/tcgarvin/crew` (private). A push to `main` builds
+and deploys production; any other branch or PR gets a preview deployment. Both run the same
+build command, so both run migrations against the database their environment points at. GitHub
+Actions (`.github/workflows/ci.yml`) runs typecheck, lint, depcruise and tests on every push and
+PR, independently of the Vercel build. `vercel deploy` from a laptop still works but is no longer
+the normal path.

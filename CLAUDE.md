@@ -27,7 +27,8 @@ when narrator prompts or plan parsing change.
 
 Claude owns deployment and environment setup; the user supplies logins and API keys only.
 
-- Vercel project `crew` (team `team_zOyNZQQhuDYkeBpNBe0myKWl`), linked in `.vercel/`. Build steps
+- Vercel project `crew` (team `tims-projects-6bc94f1b`), linked in `.vercel/` and Git-connected to
+  `github.com/tcgarvin/crew`: push to `main` = production deploy, other branches = previews. Build steps
   are in `vercel.json` and explained in `docs/DEPLOYMENT.md`. Migrations run in the Vercel build,
   which is the only path that changes the prod schema.
 - Neon Postgres, provisioned through the Vercel Marketplace. Its env vars are marked sensitive
