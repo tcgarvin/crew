@@ -27,6 +27,7 @@ import {
   type TempRef,
   basePriceFor,
   configTicks,
+  jobBlockingAcceptance,
 } from "@crew/sim";
 import {
   AFTERMATH_MAX_WORDS,
@@ -198,9 +199,11 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const config = snapshot.config;
   const here = offerPortNow(snapshot.state);
   if (here === undefined) return no("offerJob: the ship is not at or approaching a port");
-  // D16/D50: one job at a time. The kernel rejects `acceptContract` while a job is in hand, so
-  // an offer made now could only be declined; drop it here with the job it would collide with.
-  const inHand = jobInHand(snapshot.state);
+  // D16/D50/D52: one job at a time. The kernel rejects `acceptContract` while a job is in hand,
+  // so an offer made now could only be declined; drop it here with the job it would collide
+  // with. The kernel's own rule, so a job being finished at this port (freight unloading at its
+  // destination, a passenger walking off) does not drop an offer made on the docked tick.
+  const inHand = jobBlockingAcceptance(snapshot.state);
   if (inHand !== undefined) {
     return no(
       `offerJob: a job is already in hand: ${inHand.id} to ${portName(content, inHand.toPortId)}`,
@@ -282,17 +285,6 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
       surface,
     },
   });
-}
-
-/**
- * The job the ship is carrying, if any: accepted, under way, or delivered and not yet paid.
- * Offered jobs are not in hand (the captain may still decline them), nor are closed ones.
- */
-function jobInHand(state: State): DeepReadonly<Job> | undefined {
-  const held = new Set(["accepted", "inTransit", "delivered"]);
-  return Object.values(state.jobs)
-    .filter((j) => held.has(j.status))
-    .sort((a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id))[0];
 }
 
 /** The cargo lines of an offer with the class and unit count the pay is figured from. */

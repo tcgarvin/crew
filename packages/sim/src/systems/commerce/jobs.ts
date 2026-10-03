@@ -14,7 +14,7 @@
  */
 import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
-import { dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
+import { dockAlongside, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { CargoClass, DockDef, ExternalStoreDef, PortDef } from "../../core/types/content";
@@ -34,6 +34,7 @@ import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 import { writeFact } from "../work/facts";
+import { awaitsFamiliarityBrief } from "../work/perception";
 
 // ---------------------------------------------------------------------------------------------
 // Issuers (D25)
@@ -407,6 +408,9 @@ function briefCrew(ctx: ApplyCtx, itemIds: readonly ItemId[]): void {
   const source = { tick: ctx.tick, evidence: "report", certainty: "reported" } as const;
   for (const actor of Object.values(ctx.state.actors)) {
     if (!actor.crew || actor.passenger === true) continue;
+    // Their first look's familiarity brief covers every on-deck item, the staged crates included;
+    // a fact written here first would stop that brief, and they would never learn the stores.
+    if (awaitsFamiliarityBrief(actor)) continue;
     for (const itemId of itemIds) {
       const item = ctx.state.items[itemId];
       if (item === undefined) continue;
@@ -552,10 +556,12 @@ export function jobFulfilled(
  * goes the same way.
  */
 export function cartDeliveredFreight(ctx: ApplyCtx, job: Job): void {
-  const travel = ctx.state.travel;
-  if (travel.stage !== "docked") return;
-  const portId = travel.portId;
-  if (dockAlongsideAt(ctx.content, ctx.state, portId) === undefined) return;
+  // Whenever a dock is alongside, not only while `docked`: the last crate set down in the bay
+  // often ends the port call's work, so travel moves to `preparingDeparture` that same tick,
+  // before this runs, and the crates would sit in the bay until the dock's last-guard sweep.
+  const dock = dockAlongside(ctx.content, ctx.state);
+  if (dock === undefined) return;
+  const portId = dock.portId;
   const inBay = job.cargoItemIds.filter((itemId) => {
     const item = ctx.state.items[itemId];
     return item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay");

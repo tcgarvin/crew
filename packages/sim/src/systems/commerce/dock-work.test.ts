@@ -146,6 +146,32 @@ describe("freight on offer is staged on the dock (D63)", () => {
   });
 });
 
+describe("taking a job before the crew's first look (D63)", () => {
+  it("still leaves every crew member briefed on the ship's stores, and on the freight", () => {
+    const test = dockWorkWorld();
+    const { world } = test;
+    // A fresh crew: nobody has looked around yet.
+    for (const actor of Object.values(world.state.actors)) actor.knowledge = {};
+    const id = offerFreight(test);
+    accept(test, id);
+    const freight = new Set<string>(job(world, id).cargoItemIds);
+    const stores = Object.values(world.state.items).filter(
+      (item) => item.location.kind === "onDeck" && !freight.has(item.id),
+    );
+    expect(stores.length).toBeGreaterThan(0);
+    run(test, 10 * 20);
+    for (const actor of Object.values(world.state.actors)) {
+      if (!actor.crew || actor.passenger === true) continue;
+      for (const item of [...stores.map((i) => i.id), ...freight]) {
+        expect(
+          actor.knowledge[`${item}/itemLocation`],
+          `${actor.name} knows ${item}`,
+        ).toBeDefined();
+      }
+    }
+  });
+});
+
 describe("freight is loaded by hand and delivered to the bay (D63)", () => {
   it("carries the crates aboard from staging, delivers them to the bay, pays once, carts them in", () => {
     const test = dockWorkWorld();
@@ -209,6 +235,70 @@ describe("freight is loaded by hand and delivered to the bay (D63)", () => {
     expect(carted.every((e) => e.tick === paidTick)).toBe(true);
   });
 
+  it("carts the delivered crates in when the last one set down ends the port call", () => {
+    const test = dockWorkWorld();
+    const { world } = test;
+    const id = offerFreight(test);
+    const crates = [...job(world, id).cargoItemIds];
+    accept(test, id);
+    setCourse(test);
+    run(
+      test,
+      20 * MINUTE,
+      (w) => w.state.travel.stage === "docked" && w.state.travel.portId === TINY.port2,
+    );
+    expect(world.state.travel).toMatchObject({ stage: "docked", portId: TINY.port2 });
+    // Course home is set before unloading ends, so the port call ends with the last crate: travel
+    // moves to departure prep that tick, before commerce pays and carts.
+    setCourse(test, TINY.port);
+    const events = run(test, 10 * MINUTE, (w) => w.state.travel.stage === "departing");
+    expect(job(world, id).status).toBe("paid");
+    const prep = events.find(
+      (e) => e.type === "travelStageChanged" && e.payload.to === "preparingDeparture",
+    );
+    const paid = events.find((e) => e.type === "paymentMade" && e.payload.jobId === id);
+    expect(prep?.tick).toBe(paid?.tick);
+    expect(events.filter((e) => e.type === "leftOnDock")).toEqual([]);
+    expect(events.filter((e) => e.type === "cargoTransferred")).toHaveLength(crates.length);
+    for (const itemId of crates) {
+      expect(world.state.items[itemId]?.location).toEqual({
+        kind: "inExternalStore",
+        portId: TINY.port2,
+        storeKey: "warehouse",
+      });
+    }
+  });
+
+  it("keeps carrying a crate when a repair it cannot do (no parts anywhere) comes up", () => {
+    const test = dockWorkWorld({ partsStock: 0 });
+    const { world } = test;
+    const id = offerFreight(test);
+    const crates = new Set<string>(job(world, id).cargoItemIds);
+    accept(test, id);
+    const carrying = (w: World) =>
+      Object.values(w.state.items).some(
+        (item) => crates.has(item.id) && item.location.kind === "carriedBy",
+      );
+    run(test, 2 * MINUTE, carrying);
+    expect(carrying(world)).toBe(true);
+    // A fault whose repair consumes a part the ship does not have and the port does not sell.
+    addEngineFault(world);
+    const events = run(test, 30 * 20);
+    expect(events.some((e) => e.type === "taskBlocked")).toBe(true);
+    const loadTasks = new Set(
+      Object.values(world.state.work.tasks)
+        .filter((t) => t.type === "haul")
+        .map((t) => t.id),
+    );
+    const dropped = events.filter(
+      (e) =>
+        e.type === "taskReleased" &&
+        e.payload.reason === "interrupted" &&
+        loadTasks.has(e.payload.taskId),
+    );
+    expect(dropped).toEqual([]);
+  });
+
   it("does not leave while accepted freight lies on the dock, even with its load work gone", () => {
     const test = dockWorkWorld();
     const { world } = test;
@@ -262,6 +352,42 @@ describe("parts are bought on the dock (D63)", () => {
       events.some((e) => e.type === "faultRepaired"),
       "the repair used the part",
     ).toBe(true);
+  });
+
+  it("sets the part down when the repairer gives up the repair, so someone else can fit it", () => {
+    const test = dockWorkWorld();
+    const { world } = test;
+    const { problemId } = addEngineFault(world);
+    const repairTask = () =>
+      Object.values(world.state.work.tasks).find(
+        (t) => t.problemId === problemId && t.type === "repair",
+      );
+    const repairerHolding = (w: World) => {
+      const held = boughtParts(w).find((i) => i.location.kind === "carriedBy");
+      if (held?.location.kind !== "carriedBy") return undefined;
+      const actor = w.state.actors[held.location.actorId];
+      const task = repairTask();
+      return actor?.activity.kind === "task" && actor.activity.taskId === task?.id
+        ? actor
+        : undefined;
+    };
+    run(test, 3 * MINUTE, (w) => repairerHolding(w) !== undefined);
+    const repairer = repairerHolding(world);
+    if (repairer === undefined) throw new Error("nobody picked the part up for the repair");
+    // Hunger past survival interrupts the repair.
+    send(test, {
+      source: "scenario",
+      kind: "scenarioSetNeeds",
+      payload: { actorId: repairer.id, needs: { hunger: 1 } },
+    });
+    run(test, 20, (w) => w.state.actors[repairer.id]?.activity.kind !== "task");
+    expect(repairer.activity.kind === "task" && repairer.activity.taskId === repairTask()?.id).toBe(
+      false,
+    );
+    const part = boughtParts(world)[0];
+    expect(part?.location.kind).toBe("onDeck");
+    run(test, 3 * MINUTE, (w) => w.state.work.problems[problemId]?.status === "resolved");
+    expect(world.state.work.problems[problemId]?.status).toBe("resolved");
   });
 
   it("buys through the gate where the dock has no stall: off ship at the gate, back with the part", () => {

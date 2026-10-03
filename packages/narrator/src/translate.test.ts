@@ -945,6 +945,22 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
       },
     );
 
+    it.each(["inTransit", "delivered"])(
+      "freight %s at the port the ship is docked at does not drop an offer (the kernel's rule)",
+      (status) => {
+        const { ctx } = withJobStatus(status);
+        const held = Object.values(ctx.snapshot.state.jobs)[0];
+        if (held === undefined) throw new Error("fixture: no job");
+        // Freight being unloaded here, not a passage: the kernel would accept the next job.
+        // biome-ignore lint/performance/noDelete: a freight job has no passage key.
+        delete (held as { passage?: unknown }).passage;
+        (held as { toPortId: string }).toPortId = "port.kessler_drift";
+        const result = translateIntents(plan([{ ...job, fromPort: "port.kessler_drift" }]), ctx);
+        expect(result.dropped).toEqual([]);
+        expect(result.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+      },
+    );
+
     it.each(["paid", "declined", "expired", "failed", "offered"])(
       "a job that is %s is not in hand, so an offer goes through",
       (status) => {

@@ -146,11 +146,20 @@ function PlaceInspector({ place }: { place: PlaceInspection }) {
   );
 }
 
+/** D63: freight on offer is staged on the dock but belongs to nobody until the job is taken. */
+function itemSubtitle(item: ItemInspection): string {
+  if (item.job === undefined) return "ship's stores";
+  return item.job.status === "offered" ? "freight on offer" : "freight";
+}
+
 function ItemInspector({ item }: { item: ItemInspection }) {
   return (
     <div>
       <h2>{item.name}</h2>
-      <p className="inspector-subtitle">{item.job === undefined ? "ship's stores" : "freight"}</p>
+      <p className="inspector-subtitle">{itemSubtitle(item)}</p>
+      {item.job?.status === "offered" && (
+        <p>Set out for whoever takes the job; nobody loads it until then.</p>
+      )}
       <dl className="inspector-grid">
         <dt>Count</dt>
         <dd>{item.count}</dd>

@@ -111,7 +111,10 @@ export function DeckCanvas({
     canvas.style.height = `${height}px`;
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    rotatedRef.current = shouldRotate(width, height, layout);
+    // Decided by the window, not the canvas: on a portrait phone the canvas is close to square,
+    // so a headline wrapping to a second line (docked, "loading cargo (0 of 3 crates aboard)")
+    // used to flip the whole drawing 90° and back as the headline changed.
+    rotatedRef.current = shouldRotate(window.innerWidth, window.innerHeight, layout);
     dirtyRef.current = true;
   }, [layout]);
 

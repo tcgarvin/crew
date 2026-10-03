@@ -474,6 +474,33 @@ describe("createHost hook halt", () => {
     expect(maxFrameTick()).toBeGreaterThan(5);
   });
 
+  it("snapshots the halted tick, so what the frame shows at a hook can be inspected", () => {
+    const { kernel } = makeFakeKernel(5);
+    const messages: FromWorker[] = [];
+    const { clock, advance } = makeFakeClock();
+    const host = createHost({
+      kernel,
+      content: {} as ContentBundle,
+      config: CONFIG,
+      postMessage: (m) => messages.push(m),
+      clock,
+      loopIntervalMs: 50,
+      runAheadCapSeconds: 60,
+    });
+    host.handleMessage({
+      type: "load",
+      source: { kind: "scenario", scenarioId: "s" as ScenarioDefId, seed: 1 },
+    });
+    for (let i = 0; i < 10; i++) advance(50);
+    expect(messages.some((m) => m.type === "hookRaised")).toBe(true);
+    host.handleMessage({ type: "requestSnapshotAt", requestId: "s1", tick: 5 as never });
+    const reply = messages.find(
+      (m): m is Extract<FromWorker, { type: "snapshot" }> =>
+        m.type === "snapshot" && m.requestId === "s1",
+    );
+    expect(reply?.tick).toBe(5);
+  });
+
   it("bursts again to rebuild the lead once a hook is answered", () => {
     const { kernel } = makeFakeKernel(5);
     const messages: FromWorker[] = [];

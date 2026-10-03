@@ -649,3 +649,31 @@ the crew's beliefs moved too, and its open unloads there revised so they re-deri
 *Speed.* Planner travel estimates now go through the nav path cache under the schematic key
 (ramp changes and geometry rebuilds already clear it); the dock's long walks had made uncached
 A* the planner's main cost. The three full-sim cases take 13.3 s against 14.8 s before.
+
+**D64. Phase 2 verified end to end; what the playthrough turned up.** A browser playthrough
+(null narrator, 8x, landscape and 390×700) and headless tours of all six ports, every invariant
+checked each tick. Fixes, each with a test:
+*Offered freight* is drawn as a translucent crate with a dashed outline in its class colour,
+never piled with taken freight of the same kind, and the item inspector says "freight on offer"
+and that nobody loads it until the job is taken. The host now snapshots the tick a hook or
+decision halts on, so tapping a crate while its offer's card waits ("Inspect ship") finds it;
+the ring's last due snapshot predated the crates and the tap showed nothing.
+*Carting.* Delivered crates are carted from the bay whenever a dock is alongside, not only while
+`docked`: the last crate set down usually ends the port call, travel moved to departure prep
+that same tick before commerce ran, and every delivery was left to `leftOnDock` at undocking.
+*Work.* An actor plans a new task or activity against truth before giving up the current one:
+a repair whose part is aboard nowhere (Green Meridian and Vesper Gate sell none) was chosen from
+beliefs every time its blockage expired, made the crate carrier set the crate down mid-dock and
+then failed, holding one Vesper delivery 145 s. An actor giving up a task sets down the tools and
+consumables they had picked up for it, so the ship's only spares are not left in a pilot's hands.
+D63's freight brief skips crew who have not had their first look yet, since a single fact
+stopped the ship-familiarity brief and they never learned where the stores were.
+*Narrator.* The translator drops `offerJob` by the kernel's own rule (`jobBlockingAcceptance`)
+rather than a stricter copy, so an offer made while freight is unloading at its destination, or
+on approach, goes through; the null narrator never offered a second job before (every docking
+after the first sat idle on `quietTooLong`). Open: the kernel's `jobInHand` does not count
+freight under way, though D52 says it does, so a second job can be taken mid-voyage. Left as is.
+*Phone.* Rotation is decided by the window, not the canvas: at 390×700 the canvas is nearly
+square and the drawing flipped 90° whenever the headline wrapped to two lines.
+Not changed: docking often waits 10–20 s "for someone at the helm" because the pilot wanders off
+in transit; a ship out of spares far from a market drifts until the narrator acts.

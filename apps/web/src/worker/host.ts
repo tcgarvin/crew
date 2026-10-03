@@ -103,10 +103,11 @@ export function createHost(deps: HostDeps): Host {
     clock.clearInterval(intervalId);
   }
 
-  function pushSnapshotIfDue(): void {
+  function pushSnapshotIfDue(force = false): void {
     if (!world) return;
     const intervalTicks = Math.max(1, Math.round(tickRate * snapshotIntervalSeconds));
-    if (world.state.tick - lastSnapshotTick < intervalTicks && ring.length > 0) return;
+    if (force && ring.at(-1)?.tick === world.state.tick) return;
+    if (!force && world.state.tick - lastSnapshotTick < intervalTicks && ring.length > 0) return;
     lastSnapshotTick = world.state.tick;
     const envelope = deps.kernel.serialize(world);
     ring.push({ tick: world.state.tick, envelope });
@@ -153,6 +154,9 @@ export function createHost(deps: HostDeps): Host {
   function handleHalt(kind: "hook" | "decision"): void {
     if (!world) return;
     haltedFor = kind;
+    // The halted tick is what the player inspects while a card waits (D63: an offer's crates
+    // appear on the dock on that very tick), so the ring must hold it, not the last due one.
+    pushSnapshotIfDue(true);
     if (kind === "hook") {
       const hook = world.state.narrator.pendingHook;
       if (hook) deps.postMessage({ type: "hookRaised", hook, tick: world.state.tick });

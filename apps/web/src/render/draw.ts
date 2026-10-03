@@ -453,8 +453,10 @@ export function deckPiles(frame: RenderFrame, deckId: string): ItemPile[] {
       byDef = new Map();
       tiles.set(tileKey, byDef);
     }
-    const pile = byDef.get(item.defId);
-    if (pile === undefined) byDef.set(item.defId, { top: item, count: item.count });
+    // D63: crates on offer never pile with taken freight of the same kind, so each reads as itself.
+    const pileKey = item.offered === true ? `${item.defId}/offered` : item.defId;
+    const pile = byDef.get(pileKey);
+    if (pile === undefined) byDef.set(pileKey, { top: item, count: item.count });
     else pile.count += item.count;
   }
   const piles: ItemPile[] = [];
@@ -490,6 +492,9 @@ function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, count: n
   ctx.fillText(text, x + 2, y - h / 2 + 0.5);
 }
 
+/** How strongly an offered crate (D63) is filled: enough to show its class, clearly not solid. */
+const OFFERED_FILL_ALPHA = 0.3;
+
 function drawCrate(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -497,20 +502,35 @@ function drawCrate(
   size: number,
   color: string,
   selected: boolean,
+  offered = false,
 ): void {
   const x = cx - size / 2;
   const y = cy - size / 2;
+  ctx.save();
+  if (offered) ctx.globalAlpha *= OFFERED_FILL_ALPHA;
   ctx.fillStyle = color;
   ctx.fillRect(x, y, size, size);
-  ctx.strokeStyle = "rgba(10, 14, 20, 0.85)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x, y, size, size);
-  if (size >= 9) {
-    // A strap across the lid, so it reads as a crate rather than a machine tile.
-    ctx.beginPath();
-    ctx.moveTo(x, cy);
-    ctx.lineTo(x + size, cy);
-    ctx.stroke();
+  ctx.restore();
+  if (offered) {
+    // Freight on offer is nobody's yet: a dashed outline in its class colour reads as
+    // "available" rather than as cargo the crew are handling, or as the dock's own crates.
+    ctx.save();
+    ctx.setLineDash([3, 2]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.75, y + 0.75, size - 1.5, size - 1.5);
+    ctx.restore();
+  } else {
+    ctx.strokeStyle = "rgba(10, 14, 20, 0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, size, size);
+    if (size >= 9) {
+      // A strap across the lid, so it reads as a crate rather than a machine tile.
+      ctx.beginPath();
+      ctx.moveTo(x, cy);
+      ctx.lineTo(x + size, cy);
+      ctx.stroke();
+    }
   }
   if (selected) {
     ctx.strokeStyle = "#ffffff";
@@ -537,7 +557,15 @@ export function drawDeckItems(
     const size = Math.max(pile.top.kind === "crate" ? 10 : 6, t.scale * pile.size);
     // Ship's stores are drawn dimmer than freight so the cargo reads first.
     ctx.globalAlpha = pile.top.kind === "crate" ? 1 : 0.75;
-    drawCrate(ctx, cx, cy, size, itemColor(pile.top), pile.top.id === selectedId);
+    drawCrate(
+      ctx,
+      cx,
+      cy,
+      size,
+      itemColor(pile.top),
+      pile.top.id === selectedId,
+      pile.top.offered === true,
+    );
     ctx.globalAlpha = 1;
     // Freight only: the stores' ration counts are noise at this zoom.
     if (pile.count > 1 && pile.top.kind === "crate") {

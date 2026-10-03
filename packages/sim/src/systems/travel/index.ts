@@ -29,5 +29,6 @@ export {
   impairmentKey,
   worstImpairment,
 } from "./departure-gate";
+export { jobBlockingAcceptance } from "./in-hand";
 export { travelTaskDerivations } from "./tasks";
 export { travelViolations } from "./invariants";

@@ -37,6 +37,15 @@ function outwardStatus(machine: Machine): "ok" | "degraded" | "failed" | "off" {
   return machine.output < 1 ? "degraded" : "ok";
 }
 
+/**
+ * Whether the actor has yet to have their first look, and so the ship-familiarity brief. Anyone
+ * else writing facts for such an actor (D63's freight brief) must leave them to it: a single
+ * fact makes the knowledge table non-empty and the brief would never run.
+ */
+export function awaitsFamiliarityBrief(actor: Pick<Actor, "knowledge">): boolean {
+  return Object.keys(actor.knowledge).length === 0;
+}
+
 function brief(ctx: StepCtx, actor: Actor, deckId: OnDeckLocation["deckId"]): void {
   for (const item of Object.values(ctx.state.items)) {
     if (item.location.kind !== "onDeck" || item.location.deckId !== deckId) continue;
@@ -165,7 +174,7 @@ export function observe(ctx: StepCtx, actor: Actor): void {
   if (location.kind !== "onDeck") return;
   const geometry = ctx.caches.nav.decks[location.deckId];
   if (geometry === undefined) return;
-  if (Object.keys(actor.knowledge).length === 0) brief(ctx, actor, location.deckId);
+  if (awaitsFamiliarityBrief(actor)) brief(ctx, actor, location.deckId);
   const here = compartmentAt(geometry, location.x, location.y);
   if (here === undefined) {
     if (!isDockTile(geometry, location.x, location.y)) return;

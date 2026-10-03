@@ -39,6 +39,7 @@ export {
 export { equipmentTaskDerivation, registerEquipmentSystems } from "./systems/equipment/index";
 export {
   hopCount,
+  jobBlockingAcceptance,
   nextHop,
   registerTravel,
   shortestPath,

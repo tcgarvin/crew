@@ -337,6 +337,34 @@ function dropHaulCargo(ctx: StepCtx, actor: Actor, task: Task): void {
   touchInventory(ctx);
 }
 
+/**
+ * Set down the tools and consumables the actor picked up for a task they are giving up, where
+ * they stand: carried on, the ship's only spares (or wrench) would be out of everyone else's
+ * reach until this actor happened to take the task up again.
+ */
+function dropTaskSupplies(ctx: StepCtx, actor: Actor, task: Task): void {
+  if (task.consumables.length === 0 && task.requiredTools.length === 0) return;
+  if (actor.location.kind !== "onDeck") return;
+  const { deckId, x, y } = actor.location;
+  const consumed = new Set(task.consumables.map((need) => need.itemDefId));
+  let dropped = false;
+  for (const item of carriedItems(ctx, actor.id)) {
+    const def = ctx.content.items[item.defId];
+    const tool = def?.toolKinds.some((kind) => task.requiredTools.includes(kind)) ?? false;
+    if (!consumed.has(item.defId) && !tool) continue;
+    item.location = { kind: "onDeck", deckId, x, y };
+    writeFact(
+      actor,
+      item.id,
+      "itemLocation",
+      { location: item.location },
+      directSight(actor, ctx.tick),
+    );
+    dropped = true;
+  }
+  if (dropped) touchInventory(ctx);
+}
+
 function leaveHold(ctx: StepCtx, actor: Actor): void {
   if (currentHold(actor.activity) === "sleep") {
     ctx.emit({ type: "wokeUp", subjectIds: [actor.id], causeIds: [], source: "sim", payload: {} });
@@ -356,7 +384,10 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined) {
       dropHaulCargo(ctx, actor, task);
-      if (!isTerminal(task)) releaseActorClaim(ctx, actor.id, task, reason);
+      if (!isTerminal(task)) {
+        dropTaskSupplies(ctx, actor, task);
+        releaseActorClaim(ctx, actor.id, task, reason);
+      }
     }
   }
   actor.activity = { kind: "idle" };
@@ -829,8 +860,18 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
   const others = claimantsOf(ctx, task.id).filter((id) => id !== actor.id);
   if (others.length >= task.workerSlots) return;
   if (task.blockage !== undefined && ctx.tick < task.blockage.retryAfterTick) return;
-  abortActivity(ctx, actor, "interrupted");
   learnManifest(ctx, actor, task);
+  // Plan against truth before dropping what the actor is doing: the planner chose from beliefs,
+  // and a choice that cannot be carried out (a repair whose parts are not aboard) must not make
+  // them set a crate down mid-haul. Aborting only moves things from hand to feet, so a plan
+  // that fails now would fail after the abort too; the plan used is rebuilt after it.
+  const feasible = buildTaskPlan(ctx, actor, task);
+  if (!feasible.ok) {
+    setBackoff(ctx, actor, backoffRef.task(task.id));
+    blockTask(ctx, actor, task, feasible.reason);
+    return;
+  }
+  abortActivity(ctx, actor, "interrupted");
   const plan = buildTaskPlan(ctx, actor, task);
   if (!plan.ok) {
     setBackoff(ctx, actor, backoffRef.task(task.id));
@@ -873,6 +914,11 @@ function startPersonal(
     intent.activity,
     intent.itemId ?? (intent.targetId as MachineId | undefined),
   );
+  // As for tasks: an activity that cannot be carried out leaves the current one alone.
+  if (!buildPersonalPlan(ctx, actor, intent).ok) {
+    setBackoff(ctx, actor, ref);
+    return;
+  }
   abortActivity(ctx, actor, "interrupted");
   const plan = buildPersonalPlan(ctx, actor, intent);
   if (!plan.ok) {

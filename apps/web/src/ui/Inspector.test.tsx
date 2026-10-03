@@ -51,3 +51,27 @@ describe("Inspector actor sheet", () => {
     expect(html.match(/inspector-tag/g)).toHaveLength(1);
   });
 });
+
+describe("Inspector item sheet", () => {
+  const crate = (status: string) => ({
+    kind: "item" as const,
+    item: {
+      name: "General freight crate",
+      count: 1,
+      where: "in the freight staging area on the dock",
+      job: { issuer: "Hal Petrosyan", from: "Crossroads Hub", to: "Kessler Drift", status },
+    },
+  });
+
+  it("says freight on offer is on offer and nobody's until the job is taken (D63)", () => {
+    const html = renderToStaticMarkup(<Inspector data={crate("offered")} onClose={() => {}} />);
+    expect(html).toContain('class="inspector-subtitle">freight on offer<');
+    expect(html).toContain("nobody loads it until then");
+  });
+
+  it("reads taken freight as plain freight", () => {
+    const html = renderToStaticMarkup(<Inspector data={crate("accepted")} onClose={() => {}} />);
+    expect(html).toContain('class="inspector-subtitle">freight<');
+    expect(html).not.toContain("nobody loads it");
+  });
+});
