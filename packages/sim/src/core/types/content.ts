@@ -14,6 +14,7 @@ import type { Rotation, Seconds, TileCoord, TileEdge } from "./common";
 import type {
   CrewDefId,
   DeckDefId,
+  DockDefId,
   ItemDefId,
   LocalKey,
   MachineDefId,
@@ -207,6 +208,28 @@ export interface DockingInterfaceDef {
   /** Floor tiles just inside each ramp, where transferred items/people appear or leave. */
   readonly cargoTransferTiles: readonly TileCoord[];
   readonly personnelTransferTiles: readonly TileCoord[];
+}
+
+/**
+ * Dockside spike (docs/design/dockside-spike.md): the part of a port's dock map that navigation
+ * needs. Phase 2's `DockDef` (rows + legend, posts, areas, props, palette) is the authored form;
+ * this is derived from it. Coordinates are in the dock map's own frame.
+ *
+ * Ramp landings are not listed: the dock is grafted into the deck's frame at `shipAt`, so each
+ * ramp door lands on the dock tile across its hull edge (`systems/spatial/dock.ts`
+ * `rampLandings`), and the nav builder throws if that tile is not dock floor.
+ */
+export interface DockLayout {
+  readonly id: DockDefId;
+  readonly width: number;
+  readonly height: number;
+  /**
+   * `height` rows of `width` characters: `.` is walkable dock floor; anything else (wall, void,
+   * berth, blocking prop) is not. Dock floor may not overlap the ship's floor.
+   */
+  readonly rows: readonly string[];
+  /** Dock tile under deck tile (0,0): deck (x, y) is dock (x + shipAt.x, y + shipAt.y). */
+  readonly shipAt: TileCoord;
 }
 
 export interface SpawnPointDef {
@@ -796,6 +819,11 @@ export interface ContentBundle {
    * narrator falls back to the template's `issuer` as the person's name.
    */
   readonly people?: PeopleTableDef;
+  /**
+   * Dockside spike: walkable dock layouts by id. Optional and unused by authored content until
+   * phase 2 adds `DockDef` (whose nav subset this is); see docs/design/dockside-spike.md.
+   */
+  readonly docks?: Readonly<Record<DockDefId, DockLayout>>;
   readonly config: ConfigDef;
   readonly hash: string;
 }

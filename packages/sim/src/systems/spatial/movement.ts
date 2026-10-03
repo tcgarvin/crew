@@ -345,6 +345,14 @@ function enterSegment(
       blocked(ctx, actor, geometry, a, b, doorId);
       return "ended";
     }
+    if (door.physicalState !== "open" && door.kind === "ramp") {
+      // Dockside spike: travel owns ramps. Wait while one is lowering; otherwise the dock is cut
+      // off and the route ends here (planning already treats a closed ramp as impassable, so no
+      // door fact is needed).
+      if (doorWillOpen(ctx.state, door, nav)) return "wait";
+      blocked(ctx, actor, geometry, a, b, doorId);
+      return "ended";
+    }
     if (door.physicalState !== "open") {
       door.requestedState = "open";
       if (waitedOut() && !doorWillOpen(ctx.state, door, nav)) {

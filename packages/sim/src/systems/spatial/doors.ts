@@ -12,7 +12,8 @@
  *   in its aperture; that takes `config.doors.manualOpenSeconds`. The request itself is
  *   instantaneous (no `operateDoor` action in V1).
  * - Only doors that reached `open` under power get `closeAfterTick`; authored-open doors and
- *   hand-opened doors stay open. The timer restarts while anyone is in the aperture.
+ *   hand-opened doors stay open, and so do ramps, which only travel closes. The timer restarts
+ *   while anyone is in the aperture.
  * - Closing reverses to opening when an actor enters the aperture or re-requests `open`; closure
  *   never pushes or crushes anyone.
  */
@@ -22,7 +23,7 @@ import type { LocalKey } from "../../core/types/ids";
 import type { NavDoor } from "../../core/types/nav";
 import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipeline";
 import type { Door, DoorPhysicalState } from "../../core/types/ship";
-import { deckGeometry } from "./geometry";
+import { deckGeometry, syncRampPassability } from "./geometry";
 
 export function isPowerDomainLive(state: ReadonlyWorldState, key: LocalKey): boolean {
   const domain = state.power.domains[key];
@@ -41,11 +42,13 @@ export function doorHasPower(
 
 /**
  * Will this door move toward `open` for an actor waiting at it? Used by movement to decide
- * whether waiting is still worthwhile.
+ * whether waiting is still worthwhile. Actors never ask a ramp to open (travel owns ramps), so a
+ * ramp will open only if travel has already asked for it.
  */
 export function doorWillOpen(state: ReadonlyWorldState, door: Door, nav: NavDoor): boolean {
   if (door.physicalState === "open") return true;
   if (door.physicalState === "jammed") return false;
+  if (door.kind === "ramp" && door.requestedState !== "open") return false;
   return doorHasPower(state, door, nav) || door.manualOperationSupported;
 }
 
@@ -108,11 +111,17 @@ export function updateDoor(ctx: StepCtx, door: Door, nav: NavDoor): void {
       const seconds = powered ? config.doors.openSeconds : config.doors.manualOpenSeconds;
       if (step(ctx, door, seconds)) {
         transition(ctx, door, "open", 0);
-        if (powered) door.closeAfterTick = ctx.tick + autoCloseTicks;
+        // Ramps never close themselves: travel lowers and raises them (Dockside spike).
+        if (powered && door.kind !== "ramp") door.closeAfterTick = ctx.tick + autoCloseTicks;
       }
       return;
     }
     case "open":
+      if (door.kind === "ramp" && door.closeAfterTick !== undefined) {
+        // A save from before ramps stopped auto-closing may still carry the timer.
+        // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
+        delete door.closeAfterTick;
+      }
       if (door.closeAfterTick !== undefined && occupied) {
         door.closeAfterTick = ctx.tick + autoCloseTicks;
       } else if (door.closeAfterTick !== undefined && ctx.tick >= door.closeAfterTick && powered) {
@@ -148,5 +157,7 @@ export const doorsSystem: System = {
       if (nav === undefined) throw new Error(`Door ${door.id} is missing from the nav cache`);
       updateDoor(ctx, door, nav);
     }
+    // Dockside spike: a ramp opening, closing or being asked up connects or cuts off the dock.
+    syncRampPassability(ctx.state, ctx.caches);
   },
 };

@@ -5,15 +5,32 @@
  * W0 decision 7: walls are implicit on every edge between two different compartments and between
  * floor and void; `openings` remove such a wall, `walls` add one inside a compartment, and a door
  * edge is neither wall nor open (crossing it needs a door check).
+ *
+ * Dockside spike (docs/design/dockside-spike.md): while a dock is alongside (`state.deck.dock`),
+ * its floor is grafted into the deck's grid in the deck's own frame (deck tile = dock tile −
+ * shipAt), as floor in no compartment. Dock floor is a region of its own for implicit walls, so
+ * the hull walls it off from the ship everywhere except across the ramp doors. The grid then has
+ * a non-zero origin and larger bounds; every index goes through `indexAt`/`tileAtIndex`.
  */
 import type { CacheBuilder } from "../../core/registry";
 import type { EdgeSide, TileCoord, TileEdge } from "../../core/types/common";
-import type { ContentBundle, DeckDef, MachineDef } from "../../core/types/content";
+import type { ContentBundle, DeckDef, DockLayout, MachineDef } from "../../core/types/content";
 import type { CompartmentId, DeckDefId, DoorId, MachineId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
-import type { DeckGeometry, NavDoor, NavInteractionPosition } from "../../core/types/nav";
+import {
+  DOCK_FLOOR,
+  type DeckGeometry,
+  type NavDockGraft,
+  type NavDoor,
+  type NavInteractionPosition,
+} from "../../core/types/nav";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
+import type { DockPresence, Door } from "../../core/types/ship";
+import type { WorldState } from "../../core/types/state";
+import { type Grid, inBounds, indexAt, tileIndex } from "./grid";
 import { rebuildReservations } from "./reservations";
+
+export { inBounds, indexAt, tileAtIndex, tileIndex } from "./grid";
 
 export const SIDE_BIT: Readonly<Record<EdgeSide, number>> = { n: 1, e: 2, s: 4, w: 8 };
 
@@ -53,29 +70,48 @@ export function sideTowards(from: TileCoord, to: TileCoord): EdgeSide | undefine
   return undefined;
 }
 
-export function inBounds(geometry: DeckGeometry, x: number, y: number): boolean {
-  return x >= 0 && y >= 0 && x < geometry.width && y < geometry.height;
-}
-
-export function tileIndex(geometry: DeckGeometry, tile: TileCoord): number {
-  return tile.y * geometry.width + tile.x;
-}
-
 /** Static floor that no machine stands on. */
+/**
+ * Grid index of tile (x, y), or -1 off the grid. Same arithmetic as `grid.ts`, kept local
+ * because these predicates are pathfinding's innermost calls and a cross-module call costs a
+ * binding lookup per call under the test runner's module transform (measurable in fullSim).
+ */
+function cell(geometry: Grid, x: number, y: number): number {
+  const gx = x - geometry.originX;
+  const gy = y - geometry.originY;
+  if (gx < 0 || gy < 0 || gx >= geometry.width || gy >= geometry.height) return -1;
+  return gy * geometry.width + gx;
+}
+
 export function isStaticWalkable(geometry: DeckGeometry, x: number, y: number): boolean {
-  if (!inBounds(geometry, x, y)) return false;
-  const i = y * geometry.width + x;
-  return geometry.floor[i] === 1 && geometry.footprint[i] === 0;
+  const i = cell(geometry, x, y);
+  return i >= 0 && geometry.floor[i] === 1 && geometry.footprint[i] === 0;
 }
 
 /** Walkable right now: static walkable and not dynamically obstructed. */
 export function isWalkable(geometry: DeckGeometry, x: number, y: number): boolean {
-  return isStaticWalkable(geometry, x, y) && geometry.obstructed[y * geometry.width + x] === 0;
+  const i = cell(geometry, x, y);
+  return (
+    i >= 0 && geometry.floor[i] === 1 && geometry.footprint[i] === 0 && geometry.obstructed[i] === 0
+  );
+}
+
+/** Is the tile under this point floor (the ship's or a grafted dock's), machines or not? */
+export function isStaticFloor(geometry: DeckGeometry, x: number, y: number): boolean {
+  const i = cell(geometry, Math.floor(x), Math.floor(y));
+  return i >= 0 && geometry.floor[i] === 1;
+}
+
+/** Is the tile under this point grafted dock floor (rather than the ship's own floor)? */
+export function isDockTile(geometry: DeckGeometry, x: number, y: number): boolean {
+  const i = cell(geometry, Math.floor(x), Math.floor(y));
+  return i >= 0 && geometry.compartment[i] === DOCK_FLOOR;
 }
 
 export function hasWall(geometry: DeckGeometry, tile: TileCoord, side: EdgeSide): boolean {
-  if (!inBounds(geometry, tile.x, tile.y)) return true;
-  return ((geometry.walls[tileIndex(geometry, tile)] ?? 0) & SIDE_BIT[side]) !== 0;
+  const i = cell(geometry, tile.x, tile.y);
+  if (i < 0) return true;
+  return ((geometry.walls[i] ?? 0) & SIDE_BIT[side]) !== 0;
 }
 
 export function doorOnEdge(
@@ -103,8 +139,9 @@ export function compartmentAt(
 ): CompartmentId | undefined {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
-  if (!inBounds(geometry, tx, ty)) return undefined;
-  const index = geometry.compartment[ty * geometry.width + tx] ?? -1;
+  const i = cell(geometry, tx, ty);
+  if (i < 0) return undefined;
+  const index = geometry.compartment[i] ?? -1;
   return index < 0 ? undefined : geometry.compartmentIds[index];
 }
 
@@ -131,18 +168,50 @@ export interface GeometryInputs {
   readonly doorIdByKey: ReadonlyMap<string, DoorId>;
   /** Machine instance by placement key. */
   readonly machineIdByKey: ReadonlyMap<string, MachineId>;
+  /** The dock to graft onto this deck, if one is alongside. */
+  readonly dock?: DockLayout;
 }
 
-/** Build the static geometry for one deck. Pure; `obstructed` starts clear. */
+/** Deck-frame tiles of a dock layout's floor. Throws on a malformed layout. */
+export function dockFloorTiles(dock: DockLayout): TileCoord[] {
+  if (dock.rows.length !== dock.height) {
+    throw new Error(`Dock "${dock.id}": ${dock.rows.length} rows, expected ${dock.height}`);
+  }
+  const tiles: TileCoord[] = [];
+  dock.rows.forEach((row, y) => {
+    if (row.length !== dock.width) {
+      throw new Error(`Dock "${dock.id}": row ${y} is ${row.length} wide, expected ${dock.width}`);
+    }
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === ".") tiles.push({ x: x - dock.shipAt.x, y: y - dock.shipAt.y });
+    }
+  });
+  return tiles;
+}
+
+/** Bounds of the deck plus, if docked, the dock map (both in deck coordinates). */
+function gridBounds(deck: DeckDef, dock: DockLayout | undefined): Grid {
+  if (dock === undefined) return { originX: 0, originY: 0, width: deck.width, height: deck.height };
+  const originX = Math.min(0, -dock.shipAt.x);
+  const originY = Math.min(0, -dock.shipAt.y);
+  const endX = Math.max(deck.width, dock.width - dock.shipAt.x);
+  const endY = Math.max(deck.height, dock.height - dock.shipAt.y);
+  return { originX, originY, width: endX - originX, height: endY - originY };
+}
+
+/** Build the static geometry for one deck and any grafted dock. Pure; dynamic state starts clear. */
 export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
-  const { deck } = inputs;
-  const { width, height } = deck;
+  const { deck, dock } = inputs;
+  const grid = gridBounds(deck, dock);
+  const { originX, originY, width, height } = grid;
   const size = width * height;
   const floor = new Uint8Array(size);
   const footprint = new Uint8Array(size);
   const compartment = new Int16Array(size).fill(-1);
   const walls = new Uint8Array(size);
   const doorSides = new Uint8Array(size);
+  const inGrid = (x: number, y: number) => inBounds(grid, x, y);
+  const at = (x: number, y: number) => indexAt(grid, x, y);
 
   const compartmentIds: CompartmentId[] = [];
   const symbolIndex = new Map<string, number>();
@@ -153,20 +222,33 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
     compartmentIds.push(id);
   });
 
-  for (let y = 0; y < height; y++) {
+  for (let y = 0; y < deck.height; y++) {
     const row = deck.tiles[y] ?? "";
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < deck.width; x++) {
       const symbol = row[x] ?? " ";
       if (symbol === " ") continue;
       const index = symbolIndex.get(symbol);
       if (index === undefined) throw new Error(`Deck "${deck.id}": unknown symbol "${symbol}"`);
-      floor[y * width + x] = 1;
-      compartment[y * width + x] = index;
+      floor[at(x, y)] = 1;
+      compartment[at(x, y)] = index;
+    }
+  }
+  if (dock !== undefined) {
+    for (const tile of dockFloorTiles(dock)) {
+      const i = at(tile.x, tile.y);
+      if (floor[i] === 1) {
+        throw new Error(
+          `Dock "${dock.id}": floor at deck (${tile.x},${tile.y}) overlaps deck "${deck.id}"`,
+        );
+      }
+      floor[i] = 1;
+      compartment[i] = DOCK_FLOOR;
     }
   }
 
-  const compartmentOf = (x: number, y: number): number =>
-    x < 0 || y < 0 || x >= width || y >= height ? -1 : (compartment[y * width + x] ?? -1);
+  // Void and off-grid are both -1, so the grid's outer edge is walled too.
+  const regionOf = (x: number, y: number): number =>
+    inGrid(x, y) ? (compartment[at(x, y)] ?? -1) : -1;
   const setEdgeBits = (target: Uint8Array, edge: TileEdge, on: boolean) => {
     const delta = SIDE_DELTA[edge.side];
     const pairs: [number, number, EdgeSide][] = [
@@ -174,21 +256,22 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
       [edge.x + delta.x, edge.y + delta.y, OPPOSITE[edge.side]],
     ];
     for (const [x, y, side] of pairs) {
-      if (x < 0 || y < 0 || x >= width || y >= height) continue;
-      const i = y * width + x;
+      if (!inGrid(x, y)) continue;
+      const i = at(x, y);
       target[i] = on ? (target[i] ?? 0) | SIDE_BIT[side] : (target[i] ?? 0) & ~SIDE_BIT[side];
     }
   };
 
-  // Implicit walls: between floor and void/off-grid, and between different compartments.
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const here = compartmentOf(x, y);
-      if (here < 0) continue;
+  // Implicit walls: between floor and void/off-grid, between different compartments, and between
+  // the ship and grafted dock floor (the hull), on both tiles of each edge.
+  for (let y = originY; y < originY + height; y++) {
+    for (let x = originX; x < originX + width; x++) {
+      const here = regionOf(x, y);
+      if (here === -1) continue;
       for (const side of SIDES) {
         const d = SIDE_DELTA[side];
-        if (compartmentOf(x + d.x, y + d.y) !== here) {
-          walls[y * width + x] = (walls[y * width + x] ?? 0) | SIDE_BIT[side];
+        if (regionOf(x + d.x, y + d.y) !== here) {
+          walls[at(x, y)] = (walls[at(x, y)] ?? 0) | SIDE_BIT[side];
         }
       }
     }
@@ -226,7 +309,7 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
       const r = rotateOffset(offset, placement.rotation);
       const x = placement.origin.x + r.x;
       const y = placement.origin.y + r.y;
-      if (x >= 0 && y >= 0 && x < width && y < height) footprint[y * width + x] = 1;
+      if (inGrid(x, y)) footprint[at(x, y)] = 1;
     }
     for (const position of def.interactionPositions) {
       const r = rotateOffset(position.offset, placement.rotation);
@@ -239,15 +322,17 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
         capacity: position.capacity,
       };
       interactionPositions.push(entry);
-      const index = tile.y * width + tile.x;
+      const index = at(tile.x, tile.y);
       const list = interactionByTile.get(index);
       if (list === undefined) interactionByTile.set(index, [entry]);
       else list.push(entry);
     }
   }
 
-  return {
+  const geometry: DeckGeometry = {
     deckId: deck.id,
+    originX,
+    originY,
     width,
     height,
     floor,
@@ -261,11 +346,29 @@ export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
     doors,
     interactionPositions,
     interactionByTile,
+    openRamps: new Set(),
   };
+  return dock === undefined ? geometry : { ...geometry, dock: dockGraft(geometry, dock) };
 }
 
-/** Copy dynamic obstructions from `state.deck.tiles` into the geometry. */
-export function refreshObstructions(geometry: DeckGeometry, state: ReadonlyWorldState): void {
+/** Where each ramp lands on the dock; throws if a ramp would open onto anything but dock floor. */
+function dockGraft(geometry: DeckGeometry, dock: DockLayout): NavDockGraft {
+  const landings = new Map<DoorId, TileCoord>();
+  for (const nav of geometry.doors.values()) {
+    if (nav.placement.kind !== "ramp") continue;
+    const outside = nav.tiles.find((t) => isDockTile(geometry, t.x, t.y));
+    if (outside === undefined) {
+      throw new Error(
+        `Dock "${dock.id}": ramp "${nav.placement.key}" does not open onto dock floor`,
+      );
+    }
+    landings.set(nav.id, outside);
+  }
+  return { dockId: dock.id, offset: { x: -dock.shipAt.x, y: -dock.shipAt.y }, landings };
+}
+
+/** Copy dynamic state into the geometry: obstructions from `state.deck.tiles`, and open ramps. */
+export function refreshDynamic(geometry: DeckGeometry, state: ReadonlyWorldState): void {
   geometry.obstructed.fill(0);
   const tiles = state.deck.tiles[geometry.deckId] ?? {};
   for (const [key, tileState] of Object.entries(tiles)) {
@@ -273,8 +376,81 @@ export function refreshObstructions(geometry: DeckGeometry, state: ReadonlyWorld
     const [xs, ys] = key.split(",");
     const x = Number(xs);
     const y = Number(ys);
-    if (inBounds(geometry, x, y)) geometry.obstructed[y * geometry.width + x] = 1;
+    if (inBounds(geometry, x, y)) geometry.obstructed[indexAt(geometry, x, y)] = 1;
   }
+  geometry.openRamps.clear();
+  for (const nav of geometry.doors.values()) {
+    const door = state.doors[nav.id];
+    if (nav.placement.kind === "ramp" && door !== undefined && rampPassable(door)) {
+      geometry.openRamps.add(nav.id);
+    }
+  }
+}
+
+/**
+ * Planning may route across a ramp only while it is fully open and travel still wants it open:
+ * once travel asks for the ramps up, nobody sets off down one. Ramp requests are as public as
+ * ramp state.
+ */
+export function rampPassable(door: Pick<Door, "physicalState" | "requestedState">): boolean {
+  return door.physicalState === "open" && door.requestedState === "open";
+}
+
+/**
+ * Bring every deck's `openRamps` in line with the doors; on any change, bump the geometry
+ * revision (cached routes keyed by it miss) and flag navigation dirty. Called by the door system
+ * every run and by whoever changes a ramp request (travel), so planning sees it the same tick.
+ */
+export function syncRampPassability(
+  state: { readonly doors: WorldState["doors"]; readonly deck: WorldState["deck"] },
+  caches: DerivedCaches,
+): void {
+  let changed = false;
+  for (const geometry of Object.values(caches.nav.decks)) {
+    for (const nav of geometry.doors.values()) {
+      if (nav.placement.kind !== "ramp") continue;
+      const door = state.doors[nav.id];
+      const passable = door !== undefined && rampPassable(door);
+      if (passable === geometry.openRamps.has(nav.id)) continue;
+      if (passable) geometry.openRamps.add(nav.id);
+      else geometry.openRamps.delete(nav.id);
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  state.deck.geometryRevision += 1;
+  // Drop cached routes now: not every policy key carries the revision (`schematic` does not).
+  caches.nav.paths.clear();
+  caches.dirty.navigation = true;
+}
+
+/** The dock layout grafted onto `deckId` in this state, if any; throws if content lacks it. */
+export function dockLayoutFor(
+  content: ContentBundle,
+  state: ReadonlyWorldState,
+  deckId: DeckDefId,
+): DockLayout | undefined {
+  const presence = state.deck.dock;
+  if (presence === undefined || presence.deckId !== deckId) return undefined;
+  const layout = content.docks?.[presence.dockId];
+  if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
+  return layout;
+}
+
+/**
+ * Build (and discard) the geometry `presence` would produce, so a bad graft throws before any
+ * state changes: unknown deck or layout, dock floor over the ship, a ramp landing on nothing.
+ */
+export function checkDockGraft(
+  content: ContentBundle,
+  state: ReadonlyWorldState,
+  presence: DockPresence,
+): void {
+  const deck = content.decks[presence.deckId];
+  if (deck === undefined) throw new Error(`No deck "${presence.deckId}" to dock against`);
+  const layout = content.docks?.[presence.dockId];
+  if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
+  buildDeckGeometry({ ...geometryInputs(deck, content, state), dock: layout });
 }
 
 function geometryInputs(
@@ -293,8 +469,10 @@ function geometryInputs(
     }
     return map;
   };
+  const dock = dockLayoutFor(content, state, deck.id);
   return {
     deck,
+    ...(dock === undefined ? {} : { dock }),
     machineDefs: (id) => content.machines[id],
     compartmentIdByKey: byKey(
       state.compartments,
@@ -314,8 +492,8 @@ function geometryInputs(
   };
 }
 
-/** Rebuild every deck's geometry, the edge masks and the reservations from state + content. */
-export function rebuildNav(
+/** Rebuild every deck's geometry (with any grafted dock) and edge mask; drops cached paths. */
+export function rebuildGeometries(
   caches: DerivedCaches,
   content: ContentBundle,
   state: ReadonlyWorldState,
@@ -328,7 +506,7 @@ export function rebuildNav(
     const deck = content.decks[deckId];
     if (deck === undefined) continue;
     const geometry = buildDeckGeometry(geometryInputs(deck, content, state));
-    refreshObstructions(geometry, state);
+    refreshDynamic(geometry, state);
     nav.decks[deckId] = geometry;
     const mask = new Uint8Array(geometry.walls.length);
     for (let i = 0; i < mask.length; i++) {
@@ -337,6 +515,24 @@ export function rebuildNav(
     nav.edgeMask[deckId] = mask;
   }
   nav.geometryRevision = state.deck.geometryRevision;
+}
+
+/** Does every cached deck geometry graft exactly the dock the state says is alongside? */
+export function dockGraftCurrent(caches: DerivedCaches, state: ReadonlyWorldState): boolean {
+  const presence = state.deck.dock;
+  return Object.values(caches.nav.decks).every((geometry) => {
+    const wanted = presence?.deckId === geometry.deckId ? presence.dockId : undefined;
+    return geometry.dock?.dockId === wanted;
+  });
+}
+
+/** Rebuild every deck's geometry, the edge masks and the reservations from state + content. */
+export function rebuildNav(
+  caches: DerivedCaches,
+  content: ContentBundle,
+  state: ReadonlyWorldState,
+): void {
+  rebuildGeometries(caches, content, state);
   rebuildReservations(caches, state);
 }
 

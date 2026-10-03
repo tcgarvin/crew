@@ -11,7 +11,17 @@ import type { TileCoord } from "../../core/types/common";
 import type { DoorId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { DerivedCaches } from "../../core/types/pipeline";
-import { SIDE_BIT, doorOnEdge, hasWall, inBounds, isStaticWalkable, sideTowards } from "./geometry";
+import {
+  SIDE_BIT,
+  doorOnEdge,
+  hasWall,
+  inBounds,
+  indexAt,
+  isStaticWalkable,
+  sideTowards,
+  tileAtIndex,
+  tileIndex,
+} from "./geometry";
 
 export interface PathPolicy {
   /** Cache key for results under this policy; omit to skip the cache. */
@@ -130,8 +140,7 @@ export function findPath(
   to: TileCoord,
   policy: PathPolicy,
 ): TileCoord[] | null {
-  const { width } = geometry;
-  if (!inBounds(geometry, from.x, from.y) || geometry.floor[from.y * width + from.x] !== 1) {
+  if (!inBounds(geometry, from.x, from.y) || geometry.floor[tileIndex(geometry, from)] !== 1) {
     return null;
   }
   const walkable = (x: number, y: number) =>
@@ -139,12 +148,15 @@ export function findPath(
   if (!walkable(to.x, to.y)) return null;
   if (from.x === to.x && from.y === to.y) return [{ x: from.x, y: from.y }];
 
+  const { width, originX, originY } = geometry;
+  // `indexAt` inlined for the inner loops (callers have bounds-checked through `walkable`).
+  const indexOf = (x: number, y: number) => (y - originY) * width + (x - originX);
   const size = width * geometry.height;
   const g = new Float64Array(size).fill(Number.POSITIVE_INFINITY);
   const parent = new Int32Array(size).fill(-1);
   const closed = new Uint8Array(size);
-  const start = from.y * width + from.x;
-  const goal = to.y * width + to.x;
+  const start = tileIndex(geometry, from);
+  const goal = tileIndex(geometry, to);
   const heap = new NodeHeap();
   const maxOpen = size * 8 + 1;
   g[start] = 0;
@@ -156,8 +168,10 @@ export function findPath(
     g[next] = candidate;
     parent[next] = node;
     if (heap.size < maxOpen) {
-      const nx = next % width;
-      const ny = (next - nx) / width;
+      // `tileAtIndex` inlined: relax is the hot path, so keep it allocation-free.
+      const gx = next % width;
+      const nx = gx + originX;
+      const ny = (next - gx) / width + originY;
       heap.push(next, candidate + octile(nx, ny, to.x, to.y), candidate);
     }
   };
@@ -167,8 +181,9 @@ export function findPath(
     if (closed[node] === 1) continue;
     if (node === goal) break;
     closed[node] = 1;
-    const x = node % width;
-    const y = (node - x) / width;
+    const gx = node % width;
+    const x = gx + originX;
+    const y = (node - gx) / width + originY;
     const here = { x, y };
 
     for (const [dx, dy] of CARDINALS) {
@@ -186,7 +201,7 @@ export function findPath(
       } else if (hasWall(geometry, here, side)) {
         continue;
       }
-      relax(node, ny * width + nx, cost);
+      relax(node, indexOf(nx, ny), cost);
     }
 
     for (const [dx, dy] of DIAGONALS) {
@@ -197,7 +212,7 @@ export function findPath(
       const sy = dy > 0 ? "s" : "n";
       const blocked = (tile: TileCoord, side: "n" | "e" | "s" | "w") =>
         hasWall(geometry, tile, side) ||
-        ((geometry.doorSides[tile.y * width + tile.x] ?? 0) & SIDE_BIT[side]) !== 0;
+        ((geometry.doorSides[indexOf(tile.x, tile.y)] ?? 0) & SIDE_BIT[side]) !== 0;
       if (
         blocked(here, sx) ||
         blocked(here, sy) ||
@@ -206,15 +221,14 @@ export function findPath(
       ) {
         continue;
       }
-      relax(node, ny * width + nx, SQRT2);
+      relax(node, indexOf(nx, ny), SQRT2);
     }
   }
 
   if (parent[goal] === -1) return null;
   const path: TileCoord[] = [];
   for (let node = goal; node !== -1; node = parent[node] as number) {
-    const px = node % width;
-    path.push({ x: px, y: (node - px) / width });
+    path.push(tileAtIndex(geometry, node));
     if (node === start) break;
   }
   return path.reverse();

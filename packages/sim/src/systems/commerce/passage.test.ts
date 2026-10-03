@@ -562,7 +562,8 @@ describe("passage lifecycle", () => {
  * as the test wants: the window between docking and stepping off.
  */
 function giveTheDeckANavCache(world: World): void {
-  world.caches.nav.decks[FIX.deck] = {} as DeckGeometry;
+  // A door table, because travel syncs ramp passability through it (Dockside spike).
+  world.caches.nav.decks[FIX.deck] = { doors: new Map() } as unknown as DeckGeometry;
 }
 
 function placeOnDeck(world: World, actorId: ActorId, x: number, y: number) {

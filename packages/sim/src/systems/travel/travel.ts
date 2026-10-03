@@ -28,6 +28,7 @@ import type {
   VoyageFields,
 } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
+import { syncRampPassability } from "../spatial/geometry";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
 import { raiseHookIfIdle } from "./hooks";
@@ -78,15 +79,20 @@ function rampDoorIds(ctx: Pick<StepCtx, "state" | "content">): DoorId[] {
     .map((d) => d.id);
 }
 
-/** Request every ramp door to `state`; the door system (W3) drives the physical transition. */
+/**
+ * Request every ramp door to `state`; the door system (W3) drives the physical transition.
+ * Planning stops routing across a ramp the moment it is asked up (Dockside spike), so the nav
+ * cache is told now rather than at the door system's next run.
+ */
 export function requestRamps(
-  ctx: Pick<StepCtx, "state" | "content">,
+  ctx: Pick<StepCtx, "state" | "content" | "caches">,
   state: "open" | "closed",
 ): void {
   for (const doorId of rampDoorIds(ctx)) {
     const door = ctx.state.doors[doorId];
     if (door !== undefined) door.requestedState = state;
   }
+  syncRampPassability(ctx.state, ctx.caches);
 }
 
 function rampsClosed(ctx: Pick<StepCtx, "state" | "content">): boolean {
