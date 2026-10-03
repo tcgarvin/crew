@@ -8,12 +8,14 @@
     {
       "name": "Sister Aurelie Doucet",
       "role": "hospice warden",
-      "note": "Calm, dry, and the person who decides whether a visitor is let in; she has seen every kind of grief and is unimpressed by drama."
+      "note": "Calm, dry, and the person who decides whether a visitor is let in; she has seen every kind of grief and is unimpressed by drama.",
+      "post": "chapel_doors"
     },
     {
       "name": "Jonah Weir",
       "role": "dock keeper",
-      "note": "Meets every ship himself, remembers every passenger's name, and keeps a list of the ones who never came back for a second visit."
+      "note": "Meets every ship himself, remembers every passenger's name, and keeps a list of the ones who never came back for a second visit.",
+      "post": "dock_keeper"
     },
     {
       "name": "Dr. Imke Rasmussen",

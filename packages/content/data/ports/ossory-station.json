@@ -8,12 +8,14 @@
     {
       "name": "Vida Orlov",
       "role": "yard boss",
-      "note": "Owns the cutting gantries and prices a hull by looking at it; she has never been wrong by more than ten percent."
+      "note": "Owns the cutting gantries and prices a hull by looking at it; she has never been wrong by more than ten percent.",
+      "post": "yard_gate"
     },
     {
       "name": "Ezra Pell",
       "role": "claims registrar",
-      "note": "Keeps the registry of mining claims and estates, and every sale and every funeral in the Drift passes across his desk."
+      "note": "Keeps the registry of mining claims and estates, and every sale and every funeral in the Drift passes across his desk.",
+      "post": "claims_office"
     },
     {
       "name": "Sunny Bakare",

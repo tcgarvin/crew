@@ -1,0 +1,241 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.ossory_station",
+  "portId": "port.ossory_station",
+  "name": "Ossory Station, breaker's slip 9",
+  "setting": "station",
+  "palette": {
+    "floor": "#4d4a45",
+    "wall": "#2a2522",
+    "accent": "#e0602f"
+  },
+  "width": 40,
+  "height": 28,
+  "rows": [
+    "########################################",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "    BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB    ",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "########################################"
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "B": "berth"
+  },
+  "shipAt": {
+    "x": 4,
+    "y": 1
+  },
+  "posts": [
+    {
+      "key": "claims_office",
+      "kind": "kiosk",
+      "name": "the claims office window",
+      "tile": {
+        "x": 11,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "salvage_market",
+      "kind": "marketStall",
+      "name": "the salvage market container",
+      "tile": {
+        "x": 35,
+        "y": 22
+      },
+      "facing": "w"
+    },
+    {
+      "key": "registry_stairs",
+      "kind": "gate",
+      "name": "the stairs up to the registry",
+      "tile": {
+        "x": 3,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "yard_gate",
+      "kind": "warehouseDoor",
+      "name": "the breaker's yard gate",
+      "tile": {
+        "x": 26,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "breakers_bench",
+      "kind": "bench",
+      "name": "the breakers' bench",
+      "tile": {
+        "x": 15,
+        "y": 26
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [
+    {
+      "key": "staging",
+      "kind": "freightStaging",
+      "rect": {
+        "x": 21,
+        "y": 23,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "key": "delivery",
+      "kind": "deliveryBay",
+      "rect": {
+        "x": 28,
+        "y": 23,
+        "w": 4,
+        "h": 2
+      }
+    }
+  ],
+  "props": [
+    {
+      "key": "hull_fore",
+      "kind": "hullSection",
+      "rect": {
+        "x": 0,
+        "y": 21,
+        "w": 4,
+        "h": 3
+      },
+      "rot": 90,
+      "blocking": true
+    },
+    {
+      "key": "hull_mid",
+      "kind": "hullSection",
+      "rect": {
+        "x": 11,
+        "y": 21,
+        "w": 6,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "crane",
+      "kind": "crane",
+      "rect": {
+        "x": 23,
+        "y": 20,
+        "w": 2,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "market_box",
+      "kind": "container",
+      "rect": {
+        "x": 36,
+        "y": 20,
+        "w": 4,
+        "h": 5
+      },
+      "rot": 90,
+      "blocking": true
+    },
+    {
+      "key": "plate_stack",
+      "kind": "crates",
+      "rect": {
+        "x": 32,
+        "y": 25,
+        "w": 3,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "scrap_drums",
+      "kind": "barrels",
+      "rect": {
+        "x": 0,
+        "y": 25,
+        "w": 2,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    }
+  ],
+  "foreground": [
+    {
+      "kind": "bayWall",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 1
+      }
+    },
+    {
+      "kind": "gantry",
+      "rect": {
+        "x": 10,
+        "y": 0,
+        "w": 1,
+        "h": 19
+      }
+    },
+    {
+      "kind": "gantry",
+      "rect": {
+        "x": 30,
+        "y": 0,
+        "w": 1,
+        "h": 19
+      }
+    },
+    {
+      "kind": "terminalEdge",
+      "rect": {
+        "x": 0,
+        "y": 27,
+        "w": 40,
+        "h": 1
+      }
+    }
+  ],
+  "ambience": "Cutting torches flare somewhere aft, and the deck plates ring every time a section drops."
+}

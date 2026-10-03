@@ -71,6 +71,11 @@ import portVesperGate from "../data/ports/vesper-gate.json";
 
 // Docks (Dockside §3)
 import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
+import dockGreenMeridian from "../data/docks/green-meridian.json";
+import dockKesslerDrift from "../data/docks/kessler-drift.json";
+import dockOssoryStation from "../data/docks/ossory-station.json";
+import dockTernsRest from "../data/docks/terns-rest.json";
+import dockVesperGate from "../data/docks/vesper-gate.json";
 
 // Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
@@ -140,7 +145,14 @@ const PORTS = [
   portVesperGate,
   portTernsRest,
 ];
-const DOCKS = [dockCrossroadsHub];
+const DOCKS = [
+  dockCrossroadsHub,
+  dockKesslerDrift,
+  dockGreenMeridian,
+  dockOssoryStation,
+  dockVesperGate,
+  dockTernsRest,
+];
 const SCENARIOS = [scenarioDefault];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */

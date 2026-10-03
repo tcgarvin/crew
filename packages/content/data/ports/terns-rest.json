@@ -8,7 +8,8 @@
     {
       "name": "Marshal Teodora Quint",
       "role": "settlement marshal",
-      "note": "Harbourmaster, postmaster and law in one weathered coat; she will know why a passenger came before they say it."
+      "note": "Harbourmaster, postmaster and law in one weathered coat; she will know why a passenger came before they say it.",
+      "post": "harbourmaster"
     },
     {
       "name": "Pim Delacroix",
@@ -18,7 +19,8 @@
     {
       "name": "Nell Harrow",
       "role": "trading-post keeper",
-      "note": "Buys anything, sells everything, and keeps a wall of notes from people looking for people who went out past the Rest."
+      "note": "Buys anything, sells everything, and keeps a wall of notes from people looking for people who went out past the Rest.",
+      "post": "trading_post"
     }
   ],
   "externalStores": [

@@ -13,12 +13,14 @@
     {
       "name": "Tilde Haugen",
       "role": "seed-bank archivist",
-      "note": "Young, curious about every ship that docks, and quietly saving up to leave on one."
+      "note": "Young, curious about every ship that docks, and quietly saving up to leave on one.",
+      "post": "pad_bench"
     },
     {
       "name": "Bo Sandoval",
       "role": "silo keeper",
-      "note": "Counts every crate twice and will not sign a manifest he has not walked."
+      "note": "Counts every crate twice and will not sign a manifest he has not walked.",
+      "post": "produce_shed"
     }
   ],
   "externalStores": [

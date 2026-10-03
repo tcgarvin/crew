@@ -143,6 +143,19 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
+  it("gives every port one dock map, with at least one regular posted on it (Dockside §3.3)", () => {
+    const docks = Object.values(result.bundle.docks ?? {});
+    for (const port of Object.values(ports)) {
+      expect(docks.filter((d) => d.portId === port.id).length, port.id).toBe(1);
+      expect(
+        port.castSeed.some((seed) => seed.post !== undefined),
+        port.id,
+      ).toBe(true);
+    }
+    const planets = docks.filter((d) => d.setting === "planet").map((d) => d.portId);
+    expect(planets.sort()).toEqual(["port.green_meridian", "port.terns_rest"]);
+  });
+
   it("stocks each port differently (D47)", () => {
     const stock = Object.values(ports).map((p) =>
       p.market.map((l) => `${l.itemDefId}:${l.count}:${l.price}`).join(","),
