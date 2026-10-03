@@ -13,6 +13,34 @@
     "description": {
       "type": "string"
     },
+    "character": {
+      "type": "string",
+      "minLength": 1
+    },
+    "castSeed": {
+      "minItems": 2,
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["name", "role", "note"],
+        "additionalProperties": false
+      }
+    },
     "externalStores": {
       "minItems": 1,
       "type": "array",
@@ -130,6 +158,16 @@
       }
     }
   },
-  "required": ["id", "name", "description", "externalStores", "market", "jobTemplates", "routes"],
+  "required": [
+    "id",
+    "name",
+    "description",
+    "character",
+    "castSeed",
+    "externalStores",
+    "market",
+    "jobTemplates",
+    "routes"
+  ],
   "additionalProperties": false
 }

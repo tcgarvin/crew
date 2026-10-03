@@ -96,6 +96,65 @@ describe("offer card templates", () => {
   });
 });
 
+describe("passage offer card templates (passengers §6)", () => {
+  const passage = {
+    issuer: "Halla Thorne, assayer",
+    name: "Halla Thorne",
+    role: "assayer",
+    from: "port.crossroads_hub",
+    to: "port.ossory_station",
+    urgency: "soon",
+    pitch: "I need to get to Ossory and back. I can pay, and I don't take up much room.",
+    passenger: "true",
+    roundTrip: "true",
+  };
+
+  it("says a person wants passage there and back, travelling light, with passage sides and aftermaths", () => {
+    const card = templateCard(offer(passage), bundle());
+    expect(card.title).toBe("Halla Thorne, assayer");
+    expect(card.speaker).toBe("Halla Thorne");
+    expect(card.situation).toBe(
+      "“I need to get to Ossory and back. I can pay, and I don't take up much room.” Halla Thorne wants passage to Ossory Station and back, travelling light, wanted soon.",
+    );
+    expect(card.situation).not.toMatch(/freight/i);
+    expect(card.situation).not.toMatch(/\d/);
+    expect(card.situation).not.toMatch(/\b(she|he|her|him|his|hers)\b/i);
+    expect(card.situation.split(/\s+/).length).toBeLessThanOrEqual(70);
+    expect(card.leftLabel).toBe("Welcome aboard.");
+    expect(card.rightLabel).toBe("Not this trip.");
+    expect(card.leftAftermath).toBe(
+      "They come up the ramp with what they carry. We leave once they're settled.",
+    );
+    expect(card.rightAftermath).toBe("You pass. They go looking for another ship.");
+    expect(`${card.leftAftermath} ${card.rightAftermath}`).not.toMatch(/\d/);
+  });
+
+  it("one way with luggage names the luggage by its cargo word and drops 'and back'", () => {
+    const card = templateCard(
+      offer({ ...passage, roundTrip: "false", cargo: "item.crate_fragile", urgency: "relaxed" }),
+      bundle(),
+    );
+    expect(card.situation).toMatch(
+      /” Halla Thorne wants passage to Ossory Station, with luggage \([a-z ]+\), no rush\.$/,
+    );
+    expect(card.situation.split("” ")[1]).not.toContain("and back");
+    expect(card.situation).not.toMatch(/\d/);
+  });
+
+  it("keeps the freight sides for freight, and narrator prose on a side wins over the passage text", () => {
+    const freight = templateCard(offer({ ...passage, passenger: "false" }), bundle());
+    expect(freight.leftLabel).toBe("Take the job");
+    expect(freight.situation).not.toContain("wants passage");
+    const prose = offer(passage);
+    const withProse = {
+      ...prose,
+      left: { ...prose.left, label: { ...prose.left.label, prose: "Bring her up." } },
+    };
+    expect(templateCard(withProse, bundle()).leftLabel).toBe("Bring her up.");
+    expect(templateCard(withProse, bundle()).rightLabel).toBe("Not this trip.");
+  });
+});
+
 describe("departure gate card templates (D36)", () => {
   function gate(params: Decision["prompt"]["params"]): Decision {
     return {
@@ -147,5 +206,53 @@ describe("departure gate card templates (D36)", () => {
     }
     expect(templateCard(gate({ reason: "blocked" })).speaker).toBeUndefined();
     expect(templateCard(gate({ reason: "blocked" })).title).toBe("Before we leave");
+  });
+});
+
+describe("passenger overdue card templates (passengers §3.3)", () => {
+  function overdue(params: Decision["prompt"]["params"]): Decision {
+    return {
+      ...offer({}),
+      prompt: { key: "commerce.passengerOverdue", params },
+      left: {
+        label: { key: "commerce.passengerOverdue.wait", params: {} },
+        commands: [],
+        aftermath: { key: "commerce.passengerOverdue.wait.aftermath", params: {} },
+      },
+      right: {
+        label: { key: "commerce.passengerOverdue.leave", params: {} },
+        commands: [],
+        aftermath: { key: "commerce.passengerOverdue.leave.aftermath", params: {} },
+      },
+    };
+  }
+
+  it("names the passenger and the port, spoken by the first officer, with no numbers or pronoun guesses", () => {
+    const card = templateCard(
+      overdue({
+        jobId: "j1",
+        name: "Halla Thorne",
+        port: "port.ossory_station",
+        speaker: "Dane Whitcross",
+      }),
+      bundle(),
+    );
+    expect(card.title).toBe("Overdue: Halla Thorne");
+    expect(card.speaker).toBe("Dane Whitcross");
+    expect(card.situation).toMatch(/^Halla Thorne went ashore at Ossory Station/);
+    expect(card.situation).not.toMatch(/\d/);
+    expect(card.situation).not.toMatch(/\b(she|he|her|him)\b/i);
+    expect(card.leftLabel).toBe("Wait for them");
+    expect(card.rightLabel).toBe("Leave without them");
+    expect(card.leftAftermath).toBeTruthy();
+    expect(card.rightAftermath).toBeTruthy();
+    expect(card.situation.split(/\s+/).length).toBeLessThanOrEqual(70);
+  });
+
+  it("falls back without a speaker or a name", () => {
+    const card = templateCard(overdue({}));
+    expect(card.title).toBe("Overdue");
+    expect(card.speaker).toBeUndefined();
+    expect(card.situation).toMatch(/^Our passenger went ashore at another port/);
   });
 });

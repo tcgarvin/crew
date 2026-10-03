@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { queuePolicyDecision } from "./decisions";
 import { cmd, tinyTestWorld } from "./fixtures/test-world";
+import { TINY } from "./fixtures/tiny-content";
+import { raiseHookIfIdle } from "./hooks";
 import { dueActors, isStaggerDue, runStep } from "./pipeline";
 import { NotImplementedError } from "./registry";
 import type { ActorId, HookId } from "./types/ids";
@@ -149,6 +152,18 @@ describe("planner stage", () => {
   });
 });
 
+function acknowledge(
+  kernel: ReturnType<typeof tinyTestWorld>["kernel"],
+  world: World,
+  hookId: HookId | undefined,
+) {
+  const ack = kernel.enqueueCommand(
+    world,
+    cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId: hookId as HookId } }),
+  );
+  expect(ack.status).toBe("accepted");
+}
+
 describe("quiet-too-long timer", () => {
   it("raises exactly once, halts advance, and pauses until acknowledged", () => {
     // 1 s at 20 ticks/s: fires once 20 ticks have passed without a narrative event.
@@ -202,6 +217,79 @@ describe("quiet-too-long timer", () => {
     expect(world.state.narrator.lastNarrativeTick).toBe(35);
     expect(result.ticksAdvanced).toBe(35);
     expect(world.state.narrator.pendingHook?.context).toEqual({ quietSinceTick: 15 });
+  });
+
+  it("does not fire within quietTooLongSeconds of an approachingPort hook", () => {
+    // Any hook raised is narrator contact: the quiet window restarts from its raise tick.
+    const { world, kernel, registry } = tinyTestWorld({ quietTooLongSeconds: 1 });
+    registry.registerSystem({
+      name: "approach",
+      phase: "equipment",
+      run: (ctx) => {
+        if (ctx.tick === 15)
+          raiseHookIfIdle(ctx, "approachingPort", { portId: TINY.port, etaTicks: 5 });
+      },
+    });
+    const approach = kernel.advance(world, 200);
+    expect(approach).toMatchObject({ ticksAdvanced: 15, halt: { kind: "hook" } });
+    const hook = world.state.narrator.pendingHook;
+    expect(hook).toMatchObject({ kind: "approachingPort", tick: 15 });
+    expect(world.state.narrator.lastNarrativeTick).toBe(15);
+    acknowledge(kernel, world, hook?.id);
+
+    const quiet = kernel.advance(world, 200);
+    // 15 + 20 ticks: a full window after the approach, not 20 after tick 0.
+    expect(quiet).toMatchObject({ ticksAdvanced: 20, halt: { kind: "hook" } });
+    expect(world.state.narrator.pendingHook).toMatchObject({
+      kind: "quietTooLong",
+      tick: 35,
+      context: { quietSinceTick: 15 },
+    });
+  });
+
+  it("yields to another hook raised in the same tick, so one tick raises one hook", () => {
+    const { world, kernel, registry } = tinyTestWorld({ quietTooLongSeconds: 1 });
+    registry.registerSystem({
+      name: "approach",
+      phase: "equipment",
+      run: (ctx) => {
+        // Tick 20 is exactly when the quiet timer is due.
+        if (ctx.tick === 20)
+          raiseHookIfIdle(ctx, "approachingPort", { portId: TINY.port, etaTicks: 5 });
+      },
+    });
+    const result = kernel.advance(world, 200);
+    expect(result).toMatchObject({ ticksAdvanced: 20, halt: { kind: "hook" } });
+    expect(result.events.filter((e) => e.type === "narratorHookRaised")).toHaveLength(1);
+    const hook = world.state.narrator.pendingHook;
+    expect(hook).toMatchObject({ kind: "approachingPort", tick: 20 });
+    acknowledge(kernel, world, hook?.id);
+
+    const next = kernel.advance(world, 200);
+    expect(next.events.filter((e) => e.type === "narratorHookRaised")).toHaveLength(1);
+    expect(world.state.narrator.pendingHook).toMatchObject({ kind: "quietTooLong", tick: 40 });
+  });
+
+  it("yields to a policyDecision hook raised in the same tick", () => {
+    const { world, kernel, registry } = tinyTestWorld({ quietTooLongSeconds: 1 });
+    registry.registerSystem({
+      name: "card",
+      phase: "equipment",
+      run: (ctx) => {
+        if (ctx.tick !== 20) return;
+        const actorId = Object.keys(ctx.state.actors)[0] as ActorId;
+        queuePolicyDecision(ctx, {
+          perspectiveActorId: actorId,
+          prompt: { key: "test.card", params: {} },
+          left: { label: { key: "test.left", params: {} }, commands: [] },
+          right: { label: { key: "test.right", params: {} }, commands: [] },
+        });
+      },
+    });
+    const result = kernel.advance(world, 200);
+    expect(result).toMatchObject({ ticksAdvanced: 20, halt: { kind: "hook" } });
+    expect(result.events.filter((e) => e.type === "narratorHookRaised")).toHaveLength(1);
+    expect(world.state.narrator.pendingHook).toMatchObject({ kind: "policyDecision", tick: 20 });
   });
 
   it("rejects acknowledging a hook that is not pending", () => {

@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/crew.schema.json",
+  "id": "crew.passenger",
+  "name": "Passenger",
+  "roleTags": [],
+  "skills": {},
+  "startingInventory": [],
+  "shift": "alpha",
+  "bio": "A paying passenger. The sim names them from the people table when a passage is accepted; this template only gives them a body and a bunk.",
+  "voice": "Whoever they turn out to be. The narrator decides how they talk from the pitch that brought them aboard and the reason they are travelling; nothing here is fixed."
+}

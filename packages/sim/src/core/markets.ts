@@ -33,6 +33,20 @@ export function effectiveMarket(
   return port === undefined ? {} : marketSeed(port);
 }
 
+/** How many of `itemDefId` the crew can buy at `portId` right now toward `wanted` units. */
+export function affordableUnits(
+  state: Pick<ReadonlyWorldState, "markets" | "money">,
+  content: Pick<ContentBundle, "ports">,
+  portId: PortDefId,
+  itemDefId: ItemDefId,
+  wanted: number,
+): number {
+  const line = effectiveMarket(state, content, portId)[itemDefId];
+  if (line === undefined || line.count <= 0 || line.price <= 0) return 0;
+  const byMoney = Math.floor(state.money.balance / line.price);
+  return Math.max(0, Math.min(wanted, line.count, byMoney));
+}
+
 /** The live market at `portId`, seeded from content on first write. */
 export function ensureMarket(
   state: Pick<WorldState, "markets">,

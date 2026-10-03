@@ -1,0 +1,97 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.terns_rest",
+  "name": "Tern's Rest",
+  "description": "A homestead settlement and relay post at the edge of the charted lanes; one long pier, a trading post, and a lot of sky.",
+  "character": "Tern's Rest is homesteaders, a relay crew, and a marshal who is also the harbourmaster, the postmaster and the judge. They want supplies, news, and new neighbours who will stay, and they are suspicious of anyone who arrives with nothing to sell and nothing to settle. The Rest is known as the place people go to start over, and as the place the lost were last seen heading for.",
+  "castSeed": [
+    {
+      "name": "Marshal Teodora Quint",
+      "role": "settlement marshal",
+      "note": "Harbourmaster, postmaster and law in one weathered coat; she will know why a passenger came before they say it."
+    },
+    {
+      "name": "Pim Delacroix",
+      "role": "relay operator",
+      "note": "Keeps the comms relay alive on scrounged parts and has read every message that has passed through the Rest in six years."
+    },
+    {
+      "name": "Nell Harrow",
+      "role": "trading-post keeper",
+      "note": "Buys anything, sells everything, and keeps a wall of notes from people looking for people who went out past the Rest."
+    }
+  ],
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Pier Shed",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Harrow's Trading Post",
+      "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Relay Common Room",
+      "kind": "lounge"
+    }
+  ],
+  "market": [
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 10,
+      "price": 12
+    },
+    {
+      "itemDefId": "item.coolant_canister",
+      "count": 1,
+      "price": 95
+    },
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 1,
+      "price": 210
+    },
+    {
+      "itemDefId": "item.med_kit",
+      "count": 1,
+      "price": 130
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "survey_samples_to_hub",
+      "issuer": "Tern's Rest Relay",
+      "toPortId": "port.crossroads_hub",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_general",
+          "countMin": 2,
+          "countMax": 5
+        }
+      ],
+      "weight": 3
+    },
+    {
+      "key": "tailings_to_drift",
+      "issuer": "Harrow's Trading Post",
+      "toPortId": "port.kessler_drift",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_hazardous",
+          "countMin": 1,
+          "countMax": 2
+        }
+      ],
+      "weight": 1
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.crossroads_hub",
+      "distance": 90
+    }
+  ]
+}

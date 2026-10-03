@@ -52,6 +52,60 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     expect(world.state.money.balance).toBe(bundle.scenarios[FIXTURE_SCENARIO]?.startingMoney);
   });
 
+  it("accepts a translated round-trip passage: the translator's fare is inside the kernel's passenger band (§3.4)", () => {
+    const bundle = content();
+    const registry = createRegistry();
+    registerCommerce(registry);
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(FIXTURE_SCENARIO, 7, bundle, {
+      values: bundle.config,
+      hash: bundle.hash,
+    });
+    const travel = world.state.travel;
+    if (travel.stage !== "docked") throw new Error("expected a new world to start docked");
+    const ctx: TranslationCtx = {
+      snapshot: kernel.serialize(world),
+      content: bundle,
+      hookTick: world.state.tick,
+      callId: "call-passage",
+    };
+    const { commands, dropped } = translateIntents(
+      emptyPlan({
+        intents: [
+          {
+            kind: "offerJob",
+            issuerName: "Halla Thorne",
+            issuerRole: "assayer",
+            issuerOrg: "",
+            pitch: "I need to get to Ossory and back.",
+            description: "Passage to Ossory Station and home again.",
+            fromPort: travel.portId,
+            toPort: "port.ossory_station",
+            cargoItem: "item.crate_fragile",
+            quantity: "few",
+            payTier: "generous",
+            urgency: "soon",
+            surface: false,
+            passenger: true,
+            roundTrip: true,
+          },
+        ] as unknown as NarratorPlan["intents"],
+      }),
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    const [command] = commands;
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    kernel.advance(world, 2);
+    const job = Object.values(world.state.jobs)[0];
+    expect(job).toMatchObject({
+      passage: { actorId: "", roundTrip: true, leg: "out" },
+      cargo: [{ itemDefId: "item.crate_fragile", count: 1 }],
+      pay: command.payload.job.pay,
+    });
+  });
+
   it("accepts a translated spawnAtBoundary and surfaceDecision", () => {
     const bundle = content();
     const registry = createRegistry();

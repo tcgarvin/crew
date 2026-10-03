@@ -9,6 +9,8 @@
 import { loadBundle } from "@crew/content";
 import {
   type ContentBundle,
+  type DeepReadonly,
+  type Job,
   type NarratorCommand,
   type PortDefId,
   SCHEMA_VERSION,
@@ -27,8 +29,10 @@ import type {
 } from "./contract";
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
+import type { State } from "./lookups";
 import {
   type MetIssuer,
+  type NarratorCastEntry,
   type NarratorNotes,
   boundNotes,
   mergeCast,
@@ -140,14 +144,99 @@ function parsePlan(content: string, schema: NarratorPlanSchema): NarratorPlan {
   return result.data;
 }
 
-/** D25: the people who made the captain an offer this call, for the cast. */
-function issuersMet(commands: readonly NarratorCommand[]): MetIssuer[] {
-  return commands.flatMap((command) => {
+/**
+ * D25: the people who made the captain an offer this call, for the cast. Passengers-and-galaxy
+ * §4.1: a passenger joins the cast placed aboard (no port) with where they are bound, so the
+ * model keeps their name and purpose for the voyage and the port they end up at.
+ */
+function issuersMet(commands: readonly NarratorCommand[], content: ContentBundle): MetIssuer[] {
+  return commands.flatMap((command): MetIssuer[] => {
     if (command.kind !== "offerJob") return [];
-    const { issuer, fromPortId } = command.payload.job;
+    const { issuer, fromPortId, toPortId, passenger, roundTrip } = command.payload.job;
     if (typeof issuer === "string") return [];
-    const note = issuer.org === undefined ? issuer.role : `${issuer.role}, ${issuer.org}`;
-    return [{ name: issuer.name, note: `${note}; offered us work`, portId: fromPortId }];
+    const who = issuer.org === undefined ? issuer.role : `${issuer.role}, ${issuer.org}`;
+    if (passenger === true) {
+      const to = content.ports[toPortId]?.name ?? toPortId;
+      const back = roundTrip === true ? " and back" : "";
+      return [
+        { name: issuer.name, note: `${who}; passenger, bound for ${to}${back}`, portId: null },
+      ];
+    }
+    return [{ name: issuer.name, note: `${who}; offered us work`, portId: fromPortId }];
+  });
+}
+
+/** Where a passenger's cast entry belongs once the kernel has settled their fate, and why. */
+interface PassengerPlacement {
+  readonly portId: PortDefId;
+  readonly phrase: string;
+}
+
+/**
+ * A passenger's whereabouts from the job and the actor the kernel keeps: left behind or put off
+ * at a port (off ship in its lounge), home or at the destination when the passage completed
+ * (the actor is gone), or still at the offer port when the offer was declined or expired.
+ * Undefined while the passage is live or not yet answered.
+ */
+function passengerPlacement(
+  job: DeepReadonly<Job>,
+  state: State,
+  content: ContentBundle,
+): PassengerPlacement | undefined {
+  const passage = job.passage;
+  if (passage === undefined) return undefined;
+  const name = (id: PortDefId) => content.ports[id]?.name ?? id;
+  if (job.status === "declined" || job.status === "expired") {
+    return {
+      portId: job.fromPortId,
+      phrase: `offer ${job.status}, still at ${name(job.fromPortId)}`,
+    };
+  }
+  const actor = state.actors[passage.actorId];
+  const ashoreAt = actor?.location.kind === "inExternalStore" ? actor.location.portId : undefined;
+  const reason = passage.endReason;
+  if (reason === "completed") {
+    const portId = passage.roundTrip ? job.fromPortId : job.toPortId;
+    return { portId, phrase: `passage completed, at ${name(portId)}` };
+  }
+  if (reason === "leftBehind") {
+    const portId = ashoreAt ?? job.toPortId;
+    return { portId, phrase: `left behind at ${name(portId)}` };
+  }
+  // Put off while aboard, they leave at the next docking: nowhere yet until they have.
+  if (reason === "putOff" && ashoreAt !== undefined) {
+    return { portId: ashoreAt, phrase: `put off at ${name(ashoreAt)}` };
+  }
+  return undefined;
+}
+
+/**
+ * Passengers-and-galaxy §4.1: a passenger joins the cast with no port while they ride. Once the
+ * kernel has ended the passage (or the offer was never taken) it knows where they are and the
+ * model often does not, so the server places any such entry still without a port and appends
+ * the reason to its note once. An entry the model has already placed somewhere is left alone.
+ */
+function placeEndedPassengers(
+  cast: readonly NarratorCastEntry[],
+  state: State,
+  content: ContentBundle,
+): NarratorCastEntry[] {
+  const key = (name: string) => name.trim().toLowerCase();
+  const placements = new Map<string, PassengerPlacement>();
+  const jobs = Object.values(state.jobs).sort(
+    (a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id),
+  );
+  for (const job of jobs) {
+    const placed = passengerPlacement(job, state, content);
+    if (placed !== undefined) placements.set(key(job.issuerPerson.name), placed);
+  }
+  return cast.map((entry) => {
+    const placed = placements.get(key(entry.name));
+    if (placed === undefined || entry.portId !== null) return entry;
+    const note = entry.note.includes(placed.phrase)
+      ? entry.note
+      : `${entry.note}; ${placed.phrase}`;
+    return { ...entry, portId: placed.portId, note };
   });
 }
 
@@ -191,6 +280,7 @@ function notesFrom(
   tick: number,
   translated: TranslationResult,
   content: ContentBundle,
+  state: State,
 ): NarratorNotes {
   const { commands, dropped } = translated;
   return boundNotes({
@@ -203,7 +293,11 @@ function notesFrom(
       translated.beatCardThread,
     ),
     cardsShown: recordCardsFromCall(previous.cardsShown, tick, translated.card, commands),
-    cast: mergeCast(castWritten(plan, content), previous.cast, issuersMet(commands), tick),
+    cast: placeEndedPassengers(
+      mergeCast(castWritten(plan, content), previous.cast, issuersMet(commands, content), tick),
+      state,
+      content,
+    ),
     lastUpdatedTick: tick,
     // D41: non-fatal corrections ride along with the drop reasons.
     lastRejections: [...dropped.map((d) => d.reason), ...translated.notes],
@@ -294,7 +388,7 @@ export async function runNarratorWithTrace(
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
-      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated, content),
+      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated, content, snapshot.state),
       callId,
       model: result.model,
       promptVersion: PROMPT_VERSION,

@@ -9,7 +9,7 @@ import { applyDueCommands } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
-import { allocateId } from "./ids";
+import { raiseHookIfIdle } from "./hooks";
 import type { KernelRegistry } from "./registry";
 import { createRngApi } from "./rng";
 import type { EventDraft, SimEvent } from "./types/events";
@@ -156,38 +156,32 @@ function runPlannerStage(
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Quiet-too-long timer (phase 7). Reads `state.narrator.lastNarrativeTick`, which phase 8 writes
- * from the previous ticks' committed events (never the current buffer). While a hook is pending
- * the timer does not fire; the sim is halted anyway, so no ticks accrue.
+ * Quiet-too-long timer (phase 8, after `decisionPendingSystem`). Reads
+ * `state.narrator.lastNarrativeTick`, which phase 8 commit writes from the previous ticks'
+ * committed events (never the current buffer) and `raiseHookIfIdle` writes whenever any hook
+ * is raised. While a hook is pending the timer does not fire; the sim is halted anyway, so no
+ * ticks accrue.
  *
  * W2 decision: the contract's `lastNarrativeTick` (narrative-significance events) drives the
  * timer, not a separate notable counter. Raising the hook re-arms the timer by setting
  * `lastNarrativeTick` to the raise tick, so after `acknowledgeHook` the next hook needs another
  * full quiet window.
+ *
+ * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongSeconds`
+ * with no narrator contact at all, so every hook kind re-arms the timer (see `core/hooks.ts`),
+ * and the timer runs last in the tick so that any other hook raised in the same tick
+ * (`approachingPort`, `jobBoard`, `notableEvent` in phase 4; `policyDecision` just before this
+ * system) wins and the quiet one yields.
  */
 export const quietTimerSystem: System = {
   name: "core.quietTimer",
-  phase: "planning",
+  phase: "finalize",
   run(ctx) {
     const narrator = ctx.state.narrator;
     if (narrator.pendingHook !== undefined) return;
     const quietTicks = configTicks(ctx.config, ctx.config.narrator.quietTooLongSeconds);
     if (ctx.tick - narrator.lastNarrativeTick < quietTicks) return;
-    const hookId = allocateId(ctx.state, "hook");
-    narrator.pendingHook = {
-      id: hookId,
-      kind: "quietTooLong",
-      context: { quietSinceTick: narrator.lastNarrativeTick },
-      tick: ctx.tick,
-    };
-    narrator.lastNarrativeTick = ctx.tick;
-    ctx.emit({
-      type: "narratorHookRaised",
-      subjectIds: [hookId],
-      causeIds: [],
-      source: "sim",
-      payload: { hookId, kind: "quietTooLong" },
-    });
+    raiseHookIfIdle(ctx, "quietTooLong", { quietSinceTick: narrator.lastNarrativeTick });
   },
 };
 
@@ -252,7 +246,7 @@ export function coreSystems(registry: KernelRegistry): System[] {
       run: (ctx) => applyDueCommands(registry, ctx),
     },
     indexSystem,
-    quietTimerSystem,
     decisionPendingSystem,
+    quietTimerSystem,
   ];
 }

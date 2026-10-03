@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Command } from "../../core/types/commands";
 import type { CommandId, HookId } from "../../core/types/ids";
 import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "./fixtures";
+import { raiseHookIfIdle } from "./hooks";
 
 let counter = 0;
 function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
@@ -255,20 +256,29 @@ describe("departure gate (D36)", () => {
   });
 
   it("narrates the gate even when another hook was pending the tick it was raised (D37)", () => {
-    const { world, kernel } = freightTestWorld();
+    const { world, kernel, registry } = freightTestWorld();
     addFault(world, "wornBearing");
     world.state.travel = { stage: "docked", portId: PORTS.a, plannedDestinationId: PORTS.b };
-    // Make the quiet timer fire on the very next tick, ahead of the gate in the same tick.
-    world.state.narrator.lastNarrativeTick = -1_000_000;
+    // Another hook raised earlier in the same tick (phase 2 runs before travel's phase 4), so
+    // the gate's own hook has to wait. (The quiet timer runs last in the tick since the pacing
+    // follow-up, so it can no longer be the hook that gets ahead of the gate.)
+    registry.registerSystem({
+      name: "earlyHook",
+      phase: "topology",
+      run: (ctx) => {
+        if (ctx.tick === 1)
+          raiseHookIfIdle(ctx, "approachingPort", { portId: PORTS.a, etaTicks: 5 });
+      },
+    });
 
     const first = kernel.advance(world, 50);
     expect(first.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("quietTooLong");
+    expect(world.state.narrator.pendingHook?.kind).toBe("approachingPort");
     const gate = pendingGate(world);
     expect(gate).toBeDefined();
     expect(gate?.narratorHookId).toBeUndefined();
 
-    // Acknowledging the quiet hook does not show the card: the next tick raises the gate's hook.
+    // Acknowledging the other hook does not show the card: the next tick raises the gate's hook.
     const quietId = world.state.narrator.pendingHook?.id as HookId;
     kernel.enqueueCommand(
       world,
@@ -363,5 +373,387 @@ describe("departure gate (D36)", () => {
     setCourseTo(kernel, world, PORTS.b);
     expectGateAsked(kernel, world);
     expect(pendingGate(world)?.prompt.params.reason).toBe("lowOutput");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Voyages (passengers-and-galaxy §2.3)
+// ---------------------------------------------------------------------------------------------
+
+type VoyageKernel = GateWorld["kernel"];
+type VoyageWorld = GateWorld["world"];
+
+/**
+ * Advance in short steps until `done` holds or `maxTicks` run out, acknowledging every hook on
+ * the way and recording its kind; stops at a decision halt so the test can resolve it.
+ */
+function advanceUntil(
+  kernel: VoyageKernel,
+  world: VoyageWorld,
+  done: (world: VoyageWorld) => boolean,
+  maxTicks = 2000,
+): { hooks: string[]; haltedOnDecision: boolean } {
+  const hooks: string[] = [];
+  let remaining = maxTicks;
+  while (remaining > 0 && !done(world)) {
+    const result = kernel.advance(world, Math.min(remaining, 20));
+    remaining -= result.ticksAdvanced;
+    if (result.halt.kind === "decision") return { hooks, haltedOnDecision: true };
+    if (result.halt.kind === "hook") {
+      const hook = world.state.narrator.pendingHook;
+      if (hook === undefined) throw new Error("hook halt without a pending hook");
+      hooks.push(hook.kind);
+      kernel.enqueueCommand(
+        world,
+        cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } }),
+      );
+    }
+  }
+  return { hooks, haltedOnDecision: false };
+}
+
+const dockedAt = (portId: string) => (world: VoyageWorld) =>
+  world.state.travel.stage === "docked" && world.state.travel.portId === portId;
+
+function openProblem(world: VoyageWorld, problem: Record<string, unknown>) {
+  const id = `problem:test:${counter++}`;
+  world.state.work.problems[id as never] = {
+    id,
+    owner: "commerce",
+    visibility: "public",
+    dedupeKey: id,
+    status: "open",
+    createdTick: world.state.tick,
+    revision: 1,
+    baseUrgency: "routineObligation",
+    location: { kind: "port", portId: PORTS.c },
+    ...problem,
+  } as never;
+  return id;
+}
+
+function resolveProblem(world: VoyageWorld, id: string) {
+  const problem = world.state.work.problems[id as never];
+  if (problem === undefined) throw new Error("problem missing");
+  problem.status = "resolved";
+}
+
+describe("voyages: a destination beyond one hop (§2.3)", () => {
+  it("setCourse to a two-hop port sets the voyage and flies the first hop of the shortest path", () => {
+    const { world, kernel } = freightTestWorld();
+    setCourseTo(kernel, world, PORTS.d);
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({
+      stage: "preparingDeparture",
+      fromPortId: PORTS.a,
+      toPortId: PORTS.c,
+      routeDistance: 45,
+      voyageDestinationId: PORTS.d,
+    });
+  });
+
+  it("setCourse to a neighbour sets no voyage, as before", () => {
+    const { world, kernel } = freightTestWorld();
+    setCourseTo(kernel, world, PORTS.b);
+    kernel.advance(world, 1);
+    expect(world.state.travel.stage).toBe("preparingDeparture");
+    expect(world.state.travel.voyageDestinationId).toBeUndefined();
+  });
+
+  it("accepting a job to a far port through the offer card starts the voyage towards it", () => {
+    const { world, kernel } = freightTestWorld();
+    kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "narrator",
+        kind: "offerJob",
+        payload: {
+          surface: true,
+          job: {
+            issuer: "Delta Freight",
+            description: { key: "test.job", params: {} },
+            fromPortId: PORTS.a,
+            toPortId: PORTS.d,
+            cargo: [{ itemDefId: FIX.crate, count: 1 }],
+            pay: 95, // 1 unit × path distance 95 × band min 1
+          },
+        },
+      }),
+    );
+    kernel.advance(world, 1);
+    const decisionId = world.state.decisions.queue[0];
+    expect(decisionId).toBeDefined();
+    kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "player",
+        kind: "resolveDecision",
+        payload: { decisionId: decisionId as never, side: "left" },
+      }),
+    );
+    kernel.advance(world, 1);
+    // Cargo is still ashore, so the ship waits docked with the first hop planned.
+    expect(world.state.travel).toMatchObject({
+      stage: "docked",
+      portId: PORTS.a,
+      plannedDestinationId: PORTS.c,
+      voyageDestinationId: PORTS.d,
+    });
+    expect(Object.values(world.state.jobs)[0]?.status).toBe("accepted");
+  });
+
+  it("docks at the waypoint for real (fee, arrival, approach hook), then plans the next hop on its own and ends the voyage at its destination", () => {
+    const { world, kernel } = freightTestWorld({ dockingFee: 5 });
+    setCourseTo(kernel, world, PORTS.d);
+
+    const toC = advanceUntil(kernel, world, dockedAt(PORTS.c));
+    expect(toC.haltedOnDecision).toBe(false);
+    expect(toC.hooks).toContain("approachingPort");
+    expect(world.state.money.balance).toBe(95);
+    expect(world.state.travel).toMatchObject({ stage: "docked", portId: PORTS.c });
+    expect(world.state.travel.voyageDestinationId).toBe(PORTS.d);
+
+    // The next tick plans the last hop with nothing holding the ship, and departure follows.
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({
+      stage: "preparingDeparture",
+      fromPortId: PORTS.c,
+      toPortId: PORTS.d,
+      voyageDestinationId: PORTS.d,
+    });
+
+    const toD = advanceUntil(kernel, world, dockedAt(PORTS.d));
+    expect(toD.haltedOnDecision).toBe(false);
+    // The waypoint is a stop on the way: the board was not asked there, only at the end.
+    expect(toC.hooks).not.toContain("jobBoard");
+    expect(world.state.money.balance).toBe(90);
+    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.d });
+  });
+
+  it("a detour to a neighbour keeps the voyage and routes on from where the ship ends up", () => {
+    const { world, kernel } = freightTestWorld();
+    world.state.travel = { stage: "docked", portId: PORTS.c, voyageDestinationId: PORTS.d };
+    setCourseTo(kernel, world, PORTS.a);
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({
+      stage: "preparingDeparture",
+      toPortId: PORTS.a,
+      voyageDestinationId: PORTS.d,
+    });
+    advanceUntil(kernel, world, dockedAt(PORTS.a));
+    expect(world.state.travel.voyageDestinationId).toBe(PORTS.d);
+    kernel.advance(world, 1);
+    // From A the shortest way to D is back through C, not via B.
+    expect(world.state.travel).toMatchObject({ stage: "preparingDeparture", toPortId: PORTS.c });
+  });
+
+  it("waits at the waypoint for a part the crew can buy here, then continues once it is settled", () => {
+    const { world, kernel } = freightTestWorld();
+    world.state.travel = { stage: "docked", portId: PORTS.c, voyageDestinationId: PORTS.d };
+    world.state.markets[PORTS.c] = { [FIX.parts]: { count: 1, price: 10 } };
+    const engine = theEngine(world);
+    const problemId = openProblem(world, {
+      kind: "partsNeeded",
+      owner: "equipment",
+      payload: { machineId: engine.id, itemDefId: FIX.parts, count: 1 },
+      location: { kind: "machine", machineId: engine.id },
+    });
+
+    kernel.advance(world, 40);
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.c,
+      voyageDestinationId: PORTS.d,
+    });
+
+    resolveProblem(world, problemId);
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({ stage: "preparingDeparture", toPortId: PORTS.d });
+  });
+
+  it("does not wait for a part the market lacks or the ship cannot afford", () => {
+    for (const market of [{}, { [FIX.parts]: { count: 1, price: 1000 } }]) {
+      const { world, kernel } = freightTestWorld();
+      world.state.travel = { stage: "docked", portId: PORTS.c, voyageDestinationId: PORTS.d };
+      world.state.markets[PORTS.c] = market;
+      const engine = theEngine(world);
+      openProblem(world, {
+        kind: "partsNeeded",
+        owner: "equipment",
+        payload: { machineId: engine.id, itemDefId: FIX.parts, count: 1 },
+        location: { kind: "machine", machineId: engine.id },
+      });
+      kernel.advance(world, 1);
+      expect(world.state.travel).toMatchObject({ stage: "preparingDeparture", toPortId: PORTS.d });
+    }
+  });
+
+  it("waits at the waypoint for cargo work and for a pending card", () => {
+    const { world, kernel } = freightTestWorld();
+    world.state.travel = { stage: "docked", portId: PORTS.c, voyageDestinationId: PORTS.d };
+    const cargo = openProblem(world, {
+      kind: "cargoToUnload",
+      payload: { jobId: "job:x", itemId: "item:x", portId: PORTS.c, storeKey: "warehouse" },
+    });
+    kernel.advance(world, 20);
+    expect(world.state.travel.stage).toBe("docked");
+    expect(world.state.travel.plannedDestinationId).toBeUndefined();
+
+    resolveProblem(world, cargo);
+    const decisionId = "decision:test:pending";
+    world.state.decisions.records[decisionId as never] = {
+      id: decisionId,
+      origin: "narrator",
+      perspectiveActorId: Object.keys(world.state.actors)[0],
+      prompt: { key: "test.card", params: {} },
+      left: { label: { key: "l", params: {} }, commands: [], aftermath: { key: "l", params: {} } },
+      right: { label: { key: "r", params: {} }, commands: [], aftermath: { key: "r", params: {} } },
+      status: "pending",
+      createdTick: world.state.tick,
+    } as never;
+    world.state.decisions.queue.push(decisionId as never);
+    expect(kernel.advance(world, 5).halt).toEqual({ kind: "decision" });
+    expect(world.state.travel.stage).toBe("docked");
+    expect(world.state.travel.plannedDestinationId).toBeUndefined();
+
+    kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "player",
+        kind: "resolveDecision",
+        payload: { decisionId: decisionId as never, side: "left" },
+      }),
+    );
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({ stage: "preparingDeparture", toPortId: PORTS.d });
+  });
+
+  it("drops a voyage whose destination can no longer be reached from here", () => {
+    const { world, kernel } = freightTestWorld();
+    world.state.travel = {
+      stage: "docked",
+      portId: PORTS.c,
+      voyageDestinationId: "port.gone" as never,
+    };
+    kernel.advance(world, 1);
+    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.c });
+  });
+
+  it("survives save/restore mid-voyage, and a save from before voyages loads with none", () => {
+    const { world, kernel } = freightTestWorld();
+    setCourseTo(kernel, world, PORTS.d);
+    kernel.advance(world, 90);
+    const saved = JSON.parse(JSON.stringify(kernel.serialize(world)));
+    expect(saved.state.travel.voyageDestinationId).toBe(PORTS.d);
+    const restored = kernel.restore(saved, world.content);
+    expect(restored.state.travel).toEqual(world.state.travel);
+
+    const fresh = freightTestWorld();
+    const oldSave = JSON.parse(JSON.stringify(fresh.kernel.serialize(fresh.world)));
+    expect("voyageDestinationId" in oldSave.state.travel).toBe(false);
+    const loaded = fresh.kernel.restore(oldSave, fresh.world.content);
+    expect(loaded.state.travel).toEqual({ stage: "docked", portId: PORTS.a });
+  });
+});
+
+describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
+  it("'Leave anyway' at the start covers every waypoint and is forgotten when the voyage ends", () => {
+    const { world, kernel } = freightTestWorld();
+    addFault(world, "wornBearing");
+    setCourseTo(kernel, world, PORTS.d);
+    expectGateAsked(kernel, world);
+    resolveGate(kernel, world, "right");
+
+    const toC = advanceUntil(kernel, world, dockedAt(PORTS.c));
+    expect(toC.haltedOnDecision).toBe(false);
+    expect(world.state.travel).toMatchObject({
+      stage: "docked",
+      portId: PORTS.c,
+      voyageDestinationId: PORTS.d,
+      departureRiskAccepted: true,
+      acceptedImpairmentKey: `${theEngine(world).id}:fault`,
+    });
+
+    // Through the waypoint without a second card, still faulty.
+    const toD = advanceUntil(kernel, world, dockedAt(PORTS.d));
+    expect(toD.haltedOnDecision).toBe(false);
+    expect(world.state.decisions.queue).toEqual([]);
+    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.d });
+
+    // The voyage is over: the next planned departure asks again.
+    setCourseTo(kernel, world, PORTS.c);
+    expectGateAsked(kernel, world);
+  });
+
+  it("asks again at a waypoint when the impaired set has changed since 'leave anyway'", () => {
+    const { world, kernel } = freightTestWorld();
+    addFault(world, "wornBearing");
+    setCourseTo(kernel, world, PORTS.d);
+    expectGateAsked(kernel, world);
+    resolveGate(kernel, world, "right");
+    advanceUntil(kernel, world, dockedAt(PORTS.c));
+
+    // The same fault now derates output: a different impairment, so the engineer speaks again.
+    theEngine(world).output = 0.5;
+    expectGateAsked(kernel, world, 20);
+    expect(pendingGate(world)?.prompt.params.reason).toBe("faultDerated");
+    expect(world.state.travel).toMatchObject({ stage: "docked", portId: PORTS.c });
+  });
+
+  it("a repair on the way clears the answer, so a new fault later asks again; a healthy ship never does", () => {
+    const { world, kernel } = freightTestWorld();
+    addFault(world, "wornBearing");
+    setCourseTo(kernel, world, PORTS.d);
+    expectGateAsked(kernel, world);
+    resolveGate(kernel, world, "right");
+    advanceUntil(kernel, world, dockedAt(PORTS.c));
+
+    theEngine(world).faults = [];
+    kernel.advance(world, 1);
+    expect(world.state.travel).toMatchObject({ stage: "preparingDeparture", toPortId: PORTS.d });
+    expect(world.state.travel.departureRiskAccepted).toBeUndefined();
+    expect(world.state.decisions.queue).toEqual([]);
+
+    addFault(world, "wornBearing");
+    expectGateAsked(kernel, world, 20);
+  });
+
+  it("'Hold for repairs' at a waypoint waits docked with the voyage kept, then continues", () => {
+    const { world, kernel } = freightTestWorld();
+    world.state.travel = { stage: "docked", portId: PORTS.c, voyageDestinationId: PORTS.d };
+    addFault(world, "wornBearing");
+    expectGateAsked(kernel, world, 20);
+    resolveGate(kernel, world, "left");
+    kernel.advance(world, 100);
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.c,
+      plannedDestinationId: PORTS.d,
+      voyageDestinationId: PORTS.d,
+      holdForRepairs: true,
+    });
+    theEngine(world).faults = [];
+    const released = kernel.advance(world, 100);
+    expect(released.events.some((e) => e.type === "departureHoldLifted")).toBe(true);
+    expect(world.state.travel).toMatchObject({
+      stage: "transit",
+      toPortId: PORTS.d,
+      voyageDestinationId: PORTS.d,
+    });
+  });
+
+  it("honours a pre-voyage save's 'leave anyway' that carries no impairment key", () => {
+    const { world, kernel } = freightTestWorld();
+    addFault(world, "wornBearing");
+    world.state.travel = {
+      stage: "docked",
+      portId: PORTS.a,
+      plannedDestinationId: PORTS.b,
+      departureRiskAccepted: true,
+    };
+    const result = kernel.advance(world, 80);
+    expect(result.halt).toEqual({ kind: "completed" });
+    expect(world.state.decisions.queue).toEqual([]);
+    expect(world.state.travel.stage).toBe("transit");
   });
 });

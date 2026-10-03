@@ -82,6 +82,7 @@ describe("kernel integration", () => {
         y: 1.5,
         facing: 0,
         actionLabel: "idle",
+        passenger: false,
       },
     ]);
     expect(frame.machines).toEqual([

@@ -11,13 +11,16 @@ import {
   type DecisionId,
   type DeepReadonly,
   type ItemDefId,
+  type Job,
   type JobIssuer,
   type MachineId,
   type NarratorHook,
+  PASSENGER_OVERDUE_PROMPT_KEY,
   type PortDefId,
   type Problem,
   type SimEvent,
   actionLabel,
+  configTicks,
   describeEvent,
   effectiveMarket,
   marketBlock,
@@ -31,13 +34,21 @@ import {
   machineCompartment,
   machineName,
   offerPortNow,
+  pathBetween,
   portName,
+  voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
 import { templateCard } from "./templates";
 
-/** Policy prompt keys whose template text is the card the captain sees (D36 gate; job offers keep their params line). */
-const TEMPLATED_PROMPT_KEYS: ReadonlySet<string> = new Set(["travel.departureGate"]);
+/**
+ * Policy prompt keys whose template text is the card the captain sees (D36 gate, the passengers
+ * §3.3 overdue card; job offers keep their params line).
+ */
+const TEMPLATED_PROMPT_KEYS: ReadonlySet<string> = new Set([
+  "travel.departureGate",
+  PASSENGER_OVERDUE_PROMPT_KEY,
+]);
 
 /** ~2.5k tokens at ~4 characters per token. */
 export const DIGEST_MAX_CHARS = 10_000;
@@ -96,7 +107,31 @@ function policyHookLine(
   return line;
 }
 
-function hookLine(hook: DeepReadonly<NarratorHook>, state: State, content: ContentBundle): string {
+/**
+ * Passengers-and-galaxy §3.5: `passengerReturned` is the turn of the episode, so the hook line
+ * says it in words ("Halla Thorne is back aboard") rather than as an event id alone.
+ */
+function notableHookLine(
+  hook: DeepReadonly<Extract<NarratorHook, { kind: "notableEvent" }>>,
+  events: readonly SimEvent[],
+  state: State,
+  content: ContentBundle,
+): string {
+  const ids = new Set<string>(hook.context.eventIds);
+  const said = events
+    .filter((e) => ids.has(e.id))
+    .map((e) => describeEvent(e, state as never, content))
+    .filter((line) => line !== "");
+  const base = `notableEvent: events ${hook.context.eventIds.join(", ")}`;
+  return said.length === 0 ? base : `${base}: ${said.join("; ")}`;
+}
+
+function hookLine(
+  hook: DeepReadonly<NarratorHook>,
+  events: readonly SimEvent[],
+  state: State,
+  content: ContentBundle,
+): string {
   switch (hook.kind) {
     case "approachingPort":
       return `approachingPort: arriving at ${portName(content, hook.context.portId)} (${hook.context.portId}) shortly`;
@@ -105,10 +140,42 @@ function hookLine(hook: DeepReadonly<NarratorHook>, state: State, content: Conte
     case "quietTooLong":
       return `quietTooLong: nothing story-worthy since tick ${hook.context.quietSinceTick}`;
     case "notableEvent":
-      return `notableEvent: events ${hook.context.eventIds.join(", ")}`;
+      return notableHookLine(hook, events, state, content);
     case "policyDecision":
       return policyHookLine(hook, state, content);
   }
+}
+
+/** "2 hops, 145s" / "1 hop, 120s": what is left of a voyage or a far job. */
+function hopsWord(hops: number, distance: number): string {
+  return `${hops} ${hops === 1 ? "hop" : "hops"}, ${Math.round(distance)}s transit`;
+}
+
+/**
+ * Passengers-and-galaxy §2.3: the travel line. A voyage beyond the current leg is said in the
+ * spec's words: "stopping at Kessler Drift on the way to Ossory Station" when docked at a
+ * waypoint, "under way to Kessler Drift, bound for Ossory Station" on a leg, with what is left.
+ */
+function travelLine(state: State, content: ContentBundle): string {
+  const t = state.travel;
+  const voyage = voyageAhead(state, content);
+  const bound =
+    voyage === undefined
+      ? ""
+      : `, bound for ${portName(content, voyage.destinationId)} (${voyage.destinationId}); ${hopsWord(voyage.hops, voyage.distance)} still to go from there`;
+  if (t.stage === "docked") {
+    const next =
+      t.plannedDestinationId === undefined ? "" : portName(content, t.plannedDestinationId);
+    if (voyage !== undefined) {
+      const nextLeg = next === "" ? "" : `; next leg to ${next}`;
+      return `travel: stopping at ${portName(content, t.portId)} (${t.portId}) on the way to ${portName(content, voyage.destinationId)} (${voyage.destinationId}); ${hopsWord(voyage.hops, voyage.distance)} still to go${nextLeg}; the ship continues on her own once nothing holds her here`;
+    }
+    const course = next === "" ? "" : `; course set for ${next}`;
+    return `travel: docked at ${portName(content, t.portId)} (${t.portId})${course}`;
+  }
+  const progress = t.routeDistance > 0 ? t.routeProgress / t.routeDistance : 0;
+  const drifting = t.drifting ? ", DRIFTING (propulsion lost)" : "";
+  return `travel: ${t.stage}, under way ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ${pct(progress)} of route${drifting}${bound}`;
 }
 
 function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
@@ -117,17 +184,7 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
   const lines: string[] = [];
   const secs = Math.round(ticksToSeconds(state.tick, snapshot.config.time.tickRate));
   lines.push(`tick ${state.tick} (${secs}s into the game)`);
-  if (t.stage === "docked") {
-    const planned = t.plannedDestinationId
-      ? `; course set for ${portName(content, t.plannedDestinationId)}`
-      : "";
-    lines.push(`travel: docked at ${portName(content, t.portId)} (${t.portId})${planned}`);
-  } else {
-    const progress = t.routeDistance > 0 ? t.routeProgress / t.routeDistance : 0;
-    lines.push(
-      `travel: ${t.stage} ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ${pct(progress)} of route${t.drifting ? ", DRIFTING (propulsion lost)" : ""}`,
-    );
-  }
+  lines.push(travelLine(state, content));
   lines.push(`money: ${state.money.balance} credits`);
   if (t.stage === "docked") {
     // D47: what is on sale here, with prices (this is private to the model; cards carry no numbers).
@@ -198,11 +255,90 @@ function partsShortfallNote(state: State, content: ContentBundle): string {
   return `; the repair is waiting on parts: ${parts.join("; ")}`;
 }
 
-function crewSection(state: State, content: ContentBundle): Section {
+/**
+ * Passengers-and-galaxy §3.2: the "Aboard" line for a passenger: name, passenger, where to and
+ * whether they come back, where they are on deck now; while ashore, where and when they are due
+ * back (and overdue, once `ashoreSinceTick + overdueSeconds` has passed); while walking off,
+ * "going down the ramp".
+ */
+function aboardLine(
+  snapshot: Snapshot,
+  content: ContentBundle,
+  actor: State["actors"][keyof State["actors"]],
+  job: DeepReadonly<Job> | undefined,
+): string {
+  const state = snapshot.state;
+  const config = snapshot.config;
+  const passage = job?.passage;
+  const bound =
+    job === undefined
+      ? "destination unknown"
+      : passage?.roundTrip === true
+        ? passage.leg === "back"
+          ? `on the way home to ${portName(content, job.fromPortId)}`
+          : `bound for ${portName(content, job.toPortId)} and back to ${portName(content, job.fromPortId)}`
+        : `bound for ${portName(content, job.toPortId)}, one way`;
+  const purpose = job?.description.prose === undefined ? "" : ` Says: ${job.description.prose}`;
+  if (passage?.leg === "ashore" && job !== undefined) {
+    const dueAt = passage.returnsAtTick;
+    const back =
+      dueAt === undefined
+        ? "no word on when they are back"
+        : `back at about ${Math.round(ticksToSeconds(dueAt, config.time.tickRate))}s (tick ${dueAt})`;
+    const since = passage.ashoreSinceTick;
+    const overdueAt =
+      since === undefined
+        ? undefined
+        : since + configTicks(config, config.commerce.passage.overdueSeconds);
+    const overdue =
+      overdueAt !== undefined && state.tick >= overdueAt
+        ? `; OVERDUE (expected by tick ${overdueAt})`
+        : "";
+    return `- Aboard: ${actor.name}, passenger, ${bound}; ashore at ${portName(content, job.toPortId)}, ${back}${overdue}.${purpose}`;
+  }
+  const loc = actor.location;
+  const where =
+    loc.kind === "onDeck" ? compartmentNameAt(content, loc.deckId, loc.x, loc.y) : loc.kind;
+  const now =
+    actor.disembarking === true
+      ? "going down the ramp"
+      : `${actionLabel(actor, state, content)}${where ? ` in ${where}` : ""}`;
+  return `- Aboard: ${actor.name}, passenger, ${bound}; now ${now}.${purpose}`;
+}
+
+/** The passage an actor rides (or rode): the latest job whose `passage.actorId` is theirs. */
+function passageOf(state: State, actorId: string): DeepReadonly<Job> | undefined {
+  return Object.values(state.jobs)
+    .filter((j) => j.passage?.actorId === actorId)
+    .sort((a, b) => b.offeredTick - a.offeredTick || b.id.localeCompare(a.id))[0];
+}
+
+/**
+ * Passengers whose passage ended at `portId` with them off the ship (left behind or put off):
+ * the kernel keeps them as off-ship actors in the port's lounge, the narrator's to use as cast.
+ */
+function passengersAshoreAt(
+  state: State,
+  portId: PortDefId,
+): { readonly actor: State["actors"][keyof State["actors"]]; readonly job: DeepReadonly<Job> }[] {
+  const ashore: { actor: State["actors"][keyof State["actors"]]; job: DeepReadonly<Job> }[] = [];
+  for (const actor of Object.values(state.actors)) {
+    if (actor.passenger !== true || actor.availability !== "offShip") continue;
+    const loc = actor.location;
+    if (loc.kind !== "inExternalStore" || loc.portId !== portId) continue;
+    const job = passageOf(state, actor.id);
+    if (job?.passage?.endReason === undefined) continue;
+    ashore.push({ actor, job });
+  }
+  return ashore.sort((a, b) => a.actor.id.localeCompare(b.actor.id, "en", { numeric: true }));
+}
+
+function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
+  const state = snapshot.state;
   const isCaptain = (a: { readonly roleTags: readonly string[] }) => a.roleTags.includes("captain");
   // D41: the captain (the player's avatar) is listed first and never as a speaker.
   const actors = Object.values(state.actors)
-    .filter((a) => a.crew)
+    .filter((a) => a.crew && a.passenger !== true)
     .sort(
       (a, b) =>
         Number(isCaptain(b)) - Number(isCaptain(a)) ||
@@ -237,9 +373,29 @@ function crewSection(state: State, content: ContentBundle): Section {
     }
     return `- ${actor.name}${roles}${status}: ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
+  // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.
+  // One whose passage has ended is not aboard: left behind or put off, they are off ship at a
+  // port and appear under "People you know here" there (`peopleSection`); put off while still on
+  // deck, they are aboard only until the next docking, and the line says so.
+  const passengers = Object.values(state.actors)
+    .filter((a) => a.crew && a.passenger === true)
+    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+  for (const passenger of passengers) {
+    const job = passageOf(state, passenger.id);
+    const ended = job?.passage?.endReason;
+    if (ended === undefined) {
+      lines.push(aboardLine(snapshot, content, passenger, job));
+      continue;
+    }
+    if (ended === "putOff" && passenger.location.kind === "onDeck") {
+      lines.push(
+        `- Aboard: ${passenger.name}, passenger, put off: leaves the ship at the next docking; now ${actionLabel(passenger, state, content)}.`,
+      );
+    }
+  }
   const npcs = Object.values(state.actors).filter((a) => !a.crew);
   if (npcs.length > 0) {
-    lines.push(`- passengers/NPCs: ${npcs.map((a) => a.name).join(", ")}`);
+    lines.push(`- NPCs: ${npcs.map((a) => a.name).join(", ")}`);
   }
   return { heading: `Crew (${actors.length})`, lines, priority: 6, trimFrom: "end" };
 }
@@ -319,8 +475,23 @@ function jobSection(state: State, content: ContentBundle): Section {
       const cargo = j.cargo
         .map((c) => `${c.count}x ${content.items[c.itemDefId]?.name ?? c.itemDefId}`)
         .join(", ");
+      // §2.3: a far destination says how far, so the model knows the job is a voyage.
+      const path = pathBetween(content, j.fromPortId, j.toPortId);
+      const far =
+        path === undefined || path.hops <= 1
+          ? ""
+          : ` (${hopsWord(path.hops, path.distance)} via ${path.path
+              .slice(1, -1)
+              .map((id) => portName(content, id))
+              .join(", ")})`;
       // D24: pay is left out; the model has no use for the amount and must never repeat it.
-      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}, ${cargo}`;
+      // §3.1: a passage says so, with the leg it is on; its cargo line is luggage.
+      const passage = j.passage;
+      const kind =
+        passage === undefined
+          ? cargo
+          : `${passage.roundTrip ? "round-trip passage" : "one-way passage"} (${passage.endReason ?? `leg ${passage.leg}`})${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
+      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}${far}, ${kind}`;
     });
   return { heading: "Jobs", lines, priority: 7, trimFrom: "end" };
 }
@@ -333,6 +504,13 @@ function personLine(person: DeepReadonly<JobIssuer>): string {
  * D25 / GDD §21: people the captain has already met at the port the ship is at or approaching:
  * the narrator's cast placed there, and whoever offered jobs from there before (the null job
  * source's people too), so the model can bring someone back instead of inventing a stranger.
+ *
+ * Passengers-and-galaxy §2.4: the port's character and its seeded locals (`PortDef.castSeed`)
+ * follow, as locals the model may bring in. They live in content, not in `notes.cast`: a seed
+ * never costs one of the twelve cast slots, is never stamped with a sighting, and reappears here
+ * every visit whether or not the model wrote about them. Once the model does write one into its
+ * cast (same name), the cast entry is shown and the seed line is not, so the model's own note on
+ * that person wins.
  */
 function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: ContentBundle): Section {
   const state = snapshot.state;
@@ -340,11 +518,24 @@ function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: Conten
   const portId = offerPortNow(state) ?? (t.stage === "docked" ? t.portId : t.toPortId);
   const lines: string[] = [];
   const named = new Set<string>();
+  const port = content.ports[portId];
+  if (port !== undefined) lines.push(`the place: ${port.character}`);
   for (const c of notes.cast) {
     if (c.portId !== portId) continue;
     named.add(c.name.toLowerCase());
     const seen = c.lastSeenTick >= 0 ? `; last seen at tick ${c.lastSeenTick}` : "";
     lines.push(`- ${c.name}: ${c.note}${seen}`);
+  }
+  // Passengers-and-galaxy §3.3: a passenger left behind or put off here is a local now.
+  for (const { actor, job } of passengersAshoreAt(state, portId)) {
+    const key = actor.name.toLowerCase();
+    if (named.has(key)) continue;
+    named.add(key);
+    const how = job.passage?.endReason === "putOff" ? "put off the ship" : "left behind";
+    const purpose = job.description.prose === undefined ? "" : ` Said: ${job.description.prose}`;
+    lines.push(
+      `- ${actor.name}: passenger ${how} here, off ship (was bound for ${portName(content, job.toPortId)}${job.passage?.roundTrip === true ? ` and back to ${portName(content, job.fromPortId)}` : ""}); yours to use.${purpose}`,
+    );
   }
   const issuers = Object.values(state.jobs)
     .filter((j) => j.fromPortId === portId)
@@ -356,6 +547,13 @@ function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: Conten
     lines.push(
       `- ${personLine(job.issuerPerson)}: offered a job to ${portName(content, job.toPortId)} at tick ${job.offeredTick} (${job.status})`,
     );
+  }
+  const seeds = (port?.castSeed ?? []).filter((seed) => !named.has(seed.name.toLowerCase()));
+  if (seeds.length > 0) {
+    lines.push(
+      "locals you have not met yet but may bring in (not in your cast until you write about them):",
+    );
+    for (const seed of seeds) lines.push(`- ${seed.name}, ${seed.role}: ${seed.note}`);
   }
   return {
     heading: `People you know here (${portName(content, portId)})`,
@@ -474,7 +672,7 @@ export function buildDigest(
   const state = snapshot.state;
   const hookSection: Section = {
     heading: "Why you were called",
-    lines: [hook === undefined ? "no hook recorded" : hookLine(hook, state, content)],
+    lines: [hook === undefined ? "no hook recorded" : hookLine(hook, recentEvents, state, content)],
     priority: Number.POSITIVE_INFINITY,
     trimFrom: "end",
   };
@@ -485,7 +683,7 @@ export function buildDigest(
     decisionSection(state, content),
     machineSection(state, content, snapshot.config.time.tickRate),
     jobSection(state, content),
-    crewSection(state, content),
+    crewSection(snapshot, content),
     notesSection(notes),
     cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),

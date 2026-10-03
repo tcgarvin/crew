@@ -169,6 +169,9 @@ function offerIntent(
     // A surfaced offer is the card; while another card is already queued it posts quietly, as a
     // model's offer would.
     surface: snapshot.state.decisions.queue.length === 0,
+    // Passengers-and-galaxy §4.4: the null narrator never offers passages.
+    passenger: false,
+    roundTrip: false,
   };
 }
 

@@ -4,7 +4,7 @@
  */
 import type { TextRef, Tick } from "./common";
 import type { CargoClass } from "./content";
-import type { CommandId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "./ids";
+import type { ActorId, CommandId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "./ids";
 
 /** SD §17.1 exterior state machine, in order. */
 export const TRAVEL_STAGES = [
@@ -20,15 +20,34 @@ export type TravelStage = (typeof TRAVEL_STAGES)[number];
 
 /**
  * D36 departure-gate flags, meaningful while a departure is planned (`docked` with a
- * `plannedDestinationId`, or `preparingDeparture`). Both are dropped by the fresh state object
- * every later stage builds, so "leave anyway" is forgotten by the next docking and a hold never
- * outlives the departure it held.
+ * `plannedDestinationId`, or `preparingDeparture`). `holdForRepairs` is dropped by the fresh
+ * state object every later stage builds, so a hold never outlives the departure it held.
+ * `departureRiskAccepted` is asked once per *voyage* (passengers-and-galaxy §2.3): it rides
+ * through every stage and every intermediate docking, and is dropped when the ship docks with no
+ * voyage left to run, or the moment the impaired set changes (a new fault, or a repair: see
+ * `acceptedImpairmentKey` and `departureCleared`).
  */
 export interface DepartureGateFlags {
   /** "Hold for repairs": wait docked until no engine/generator is impaired, then go. */
   holdForRepairs?: boolean;
-  /** "Leave anyway": the gate does not ask again for this docking. */
+  /** "Leave anyway": the gate does not ask again for this voyage (or docking, with no voyage). */
   departureRiskAccepted?: boolean;
+  /**
+   * The impairment set "leave anyway" was answered for (`impairmentKey`, departure-gate.ts).
+   * The gate re-asks when the live set differs. Absent on saves from before voyages, which
+   * are treated as accepted for whatever is impaired now.
+   */
+  acceptedImpairmentKey?: string;
+}
+
+/**
+ * Passengers-and-galaxy §2.3: a destination beyond one hop. Set on every stage while a voyage
+ * runs; `plannedDestinationId`/`toPortId` is always the next hop on `shortestPath(here, voyage)`
+ * (or a detour a card chose), and the field is cleared when the ship docks at the voyage
+ * destination. Optional, so saves from before voyages load unchanged.
+ */
+export interface VoyageFields {
+  voyageDestinationId?: PortDefId;
 }
 
 export type TravelState =
@@ -37,7 +56,8 @@ export type TravelState =
       portId: PortDefId;
       /** Set by `setCourse`; departure prep begins when cleared to go. */
       plannedDestinationId?: PortDefId;
-    } & DepartureGateFlags)
+    } & DepartureGateFlags &
+      VoyageFields)
   | ({
       stage: Exclude<TravelStage, "docked">;
       fromPortId: PortDefId;
@@ -50,7 +70,8 @@ export type TravelState =
       /** Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed). */
       drifting: boolean;
       stageStartedTick: Tick;
-    } & DepartureGateFlags);
+    } & DepartureGateFlags &
+      VoyageFields);
 
 // ---------------------------------------------------------------------------------------------
 // Jobs
@@ -89,6 +110,30 @@ export type JobUrgency = (typeof JOB_URGENCIES)[number];
 export interface CargoLine {
   itemDefId: ItemDefId;
   count: number;
+}
+
+/** Where a passage can end (passengers-and-galaxy §3). */
+export type PassageEndReason = "completed" | "leftBehind" | "putOff";
+
+/** Which stretch of the passage the passenger is on: outbound, ashore at `toPortId`, or homeward. */
+export type PassageLeg = "out" | "ashore" | "back";
+
+/**
+ * Passengers-and-galaxy §3.1: a passage is a job with a person in it. The issuer is the
+ * passenger; accepting the job spawns them aboard (`crew.passenger` template, issuer's name) and
+ * `actorId` points at that actor. One-way (`roundTrip: false`) ends at `toPortId`; there-and-back
+ * goes ashore at `toPortId` (`availability: offShip`, in the port's lounge store) and ends back at
+ * `fromPortId`. `returnsAtTick` is drawn by the sim while ashore. `endReason` is set exactly once;
+ * `completed` is the only ending that pays the fare. Optional on `Job`, so older saves load.
+ */
+export interface JobPassage {
+  actorId: ActorId;
+  roundTrip: boolean;
+  leg: PassageLeg;
+  returnsAtTick?: Tick;
+  /** While ashore: the tick they went ashore; the overdue card is timed from it. */
+  ashoreSinceTick?: Tick;
+  endReason?: PassageEndReason;
 }
 
 /**
@@ -137,6 +182,12 @@ export interface Job {
   surfaceWhenDocked?: true;
   /** Command that created it (narrator audit). */
   causeCommandId?: CommandId;
+  /**
+   * Passengers-and-galaxy §3: present when the issuer travels with the job. Its `cargo` is then
+   * zero or one line of luggage, and `cargoClass` is the luggage's class (or `general`); pay is
+   * banded by `config.commerce.priceBands.passenger` instead.
+   */
+  passage?: JobPassage;
 }
 
 // ---------------------------------------------------------------------------------------------

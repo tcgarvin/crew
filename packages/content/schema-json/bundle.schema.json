@@ -1169,6 +1169,34 @@
           "description": {
             "type": "string"
           },
+          "character": {
+            "type": "string",
+            "minLength": 1
+          },
+          "castSeed": {
+            "minItems": 2,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "note": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["name", "role", "note"],
+              "additionalProperties": false
+            }
+          },
           "externalStores": {
             "minItems": 1,
             "type": "array",
@@ -1290,6 +1318,8 @@
           "id",
           "name",
           "description",
+          "character",
+          "castSeed",
           "externalStores",
           "market",
           "jobTemplates",
@@ -1941,9 +1971,24 @@
                   },
                   "required": ["min", "max"],
                   "additionalProperties": false
+                },
+                "passenger": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["min", "max"],
+                  "additionalProperties": false
                 }
               },
-              "required": ["general", "fragile", "perishable", "hazardous"],
+              "required": ["general", "fragile", "perishable", "hazardous", "passenger"],
               "additionalProperties": false
             },
             "jobOfferTtlSeconds": {
@@ -1967,6 +2012,25 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "passage": {
+              "type": "object",
+              "properties": {
+                "ashoreSecondsMin": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "ashoreSecondsMax": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "overdueSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["ashoreSecondsMin", "ashoreSecondsMax", "overdueSeconds"],
+              "additionalProperties": false
             },
             "market": {
               "type": "object",
@@ -2016,6 +2080,7 @@
             "haulEstimateSeconds",
             "reofferSeconds",
             "maxCratesPerJob",
+            "passage",
             "market"
           ],
           "additionalProperties": false

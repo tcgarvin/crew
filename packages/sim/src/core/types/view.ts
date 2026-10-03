@@ -69,6 +69,10 @@ export interface SelfView {
   readonly lastPlannedTick: Tick;
   /** W4a addition: the actor's own retry backoff (`Actor.workBackoff`); refs → retry tick. */
   readonly backoff?: Readonly<Record<string, Tick>>;
+  /** Passengers §3.2: a paying passenger; never offered tasks or a post. */
+  readonly passenger?: true;
+  /** Passengers §3.5: walking off the ship; the planner keeps out of the way. */
+  readonly disembarking?: true;
 }
 
 /**
@@ -134,6 +138,8 @@ export interface RosterEntry {
   readonly name: string;
   readonly roleTags: readonly RoleTag[];
   readonly skills: SkillLevels;
+  /** Passengers §3.2: aboard as a passenger, not crew. Absent for crew. */
+  readonly passenger?: true;
 }
 
 /**
@@ -191,6 +197,8 @@ export interface RenderActor {
   readonly facing?: number;
   /** Short present-tense verb phrase for the label: "repairing pump", "sleeping", "walking". */
   readonly actionLabel: string;
+  /** Passengers §3.2: a paying passenger rather than crew, so the client can draw them apart. */
+  readonly passenger: boolean;
 }
 
 export type RenderMachineState = "ok" | "degraded" | "failed" | "off";

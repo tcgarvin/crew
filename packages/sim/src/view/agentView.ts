@@ -97,6 +97,8 @@ function buildSelf(
     onDuty: isOnDuty(actor.schedule, state.tick + 1, config),
     lastPlannedTick: actor.lastPlannedTick,
     ...(actor.workBackoff === undefined ? {} : { backoff: actor.workBackoff }),
+    ...(actor.passenger === true ? { passenger: true as const } : {}),
+    ...(actor.disembarking === true ? { disembarking: true as const } : {}),
   };
 }
 
@@ -215,10 +217,20 @@ function knownItems(world: World, actor: ReadonlyActor): KnownItemView[] {
   return out;
 }
 
+/**
+ * Who is aboard: the living crew, passengers included, minus anyone off the ship (a passenger
+ * ashore at a port, or one left behind or put off there; passengers §3.3, §4.2).
+ */
 function roster(state: ReadonlyWorldState): RosterEntry[] {
   return Object.values(state.actors)
-    .filter((a) => a.crew && a.availability !== "dead")
-    .map((a) => ({ actorId: a.id, name: a.name, roleTags: a.roleTags, skills: a.skills }));
+    .filter((a) => a.crew && a.availability !== "dead" && a.availability !== "offShip")
+    .map((a) => ({
+      actorId: a.id,
+      name: a.name,
+      roleTags: a.roleTags,
+      skills: a.skills,
+      ...(a.passenger === true ? { passenger: true as const } : {}),
+    }));
 }
 
 export function buildAgentView(world: World, actorId: ActorId): AgentView {

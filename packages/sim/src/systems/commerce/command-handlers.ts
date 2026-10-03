@@ -1,7 +1,8 @@
 import { configTicks } from "../../core/clock";
 import { newActor } from "../../core/command-handlers";
 /**
- * Commerce command handlers (PLAN §6 W6 items 3–4): `offerJob`, `acceptContract`, `declineJob`.
+ * Commerce command handlers (PLAN §6 W6 items 3–4): `offerJob`, `acceptContract`, `declineJob`,
+ * and (passengers-and-galaxy §4.2) `endPassage`.
  */
 import {
   type AppliedCommand,
@@ -22,13 +23,15 @@ import type { PhysicalLocation } from "../../core/types/common";
 import type { CrewDef, ItemDef } from "../../core/types/content";
 import type { CrewDefId, EntityId, ItemDefId, ItemId, JobId, TempRef } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
-import type { Job } from "../../core/types/travel";
+import type { CargoLine, Job } from "../../core/types/travel";
+import { jobBlockingAcceptance } from "../travel/in-hand";
 import { portStoreLocation } from "../travel/travel";
 import {
   DEFAULT_PITCH_KEY,
   acceptJob,
   cargoClassOf,
   cargoStowageZoneKey,
+  checkPassageBand,
   checkPriceBand,
   clampCargoToMaxCrates,
   dockedAtOrigin,
@@ -37,10 +40,20 @@ import {
   spawnCargoItem,
   surfaceOfferCard,
 } from "./jobs";
+import { PASSENGER_CREW_DEF_ID, endPassageEarly, spawnPassenger } from "./passage";
 
 // ---------------------------------------------------------------------------------------------
 // offerJob
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * Passengers §3.1: a passage's luggage is zero or one line; its count beyond one unit is ignored
+ * (the line becomes one piece of luggage). Two lines are a malformed draft and are rejected.
+ */
+function luggageOf(cargo: readonly CargoLine[]): CargoLine[] {
+  const [line] = cargo;
+  return line === undefined ? [] : [{ itemDefId: line.itemDefId, count: 1 }];
+}
 
 export const offerJob: CommandHandler<"offerJob", null> = {
   validate(ctx, command): Validation<null> {
@@ -49,8 +62,27 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     if (issuer.name === "" || issuer.role === "") {
       return reject("invalidPayload", "offerJob: the issuer needs a name and a role");
     }
-    const problem = checkPriceBand(ctx, job.fromPortId, job.toPortId, job.cargo, job.pay);
-    if (problem !== null) return reject("outOfBounds", `offerJob: ${problem}`);
+    const passenger = job.passenger === true;
+    const roundTrip = job.roundTrip === true;
+    if (roundTrip && !passenger) {
+      return reject(
+        "invalidPayload",
+        "offerJob: roundTrip needs passenger (freight has no return)",
+      );
+    }
+    if (passenger) {
+      if (job.cargo.length > 1) {
+        return reject("invalidPayload", "offerJob: a passage carries at most one line of luggage");
+      }
+      if (findCrewDef(ctx.content, ctx.state, PASSENGER_CREW_DEF_ID) === undefined) {
+        return reject("unknownEntity", `offerJob: no "${PASSENGER_CREW_DEF_ID}" crew template`);
+      }
+      const fare = checkPassageBand(ctx, job.fromPortId, job.toPortId, roundTrip, job.pay);
+      if (fare !== null) return reject("outOfBounds", `offerJob: ${fare}`);
+    } else {
+      const problem = checkPriceBand(ctx, job.fromPortId, job.toPortId, job.cargo, job.pay);
+      if (problem !== null) return reject("outOfBounds", `offerJob: ${problem}`);
+    }
     for (const line of job.cargo) {
       if (!Number.isInteger(line.count) || line.count < 1) {
         return reject("invalidPayload", "offerJob: cargo count must be a positive integer");
@@ -64,16 +96,16 @@ export const offerJob: CommandHandler<"offerJob", null> = {
   apply(ctx: ApplyCtx, command: CommandOfKind<"offerJob">): AppliedCommand {
     const { job: draft, surface } = command.payload;
     const jobId: JobId = allocateId(ctx.state, "job");
-    // Validated by `checkPriceBand` above: every cargo line shares one `CargoClass`.
+    const passenger = draft.passenger === true;
+    // Validated by `checkPriceBand` above: every cargo line shares one `CargoClass`. A passage's
+    // class is its luggage's (or `general`); its pay was banded by `checkPassageBand` instead.
     const cargoClass = cargoClassOf(ctx, draft.cargo) ?? "general";
     const issuerPerson = normaliseIssuer(draft.issuer);
     // Owner feedback 2026-09-30: freight now spawns as individual crates on acceptance
     // (`acceptJob`), so a haul stays short by capping units here, at offer time.
-    const { cargo, pay } = clampCargoToMaxCrates(
-      draft.cargo,
-      draft.pay,
-      ctx.config.commerce.maxCratesPerJob,
-    );
+    const { cargo, pay } = passenger
+      ? { cargo: luggageOf(draft.cargo), pay: draft.pay }
+      : clampCargoToMaxCrates(draft.cargo, draft.pay, ctx.config.commerce.maxCratesPerJob);
     const job: Job = {
       id: jobId,
       origin: command.source === "narrator" ? "narrator" : "portBoard",
@@ -92,6 +124,10 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       expiresAtTick: ctx.tick + configTicks(ctx.config, ctx.config.commerce.jobOfferTtlSeconds),
       cargoItemIds: [],
       causeCommandId: command.id,
+      // `actorId` is a placeholder until acceptance spawns the passenger (`acceptContract`).
+      ...(passenger
+        ? { passage: { actorId: "" as never, roundTrip: draft.roundTrip === true, leg: "out" } }
+        : {}),
     };
     ctx.state.jobs[jobId] = job;
     ctx.emit({
@@ -130,12 +166,24 @@ export const acceptContract: CommandHandler<"acceptContract", null> = {
     if (travel.stage !== "docked" || travel.portId !== job.fromPortId) {
       return reject("preconditionFailed", `acceptContract: not docked at "${job.fromPortId}"`);
     }
+    // D16/D50: one job at a time. Offers can wait (the card stays, "Pass" is always open); taking
+    // one while another is still under way is refused.
+    const inHand = jobBlockingAcceptance(ctx.state);
+    if (inHand !== undefined && inHand.id !== job.id) {
+      return reject(
+        "preconditionFailed",
+        `acceptContract: a job is already in hand (job "${inHand.id}", status "${inHand.status}")`,
+      );
+    }
     return ok(null);
   },
   apply(ctx: ApplyCtx, command: CommandOfKind<"acceptContract">): AppliedCommand {
     const job = ctx.state.jobs[command.payload.jobId];
     if (job === undefined) throw new Error("validated job vanished");
     job.status = "accepted";
+    // Passengers §3.5: the passenger boards at the personnel ramp; luggage spawns as freight.
+    if (job.passage !== undefined)
+      job.passage.actorId = spawnPassenger(ctx, job, causedBy(command));
     job.cargoItemIds = acceptJob(ctx, job);
     ctx.emit({
       type: "jobAccepted",
@@ -176,6 +224,33 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       source: command.source,
       payload: { jobId: job.id },
     });
+    return NO_TEMP_REFS;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// endPassage (passengers §4.2): the captain puts a passenger off, or leaves one behind.
+// ---------------------------------------------------------------------------------------------
+
+export const endPassage: CommandHandler<"endPassage", null> = {
+  validate(ctx, command): Validation<null> {
+    const job = ctx.state.jobs[command.payload.jobId];
+    if (job === undefined) return reject("unknownEntity", `unknown job "${command.payload.jobId}"`);
+    if (job.passage === undefined) {
+      return reject("preconditionFailed", `endPassage: job "${job.id}" carries no passenger`);
+    }
+    if (job.passage.endReason !== undefined) {
+      return reject("preconditionFailed", `endPassage: passage "${job.id}" already ended`);
+    }
+    if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") {
+      return reject("preconditionFailed", `endPassage: job "${job.id}" is ${job.status}`);
+    }
+    return ok(null);
+  },
+  apply(ctx: ApplyCtx, command: CommandOfKind<"endPassage">): AppliedCommand {
+    const job = ctx.state.jobs[command.payload.jobId];
+    if (job === undefined) throw new Error("validated job vanished");
+    endPassageEarly(ctx, job, causedBy(command));
     return NO_TEMP_REFS;
   },
 };

@@ -44,6 +44,7 @@ import crewJaxOkonkwo from "../data/crew/jax-okonkwo.json";
 // Crew
 import crewMaraOsei from "../data/crew/mara-osei.json";
 import crewOyelaranAbiodun from "../data/crew/oyelaran-abiodun.json";
+import crewPassenger from "../data/crew/passenger.json";
 import crewPriyaKessler from "../data/crew/priya-kessler.json";
 import crewSunnivaPark from "../data/crew/sunniva-park.json";
 import crewTomasRuiz from "../data/crew/tomas-ruiz.json";
@@ -64,6 +65,9 @@ import traitSteady from "../data/traits/steady.json";
 import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
 import portKesslerDrift from "../data/ports/kessler-drift.json";
+import portOssoryStation from "../data/ports/ossory-station.json";
+import portTernsRest from "../data/ports/terns-rest.json";
+import portVesperGate from "../data/ports/vesper-gate.json";
 
 // Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
@@ -111,6 +115,7 @@ const CREW = [
   crewBettinaSolheim,
   crewOyelaranAbiodun,
   crewSunnivaPark,
+  crewPassenger,
 ];
 const TRAITS = [
   traitSteady,
@@ -124,7 +129,14 @@ const TRAITS = [
   traitBriskWalker,
   traitMethodical,
 ];
-const PORTS = [portCrossroadsHub, portKesslerDrift, portGreenMeridian];
+const PORTS = [
+  portCrossroadsHub,
+  portKesslerDrift,
+  portGreenMeridian,
+  portOssoryStation,
+  portVesperGate,
+  portTernsRest,
+];
 const SCENARIOS = [scenarioDefault];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */

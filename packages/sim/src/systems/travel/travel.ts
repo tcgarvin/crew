@@ -7,6 +7,7 @@
  */
 import { configTicks } from "../../core/clock";
 import { allocateId } from "../../core/ids";
+import { affordableUnits } from "../../core/markets";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ExternalStoreDef, MachineTag, PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
@@ -18,11 +19,17 @@ import type {
   PortDefId,
   ProblemId,
 } from "../../core/types/ids";
-import type { StepCtx, System } from "../../core/types/pipeline";
+import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
-import type { TravelStage, TravelState } from "../../core/types/travel";
+import type {
+  DepartureGateFlags,
+  TravelStage,
+  TravelState,
+  VoyageFields,
+} from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
 import { departureCleared } from "./departure-gate";
+import { nextHop } from "./graph";
 import { raiseHookIfIdle } from "./hooks";
 
 // ---------------------------------------------------------------------------------------------
@@ -134,7 +141,9 @@ function isStaffed(ctx: Pick<StepCtx, "state" | "content">): boolean {
   const deckId = theDeckId(ctx);
   return Object.values(ctx.state.actors).some((actor) => {
     const location = actor.location;
-    if (!actor.crew || location.kind !== "onDeck" || location.deckId !== deckId) return false;
+    // Passengers §3.2: a passenger standing by the console is not staffing it.
+    if (!actor.crew || actor.passenger === true) return false;
+    if (location.kind !== "onDeck" || location.deckId !== deckId) return false;
     return positions.some(
       (p) => Math.abs(location.x - (p.x + 0.5)) <= 1 && Math.abs(location.y - (p.y + 0.5)) <= 1,
     );
@@ -253,6 +262,85 @@ export function hasOpenCargoWork(ctx: Pick<StepCtx, "state">): boolean {
   );
 }
 
+/**
+ * D47 at a waypoint: an open `partsNeeded` the crew could answer at this port's market (stock
+ * and money allow at least one unit), i.e. one that derives a runnable `buyParts` task. The
+ * voyage waits for it, so a stalled repair can buy its part on the way through.
+ */
+export function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked") return false;
+  return Object.values(ctx.state.work.problems).some(
+    (p) =>
+      p.kind === "partsNeeded" &&
+      p.status === "open" &&
+      affordableUnits(ctx.state, ctx.content, travel.portId, p.payload.itemDefId, p.payload.count) >
+        0,
+  );
+}
+
+/**
+ * Passengers §3.3: the ship is docked and a passenger keeps it there: a round-trip passenger
+ * ashore at this port whose passage has not ended (the voyage home waits for them, course kept,
+ * ramps open), or one walking down the ramp to leave (`Actor.disembarking`, §3.5/§4.2). Returns
+ * their name, for the headline.
+ */
+export function waitingForPassenger(
+  state: Pick<ReadonlyWorldState, "travel" | "jobs" | "actors">,
+): string | undefined {
+  const travel = state.travel;
+  if (travel.stage !== "docked") return undefined;
+  for (const job of Object.values(state.jobs)) {
+    const passage = job.passage;
+    if (passage === undefined) continue;
+    const actor = state.actors[passage.actorId];
+    if (actor?.disembarking === true) return actor.name;
+    if (passage.leg !== "ashore" || passage.endReason !== undefined) continue;
+    if (job.toPortId !== travel.portId) continue;
+    return actor?.name ?? job.issuerPerson.name;
+  }
+  return undefined;
+}
+
+/** A decision card is queued for the captain (any origin). */
+export function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
+  const { records, queue } = ctx.state.decisions;
+  return queue.some((id) => records[id]?.status === "pending");
+}
+
+/**
+ * Passengers-and-galaxy §2.3: what holds the ship at an intermediate port of a voyage. Cargo
+ * work, a purchasable part, a hold for repairs and a pending card each keep it docked; the
+ * travel system plans the next hop the first tick none of them applies.
+ */
+export function voyageHeldAtWaypoint(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return (
+    hasOpenCargoWork(ctx) ||
+    hasRunnableBuyPartsWork(ctx) ||
+    ctx.state.travel.holdForRepairs === true ||
+    hasPendingDecision(ctx) ||
+    waitingForPassenger(ctx.state) !== undefined
+  );
+}
+
+/**
+ * The fields a fresh stage object inherits from the previous one: the voyage, and the gate's
+ * "leave anyway" answer with the impairment set it was answered for (asked once per voyage).
+ */
+export function carriedVoyageFields(
+  travel: Readonly<DepartureGateFlags & VoyageFields>,
+): DepartureGateFlags & VoyageFields {
+  return {
+    ...(travel.voyageDestinationId === undefined
+      ? {}
+      : { voyageDestinationId: travel.voyageDestinationId }),
+    ...(travel.departureRiskAccepted === true ? { departureRiskAccepted: true } : {}),
+    ...(travel.acceptedImpairmentKey === undefined
+      ? {}
+      : { acceptedImpairmentKey: travel.acceptedImpairmentKey }),
+  };
+}
+
 /** Enter `preparingDeparture` from `docked` towards `toPortId` (shared with `setCourse`). */
 export function beginDeparture(
   ctx: Pick<StepCtx, "state" | "content" | "emit" | "tick">,
@@ -272,8 +360,9 @@ export function beginDeparture(
     routeDistance: distance ?? 0,
     drifting: false,
     stageStartedTick: ctx.tick,
-    // D36: "leave anyway" answered while docked still covers the departure it was asked for.
-    ...(travel.departureRiskAccepted === true ? { departureRiskAccepted: true } : {}),
+    // D36: "leave anyway" answered while docked still covers the departure it was asked for,
+    // and (§2.3) the rest of the voyage.
+    ...carriedVoyageFields(travel),
   };
   ctx.emit({
     ...cause,
@@ -283,9 +372,31 @@ export function beginDeparture(
   });
 }
 
+/**
+ * Docked at an intermediate port of a voyage with no course planned: plan the next hop on the
+ * shortest path from *here* (a detour re-routes from wherever it ended up) once nothing holds
+ * the ship. A voyage whose destination is no longer reachable is dropped rather than stranding
+ * the ship with a course it can never plan.
+ */
+function continueVoyageIfFree(ctx: StepCtx): void {
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) return;
+  const voyage = travel.voyageDestinationId;
+  if (voyage === undefined || voyage === travel.portId) return;
+  const hop = nextHop(ctx.content.ports, travel.portId, voyage);
+  if (hop === undefined) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.voyageDestinationId;
+    return;
+  }
+  if (voyageHeldAtWaypoint(ctx)) return;
+  travel.plannedDestinationId = hop;
+}
+
 function advanceTravel(ctx: StepCtx): void {
   const travel = ctx.state.travel;
   if (travel.stage === "docked") {
+    continueVoyageIfFree(ctx);
     // Integration 2: a course set while freight was still moving waits here, docked with the
     // ramp open, until the last crate is aboard (or ashore), then departure prep begins.
     const planned = travel.plannedDestinationId;
@@ -304,11 +415,22 @@ function advanceTravel(ctx: StepCtx): void {
       // until the loading crew runs out of crates to distract them with. Keeping the problem open
       // (so the claim and the hold persist) until the ship is actually ready to leave means a
       // pilot who gets there early just stays there.
+      //
+      // Passengers §3.3: while the ship waits for a passenger ashore (or walking off) the station
+      // is not wanted yet: an open problem here would have the pilot arrive, "resolve" it, wander
+      // off and be sent back for the whole stay. It is treated as settled until they are aboard.
       const console_ = bridgeConsole(ctx);
       if (console_ !== undefined) {
-        updateStaffingProblem(ctx, console_.id, isStaffed(ctx) && !hasOpenCargoWork(ctx));
+        const waiting = waitingForPassenger(ctx.state) !== undefined;
+        updateStaffingProblem(
+          ctx,
+          console_.id,
+          waiting || (isStaffed(ctx) && !hasOpenCargoWork(ctx)),
+        );
       }
     }
+    // Passengers §3.3: a planned voyage home waits docked for the passenger ashore.
+    if (planned !== undefined && waitingForPassenger(ctx.state) !== undefined) return;
     // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
     if (planned !== undefined && !hasOpenCargoWork(ctx) && departureCleared(ctx)) {
       beginDeparture(ctx, planned);
@@ -381,7 +503,15 @@ function advanceStage(ctx: StepCtx): void {
 
   if (to === "docked") {
     const portId = travel.toPortId;
-    ctx.state.travel = { stage: "docked", portId };
+    // §2.3: the voyage (and the gate's answer for it) survives an intermediate docking and ends
+    // at its destination; with no voyage, "leave anyway" is forgotten here as before (D36).
+    const voyageContinues =
+      travel.voyageDestinationId !== undefined && travel.voyageDestinationId !== portId;
+    ctx.state.travel = {
+      stage: "docked",
+      portId,
+      ...(voyageContinues ? carriedVoyageFields(travel) : {}),
+    };
     requestRamps(ctx, "open");
     // W6 decision: the fee is a flat config value, not per-`PortDef`, to keep V1 thin; a
     // per-port fee would read `ctx.defs.port(portId)` here instead.
@@ -420,6 +550,7 @@ function advanceStage(ctx: StepCtx): void {
     routeDistance,
     drifting: travel.drifting,
     stageStartedTick: ctx.tick,
+    ...carriedVoyageFields(travel),
   };
   emitStageChanged(ctx, from, to);
   if (from === "undocking" && to === "departing") {

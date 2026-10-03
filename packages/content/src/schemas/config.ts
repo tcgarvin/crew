@@ -87,12 +87,27 @@ export const configDefSchema = z.strictObject({
     departureMinOutput: unitInterval,
   }),
   commerce: z.strictObject({
-    priceBands: z.strictObject({ general: band, fragile: band, perishable: band, hazardous: band }),
+    priceBands: z.strictObject({
+      general: band,
+      fragile: band,
+      perishable: band,
+      hazardous: band,
+      passenger: band,
+    }),
     jobOfferTtlSeconds: positive,
     dockingFee: z.number().int().min(0),
     haulEstimateSeconds: nonNegative,
     reofferSeconds: nonNegative,
     maxCratesPerJob: positiveInt,
+    passage: z
+      .strictObject({
+        ashoreSecondsMin: nonNegative,
+        ashoreSecondsMax: nonNegative,
+        overdueSeconds: nonNegative,
+      })
+      .refine((p) => p.ashoreSecondsMin <= p.ashoreSecondsMax, {
+        message: "ashoreSecondsMin must be <= ashoreSecondsMax",
+      }),
     market: z.strictObject({
       priceTiers: z.strictObject({ cheap: positive, fair: positive, dear: positive }),
       maxStockPerCommand: nonNegativeInt,

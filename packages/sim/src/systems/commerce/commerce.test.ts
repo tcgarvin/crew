@@ -38,6 +38,39 @@ describe("commerce: price bands (D6)", () => {
     expect(result).toMatchObject({ status: "rejected", rejection: { code: "outOfBounds" } });
   });
 
+  it("bands pay over the shortest path to a port beyond one hop (§2.3)", () => {
+    // a -> c -> d is 95; 2 crates × general [1, 3] gives [190, 570].
+    const draft = (pay: number) => ({ ...jobDraft(pay), toPortId: PORTS.d });
+    const offer = (pay: number) =>
+      freightTestWorld().kernel.enqueueCommand(
+        freightTestWorld().world,
+        cmd({ source: "narrator", kind: "offerJob", payload: { job: draft(pay), surface: false } }),
+      );
+    expect(offer(190).status).toBe("accepted");
+    expect(offer(570).status).toBe("accepted");
+    expect(offer(189)).toMatchObject({
+      status: "rejected",
+      rejection: { code: "outOfBounds", reason: expect.stringContaining("[190, 570]") },
+    });
+    expect(offer(571).status).toBe("rejected");
+  });
+
+  it("rejects a destination no chain of routes reaches, with a reason", () => {
+    const { world, kernel } = freightTestWorld();
+    const result = kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "narrator",
+        kind: "offerJob",
+        payload: { job: { ...jobDraft(100), toPortId: "port.nowhere" as never }, surface: false },
+      }),
+    );
+    expect(result).toMatchObject({
+      status: "rejected",
+      rejection: { code: "outOfBounds", reason: expect.stringContaining("unknown port") },
+    });
+  });
+
   it("accepts a narrator offerJob within the band (AUTHORITY allows it)", () => {
     const { world, kernel } = freightTestWorld();
     const result = kernel.enqueueCommand(

@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ValidationIssue, contentJsonSchemas, loadBundle } from "@crew/content";
 import type { DeckDefId } from "@crew/sim";
+import { runPacingCli } from "./pacing";
 import { renderDeck } from "./render-deck";
 
 export interface CliResult {
@@ -102,10 +103,13 @@ function runContent(sub: string | undefined, rest: readonly string[]): CliResult
 export function crew(argv: readonly string[]): CliResult {
   const [command, sub, ...rest] = argv;
   if (command === undefined) {
-    return fail("crew: no command given (try `crew content validate`)");
+    return fail("crew: no command given (try `crew content validate` or `crew pacing`)");
   }
   if (command === "content") {
     return runContent(sub, rest);
+  }
+  if (command === "pacing") {
+    return runPacingCli(sub === undefined ? rest : [sub, ...rest]);
   }
   return fail(`crew: unknown command "${command}"`);
 }

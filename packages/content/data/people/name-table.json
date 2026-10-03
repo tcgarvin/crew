@@ -79,6 +79,30 @@
         "This lot was picked this morning. It won't wait for the next quiet ship.",
         "We grow it slow out here. Getting it to {to} is the part we can't do ourselves."
       ]
+    },
+    "port.ossory_station": {
+      "roles": ["yard boss", "claims registrar", "breaker", "scrap buyer"],
+      "orgs": ["Ossory Breakers' Association", "Ossory Claims Registry", "Orlov Cutting Yard"],
+      "pitches": [
+        "We cut up more ships than dock here. Someone has to carry the pieces out.",
+        "Estate's settled, claim's sold, and the {cargo} goes to {to}. Don't ask whose it was."
+      ]
+    },
+    "port.vesper_gate": {
+      "roles": ["hospice warden", "dock keeper", "physician", "chaplain"],
+      "orgs": ["Vesper Gate Hospice", "Order of the Long Gallery", "Gate Dispensary"],
+      "pitches": [
+        "We make these for the sick. Get them to {to} and someone will be glad you did.",
+        "People come here to say goodbye. Most of them need a ship home afterwards."
+      ]
+    },
+    "port.terns_rest": {
+      "roles": ["marshal", "relay operator", "homesteader", "trading-post keeper"],
+      "orgs": ["Tern's Rest Relay", "Harrow's Trading Post", "Rest Homesteaders' Council"],
+      "pitches": [
+        "Nobody comes out this far by accident. Since you're here, take this to {to}.",
+        "Out here a ship that comes back twice is news. Be news."
+      ]
     }
   }
 }

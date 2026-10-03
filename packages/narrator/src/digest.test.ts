@@ -1,7 +1,21 @@
-import type { EventId, MachineId, ProblemId, SaveEnvelope, SimEvent } from "@crew/sim";
+import {
+  type EventId,
+  type MachineId,
+  type PortDefId,
+  type ProblemId,
+  type SaveEnvelope,
+  type SimEvent,
+  configTicks,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
-import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
+import {
+  FIXTURE_PASSENGER,
+  approachingPortRequest,
+  passengerAboardRequest,
+  passengerOverdueRequest,
+  quietTooLongRequest,
+} from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { content } from "./test-support";
 
@@ -293,8 +307,278 @@ describe("buildDigest", () => {
     };
     const { text } = buildDigest(req.snapshot, req.recentEvents, notes, content(), req.hook);
     const section = text.split("## People you know here (Green Meridian)\n")[1]?.split("\n\n")[0];
-    expect(section).toBe("- Ysolde Maren: grower, owes us a favour; last seen at tick 1200");
+    const lines = section?.split("\n") ?? [];
+    expect(lines[0]).toMatch(/^the place: /);
+    expect(lines[1]).toBe("- Ysolde Maren: grower, owes us a favour; last seen at tick 1200");
+    expect(section).not.toContain("Hamid Rask");
     expect(text).toContain("from Tobiah Rask (freight broker, Meridian Trading House)");
     expect(text).not.toContain("pays");
+  });
+
+  it("seeds the port's character and its locals into the people section without touching the cast (§2.4)", () => {
+    const req = quietTooLongRequest(content());
+    const port = content().ports["port.green_meridian" as never];
+    if (port === undefined) throw new Error("fixture port");
+    const [first, ...rest] = port.castSeed;
+    if (first === undefined) throw new Error("port has no cast seed");
+    // The model already wrote about one of the seeded locals: its own note wins.
+    const notes = {
+      ...EMPTY_NOTES,
+      cast: [{ name: first.name, note: "owes us a favour", portId: port.id, lastSeenTick: 1200 }],
+    };
+    const { text } = buildDigest(req.snapshot, req.recentEvents, notes, content(), req.hook);
+    const section = text.split("## People you know here (Green Meridian)\n")[1]?.split("\n\n")[0];
+    expect(section).toContain(`the place: ${port.character}`);
+    expect(section).toContain(`- ${first.name}: owes us a favour; last seen at tick 1200`);
+    expect(section).not.toContain(`- ${first.name}, ${first.role}:`);
+    expect(section).toContain("locals you have not met yet but may bring in");
+    for (const seed of rest)
+      expect(section).toContain(`- ${seed.name}, ${seed.role}: ${seed.note}`);
+    // Seeds are read from content, never written into the notes the model gets back.
+    expect(text.match(/^cast: /gm) ?? []).toHaveLength(1);
+  });
+});
+
+describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
+  const OSSORY = "port.ossory_station" as never;
+  const DRIFT = "port.kessler_drift" as never;
+  const HUB = "port.crossroads_hub" as never;
+
+  it("says the ship is under way on a leg and bound for the voyage destination, with hops left", () => {
+    const req = approachingPortRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const t = snapshot.state.travel;
+    if (t.stage === "docked") throw new Error("fixture: expected a leg");
+    snapshot.state.travel = { ...t, voyageDestinationId: OSSORY };
+    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
+    expect(text).toContain(
+      "travel: approaching, under way Crossroads Hub -> Kessler Drift (port.kessler_drift), 100% of route, bound for Ossory Station (port.ossory_station); 1 hop, 120s transit still to go from there",
+    );
+  });
+
+  it("says the ship is stopping at a waypoint on the way, and plain docked otherwise", () => {
+    const req = approachingPortRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.travel = {
+      stage: "docked",
+      portId: DRIFT,
+      plannedDestinationId: OSSORY,
+      voyageDestinationId: OSSORY,
+    };
+    const stopping = buildDigest(snapshot, [], EMPTY_NOTES, content(), undefined).text;
+    expect(stopping).toContain(
+      "travel: stopping at Kessler Drift (port.kessler_drift) on the way to Ossory Station (port.ossory_station); 1 hop, 120s transit still to go; next leg to Ossory Station; the ship continues on her own once nothing holds her here",
+    );
+    snapshot.state.travel = { stage: "docked", portId: HUB, voyageDestinationId: OSSORY };
+    expect(buildDigest(snapshot, [], EMPTY_NOTES, content(), undefined).text).toContain(
+      "on the way to Ossory Station (port.ossory_station); 2 hops, 145s transit still to go;",
+    );
+    // At the destination the voyage is over: no "on the way" wording even if the field lingers.
+    snapshot.state.travel = { stage: "docked", portId: OSSORY, voyageDestinationId: OSSORY };
+    expect(buildDigest(snapshot, [], EMPTY_NOTES, content(), undefined).text).toContain(
+      "travel: docked at Ossory Station (port.ossory_station)\n",
+    );
+  });
+
+  it("marks a far job with its hops, transit and waypoints", () => {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    for (const job of Object.values(snapshot.state.jobs)) job.toPortId = OSSORY;
+    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
+    expect(text).toContain(
+      "Crossroads Hub -> Ossory Station (2 hops, 145s transit via Kessler Drift), 4x General Cargo Crate",
+    );
+    const near = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook).text;
+    expect(near).toContain("Crossroads Hub -> Green Meridian, 4x General Cargo Crate");
+  });
+});
+
+describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
+  const ABOARD = `- Aboard: ${FIXTURE_PASSENGER}, passenger, bound for Ossory Station and back to Crossroads Hub`;
+
+  function digestOf(req: ReturnType<typeof passengerAboardRequest>) {
+    return buildDigest(req.snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook).text;
+  }
+
+  it("lists a passenger aboard on an Aboard line after the crew: where to, whether back, where on deck now", () => {
+    const req = passengerAboardRequest(content());
+    const text = digestOf(req);
+    const aboard = text.split("\n").find((l) => l.startsWith("- Aboard:"));
+    expect(aboard).toContain(`${ABOARD}; now `);
+    expect(aboard).toMatch(/now (idle|wandering|walking|eating|sleeping|resting)/);
+    expect(aboard).toContain("Says: Passage to Ossory Station and home again.");
+    // Not a crew line: no role tags, needs or voice; the crew count leaves her out.
+    expect(text).toContain("## Crew (8)");
+    expect(text).not.toMatch(new RegExp(`^- ${FIXTURE_PASSENGER}[ :\\[]`, "m"));
+    expect(text).not.toContain("passengers/NPCs");
+  });
+
+  it("says the job is a round-trip passage on the Jobs line, with the leg and the luggage", () => {
+    const req = passengerAboardRequest(content());
+    expect(digestOf(req)).toContain(
+      "Crossroads Hub -> Ossory Station (2 hops, 145s transit via Kessler Drift), round-trip passage (leg out), no luggage",
+    );
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const job = Object.values(snapshot.state.jobs)[0];
+    if (job?.passage === undefined) throw new Error("fixture: no passage");
+    job.passage.roundTrip = false;
+    job.cargo = [{ itemDefId: "item.crate_fragile" as never, count: 1 }];
+    const oneWay = digestOf({ ...req, snapshot });
+    expect(oneWay).toContain("one-way passage (leg out), luggage: 1x Fragile Cargo Crate");
+    expect(oneWay).toContain(
+      `- Aboard: ${FIXTURE_PASSENGER}, passenger, bound for Ossory Station, one way;`,
+    );
+  });
+
+  function ended(
+    reason: "leftBehind" | "putOff" | "completed",
+    where: "ashore" | "onDeck",
+  ): ReturnType<typeof passengerAboardRequest> {
+    const req = passengerAboardRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const job = Object.values(snapshot.state.jobs)[0];
+    const passenger = Object.values(snapshot.state.actors).find((a) => a.passenger === true);
+    if (job?.passage === undefined || passenger === undefined) throw new Error("fixture");
+    job.passage.endReason = reason;
+    snapshot.state.travel = { stage: "docked", portId: "port.ossory_station" as PortDefId };
+    if (where === "ashore") {
+      passenger.availability = "offShip";
+      passenger.location = {
+        kind: "inExternalStore",
+        portId: "port.ossory_station" as PortDefId,
+        storeKey: "lounge" as never,
+      };
+    }
+    return { ...req, snapshot };
+  }
+
+  it.each(["leftBehind", "putOff"] as const)(
+    "a passenger %s at a port is no longer Aboard and is listed under the people at that port",
+    (reason) => {
+      const text = digestOf(ended(reason, "ashore"));
+      expect(text).not.toContain("- Aboard:");
+      expect(text).toContain("## Crew (8)");
+      const section = text.split("## People you know here (Ossory Station)\n")[1]?.split("\n\n")[0];
+      const how = reason === "putOff" ? "put off the ship" : "left behind";
+      expect(section).toContain(
+        `- ${FIXTURE_PASSENGER}: passenger ${how} here, off ship (was bound for Ossory Station and back to Crossroads Hub); yours to use. Said: Passage to Ossory Station and home again.`,
+      );
+      // The cast slot is the model's: a cast entry by the same name wins over the kernel's line.
+      const notes = {
+        ...EMPTY_NOTES,
+        cast: [
+          {
+            name: FIXTURE_PASSENGER,
+            note: "stranded, furious",
+            portId: "port.ossory_station",
+            lastSeenTick: 5,
+          },
+        ],
+      };
+      const req = ended(reason, "ashore");
+      const withCast = buildDigest(req.snapshot, req.recentEvents, notes, content(), req.hook).text;
+      expect(withCast).toContain(`- ${FIXTURE_PASSENGER}: stranded, furious; last seen at tick 5`);
+      expect(withCast).not.toContain(`passenger ${how} here`);
+    },
+  );
+
+  it("a passenger put off while still on deck is Aboard until the next docking, and says so", () => {
+    const text = digestOf(ended("putOff", "onDeck"));
+    expect(text).toMatch(
+      new RegExp(
+        `^- Aboard: ${FIXTURE_PASSENGER}, passenger, put off: leaves the ship at the next docking; now .+\\.$`,
+        "m",
+      ),
+    );
+    expect(text).not.toContain("bound for Ossory Station");
+  });
+
+  it("a passenger mid-passage ashore at the far port is Aboard (ashore), not one of the people there", () => {
+    const req = passengerOverdueRequest(content());
+    const text = digestOf(req);
+    expect(text).toContain(`${ABOARD}; ashore at Ossory Station`);
+    expect(text).not.toContain("passenger left behind here");
+  });
+
+  it("says 'going down the ramp' while the passenger is disembarking", () => {
+    const req = passengerAboardRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const passenger = Object.values(snapshot.state.actors).find((a) => a.passenger === true);
+    if (passenger === undefined) throw new Error("fixture: no passenger");
+    passenger.disembarking = true;
+    expect(digestOf({ ...req, snapshot })).toContain(`${ABOARD}; now going down the ramp.`);
+  });
+
+  it("while ashore says where, when they are due back, and OVERDUE once the overdue window has passed", () => {
+    const req = passengerOverdueRequest(content());
+    const overdue = digestOf(req);
+    const job = Object.values(req.snapshot.state.jobs)[0];
+    const since = job?.passage?.ashoreSinceTick;
+    const dueAt = job?.passage?.returnsAtTick;
+    if (since === undefined || dueAt === undefined) throw new Error("fixture: not ashore");
+    const config = req.snapshot.config;
+    const overdueAt = since + configTicks(config, config.commerce.passage.overdueSeconds);
+    expect(overdue).toContain(
+      `${ABOARD}; ashore at Ossory Station, back at about ${Math.round(dueAt / config.time.tickRate)}s (tick ${dueAt}); OVERDUE (expected by tick ${overdueAt}).`,
+    );
+    expect(overdue).toContain("round-trip passage (leg ashore), no luggage");
+    // Earlier in the stay, not overdue yet.
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.tick = overdueAt - 1;
+    const early = digestOf({ ...req, snapshot });
+    expect(early).toContain("ashore at Ossory Station, back at about");
+    expect(early).not.toContain("OVERDUE");
+  });
+
+  it("the overdue policy hook names the first officer and shows the templated card with both sides (D37)", () => {
+    const req = passengerOverdueRequest(content());
+    const text = digestOf(req);
+    const firstOfficer = Object.values(req.snapshot.state.actors).find(
+      (a) => a.passenger !== true && a.roleTags.includes("firstOfficer"),
+    );
+    if (firstOfficer === undefined) throw new Error("fixture: no first officer");
+    expect(text).toContain(
+      `policyDecision: decision ${req.hook.kind === "policyDecision" ? req.hook.context.decisionId : "?"} needs the captain; ${firstOfficer.name} brings it: write the card in their voice`,
+    );
+    expect(text).toContain(`(brought by ${firstOfficer.name})`);
+    expect(text).toContain(
+      `${FIXTURE_PASSENGER} went ashore at Ossory Station and hasn't come back when they said they would.`,
+    );
+    expect(text).toContain('Left: "Wait for them". Right: "Leave without them".');
+    expect(text).not.toContain("commerce.passengerOverdue {");
+  });
+
+  it("a notableEvent hook for passengerReturned reads as 'is back aboard'", () => {
+    const base = passengerAboardRequest(content());
+    const snapshot = structuredClone(base.snapshot) as SaveEnvelope;
+    const job = Object.values(snapshot.state.jobs)[0];
+    if (job?.passage === undefined) throw new Error("fixture: no passage");
+    job.passage.leg = "back";
+    const returned: SimEvent = {
+      id: "evt9" as EventId,
+      tick: 8_000,
+      seq: 0,
+      type: "passengerReturned",
+      subjectIds: [],
+      causeIds: [],
+      source: "sim",
+      significance: "narrative",
+      payload: { jobId: job.id, actorId: job.passage.actorId, name: FIXTURE_PASSENGER },
+    } as unknown as SimEvent;
+    const hook = {
+      id: base.hook.id,
+      kind: "notableEvent" as const,
+      context: { eventIds: [returned.id] },
+      tick: 8_001,
+    };
+    const text = buildDigest(
+      snapshot,
+      [...base.recentEvents, returned],
+      EMPTY_NOTES,
+      content(),
+      hook,
+    ).text;
+    expect(text).toContain(`notableEvent: events evt9: ${FIXTURE_PASSENGER} is back aboard`);
+    expect(text).toContain(`${FIXTURE_PASSENGER}, passenger, on the way home to Crossroads Hub;`);
   });
 });

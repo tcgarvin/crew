@@ -3,6 +3,24 @@
   "id": "port.kessler_drift",
   "name": "Kessler Drift",
   "description": "A mining outpost bolted to a nickel-iron asteroid; bare corridors, docked ore haulers, and a market that only wants to talk about ore prices.",
+  "character": "Kessler Drift is miners and the people who service miners: shift crews on rotation, assay clerks, a fabrication shop that will weld anything for the right price. They want ore prices up, parts in, and no surprises on the dock. The Drift is known for hard work, thin margins, and a canteen where every conversation is about the next shift or the last accident.",
+  "castSeed": [
+    {
+      "name": "Greta Lindholm",
+      "role": "shift foreman",
+      "note": "Big, tired and fair; she decides which hauler loads first and nobody argues twice."
+    },
+    {
+      "name": "Osric Tan",
+      "role": "assay clerk",
+      "note": "Precise to the gram, keeps a private ledger of who shorted whom, and will share it for a favour."
+    },
+    {
+      "name": "Marisol Kemp",
+      "role": "canteen keeper",
+      "note": "Runs the only bar on the rock and hears everything before the Guild does."
+    }
+  ],
   "externalStores": [
     {
       "key": "warehouse",
@@ -13,6 +31,11 @@
       "key": "market",
       "name": "Drift Exchange",
       "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Drift Canteen",
+      "kind": "lounge"
     }
   ],
   "market": [
@@ -63,6 +86,10 @@
     {
       "toPortId": "port.green_meridian",
       "distance": 70
+    },
+    {
+      "toPortId": "port.ossory_station",
+      "distance": 120
     }
   ]
 }

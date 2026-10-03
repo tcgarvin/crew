@@ -8,8 +8,13 @@ import {
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
-import { approachingPortRequest, quietTooLongRequest } from "./fixtures";
-import { payFor, routeDistance } from "./lookups";
+import {
+  approachingPortRequest,
+  farJobBoardRequest,
+  passengerAboardRequest,
+  quietTooLongRequest,
+} from "./fixtures";
+import { fareFor, pathBetween, payFor, routeDistance } from "./lookups";
 import { content, emptyPlan } from "./test-support";
 import { translateIntents } from "./translate";
 
@@ -47,6 +52,8 @@ const job = {
   payTier: "generous",
   urgency: "urgent",
   surface: true,
+  passenger: false,
+  roundTrip: false,
 };
 
 const decision = {
@@ -91,6 +98,69 @@ function expectNarratorOnly(commands: readonly NarratorCommand[]): void {
     expect(command.source).toBe("narrator");
   }
 }
+
+describe("translateIntents: far ports (passengers-and-galaxy §2.3)", () => {
+  const OSSORY = "port.ossory_station";
+  const HUB = "port.crossroads_hub";
+
+  it("accepts an offerJob to a port two hops away and prices it over the path distance", () => {
+    const req = docked(approachingPortRequest(content()), HUB);
+    const far = { ...job, fromPort: HUB, toPort: OSSORY, payTier: "standard" };
+    const result = translateIntents(plan([far]), ctxOf(req));
+    expect(result.dropped).toEqual([]);
+    const command = result.commands[0];
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    const draft = command.payload.job;
+    expect(draft.toPortId).toBe(OSSORY);
+    expect(routeDistance(content(), HUB, OSSORY)).toBeUndefined();
+    const path = pathBetween(content(), HUB, OSSORY);
+    expect(path).toMatchObject({ hops: 2, distance: 145 });
+    const expected = payFor(req.snapshot.config, "hazardous", 145, 3, "standard");
+    expect(draft.pay).toBe(expected.pay);
+    // Direct-route pricing would be a different (lower) number.
+    expect(draft.pay).not.toBe(payFor(req.snapshot.config, "hazardous", 25, 3, "standard").pay);
+  });
+
+  it("still drops an offerJob to a port no chain of legs reaches", () => {
+    const bundle = content();
+    const ossory = bundle.ports[OSSORY as PortDefId];
+    const drift = bundle.ports["port.kessler_drift" as PortDefId];
+    if (ossory === undefined || drift === undefined) throw new Error("fixture ports");
+    const cut = {
+      ...bundle,
+      ports: {
+        ...bundle.ports,
+        [OSSORY]: { ...ossory, routes: [] },
+        "port.kessler_drift": {
+          ...drift,
+          routes: drift.routes.filter((r) => r.toPortId !== OSSORY),
+        },
+      },
+    };
+    const req = docked(approachingPortRequest(content()), HUB);
+    const far = { ...job, fromPort: HUB, toPort: OSSORY };
+    const result = translateIntents(plan([far]), { ...ctxOf(req), content: cut });
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "offerJob: no route from port.crossroads_hub to port.ossory_station",
+    );
+  });
+
+  it("accepts a setCourse side to a port two hops away", () => {
+    const req = docked(approachingPortRequest(content()), HUB);
+    const card = {
+      ...decision,
+      left: { label: "Make for Ossory", effect: "setCourse", coursePort: OSSORY },
+    };
+    const result = translateIntents(plan([card]), ctxOf(req));
+    expect(result.dropped).toEqual([]);
+    const command = result.commands[0];
+    if (command?.kind !== "surfaceDecision") throw new Error("no card");
+    expect(command.payload.card.left.commands).toEqual([
+      { kind: "setCourse", payload: { destinationPortId: OSSORY } },
+    ]);
+  });
+});
 
 describe("translateIntents: valid intents", () => {
   it("offerJob → offerJob with pay inside the kernel price band", () => {
@@ -446,13 +516,13 @@ describe("translateIntents: drops with reasons", () => {
       quantity: "one",
       location: { kind: "onDeck", deckId: "deck.freighter_mk1", x: 3, y: 3 },
     };
-    const noLounge = { ...onDeck, store: "lounge" } as Record<string, unknown>;
+    const noChapel = { ...onDeck, store: "chapel" } as Record<string, unknown>;
     // biome-ignore lint/performance/noDelete: building a test intent without the key.
-    delete noLounge.location;
-    const result = translateIntents(plan([onDeck, noLounge]), ctxOf(req));
+    delete noChapel.location;
+    const result = translateIntents(plan([onDeck, noChapel]), ctxOf(req));
     expect(result.commands).toEqual([]);
     expect(result.dropped[1]?.reason).toBe(
-      'spawnAtBoundary: port port.kessler_drift has no store "lounge"; use one listed under What you can do',
+      'spawnAtBoundary: port port.kessler_drift has no store "chapel"; use one listed under What you can do',
     );
   });
 
@@ -671,5 +741,207 @@ describe("translateIntents: malicious plans (N6)", () => {
 
   it("the narrator's kernel authority is exactly the allow-list", () => {
     expect([...AUTHORITY.narrator].sort()).toEqual([...NARRATOR_COMMAND_KINDS].sort());
+  });
+});
+
+describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", () => {
+  const passage = {
+    ...job,
+    issuerName: "Halla Thorne",
+    issuerRole: "assayer",
+    issuerOrg: "",
+    pitch: "I need to get to Ossory and back. I can pay, and I don't take up much room.",
+    description: "Passage to Ossory Station and home again. She says she has a claim to sell.",
+    fromPort: "port.crossroads_hub",
+    toPort: "port.ossory_station",
+    cargoItem: "",
+    quantity: "several",
+    payTier: "standard",
+    surface: false,
+    passenger: true,
+    roundTrip: true,
+  };
+  const atHub = () => ctxOf(farJobBoardRequest(content()));
+
+  it("passenger offer → a passage draft: passenger and roundTrip set, surface forced true, no luggage for an empty cargoItem", () => {
+    const result = translateIntents(plan([passage]), atHub());
+    expect(result.dropped).toEqual([]);
+    const [command] = result.commands;
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    expect(command.payload.surface).toBe(true);
+    expect(command.payload.job).toMatchObject({
+      passenger: true,
+      roundTrip: true,
+      cargo: [],
+      fromPortId: "port.crossroads_hub",
+      toPortId: "port.ossory_station",
+      issuer: { name: "Halla Thorne", role: "assayer" },
+    });
+  });
+
+  it("prices a passage by the passenger band over path distance, doubled for a round trip", () => {
+    const config = farJobBoardRequest(content()).snapshot.config;
+    const path = pathBetween(content(), "port.crossroads_hub", "port.ossory_station");
+    if (path === undefined) throw new Error("no path");
+    expect(path.hops).toBe(2);
+    const round = translateIntents(plan([passage]), atHub()).commands[0];
+    const oneWay = translateIntents(plan([{ ...passage, roundTrip: false }]), atHub()).commands[0];
+    if (round?.kind !== "offerJob" || oneWay?.kind !== "offerJob") throw new Error("no offer");
+    expect(round.payload.job.pay).toBe(fareFor(config, path.distance, true, "standard").pay);
+    expect(oneWay.payload.job.pay).toBe(fareFor(config, path.distance, false, "standard").pay);
+    expect(round.payload.job.pay).toBe(oneWay.payload.job.pay * 2);
+    const band = config.commerce.priceBands.passenger;
+    expect(round.payload.job.pay).toBeGreaterThanOrEqual(Math.round(band.min * path.distance * 2));
+    expect(round.payload.job.pay).toBeLessThanOrEqual(Math.round(band.max * path.distance * 2));
+    expect(oneWay.payload.job.roundTrip).toBe(false);
+  });
+
+  it("takes cargoItem as one unit of luggage whatever the quantity tier, and luggage adds nothing to the fare", () => {
+    const withBag = translateIntents(
+      plan([{ ...passage, cargoItem: "item.crate_fragile", quantity: "several" }]),
+      atHub(),
+    );
+    expect(withBag.dropped).toEqual([]);
+    const [command] = withBag.commands;
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    expect(command.payload.job.cargo).toEqual([{ itemDefId: "item.crate_fragile", count: 1 }]);
+    const noBag = translateIntents(plan([passage]), atHub()).commands[0];
+    if (noBag?.kind !== "offerJob") throw new Error("no offer");
+    expect(command.payload.job.pay).toBe(noBag.payload.job.pay);
+  });
+
+  it("still checks that luggage is a known cargo item", () => {
+    const result = translateIntents(plan([{ ...passage, cargoItem: "item.unobtainium" }]), atHub());
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toContain(
+      'offerJob: cargoItem: unknown item "item.unobtainium"',
+    );
+  });
+
+  it("drops roundTrip without passenger with a reason, and leaves freight untouched", () => {
+    const result = translateIntents(
+      plan([
+        { ...passage, passenger: false, roundTrip: true, cargoItem: "item.crate_general" },
+        { ...passage, passenger: false, roundTrip: false, cargoItem: "item.crate_general" },
+      ]),
+      atHub(),
+    );
+    expect(result.dropped).toEqual([
+      {
+        intentIndex: 0,
+        kind: "offerJob",
+        reason: "offerJob: roundTrip needs passenger (freight has no return)",
+      },
+    ]);
+    const [freight] = result.commands;
+    if (freight?.kind !== "offerJob") throw new Error("no offer");
+    expect(freight.payload.surface).toBe(false);
+    expect(freight.payload.job.passenger).toBeUndefined();
+    expect(freight.payload.job.roundTrip).toBeUndefined();
+    expect(freight.payload.job.cargo).toEqual([{ itemDefId: "item.crate_general", count: 6 }]);
+  });
+
+  it("a passenger offer counts as the call's one card, so a second surfaced card is dropped", () => {
+    const result = translateIntents(plan([passage, decision]), atHub());
+    expect(result.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+    expect(result.dropped[0]?.reason).toBe("surfaceDecision: only one card per call");
+  });
+
+  it("a passenger offer after the call's card is dropped with its own reason, never posted quietly", () => {
+    const card = { ...decision, left: { label: "Fine by me", effect: "none", coursePort: "" } };
+    const result = translateIntents(plan([card, passage]), atHub());
+    expect(result.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(result.dropped).toEqual([
+      {
+        intentIndex: 1,
+        kind: "offerJob",
+        reason: "offerJob: a passenger offer must be surfaced and this call's card is taken",
+      },
+    ]);
+    // Freight in the same spot keeps the generic reason (it could have gone to the board).
+    const freight = translateIntents(
+      plan([card, { ...job, fromPort: "port.crossroads_hub", toPort: "port.kessler_drift" }]),
+      atHub(),
+    );
+    expect(freight.dropped[0]?.reason).toBe("offerJob: only one card per call");
+  });
+
+  describe("one job at a time (D16, D50)", () => {
+    function withJobStatus(status: string): { ctx: TranslationCtx; jobId: string } {
+      const req = docked(passengerAboardRequest(content()), "port.kessler_drift");
+      const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+      const held = Object.values(snapshot.state.jobs)[0];
+      if (held === undefined) throw new Error("fixture: no job");
+      held.status = status as never;
+      return { ctx: ctxOf({ ...req, snapshot }), jobId: held.id };
+    }
+
+    it.each(["accepted", "inTransit", "delivered"])(
+      "drops any offerJob while a job is %s, naming the job in hand",
+      (status) => {
+        const { ctx, jobId } = withJobStatus(status);
+        const result = translateIntents(
+          plan([job, { ...passage, fromPort: "port.kessler_drift" }]),
+          ctx,
+        );
+        expect(result.commands).toEqual([]);
+        expect(result.dropped.map((d) => d.reason)).toEqual([
+          `offerJob: a job is already in hand: ${jobId} to Ossory Station`,
+          `offerJob: a job is already in hand: ${jobId} to Ossory Station`,
+        ]);
+      },
+    );
+
+    it.each(["paid", "declined", "expired", "failed", "offered"])(
+      "a job that is %s is not in hand, so an offer goes through",
+      (status) => {
+        const { ctx } = withJobStatus(status);
+        const result = translateIntents(plan([job]), ctx);
+        expect(result.dropped).toEqual([]);
+        expect(result.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+      },
+    );
+  });
+
+  const putOff = {
+    ...decision,
+    title: "About our passenger",
+    speaker: "Dane Whitcross",
+    situation:
+      "Dane finds the captain by the galley hatch. “She's been in the hold twice tonight, Captain. Nothing missing that I can see. I'd put her off at the Drift and be done.”",
+    left: { label: "Put her off at the Drift.", effect: "endPassage", coursePort: "" },
+    right: { label: "She stays.", effect: "none", coursePort: "" },
+    leftAftermath: "Dane nods; she goes down the ramp at the next port.",
+    rightAftermath: "Dane says nothing more about it, for now.",
+  };
+
+  it("endPassage side → the kernel's endPassage for the live passage, as a player command", () => {
+    const req = passengerAboardRequest(content());
+    const result = translateIntents(plan([putOff]), ctxOf(req));
+    expect(result.dropped).toEqual([]);
+    const [command] = result.commands;
+    if (command?.kind !== "surfaceDecision") throw new Error("no card");
+    const jobId = Object.keys(req.snapshot.state.jobs)[0];
+    expect(command.payload.card.left.commands).toEqual([
+      { kind: "endPassage", payload: { jobId } },
+    ]);
+    expect(command.payload.card.right.commands).toEqual([]);
+    expect((AUTHORITY.player as readonly CommandKind[]).includes("endPassage")).toBe(true);
+  });
+
+  it("drops an endPassage side when no passage is live: none at all, or one already ended", () => {
+    const none = translateIntents(plan([putOff]), ctxOf(approachingPortRequest(content())));
+    expect(none.commands).toEqual([]);
+    expect(none.dropped[0]?.reason).toBe(
+      "surfaceDecision: left: endPassage needs a passenger aboard or ashore on a live passage",
+    );
+    const req = passengerAboardRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    for (const j of Object.values(snapshot.state.jobs)) {
+      if (j.passage !== undefined) j.passage.endReason = "putOff";
+    }
+    const ended = translateIntents(plan([putOff]), ctxOf({ ...req, snapshot }));
+    expect(ended.commands).toEqual([]);
+    expect(ended.dropped[0]?.reason).toContain("endPassage needs a passenger");
   });
 });

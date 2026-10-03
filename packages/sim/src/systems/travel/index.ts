@@ -11,8 +11,22 @@ export function registerTravel(registry: KernelRegistry): void {
 }
 
 export { travelSystem } from "./travel";
-export { propulsionFactor, portStoreLocation, theDeckId } from "./travel";
+export {
+  hasOpenCargoWork,
+  hasRunnableBuyPartsWork,
+  propulsionFactor,
+  portStoreLocation,
+  theDeckId,
+  voyageHeldAtWaypoint,
+  waitingForPassenger,
+} from "./travel";
+export { hopCount, nextHop, shortestPath, type ShortestPath } from "./graph";
 export { commandActor, isFitForCommand } from "./roster";
 export { raiseHookIfIdle, raiseJobBoardHookIfNeeded } from "./hooks";
-export { DEPARTURE_GATE_PROMPT_KEY, departureCleared, worstImpairment } from "./departure-gate";
+export {
+  DEPARTURE_GATE_PROMPT_KEY,
+  departureCleared,
+  impairmentKey,
+  worstImpairment,
+} from "./departure-gate";
 export { travelTaskDerivations } from "./tasks";

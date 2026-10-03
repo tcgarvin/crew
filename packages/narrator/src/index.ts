@@ -34,5 +34,15 @@ export {
   TransportError,
 } from "./transport";
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";
-export { approachingPortRequest, FIXTURE_SCENARIO, quietTooLongRequest } from "./fixtures";
+export {
+  approachingPortRequest,
+  FAR_FIXTURE_PORT,
+  FIXTURE_PASSENGER,
+  FIXTURE_SCENARIO,
+  farJobBoardRequest,
+  jobBoardRequest,
+  passengerAboardRequest,
+  passengerOverdueRequest,
+  quietTooLongRequest,
+} from "./fixtures";
 export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";

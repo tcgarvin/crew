@@ -1,6 +1,7 @@
 /** Commerce and custody events (W6). */
 import type { PhysicalLocation } from "../common";
-import type { EntityId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "../ids";
+import type { ActorId, EntityId, ItemDefId, ItemId, JobId, PortDefId, TransactionId } from "../ids";
+import type { PassageEndReason } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
 export interface CommerceEventPayloads {
@@ -39,6 +40,21 @@ export interface CommerceEventPayloads {
     readonly count: number;
     readonly price: number;
   };
+  /** Passengers-and-galaxy §3.5: the passenger of `jobId` came aboard at the personnel ramp. */
+  passengerBoarded: PassengerEvent;
+  /** The passenger went ashore at the job's destination (round trip); they are off ship now. */
+  passengerAshore: PassengerEvent & { readonly portId: PortDefId };
+  /** The passenger walked back aboard; the voyage home may leave. The turn of the episode. */
+  passengerReturned: PassengerEvent;
+  /** The passage ended, for any reason; `completed` is the only one that pays. */
+  passageEnded: PassengerEvent & { readonly reason: PassageEndReason; readonly portId: PortDefId };
+}
+
+/** What every passenger event carries: the job, the actor, and their name (for ticker and digest). */
+export interface PassengerEvent {
+  readonly jobId: JobId;
+  readonly actorId: ActorId;
+  readonly name: string;
 }
 
 export const COMMERCE_EVENT_SIGNIFICANCE = {
@@ -54,4 +70,10 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   // quiet hand and never reaches the ticker.
   partsBought: "narrative",
   marketStocked: "trace",
+  // Passengers §3.5: boarding follows the offer card by seconds and going ashore is already
+  // covered by `approachingPort`, so neither is hook-worthy; the return and the ending are.
+  passengerBoarded: "notable",
+  passengerAshore: "notable",
+  passengerReturned: "narrative",
+  passageEnded: "narrative",
 } as const satisfies SignificanceCatalog<CommerceEventPayloads>;

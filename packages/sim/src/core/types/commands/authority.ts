@@ -41,6 +41,7 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "setCourse",
     "holdDepartureForRepairs",
     "acceptDepartureRisk",
+    "endPassage",
   ],
   narrator: NARRATOR_COMMAND_KINDS,
   system: [
@@ -52,6 +53,7 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "setCourse",
     "holdDepartureForRepairs",
     "acceptDepartureRisk",
+    "endPassage",
   ],
   scenario: [
     "scenarioSpawn",
@@ -64,5 +66,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "spawnAtBoundary",
     "surfaceDecision",
     "stockMarket",
+    "endPassage",
   ],
 };

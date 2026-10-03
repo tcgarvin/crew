@@ -79,6 +79,8 @@ function toIntent(best: Candidate, t: PlannerTrace): Intent {
 }
 
 export function selectIntent(view: AgentView, config: PlannerConfig): Intent {
+  // Passengers §3.5: a passenger walking to the ramp keeps walking; commerce owns that intent.
+  if (view.self.disembarking === true) return { kind: "continue" };
   const { candidates, rejected } = enumerateCandidates(view, config);
   const ranked = [...candidates].sort((a, b) => compareCandidates(a, b, config));
   const best = ranked[0];

@@ -13,7 +13,7 @@
  */
 import { rebuildItemIndexes } from "../../core/caches";
 import { allocateId } from "../../core/ids";
-import { effectiveMarket, ensureMarket } from "../../core/markets";
+import { affordableUnits, effectiveMarket, ensureMarket } from "../../core/markets";
 import type { Actor } from "../../core/types/actor";
 import type { ItemDefId, ItemId, PortDefId, TransactionId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
@@ -22,19 +22,8 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { resolveProblem } from "../equipment/problems";
 import { writeFact } from "../work/facts";
 
-/** How many of `itemDefId` the crew can buy at `portId` right now toward `wanted` units. */
-export function affordableUnits(
-  state: Pick<ReadonlyWorldState, "markets" | "money">,
-  content: StepCtx["content"],
-  portId: PortDefId,
-  itemDefId: ItemDefId,
-  wanted: number,
-): number {
-  const line = effectiveMarket(state, content, portId)[itemDefId];
-  if (line === undefined || line.count <= 0 || line.price <= 0) return 0;
-  const byMoney = Math.floor(state.money.balance / line.price);
-  return Math.max(0, Math.min(wanted, line.count, byMoney));
-}
+/** Moved to `core/markets` so travel can read it without a travel/commerce import cycle. */
+export { affordableUnits } from "../../core/markets";
 
 /** Why a purchase cannot happen here, for the digest and the narrator; `undefined` = it can. */
 export type MarketBlock = "notDocked" | "notSoldHere" | "cannotAfford";

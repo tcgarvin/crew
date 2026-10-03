@@ -98,7 +98,10 @@ export type NarratorHook = { [K in NarratorHookKind]: NarratorHookBase<K> }[Narr
 export interface NarratorState {
   /** The hook the sim is paused on; `advance()` returns immediately while set. */
   pendingHook?: NarratorHook;
-  /** Tick of the last `narrative`-significance event; drives `quietTooLong`. */
+  /**
+   * Tick of the last narrator contact: the later of the last `narrative`-significance event and
+   * the last hook raised (any kind). Drives `quietTooLong`.
+   */
   lastNarrativeTick: Tick;
   /** Remaining narrator-caused spawns/faults before the budget refills. */
   budget: { spawnsRemaining: number; faultsRemaining: number };

@@ -25,6 +25,14 @@ export interface JobDraft {
   readonly toPortId: PortDefId;
   readonly cargo: readonly CargoLine[];
   readonly pay: number;
+  /**
+   * Passengers-and-galaxy §3: the issuer travels with the job. `cargo` is then at most one
+   * luggage line (its count is ignored beyond one unit) and pay is banded by
+   * `priceBands.passenger` over path distance. Absent = `false` (drafts from before passages).
+   */
+  readonly passenger?: boolean;
+  /** There and back (`toPortId`, then home to `fromPortId`). Requires `passenger`. */
+  readonly roundTrip?: boolean;
 }
 
 export interface CommerceCommandPayloads {
@@ -35,6 +43,14 @@ export interface CommerceCommandPayloads {
   offerJob: { readonly job: JobDraft; readonly surface: boolean };
   acceptContract: { readonly jobId: JobId };
   declineJob: { readonly jobId: JobId };
+  /**
+   * Passengers-and-galaxy §4.2: end a passage early, no fare. A passenger aboard leaves at the
+   * next docking (now, if docked) and the passage ends `putOff`; one already ashore is left there
+   * and it ends `leftBehind` (the overdue card's "Leave without them"). Either way they stay at
+   * that port as an off-ship actor in its lounge store. A player command, so a card side can
+   * carry it.
+   */
+  endPassage: { readonly jobId: JobId };
   /**
    * D47: set what a port's market has of one item: `count` units (0 removes it from sale) at
    * `price` integer credits per unit. The narrator's lever for "the part is here" or "not here";

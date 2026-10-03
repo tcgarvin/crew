@@ -22,7 +22,8 @@ export interface NarratorCastEntry {
 export interface MetIssuer {
   readonly name: string;
   readonly note: string;
-  readonly portId: string;
+  /** Where to find them; null for a passenger, who is aboard (passengers-and-galaxy §4.1). */
+  readonly portId: string | null;
 }
 
 /** D32: how long a thread runs. An episode is one complete story, usually about a job's length; it need not involve a job. */

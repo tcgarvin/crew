@@ -82,7 +82,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
         : source.CREW_NARRATOR_MODEL,
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
-    narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 6),
+    narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 30),
     nodeEnv,
   };
 }

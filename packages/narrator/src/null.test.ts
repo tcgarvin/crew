@@ -104,12 +104,54 @@ describe("null narrator offers work (D40)", () => {
     expect(offers.size).toBeGreaterThan(1);
   });
 
+  it("never offers passages: passenger and roundTrip are false on every offline offer (§4.4)", () => {
+    for (const req of [approachingPortRequest(content()), jobBoardRequest()]) {
+      const { job } = offerOf(req).command.payload;
+      expect(job.passenger ?? false).toBe(false);
+      expect(job.roundTrip ?? false).toBe(false);
+      expect(job.cargo.length).toBeGreaterThan(0);
+    }
+  });
+
   it("posts the offer quietly when a card is already queued", () => {
     const req = jobBoardRequest();
     const snapshot = req.snapshot as SaveEnvelope;
     snapshot.state.decisions.queue.push("d-queued" as never);
     const { command } = offerOf(req);
     expect(command.payload.surface).toBe(false);
+  });
+
+  it("translates a two-hop template at a far port, priced by path distance (§2.3)", () => {
+    const TERNS = "port.terns_rest" as PortDefId;
+    const bundle = content();
+    expect(Object.keys(bundle.ports)).toHaveLength(6);
+    const terns = bundle.ports[TERNS];
+    if (terns === undefined) throw new Error("fixture port");
+    // Tern's Rest -> Kessler Drift runs through the Hub: 90 + 25.
+    const twoHop = terns.jobTemplates.filter((t) => t.toPortId === DRIFT);
+    expect(twoHop).toHaveLength(1);
+    const farOnly: ContentBundle = {
+      ...bundle,
+      ports: { ...bundle.ports, [TERNS]: { ...terns, jobTemplates: twoHop } },
+    };
+    const req = jobBoardRequest();
+    const snapshot = req.snapshot as SaveEnvelope;
+    snapshot.state.travel = { stage: "docked", portId: TERNS };
+    const hook: NarratorHook = { ...req.hook, kind: "jobBoard", context: { portId: TERNS } };
+    snapshot.state.narrator.pendingHook = hook;
+    const res = nullNarratorResponse({ ...req, hook }, { callId: "c", content: farOnly });
+    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+    const command = res.commands[0];
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    const { job } = command.payload;
+    expect(job.fromPortId).toBe(TERNS);
+    expect(job.toPortId).toBe(DRIFT);
+    expect(routeDistance(bundle, TERNS, DRIFT)).toBeUndefined();
+    const line = job.cargo[0];
+    if (line === undefined) throw new Error("no cargo");
+    const { min, max } = payFor(bundle.config, "hazardous", 115, line.count, "standard");
+    expect(job.pay).toBeGreaterThanOrEqual(min);
+    expect(job.pay).toBeLessThanOrEqual(max);
   });
 
   it("offers nothing without content, at a port with no templates, or on other hooks", () => {

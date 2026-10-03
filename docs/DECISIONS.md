@@ -322,3 +322,100 @@ to make a part available, scarce or absent at this or another port; it never buy
 repairs or pays, and must never narrate a repair, purchase or delivery the digest does not show:
 a card may state what someone intends or claims, never that it happened. No scheduled
 deliveries. Owner: "let's just deal with things that are already there." Prompt v0.11.
+
+## 2026-10-02 — Passengers and the galaxy
+
+Rulings on `docs/design/passengers-and-galaxy.md` §8. The owner asked for the galaxy expansion
+and passenger jobs "per the spec"; each ruling below takes the spec's recommendation, and the
+spec's rationale stands as the reason.
+
+**D48. Six ports: a core triangle and three far spurs.** The three existing ports keep their
+legs (Hub–Kessler 25, Hub–Meridian 45, Kessler–Meridian 70). Three far ports hang off them on
+long legs: Ossory Station off Kessler Drift (120), Vesper Gate off Green Meridian (120), Tern's
+Rest off Crossroads Hub (90). Longest shortest path is three hops. Names are placeholders. Every
+port now has `character` (two or three sentences the narrator sees) and `castSeed` (two or three
+named locals, shown to the narrator at that port without consuming its cast cap), a `lounge`
+store (passengers ashore wait there), and a market that differs from the others (D47). Routes
+are listed on both ends with equal distance; the loader checks it. Nine ports were rejected as
+more content and continuity for no new kind of story.
+
+**D49. Voyages: the sim picks the next hop.** A course or job may name any reachable port.
+`travel.voyageDestinationId` holds the far end; `plannedDestinationId` is the next hop on the
+shortest path by distance (`shortestPath` in `systems/travel/graph.ts`). Intermediate stops are
+real dockings (fee, ramps, market, `approachingPort`); the ship continues on its own once nothing
+holds it: no cargo work, no `buyParts` it could run here, no hold for repairs, no pending card.
+`jobBoard` is not asked at a waypoint. A card's `setCourse` to a neighbour during a voyage is a
+detour: the voyage stays and the sim routes on from wherever the ship docks. The departure gate
+(D36) is asked once per voyage: "leave anyway" is remembered with the impairment it answered
+(`acceptedImpairmentKey`) and asked again only if that set changes. Freight pay uses path
+distance in the price band. Headlines: "Under way to Kessler Drift, bound for Ossory Station";
+"Stopping at Kessler Drift on the way to Ossory Station". The first draft's captain-chooses-
+every-leg was rejected because it costs a narrator call and a card per waypoint (D14: the captain
+acts only through cards).
+
+**D50. A passage is a job with a person in it.** No `Passage` entity: `Job.passage` (`actorId`,
+`roundTrip`, `leg` out/ashore/back, `returnsAtTick`, `ashoreSinceTick`, `endReason`
+completed/leftBehind/putOff) and two booleans on `offerJob`, `passenger` and `roundTrip`
+(`roundTrip` without `passenger` is rejected). The issuer is the passenger; `description` is their
+stated purpose, the truth may differ in the narrator's notes. Luggage is the job's cargo line,
+zero or one line of one unit, hauled and held like freight (the GDD §7 diamond rule with no new
+code). Two shapes only: one-way and there-and-back. One passage at a time, and it is the job
+(D16): a passenger competes with freight for the ship. Accepting spawns the passenger from the
+generic `crew.passenger` template with the issuer's name at the personnel ramp; they keep
+`crew: true` so needs, movement, bunks, galley, ambient conversation and perception all work,
+and `passenger: true` keeps them out of task and post candidates, bridge staffing and the
+market. No cabins. On a round trip they go ashore at the far port (`availability: offShip`, held
+in the port's lounge store), the voyage home is planned at once and departure waits for them
+("Waiting for <name>"); they return at a tick drawn from `commerce.passage.ashoreSecondsMin..Max`
+(60 to 180) on the commerce RNG stream. If they are not back `commerce.passage.overdueSeconds`
+(120) after going ashore, the kernel queues one policy decision (`commerce.passengerOverdue`,
+brought by the first officer, narrated through `policyDecision` per D37): "Wait for them" /
+"Leave without them". The name table has no pronouns, so cards say "them". Leaving ends the
+passage `leftBehind` with no fare and the passenger stays at that port as an off-ship actor, the
+narrator's to use as cast. `endPassage { jobId }` is the second failure mode: a card-side effect
+(`decisionSide.effect`: none | setCourse | endPassage) that puts the passenger off at the next
+docking (now, if docked), `putOff`, no fare. One fare, paid on completion, from the `passenger`
+price band (6 to 12 credits per unit of path distance, doubled for a round trip; luggage adds
+nothing; four docking fees on a round trip through a waypoint are real costs the band clears:
+Hub to Ossory and back is 1740 to 3480 against 600 in fees. A short hop is deliberately thin:
+Hub to Kessler one-way is 150 to 300 against one fee of 150, so passengers pay when they go far).
+Events `passengerBoarded`, `passengerAshore`, `passengerReturned`, `passageEnded {reason}`;
+only `passengerReturned` joins the default `hookOnEvents` (boarding follows the offer card by
+seconds and arrival already hooks). The narrator never decides a passenger's fate and never
+narrates what they did ashore as fact; the null narrator never offers passages. Luggage on a
+round trip is unloaded at the far port and does not come back (v2 will decide whether it should).
+Opinion of a passenger lives in threads (D32), not a per-crew table. Deferred to v2: undisclosed
+destinations, luggage that goes ashore, passenger illness, mood effects on crew.
+
+**D51. The narrator budget, measured.** `crew pacing` (apps/cli) runs a headless hub → Kessler →
+Ossory → Kessler → hub round trip against a stub narrator with 25 s latency and the host's
+run-ahead model, and reports calls per hook kind, sim time, stall and wall time per speed. The
+first run, at `quietTooLongSeconds` 40, cost 13 calls (15 with freight), not the spec's eight:
+three quiet check-ins per far leg, one landing 10 s after an approach hook and one in the same
+tick as one, because hooks did not reset the quiet timer. Two changes: `quietTooLongSeconds` 40
+→ 60 (spec §8.6), and the quiet timer now counts from the last narrator contact of any kind (a
+narrative event or any hook raised), runs last in the tick and yields to any other hook, so a
+tick raises at most one hook and a quiet check-in only follows a real silence. Result: 10 calls
+per round trip (4 approach, 2 job board, 3 to 4 quiet, 0 to 1 notable), no stall at 1x, about
+55 s at 2x, about 3 min at 8x where the narrator is the clock. Each far leg still gets two quiet
+check-ins; one would need `quietTooLongSeconds` near 75 or a timer that defers when an approach
+is imminent, left for the playtest. `CREW_NARRATOR_MAX_CALLS_PER_HOUR` default 6 → 30 (one trip
+is a third of it; back-to-back trips at any speed would exceed it, which is the cap's job).
+Startup still costs one full latency at tick 1 (the first `jobBoard`), shown as a loading
+screen, not stall.
+
+**D52. One job at a time, enforced.** D16 was prose until passengers made it bite. The kernel's
+`acceptContract` now rejects while a job is in hand (accepted, under way, or delivered and not
+yet paid), except a job being finished at this very port (freight unloading at its destination,
+a passenger walking off at their last port), since an offer carded on the first docked tick
+would otherwise deadlock behind its own card. The translator drops `offerJob` for the same
+reason, hooks ask for one offer and none while a job is in hand or at a waypoint, and a
+passenger offer whose card slot is already taken is dropped with that reason rather than posted
+quietly (a quiet offer never reaches the captain; there is no board). `setCourse` cannot replace
+a live passage's far destination; neighbours remain detours. Putting a passenger off cancels
+the voyage (and the course when docked) and unloads their luggage where they leave; leaving one
+behind keeps the voyage home. The voyage home is planned on arrival, before the passenger walks
+off, so `jobBoard` never fires in that gap. A due return waits while the overdue card is still
+unanswered, since no decision can be withdrawn. A passenger who is left behind or put off drops
+off the roster and the digest's Aboard line and appears in the narrator's people section at
+that port; the server places their cast entry there from state. Prompt v0.14.

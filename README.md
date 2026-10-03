@@ -1,7 +1,7 @@
 # Crew
 
 A small freighter deck with an autonomous crew, ship systems that degrade and get repaired, a
-freight loop between three ports, and an LLM narrator hook. See `docs/PLAN.md` for the full
+freight and passenger loop across six ports (a core triangle and three far spurs), and an LLM narrator hook. See `docs/PLAN.md` for the full
 design and `docs/DECISIONS.md` for rule rationale.
 
 ## Stack

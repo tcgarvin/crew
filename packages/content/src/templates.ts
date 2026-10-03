@@ -104,9 +104,29 @@ function offerSituation(p: Params, c: ContentBundle | undefined): string {
       ? String(p.pitch)
       : renderTextRef({ key: String(p.pitchKey ?? DEFAULT_PITCH_KEY), params: p }, c);
   const urgency = URGENCY_WORDS[String(p.urgency)] ?? URGENCY_WORDS.relaxed;
-  const context = `${capitalise(cargoWords(p.cargo, c))}, ${portLabel(p.from, c)} to ${portLabel(p.to, c)}, ${urgency}.`;
+  const context = isPassage(p)
+    ? `${p.name} wants passage to ${portLabel(p.to, c)}${p.roundTrip === "true" ? " and back" : ""}, ${p.cargo === undefined ? "travelling light" : `with luggage (${cargoWords(p.cargo, c)})`}, ${urgency}.`
+    : `${capitalise(cargoWords(p.cargo, c))}, ${portLabel(p.from, c)} to ${portLabel(p.to, c)}, ${urgency}.`;
   return clipWords(`“${pitch}” ${context}`, SITUATION_MAX_WORDS);
 }
+
+/**
+ * Passengers §6: the sim marks a passage offer with `passenger: "true"` (and `roundTrip`) in the
+ * prompt params (`offerPromptParams` in `systems/commerce`); the side labels keep the freight
+ * keys with no params, so the card branches on the prompt's params for its sides too.
+ */
+function isPassage(p: Params): boolean {
+  return p.passenger === "true";
+}
+
+/** The offer card's sides and aftermaths when the job is a person, not freight. */
+const PASSAGE_SIDE_TEXT: Readonly<Record<string, string>> = {
+  "job.offer.accept": "Welcome aboard.",
+  "job.offer.decline": "Not this trip.",
+  "job.accept.aftermath":
+    "They come up the ramp with what they carry. We leave once they're settled.",
+  "job.decline.aftermath": "You pass. They go looking for another ship.",
+};
 
 /** D36: the gate card's reason, in plain words (no numbers, D24). Keyed by `ImpairmentReason`. */
 const GATE_REASONS: Readonly<Record<string, string>> = {
@@ -126,6 +146,18 @@ function departureGateSituation(p: Params): string {
 
 const DEPARTURE_GATE_KEY = "travel.departureGate";
 
+/** Passengers §3.3: the overdue card's key (`systems/commerce` `PASSENGER_OVERDUE_PROMPT_KEY`). */
+const PASSENGER_OVERDUE_KEY = "commerce.passengerOverdue";
+
+/**
+ * Passengers §3.3: "Halla Thorne went ashore at Ossory Station and hasn't come back. ..." The
+ * name table has no pronouns, so the card says "them". No numbers (D24).
+ */
+function passengerOverdueSituation(p: Params, c: ContentBundle | undefined): string {
+  const name = p.name === undefined ? "Our passenger" : String(p.name);
+  return `${name} went ashore at ${portLabel(p.port, c)} and hasn't come back when they said they would. We can hold the ship for them, or go without them.`;
+}
+
 const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefined) => string>> = {
   "job.offer": offerSituation,
   // D36 departure gate.
@@ -136,6 +168,14 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
     "We stay put. The crew get to work on it, and we leave the moment it's fixed.",
   "travel.departureGate.leave.aftermath": () =>
     "We go as we are. Whatever's wrong with it comes with us.",
+  // Passengers §3.3 overdue card.
+  [PASSENGER_OVERDUE_KEY]: passengerOverdueSituation,
+  [`${PASSENGER_OVERDUE_KEY}.wait`]: () => "Wait for them",
+  [`${PASSENGER_OVERDUE_KEY}.leave`]: () => "Leave without them",
+  [`${PASSENGER_OVERDUE_KEY}.wait.aftermath`]: () =>
+    "We hold the ship. The ramp stays down until they come up it.",
+  [`${PASSENGER_OVERDUE_KEY}.leave.aftermath`]: () =>
+    "We close up and go. Whatever kept them, it's their problem now, and there's no fare.",
   "job.offer.accept": () => "Take the job",
   "job.offer.decline": () => "Pass on it",
   // D26 aftermaths for the offer card.
@@ -167,6 +207,8 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
   // D36: "Before we leave: Main Engine".
   [DEPARTURE_GATE_KEY]: (p) =>
     p.machine === undefined ? "Before we leave" : `Before we leave: ${String(p.machine)}`,
+  // Passengers §3.3: "Overdue: Halla Thorne".
+  [PASSENGER_OVERDUE_KEY]: (p) => (p.name === undefined ? "Overdue" : `Overdue: ${String(p.name)}`),
 };
 
 /** D29: who is speaking, per prompt key; the offer card's issuer, or the narrator's param. */
@@ -175,6 +217,8 @@ const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
   // D36: the engineer brings the gate card (D29), when the ship has one.
   [DEPARTURE_GATE_KEY]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+  // Passengers §3.3: the first officer brings the overdue card (D29).
+  [PASSENGER_OVERDUE_KEY]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
 };
 
 const GENERIC_TITLE = "The captain's call";
@@ -204,18 +248,20 @@ export function templateCard(
   const leftAftermath = decision.left.aftermath;
   const rightAftermath = decision.right.aftermath;
   const speaker = SPEAKERS[decision.prompt.key]?.(decision.prompt.params);
+  const passage = decision.prompt.key === "job.offer" && isPassage(decision.prompt.params);
+  const side = (ref: DeepReadonly<TextRef>): string => {
+    const text = passage ? PASSAGE_SIDE_TEXT[ref.key] : undefined;
+    const hasProse = ref.prose !== undefined && ref.prose.trim() !== "";
+    return text === undefined || hasProse ? renderTextRef(ref, content) : text;
+  };
   return {
     decisionId: decision.id,
     title: TITLES[decision.prompt.key]?.(decision.prompt.params) ?? GENERIC_TITLE,
     ...(speaker === undefined || speaker.trim() === "" ? {} : { speaker }),
     situation: renderTextRef(decision.prompt, content),
-    leftLabel: renderTextRef(decision.left.label, content),
-    rightLabel: renderTextRef(decision.right.label, content),
-    ...(leftAftermath === undefined
-      ? {}
-      : { leftAftermath: renderTextRef(leftAftermath, content) }),
-    ...(rightAftermath === undefined
-      ? {}
-      : { rightAftermath: renderTextRef(rightAftermath, content) }),
+    leftLabel: side(decision.left.label),
+    rightLabel: side(decision.right.label),
+    ...(leftAftermath === undefined ? {} : { leftAftermath: side(leftAftermath) }),
+    ...(rightAftermath === undefined ? {} : { rightAftermath: side(rightAftermath) }),
   };
 }

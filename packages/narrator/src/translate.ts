@@ -17,6 +17,7 @@ import {
   type DeepReadonly,
   type ItemDef,
   type ItemDefId,
+  type Job,
   type MachineId,
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
@@ -44,12 +45,15 @@ import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
   type Snapshot,
+  type State,
+  fareFor,
   faultDiscovery,
   faultWindowTicks,
+  livePassage,
   offerPortNow,
+  pathBetween,
   payFor,
   portName,
-  routeDistance,
 } from "./lookups";
 import { NARRATOR_TEXT_KEYS, templateCard } from "./templates";
 
@@ -190,6 +194,14 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const config = snapshot.config;
   const here = offerPortNow(snapshot.state);
   if (here === undefined) return no("offerJob: the ship is not at or approaching a port");
+  // D16/D50: one job at a time. The kernel rejects `acceptContract` while a job is in hand, so
+  // an offer made now could only be declined; drop it here with the job it would collide with.
+  const inHand = jobInHand(snapshot.state);
+  if (inHand !== undefined) {
+    return no(
+      `offerJob: a job is already in hand: ${inHand.id} to ${portName(content, inHand.toPortId)}`,
+    );
+  }
   const fromPort = knownPort(content, intent.fromPort);
   if (!fromPort.ok) return no(`offerJob: fromPort: ${fromPort.reason}`);
   const toPort = knownPort(content, intent.toPort);
@@ -200,16 +212,33 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
     );
   }
   if (intent.toPort === intent.fromPort) return no("offerJob: toPort equals fromPort");
-  const distance = routeDistance(content, intent.fromPort, intent.toPort);
-  if (distance === undefined)
+  // Passengers-and-galaxy §2.3: any reachable port; a far one becomes a voyage when accepted,
+  // and the kernel prices it over the same path distance.
+  const path = pathBetween(content, intent.fromPort, intent.toPort);
+  if (path === undefined)
     return no(`offerJob: no route from ${intent.fromPort} to ${intent.toPort}`);
-  const cargo = cargoItem(content, intent.cargoItem);
-  if (!cargo.ok) return no(`offerJob: cargoItem: ${cargo.reason}`);
-  const item = cargo.value;
-  if (intent.surface && env.hook?.kind === "policyDecision") {
+  const distance = path.distance;
+  // §4.1: roundTrip is a passenger's shape; freight has no return leg.
+  if (intent.roundTrip && !intent.passenger) {
+    return no("offerJob: roundTrip needs passenger (freight has no return)");
+  }
+  // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (D42 holds the card
+  // until the ship is docked at fromPort).
+  const surface = intent.passenger || intent.surface;
+  if (surface && env.hook?.kind === "policyDecision") {
     return no("offerJob: cannot surface a new card while a policy decision is pending");
   }
-  if (intent.surface && env.tally.cardUsed) return no("offerJob: only one card per call");
+  if (surface && env.tally.cardUsed) {
+    // A quiet offer never reaches the captain (nothing surfaces a board offer later), so a
+    // passenger offer cannot fall back to the board the way freight can.
+    return no(
+      intent.passenger
+        ? "offerJob: a passenger offer must be surfaced and this call's card is taken"
+        : "offerJob: only one card per call",
+    );
+  }
+  const cargo = offerCargo(env, intent);
+  if (!cargo.ok) return no(`offerJob: cargoItem: ${cargo.reason}`);
   const name = clipChars(intent.issuerName, ISSUER_MAX_CHARS);
   const role = clipChars(intent.issuerRole, ISSUER_MAX_CHARS).toLowerCase();
   const org = clipChars(intent.issuerOrg, ISSUER_MAX_CHARS);
@@ -226,9 +255,12 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
     const problem = textProblem(text, env.secrets);
     if (problem !== undefined) return no(`offerJob: ${field}: ${problem}`);
   }
-  const units = JOB_QUANTITY_UNITS[intent.quantity];
-  const { pay } = payFor(config, item.cargoClass, distance, units, intent.payTier);
-  if (intent.surface) env.tally.cardUsed = true;
+  // §3.4: a passage is priced by the passenger band over path distance (doubled for a round
+  // trip), luggage adding nothing; freight by its class band per unit.
+  const { pay } = intent.passenger
+    ? fareFor(config, distance, intent.roundTrip, intent.payTier)
+    : payFor(config, cargo.value.cargoClass, distance, cargo.value.units, intent.payTier);
+  if (surface) env.tally.cardUsed = true;
   return ok({
     kind: "offerJob",
     payload: {
@@ -239,11 +271,49 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
         description: { key: NARRATOR_TEXT_KEYS.jobDescription, params: {}, prose: description },
         fromPortId: intent.fromPort as PortDefId,
         toPortId: intent.toPort as PortDefId,
-        cargo: [{ itemDefId: item.id, count: units }],
+        cargo: cargo.value.lines,
         pay,
+        ...(intent.passenger ? { passenger: true, roundTrip: intent.roundTrip } : {}),
       },
-      surface: intent.surface,
+      surface,
     },
+  });
+}
+
+/**
+ * The job the ship is carrying, if any: accepted, under way, or delivered and not yet paid.
+ * Offered jobs are not in hand (the captain may still decline them), nor are closed ones.
+ */
+function jobInHand(state: State): DeepReadonly<Job> | undefined {
+  const held = new Set(["accepted", "inTransit", "delivered"]);
+  return Object.values(state.jobs)
+    .filter((j) => held.has(j.status))
+    .sort((a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id))[0];
+}
+
+/** The cargo lines of an offer with the class and unit count the pay is figured from. */
+interface OfferCargo {
+  readonly lines: { readonly itemDefId: ItemDefId; readonly count: number }[];
+  readonly cargoClass: CargoItemDef["cargoClass"];
+  readonly units: number;
+}
+
+/**
+ * Freight: one cargo line at the quantity tier's unit count. Passage (§4.1): `cargoItem` is the
+ * passenger's luggage, one unit of an existing cargo item, or empty for none; quantity is
+ * ignored. The kernel keeps the same one-unit rule.
+ */
+function offerCargo(env: Env, intent: Intent<"offerJob">): Outcome<OfferCargo> {
+  if (intent.passenger && intent.cargoItem.trim() === "") {
+    return ok({ lines: [], cargoClass: "general", units: 0 });
+  }
+  const cargo = cargoItem(env.content, intent.cargoItem);
+  if (!cargo.ok) return cargo;
+  const units = intent.passenger ? 1 : JOB_QUANTITY_UNITS[intent.quantity];
+  return ok({
+    lines: [{ itemDefId: cargo.value.id, count: units }],
+    cargoClass: cargo.value.cargoClass,
+    units,
   });
 }
 
@@ -318,15 +388,17 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
 
 type Side = Intent<"surfaceDecision">["left"];
 
-function translateSide(
-  env: Env,
-  side: Side,
-  which: string,
-): Outcome<{ label: string; commands: CommandDraft[] }> {
-  const label = clipChars(side.label, LABEL_MAX_CHARS);
-  const problem = textProblem(label, env.secrets);
-  if (problem !== undefined) return no(`${which} label: ${problem}`);
-  if (side.effect === "none") return ok({ label, commands: [] });
+type SideCommands = { label: string; commands: CommandDraft[] };
+
+/** Option commands run as `player` when chosen; never offer one the player could not issue. */
+function playerSide(label: string, command: CommandDraft, which: string): Outcome<SideCommands> {
+  if (!(AUTHORITY.player as readonly string[]).includes(command.kind)) {
+    return no(`${which}: ${command.kind} is not a player command`);
+  }
+  return ok({ label, commands: [command] });
+}
+
+function setCourseSide(env: Env, side: Side, label: string, which: string): Outcome<SideCommands> {
   const travel = env.snapshot.state.travel;
   if (travel.stage !== "docked") return no(`${which}: setCourse is only possible while docked`);
   if (side.coursePort.trim() === "") return no(`${which}: setCourse needs coursePort`);
@@ -334,18 +406,43 @@ function translateSide(
   if (!course.ok) return no(`${which}: coursePort: ${course.reason}`);
   if (side.coursePort === travel.portId)
     return no(`${which}: already docked at ${side.coursePort}`);
-  if (routeDistance(env.content, travel.portId, side.coursePort) === undefined) {
+  // §2.3: any reachable port. Beyond one hop the kernel makes it a voyage; a neighbour while a
+  // voyage is already set is a detour the kernel routes on from. Nothing more to do here.
+  if (pathBetween(env.content, travel.portId, side.coursePort) === undefined) {
     return no(`${which}: no route from ${travel.portId} to ${side.coursePort}`);
   }
-  const command: CommandDraft = {
-    kind: "setCourse",
-    payload: { destinationPortId: side.coursePort as PortDefId },
-  };
-  // Option commands run as `player` when chosen; never offer one the player could not issue.
-  if (!(AUTHORITY.player as readonly string[]).includes(command.kind)) {
-    return no(`${which}: ${command.kind} is not a player command`);
+  return playerSide(
+    label,
+    { kind: "setCourse", payload: { destinationPortId: side.coursePort as PortDefId } },
+    which,
+  );
+}
+
+/**
+ * Passengers-and-galaxy §4.2: `endPassage` is only a real side while a passenger is actually
+ * aboard or ashore on an unended passage; the kernel ends it `putOff` (or `leftBehind`) with no
+ * fare when the captain picks it.
+ */
+function endPassageSide(env: Env, label: string, which: string): Outcome<SideCommands> {
+  const job = livePassage(env.snapshot.state);
+  if (job === undefined) {
+    return no(`${which}: endPassage needs a passenger aboard or ashore on a live passage`);
   }
-  return ok({ label, commands: [command] });
+  return playerSide(label, { kind: "endPassage", payload: { jobId: job.id } }, which);
+}
+
+function translateSide(env: Env, side: Side, which: string): Outcome<SideCommands> {
+  const label = clipChars(side.label, LABEL_MAX_CHARS);
+  const problem = textProblem(label, env.secrets);
+  if (problem !== undefined) return no(`${which} label: ${problem}`);
+  switch (side.effect) {
+    case "none":
+      return ok({ label, commands: [] });
+    case "setCourse":
+      return setCourseSide(env, side, label, which);
+    case "endPassage":
+      return endPassageSide(env, label, which);
+  }
 }
 
 /**
@@ -429,7 +526,7 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   }
   env.tally.cardUsed = true;
   env.tally.beatCardThread = beat.value;
-  const sideSpec = (s: { label: string; commands: CommandDraft[] }, aftermath: string) => ({
+  const sideSpec = (s: SideCommands, aftermath: string) => ({
     label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
     commands: s.commands,
     ...(aftermath === ""

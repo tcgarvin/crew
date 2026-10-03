@@ -158,7 +158,7 @@ const idOf = (what: string) => z.string().describe(`${what} ${ID_HINT}.`);
  * too large; the live probe showed the schema compiling once they were gone. Only `card` (a
  * whole object) and the intents union remain unions.
  */
-const EMPTY_FOR_NONE = "empty string for none";
+const EMPTY_FOR_NONE = "empty for none";
 
 /** Coarse pay position inside the config price band; the translator maps it to credits. */
 export const PAY_TIERS = ["low", "standard", "generous"] as const;
@@ -177,16 +177,19 @@ export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
     label: z.string().describe("What the captain says or does, two to six words."),
-    /** Side effect when chosen; `setCourse` needs `coursePort`. */
-    effect: z.enum(["none", "setCourse"]),
-    coursePort: z.string().describe(`Port id ${ID_HINT} if effect is setCourse; else empty.`),
+    /**
+     * Side effect when chosen; `setCourse` needs `coursePort`. Passengers-and-galaxy §4.2:
+     * `endPassage` puts the current passenger off at the next docking (no fare).
+     */
+    effect: z.enum(["none", "setCourse", "endPassage"]),
+    coursePort: z.string().describe("Port id if effect is setCourse; else empty."),
   });
 
   // D25: every offer comes from a named person who says something; D24: nobody talks pay.
   const offerJob = z.strictObject({
     kind: z.literal("offerJob"),
     issuerName: z.string().describe("Given and family name."),
-    issuerRole: z.string().describe("What they do, lower case, e.g. 'shift foreman'."),
+    issuerRole: z.string().describe("What they do, lower case."),
     issuerOrg: z.string().describe(`Who they work for; ${EMPTY_FOR_NONE}.`),
     pitch: z.string().describe("One line the issuer says, in their voice. Max 30 words. No pay."),
     description: z.string().describe("One or two sentences about the job. No pay."),
@@ -198,10 +201,17 @@ export function buildNarratorPlanSchema() {
     urgency: z.enum(JOB_URGENCIES),
     /** Present it as an accept/decline card now. */
     surface: z.boolean(),
+    /**
+     * Passengers-and-galaxy §4.1: the issuer rides; `cargoItem` is then their luggage (empty for
+     * none) and the fare is banded over path distance. Two plain booleans, not a new intent (D45).
+     */
+    passenger: z.boolean(),
+    /** Passenger only: there and back to fromPort. Dropped with a reason without `passenger`. */
+    roundTrip: z.boolean(),
   });
 
-  // W0 decision: V1 narrator spawns only existing item defs into port stores; generated defs and
-  // NPC passengers (supported by the kernel command) wait until the vocabulary grows (D11).
+  // W0 decision: V1 narrator spawns only existing item defs into port stores; generated defs wait
+  // until the vocabulary grows (D11). Passengers ride through `offerJob.passenger` instead.
   const spawnAtBoundary = z.strictObject({
     kind: z.literal("spawnAtBoundary"),
     port: port,
@@ -240,7 +250,7 @@ export function buildNarratorPlanSchema() {
   // D39: a beat card foreshadows a thread without asking for a decision.
   const beatOfThread = z
     .string()
-    .describe("Empty normally; for a beat card, the exact title of the thread it foreshadows.");
+    .describe("Empty, or for a beat card the exact title of the thread it foreshadows.");
 
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
@@ -296,9 +306,7 @@ export function buildNarratorPlanSchema() {
           z.strictObject({
             name: z.string(),
             note: z.string(),
-            portId: z
-              .string()
-              .describe(`Port id ${ID_HINT} where to find them; ${EMPTY_FOR_NONE}.`),
+            portId: z.string().describe(`Port id where to find them; ${EMPTY_FOR_NONE}.`),
           }),
         )
         .describe("Supporting characters, not crew; keep those the captain has met."),

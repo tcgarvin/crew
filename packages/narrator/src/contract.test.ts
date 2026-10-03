@@ -62,6 +62,8 @@ describe("NarratorPlan structured-output schema", () => {
           payTier: "standard",
           urgency: "soon",
           surface: true,
+          passenger: false,
+          roundTrip: false,
         },
         {
           kind: "spawnAtBoundary",
@@ -102,6 +104,55 @@ describe("NarratorPlan structured-output schema", () => {
     expect(schema.safeParse({ ...plan, intents: [{ kind: "setMoney", amount: 5 }] }).success).toBe(
       false,
     );
+  });
+
+  it("parses passenger and roundTrip on offerJob and endPassage on a side, and requires the booleans (passengers §4)", () => {
+    const base = {
+      rationale: "",
+      intents: [],
+      card: null,
+      notes: { summary: "", threads: [], cast: [] },
+    };
+    const passage = {
+      kind: "offerJob",
+      issuerName: "Halla Thorne",
+      issuerRole: "assayer",
+      issuerOrg: "",
+      pitch: "I need to get to Ossory and back.",
+      description: "Passage there and home.",
+      fromPort: "port.a",
+      toPort: "port.b",
+      cargoItem: "",
+      quantity: "one",
+      payTier: "standard",
+      urgency: "soon",
+      surface: true,
+      passenger: true,
+      roundTrip: true,
+    };
+    const putOff = {
+      kind: "surfaceDecision",
+      title: "About our passenger",
+      speaker: "Dane Whitcross",
+      situation: "Dane has a word about the passenger.",
+      left: { label: "Put her off", effect: "endPassage", coursePort: "" },
+      right: { label: "She stays", effect: "none", coursePort: "" },
+      leftAftermath: "",
+      rightAftermath: "",
+      beatOfThread: "",
+    };
+    const plan = { ...base, intents: [passage, putOff] };
+    expect(schema.parse(plan)).toEqual(plan);
+    const { passenger: _p, ...noPassenger } = passage;
+    expect(schema.safeParse({ ...base, intents: [noPassenger] }).success).toBe(false);
+    const { roundTrip: _r, ...noRoundTrip } = passage;
+    expect(schema.safeParse({ ...base, intents: [noRoundTrip] }).success).toBe(false);
+    expect(
+      schema.safeParse({
+        ...base,
+        intents: [{ ...putOff, left: { ...putOff.left, effect: "abandon" } }],
+      }).success,
+    ).toBe(false);
   });
 
   it("does not embed the vocabulary: ids are strings the translator checks (D45)", () => {

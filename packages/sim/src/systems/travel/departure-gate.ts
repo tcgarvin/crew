@@ -9,10 +9,13 @@
  * 100%": a symptom-only (overheat) fault, condition, and integrity above the derate threshold
  * never count on their own.
  *
- * Asked at most once per docking: not while `departureRiskAccepted` is set, nor while a gate
- * decision is already queued. The decision is queued through `queuePolicyDecision` (D37: the
- * kernel narrates it before showing it); the chosen side's command (`holdDepartureForRepairs` /
- * `acceptDepartureRisk`, `command-handlers.ts`) sets the travel flag the gate reads next tick.
+ * Asked at most once per voyage (passengers-and-galaxy §2.3; once per docking with no voyage):
+ * not while `departureRiskAccepted` is set for the impairment set that is live now
+ * (`impairmentKey`), nor while a gate decision is already queued. A new fault or a repair
+ * changes the key, drops the answer and asks again. The decision is queued through
+ * `queuePolicyDecision` (D37: the kernel narrates it before showing it); the chosen side's
+ * command (`holdDepartureForRepairs` / `acceptDepartureRisk`, `command-handlers.ts`) sets the
+ * travel flag the gate reads next tick.
  */
 import { queuePolicyDecision } from "../../core/decisions";
 import type { Actor } from "../../core/types/actor";
@@ -46,7 +49,10 @@ const SEVERITY: Readonly<Record<ImpairmentReason, number>> = {
   lowOutput: 1,
 };
 
-function impairmentOf(ctx: StepCtx, machine: Machine, def: MachineDef): Impairment | undefined {
+/** What the gate reads: truth, content and the thresholds in config. */
+export type GateCtx = Pick<StepCtx, "state" | "content" | "config">;
+
+function impairmentOf(ctx: GateCtx, machine: Machine, def: MachineDef): Impairment | undefined {
   const base = { machineId: machine.id, machineName: def.name, output: machine.output };
   if (isMachineBlocked(machine, def, ctx.config.equipment)) return { ...base, reason: "blocked" };
   const disablingFault = machine.faults.some((fault) => {
@@ -62,15 +68,34 @@ function impairmentOf(ctx: StepCtx, machine: Machine, def: MachineDef): Impairme
   return undefined;
 }
 
-/** The most serious impairment among `engine`/`generator` machines, or none. */
-export function worstImpairment(ctx: StepCtx): Impairment | undefined {
-  let worst: Impairment | undefined;
+/** Every impairment among `engine`/`generator` machines, in machine key order. */
+export function impairments(ctx: GateCtx): Impairment[] {
+  const found: Impairment[] = [];
   for (const machine of Object.values(ctx.state.machines)) {
     const def = ctx.content.machines[machine.defId];
     if (def === undefined) continue;
     if (!def.tags.includes("engine") && !def.tags.includes("generator")) continue;
-    const found = impairmentOf(ctx, machine, def);
-    if (found === undefined) continue;
+    const impairment = impairmentOf(ctx, machine, def);
+    if (impairment !== undefined) found.push(impairment);
+  }
+  return found;
+}
+
+/**
+ * The impaired set as one string (`machineId:reason`, sorted, comma-joined; "" when nothing is
+ * impaired). "Leave anyway" is remembered against this, so a new fault or a repair re-asks.
+ */
+export function impairmentKey(ctx: GateCtx): string {
+  return impairments(ctx)
+    .map((i) => `${i.machineId}:${i.reason}`)
+    .sort()
+    .join(",");
+}
+
+/** The most serious impairment among `engine`/`generator` machines, or none. */
+export function worstImpairment(ctx: GateCtx): Impairment | undefined {
+  let worst: Impairment | undefined;
+  for (const found of impairments(ctx)) {
     if (
       worst === undefined ||
       SEVERITY[found.reason] > SEVERITY[worst.reason] ||
@@ -131,7 +156,15 @@ function raiseDepartureGate(ctx: StepCtx, impairment: Impairment): void {
  */
 export function departureCleared(ctx: StepCtx): boolean {
   const travel = ctx.state.travel;
-  if (travel.departureRiskAccepted === true) return true;
+  if (travel.departureRiskAccepted === true) {
+    const key = travel.acceptedImpairmentKey;
+    if (key === undefined || key === impairmentKey(ctx)) return true;
+    // The impaired set changed since "leave anyway" (a new fault, or a repair): ask again.
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.departureRiskAccepted;
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.acceptedImpairmentKey;
+  }
   const impairment = worstImpairment(ctx);
   if (impairment === undefined) {
     if (travel.holdForRepairs === true) {

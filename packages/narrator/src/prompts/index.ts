@@ -3,8 +3,9 @@
  *  1. `STATIC_RULES`: principles plus every hook's instructions. Byte-identical for every call
  *     of every game, so one cache entry serves them all.
  *  2. The game's capability list (ports, cargo, the ship's machine instance IDs such as `m2`).
- *     Fixed for a game, so it caches per game; it is placed after the static rules so a new game
- *     never invalidates them.
+ *     Nearly fixed for a game (the port markets and each port's distance "from here" move with
+ *     the ship), so it caches across a run of calls; it is placed after the static rules so a
+ *     new game never invalidates them.
  * Everything that changes between calls (tick, digest, notes, which hook) is in the user turn,
  * after both breakpoints.
  */

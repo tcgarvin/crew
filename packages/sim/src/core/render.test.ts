@@ -7,7 +7,7 @@ import { TINY } from "./fixtures/tiny-content";
 import { formatEta, renderItems, shipHeadline } from "./render";
 import type { ItemId, JobId, ProblemId } from "./types/ids";
 import type { WorldState } from "./types/state";
-import type { Job } from "./types/travel";
+import type { Job, JobPassage } from "./types/travel";
 import type { Problem } from "./types/work";
 
 const JOB = "j1" as JobId;
@@ -107,6 +107,25 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Docked at Tiny Dock — looking for work");
   });
 
+  it("waits for a passenger ashore by name, ahead of the planned course home", () => {
+    const { world } = tinyTestWorld();
+    const passage: JobPassage = { actorId: "a1" as never, roundTrip: true, leg: "ashore" };
+    world.state.jobs[JOB] = {
+      ...job("accepted"),
+      status: "inTransit",
+      fromPortId: TINY.port2,
+      toPortId: TINY.port,
+      cargo: [],
+      cargoItemIds: [],
+      passage,
+    };
+    world.state.travel = { stage: "docked", portId: TINY.port, plannedDestinationId: TINY.port2 };
+    expect(headline(world.state)).toBe("Waiting for Mara Voss — docked at tiny dock");
+    // Ended passages (left behind) no longer hold the headline.
+    passage.endReason = "leftBehind";
+    expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
+  });
+
   it("does not narrate an open offer in the headline", () => {
     const { world } = tinyTestWorld();
     world.state.jobs[JOB] = job("offered");
@@ -166,6 +185,25 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Under way to Far Dock — 18 s");
     if (world.state.travel.stage === "transit") world.state.travel.drifting = true;
     expect(headline(world.state)).toBe("Adrift on the way to Far Dock — engines down");
+  });
+
+  it("names the voyage destination under way and at a waypoint (§2.3), not on a direct leg", () => {
+    const { world } = tinyTestWorld();
+    underway(world.state, "transit", 12);
+    world.state.travel.voyageDestinationId = TINY.port3;
+    expect(headline(world.state)).toBe("Under way to Far Dock, bound for Beyond Dock — 18 s");
+    world.state.travel = { stage: "docked", portId: TINY.port2, voyageDestinationId: TINY.port3 };
+    expect(headline(world.state)).toBe("Stopping at Far Dock on the way to Beyond Dock");
+    world.state.travel.plannedDestinationId = TINY.port3;
+    expect(headline(world.state)).toBe("Stopping at Far Dock on the way to Beyond Dock");
+    world.state.travel.holdForRepairs = true;
+    expect(headline(world.state)).toBe(
+      "Stopping at Far Dock on the way to Beyond Dock — holding for repairs",
+    );
+    // The last leg of a voyage reads like a direct one.
+    underway(world.state, "transit", 12);
+    world.state.travel.voyageDestinationId = TINY.port2;
+    expect(headline(world.state)).toBe("Under way to Far Dock — 18 s");
   });
 
   it("counts crates carried ashore while unloading", () => {

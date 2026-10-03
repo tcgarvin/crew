@@ -14,6 +14,19 @@ export const portDefSchema = z.strictObject({
   id: portDefIdSchema,
   name: z.string().min(1),
   description: z.string(),
+  /** Passengers spec §2.4: two or three sentences of port character for the narrator. */
+  character: z.string().min(1),
+  /** Passengers spec §2.4: two or three named recurring locals. */
+  castSeed: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1),
+        role: z.string().min(1),
+        note: z.string().min(1),
+      }),
+    )
+    .min(2)
+    .max(3),
   externalStores: z
     .array(
       z.strictObject({

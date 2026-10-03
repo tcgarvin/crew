@@ -3,6 +3,24 @@
   "id": "port.crossroads_hub",
   "name": "Crossroads Hub",
   "description": "A crowded transfer station at the junction of three trade lanes; docking queues, blaring announcements, and a market that never quite closes.",
+  "character": "Everyone at the Hub is on their way somewhere else, and the people who live here make a living off that: brokers, berth agents, dockside cooks, anyone who can shave ten minutes off a queue for a fee. They want throughput and a quiet shift, and they have long memories for crews who hold up a berth. The Hub is known for its queue board, its all-hours market, and for being the place you go when you need a ship to anywhere.",
+  "castSeed": [
+    {
+      "name": "Hal Petrosyan",
+      "role": "berth agent",
+      "note": "Runs the queue board from a kiosk by the ramps and treats a late departure as a personal insult."
+    },
+    {
+      "name": "Anneke Vos",
+      "role": "night-market stallholder",
+      "note": "Sells rations, gossip and the occasional spare part, and knows which crews pay their tabs."
+    },
+    {
+      "name": "Fenwick Adair",
+      "role": "Co-op dispatcher",
+      "note": "Soft-spoken, overworked, and always has one more manifest he would rather hand to a crew he trusts."
+    }
+  ],
   "externalStores": [
     {
       "key": "warehouse",
@@ -91,6 +109,10 @@
     {
       "toPortId": "port.green_meridian",
       "distance": 45
+    },
+    {
+      "toPortId": "port.terns_rest",
+      "distance": 90
     }
   ]
 }

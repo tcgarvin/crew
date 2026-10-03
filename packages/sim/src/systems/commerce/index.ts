@@ -3,6 +3,7 @@ import type { KernelRegistry } from "../../core/registry";
 import {
   acceptContract,
   declineJob,
+  endPassage,
   offerJob,
   spawnAtBoundary,
   stockMarket,
@@ -16,6 +17,7 @@ export function registerCommerce(registry: KernelRegistry): void {
   registry.registerCommandHandler("declineJob", declineJob);
   registry.registerCommandHandler("spawnAtBoundary", spawnAtBoundary);
   registry.registerCommandHandler("stockMarket", stockMarket);
+  registry.registerCommandHandler("endPassage", endPassage);
 }
 
 export { commerceSystem } from "./commerce";
@@ -32,5 +34,14 @@ export {
   spawnCargoItem,
   cargoStowageZoneKey,
 } from "./jobs";
+export { checkPassageBand, jobFulfilled } from "./jobs";
+export {
+  PASSENGER_CREW_DEF_ID,
+  PASSENGER_OVERDUE_PROMPT_KEY,
+  loungeLocation,
+  overdueCardRaised,
+  passengerSpawnTile,
+  sweepPassages,
+} from "./passage";
 export { commerceTaskDerivations } from "./tasks";
 export { affordableUnits, buyFromMarket, marketBlock, type MarketBlock } from "./market";

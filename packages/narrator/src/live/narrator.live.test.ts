@@ -18,8 +18,10 @@ import type { NarratorRequest, NarratorResponse } from "../contract";
 import {
   approachingPortRequest,
   departureGateRequest,
+  farJobBoardRequest,
   jobBoardRequest,
   notableEventRequest,
+  passengerOverdueRequest,
   quietTooLongRequest,
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
@@ -142,6 +144,49 @@ suite(`live narrator (${model})${skipReason}`, () => {
       expect(response.card?.speaker, "card has no speaker").toBeDefined();
       const captain = captainName(request.snapshot, content());
       expect(response.card?.speaker?.toLowerCase()).not.toBe(captain?.toLowerCase());
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  it(
+    "jobBoard at the hub with a far port two hops away: a passenger offer, or a rationale (passengers §9)",
+    async () => {
+      const run = await liveRun(farJobBoardRequest(content()));
+      const response = expectModelAnswered(run);
+      const offers = response.commands.filter((c) => c.kind === "offerJob");
+      const passage = offers.find((c) => c.payload.job.passenger === true);
+      const rationale = run.trace.plan?.rationale ?? "";
+      expect(
+        passage !== undefined || rationale.length > 0,
+        `no passenger offer and no rationale explaining the choice (dropped: ${JSON.stringify(response.dropped)})`,
+      ).toBe(true);
+      if (passage === undefined) {
+        console.log(`no passenger offered for ${req(run)}; rationale: ${rationale}`);
+      } else {
+        // §4.1: a passenger offer is always the surfaced card.
+        expect(passage.payload.surface).toBe(true);
+      }
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  it(
+    "policyDecision: the first officer brings the overdue-passenger card (passengers §3.3)",
+    async () => {
+      const request = passengerOverdueRequest(content());
+      const run = await liveRun(request);
+      const response = expectModelAnswered(run);
+      if (request.hook.kind !== "policyDecision") throw new Error("fixture hook kind");
+      expect(
+        response.card,
+        `no card translated (rejections: ${JSON.stringify(response.notesUpdate?.lastRejections)})`,
+      ).toBeDefined();
+      expect(response.card?.decisionId).toBe(request.hook.context.decisionId);
+      const firstOfficer = Object.values(request.snapshot.state.actors).find(
+        (a) => a.passenger !== true && a.roleTags.includes("firstOfficer"),
+      );
+      expect(firstOfficer, "fixture has no first officer").toBeDefined();
+      expect(response.card?.speaker?.toLowerCase()).toBe(firstOfficer?.name.toLowerCase());
     },
     LIVE_TIMEOUT_MS,
   );

@@ -14,7 +14,9 @@ import type { NarratorRequest } from "./contract";
 import {
   approachingPortRequest,
   departureGateRequest,
+  farJobBoardRequest,
   jobBoardRequest,
+  passengerAboardRequest,
   quietTooLongRequest,
 } from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
@@ -39,6 +41,8 @@ const offer = {
   payTier: "standard",
   urgency: "relaxed",
   surface: false,
+  passenger: false,
+  roundTrip: false,
 };
 
 const assayThread = {
@@ -177,6 +181,163 @@ describe("runNarrator", () => {
     expect(call?.user).toContain("approachingPort");
     expect(call?.jsonSchema.additionalProperties).toBe(false);
     expect(call?.jsonSchema).not.toHaveProperty("$schema");
+  });
+
+  it("places a passenger in the cast aboard, bound for their port (passengers §4.1)", async () => {
+    const passage = {
+      ...offer,
+      issuerName: "Halla Thorne",
+      issuerRole: "assayer",
+      issuerOrg: "",
+      pitch: "I need to get to Ossory and back.",
+      description: "Passage to Ossory and home. She says she has a claim to sell.",
+      fromPort: "port.crossroads_hub",
+      toPort: "port.ossory_station",
+      cargoItem: "",
+      passenger: true,
+      roundTrip: true,
+    };
+    const plan = emptyPlan({
+      intents: [passage] as never,
+      notes: { summary: "A passenger at the Hub.", threads: [], cast: [] },
+    });
+    const req = farJobBoardRequest(content());
+    const res = await runNarrator(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
+    expect(res.dropped).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+    expect(res.notesUpdate?.cast).toEqual([
+      {
+        name: "Halla Thorne",
+        note: "assayer; passenger, bound for Ossory Station and back",
+        portId: null,
+        lastSeenTick: req.hook.tick,
+      },
+    ]);
+  });
+
+  describe("places a passenger in the cast once the kernel has settled their fate", () => {
+    const aboardNote = "assayer; passenger, bound for Ossory Station and back";
+    const stored = (portId: string | null = null) => ({
+      summary: "Halla rides with us.",
+      threads: [],
+      cast: [{ name: "Halla Thorne", note: aboardNote, portId, lastSeenTick: 2_900 }],
+    });
+
+    function endedRequest(
+      reason: "leftBehind" | "putOff" | "completed" | "declined",
+      opts: { readonly roundTrip?: boolean; readonly ashore?: boolean } = {},
+    ): NarratorRequest {
+      const req = passengerAboardRequest(content());
+      const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+      const job = Object.values(snapshot.state.jobs)[0];
+      const passenger = Object.values(snapshot.state.actors).find((a) => a.passenger === true);
+      if (job?.passage === undefined || passenger === undefined) throw new Error("fixture");
+      job.passage.roundTrip = opts.roundTrip ?? true;
+      if (reason === "declined") {
+        job.status = "declined";
+        delete snapshot.state.actors[passenger.id];
+      } else {
+        job.passage.endReason = reason;
+      }
+      if (reason === "completed") delete snapshot.state.actors[passenger.id];
+      if (opts.ashore === true) {
+        passenger.availability = "offShip";
+        passenger.location = {
+          kind: "inExternalStore",
+          portId: "port.ossory_station" as PortDefId,
+          storeKey: "lounge" as never,
+        };
+      }
+      return { ...req, snapshot };
+    }
+
+    // The model rewrites the entry with no port, as it was told to while she rode.
+    const rewrite = emptyPlan({
+      notes: {
+        summary: "s",
+        threads: [],
+        cast: [{ name: "Halla Thorne", note: aboardNote, portId: "" }],
+      },
+    });
+
+    it.each([
+      ["leftBehind", { ashore: true }, "port.ossory_station", "left behind at Ossory Station"],
+      ["putOff", { ashore: true }, "port.ossory_station", "put off at Ossory Station"],
+      [
+        "completed",
+        { roundTrip: true },
+        "port.crossroads_hub",
+        "passage completed, at Crossroads Hub",
+      ],
+      [
+        "completed",
+        { roundTrip: false },
+        "port.ossory_station",
+        "passage completed, at Ossory Station",
+      ],
+      ["declined", {}, "port.crossroads_hub", "offer declined, still at Crossroads Hub"],
+    ] as const)("%s %o → at %s, note says %s", async (reason, opts, portId, phrase) => {
+      const res = await runNarrator(endedRequest(reason, opts), {
+        ...ctx(fakeTransport(okResult(JSON.stringify(rewrite)))),
+        notes: stored(),
+      });
+      expect(res.notesUpdate?.cast).toEqual([
+        {
+          name: "Halla Thorne",
+          note: `${aboardNote}; ${phrase}`,
+          portId,
+          lastSeenTick: expect.any(Number),
+        },
+      ]);
+    });
+
+    it("leaves a passenger still aboard, or put off but not yet ashore, without a port", async () => {
+      for (const req of [passengerAboardRequest(content()), endedRequest("putOff")]) {
+        const res = await runNarrator(req, {
+          ...ctx(fakeTransport(okResult(JSON.stringify(rewrite)))),
+          notes: stored(),
+        });
+        expect(res.notesUpdate?.cast[0]).toMatchObject({ note: aboardNote, portId: null });
+      }
+    });
+
+    it("does not move an entry the model has placed itself, and appends the reason only once", async () => {
+      const placed = emptyPlan({
+        notes: {
+          summary: "s",
+          threads: [],
+          cast: [
+            { name: "Halla Thorne", note: "went home by liner", portId: "port.kessler_drift" },
+          ],
+        },
+      });
+      const moved = await runNarrator(endedRequest("leftBehind", { ashore: true }), {
+        ...ctx(fakeTransport(okResult(JSON.stringify(placed)))),
+        notes: stored(),
+      });
+      expect(moved.notesUpdate?.cast[0]).toMatchObject({
+        note: "went home by liner",
+        portId: "port.kessler_drift",
+      });
+      const again = emptyPlan({
+        notes: {
+          summary: "s",
+          threads: [],
+          cast: [
+            {
+              name: "Halla Thorne",
+              note: `${aboardNote}; left behind at Ossory Station`,
+              portId: "",
+            },
+          ],
+        },
+      });
+      const twice = await runNarrator(endedRequest("leftBehind", { ashore: true }), {
+        ...ctx(fakeTransport(okResult(JSON.stringify(again)))),
+        notes: stored("port.ossory_station"),
+      });
+      expect(twice.notesUpdate?.cast[0]?.note).toBe(`${aboardNote}; left behind at Ossory Station`);
+    });
   });
 
   it("feeds stored notes back into the prompt", async () => {
@@ -583,7 +744,29 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.11");
+    expect(PROMPT_VERSION).toBe("v0.14");
+  });
+
+  it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
+    expect(STATIC_RULES).toContain("A passenger is a job with a person in it");
+    expect(STATIC_RULES).toContain("You never decide a passenger's fate");
+    expect(STATIC_RULES).toContain("You never narrate what they did ashore as fact");
+    expect(STATIC_RULES).toContain("The stated purpose of the trip is the description");
+    expect(STATIC_RULES).toContain("the truth may differ, and lives in your notes");
+    expect(STATIC_RULES).toContain("endPassage on a card side");
+    expect(STATIC_RULES).toContain("never as the only side");
+    // The six card kinds of §6.
+    expect(STATIC_RULES).toContain("the offer (the passenger at the ramp");
+    expect(STATIC_RULES).toContain("a waypoint or long-leg beat");
+    expect(STATIC_RULES).toContain("crew friction");
+    expect(STATIC_RULES).toContain("the turn, on passengerReturned");
+    expect(STATIC_RULES).toContain("the overdue card, which the sim raises itself");
+    expect(STATIC_RULES).toContain("the payoff on contractCompleted");
+    // The overdue card under policyDecision: the first officer speaks, wait / leave.
+    expect(STATIC_RULES).toContain(
+      "For an overdue passenger (commerce.passengerOverdue) the first officer brings it",
+    );
+    expect(STATIC_RULES).toContain("the left side waits, the right side leaves without them");
   });
 
   it("tells the model it runs the pace (D46)", () => {
@@ -593,6 +776,13 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("Do not fill that wait with faults.");
     expect(STATIC_RULES).toContain("A fault is a pressure, not a pastime.");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("Say which you chose and why in rationale");
+    // v0.14: one job at a time, so every hook asks for one offer and none with a job in hand.
+    for (const text of Object.values(HOOK_INSTRUCTIONS)) expect(text).not.toContain("one or two");
+    expect(HOOK_INSTRUCTIONS.approachingPort).toContain(
+      "Offer one job from this port (offerJob with fromPort set to it), and none while a job is in hand or this port is a waypoint of a voyage",
+    );
+    expect(HOOK_INSTRUCTIONS.jobBoard).toContain("one job from this port");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("idle at a port with no job in hand");
     expect(HOOK_INSTRUCTIONS.quietTooLong).not.toContain("Prefer advancing a thread");
   });
 

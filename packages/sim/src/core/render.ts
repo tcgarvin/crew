@@ -11,6 +11,7 @@ import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
 import type { Item, Machine } from "./types/ship";
+import type { PassageEndReason } from "./types/travel";
 import type {
   RenderActor,
   RenderFrame,
@@ -107,6 +108,7 @@ function renderActor(
     y: location.y,
     facing: actor.facing,
     actionLabel: actionLabel(actor, state, content),
+    passenger: actor.passenger === true,
   };
 }
 
@@ -160,6 +162,15 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
   docking: "Docking",
 };
 
+/** Passengers §3.5: how a passage's ending reads in the ticker, by `PassageEndReason`. */
+const PASSAGE_END_LINES: Readonly<
+  Record<PassageEndReason, (name: string, port: string) => string>
+> = {
+  completed: (name, port) => `${name} went down the ramp at ${port}`,
+  leftBehind: (name, port) => `Left ${port} without ${name}`,
+  putOff: (name, port) => `Put ${name} off at ${port}`,
+};
+
 type Names = {
   actor(id: string): string | undefined;
   machine(id: string): string | undefined;
@@ -168,7 +179,7 @@ type Names = {
   itemDef(defId: string): string;
   faultName(machineId: string, faultKey: string): string;
   symptomName(machineId: string, symptomKey: string): string;
-  job(id: string): { issuer: string; to: string } | undefined;
+  job(id: string): { issuer: string; name: string; to: string; passenger: boolean } | undefined;
 };
 
 function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
@@ -205,7 +216,9 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       if (job === undefined) return undefined;
       return {
         issuer: job.issuer,
+        name: job.issuerPerson.name,
         to: content.ports[job.toPortId]?.name ?? job.toPortId,
+        passenger: job.passage !== undefined,
       };
     },
   };
@@ -272,7 +285,10 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Repairs done: departing for ${n.port(event.payload.toPortId)}`;
     case "jobOffered": {
       const job = n.job(event.payload.jobId);
-      return job === undefined ? "A job is on offer" : `${job.issuer} has freight for ${job.to}`;
+      if (job === undefined) return "A job is on offer";
+      return job.passenger
+        ? `${job.name} wants passage to ${job.to}`
+        : `${job.issuer} has freight for ${job.to}`;
     }
     case "jobAccepted": {
       const job = n.job(event.payload.jobId);
@@ -282,7 +298,19 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return "Passed on the job";
     case "contractCompleted": {
       const job = n.job(event.payload.jobId);
-      return job === undefined ? "Delivery complete" : `Delivered for ${job.issuer}`;
+      if (job === undefined) return "Delivery complete";
+      return job.passenger ? `${job.name}'s fare is paid` : `Delivered for ${job.issuer}`;
+    }
+    case "passengerBoarded":
+      return `${event.payload.name} came aboard`;
+    case "passengerAshore":
+      return `${event.payload.name} went ashore at ${n.port(event.payload.portId)}`;
+    case "passengerReturned":
+      return `${event.payload.name} is back aboard`;
+    case "passageEnded": {
+      const { name, reason, portId } = event.payload;
+      const port = n.port(portId);
+      return PASSAGE_END_LINES[reason](name, port);
     }
     case "paymentMade":
       return `Paid ${event.payload.amount} cr`;
@@ -485,6 +513,26 @@ function hasOpenProblem(state: ReadonlyWorldState, kind: "stationToStaff"): bool
 }
 
 /**
+ * Passengers §3.3: the name of the passenger the docked ship is waiting for: one ashore at this
+ * port whose passage is still live, or one walking down the ramp. Mirrors `systems/travel`
+ * `waitingForPassenger` (core may not import systems).
+ */
+function passengerAshoreHere(state: ReadonlyWorldState): string | undefined {
+  const travel = state.travel;
+  if (travel.stage !== "docked") return undefined;
+  for (const job of Object.values(state.jobs)) {
+    const passage = job.passage;
+    if (passage === undefined) continue;
+    const actor = state.actors[passage.actorId];
+    if (actor?.disembarking === true) return actor.name;
+    if (passage.leg !== "ashore" || passage.endReason !== undefined) continue;
+    if (job.toPortId !== travel.portId) continue;
+    return actor?.name ?? job.issuerPerson.name;
+  }
+  return undefined;
+}
+
+/**
  * One plain-language line of what the ship is doing (D27), derived from travel stage, open
  * freight problems and the job board. Pure; cheap enough to compute every frame.
  */
@@ -502,6 +550,14 @@ export function shipHeadline(
     }
     const loading = freightProgress(state, "cargoToLoad");
     if (loading !== undefined) return `${here} — ${loadingLine(loading)}`;
+    const awaited = passengerAshoreHere(state);
+    if (awaited !== undefined) return `Waiting for ${awaited} — ${here.toLowerCase()}`;
+    const voyage = travel.voyageDestinationId;
+    if (voyage !== undefined && voyage !== travel.portId) {
+      // §2.3: a waypoint is a stop on the way, whether or not the next hop is planned yet.
+      const stop = `Stopping at ${portName(content, travel.portId)} on the way to ${portName(content, voyage)}`;
+      return travel.holdForRepairs === true ? `${stop} — holding for repairs` : stop;
+    }
     if (travel.plannedDestinationId !== undefined) {
       const to = portName(content, travel.plannedDestinationId);
       return travel.holdForRepairs === true
@@ -532,7 +588,12 @@ export function shipHeadline(
       const speed = nominalSpeed * engineFactor(state, content);
       if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
       const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
-      return `Under way to ${to} — ${formatEta(remaining / speed)}`;
+      const voyage = travel.voyageDestinationId;
+      const leg =
+        voyage === undefined || voyage === travel.toPortId
+          ? `Under way to ${to}`
+          : `Under way to ${to}, bound for ${portName(content, voyage)}`;
+      return `${leg} — ${formatEta(remaining / speed)}`;
     }
     case "approaching":
       return `Approaching ${to}`;

@@ -1,0 +1,92 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.vesper_gate",
+  "name": "Vesper Gate",
+  "description": "A hospice and retreat station beyond Green Meridian; dim corridors, a chapel that doubles as a dock lounge, and a market that mostly sells what the sick need.",
+  "character": "Vesper Gate is wardens, physicians and the people who came to sit with someone and stayed: pilgrims, mourners, a few who took vows and a few who are only hiding. They want quiet, respect for the dying, and ships that leave on time and do not make a fuss. The Gate is known for its hospice, for funerals held in the long gallery with the viewport open, and for making the best medical kits on the lanes.",
+  "castSeed": [
+    {
+      "name": "Sister Aurelie Doucet",
+      "role": "hospice warden",
+      "note": "Calm, dry, and the person who decides whether a visitor is let in; she has seen every kind of grief and is unimpressed by drama."
+    },
+    {
+      "name": "Jonah Weir",
+      "role": "dock keeper",
+      "note": "Meets every ship himself, remembers every passenger's name, and keeps a list of the ones who never came back for a second visit."
+    },
+    {
+      "name": "Dr. Imke Rasmussen",
+      "role": "physician",
+      "note": "Runs the clinic and the med-kit workshop, blunt about prognoses, and always short of parts for her autoclaves."
+    }
+  ],
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Gate Stores",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Vesper Dispensary",
+      "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Long Gallery",
+      "kind": "lounge"
+    }
+  ],
+  "market": [
+    {
+      "itemDefId": "item.med_kit",
+      "count": 5,
+      "price": 55
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 12,
+      "price": 9
+    },
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 0,
+      "price": 240
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "medkits_to_meridian",
+      "issuer": "Vesper Gate Hospice",
+      "toPortId": "port.green_meridian",
+      "cargo": [
+        {
+          "itemDefId": "item.med_kit",
+          "countMin": 2,
+          "countMax": 6
+        }
+      ],
+      "weight": 3
+    },
+    {
+      "key": "effects_to_hub",
+      "issuer": "Vesper Gate Hospice",
+      "toPortId": "port.crossroads_hub",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_fragile",
+          "countMin": 1,
+          "countMax": 3
+        }
+      ],
+      "weight": 1
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.green_meridian",
+      "distance": 120
+    }
+  ]
+}

@@ -20,6 +20,7 @@ import type {
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
+import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 
@@ -56,8 +57,21 @@ export function normaliseIssuer(issuer: string | Readonly<JobIssuer>): JobIssuer
 // Price bands (D6)
 // ---------------------------------------------------------------------------------------------
 
+/** Distance of the direct route from `port` to `toPortId`, if one is listed. */
 export function routeDistance(port: PortDef, toPortId: PortDefId): number | undefined {
   return port.routes.find((r) => r.toPortId === toPortId)?.distance;
+}
+
+/**
+ * Passengers-and-galaxy §2.3: the distance pay is banded over is the shortest path, so a job
+ * may name any reachable port and a two-hop haul pays for two legs.
+ */
+export function pathDistance(
+  ctx: Pick<StepCtx, "content">,
+  fromPortId: PortDefId,
+  toPortId: PortDefId,
+): number | undefined {
+  return shortestPath(ctx.content.ports, fromPortId, toPortId)?.distance;
 }
 
 /** Every cargo line must share one `CargoClass` (the band is keyed by class, not per-item). */
@@ -106,7 +120,8 @@ export function clampCargoToMaxCrates(
 
 /**
  * D6: `pay` must fall within `priceBands[cargoClass].{min,max}` per unit per distance unit,
- * inclusive, scaled by total cargo units and route distance. Returns a reason string on failure.
+ * inclusive, scaled by total cargo units and path distance (`shortestPath`, §2.3). Returns a
+ * reason string on failure, including for a destination no chain of routes reaches.
  */
 export function checkPriceBand(
   ctx: Pick<StepCtx, "content" | "config">,
@@ -120,7 +135,8 @@ export function checkPriceBand(
   const fromPort = ctx.content.ports[fromPortId];
   if (fromPort === undefined) return `unknown port "${fromPortId}"`;
   if (ctx.content.ports[toPortId] === undefined) return `unknown port "${toPortId}"`;
-  const distance = routeDistance(fromPort, toPortId);
+  if (fromPortId === toPortId) return "destination must differ from the origin";
+  const distance = pathDistance(ctx, fromPortId, toPortId);
   if (distance === undefined) return `no route from "${fromPortId}" to "${toPortId}"`;
   const cargoClass = cargoClassOf(ctx, cargo);
   if (cargoClass === undefined) return "cargo lines must share one cargo class";
@@ -130,6 +146,32 @@ export function checkPriceBand(
   const min = Math.round(band.min * distance * units);
   const max = Math.round(band.max * distance * units);
   if (pay < min || pay > max) return `pay ${pay} outside price band [${min}, ${max}]`;
+  return null;
+}
+
+/**
+ * Passengers-and-galaxy §3.4: a fare is banded by `priceBands.passenger` per unit of path
+ * distance, doubled for a round trip; luggage adds nothing. Returns a reason string on failure.
+ */
+export function checkPassageBand(
+  ctx: Pick<StepCtx, "content" | "config">,
+  fromPortId: PortDefId,
+  toPortId: PortDefId,
+  roundTrip: boolean,
+  pay: number,
+): string | null {
+  if (!Number.isInteger(pay) || pay < 0) return "pay must be a nonnegative integer";
+  const fromPort = ctx.content.ports[fromPortId];
+  if (fromPort === undefined) return `unknown port "${fromPortId}"`;
+  if (ctx.content.ports[toPortId] === undefined) return `unknown port "${toPortId}"`;
+  if (fromPortId === toPortId) return "destination must differ from the origin";
+  const distance = pathDistance(ctx, fromPortId, toPortId);
+  if (distance === undefined) return `no route from "${fromPortId}" to "${toPortId}"`;
+  const band = ctx.config.commerce.priceBands.passenger;
+  const fareDistance = roundTrip ? distance * 2 : distance;
+  const min = Math.round(band.min * fareDistance);
+  const max = Math.round(band.max * fareDistance);
+  if (pay < min || pay > max) return `fare ${pay} outside passenger band [${min}, ${max}]`;
   return null;
 }
 
@@ -219,19 +261,29 @@ export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
 
 /**
  * Raise one `cargoToUnload` problem per manifest item (owner: commerce), called on arrival at
- * the job's destination (see `commerce.ts` `sweepJobs`). Deduped like `acceptJob`.
+ * the job's destination (see `commerce.ts` `sweepJobs`). Deduped like `acceptJob`. A passage
+ * put off early (`passage.ts`) unloads its luggage at whatever port the passenger leaves from:
+ * `portId` names it and `itemIds` narrows the manifest to what is aboard; such a problem gets
+ * its own dedupe key, since the job's regular unload at `toPortId` may already be on record.
  */
-export function raiseUnloadProblems(ctx: ApplyCtx, job: Job): void {
-  const toPort = ctx.defs.port(job.toPortId);
-  const storeKey = warehouseStoreKey(toPort);
-  for (const itemId of job.cargoItemIds) {
-    const dedupeKey = `cargoToUnload:${job.id}:${itemId}`;
+export function raiseUnloadProblems(
+  ctx: ApplyCtx,
+  job: Job,
+  portId: PortDefId = job.toPortId,
+  itemIds: readonly ItemId[] = job.cargoItemIds,
+): void {
+  const storeKey = warehouseStoreKey(ctx.defs.port(portId));
+  for (const itemId of itemIds) {
+    const dedupeKey =
+      portId === job.toPortId
+        ? `cargoToUnload:${job.id}:${itemId}`
+        : `cargoToUnload:${job.id}:${itemId}:${portId}`;
     if (Object.values(ctx.state.work.problems).some((p) => p.dedupeKey === dedupeKey)) continue;
     const problemId = allocateId(ctx.state, "problem") as ProblemId;
     ctx.state.work.problems[problemId] = {
       id: problemId,
       kind: "cargoToUnload",
-      payload: { jobId: job.id, itemId, portId: job.toPortId, storeKey },
+      payload: { jobId: job.id, itemId, portId, storeKey },
       owner: "commerce",
       visibility: "public",
       dedupeKey,
@@ -239,7 +291,7 @@ export function raiseUnloadProblems(ctx: ApplyCtx, job: Job): void {
       createdTick: ctx.tick,
       revision: 1,
       baseUrgency: "routineObligation",
-      location: { kind: "port", portId: job.toPortId },
+      location: { kind: "port", portId },
     };
   }
 }
@@ -264,11 +316,25 @@ export function deliveryComplete(
   });
 }
 
+/**
+ * Pure: what a job must have done to earn its pay. Freight: every manifest item in the
+ * destination store. A passage (§3.4): the passenger's journey ended `completed`, plus the
+ * luggage delivered when there is any.
+ */
+export function jobFulfilled(
+  state: Pick<ReadonlyWorldState, "items">,
+  job: Pick<Job, "cargoItemIds" | "toPortId" | "passage">,
+): boolean {
+  if (job.passage === undefined) return deliveryComplete(state, job);
+  if (job.passage.endReason !== "completed") return false;
+  return job.cargoItemIds.length === 0 || deliveryComplete(state, job);
+}
+
 /** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
 export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
   if (job.status === "paid" || job.paymentTransactionId !== undefined) return;
   if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") return;
-  if (!deliveryComplete(ctx.state, job)) return;
+  if (!jobFulfilled(ctx.state, job)) return;
   job.status = "delivered";
   const txId: TransactionId = allocateId(ctx.state, "transaction");
   ctx.state.money.balance += job.pay;
@@ -339,6 +405,10 @@ function offerPromptParams(job: Readonly<Job>): Record<string, string> {
     ...(firstLine === undefined ? {} : { cargo: firstLine.itemDefId }),
     urgency: job.urgency,
     ...(pitch === undefined || pitch.trim() === "" ? { pitchKey: job.pitch.key } : { pitch }),
+    // Passengers §6: the offer card says it is a person travelling, and whether they come back.
+    ...(job.passage === undefined
+      ? {}
+      : { passenger: "true", roundTrip: job.passage.roundTrip ? "true" : "false" }),
   };
 }
 

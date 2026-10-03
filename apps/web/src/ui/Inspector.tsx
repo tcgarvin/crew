@@ -1,4 +1,5 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
+import { actorSubtitle, rosterRole } from "./actorWords";
 
 export type InspectorData =
   | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
@@ -61,7 +62,7 @@ function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: stri
   return (
     <div>
       <h2>{self.name}</h2>
-      <p className="inspector-subtitle">{self.roleTags.join(", ") || "crew"}</p>
+      <p className="inspector-subtitle">{actorSubtitle(self)}</p>
       <dl className="inspector-grid">
         <dt>Activity</dt>
         <dd>{label ?? self.activity.kind}</dd>
@@ -87,7 +88,12 @@ function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: stri
       <ul>
         {view.roster.map((r) => (
           <li key={r.actorId}>
-            {r.name} — {r.roleTags.join(", ")}
+            {r.name} —{" "}
+            {r.passenger === true ? (
+              <span className="inspector-tag">{rosterRole(r)}</span>
+            ) : (
+              rosterRole(r)
+            )}
           </li>
         ))}
       </ul>

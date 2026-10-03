@@ -1,8 +1,12 @@
 /**
- * `setCourse` (PLAN §6 W6 item 1): valid only while docked, targeting a different port with a
- * known route. Enters `preparingDeparture` (or, while cargo work is open, plans the course and
- * waits docked — see `apply`); the travel system (`travel.ts`) then holds progress
- * there until ramps are closed, cargo is loaded and (if required) the bridge is staffed.
+ * `setCourse` (PLAN §6 W6 item 1): valid only while docked, targeting a different, reachable
+ * port. A neighbouring port is the next leg as before (and, while a voyage runs, a detour: the
+ * voyage stays and the sim routes on from wherever the ship docks). A port beyond one hop
+ * (passengers-and-galaxy §2.3) sets `voyageDestinationId` and makes the first hop of
+ * `shortestPath` the leg. Either way this enters `preparingDeparture` (or, while cargo work is
+ * open, plans the course and waits docked — see `apply`); the travel system (`travel.ts`) then
+ * holds progress there until ramps are closed, cargo is loaded and (if required) the bridge is
+ * staffed.
  */
 import {
   type AppliedCommand,
@@ -17,19 +21,22 @@ import {
 } from "../../core/commands";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { MachineId, PortDefId } from "../../core/types/ids";
-import { beginDeparture, hasOpenCargoWork, requestRamps } from "./travel";
-
-function findRoute(
-  ctx: Pick<ValidateCtx, "content">,
-  fromPortId: PortDefId,
-  toPortId: PortDefId,
-): number | undefined {
-  const port = ctx.content.ports[fromPortId];
-  return port?.routes.find((r) => r.toPortId === toPortId)?.distance;
-}
+import { impairmentKey } from "./departure-gate";
+import { shortestPath } from "./graph";
+import { livePassage } from "./in-hand";
+import {
+  beginDeparture,
+  carriedVoyageFields,
+  hasOpenCargoWork,
+  requestRamps,
+  waitingForPassenger,
+} from "./travel";
 
 interface SetCoursePlan {
-  readonly distance: number;
+  /** The leg to fly now: the destination itself, or the first hop towards it. */
+  readonly nextHop: PortDefId;
+  /** Set when the destination is beyond one hop. */
+  readonly voyageDestinationId?: PortDefId;
 }
 
 export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
@@ -45,30 +52,51 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     if (ctx.content.ports[destinationPortId] === undefined) {
       return reject("unknownEntity", `setCourse: unknown port "${destinationPortId}"`);
     }
-    const distance = findRoute(ctx, travel.portId, destinationPortId);
-    if (distance === undefined) {
+    const route = shortestPath(ctx.content.ports, travel.portId, destinationPortId);
+    const nextHop = route?.path[1];
+    if (route === undefined || nextHop === undefined) {
       return reject(
         "preconditionFailed",
         `setCourse: no route from "${travel.portId}" to "${destinationPortId}"`,
       );
     }
-    return ok({ distance });
+    // D50: a live passage is the voyage. A far destination that is not where the passenger is
+    // bound would quietly replace it; a neighbour is a detour (the voyage stays, §2.3), and the
+    // passenger's own port is fine (it is what the offer card itself sends).
+    const passage = livePassage(ctx.state);
+    if (passage !== undefined && route.path.length > 2 && destinationPortId !== passage.bound) {
+      return reject(
+        "preconditionFailed",
+        `setCourse: a passenger is bound for "${passage.bound}" (job "${passage.job.id}"); only a detour to a neighbouring port is allowed`,
+      );
+    }
+    return ok({
+      nextHop,
+      ...(route.path.length > 2 ? { voyageDestinationId: destinationPortId } : {}),
+    });
   },
-  apply(ctx: ApplyCtx, command: CommandOfKind<"setCourse">): AppliedCommand {
+  apply(ctx: ApplyCtx, command: CommandOfKind<"setCourse">, plan: SetCoursePlan): AppliedCommand {
     const travel = ctx.state.travel;
     if (travel.stage !== "docked") throw new Error("validated docked travel state vanished");
-    const destinationPortId = command.payload.destinationPortId;
-    if (hasOpenCargoWork(ctx)) {
+    // A multi-hop destination starts (or replaces) a voyage; a neighbouring one leaves any
+    // running voyage alone, which is what makes it a detour rather than a cancellation.
+    if (plan.voyageDestinationId !== undefined) {
+      travel.voyageDestinationId = plan.voyageDestinationId;
+    }
+    if (hasOpenCargoWork(ctx) || waitingForPassenger(ctx.state) !== undefined) {
       // Integration 2: freight is still moving through the open ramp; stay docked with the
       // course planned. The travel system begins departure prep once the cargo work is done.
+      // Passengers §3.3: likewise while a passenger is ashore; the ship never leaves them
+      // quietly, only through the overdue card or `endPassage`.
       ctx.state.travel = {
         stage: "docked",
         portId: travel.portId,
-        plannedDestinationId: destinationPortId,
+        plannedDestinationId: plan.nextHop,
+        ...carriedVoyageFields(travel),
       };
       return NO_TEMP_REFS;
     }
-    beginDeparture(ctx, destinationPortId, causedBy(command));
+    beginDeparture(ctx, plan.nextHop, causedBy(command));
     return NO_TEMP_REFS;
   },
 };
@@ -110,7 +138,12 @@ export const holdDepartureForRepairs: CommandHandler<"holdDepartureForRepairs", 
       // and the ramps open, so the crew can buy the part the repair is waiting on from the
       // port's market. The hold lifts into `beginDeparture` again once nothing is impaired.
       const { fromPortId, toPortId } = travel;
-      travel = { stage: "docked", portId: fromPortId, plannedDestinationId: toPortId };
+      travel = {
+        stage: "docked",
+        portId: fromPortId,
+        plannedDestinationId: toPortId,
+        ...carriedVoyageFields(travel),
+      };
       ctx.state.travel = travel;
       requestRamps(ctx, "open");
       ctx.emit({
@@ -141,6 +174,8 @@ export const acceptDepartureRisk: CommandHandler<"acceptDepartureRisk", null> = 
   apply(ctx: ApplyCtx, command: CommandOfKind<"acceptDepartureRisk">): AppliedCommand {
     const travel = ctx.state.travel;
     travel.departureRiskAccepted = true;
+    // §2.3: remembered for the voyage, against the impaired set as it is now.
+    travel.acceptedImpairmentKey = impairmentKey(ctx);
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
     delete travel.holdForRepairs;
     ctx.emit({

@@ -4,7 +4,10 @@
  *     problems on arrival at the destination, and pays a delivered job exactly once,
  *  2. expires stale offers and surfaces the cards of offers that waited for the dock (D42),
  *  3. raises the `jobBoard` hook when the captain is docked with nothing to do (see
- *     `travel/hooks.ts` `raiseJobBoardHookIfNeeded`).
+ *     `travel/hooks.ts` `raiseJobBoardHookIfNeeded`),
+ *  4. walks passengers off and on, times their stay ashore and raises the overdue card
+ *     (passengers-and-galaxy §3, `passage.ts`); it runs before the job sweep so a passage that
+ *     completes this tick is paid this tick.
  *
  * D40 (2026-10-01): the narrator is the only source of work. The deterministic job source that
  * used to live beside this system (posting template offers while docked) is gone; `jobBoard` is
@@ -18,6 +21,7 @@
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { raiseJobBoardHookIfNeeded } from "../travel/hooks";
 import { expireStaleOffers, payJobIfDue, raiseUnloadProblems, surfaceDeferredOffers } from "./jobs";
+import { sweepPassages } from "./passage";
 
 function sweepJobs(ctx: StepCtx): void {
   const travel = ctx.state.travel;
@@ -40,6 +44,7 @@ export const commerceSystem: System = {
   name: "commerce.jobs",
   phase: "equipment",
   run(ctx) {
+    sweepPassages(ctx);
     sweepJobs(ctx);
     raiseJobBoardHookIfNeeded(ctx);
   },

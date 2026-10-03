@@ -429,7 +429,18 @@ export interface TraitDef {
 export interface PortDef {
   readonly id: PortDefId;
   readonly name: string;
+  /** One line for lists and the capabilities block. */
   readonly description: string;
+  /**
+   * Passengers spec §2.4: two or three sentences on what kind of people are here, what they
+   * want and what the place is known for. The narrator reads it; the kernel never does.
+   */
+  readonly character: string;
+  /**
+   * Passengers spec §2.4: two or three named recurring locals the narrator can bring back. Not
+   * actors; a passenger spawned here takes a name from the people table, not from this list.
+   */
+  readonly castSeed: readonly CastSeedDef[];
   readonly externalStores: readonly ExternalStoreDef[];
   /**
    * D47: what the port sells. Seeds `WorldState.markets[portId]` at world creation; the live
@@ -447,6 +458,14 @@ export interface PortDef {
    * Symmetry is checked at L2, not assumed.
    */
   readonly routes: readonly { readonly toPortId: PortDefId; readonly distance: Seconds }[];
+}
+
+/** A recurring local at a port, for the narrator's continuity (passengers spec §2.4). */
+export interface CastSeedDef {
+  readonly name: string;
+  readonly role: string;
+  /** One sentence: what they are like or what they are after. */
+  readonly note: string;
 }
 
 export interface ExternalStoreDef {
@@ -625,9 +644,13 @@ export interface ConfigDef {
     readonly departureMinOutput: number;
   };
   readonly commerce: {
-    /** Credits per unit distance per cargo unit, inclusive band. Narrator `offerJob` pay must fit. */
+    /**
+     * Credits per unit distance per cargo unit, inclusive band. Narrator `offerJob` pay must fit.
+     * `passenger` (passengers-and-galaxy §3.4) is per unit of path distance for one fare, doubled
+     * for a round trip; luggage adds nothing.
+     */
     readonly priceBands: Readonly<
-      Record<CargoClass, { readonly min: number; readonly max: number }>
+      Record<CargoClass | "passenger", { readonly min: number; readonly max: number }>
     >;
     readonly jobOfferTtlSeconds: Seconds;
     /**
@@ -648,6 +671,14 @@ export interface ConfigDef {
      * a long single-actor slog.
      */
     readonly maxCratesPerJob: number;
+    /** Passengers-and-galaxy §3.3: how long a round-trip passenger stays ashore. */
+    readonly passage: {
+      /** `returnsAtTick` is drawn uniformly in [min, max] seconds after going ashore. */
+      readonly ashoreSecondsMin: Seconds;
+      readonly ashoreSecondsMax: Seconds;
+      /** Not back this long after going ashore: the overdue card ("Wait for them" / "Leave"). */
+      readonly overdueSeconds: Seconds;
+    };
     /** D47: the parts market. */
     readonly market: {
       /** Multipliers over a port's content price for the narrator's `stockMarket` price tiers. */

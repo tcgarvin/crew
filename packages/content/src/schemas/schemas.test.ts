@@ -123,10 +123,17 @@ const trait = {
   excludes: [],
 };
 
+const castSeed = [
+  { name: "Ada Test", role: "berth agent", note: "Runs the dock." },
+  { name: "Bo Test", role: "broker", note: "Wants freight moved." },
+];
+
 const port = {
   id: "port.test.a",
   name: "Port A",
   description: "",
+  character: "A test port where testers test.",
+  castSeed,
   externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
   market: [{ itemDefId: "item.test.wrench", count: 2, price: 40 }],
   jobTemplates: [
@@ -145,6 +152,8 @@ const portB = {
   id: "port.test.b",
   name: "Port B",
   description: "",
+  character: "Another test port.",
+  castSeed,
   externalStores: [{ key: "warehouse", name: "Warehouse B", kind: "warehouse" }],
   market: [],
   jobTemplates: [],
@@ -229,12 +238,19 @@ const config = {
     departureMinOutput: 0.5,
   },
   commerce: {
-    priceBands: { general: band, fragile: band, perishable: band, hazardous: band },
+    priceBands: {
+      general: band,
+      fragile: band,
+      perishable: band,
+      hazardous: band,
+      passenger: band,
+    },
     jobOfferTtlSeconds: 300,
     dockingFee: 0,
     haulEstimateSeconds: 5,
     reofferSeconds: 60,
     maxCratesPerJob: 6,
+    passage: { ashoreSecondsMin: 60, ashoreSecondsMax: 180, overdueSeconds: 120 },
     market: {
       priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
       maxStockPerCommand: 4,
@@ -465,6 +481,30 @@ describe("bundle validation", () => {
       if (parsed.ok) {
         const issues = validateReferences(parsed.bundle);
         expect(issues.some((i) => i.message.includes("must have maxStack 1"))).toBe(true);
+      }
+    });
+
+    it("rejects a port without character or with fewer than two cast seeds (spec §2.4)", () => {
+      const { character: _dropped, ...noCharacter } = port;
+      expect(portDefSchema.safeParse(noCharacter).success).toBe(false);
+      expect(portDefSchema.safeParse({ ...port, character: "" }).success).toBe(false);
+      expect(portDefSchema.safeParse({ ...port, castSeed: [castSeed[0]] }).success).toBe(false);
+      expect(
+        portDefSchema.safeParse({ ...port, castSeed: [...castSeed, ...castSeed] }).success,
+      ).toBe(false);
+      expect(portDefSchema.safeParse(port).success).toBe(true);
+    });
+
+    it("rejects a route whose return leg has a different distance", () => {
+      const farB = { ...portB, routes: [{ toPortId: port.id, distance: 99 }] };
+      const parsed = validateStructure({
+        ...bundle,
+        ports: { [port.id]: port, [farB.id]: farB },
+      });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validateReferences(parsed.bundle);
+        expect(issues.some((i) => i.message.includes("does not match return distance"))).toBe(true);
       }
     });
 

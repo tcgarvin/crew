@@ -6,12 +6,15 @@ import {
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  type Job,
   type Machine,
   type MachineFault,
   type PortDefId,
   type SaveEnvelope,
   type WorldState,
   configTicks,
+  hopCount,
+  shortestPath,
 } from "@crew/sim";
 
 export type Snapshot = DeepReadonly<SaveEnvelope>;
@@ -76,6 +79,7 @@ export function offerPortNow(state: State): PortDefId | undefined {
   return undefined;
 }
 
+/** The length of a direct leg between two ports, or `undefined` when no route joins them. */
 export function routeDistance(
   content: ContentBundle,
   fromPortId: string,
@@ -83,6 +87,53 @@ export function routeDistance(
 ): number | undefined {
   return content.ports[fromPortId as PortDefId]?.routes.find((r) => r.toPortId === toPortId)
     ?.distance;
+}
+
+/**
+ * Passengers-and-galaxy §2.3: the shortest chain of legs between two ports, with its hop count
+ * and summed distance, or `undefined` when either port is unknown or no chain joins them. The
+ * same `shortestPath` the kernel prices jobs by, so the translator's pay matches the kernel's
+ * band and the digest's "N hops" matches the voyage the sim will actually run.
+ */
+export function pathBetween(
+  content: ContentBundle,
+  fromPortId: string,
+  toPortId: string,
+):
+  | { readonly path: readonly PortDefId[]; readonly hops: number; readonly distance: number }
+  | undefined {
+  const found = shortestPath(content.ports, fromPortId as PortDefId, toPortId as PortDefId);
+  if (found === undefined) return undefined;
+  return { path: found.path, hops: hopCount(found.path), distance: found.distance };
+}
+
+/**
+ * The port the ship is at or heading for next: the docked port, or the far end of the leg in
+ * progress. Undefined only when the travel state names no port at all (it always does).
+ */
+export function portHereOrNext(state: State): PortDefId {
+  const travel = state.travel;
+  return travel.stage === "docked" ? travel.portId : travel.toPortId;
+}
+
+/**
+ * The voyage the ship is on beyond the current leg (§2.3): the voyage destination when it is set
+ * and is not the port the ship is at or about to reach, with the hops and distance still to run
+ * from there. Undefined for a single-leg trip or no trip at all.
+ */
+export function voyageAhead(
+  state: State,
+  content: ContentBundle,
+):
+  | { readonly destinationId: PortDefId; readonly hops: number; readonly distance: number }
+  | undefined {
+  const destinationId = state.travel.voyageDestinationId;
+  if (destinationId === undefined) return undefined;
+  const from = portHereOrNext(state);
+  if (from === destinationId) return undefined;
+  const path = pathBetween(content, from, destinationId);
+  if (path === undefined) return undefined;
+  return { destinationId, hops: path.hops, distance: path.distance };
 }
 
 /** Relative fault windows in seconds, derived from config so they always fit the kernel bound. */
@@ -130,4 +181,32 @@ export function payFor(
   const max = Math.round(band.max * distance * units);
   const pay = Math.round(min + PAY_TIER_FRACTION[tier] * (max - min));
   return { pay: Math.min(max, Math.max(min, pay)), min, max };
+}
+
+/**
+ * Passengers-and-galaxy §3.4: the fare for a passage, mirroring the kernel's `checkPassageBand`:
+ * the passenger band is per unit of path distance for one fare, doubled for a round trip; the
+ * tier picks a point inside it. Luggage adds nothing.
+ */
+export function fareFor(
+  config: ConfigDef,
+  distance: number,
+  roundTrip: boolean,
+  tier: keyof typeof PAY_TIER_FRACTION,
+): { pay: number; min: number; max: number } {
+  return payFor(config, "passenger", roundTrip ? distance * 2 : distance, 1, tier);
+}
+
+/**
+ * Passengers-and-galaxy §3.1: the one live passage, if the current job carries a person: a job
+ * accepted or under way whose `passage` has not ended. D16 allows one job at a time, so at most
+ * one exists; the first by offer tick wins if a fixture breaks that rule.
+ */
+export function livePassage(state: State): DeepReadonly<Job> | undefined {
+  const live = new Set(["accepted", "inTransit", "delivered"]);
+  return Object.values(state.jobs)
+    .filter(
+      (j) => live.has(j.status) && j.passage !== undefined && j.passage.endReason === undefined,
+    )
+    .sort((a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id))[0];
 }

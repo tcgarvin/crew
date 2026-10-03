@@ -9,6 +9,7 @@
 import type {
   CargoClass,
   DoorPhysicalState,
+  RenderActor,
   RenderFrame,
   RenderItem,
   RenderItemKind,
@@ -356,6 +357,19 @@ export function drawMachineLabels(
 
 const MIN_DOT_RADIUS = 4; // >= 8px diameter at 390px width, per the brief
 
+const CREW_DOT_COLOR = "#f2c14e";
+/**
+ * Passengers §3.2: a paying passenger is a person aboard but not crew, so their dot is a pale
+ * one with a blue rim rather than crew yellow. Pale rather than another hue so it never reads as
+ * a crate or a machine state on a phone.
+ */
+const PASSENGER_DOT_COLOR = "#dfe9f3";
+const PASSENGER_RIM_COLOR = "#5b86b8";
+
+export function actorDotColor(actor: Pick<RenderActor, "passenger">): string {
+  return actor.passenger ? PASSENGER_DOT_COLOR : CREW_DOT_COLOR;
+}
+
 export function drawActorDots(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
@@ -367,10 +381,15 @@ export function drawActorDots(
   const radius = Math.max(MIN_DOT_RADIUS, t.scale * 0.22);
   for (const actor of frame.actors) {
     const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
-    ctx.fillStyle = "#f2c14e";
+    ctx.fillStyle = actorDotColor(actor);
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
+    if (actor.passenger) {
+      ctx.strokeStyle = PASSENGER_RIM_COLOR;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
     if (selectedId === actor.id) {
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;

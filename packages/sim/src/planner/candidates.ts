@@ -479,20 +479,27 @@ function postCandidate(view: AgentView): Candidate | Rejection | undefined {
 export function enumerateCandidates(view: AgentView, config: PlannerConfig): CandidateSet {
   const candidates: Candidate[] = [];
   const rejected: Rejection[] = [];
+  // Passengers §3.5: one walking off the ship wants nothing else (commerce drives the walk).
+  if (view.self.disembarking === true) return { candidates, rejected };
   const add = (result: Candidate | Rejection | undefined) => {
     if (result === undefined) return;
     if ("reason" in result) rejected.push(result);
     else candidates.push(result);
   };
-  const problems = new Map(view.knownProblems().map((p) => [p.id as string, p]));
-  const tasks = view.knownTasks();
-  const liveTaskIds = new Set<string>(tasks.map((t) => t.id));
-  for (const task of tasks) add(taskCandidate(view, config, task, problems, liveTaskIds));
+  // Passengers §3.2: a passenger eats, sleeps and socialises like anyone aboard but never plans
+  // work and has no post.
+  const passenger = view.self.passenger === true;
+  if (!passenger) {
+    const problems = new Map(view.knownProblems().map((p) => [p.id as string, p]));
+    const tasks = view.knownTasks();
+    const liveTaskIds = new Set<string>(tasks.map((t) => t.id));
+    for (const task of tasks) add(taskCandidate(view, config, task, problems, liveTaskIds));
+  }
   add(eatCandidate(view, config));
   add(sleepCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
-  add(postCandidate(view));
+  if (!passenger) add(postCandidate(view));
   return { candidates, rejected };
 }
 

@@ -209,8 +209,18 @@ export interface Actor {
   lastConversationTick?: Tick;
   /**
    * Crew or NPC. W0 decision: NPC passengers are `Actor`s with `crew: false`; they never plan work.
+   * Passengers-and-galaxy §3.2 revised that for paying passengers: they are `crew: true` (so
+   * needs, movement, perception and ambient chat treat them as a person aboard) with
+   * `passenger: true`, which is what keeps them out of work, posts and the helm.
    */
   crew: boolean;
+  /** Passengers-and-galaxy §3: a paying passenger (`Job.passage.actorId`). Never `false`. */
+  passenger?: true;
+  /**
+   * Set while the passenger is walking to the personnel ramp to leave the ship (commerce drives
+   * the walk; the planner leaves them alone). Cleared when they are off. Never `false`.
+   */
+  disembarking?: true;
 }
 
 /**

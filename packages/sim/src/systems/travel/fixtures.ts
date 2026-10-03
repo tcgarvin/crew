@@ -1,6 +1,7 @@
 /**
- * Test fixture for travel + commerce (PLAN §6 W6 "Tests"): 3 ports with route distances
- * 25/45/70s, one `engine` machine (no power system running these tests, so `actualMode`/`output`
+ * Test fixture for travel + commerce (PLAN §6 W6 "Tests"): 3 core ports with route distances
+ * 25/45/70 plus a fourth, `delta`, a spur off `gamma` (50) two hops from `alpha` for voyage
+ * tests (passengers-and-galaxy §2.3), one `engine` machine (no power system running these tests, so `actualMode`/`output`
  * are set directly), one `ramp` door, a captain + first officer, two cargo item defs, and the
  * standard price bands. Independent of `core/fixtures/tiny-content.ts` so it can shape the deck
  * exactly (ramp door, engine, two crew spawn points) without touching a fixture other
@@ -27,6 +28,8 @@ export const PORTS = {
   a: "port.freight.alpha" as PortDefId,
   b: "port.freight.beta" as PortDefId,
   c: "port.freight.gamma" as PortDefId,
+  /** Two hops from `a`: the shortest path is a -> c -> d (95), not a -> b -> c -> d (145). */
+  d: "port.freight.delta" as PortDefId,
 } as const;
 
 export const FIX = {
@@ -36,6 +39,8 @@ export const FIX = {
   parts: "item.freight.parts" as ItemDefId,
   captain: "crew.freight.captain" as CrewDefId,
   firstOfficer: "crew.freight.mate" as CrewDefId,
+  /** The generic passenger template (passengers-and-galaxy §3.5); the id the kernel spawns. */
+  passenger: "crew.passenger" as CrewDefId,
   scenario: "scenario.freight" as ScenarioDefId,
 } as const;
 
@@ -44,6 +49,7 @@ export interface FixtureConfigOverrides {
   dockingFee?: number;
   hookOnEvents?: readonly string[];
   maxCratesPerJob?: number;
+  passage?: ConfigDef["commerce"]["passage"];
 }
 
 export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef {
@@ -119,12 +125,18 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         fragile: { min: 2, max: 5 },
         perishable: { min: 2, max: 4 },
         hazardous: { min: 3, max: 8 },
+        passenger: { min: 2, max: 4 },
       },
       jobOfferTtlSeconds: 120,
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
       reofferSeconds: 60,
       maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
+      passage: overrides.passage ?? {
+        ashoreSecondsMin: 3,
+        ashoreSecondsMax: 3,
+        overdueSeconds: 10,
+      },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,
@@ -205,6 +217,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         spawnPoints: [
           { key: "bunk1", tile: { x: 1, y: 1 }, tags: ["crew"] },
           { key: "bunk2", tile: { x: 2, y: 1 }, tags: ["crew"] },
+          { key: "ramp_inside", tile: { x: 0, y: 1 }, tags: ["passenger"] },
         ],
       },
     },
@@ -285,6 +298,16 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         bio: "Backs up the captain.",
         voice: "Plain and brief.",
       },
+      [FIX.passenger]: {
+        id: FIX.passenger,
+        name: "Passenger",
+        roleTags: [],
+        skills: {},
+        startingInventory: [],
+        shift: "alpha",
+        bio: "A paying passenger.",
+        voice: "Whoever they turn out to be.",
+      },
     },
     traits: {},
     ports: {
@@ -292,7 +315,12 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         id: PORTS.a,
         name: "Alpha Station",
         description: "The home port.",
-        externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        character: "The home port.",
+        castSeed: [],
+        externalStores: [
+          { key: "warehouse", name: "Warehouse", kind: "warehouse" },
+          { key: "lounge", name: "Lounge", kind: "lounge" },
+        ],
         market: [],
         jobTemplates: [
           {
@@ -312,7 +340,12 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         id: PORTS.b,
         name: "Beta Yard",
         description: "A midway yard.",
-        externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        character: "A midway yard.",
+        castSeed: [],
+        externalStores: [
+          { key: "warehouse", name: "Warehouse", kind: "warehouse" },
+          { key: "lounge", name: "Lounge", kind: "lounge" },
+        ],
         market: [],
         jobTemplates: [],
         routes: [
@@ -324,13 +357,33 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         id: PORTS.c,
         name: "Gamma Ring",
         description: "The far ring.",
-        externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        character: "The far ring.",
+        castSeed: [],
+        externalStores: [
+          { key: "warehouse", name: "Warehouse", kind: "warehouse" },
+          { key: "lounge", name: "Lounge", kind: "lounge" },
+        ],
         market: [],
         jobTemplates: [],
         routes: [
           { toPortId: PORTS.a, distance: 45 },
           { toPortId: PORTS.b, distance: 70 },
+          { toPortId: PORTS.d, distance: 50 },
         ],
+      },
+      [PORTS.d]: {
+        id: PORTS.d,
+        name: "Delta Spur",
+        description: "A spur beyond the ring.",
+        character: "A spur beyond the ring.",
+        castSeed: [],
+        externalStores: [
+          { key: "warehouse", name: "Warehouse", kind: "warehouse" },
+          { key: "lounge", name: "Lounge", kind: "lounge" },
+        ],
+        market: [],
+        jobTemplates: [],
+        routes: [{ toPortId: PORTS.c, distance: 50 }],
       },
     },
     scenarios: {

@@ -1,0 +1,97 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.ossory_station",
+  "name": "Ossory Station",
+  "description": "A shipbreaking yard at the far end of the Kessler lane; hulls in every state of dismantling, a claims office, and a market built from whatever was cut loose last week.",
+  "character": "Ossory is breakers, scrappers and claims lawyers, the people who turn dead ships and played-out mining claims into money. They want paperwork settled, hulls cut and sold before the next one arrives, and they do not ask where a ship has been. The station is known for cheap parts of uncertain provenance, for the registry where claims and estates change hands, and for being the last stop before the dark.",
+  "castSeed": [
+    {
+      "name": "Vida Orlov",
+      "role": "yard boss",
+      "note": "Owns the cutting gantries and prices a hull by looking at it; she has never been wrong by more than ten percent."
+    },
+    {
+      "name": "Ezra Pell",
+      "role": "claims registrar",
+      "note": "Keeps the registry of mining claims and estates, and every sale and every funeral in the Drift passes across his desk."
+    },
+    {
+      "name": "Sunny Bakare",
+      "role": "old breaker",
+      "note": "Knows every hull in the yard and which ones still have someone's name scratched inside the airlock."
+    }
+  ],
+  "externalStores": [
+    {
+      "key": "warehouse",
+      "name": "Ossory Breaker's Yard",
+      "kind": "warehouse"
+    },
+    {
+      "key": "market",
+      "name": "Salvage Market",
+      "kind": "market"
+    },
+    {
+      "key": "lounge",
+      "name": "Registry Waiting Room",
+      "kind": "lounge"
+    }
+  ],
+  "market": [
+    {
+      "itemDefId": "item.spare_parts_stack",
+      "count": 6,
+      "price": 70
+    },
+    {
+      "itemDefId": "item.welder_torch",
+      "count": 1,
+      "price": 220
+    },
+    {
+      "itemDefId": "item.coolant_canister",
+      "count": 0,
+      "price": 110
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 6,
+      "price": 14
+    }
+  ],
+  "jobTemplates": [
+    {
+      "key": "salvage_to_drift",
+      "issuer": "Ossory Breakers' Association",
+      "toPortId": "port.kessler_drift",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_general",
+          "countMin": 3,
+          "countMax": 8
+        }
+      ],
+      "weight": 3
+    },
+    {
+      "key": "reclaimed_parts_to_hub",
+      "issuer": "Ossory Claims Registry",
+      "toPortId": "port.crossroads_hub",
+      "cargo": [
+        {
+          "itemDefId": "item.crate_general",
+          "countMin": 4,
+          "countMax": 12
+        }
+      ],
+      "weight": 1
+    }
+  ],
+  "routes": [
+    {
+      "toPortId": "port.kessler_drift",
+      "distance": 120
+    }
+  ]
+}

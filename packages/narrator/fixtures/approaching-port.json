@@ -10,10 +10,10 @@
     "tick": 1800
   },
   "snapshot": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "simVersion": "0.1.0",
-    "contentHash": "23dc2fb5dcc8d3c7",
-    "configHash": "23dc2fb5dcc8d3c7",
+    "contentHash": "de0741efe6e8056c",
+    "configHash": "de0741efe6e8056c",
     "savedAtTick": 1800,
     "config": {
       "time": {
@@ -118,13 +118,22 @@
           "hazardous": {
             "min": 6,
             "max": 14
+          },
+          "passenger": {
+            "min": 6,
+            "max": 12
           }
         },
         "jobOfferTtlSeconds": 600,
         "dockingFee": 150,
         "haulEstimateSeconds": 5,
-        "reofferSeconds": 20,
+        "reofferSeconds": 90,
         "maxCratesPerJob": 6,
+        "passage": {
+          "ashoreSecondsMin": 60,
+          "ashoreSecondsMax": 180,
+          "overdueSeconds": 120
+        },
         "market": {
           "priceTiers": {
             "cheap": 0.6,
@@ -137,14 +146,20 @@
         }
       },
       "narrator": {
-        "quietTooLongSeconds": 40,
+        "quietTooLongSeconds": 60,
         "approachHookLeadSeconds": 10,
         "maxSpawnsPerCommand": 3,
         "maxFaultWindowSeconds": 90,
         "spawnBudget": 3,
         "faultBudget": 2,
         "budgetRefillSeconds": 300,
-        "hookOnEvents": ["driftingChanged", "contractCompleted"]
+        "hookOnEvents": [
+          "driftingChanged",
+          "contractCompleted",
+          "departureRiskAccepted",
+          "departureHoldLifted",
+          "passengerReturned"
+        ]
       },
       "host": {
         "runAheadCapSeconds": 60,
@@ -191,7 +206,7 @@
       }
     },
     "state": {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 1800,
@@ -1365,6 +1380,96 @@
           }
         }
       },
+      "markets": {
+        "port.crossroads_hub": {
+          "item.spare_parts_stack": {
+            "count": 4,
+            "price": 120
+          },
+          "item.coolant_canister": {
+            "count": 3,
+            "price": 60
+          },
+          "item.ration_pack": {
+            "count": 20,
+            "price": 8
+          },
+          "item.med_kit": {
+            "count": 2,
+            "price": 90
+          }
+        },
+        "port.kessler_drift": {
+          "item.spare_parts_stack": {
+            "count": 1,
+            "price": 180
+          },
+          "item.coolant_canister": {
+            "count": 2,
+            "price": 75
+          }
+        },
+        "port.green_meridian": {
+          "item.spare_parts_stack": {
+            "count": 0,
+            "price": 150
+          },
+          "item.ration_pack": {
+            "count": 30,
+            "price": 6
+          }
+        },
+        "port.ossory_station": {
+          "item.spare_parts_stack": {
+            "count": 6,
+            "price": 70
+          },
+          "item.welder_torch": {
+            "count": 1,
+            "price": 220
+          },
+          "item.coolant_canister": {
+            "count": 0,
+            "price": 110
+          },
+          "item.ration_pack": {
+            "count": 6,
+            "price": 14
+          }
+        },
+        "port.vesper_gate": {
+          "item.med_kit": {
+            "count": 5,
+            "price": 55
+          },
+          "item.ration_pack": {
+            "count": 12,
+            "price": 9
+          },
+          "item.spare_parts_stack": {
+            "count": 0,
+            "price": 240
+          }
+        },
+        "port.terns_rest": {
+          "item.ration_pack": {
+            "count": 10,
+            "price": 12
+          },
+          "item.coolant_canister": {
+            "count": 1,
+            "price": 95
+          },
+          "item.spare_parts_stack": {
+            "count": 1,
+            "price": 210
+          },
+          "item.med_kit": {
+            "count": 1,
+            "price": 130
+          }
+        }
+      },
       "decisions": {
         "records": {},
         "queue": []
@@ -1396,8 +1501,7 @@
           "items": {},
           "crew": {}
         }
-      },
-      "markets": {}
+      }
     }
   },
   "recentEvents": [

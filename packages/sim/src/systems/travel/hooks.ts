@@ -9,22 +9,31 @@ import { configTicks } from "../../core/clock";
 import { raiseHookIfIdle } from "../../core/hooks";
 import type { PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
+import { jobInHand } from "./in-hand";
 
 export { raiseHookIfIdle };
 
+/** A passenger is walking down the ramp (§3.5/§4.2): the captain is not looking for work yet. */
+function somebodyDisembarking(ctx: StepCtx): boolean {
+  return Object.values(ctx.state.actors).some((a) => a.disembarking === true);
+}
+
 /**
- * Whether the captain has nothing on at `portId`: no offer open here, no job accepted anywhere,
- * no job decision queued, no course planned, and no offer here declined or expired within
- * `config.commerce.reofferSeconds`.
+ * Whether the captain has nothing on at `portId`: no offer open here, no job in hand anywhere
+ * (`jobInHand`), no passenger walking off, no job decision queued, no course planned, no voyage
+ * under way, and no offer here declined or expired within `config.commerce.reofferSeconds`.
  */
 function captainIsIdleAt(ctx: StepCtx, portId: PortDefId): boolean {
   const travel = ctx.state.travel;
   if (travel.stage === "docked" && travel.plannedDestinationId !== undefined) return false;
+  // §2.3: a waypoint of a voyage is a stop on the way, not a port to look for work at.
+  if (travel.voyageDestinationId !== undefined) return false;
+  if (somebodyDisembarking(ctx)) return false;
   const decisions = ctx.state.decisions;
   if (decisions.queue.some((id) => decisions.records[id]?.jobId !== undefined)) return false;
   const cooldownTicks = configTicks(ctx.config, ctx.config.commerce.reofferSeconds);
   for (const job of Object.values(ctx.state.jobs)) {
-    if (job.status === "accepted") return false;
+    if (jobInHand(job)) return false;
     if (job.fromPortId !== portId) continue;
     if (job.status === "offered") return false;
     if (

@@ -14,6 +14,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
         y,
         facing,
         actionLabel: "walking",
+        passenger: false,
       },
     ],
     machines: [],

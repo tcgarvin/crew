@@ -257,6 +257,8 @@ export function w5Content(
         id: W5.port,
         name: "W5 Dock",
         description: "A dock.",
+        character: "A dock.",
+        castSeed: [],
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
         market: [],
         jobTemplates: [],

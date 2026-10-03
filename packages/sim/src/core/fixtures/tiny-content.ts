@@ -1,6 +1,7 @@
 /**
  * A tiny, self-contained `ContentBundle` for kernel tests: one 6×4 deck with two compartments
- * joined by a door, one crew member carrying rations, one machine, one loose wrench, one port.
+ * joined by a door, one crew member carrying rations, one machine, one loose wrench, and three
+ * ports in a line (dock - far - beyond), so `beyond` is two hops from the start.
  * Independent of `packages/content` so kernel tests do not depend on authored data.
  */
 import type { ConfigDef, ContentBundle } from "../types/content";
@@ -23,6 +24,8 @@ export const TINY = {
   mara: "crew.tiny.mara" as CrewDefId,
   port: "port.tiny.dock" as PortDefId,
   port2: "port.tiny.far" as PortDefId,
+  /** Two hops from `port`, via `port2` (30 + 40). */
+  port3: "port.tiny.beyond" as PortDefId,
   scenario: "scenario.tiny" as ScenarioDefId,
 } as const;
 
@@ -98,10 +101,12 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
         fragile: { min: 2, max: 5 },
         perishable: { min: 2, max: 4 },
         hazardous: { min: 3, max: 8 },
+        passenger: { min: 2, max: 4 },
       },
       jobOfferTtlSeconds: 120,
       dockingFee: 0,
       haulEstimateSeconds: 5,
+      passage: { ashoreSecondsMin: 3, ashoreSecondsMax: 3, overdueSeconds: 10 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,
@@ -269,6 +274,8 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         id: TINY.port,
         name: "Tiny Dock",
         description: "A dock.",
+        character: "A dock.",
+        castSeed: [],
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
         market: [],
         jobTemplates: [],
@@ -278,10 +285,26 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         id: TINY.port2,
         name: "Far Dock",
         description: "Another dock.",
+        character: "Another dock.",
+        castSeed: [],
         externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
         market: [],
         jobTemplates: [],
-        routes: [{ toPortId: TINY.port, distance: 30 }],
+        routes: [
+          { toPortId: TINY.port, distance: 30 },
+          { toPortId: TINY.port3, distance: 40 },
+        ],
+      },
+      [TINY.port3]: {
+        id: TINY.port3,
+        name: "Beyond Dock",
+        description: "The dock past Far Dock.",
+        character: "The dock past Far Dock.",
+        castSeed: [],
+        externalStores: [{ key: "warehouse", name: "Warehouse", kind: "warehouse" }],
+        market: [],
+        jobTemplates: [],
+        routes: [{ toPortId: TINY.port2, distance: 40 }],
       },
     },
     scenarios: {

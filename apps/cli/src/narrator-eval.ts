@@ -19,6 +19,8 @@ import {
   type ModelTransport,
   type NarratorRequest,
   approachingPortRequest,
+  farJobBoardRequest,
+  passengerOverdueRequest,
   quietTooLongRequest,
   runNarratorWithTrace,
 } from "@crew/narrator";
@@ -41,6 +43,8 @@ export function runNarratorFixtures(outDir?: string): CliResult {
   const fixtures: Record<string, NarratorRequest> = {
     "approaching-port.json": approachingPortRequest(bundle),
     "quiet-too-long-pump.json": quietTooLongRequest(bundle),
+    "far-job-board.json": farJobBoardRequest(bundle),
+    "passenger-overdue.json": passengerOverdueRequest(bundle),
   };
   for (const [name, request] of Object.entries(fixtures)) {
     writeFileSync(path.join(dir, name), `${JSON.stringify(request, null, 2)}\n`);
