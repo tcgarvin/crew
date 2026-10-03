@@ -2,6 +2,7 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.terns_rest",
   "name": "Tern's Rest",
+  "setting": "planet",
   "description": "A homestead settlement and relay post at the edge of the charted lanes; one long pier, a trading post, and a lot of sky.",
   "character": "Tern's Rest is homesteaders, a relay crew, and a marshal who is also the harbourmaster, the postmaster and the judge. They want supplies, news, and new neighbours who will stay, and they are suspicious of anyone who arrives with nothing to sell and nothing to settle. The Rest is known as the place people go to start over, and as the place the lost were last seen heading for.",
   "castSeed": [

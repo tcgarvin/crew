@@ -40,7 +40,13 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       loadSpeedPerKg: 0.01,
       loadSpeedFloor: 0.5,
     },
-    doors: { openSeconds: 1, closeSeconds: 1, autoCloseAfterSeconds: 3, manualOpenSeconds: 4 },
+    doors: {
+      openSeconds: 1,
+      closeSeconds: 1,
+      autoCloseAfterSeconds: 3,
+      manualOpenSeconds: 4,
+      rampOpenSeconds: 2,
+    },
     needs: {
       hungerPerSecond: 0.001,
       fatiguePerSecondAwake: 0.001,
@@ -273,6 +279,7 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
       [TINY.port]: {
         id: TINY.port,
         name: "Tiny Dock",
+        setting: "station",
         description: "A dock.",
         character: "A dock.",
         castSeed: [],
@@ -284,6 +291,7 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
       [TINY.port2]: {
         id: TINY.port2,
         name: "Far Dock",
+        setting: "station",
         description: "Another dock.",
         character: "Another dock.",
         castSeed: [],
@@ -298,6 +306,7 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
       [TINY.port3]: {
         id: TINY.port3,
         name: "Beyond Dock",
+        setting: "station",
         description: "The dock past Far Dock.",
         character: "The dock past Far Dock.",
         castSeed: [],

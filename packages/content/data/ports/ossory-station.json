@@ -2,6 +2,7 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.ossory_station",
   "name": "Ossory Station",
+  "setting": "station",
   "description": "A shipbreaking yard at the far end of the Kessler lane; hulls in every state of dismantling, a claims office, and a market built from whatever was cut loose last week.",
   "character": "Ossory is breakers, scrappers and claims lawyers, the people who turn dead ships and played-out mining claims into money. They want paperwork settled, hulls cut and sold before the next one arrives, and they do not ask where a ship has been. The station is known for cheap parts of uncertain provenance, for the registry where claims and estates change hands, and for being the last stop before the dark.",
   "castSeed": [

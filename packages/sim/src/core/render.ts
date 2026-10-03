@@ -10,8 +10,8 @@ import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
-import type { Item, Machine } from "./types/ship";
-import type { PassageEndReason } from "./types/travel";
+import type { Door, Item, Machine } from "./types/ship";
+import type { PassageEndReason, TravelState } from "./types/travel";
 import type {
   RenderActor,
   RenderFrame,
@@ -20,6 +20,7 @@ import type {
   RenderItemLocation,
   RenderMachine,
   RenderMachineState,
+  RenderTravel,
   TickerEntry,
 } from "./types/view";
 import type { ActionKind } from "./types/work";
@@ -604,6 +605,50 @@ export function shipHeadline(
   }
 }
 
+/**
+ * Dockside §2.2: the renderer's view of travel. While docked both port ids are the dock's port, so
+ * every stage names two ports and the scenery never has to ask which one is meant.
+ */
+export function renderTravel(travel: DeepReadonly<TravelState>): RenderTravel {
+  if (travel.stage === "docked") {
+    return {
+      state: "docked",
+      progress: 0,
+      fromPortId: travel.portId,
+      toPortId: travel.portId,
+      drifting: false,
+    };
+  }
+  const progress =
+    travel.stage === "transit"
+      ? travel.routeDistance > 0
+        ? travel.routeProgress / travel.routeDistance
+        : 0
+      : travel.stageProgress;
+  return {
+    state: travel.stage,
+    progress,
+    fromPortId: travel.fromPortId,
+    toPortId: travel.toPortId,
+    drifting: travel.drifting,
+  };
+}
+
+/** D58: 0 shut to 1 open; a jammed door is impassable, so it reads shut. */
+export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionProgress">): number {
+  switch (door.physicalState) {
+    case "open":
+      return 1;
+    case "opening":
+      return door.transitionProgress;
+    case "closing":
+      return 1 - door.transitionProgress;
+    case "closed":
+    case "jammed":
+      return 0;
+  }
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors: RenderActor[] = [];
@@ -618,15 +663,6 @@ export function getRenderFrame(world: World): RenderFrame {
     deckId: machine.deckId,
     placementKey: machine.placementKey,
   }));
-  const travel = state.travel;
-  const progress =
-    travel.stage === "docked"
-      ? 0
-      : travel.stage === "transit"
-        ? travel.routeDistance > 0
-          ? travel.routeProgress / travel.routeDistance
-          : 0
-        : travel.stageProgress;
   const tickerEvents: TickerEntry[] = [];
   for (const event of world.caches.diagnostics.lastEvents) {
     const text = tickerLine(event, state, content);
@@ -641,10 +677,11 @@ export function getRenderFrame(world: World): RenderFrame {
     doors: Object.values(state.doors).map((door) => ({
       id: door.id,
       physicalState: door.physicalState,
+      openFraction: doorOpenFraction(door),
       deckId: door.deckId,
       placementKey: door.placementKey,
     })),
-    travel: { state: travel.stage, progress },
+    travel: renderTravel(state.travel),
     tickerEvents,
     money: state.money.balance,
     items: renderItems(state, content),

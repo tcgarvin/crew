@@ -131,6 +131,7 @@ const castSeed = [
 const port = {
   id: "port.test.a",
   name: "Port A",
+  setting: "station",
   description: "",
   character: "A test port where testers test.",
   castSeed,
@@ -151,6 +152,7 @@ const port = {
 const portB = {
   id: "port.test.b",
   name: "Port B",
+  setting: "planet",
   description: "",
   character: "Another test port.",
   castSeed,
@@ -182,7 +184,13 @@ const config = {
     loadSpeedPerKg: 0.01,
     loadSpeedFloor: 0.5,
   },
-  doors: { openSeconds: 0.7, closeSeconds: 0.7, autoCloseAfterSeconds: 2, manualOpenSeconds: 4 },
+  doors: {
+    openSeconds: 0.7,
+    closeSeconds: 0.7,
+    autoCloseAfterSeconds: 2,
+    manualOpenSeconds: 4,
+    rampOpenSeconds: 2,
+  },
   needs: {
     hungerPerSecond: 0.001,
     fatiguePerSecondAwake: 0.0008,

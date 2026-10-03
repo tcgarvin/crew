@@ -2,8 +2,9 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.green_meridian",
   "name": "Green Meridian",
-  "description": "A quiet agricultural station ringed by hydroponic domes; slow traffic, fresh air scrubbers, and a lounge that actually feels like one.",
-  "character": "Green Meridian is growers, silo keepers and co-op stewards who measure time in harvests and distrust anyone in a hurry. They want their produce moved before it spoils and their station left as quiet as they found it. The Meridian is known for the best food on the lanes, a seed bank older than the Hub, and a lounge where crews actually sleep.",
+  "setting": "planet",
+  "description": "A farming world of grain belts and orchard terraces, served by one small spaceport at the edge of the fields; slow traffic, real weather, and a lounge that actually feels like one.",
+  "character": "Green Meridian is growers, silo keepers and co-op stewards who measure time in harvests and distrust anyone in a hurry. They want their produce lifted off-world before it spoils and their spaceport left as quiet as they found it. The Meridian is known for the best food on the lanes, a seed bank older than the Hub, and a lounge by the landing field where crews actually sleep.",
   "castSeed": [
     {
       "name": "Nnamdi Ferreira",
@@ -13,7 +14,7 @@
     {
       "name": "Tilde Haugen",
       "role": "seed-bank archivist",
-      "note": "Young, curious about every ship that docks, and quietly saving up to leave on one."
+      "note": "Young, curious about every ship that lands, and quietly saving up to leave on one."
     },
     {
       "name": "Bo Sandoval",

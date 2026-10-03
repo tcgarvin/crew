@@ -426,9 +426,15 @@ export interface TraitDef {
 // Ports
 // ---------------------------------------------------------------------------------------------
 
+/** Dockside §3.3: what kind of place a port is, which decides how arrival looks. */
+export const PORT_SETTINGS = ["station", "planet"] as const;
+export type PortSetting = (typeof PORT_SETTINGS)[number];
+
 export interface PortDef {
   readonly id: PortDefId;
   readonly name: string;
+  /** Dockside §3.3: a station (bay and berth) or a planet (descent, pad). Presentation only. */
+  readonly setting: PortSetting;
   /** One line for lists and the capabilities block. */
   readonly description: string;
   /**
@@ -551,6 +557,11 @@ export interface ConfigDef {
     readonly closeSeconds: Seconds;
     readonly autoCloseAfterSeconds: Seconds;
     readonly manualOpenSeconds: Seconds;
+    /**
+     * Dockside §2.6 (D58): a powered ramp is a heavy plate, so it travels (open or shut) in this
+     * time instead of `openSeconds`/`closeSeconds`. Still passable only once fully open.
+     */
+    readonly rampOpenSeconds: Seconds;
   };
   readonly needs: {
     /**

@@ -13,6 +13,8 @@ import {
 export const portDefSchema = z.strictObject({
   id: portDefIdSchema,
   name: z.string().min(1),
+  /** Dockside §3.3: station or planet; drives arrival scenery only. */
+  setting: z.enum(["station", "planet"]),
   description: z.string(),
   /** Passengers spec §2.4: two or three sentences of port character for the narrator. */
   character: z.string().min(1),

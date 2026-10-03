@@ -1,6 +1,6 @@
-import type { RenderFrame } from "@crew/sim";
+import type { PortDefId, RenderFrame } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { FramePlayback, interpolateFrame, lerp, lerpAngle } from "./playback";
+import { FramePlayback, interpolateFrame, interpolateTravel, lerp, lerpAngle } from "./playback";
 
 function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
   return {
@@ -19,7 +19,13 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     ],
     machines: [],
     doors: [],
-    travel: { state: "docked", progress: 0 },
+    travel: {
+      state: "docked",
+      progress: 0,
+      fromPortId: "port.test" as PortDefId,
+      toPortId: "port.test" as PortDefId,
+      drifting: false,
+    },
     tickerEvents: [],
     money: 0,
     items: [],
@@ -77,6 +83,29 @@ describe("interpolateFrame", () => {
     const b = frame(10, 5, 5);
     const mid = interpolateFrame(a, b, 0.5);
     expect(firstActor(mid)).toEqual(firstActor(b));
+  });
+});
+
+describe("interpolateTravel", () => {
+  const HUB = "port.hub" as PortDefId;
+  const FARM = "port.farm" as PortDefId;
+  const docking = (progress: number, toPortId = FARM) =>
+    ({ state: "docking", progress, fromPortId: HUB, toPortId, drifting: false }) as const;
+
+  it("interpolates progress within one stage of one leg, so the berth slides smoothly", () => {
+    expect(interpolateTravel(docking(0.2), docking(0.4), 0.5).progress).toBeCloseTo(0.3);
+  });
+
+  it("snaps to the next frame across a stage change or a different leg", () => {
+    const docked = {
+      state: "docked",
+      progress: 0,
+      fromPortId: FARM,
+      toPortId: FARM,
+      drifting: false,
+    } as const;
+    expect(interpolateTravel(docking(0.98), docked, 0.5)).toEqual(docked);
+    expect(interpolateTravel(docking(0.9), docking(0.1, HUB), 0.5).progress).toBe(0.1);
   });
 });
 

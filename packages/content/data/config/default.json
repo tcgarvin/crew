@@ -15,7 +15,8 @@
     "openSeconds": 0.75,
     "closeSeconds": 0.75,
     "autoCloseAfterSeconds": 3,
-    "manualOpenSeconds": 4
+    "manualOpenSeconds": 4,
+    "rampOpenSeconds": 2
   },
   "needs": {
     "hungerPerSecond": 0.000833,

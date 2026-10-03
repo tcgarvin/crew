@@ -2,6 +2,7 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.kessler_drift",
   "name": "Kessler Drift",
+  "setting": "station",
   "description": "A mining outpost bolted to a nickel-iron asteroid; bare corridors, docked ore haulers, and a market that only wants to talk about ore prices.",
   "character": "Kessler Drift is miners and the people who service miners: shift crews on rotation, assay clerks, a fabrication shop that will weld anything for the right price. They want ore prices up, parts in, and no surprises on the dock. The Drift is known for hard work, thin margins, and a canteen where every conversation is about the next shift or the last accident.",
   "castSeed": [

@@ -2,6 +2,7 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.crossroads_hub",
   "name": "Crossroads Hub",
+  "setting": "station",
   "description": "A crowded transfer station at the junction of three trade lanes; docking queues, blaring announcements, and a market that never quite closes.",
   "character": "Everyone at the Hub is on their way somewhere else, and the people who live here make a living off that: brokers, berth agents, dockside cooks, anyone who can shave ten minutes off a queue for a fee. They want throughput and a quiet shift, and they have long memories for crews who hold up a berth. The Hub is known for its queue board, its all-hours market, and for being the place you go when you need a ship to anywhere.",
   "castSeed": [

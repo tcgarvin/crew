@@ -32,6 +32,7 @@ import type {
   LocalKey,
   MachineDefId,
   MachineId,
+  PortDefId,
   TraitDefId,
 } from "./ids";
 import type { DoorPhysicalState } from "./ship";
@@ -220,6 +221,11 @@ export interface RenderMachine {
 export interface RenderDoor {
   readonly id: DoorId;
   readonly physicalState: DoorPhysicalState;
+  /**
+   * Dockside (D58): how far open the leaf is, 0 shut to 1 fully open, so a ramp can be drawn
+   * extending. A jammed door reads 0: it is impassable, as if shut.
+   */
+  readonly openFraction: number;
   /** Integration 1 addition: see `RenderMachine.placementKey`. */
   readonly deckId: DeckDefId;
   readonly placementKey: LocalKey;
@@ -267,6 +273,22 @@ export interface TickerEntry {
 }
 
 /**
+ * Travel as the renderer sees it. Dockside §2.2: port-bound scenery is a pure function of stage,
+ * progress and the two ports, so the frame names them.
+ */
+export interface RenderTravel {
+  readonly state: TravelStage;
+  /** Route fraction in `transit`, stage progress in the timed stages, 0 when docked. */
+  readonly progress: number;
+  /** The port being left; the port the ship is at while docked. */
+  readonly fromPortId: PortDefId;
+  /** The port being made for; the port the ship is at while docked. */
+  readonly toPortId: PortDefId;
+  /** Propulsion lost, progress halted (SD §17.1). Always false while docked. */
+  readonly drifting: boolean;
+}
+
+/**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
  * W0 decision: frames also carry `money` (HUD) and actor `name` (labels) beyond the minimum.
@@ -276,7 +298,7 @@ export interface RenderFrame {
   readonly actors: readonly RenderActor[];
   readonly machines: readonly RenderMachine[];
   readonly doors: readonly RenderDoor[];
-  readonly travel: { readonly state: TravelStage; readonly progress: number };
+  readonly travel: RenderTravel;
   /** Notable/narrative events since the previous frame, already rendered to text. */
   readonly tickerEvents: readonly TickerEntry[];
   readonly money: number;

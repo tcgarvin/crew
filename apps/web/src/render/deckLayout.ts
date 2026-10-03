@@ -9,6 +9,7 @@ import type {
   DeckDef,
   LocalKey,
   MachineDefId,
+  MachineTag,
   TileCoord,
   TileEdge,
 } from "@crew/sim";
@@ -21,18 +22,36 @@ export interface LayoutTile {
   readonly compartmentKey: string | undefined;
 }
 
-export interface LayoutDoor {
+interface LayoutDoorBase {
   readonly placementKey: LocalKey;
-  readonly kind: "interior" | "ramp";
   readonly cx: number;
   readonly cy: number;
   readonly orientation: "horizontal" | "vertical";
 }
 
+export interface InteriorLayoutDoor extends LayoutDoorBase {
+  readonly kind: "interior";
+}
+
+/**
+ * Dockside §2.6 (D58): a ramp knows which one it is (the cargo ramp is a plate, the personnel
+ * ramp a gangway) and which way is out of the hull, so it can be drawn extending.
+ */
+export interface RampLayoutDoor extends LayoutDoorBase {
+  readonly kind: "ramp";
+  readonly role: "cargo" | "personnel";
+  /** Unit vector pointing out of the hull, in deck coordinates. */
+  readonly out: { readonly x: number; readonly y: number };
+}
+
+export type LayoutDoor = InteriorLayoutDoor | RampLayoutDoor;
+
 export interface LayoutMachine {
   readonly placementKey: LocalKey;
   readonly defId: MachineDefId;
   readonly name: string;
+  /** D58: the def's tags, so the hull can find the engines for the plume. */
+  readonly tags: readonly MachineTag[];
   readonly footprint: readonly TileCoord[];
   readonly center: { readonly x: number; readonly y: number };
 }
@@ -88,6 +107,13 @@ function doorCentre(edge: TileEdge): {
       return { cx: edge.x + 1, cy: edge.y + 0.5, orientation: "vertical" };
   }
 }
+
+const OUTWARD: Readonly<Record<TileEdge["side"], { x: number; y: number }>> = {
+  n: { x: 0, y: -1 },
+  s: { x: 0, y: 1 },
+  w: { x: -1, y: 0 },
+  e: { x: 1, y: 0 },
+};
 
 /** Canonical key for an edge, so `{x,y,n}` and `{x,y-1,s}` compare equal. */
 export function edgeKey(edge: TileEdge): string {
@@ -195,7 +221,17 @@ export function buildDeckLayout(deck: DeckDef, content: ContentBundle): DeckLayo
 
   const doors: LayoutDoor[] = deck.doors.map((d) => {
     const { cx, cy, orientation } = doorCentre(d.edge);
-    return { placementKey: d.key, kind: d.kind, cx, cy, orientation };
+    if (d.kind === "interior") return { placementKey: d.key, kind: d.kind, cx, cy, orientation };
+    const role = d.key === deck.docking.personnelRampDoorKey ? "personnel" : "cargo";
+    return {
+      placementKey: d.key,
+      kind: d.kind,
+      role,
+      out: OUTWARD[d.edge.side],
+      cx,
+      cy,
+      orientation,
+    };
   });
 
   const machines: LayoutMachine[] = deck.machines.map((placement) => {
@@ -211,6 +247,7 @@ export function buildDeckLayout(deck: DeckDef, content: ContentBundle): DeckLayo
       placementKey: placement.key,
       defId: placement.machineDefId,
       name: def?.name ?? placement.machineDefId,
+      tags: def?.tags ?? [],
       footprint,
       center: { x: cx, y: cy },
     };

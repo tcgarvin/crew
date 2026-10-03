@@ -16,6 +16,11 @@ import type {
   RenderMachineState,
 } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
+import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
+import { drawRamps } from "./ramps";
+import type { Scene } from "./scene";
+import { type SceneryFrame, drawBerth, drawFarScenery, drawForeground, drawSky } from "./scenery";
+import { type StarLayer, drawStars } from "./stars";
 
 export interface ViewTransform {
   readonly scale: number;
@@ -36,14 +41,14 @@ export function shouldRotate(
 }
 
 /**
- * Fit the deck's tile grid into a CSS-pixel viewport, centred, with padding. When `rotated`, the
+ * Fit `bounds` (tile units) into a CSS-pixel viewport, centred, with padding. When `rotated`, the
  * fit is computed against the viewport's dimensions swapped (the deck is drawn in its own
  * landscape space, then the whole canvas is rotated 90° — see `drawFrame`).
  */
 export function computeFitTransform(
   viewportWidth: number,
   viewportHeight: number,
-  layout: Pick<DeckLayout, "width" | "height">,
+  bounds: Bounds,
   rotated: boolean,
   padding = 12,
 ): ViewTransform {
@@ -51,10 +56,29 @@ export function computeFitTransform(
   const fitH = rotated ? viewportWidth : viewportHeight;
   const availW = Math.max(1, fitW - padding * 2);
   const availH = Math.max(1, fitH - padding * 2);
-  const scale = Math.min(availW / layout.width, availH / layout.height);
-  const offsetX = (fitW - layout.width * scale) / 2;
-  const offsetY = (fitH - layout.height * scale) / 2;
+  const boundsW = bounds.maxX - bounds.minX;
+  const boundsH = bounds.maxY - bounds.minY;
+  const scale = Math.min(availW / boundsW, availH / boundsH);
+  const offsetX = (fitW - boundsW * scale) / 2 - bounds.minX * scale;
+  const offsetY = (fitH - boundsH * scale) / 2 - bounds.minY * scale;
   return { scale, offsetX, offsetY };
+}
+
+/** Margin around the hull in flight, tiles: room for scenery to show past the ship (D58). */
+export const FLIGHT_MARGIN_TILES = 1;
+
+/**
+ * Dockside §2.7: in flight the camera frames the whole hull, nose to bells, with a margin. The
+ * docked fit (ship plus dock map) waits for phase 2, so phase 1 always uses this one.
+ */
+export function flightBounds(hull: Pick<HullGeometry, "bounds">): Bounds {
+  const { minX, minY, maxX, maxY } = hull.bounds;
+  return {
+    minX: minX - FLIGHT_MARGIN_TILES,
+    minY: minY - FLIGHT_MARGIN_TILES,
+    maxX: maxX + FLIGHT_MARGIN_TILES,
+    maxY: maxY + FLIGHT_MARGIN_TILES,
+  };
 }
 
 function toPx(t: ViewTransform, x: number, y: number): readonly [number, number] {
@@ -603,6 +627,43 @@ export function drawActorLabels(
   }
 }
 
+/** Dockside (D58): what `drawFrame` needs for everything outside the deck itself. */
+export interface Scenery {
+  readonly scene: Scene;
+  readonly hull: HullGeometry;
+  readonly stars: readonly StarLayer[];
+  /** The client star accumulator's offset, CSS pixels. */
+  readonly starScrollPx: number;
+  /** Scene plume times the engines' output. */
+  readonly plume: number;
+  /** -1..1 wobble for the plume (0 under reduced motion). */
+  readonly flicker: number;
+}
+
+/** The fit-space rectangle the canvas shows, in tile units. */
+function visibleTiles(t: ViewTransform, fitW: number, fitH: number): Bounds {
+  return {
+    minX: -t.offsetX / t.scale,
+    minY: -t.offsetY / t.scale,
+    maxX: (fitW - t.offsetX) / t.scale,
+    maxY: (fitH - t.offsetY) / t.scale,
+  };
+}
+
+/** Run `draw` with the context in deck tile units (inside any rotation already applied). */
+function inTileSpace(ctx: CanvasRenderingContext2D, t: ViewTransform, draw: () => void): void {
+  ctx.save();
+  ctx.translate(t.offsetX, t.offsetY);
+  ctx.scale(t.scale, t.scale);
+  draw();
+  ctx.restore();
+}
+
+/**
+ * One canvas frame, back to front (dockside §2.3): sky, stars, far scenery, the berth, plume and
+ * hull, the deck (rooms, walls, ramps, doors, machines), the foreground; then, upright in screen
+ * space, labels, items and people. The portrait rotation applies to every layer.
+ */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
@@ -611,11 +672,22 @@ export function drawFrame(
   viewportWidth: number,
   viewportHeight: number,
   rotated: boolean,
+  scenery: Scenery,
   selected?: { kind: "actor" | "machine" | "item"; id: string },
 ): void {
+  const { scene, hull } = scenery;
   ctx.clearRect(0, 0, viewportWidth, viewportHeight);
-  ctx.fillStyle = "#0a0e14";
+  ctx.fillStyle = scene.skyColor;
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+  const fitW = rotated ? viewportHeight : viewportWidth;
+  const fitH = rotated ? viewportWidth : viewportHeight;
+  const sceneryFrame: SceneryFrame = {
+    width: layout.width,
+    height: layout.height,
+    view: visibleTiles(t, fitW, fitH),
+    px: 1 / t.scale,
+  };
 
   ctx.save();
   if (rotated) {
@@ -626,14 +698,32 @@ export function drawFrame(
     ctx.translate(viewportWidth, 0);
     ctx.rotate(Math.PI / 2);
   }
+  inTileSpace(ctx, t, () => drawSky(ctx, scene, sceneryFrame));
+  drawStars(
+    ctx,
+    scenery.stars,
+    { x: 0, y: 0, width: fitW, height: fitH },
+    scenery.starScrollPx,
+    scene.starSpeed,
+    scene.starAlpha,
+  );
+  inTileSpace(ctx, t, () => {
+    drawFarScenery(ctx, scene, sceneryFrame);
+    drawBerth(ctx, scene, sceneryFrame);
+    drawPlume(ctx, hull, scenery.plume, scenery.flicker);
+    drawHull(ctx, hull, sceneryFrame.px);
+    drawRamps(ctx, layout, frame, sceneryFrame.px);
+  });
   drawCompartments(ctx, t, layout);
   drawWalls(ctx, t, layout);
   drawDoors(ctx, t, layout, frame);
   drawMachines(ctx, t, layout, frame, selected?.kind === "machine" ? selected.id : undefined);
+  inTileSpace(ctx, t, () => drawForeground(ctx, scene, sceneryFrame));
   ctx.restore();
 
   // Everything with text (and the dots and crates that text and badges sit on) is drawn after
   // `ctx.restore()`, in real screen space, so labels stay upright under rotation (task item 5).
+  // They sit above the foreground too, so bay walls and clouds never hide the crew.
   drawCompartmentLabels(ctx, t, layout, rotated, viewportWidth);
   drawMachineLabels(ctx, t, layout, rotated, viewportWidth);
   drawDeckItems(

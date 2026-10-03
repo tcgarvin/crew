@@ -1166,6 +1166,10 @@
             "type": "string",
             "minLength": 1
           },
+          "setting": {
+            "type": "string",
+            "enum": ["station", "planet"]
+          },
           "description": {
             "type": "string"
           },
@@ -1317,6 +1321,7 @@
         "required": [
           "id",
           "name",
+          "setting",
           "description",
           "character",
           "castSeed",
@@ -1574,9 +1579,19 @@
             "manualOpenSeconds": {
               "type": "number",
               "exclusiveMinimum": 0
+            },
+            "rampOpenSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
             }
           },
-          "required": ["openSeconds", "closeSeconds", "autoCloseAfterSeconds", "manualOpenSeconds"],
+          "required": [
+            "openSeconds",
+            "closeSeconds",
+            "autoCloseAfterSeconds",
+            "manualOpenSeconds",
+            "rampOpenSeconds"
+          ],
           "additionalProperties": false
         },
         "needs": {

@@ -2,6 +2,7 @@
   "$schema": "../../schema-json/port.schema.json",
   "id": "port.vesper_gate",
   "name": "Vesper Gate",
+  "setting": "station",
   "description": "A hospice and retreat station beyond Green Meridian; dim corridors, a chapel that doubles as a dock lounge, and a market that mostly sells what the sick need.",
   "character": "Vesper Gate is wardens, physicians and the people who came to sit with someone and stayed: pilgrims, mourners, a few who took vows and a few who are only hiding. They want quiet, respect for the dying, and ships that leave on time and do not make a fuss. The Gate is known for its hospice, for funerals held in the long gallery with the viewport open, and for making the best medical kits on the lanes.",
   "castSeed": [

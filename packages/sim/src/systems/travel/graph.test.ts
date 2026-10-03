@@ -14,6 +14,7 @@ function port(id: string, routes: readonly [string, number][]): PortDef {
   return {
     id: id as PortDefId,
     name: id,
+    setting: "station",
     description: "",
     character: "",
     castSeed: [],

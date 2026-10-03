@@ -256,6 +256,7 @@ export function w5Content(
       [W5.port]: {
         id: W5.port,
         name: "W5 Dock",
+        setting: "station",
         description: "A dock.",
         character: "A dock.",
         castSeed: [],

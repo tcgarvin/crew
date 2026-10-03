@@ -489,3 +489,24 @@ scripted presences; the staging hook is guaranteed and gates arrival, and its fa
 to the sim's floor set instead of pausing the game (an exception to D43); cards are delivered
 where the captain meets the speaker, superseding D42's wait-for-dock. Each phase records its own
 entries as it lands.
+
+**D58. Phase 1 of Dockside: the world moves past the ship.** The render frame's travel names both
+ports at every stage (the dock's port at both ends while docked, so neither id is ever optional)
+and `drifting` (false docked). `RenderDoor` also gains `openFraction`, beyond the plan's three
+fields, so a ramp is drawn by how far it really is open rather than by a client-side guess; a
+jammed door reads shut. Powered ramps travel open and shut in `doors.rampOpenSeconds` (2 s), and
+the schematic estimate uses it; hand-opening is unchanged. `PortDef.setting` is `station` or
+`planet`: Tern's Rest and Green Meridian, rewritten as a farming world with a small spaceport.
+`sceneAt` (`apps/web/src/render/scene.ts`) is pure in stage, progress, the ports and
+reduced motion; beside the planned channels it carries `altitude` (the planet's ground scales
+with it), `portAlpha` (the reduced-motion cross-fade), `cloudScroll` and `dust`. The berth offset
+is in deck lengths and only ever increases from approach to departure. Stars scroll at real time
+times `starSpeed` and stop when paused, not faster at 8x. The canvas runs its own animation loop
+and redraws only while stars or plume move or something changed; playback interpolates travel
+progress within one stage so the berth slides smoothly between 10 Hz frames. The foreground is
+drawn under the dots and labels, so walls and clouds never hide a person. In flight the camera
+frames the whole hull plus a tile; on a portrait phone the deck is about 15% smaller than
+before. No offscreen caching: a frame measured under 1 ms on desktop; revisit after the phone
+playtest. Powered ramps still auto-close a few seconds after opening, as all powered doors do, so
+docked ramps lower and retract rather than staying down; that is phase 2's to settle with the
+dock.

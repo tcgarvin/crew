@@ -63,7 +63,13 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       loadSpeedPerKg: 0.01,
       loadSpeedFloor: 0.5,
     },
-    doors: { openSeconds: 1, closeSeconds: 1, autoCloseAfterSeconds: 3, manualOpenSeconds: 4 },
+    doors: {
+      openSeconds: 1,
+      closeSeconds: 1,
+      autoCloseAfterSeconds: 3,
+      manualOpenSeconds: 4,
+      rampOpenSeconds: 2,
+    },
     needs: {
       hungerPerSecond: 0.001,
       fatiguePerSecondAwake: 0.001,
@@ -314,6 +320,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
       [PORTS.a]: {
         id: PORTS.a,
         name: "Alpha Station",
+        setting: "station",
         description: "The home port.",
         character: "The home port.",
         castSeed: [],
@@ -339,6 +346,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
       [PORTS.b]: {
         id: PORTS.b,
         name: "Beta Yard",
+        setting: "station",
         description: "A midway yard.",
         character: "A midway yard.",
         castSeed: [],
@@ -356,6 +364,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
       [PORTS.c]: {
         id: PORTS.c,
         name: "Gamma Ring",
+        setting: "station",
         description: "The far ring.",
         character: "The far ring.",
         castSeed: [],
@@ -374,6 +383,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
       [PORTS.d]: {
         id: PORTS.d,
         name: "Delta Spur",
+        setting: "station",
         description: "A spur beyond the ring.",
         character: "A spur beyond the ring.",
         castSeed: [],

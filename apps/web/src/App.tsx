@@ -592,7 +592,14 @@ export function App() {
         </div>
       )}
       <div className="main-area">
-        <DeckCanvas layout={layout} frame={frame} selected={selection} onSelect={onSelect} />
+        <DeckCanvas
+          layout={layout}
+          ports={bundle.ports}
+          frame={frame}
+          paused={paused}
+          selected={selection}
+          onSelect={onSelect}
+        />
         <Log
           entries={visible}
           cardText={logCardText}

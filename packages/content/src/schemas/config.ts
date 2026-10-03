@@ -31,6 +31,7 @@ export const configDefSchema = z.strictObject({
     closeSeconds: positive,
     autoCloseAfterSeconds: positive,
     manualOpenSeconds: positive,
+    rampOpenSeconds: positive,
   }),
   needs: z.strictObject({
     hungerPerSecond: nonNegative,

@@ -5,7 +5,7 @@
  * interpolation math is unit-testable; `runPlaybackLoop` is the thin `requestAnimationFrame`
  * driver used in the browser.
  */
-import type { RenderActor, RenderFrame } from "@crew/sim";
+import type { RenderActor, RenderFrame, RenderTravel } from "@crew/sim";
 
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -23,8 +23,9 @@ export function lerpAngle(a: number, b: number, t: number): number {
 /**
  * Interpolate between two frames at `t` in [0, 1]. Actors are matched by id; an actor present in
  * only one of the two frames (spawned/despawned) is passed through unchanged rather than
- * interpolated. Non-positional fields (machines, doors, ticker, money, travel, items, headline)
- * snap to `next` at t > 0, matching D7 (truth, not a smoothed guess).
+ * interpolated. Non-positional fields (machines, doors, ticker, money, items, headline) snap to
+ * `next` at t > 0, matching D7 (truth, not a smoothed guess). Travel progress is positional for
+ * the scenery (D58), so it is interpolated within one stage of one leg and snaps otherwise.
  */
 export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number): RenderFrame {
   const clamped = Math.max(0, Math.min(1, t));
@@ -49,12 +50,26 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     actors,
     machines: next.machines,
     doors: next.doors,
-    travel: next.travel,
+    travel: interpolateTravel(prev.travel, next.travel, clamped),
     money: next.money,
     tickerEvents: next.tickerEvents,
     items: next.items,
     headline: next.headline,
   };
+}
+
+/**
+ * D58: the berth slides with stage progress, and frames come every 100 sim-ms, so a snapped
+ * progress would step the scenery visibly. Interpolate only between two frames of the same stage
+ * and leg; across a stage change the next frame's value is the truth.
+ */
+export function interpolateTravel(prev: RenderTravel, next: RenderTravel, t: number): RenderTravel {
+  const sameStretch =
+    prev.state === next.state &&
+    prev.fromPortId === next.fromPortId &&
+    prev.toPortId === next.toPortId;
+  if (!sameStretch) return next;
+  return { ...next, progress: lerp(prev.progress, next.progress, t) };
 }
 
 export interface PlaybackStep {

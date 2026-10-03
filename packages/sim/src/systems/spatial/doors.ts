@@ -55,9 +55,22 @@ export function doorWillOpen(state: ReadonlyWorldState, door: Door, nav: NavDoor
  * operation is passable only if authored open. Used for planning and estimates.
  */
 export function schematicDoorSeconds(nav: NavDoor, config: ConfigDef): number | null {
-  if (nav.placement.powerDomain !== undefined) return config.doors.openSeconds;
+  if (nav.placement.powerDomain !== undefined) return poweredTravelSeconds(nav, config, "open");
   if (nav.placement.manualOperationSupported) return config.doors.manualOpenSeconds;
   return nav.placement.initialState === "open" ? 0 : null;
+}
+
+/**
+ * D58: seconds a powered leaf takes to travel. A ramp is a heavy plate and takes
+ * `rampOpenSeconds` either way; other doors use `openSeconds`/`closeSeconds`.
+ */
+function poweredTravelSeconds(
+  nav: NavDoor,
+  config: ConfigDef,
+  direction: "open" | "close",
+): number {
+  if (nav.placement.kind === "ramp") return config.doors.rampOpenSeconds;
+  return direction === "open" ? config.doors.openSeconds : config.doors.closeSeconds;
 }
 
 function transition(ctx: StepCtx, door: Door, to: DoorPhysicalState, progress: number): void {
@@ -105,7 +118,9 @@ export function updateDoor(ctx: StepCtx, door: Door, nav: NavDoor): void {
         return;
       }
       if (!powered && !byHand) return; // Holds mid-transition.
-      const seconds = powered ? config.doors.openSeconds : config.doors.manualOpenSeconds;
+      const seconds = powered
+        ? poweredTravelSeconds(nav, config, "open")
+        : config.doors.manualOpenSeconds;
       if (step(ctx, door, seconds)) {
         transition(ctx, door, "open", 0);
         if (powered) door.closeAfterTick = ctx.tick + autoCloseTicks;
@@ -132,7 +147,7 @@ export function updateDoor(ctx: StepCtx, door: Door, nav: NavDoor): void {
         }
         return;
       }
-      if (powered && step(ctx, door, config.doors.closeSeconds)) {
+      if (powered && step(ctx, door, poweredTravelSeconds(nav, config, "close"))) {
         transition(ctx, door, "closed", 0);
       }
       return;

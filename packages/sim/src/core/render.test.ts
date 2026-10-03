@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { tinyTestWorld } from "./fixtures/test-world";
 import { TINY } from "./fixtures/tiny-content";
-import { formatEta, renderItems, shipHeadline } from "./render";
+import { doorOpenFraction, formatEta, renderItems, renderTravel, shipHeadline } from "./render";
 import type { ItemId, JobId, ProblemId } from "./types/ids";
 import type { WorldState } from "./types/state";
 import type { Job, JobPassage } from "./types/travel";
@@ -214,6 +214,57 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe(
       "Docked at Far Dock — unloading cargo (1 of 3 crates ashore)",
     );
+  });
+});
+
+describe("renderTravel", () => {
+  it("names the dock's port as both ends while docked, never drifting", () => {
+    expect(
+      renderTravel({ stage: "docked", portId: TINY.port2, plannedDestinationId: TINY.port3 }),
+    ).toEqual({
+      state: "docked",
+      progress: 0,
+      fromPortId: TINY.port2,
+      toPortId: TINY.port2,
+      drifting: false,
+    });
+  });
+
+  it("carries both ports, stage progress and drifting under way", () => {
+    const { world } = tinyTestWorld();
+    underway(world.state, "docking");
+    if (world.state.travel.stage === "docked") throw new Error("expected under way");
+    world.state.travel.stageProgress = 0.4;
+    world.state.travel.drifting = true;
+    expect(renderTravel(world.state.travel)).toEqual({
+      state: "docking",
+      progress: 0.4,
+      fromPortId: TINY.port,
+      toPortId: TINY.port2,
+      drifting: true,
+    });
+  });
+
+  it("reports route progress as the fraction in transit", () => {
+    const { world } = tinyTestWorld();
+    underway(world.state, "transit", 12);
+    expect(renderTravel(world.state.travel)).toMatchObject({
+      state: "transit",
+      progress: 12 / 30,
+      fromPortId: TINY.port,
+      toPortId: TINY.port2,
+      drifting: false,
+    });
+  });
+});
+
+describe("doorOpenFraction", () => {
+  it("reads 0 shut or jammed, 1 open, and the leaf's travel in between", () => {
+    expect(doorOpenFraction({ physicalState: "closed", transitionProgress: 0 })).toBe(0);
+    expect(doorOpenFraction({ physicalState: "jammed", transitionProgress: 0.6 })).toBe(0);
+    expect(doorOpenFraction({ physicalState: "open", transitionProgress: 0 })).toBe(1);
+    expect(doorOpenFraction({ physicalState: "opening", transitionProgress: 0.25 })).toBe(0.25);
+    expect(doorOpenFraction({ physicalState: "closing", transitionProgress: 0.25 })).toBe(0.75);
   });
 });
 

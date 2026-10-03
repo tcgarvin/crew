@@ -1,23 +1,31 @@
-import type { RenderFrame } from "@crew/sim";
+import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
 /**
- * Canvas host component (PLAN §6 W7). Fits the deck to the viewport (devicePixelRatio-aware),
- * redraws on every new frame, and turns taps/clicks into entity selection for the inspector.
+ * Canvas host component (PLAN §6 W7). Fits the ship to the viewport (devicePixelRatio-aware),
+ * draws on animation frames, and turns taps/clicks into entity selection for the inspector.
  * Pan/zoom is explicitly not required (task brief).
  *
  * Integration 1: takes the real `DeckLayout` (derived from `@crew/content`'s `DeckDef`) instead
  * of the mock geometry, and rotates the canvas 90° on portrait viewports so a landscape deck
  * still fills the width (task item 5).
+ *
+ * Dockside (D58): the canvas runs its own animation loop, because the stars stream and the plume
+ * flickers between sim frames. It redraws only while something moves (stars, plume) or when the
+ * frame, selection or size changes, so a paused game at the dock costs nothing.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type DeckLayout,
   type ViewTransform,
   computeFitTransform,
   deckPiles,
   drawFrame,
+  flightBounds,
   screenToWorld,
   shouldRotate,
 } from "./draw";
+import { engineOutput, hullGeometry } from "./hull";
+import { sceneAt } from "./scene";
+import { StarScroll, buildStarField } from "./stars";
 
 export interface Selection {
   readonly kind: "actor" | "machine" | "item";
@@ -26,7 +34,11 @@ export interface Selection {
 
 export interface DeckCanvasProps {
   readonly layout: DeckLayout;
+  /** The content's ports, for each one's setting (station or planet). */
+  readonly ports: Readonly<Record<PortDefId, PortDef>>;
   readonly frame: RenderFrame | undefined;
+  /** The game is paused: the stars and plume hold still with it. */
+  readonly paused: boolean;
   readonly selected: Selection | undefined;
   readonly onSelect: (selection: Selection | undefined) => void;
 }
@@ -35,12 +47,34 @@ const HIT_RADIUS_TILES = 0.8;
 /** Crates sit on a tile; tapping anywhere near its square selects the pile's top item. */
 const ITEM_HIT_RADIUS_TILES = 0.5;
 
-export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProps) {
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+/** -1..1, a slow uneven wobble for the plume's length. */
+function plumeFlicker(nowMs: number): number {
+  return Math.sin(nowMs / 37) * 0.6 + Math.sin(nowMs / 13) * 0.4;
+}
+
+export function DeckCanvas({ layout, ports, frame, paused, selected, onSelect }: DeckCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<ViewTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const sizeRef = useRef({ width: 0, height: 0 });
   const rotatedRef = useRef(false);
+  const hull = useMemo(() => hullGeometry(layout), [layout]);
+  const stars = useMemo(() => buildStarField(), []);
+  const scrollRef = useRef(new StarScroll());
+  /** Bumped whenever the picture must be redrawn even if nothing is animating. */
+  const dirtyRef = useRef(true);
+  const latest = useRef({ frame, selected, paused });
+
+  useEffect(() => {
+    latest.current = { frame, selected, paused };
+    dirtyRef.current = true;
+  }, [frame, selected, paused]);
 
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -57,8 +91,14 @@ export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProp
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rotatedRef.current = shouldRotate(width, height, layout);
-    transformRef.current = computeFitTransform(width, height, layout, rotatedRef.current);
-  }, [layout]);
+    transformRef.current = computeFitTransform(
+      width,
+      height,
+      flightBounds(hull),
+      rotatedRef.current,
+    );
+    dirtyRef.current = true;
+  }, [layout, hull]);
 
   useEffect(() => {
     resize();
@@ -72,21 +112,58 @@ export function DeckCanvas({ layout, frame, selected, onSelect }: DeckCanvasProp
   }, [resize]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!ctx || !frame) return;
-    const { width, height } = sizeRef.current;
-    drawFrame(
-      ctx,
-      transformRef.current,
-      layout,
-      frame,
-      width,
-      height,
-      rotatedRef.current,
-      selected,
-    );
-  }, [frame, selected, layout]);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    let reducedMotion = prefersReducedMotion();
+    const media = window.matchMedia(REDUCED_MOTION_QUERY);
+    const onMotionChange = (event: MediaQueryListEvent) => {
+      reducedMotion = event.matches;
+      dirtyRef.current = true;
+    };
+    media.addEventListener("change", onMotionChange);
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const delta = now - last;
+      last = now;
+      const { frame: current, selected: chosen, paused: still } = latest.current;
+      if (current !== undefined) {
+        const scene = sceneAt(current.travel, ports, { reducedMotion });
+        const streaming = !still && scene.starSpeed > 0 && scene.starAlpha > 0;
+        const plume = scene.plume * engineOutput(current, layout);
+        const flickering = !still && !reducedMotion && plume > 0.01;
+        scrollRef.current.advance(delta, still ? 0 : scene.starSpeed);
+        if (streaming || flickering || dirtyRef.current) {
+          dirtyRef.current = false;
+          const { width, height } = sizeRef.current;
+          drawFrame(
+            ctx,
+            transformRef.current,
+            layout,
+            current,
+            width,
+            height,
+            rotatedRef.current,
+            {
+              scene,
+              hull,
+              stars,
+              starScrollPx: scrollRef.current.offsetPx,
+              plume,
+              flicker: flickering ? plumeFlicker(now) : 0,
+            },
+            chosen,
+          );
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      media.removeEventListener("change", onMotionChange);
+    };
+  }, [layout, ports, hull, stars]);
 
   const handlePointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {

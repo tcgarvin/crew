@@ -1,9 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { configTicks } from "../../core/clock";
+import { tinyConfig, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
+import { createKernel } from "../../core/kernel";
+import { createRegistry } from "../../core/registry";
 import type { SimEvent } from "../../core/types/events";
-import { JON, MARA, deck12World, doorByKey, place } from "./fixtures/deck-12x8";
+import {
+  DECK12,
+  JON,
+  MARA,
+  deck12Content,
+  deck12World,
+  doorByKey,
+  place,
+} from "./fixtures/deck-12x8";
 import { stepChecked } from "./fixtures/helpers";
+import { registerSpatial } from "./index";
 import { requestMove } from "./movement";
+
+/** The 12×8 deck with powered `doorB` authored as a ramp (D58). */
+function rampWorld() {
+  const config = tinyConfig();
+  const content = deck12Content(config);
+  const deck = content.decks[DECK12.deck];
+  if (deck === undefined) throw new Error("no deck12");
+  const doors = deck.doors.map((d) => (d.key === "doorB" ? { ...d, kind: "ramp" as const } : d));
+  const registry = createRegistry();
+  registerSpatial(registry);
+  const kernel = createKernel(registry);
+  const world = kernel.createWorld(
+    DECK12.scenario,
+    7,
+    { ...content, decks: { ...content.decks, [DECK12.deck]: { ...deck, doors } } },
+    tinyEffectiveConfig(config),
+  );
+  return { registry, kernel, world };
+}
 
 type World = ReturnType<typeof deck12World>["world"];
 
@@ -140,5 +171,27 @@ describe("doors", () => {
     expect(doorC.physicalState).toBe("jammed");
     expect(doorChanges(events)).toEqual([]);
     expect(requestMove(world.state, MARA, { x: 9, y: 2 }, world.caches, config)).toBe(false);
+  });
+
+  it("a powered ramp travels open and shut in rampOpenSeconds (D58)", () => {
+    const test = rampWorld();
+    const { world } = test;
+    const config = world.config.values;
+    expect(config.doors.rampOpenSeconds).not.toBe(config.doors.openSeconds);
+    const ramp = door(world, "doorB");
+    expect(ramp.kind).toBe("ramp");
+    ramp.requestedState = "open";
+    // Open, then the powered auto-close shuts it again: both legs take the ramp's time.
+    const changes = doorChanges(stepChecked(test, 400));
+    expect(changes.map((c) => `${c.from}>${c.to}`)).toEqual([
+      "closed>opening",
+      "opening>open",
+      "open>closing",
+      "closing>closed",
+    ]);
+    const [opening = 0, open = 0, closing = 0, closed = 0] = changes.map((c) => c.tick);
+    const rampTicks = configTicks(config, config.doors.rampOpenSeconds);
+    expect(open - opening).toBe(rampTicks);
+    expect(closed - closing).toBe(rampTicks);
   });
 });
