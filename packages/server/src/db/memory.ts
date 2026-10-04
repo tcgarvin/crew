@@ -91,13 +91,7 @@ export class MemoryDb implements Db {
     const game = this.requireGame(input.gameId);
     const row: SaveRow = {
       id: randomUUID(),
-      gameId: input.gameId,
-      blob: input.blob,
-      schemaVersion: input.schemaVersion,
-      simVersion: input.simVersion,
-      contentHash: input.contentHash,
-      savedAtTick: input.savedAtTick,
-      isMilestone: input.isMilestone,
+      ...input,
       createdAt: new Date(),
       seq: this.nextSaveSeq++,
     };
