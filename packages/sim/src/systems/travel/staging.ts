@@ -32,10 +32,7 @@ import {
 } from "../../core/types/dockside";
 import type { ItemDefId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
-import type { TravelStage, TravelState } from "../../core/types/travel";
-
-/** Travel away from the dock: the stage objects that carry route progress. */
-type InFlight = Extract<TravelState, { stage: Exclude<TravelStage, "docked"> }>;
+import type { InFlight } from "./travel";
 
 /** The lead point: route distance left at which the staging call is raised. */
 function leadDistance(ctx: Pick<StepCtx, "config">): number {

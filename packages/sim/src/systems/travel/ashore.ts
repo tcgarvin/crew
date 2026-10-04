@@ -26,7 +26,6 @@ import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { DoorId, PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
-import type { TravelStage, TravelState } from "../../core/types/travel";
 import { dockRamps, rampLanding, rampTop } from "../spatial/dock";
 import { deckGeometry } from "../spatial/geometry";
 import { centre } from "../spatial/movement";
@@ -34,11 +33,9 @@ import { releaseReservations } from "../spatial/reservations";
 import { backoffRef, isBackingOff, isOutThroughGate } from "../work/activity";
 import { abortActivity } from "../work/execute";
 import { truckCapacity } from "../work/truck";
+import type { InFlight } from "./travel";
 
 type Ctx = StepCtx;
-
-/** Travel in a stage away from `docked`; these helpers run in `preparingDeparture`. */
-type PrepTravel = Extract<TravelState, { stage: Exclude<TravelStage, "docked"> }>;
 
 const COME_ABOARD_REF = backoffRef.personal("comeAboard");
 
@@ -162,7 +159,7 @@ function bringAboard(ctx: Ctx, actor: Actor, portId: PortDefId): void {
  * call's clock, bring aboard whoever cannot walk (everyone still on the dock once the clock has
  * run out), and call the rest. A passenger walking off is never carried back.
  */
-export function recallAshore(ctx: Ctx, travel: PrepTravel, ashore: readonly Actor[]): void {
+export function recallAshore(ctx: Ctx, travel: InFlight, ashore: readonly Actor[]): void {
   travel.recallSinceTick ??= ctx.tick;
   const limit = configTicks(ctx.config, ctx.config.travel.recallAboardSeconds);
   const overdue = ctx.tick - travel.recallSinceTick >= limit;
@@ -180,7 +177,7 @@ export function recallAshore(ctx: Ctx, travel: PrepTravel, ashore: readonly Acto
 }
 
 /** Nobody is ashore any more: the next call (if anyone strays) starts a fresh clock. */
-export function endRecall(travel: PrepTravel): void {
+export function endRecall(travel: InFlight): void {
   if (travel.recallSinceTick === undefined) return;
   // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
   delete travel.recallSinceTick;

@@ -12,7 +12,10 @@ import type { DerivationCtx, DeriveTasks, TaskSpec } from "../../core/types/work
 import { rotateOffset } from "../spatial/geometry";
 
 /** Absolute `operate` tiles of a placed machine, or `[]` if it cannot be resolved. */
-export function operateTiles(ctx: DerivationCtx, machineId: MachineId): TileCoord[] {
+export function operateTiles(
+  ctx: Pick<DerivationCtx, "state" | "content">,
+  machineId: MachineId,
+): TileCoord[] {
   const machine = ctx.state.machines[machineId];
   if (machine === undefined) return [];
   const def = ctx.content.machines[machine.defId];
