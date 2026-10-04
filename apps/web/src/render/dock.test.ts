@@ -151,8 +151,9 @@ describe("dock placement", () => {
       y: -hubBerth.shipAt.y,
     });
     const start = sceneAt(travel("docking", 0, DRIFT, HUB), bundle.ports, { reducedMotion: false });
-    expect(dockSlide(start, layout.width)).toBeCloseTo(DOCKING_START_OFFSET * layout.width);
-    expect(dockOrigin(hubBerth, start, layout.width).x).toBeLessThan(-hubBerth.shipAt.x - 40);
+    // The berth is ahead (negative offset), so the dock is drawn toward the bow, +x (D72).
+    expect(dockSlide(start, layout.width)).toBeCloseTo(-DOCKING_START_OFFSET * layout.width);
+    expect(dockOrigin(hubBerth, start, layout.width).x).toBeGreaterThan(-hubBerth.shipAt.x + 40);
   });
 
   it("tells the ship's floor from the dock's, negative coordinates included", () => {
@@ -203,12 +204,12 @@ describe("dock to screen and back", () => {
       const t = computeFitTransform(width, height, cameraBounds(hull, hubBerth, 1), rotated);
       for (const post of hubDock.posts) {
         const p = onDeck(hubBerth, post.tile.x, post.tile.y);
-        const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, width);
+        const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, height);
         expect(sx, post.key).toBeGreaterThanOrEqual(0);
         expect(sx, post.key).toBeLessThanOrEqual(width);
         expect(sy, post.key).toBeGreaterThanOrEqual(0);
         expect(sy, post.key).toBeLessThanOrEqual(height);
-        const back = screenToWorld(t, sx, sy, rotated, width);
+        const back = screenToWorld(t, sx, sy, rotated, height);
         expect(back.x).toBeCloseTo(p.x);
         expect(back.y).toBeCloseTo(p.y);
       }
@@ -218,7 +219,7 @@ describe("dock to screen and back", () => {
         [hubDock.width, hubDock.height],
       ] as const) {
         const p = { x: x - hubBerth.shipAt.x, y: y - hubBerth.shipAt.y };
-        const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, width);
+        const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, height);
         expect(sx).toBeGreaterThanOrEqual(-0.001);
         expect(sx).toBeLessThanOrEqual(width + 0.001);
         expect(sy).toBeGreaterThanOrEqual(-0.001);
@@ -226,6 +227,22 @@ describe("dock to screen and back", () => {
       }
     });
   }
+});
+
+describe("the portrait turn (D72)", () => {
+  it("points the bow up and puts the quay on the right of a phone", () => {
+    const [width, height] = [390, 700];
+    const rotated = shouldRotate(width, height, layout);
+    expect(rotated).toBe(true);
+    const t = computeFitTransform(width, height, cameraBounds(hull, hubBerth, 1), rotated);
+    const mid = layout.height / 2;
+    const [, bowY] = toScreenPx(t, layout.width, mid, rotated, height);
+    const [, sternY] = toScreenPx(t, 0, mid, rotated, height);
+    expect(bowY).toBeLessThan(sternY);
+    const [northX] = toScreenPx(t, layout.width / 2, 0, rotated, height);
+    const [quayX] = toScreenPx(t, layout.width / 2, layout.height + 2, rotated, height);
+    expect(quayX).toBeGreaterThan(northX);
+  });
 });
 
 describe("dockTargetAt (taps on the dock)", () => {
@@ -245,7 +262,7 @@ describe("dockTargetAt (taps on the dock)", () => {
     const p = onDeck(hubBerth, staging.rect.x, staging.rect.y);
     expect(dockTargetAt(hubBerth, layout, p.x, p.y)).toEqual({ kind: "dock", id: hubDock.id });
     expect(dockTargetAt(hubBerth, layout, 5.5, 5.5)).toBeUndefined();
-    // Void beside the berth, fore of the ship.
+    // Void beside the berth, astern of the ship (−x, D72).
     expect(dockTargetAt(hubBerth, layout, -2.5, 5.5)).toBeUndefined();
   });
 });

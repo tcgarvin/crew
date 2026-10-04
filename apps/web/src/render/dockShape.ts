@@ -1,8 +1,9 @@
 /**
  * Dockside §3.1 (phase 2): what the renderer reads off a dock map once, memoized per def: the tile
  * grid as row runs per kind, the berth's box (D72: `DockDef.berth`, a size-class box of void), the
- * edges where the box meets the quay and where walls meet floor, and how the berth is drawn; `dockSurface` adds the floor's look once the
- * port's setting is known. Pure; dock frame (tile (0,0) is the map's top-left).
+ * edges where the box meets the quay and where walls meet floor, and how the berth is drawn;
+ * `dockSurface` adds the floor's look once the port's setting is known. Pure; dock frame (tile
+ * (0,0) is the map's top-left).
  */
 import { type DockDef, type DockTileKind, HULL_SIZE_BOX, type PortSetting } from "@crew/sim";
 import type { Bounds } from "./hull";
@@ -28,8 +29,10 @@ export interface FloorEdge {
 }
 
 /**
- * How the berth box is drawn where the hull does not cover it (all of it while the dock slides): a `pad` set into the floor when the quay surrounds it, an `open` slot (a bay
- * pit at a station, sky at a pier) when it mostly borders walls or void.
+ * How the berth box is drawn where the hull does not cover it (all of it while the dock slides,
+ * and the margin round a ship smaller than the box): a `pad` set into the ground when floor
+ * surrounds the box, an `open` slot (a bay pit at a station, sky at a pier) when its sides other
+ * than the quay mostly border walls or void.
  */
 export type BerthStyle = "pad" | "open";
 
@@ -143,8 +146,12 @@ function inBox(box: Bounds, x: number, y: number): boolean {
   return x >= box.minX && x < box.maxX && y >= box.minY && y < box.maxY;
 }
 
-/** The share of tiles around the berth's box that are floor. */
-function quayShare(
+/**
+ * The share of tiles bordering the berth's box on its north, west and east sides that are floor
+ * (off the map counts as not). D72: the quay along the box's south edge is always floor, so it
+ * says nothing about whether the box is a pad set into the ground or an open slot.
+ */
+function surroundShare(
   kinds: readonly DockTileKind[],
   width: number,
   height: number,
@@ -156,10 +163,7 @@ function quayShare(
     total += 1;
     if (x >= 0 && y >= 0 && x < width && y < height && kinds[y * width + x] === "floor") floor += 1;
   };
-  for (let x = berth.minX; x < berth.maxX; x++) {
-    count(x, berth.minY - 1);
-    count(x, berth.maxY);
-  }
+  for (let x = berth.minX; x < berth.maxX; x++) count(x, berth.minY - 1);
   for (let y = berth.minY; y < berth.maxY; y++) {
     count(berth.minX - 1, y);
     count(berth.maxX, y);
@@ -179,7 +183,7 @@ export function dockShape(dock: DockDef): DockShape {
     kinds,
     runs,
     berth,
-    berthStyle: quayShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
+    berthStyle: surroundShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
     quay: edgesToFloor(kinds, width, height, (x, y) => inBox(berth, x, y)),
     lips: edgesToFloor(
       kinds,
