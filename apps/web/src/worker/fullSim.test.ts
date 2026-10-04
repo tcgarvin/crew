@@ -316,9 +316,8 @@ describe(
     });
 
     // D77, W1's "done when": a 400 s spur leg is a whole watch long, so the bell rings at sea
-    // and the oncoming stander relieves the helm in transit. Skipped until W1's helm lands
-    // (Gate B's stub never emits `helmRelieved`); at integration it is unskipped as it stands.
-    it.skip("hands over the helm at sea on the 400 s Kessler–Ossory leg", () => {
+    // and the oncoming stander relieves the helm in transit.
+    it("hands over the helm at sea on the 400 s Kessler–Ossory leg", () => {
       const { kernel, world } = newGame(20261004);
       const ossory = "port.ossory_station" as PortDefId;
       const kessler = "port.kessler_drift" as PortDefId;

@@ -49,10 +49,10 @@ function stationSkills(ctx: Pick<DerivationCtx, "state" | "content">, machineId:
 
 // W6 decision: `stationToStaff` derives one `staffStation` task with no accumulated work
 // (occupancy is binary); `estimatedWorkSeconds` uses `config.travel.staffEstimateSeconds`.
-// D77: one task per post (`staff:watch`, `staff:relief`). W1 gives the watch post two slots, so
-// the oncoming stander can claim it beside the one they relieve, together with the planner rule
-// that only the stander and the oncoming may (`planner/helm.ts`): with the gate's open rule, a
-// second slot sends any idle hand to sit at the helm, off the cargo work.
+// D77: one task per post (`staff:watch`, `staff:relief`). The watch post has two slots, so the
+// oncoming stander can claim it beside the one they relieve; only the stander and the oncoming
+// may (`planner/helm.ts`, from the sim's `helmRoleOf`), so the second slot never sends an idle
+// hand to the helm.
 const deriveStationToStaff: DeriveTasks<"stationToStaff"> = (problem, ctx) => {
   const { machineId, post } = problem.payload;
   const spec: TaskSpec = {
@@ -63,7 +63,7 @@ const deriveStationToStaff: DeriveTasks<"stationToStaff"> = (problem, ctx) => {
     requiredSkills: stationSkills(ctx, machineId),
     requiredTools: [],
     consumables: [],
-    workerSlots: 1,
+    workerSlots: post === "watch" ? 2 : 1,
     interactionTiles: operateTiles(ctx, problem.payload.machineId),
     dependencyIds: [],
     progressRef: { kind: "occupancy", machineId: problem.payload.machineId },

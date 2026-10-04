@@ -28,6 +28,7 @@ import { registerSpatial } from "../../spatial/index";
 import { registerTravel } from "../../travel/index";
 import { ALL_DERIVATIONS, crewConfig, crewContent } from "../../work/fixtures/crew-deck";
 import { registerWork } from "../../work/index";
+import { registerWatch } from "../index";
 
 export const ROUNDS_DECK = {
   scenario: "scenario.test.rounds" as ScenarioDefId,
@@ -161,6 +162,8 @@ export function roundsWorld(options: RoundsWorldOptions = {}): TestWorld {
   registerSpatial(registry);
   if (options.travel === true) registerTravel(registry);
   registerNeeds(registry);
+  // D77: with travel the helm must be stood (its watch post and seat), so the watch runs too.
+  if (options.travel === true) registerWatch(registry);
   registerWork(registry, { derivations: ALL_DERIVATIONS });
   registerPlannerDefaults(registry);
   const kernel = createKernel(registry);

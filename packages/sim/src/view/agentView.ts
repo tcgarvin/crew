@@ -154,15 +154,15 @@ function interactionsByMachine(
 
 /** D77: the actor's place in the watch at the planning tick. */
 function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["watch"] {
-  const { state } = world;
   const config = world.config.values;
   const section = actor.schedule.section;
+  const helm = { state: world.state, content: world.content, config, tick };
   return {
     ...(section === undefined ? {} : { section: section.key }),
     onWatch: isOnWatch(actor.schedule, tick, config),
     dayworker: section === undefined,
-    helmRole: helmRoleOf(state, config, actor.id),
-    officerOfTheWatch: isOfficerOfTheWatch(state, config, actor.id, tick),
+    helmRole: helmRoleOf(helm, actor.id),
+    officerOfTheWatch: isOfficerOfTheWatch(helm, actor.id),
   };
 }
 

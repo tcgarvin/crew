@@ -13,15 +13,14 @@
  * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
  *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
  *   fully met while on duty; off duty they last until the planner finds something more urgent.
- * - Staffing holds until the station's problem is resolved *and* the ship is docked or in
- *   transit (the stages where travel does not check staffing), so the pilot does not walk off
- *   the moment `stationToStaff` resolves. TODO(W6): replace with an explicit "station released"
- *   signal from travel if one is added.
+ * - A helm hold (`staff`) ends when the stander is relieved or the watch post closes (D77,
+ *   `systems/watch/helm.ts`); while it lasts the stander learns piloting (`skillGainPerDay`,
+ *   capped at 10). A gangway hold ends when the ship sails or they are no longer the stander.
  * - A route that ended early (`movement.routeFailure`, W3's "replan now") fails the step:
  *   `positionTaken` → `occupiedPosition`, anything else → `unreachableTarget`.
  */
 import { rebuildItemIndexes } from "../../core/caches";
-import { configTicks, dayTicks } from "../../core/clock";
+import { configTicks, dayTicks, perDayToPerSecond } from "../../core/clock";
 import { deliverHeldCard, heldCard } from "../../core/delivery";
 import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
@@ -40,7 +39,7 @@ import { requestMove } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
 import { runPlot } from "../travel/course";
 import { isOnDuty } from "../watch/duty";
-import { gangwayHoldDone, helmHoldDone, runHandover } from "../watch/helm";
+import { gangwayHoldDone, helmHoldDone, holdsTheHelm, runHandover } from "../watch/helm";
 import { backoffRef, currentStep, isOutThroughGate } from "./activity";
 import { setBackoff } from "./backoff";
 import { isCompletionMet } from "./claims";
@@ -525,6 +524,19 @@ function runTalk(ctx: StepCtx, actor: Actor, step: StepOf<"talk">): StepResult {
 // Holds and dispatch
 // ---------------------------------------------------------------------------------------------
 
+/** Skills are levels in [0, 10] (W0); learning at the helm stops at the top. */
+const SKILL_CAP = 10;
+
+/** D77: a tick at the helm teaches piloting, `work.skillGainPerDay` a day, up to the cap. */
+function learnAtTheHelm(ctx: StepCtx, actor: Actor): void {
+  if (!holdsTheHelm(ctx, actor)) return;
+  const now = actor.skills.piloting ?? 0;
+  if (now >= SKILL_CAP) return;
+  const perTick =
+    perDayToPerSecond(ctx.config, ctx.config.work.skillGainPerDay) / ctx.config.time.tickRate;
+  actor.skills = { ...actor.skills, piloting: Math.min(SKILL_CAP, now + perTick) };
+}
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -540,7 +552,9 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
     case "socialize":
       return onDuty && actor.needs.social <= 0;
     case "staff":
-      return helmHoldDone(ctx, actor, step);
+      if (helmHoldDone(ctx, actor, step)) return true;
+      learnAtTheHelm(ctx, actor);
+      return false;
     case "gangway":
       return gangwayHoldDone(ctx, actor, step);
   }

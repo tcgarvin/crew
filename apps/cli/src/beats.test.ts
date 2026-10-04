@@ -104,8 +104,15 @@ describe("crew beats arguments", () => {
 });
 
 describe("crew beats: one ship's day of the pacing voyage (real content, every system)", () => {
+  // One run for both pins below (a ship's day of the real game takes a while).
+  let day: ReturnType<typeof runBeats> | undefined;
+  const oneDay = () => {
+    day ??= runBeats({ scenario: "freight", days: 1, seed: 1 });
+    return day;
+  };
+
   it("completes and rings three bells, one per watch", () => {
-    const result = runBeats({ scenario: "freight", days: 1, seed: 1 });
+    const result = oneDay();
     expect(result.watches).toBe(3);
     expect(result.simSeconds).toBe(result.days * 3 * result.watchSeconds);
     expect(result.beats.bells).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
@@ -119,7 +126,7 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
   }, 90_000);
 
-  // The helm is W1's (D77): until the stander is relieved at the bell nothing emits
-  // `helmRelieved`, so this pin lands with W1 at integration: `beats.handovers.total >= 1`.
-  it.todo("reports at least one handover at the helm in a one-day run (with W1's helm)");
+  it("reports at least one handover at the helm in a one-day run (D77)", () => {
+    expect(oneDay().beats.handovers.total).toBeGreaterThanOrEqual(1);
+  }, 90_000);
 });

@@ -10,7 +10,7 @@
  * "parking the hand truck" (D65), "eating", "asleep", "asleep in the <cabin>" (D74), "resting",
  * "chatting", "inspecting <machine>", "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>",
  * the watch (D77): "going to the helm", "relieving <name> at the helm" (or "taking the helm"),
- * "on the gangway", "doing rounds", and "plotting a course to <port>" (D78); and the captain
+ * "leaving the helm" (the step off the seat), "on the gangway", "doing rounds", and "plotting a course to <port>" (D78); and the captain
  * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
  * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
@@ -289,7 +289,13 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
       const rest = activity.plan.steps.slice(activity.plan.stepIndex);
       return truckWalkLabel(ctx, actor, haul.truckId, rest, step.target);
     }
-    return taskStepLabel(ctx, actor, ctx.state.work.tasks[activity.taskId], step);
+    const task = ctx.state.work.tasks[activity.taskId];
+    // D77: the step off the seat once relieved (no hold left in the plan).
+    const rest = activity.plan?.steps.slice(activity.plan.stepIndex) ?? [];
+    if (step.kind === "moveTo" && isHelmTask(ctx, task) && !rest.some((s) => s.kind === "hold")) {
+      return "leaving the helm";
+    }
+    return taskStepLabel(ctx, actor, task, step);
   }
   if (activity.activity === "lookForWork" || activity.activity === "meetSpeaker") {
     return shoreLabel(ctx, actor, activity.plan?.steps.slice(activity.plan.stepIndex) ?? [], step);

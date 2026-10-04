@@ -119,7 +119,7 @@ function engineerStops(ctx: StepCtx, actor: Actor, where: Where): TileCoord[] {
 }
 
 function stopsFor(ctx: StepCtx, actor: Actor, where: Where): TileCoord[] {
-  if (isOfficerOfTheWatch(ctx.state, ctx.config, actor.id, ctx.tick)) {
+  if (isOfficerOfTheWatch(ctx, actor.id)) {
     return officerStops(ctx, where);
   }
   if (actor.roleTags.includes("engineer")) return engineerStops(ctx, actor, where);
