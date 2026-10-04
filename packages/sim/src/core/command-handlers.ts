@@ -36,7 +36,7 @@ import type { ActorId, CommandId, DecisionId, EntityId, TempRef } from "./types/
 import type { Item } from "./types/ship";
 
 /** W2 decision: how many resolved hook IDs `narrator.recentHookIds` keeps. */
-export const RECENT_HOOK_IDS_CAP = 16;
+const RECENT_HOOK_IDS_CAP = 16;
 
 const TEMP_REF_PATTERN = /^\$[A-Za-z0-9_]+$/;
 

@@ -7,7 +7,7 @@ import { type IdHost, allocateId } from "./ids";
 import type { Tick } from "./types/common";
 import { EVENT_SIGNIFICANCE, type EventDraft, type SimEvent } from "./types/events";
 
-export interface EventBuffer {
+interface EventBuffer {
   /** Collect a draft. The only operation systems see. */
   readonly emit: (draft: EventDraft) => void;
   /**
@@ -54,11 +54,4 @@ function finalizeDraft(draft: EventDraft, id: SimEvent["id"], tick: Tick, seq: n
   return (
     draft.locationRef === undefined ? event : { ...event, locationRef: draft.locationRef }
   ) as SimEvent;
-}
-
-/** Significance rank for filtering: trace < notable < narrative. */
-export const SIGNIFICANCE_RANK = { trace: 0, notable: 1, narrative: 2 } as const;
-
-export function isNotableOrAbove(event: SimEvent): boolean {
-  return SIGNIFICANCE_RANK[event.significance] >= SIGNIFICANCE_RANK.notable;
 }

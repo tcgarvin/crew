@@ -23,7 +23,7 @@ import {
 } from "./types/pipeline";
 import type { AgentView } from "./types/view";
 
-export type AgentViewBuilder = (world: World, actorId: ActorId) => AgentView;
+type AgentViewBuilder = (world: World, actorId: ActorId) => AgentView;
 
 /** Rebuilds one workstream's derived cache from `world.state` + content (e.g. W3 nav). */
 export interface CacheBuilder {
@@ -66,7 +66,7 @@ const notImplementedBuilder: AgentViewBuilder = () => {
   throw new NotImplementedError("buildAgentView (W4a)");
 };
 
-export interface CreateRegistryOptions {
+interface CreateRegistryOptions {
   /** Register the kernel-core systems and command handlers (default true). */
   readonly core?: boolean;
 }

@@ -104,7 +104,7 @@ function withMissingConfig<T>(saved: T, defaults: T, path: string, filled: strin
   return out as T;
 }
 
-export interface RestoreOptions {
+interface RestoreOptions {
   readonly migrations?: MigrationRegistry;
 }
 

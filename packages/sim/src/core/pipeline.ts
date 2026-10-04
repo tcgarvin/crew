@@ -176,7 +176,7 @@ function runPlannerStage(
  * (`stageDock`, `captainAshore`, `notableEvent` in phase 4; `policyDecision` just before this
  * system) wins and the quiet one yields.
  */
-export const quietTimerSystem: System = {
+const quietTimerSystem: System = {
   name: "core.quietTimer",
   phase: "finalize",
   run(ctx) {
@@ -228,7 +228,7 @@ export const decisionPendingSystem: System = {
  * Index refresh (phase 2): item holder/container indexes when `dirty.inventory`, and the
  * actor-by-compartment index every tick (cheap; actors move every tick).
  */
-export const indexSystem: System = {
+const indexSystem: System = {
   name: "core.indexes",
   phase: "topology",
   run(ctx) {

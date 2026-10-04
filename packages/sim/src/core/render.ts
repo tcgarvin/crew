@@ -790,7 +790,7 @@ export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionP
 }
 
 /** D66: the locals on the dock alongside, in id order. */
-export function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
+function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
   return Object.values(state.dockside.locals)
     .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }))
     .map((local) => ({
@@ -810,10 +810,7 @@ export function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
 }
 
 /** D66: the staging plan's props on the dock alongside. */
-export function renderDockProps(
-  state: ReadonlyWorldState,
-  content: ContentBundle,
-): RenderDockProp[] {
+function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): RenderDockProp[] {
   const deckId = state.deck.dock?.deckId;
   if (deckId === undefined) return [];
   return state.dockside.props.map((prop) => {

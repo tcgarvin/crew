@@ -31,9 +31,6 @@ export const STAGING_COMMAND_KINDS = [
   "stageDock",
 ] as const satisfies readonly NarratorCommandKind[];
 
-/** The story narrator's kinds: everything but staging. */
-export type StoryCommandKind = Exclude<NarratorCommandKind, (typeof STAGING_COMMAND_KINDS)[number]>;
-
 /** Commands the narrator may send. A strict subset of `Command`, always with source `narrator`. */
 export type NarratorCommand = {
   [K in NarratorCommandKind]: CommandEnvelope<K> & { readonly source: "narrator" };

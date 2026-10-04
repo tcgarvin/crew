@@ -86,7 +86,6 @@ export interface EventEnvelope<T extends EventType = EventType> {
  * W0 decision: named `SimEvent`, not `Event`, to avoid shadowing the DOM `Event` global in web code.
  */
 export type SimEvent = { [T in EventType]: EventEnvelope<T> }[EventType];
-export type EventOfType<T extends EventType> = Extract<SimEvent, { type: T }>;
 
 /** What a system passes to `ctx.emit`; phase 8 completes it. */
 export type EventDraft = {

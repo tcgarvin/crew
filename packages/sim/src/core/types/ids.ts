@@ -35,17 +35,6 @@ export type ScenarioDefId = Brand<string, "ScenarioDefId">;
 /** A port's dock map (`DockDef`, Dockside §3). */
 export type DockDefId = Brand<string, "DockDefId">;
 
-/** Any definition ID. Used where a reference may point at several def kinds (e.g. narrator digests). */
-export type DefId =
-  | DeckDefId
-  | MachineDefId
-  | ItemDefId
-  | CrewDefId
-  | PortDefId
-  | TraitDefId
-  | ScenarioDefId
-  | DockDefId;
-
 /**
  * Pattern every definition ID must match: two or more lowercase dot-separated segments of
  * `[a-z0-9_]`, the first segment being the namespace (`deck`, `machine`, `item`, `crew`, `port`,

@@ -37,7 +37,7 @@ export function migrateJobsToPeople(raw: unknown): unknown {
  * as its content seed (`core/markets.ts` `effectiveMarket`), so a save from before the market
  * existed opens every port at its authored stock the first time anyone looks.
  */
-export function addMarkets(raw: unknown): unknown {
+function addMarkets(raw: unknown): unknown {
   if (!isRecord(raw)) return raw;
   if (!isRecord(raw.markets)) raw.markets = {};
   return raw;
@@ -67,7 +67,7 @@ function portAlongside(travel: Record<string, unknown>): string | undefined {
  * moved onto the dock by `stageLoadingFreightOnLoad` (D63), which runs next. A port with no dock
  * map, or a save already carrying a dock, is left alone.
  */
-export function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
   if (raw.deck.dock !== undefined) return raw;
   const portId = portAlongside(raw.travel);
@@ -97,7 +97,7 @@ export function attachDockOnLoad(raw: unknown, { content }: MigrationContext): u
  * mid-unloading has its open `cargoToUnload` problems at that port revised, so their tasks
  * re-derive towards the delivery bay. Runs after `attachDockOnLoad`, which set `deck.dock`.
  */
-export function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
   const stage = raw.travel.stage;
   if (stage !== "docked" && stage !== "preparingDeparture") return raw;
@@ -157,7 +157,7 @@ export function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationCo
  * the content's hand-truck item (a `handTruck` tool with a capacity), unless the save already
  * has one. Its id comes from the save's own item counter. Crew learn where it is by looking.
  */
-export function stowHandTruckOnLoad(raw: unknown, { content }: MigrationContext): unknown {
+function stowHandTruckOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.items) || !isRecord(raw.nextId) || !isRecord(raw.deck)) {
     return raw;
   }
@@ -204,7 +204,7 @@ function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
  *   `notableEvent` yet; it becomes `narrator.pendingNotable` (travel checks its type against
  *   `hookOnEvents` when it raises the hook).
  */
-export function addDockside(raw: unknown): unknown {
+function addDockside(raw: unknown): unknown {
   if (!isRecord(raw)) return raw;
   if (!isRecord(raw.dockside)) raw.dockside = { locals: {}, props: [] };
   if (isRecord(raw.nextId) && typeof raw.nextId.local !== "number") raw.nextId.local = 1;

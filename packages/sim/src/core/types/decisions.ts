@@ -70,14 +70,6 @@ export interface Decision {
 }
 
 /**
- * D70: who walks so that a held card's speaker and the captain meet. `captain`: the command
- * actor goes to them (across the dock to a local, or out through the gate to someone in the port
- * beyond it), as they do when ashore looking for work. `speaker`: they come to the foot of the
- * personnel ramp (a local on the dock walks over; anyone else walks in from the gate).
- */
-export type CardDeliveryVia = "captain" | "speaker";
-
-/**
  * D70 (replaces D42's `Job.surfaceWhenDocked`): a card from one of the port's people, waiting to
  * be delivered in person. Its decision record exists (status `pending`) but it is not in the
  * queue, so nothing halts until the meeting puts it there (`core/delivery.ts` `deliverHeldCard`).
@@ -97,7 +89,13 @@ export interface HeldCard {
   delivery?: CardDelivery;
 }
 
-/** D70: a held card's meeting, under way. */
+/**
+ * D70: a held card's meeting, under way. `via` is who walks so that the speaker and the captain
+ * meet. `captain`: the command actor goes to them (across the dock to a local, or out through the
+ * gate to someone in the port beyond it), as they do when ashore looking for work. `speaker`:
+ * they come to the foot of the personnel ramp (a local on the dock walks over; anyone else walks
+ * in from the gate).
+ */
 export type CardDelivery =
   | {
       via: "captain";

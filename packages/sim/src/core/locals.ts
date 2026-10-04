@@ -43,7 +43,7 @@ export function postFacing(post: Pick<DockPostDef, "facing">): number {
 }
 
 /** A uint32 palette seed for a person's dot, from their name. */
-export function lookSeedOf(name: string): number {
+function lookSeedOf(name: string): number {
   return hashString32(name.toLowerCase());
 }
 
@@ -149,7 +149,7 @@ export function localTiles(state: Pick<WorldState, "dockside">): Set<string> {
  * when everything near is full. The search walks through taken and reserved tiles, only never
  * stops on one.
  */
-export function freeTileNear(
+function freeTileNear(
   dock: DockDef,
   from: TileCoord,
   taken: ReadonlySet<string>,
@@ -182,7 +182,7 @@ export function freeTileNear(
 }
 
 /** What a local is, before a tile is chosen for them. */
-export interface LocalSpec {
+interface LocalSpec {
   readonly name: string;
   readonly role: string;
   readonly origin: LocalOrigin;
@@ -278,7 +278,7 @@ function floorSpec(entry: FloorSetEntry): LocalSpec {
  * someone already in the floor set moves them (and gives them the plan's label) instead of
  * adding a second one; the plan's people keep the order it gave.
  */
-export function dockPeople(
+function dockPeople(
   state: Pick<WorldState, "seed" | "jobs" | "actors">,
   content: ContentBundle,
   portId: PortDefId,
@@ -356,7 +356,7 @@ function placeProps(
   return props;
 }
 
-export interface DressedDock {
+interface DressedDock {
   readonly locals: readonly Local[];
   /** People the dock had no room for (logged by the caller). */
   readonly unplaced: readonly string[];

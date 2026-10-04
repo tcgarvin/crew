@@ -9,7 +9,7 @@ import type { World } from "./types/kernel";
 import type { DerivedCaches, IndexCache, NavCache, ReadonlyWorldState } from "./types/pipeline";
 
 /** An unbuilt nav cache (W3 owns it); `geometryRevision` -1 means "never built". */
-export function emptyNavCache(): NavCache {
+function emptyNavCache(): NavCache {
   return { geometryRevision: -1, edgeMask: {}, decks: {}, paths: new Map(), reservations: {} };
 }
 
@@ -28,7 +28,7 @@ export function emptyCaches(): DerivedCaches {
 }
 
 /** Resolve deck tiles to compartment instance IDs via the tile symbol and compartment key. */
-export function createCompartmentLocator(
+function createCompartmentLocator(
   content: ContentBundle,
   state: ReadonlyWorldState,
 ): (deckId: DeckDefId, x: number, y: number) => CompartmentId | undefined {
@@ -85,7 +85,7 @@ export function rebuildActorIndex(
   index.actorsByCompartment = byCompartment;
 }
 
-export function rebuildMachineIndex(
+function rebuildMachineIndex(
   content: ContentBundle,
   state: ReadonlyWorldState,
   index: IndexCache,

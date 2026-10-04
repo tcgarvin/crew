@@ -30,7 +30,7 @@ import type { DefLookup, ReadonlyWorldState, StepCtx } from "./types/pipeline";
  * W2 decision: the idempotency tail keeps this many applied/rejected command IDs. An
  * implementation bound, not a gameplay tunable, so it is not in `ConfigDef`.
  */
-export const RECENT_COMMAND_IDS_CAP = 512;
+const RECENT_COMMAND_IDS_CAP = 512;
 
 /** What `validate` may read: truth, read-only. Pure. */
 export interface ValidateCtx {
@@ -76,7 +76,7 @@ export function reject(code: RejectionCode, reason: string): Validation<never> {
   return { ok: false, rejection: { code, reason } };
 }
 
-export function validateCtxOf(world: World, tick: Tick): ValidateCtx {
+function validateCtxOf(world: World, tick: Tick): ValidateCtx {
   return {
     state: world.state,
     content: world.content,
@@ -204,7 +204,7 @@ export function enqueueCommand(
 }
 
 /** Revalidate and apply one command now, emitting `commandApplied` or `commandRejected`. */
-export function executeCommand(
+function executeCommand(
   registry: KernelRegistry,
   ctx: ApplyCtx,
   command: Command,

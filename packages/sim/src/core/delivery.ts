@@ -28,7 +28,7 @@ type Ctx = Pick<StepCtx, "state" | "content" | "tick" | "emit">;
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Someone of the ship: crew or a passenger, wherever they are (aboard, on the dock, ashore). */
-export function isShipsPerson(state: Pick<ReadonlyWorldState, "actors">, name: string): boolean {
+function isShipsPerson(state: Pick<ReadonlyWorldState, "actors">, name: string): boolean {
   return Object.values(state.actors).some((a) => sameName(a.name, name));
 }
 
@@ -56,7 +56,7 @@ export function cardSpeaker(
  * once: docked at a port whose dock is alongside, the speaker named and not of the ship, and a
  * way for them to meet (they are on the dock, or it has a gate to the port beyond).
  */
-export function holdingPort(
+function holdingPort(
   state: ReadonlyWorldState,
   content: Ctx["content"],
   speaker: string | undefined,

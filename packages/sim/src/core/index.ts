@@ -3,104 +3,28 @@
  * invariants and serialize/restore/migrate. Contracts are in `./types`.
  */
 export * from "./types";
-export {
-  actionLabel,
-  describeEvent,
-  getRenderFrame,
-  isTickerEvent,
-  tickerLine,
-} from "./render";
-export { configTicks, secondsToTicks, ticksToSeconds } from "./clock";
-export {
-  applyCommandNow,
-  type AppliedCommand,
-  type ApplyCtx,
-  type CommandHandler,
-  enqueueCommand,
-  executeCommand,
-  NO_TEMP_REFS,
-  ok,
-  reject,
-  type ValidateCtx,
-  type Validation,
-  validateCommand,
-} from "./commands";
-export {
-  headNeedingNarration,
-  needsNarration,
-  type PolicyDecisionDraft,
-  queuePolicyDecision,
-  raisePolicyDecisionHookIfDue,
-} from "./decisions";
-export { createDefLookup, findCrewDef, findItemDef } from "./defs";
+export { actionLabel, describeEvent, getRenderFrame } from "./render";
+export { configTicks, ticksToSeconds } from "./clock";
+export { enqueueCommand, ok, reject, type Validation } from "./commands";
+export { findItemDef } from "./defs";
 export {
   deckToDock,
   dockAlongside,
-  dockAlongsideAt,
   dockAreaTiles,
-  dockPost,
-  dockedPortOf,
   dockFloorMask,
   dockForPort,
-  dockToDeck,
   expectedDock,
-  isDockFloor,
-  gateTileAt,
-  isDockPoint,
   isInDockArea,
   isOnDock,
-  type MarketCounter,
-  marketCounter,
-  postServiceTile,
-  postTile,
 } from "./docks";
-export { basePriceFor, effectiveMarket, ensureMarket, marketSeed } from "./markets";
-export { DOCK_HAND_ROLE, dockHandName, floorSet } from "./floor-set";
-export {
-  clearDockside,
-  dockNeedsDressing,
-  dockPeople,
-  dressDock,
-  lookSeedOf,
-  personnelRampFoot,
-} from "./locals";
-export {
-  cardSpeaker,
-  decisionShownTick,
-  heldCard,
-  isShipsPerson,
-  localNamed,
-} from "./delivery";
-export { commandActor, isFitForCommand } from "./command-actor";
-export { isNobodysFreight } from "./freight";
-export { renderDockProps, renderLocals } from "./render";
-export { raiseHookIfIdle } from "./hooks";
-export { createEventBuffer, type EventBuffer, isNotableOrAbove } from "./events";
-export {
-  allocateId,
-  asInstanceId,
-  initialIdCounters,
-  isInstanceIdOf,
-  parseInstanceId,
-  wasAllocated,
-} from "./ids";
-export { checkInvariants, jsonSafetyViolations } from "./invariants";
+export { basePriceFor, effectiveMarket } from "./markets";
+export { floorSet } from "./floor-set";
+export { clearDockside, dressDock, personnelRampFoot } from "./locals";
+export { decisionShownTick, localNamed } from "./delivery";
+export { allocateId } from "./ids";
+export { checkInvariants } from "./invariants";
 export { createKernel, kernel } from "./kernel";
-export { dueActors, isStaggerDue, runStep } from "./pipeline";
-export {
-  type AgentViewBuilder,
-  type CacheBuilder,
-  createRegistry,
-  defaultRegistry,
-  type KernelRegistry,
-  NotImplementedError,
-  registerCacheBuilder,
-  registerCommandHandler,
-  registerPlanner,
-  registerSystem,
-  setAgentViewBuilder,
-} from "./registry";
+export { createRegistry, type KernelRegistry, NotImplementedError } from "./registry";
 export { createRngApi, seedAllStreams, seedStream } from "./rng";
-export { migrateState, migrations, restore, SaveCompatibilityError, serialize } from "./save";
-export { createCompartmentLocator, emptyCaches, emptyNavCache, rebuildCaches } from "./caches";
+export { migrateState, migrations, restore, serialize } from "./save";
 export { advance, createWorld, haltReason } from "./world";

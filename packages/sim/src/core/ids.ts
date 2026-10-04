@@ -41,7 +41,7 @@ const KIND_BY_PREFIX: Readonly<Record<string, InstanceKind>> = Object.fromEntrie
 
 const INSTANCE_ID_PATTERN = /^([a-z]+)([1-9][0-9]*)$/;
 
-export interface ParsedInstanceId {
+interface ParsedInstanceId {
   readonly kind: InstanceKind;
   readonly counter: number;
 }

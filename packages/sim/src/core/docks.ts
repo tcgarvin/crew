@@ -196,7 +196,7 @@ export function dockAreaTiles(dock: DockDef, kind: DockAreaKind): TileCoord[] {
 }
 
 /** Is deck-frame point (x, y) inside the dock's first area of `kind`? */
-export function inDockArea(dock: DockDef, kind: DockAreaKind, x: number, y: number): boolean {
+function inDockArea(dock: DockDef, kind: DockAreaKind, x: number, y: number): boolean {
   const area = dock.areas.find((a) => a.kind === kind);
   if (area === undefined) return false;
   const tile = deckToDock(dock, { x: Math.floor(x), y: Math.floor(y) });
@@ -271,7 +271,7 @@ export function gateTileAt(
  * - `transferTile`: no dock alongside (or a hand-built dock with neither post; content validation
  *   requires a gate): the units come over the ramp to a cargo transfer tile, as before.
  */
-export type MarketCounter =
+type MarketCounter =
   | { readonly kind: "stall"; readonly tile: TileCoord }
   | { readonly kind: "gate"; readonly tile: TileCoord }
   | { readonly kind: "transferTile" };

@@ -5,7 +5,6 @@
 import type { KernelRegistry, Unregister } from "../core/registry";
 import { buildAgentView } from "./agentView";
 
-export const VIEW_PLACEHOLDER = "view" as const;
 export { buildAgentView } from "./agentView";
 export { toAgentViewSnapshot } from "./snapshot";
 
