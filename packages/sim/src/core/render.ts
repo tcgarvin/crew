@@ -4,6 +4,7 @@
  * Polish A adds the items aboard (D28) and a one-line ship headline (D27). D61 adds the dock
  * alongside, with everyone and everything on it flagged `onDock`.
  */
+import { findItemDef } from "./defs";
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
@@ -206,12 +207,12 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     port: (id) => portName(content, id as PortDefId),
     item: (id) => {
       const item = state.items[id as keyof ReadonlyWorldState["items"]];
-      const def = item === undefined ? undefined : itemDef(item, state, content);
+      const def = item === undefined ? undefined : findItemDef(content, state, item.defId);
       const name = def?.name.toLowerCase() ?? "cargo";
       return item?.stacking === "stack" && item.count > 1 ? `${item.count}× ${name}` : name;
     },
     itemDef: (defId) =>
-      itemDef({ defId: defId as Item["defId"] }, state, content)?.name.toLowerCase() ?? "parts",
+      findItemDef(content, state, defId as Item["defId"])?.name.toLowerCase() ?? "parts",
     faultName: (machineId, faultKey) =>
       machineDef(machineId)
         ?.faults.find((f) => f.key === faultKey)
@@ -390,14 +391,6 @@ export function tickerLine(
 // Items aboard (Polish A, D28)
 // ---------------------------------------------------------------------------------------------
 
-function itemDef(
-  item: Pick<DeepReadonly<Item>, "defId">,
-  state: ReadonlyWorldState,
-  content: ContentBundle,
-): DeepReadonly<ItemDef> | undefined {
-  return content.items[item.defId] ?? state.defs.dynamic.items[item.defId];
-}
-
 function itemKind(def: DeepReadonly<ItemDef> | undefined): RenderItemKind {
   if (def === undefined) return "other";
   if (def.cargoClass !== undefined || def.tags.includes("cargo")) return "crate";
@@ -496,7 +489,7 @@ export function renderItems(state: ReadonlyWorldState, content: ContentBundle): 
   for (const item of Object.values(state.items)) {
     const location = renderItemLocation(item, state, content);
     if (location === null || !isOnMap(item, state)) continue;
-    const def = itemDef(item, state, content);
+    const def = findItemDef(content, state, item.defId);
     items.push({
       id: item.id,
       defId: item.defId,
@@ -816,7 +809,7 @@ function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): Ren
   const deckId = state.deck.dock?.deckId;
   if (deckId === undefined) return [];
   return state.dockside.props.map((prop) => {
-    const def = itemDef({ defId: prop.itemDefId }, state, content);
+    const def = findItemDef(content, state, prop.itemDefId);
     return {
       defId: prop.itemDefId,
       name: def?.name ?? "Crate",
