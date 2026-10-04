@@ -1253,3 +1253,113 @@ pause, which stopped the worker but not playback (seconds of buffered movement k
 `FramePlayback.setPaused` freezes the view on its last frame. "Noor" left the locals' name table
 (replaced in its slot by "Ines"), and validation now rejects a generated given name equal to a
 crew member's first name.
+
+## 2026-10-04 — Ship life, slice 2: the watch and the helm
+
+Plan: `docs/design/ship-life-plan.md` (Slice 2). Built as two serial gates (day units, then
+contracts) and six parallel streams, integrated and tuned by the team lead.
+
+**D76. Time is counted in fractions of the ship's day; fast play slows for what matters.**
+`time.daySeconds` (1200) and `time.watchesPerDay` (3) are the two knobs. Need rates are authored
+per day, and meal and sleep length, offer lifetime, re-offer cooldown, passenger time ashore and
+overdue, the quiet window and the budget refill in days (`Days`, beside `Seconds`), converted
+where read by `core/clock.ts` (`daysToSeconds`, `dayTicks`, `perDayToPerSecond`, `watchTicks`,
+`watchIndexAt`, `watchOfDay`), not at load, because the config is embedded in every save as
+authored. Motion, doors, docking stages, dockside timings, work at a machine, machine defs, host
+real time and `narrator.maxFaultWindowSeconds` stay in seconds, so changing the day rescales the
+routine while walking keeps its speed. The conversion was exact at 1200 s (`crew pacing` identical
+to the tick). The renames needed no migration: `restore` fills missing config keys from content
+(`fillConfig`), and the narrator's snapshot upgrade and the narrator-log rebuild do the same. The
+three spur legs are 400 both ways, one watch at nominal speed, so a handover happens at sea; pay
+stays band × path distance, so a spur job pays about 3× its old total at the same rate per
+transit second (left to judge in play). Fast-forward drops to 1× when *playback* reaches an event
+on `host.slowDownOnEvents`, naming it with the ticker's own text in a toast and a highlighted log
+line; nothing happens at 1× or while paused. The clock reads "Day 2 · White watch" ("White"
+below 390 px). `crew beats` runs the pacing voyage for N ship's days with an instant narrator and
+reports beats per watch, each person's share of time by activity, longest idle stretches and
+helm-empty time; it is the tuning instrument. The tuning commit set sleep to 0.2 day (recovery
+4.25/day), the quiet window to one watch, and added one planner rule: someone on duty does not go
+to bed while tiredness is only routine, so each section sleeps in the same off-watch window every
+day (Red from about 410 s into the day, White and the dayworkers from about 810 s). Measured over
+three days: 3 bells and about 3 handovers a watch, one 240 s sleep a day each, quiet-too-long
+calls from ~15 a voyage to 1, the 8× narrator stall from ~450 s to ~180 s.
+
+**D77. Watches replace shifts; the helm is the duty station.** Three sections on a watch bill
+authored in the scenario (section i stands watch i; Red = Noor, Mara, Priya; White = Jax, Tomas;
+Blue = Dane; dayworkers Bettina, Sunniva, Oyelaran on watches 0–1), the bell in the ticker,
+`CrewDef.shift` retired; a bill-less scenario (fixtures) gets a greedy generated bill. The
+validator requires one section per watch, each with a member meeting the helm's
+`operatorSkill`, and a scenario of more than three crew to author its bill. Who has the helm is
+physical: the crew member in a staff hold on its seat (`whoHasTheHelm`). The sim designates the
+stander (`helmRoleOf`): the section's qualified non-officer, then its qualified officer, then the
+nearest qualified hand aboard, then piloting ≥ 1 (visible to the narrator as an unqualified
+hand); while the helm is empty only someone free to come is designated, so an idle qualified hand
+is never passed over for a busy or sleeping one (the slice-1 QA case). The planner reads only the
+role; helm posts and the course plot skip `deferTo` and the off-duty rule. Handover: 30 s before
+the bell the oncoming goes to the standby tile, counts 5 s while the seat is held, the off-going
+steps off and the oncoming sits; an empty helm is simply taken. Relief: a stander whose need
+passes essential raises a routine relief post an off-watch qualified hand fills until the stander
+is back. Vacancy gates departure prep, the end of transit, the approach and docking, and nothing
+else; after 20 s empty in transit `helmUnattended` fires once. In port the helm watch opens once
+the course is plotted; until then the section's non-officer stander stands gangway watch at the
+airlock. The officer of the watch walks rounds (engineering, hold, mess, the helm's standby;
+start-to-start cadence `roundsEveryDays`) and idles at the captain's chair, never pinned; idle
+on-duty engineers walk the engineering machines; perception does the noticing. Piloting is
+learned only at the helm. Measured: the helm empty about a minute in three days while not docked,
+almost all of it the walk up at the start of departure prep.
+
+**D78. Course plotting and piloting checks.** `setCourse` and each voyage hop leave the course
+unplotted; travel raises `courseToPlot` per destination while a nav terminal is aboard, deriving
+one essential `plotCourse` task at the nav station that needs the helm's `operatorSkill`; skill
+sets how long it takes, and departure prep waits for it beside the departure gate. A detour
+re-raises it; a hold for repairs keeps the plot. The narrator's sixth lever is `scheduleHazard`
+(prompt v0.21): a kind (debris field, asteroid belt, ion storm), a tier (easy/hard/brutal →
+`config.hazards.difficulty`) and a fault-window word. The translator spends the hazard budget,
+lets one hazard wait at a time, and places it only on a leg with transit ahead. The sim fires it
+at the first transit tick at or after its time and rolls the stander's piloting against the
+difficulty, p = clamp((skill − difficulty + 5)/10, 0.05, 0.95): a clean pass, else evenly a scrape
+(one fault scheduled through the single fault path, D6) or a delay (the leg set back, never past
+its start); an empty helm is a scrape and a delay. A hazard whose leg ends first, or whose course
+is given up in port, is dropped with `navHazardMissed`. `scheduleFault` now spends
+`faultsRemaining` and is refused at zero, and the budget refill D6 promised runs. The digest
+carries the watch, who has the helm since when, the officer of the watch, the gangway, the next
+bell, each helm check, empty-helm spells and the hazard budget.
+
+**D79. Thoughts and mood; schema 8 migrates.** Thoughts are a closed key set in the sim with a
+required content table (label, value, duration, stacks); the first four are "stood a long
+watch", "double watch", "brought the ship through clean" and "scraped the ship through". Mood is
+the clamped sum of live thoughts; `addThought` updates it at once and the needs-phase
+`moodSystem` lets thoughts wear off, so mood always equals its thoughts at the end of a tick; a
+non-stacking thought (matched by key and `refId`) extends its expiry. Work speed is the only
+effect yet (0.9× below −0.4, 1.05× above 0.4). The digest and the inspector show mood as a word
+with the three heaviest thoughts. Save schema 8 migrates schema 7 (sections from the bill by
+crew def, empty thoughts and hazards, the hazard budget line) rather than refusing it.
+
+**D80. The ship keeps stores, limps when it cannot repair, and a starved machine waits on its
+cause.** The slice-2 integration runs (`crew beats --days 3 --scenario both`) hit three dead
+ends, each fixed with the smallest rule that keeps play going. *Food.* The default run carried
+40 ration packs for nine people eating about four a day each, so everyone's hunger sat at 1.0
+from day 1.5. The scenario now stows 220 (about six days), ports stock enough to restock, and
+Kessler Drift's canteen sells them. Commerce keeps stores through one routine problem,
+`reserveLow {itemDefId, count}`, raised only while docked at a port whose market has the item in
+stock and recounted against what is aboard every tick; it derives D47's `buyParts` task through
+a `buySpec` shared with `partsNeeded` (task target kind `market`). Food is counted in days
+(nutrition aboard ÷ eaters × `hungerPerDay`): below `commerce.foodReserve.lowBelowDays` (2) the
+crew buy up to `restockToDays` (5). A restock never holds a departure; the next port that sells
+food asks again. Slice 3's `provisionsLow` has the same shape and replaces the food rule.
+*Spares* (extends D47): the ship keeps `commerce.sparesReserve` (3) of each `spare`-tagged item
+the same way; with 2 the freight run still ran out on the Ossory leg. *Limp* (amends D64, whose
+"parks the ship until the narrator acts" cannot happen at sea, where the narrator has no lever):
+when every engine wanted on is impaired by a diagnosed fault whose repair nothing aboard can
+finish, the ship moves at `travel.limpSpeedFraction` (0.2) of nominal, sets `travel.limping` and
+says so once (`shipLimping`, narrative, hooked); while a repair aboard could still restore the
+engine, the ship drifts and the crew work, as before. Chosen over a parts-delivery lever (D47: no
+deliveries) and over ending a drift on a timer. *Reach through dependencies* (amends D71): an
+impairment with no fault of its own caused by another machine's (a consumer starved on a bus
+whose generators are impaired, a machine derating hot on a bus whose cooling is off) is out of
+reach only if every cause is; the reason given is the cause's fault. With no cause to point at,
+D71's "in reach" stands. Found: a coil burnout at Kessler Drift, which sells no spares, starved
+the engine to 0.167 output and held the ship for good. Measured after: two round trips in three
+days on both scenarios (one before), no one at hunger ≥ 0.9 (45% of person-time before), every
+hold lifted, about 110 s adrift in three days. The captain's share of the helm fell from ~28% to
+~10% once starving standers stopped calling relief.
