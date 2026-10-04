@@ -19,7 +19,7 @@ import type { EventDraft } from "../../core/types/events";
 import type { DeckDefId, LocalKey, MachineId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine, OperatingMode } from "../../core/types/ship";
-import { clamp } from "../equipment/util";
+import { clamp, machineEvent } from "../equipment/util";
 
 interface DomainGroup {
   generators: Machine[];
@@ -54,38 +54,21 @@ function groupByDomain(ctx: StepCtx): Map<LocalKey, DomainGroup> {
   return groups;
 }
 
-function emitModeChange(ctx: StepCtx, machine: Machine, from: OperatingMode): void {
-  if (machine.actualMode === from) return;
-  const draft: EventDraft = {
-    type: "machineModeChanged",
-    subjectIds: [machine.id],
-    causeIds: [],
-    source: "sim",
-    locationRef: { kind: "machine", machineId: machine.id },
-    payload: { machineId: machine.id, from, to: machine.actualMode },
-  };
-  ctx.emit(draft);
-}
-
 function drawKwOf(ctx: StepCtx, machine: Machine): number {
   const def = ctx.defs.machine(machine.defId);
   return def.power.role === "consumer" ? def.power.drawKw : 0;
 }
 
-function allocateDomain(
-  ctx: StepCtx,
-  domainKey: LocalKey,
-  group: DomainGroup,
-  dtSeconds: number,
-): void {
-  const { generators, consumers, battery } = group;
+/** What a generator puts on its bus this tick (0 when off). */
+function generatedKw(ctx: StepCtx, generator: Machine): number {
+  const def = ctx.defs.machine(generator.defId);
+  return def.power.role === "generator" && generator.actualMode !== "off"
+    ? def.power.supplyKw * generator.output
+    : 0;
+}
 
-  const supplyKw = generators.reduce((sum, g) => {
-    const def = ctx.defs.machine(g.defId);
-    if (def.power.role !== "generator" || g.actualMode === "off") return sum;
-    return sum + def.power.supplyKw * g.output;
-  }, 0);
-
+/** Consumers that want power, by priority tier, each tier in id order. */
+function consumersByTier(ctx: StepCtx, consumers: readonly Machine[]) {
   const byTier = new Map<PowerPriority, Machine[]>();
   for (const consumer of consumers) {
     if (consumer.desiredMode === "off") continue;
@@ -96,7 +79,24 @@ function allocateDomain(
     else list.push(consumer);
   }
   for (const list of byTier.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+  return byTier;
+}
 
+interface Allocation {
+  readonly allocation: Map<MachineId, number>;
+  /** Supply left over after every tier. */
+  readonly remaining: number;
+  readonly totalDemand: number;
+  /** Demand left unmet. */
+  readonly totalShort: number;
+}
+
+/** Hand out `supplyKw` tier by tier, proportionally within the tier it runs out in. */
+function allocateByTier(
+  ctx: StepCtx,
+  byTier: ReadonlyMap<PowerPriority, readonly Machine[]>,
+  supplyKw: number,
+): Allocation {
   const allocation = new Map<MachineId, number>();
   let remaining = supplyKw;
   let totalDemand = 0;
@@ -116,88 +116,112 @@ function allocateDomain(
       remaining = 0;
     }
   }
+  return { allocation, remaining, totalDemand, totalShort };
+}
 
-  // Battery: charge from surplus, or discharge to cover the shortfall — never both in one tick.
-  let batteryFlowKw = 0;
-  if (battery !== undefined) {
-    const def = ctx.defs.machine(battery.defId);
-    if (def.power.role === "battery" && battery.roleState.role === "battery") {
-      const stored = battery.roleState.storedKj;
-      if (remaining > 1e-9) {
-        const roomKj = Math.max(0, def.power.capacityKj - stored);
-        const chargeKw = Math.min(
-          remaining,
-          def.power.maxChargeKw,
-          dtSeconds > 0 ? roomKj / dtSeconds : 0,
-        );
-        if (chargeKw > 1e-9) {
-          battery.roleState = {
-            role: "battery",
-            storedKj: clamp(stored + chargeKw * dtSeconds, 0, def.power.capacityKj),
-          };
-          batteryFlowKw = chargeKw;
-        }
-      } else if (totalShort > 1e-9) {
-        const availableKw = Math.min(
-          def.power.maxDischargeKw,
-          dtSeconds > 0 ? stored / dtSeconds : 0,
-        );
-        let dischargeKw = Math.min(totalShort, availableKw);
-        if (dischargeKw > 1e-9) {
-          battery.roleState = {
-            role: "battery",
-            storedKj: clamp(stored - dischargeKw * dtSeconds, 0, def.power.capacityKj),
-          };
-          batteryFlowKw = -dischargeKw;
-          for (const tier of ctx.config.power.priorityOrder) {
-            if (dischargeKw <= 1e-9) break;
-            for (const c of byTier.get(tier) ?? []) {
-              if (dischargeKw <= 1e-9) break;
-              const need = drawKwOf(ctx, c) - (allocation.get(c.id) ?? 0);
-              if (need <= 0) continue;
-              const give = Math.min(need, dischargeKw);
-              allocation.set(c.id, (allocation.get(c.id) ?? 0) + give);
-              dischargeKw -= give;
-            }
-          }
-        }
-      }
+/**
+ * Battery: charge from surplus, or discharge to cover the shortfall — never both in one tick.
+ * A discharge tops up `allocation` in tier order. Returns the flow (positive while charging).
+ */
+function runBattery(
+  ctx: StepCtx,
+  battery: Machine,
+  byTier: ReadonlyMap<PowerPriority, readonly Machine[]>,
+  { allocation, remaining, totalShort }: Allocation,
+  dtSeconds: number,
+): number {
+  const def = ctx.defs.machine(battery.defId);
+  if (def.power.role !== "battery" || battery.roleState.role !== "battery") return 0;
+  const stored = battery.roleState.storedKj;
+  const { capacityKj } = def.power;
+  const store = (storedKj: number): void => {
+    battery.roleState = { role: "battery", storedKj: clamp(storedKj, 0, capacityKj) };
+  };
+  if (remaining > 1e-9) {
+    const roomKj = Math.max(0, capacityKj - stored);
+    const chargeKw = Math.min(
+      remaining,
+      def.power.maxChargeKw,
+      dtSeconds > 0 ? roomKj / dtSeconds : 0,
+    );
+    if (chargeKw <= 1e-9) return 0;
+    store(stored + chargeKw * dtSeconds);
+    return chargeKw;
+  }
+  if (totalShort <= 1e-9) return 0;
+  const availableKw = Math.min(def.power.maxDischargeKw, dtSeconds > 0 ? stored / dtSeconds : 0);
+  const dischargeKw = Math.min(totalShort, availableKw);
+  if (dischargeKw <= 1e-9) return 0;
+  store(stored - dischargeKw * dtSeconds);
+  let left = dischargeKw;
+  for (const tier of ctx.config.power.priorityOrder) {
+    if (left <= 1e-9) break;
+    for (const c of byTier.get(tier) ?? []) {
+      if (left <= 1e-9) break;
+      const need = drawKwOf(ctx, c) - (allocation.get(c.id) ?? 0);
+      if (need <= 0) continue;
+      const give = Math.min(need, left);
+      allocation.set(c.id, (allocation.get(c.id) ?? 0) + give);
+      left -= give;
     }
   }
+  return -dischargeKw;
+}
 
-  for (const consumer of consumers) {
-    const def = ctx.defs.machine(consumer.defId);
-    if (def.power.role !== "consumer") continue;
-    const from = consumer.actualMode;
-    if (consumer.desiredMode === "off") {
-      consumer.powerAllocatedKw = 0;
+/** A consumer's mode from what it was allocated (off when it wants to be off). */
+function applyAllocation(
+  ctx: StepCtx,
+  consumer: Machine,
+  allocation: ReadonlyMap<MachineId, number>,
+) {
+  const def = ctx.defs.machine(consumer.defId);
+  if (def.power.role !== "consumer") return;
+  const from = consumer.actualMode;
+  if (consumer.desiredMode === "off") {
+    consumer.powerAllocatedKw = 0;
+    consumer.actualMode = "off";
+  } else {
+    const allocated = allocation.get(consumer.id) ?? 0;
+    consumer.powerAllocatedKw = allocated;
+    if (allocated >= def.power.drawKw - 1e-9) {
+      consumer.actualMode = "on";
+    } else if (allocated <= 1e-9) {
       consumer.actualMode = "off";
     } else {
-      const allocated = allocation.get(consumer.id) ?? 0;
-      consumer.powerAllocatedKw = allocated;
-      if (allocated >= def.power.drawKw - 1e-9) {
-        consumer.actualMode = "on";
-      } else if (allocated <= 1e-9) {
-        consumer.actualMode = "off";
-      } else {
-        consumer.actualMode = def.power.partialPower === "derate" ? "on" : "off";
-      }
+      consumer.actualMode = def.power.partialPower === "derate" ? "on" : "off";
     }
-    emitModeChange(ctx, consumer, from);
   }
-  for (const generator of generators) {
-    const def = ctx.defs.machine(generator.defId);
-    generator.powerAllocatedKw =
-      def.power.role === "generator" && generator.actualMode !== "off"
-        ? def.power.supplyKw * generator.output
-        : 0;
-  }
+  if (consumer.actualMode === from) return;
+  ctx.emit(
+    machineEvent("machineModeChanged", consumer.id, {
+      machineId: consumer.id,
+      from,
+      to: consumer.actualMode,
+    }),
+  );
+}
+
+function allocateDomain(
+  ctx: StepCtx,
+  domainKey: LocalKey,
+  group: DomainGroup,
+  dtSeconds: number,
+): void {
+  const { generators, consumers, battery } = group;
+  const supplyKw = generators.reduce((sum, g) => sum + generatedKw(ctx, g), 0);
+  const byTier = consumersByTier(ctx, consumers);
+  const allocated = allocateByTier(ctx, byTier, supplyKw);
+  const batteryFlowKw =
+    battery === undefined ? 0 : runBattery(ctx, battery, byTier, allocated, dtSeconds);
+
+  for (const consumer of consumers) applyAllocation(ctx, consumer, allocated.allocation);
+  for (const generator of generators) generator.powerAllocatedKw = generatedKw(ctx, generator);
   if (battery !== undefined) battery.powerAllocatedKw = Math.abs(batteryFlowKw);
 
   const domain = ctx.state.power.domains[domainKey];
   if (domain !== undefined) {
     domain.supplyKw = supplyKw + Math.max(0, -batteryFlowKw);
-    domain.demandKw = totalDemand;
+    domain.demandKw = allocated.totalDemand;
     domain.batteryFlowKw = batteryFlowKw;
   }
 }
