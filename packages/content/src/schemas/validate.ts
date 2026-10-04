@@ -11,7 +11,8 @@
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
- *   some item def. Dock maps (`validate-dock.ts`): rows against the legend, the berth against
+ *   some item def, and carried from the start by every scenario whose deck has the machine
+ *   (D71). Dock maps (`validate-dock.ts`): rows against the legend, the berth against
  *   each deck's footprint, ramp landings on floor, posts and areas on floor and reachable from
  *   both landings, the size cap.
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
@@ -975,6 +976,46 @@ function checkRecipeToolsSatisfiable(bundle: ContentBundle, issues: ValidationIs
   }
 }
 
+/**
+ * D71: a scenario's ship starts able to do every repair and inspection its own machines' recipes
+ * describe: each tool kind a recipe on the scenario's deck names is provided by one of its starting
+ * items. A tool only a far port sells left every fault that needs it unrepairable everywhere else
+ * (the welder, D69). Markets may still sell tools, as replacements.
+ */
+function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  for (const scenario of Object.values(bundle.scenarios)) {
+    const deck = bundle.decks[scenario.deckId];
+    if (deck === undefined) continue;
+    const carried = new Set<string>();
+    for (const line of scenario.startingItems) {
+      for (const kind of bundle.items[line.itemDefId]?.toolKinds ?? []) carried.add(kind);
+    }
+    const reported = new Set<string>();
+    for (const machineDefId of new Set(deck.machines.map((m) => m.machineDefId))) {
+      const machine = bundle.machines[machineDefId];
+      if (machine === undefined) continue;
+      const steps = [
+        ...machine.faults.flatMap((fault) => fault.repair.steps),
+        ...(machine.maintenance === undefined ? [] : [machine.maintenance.inspect]),
+      ];
+      for (const step of steps) {
+        for (const tool of step.tools) {
+          const key = `${machine.id}:${tool}`;
+          if (carried.has(tool) || reported.has(key)) continue;
+          reported.add(key);
+          issues.push(
+            issue(
+              "physical",
+              ["scenarios", scenario.id, "startingItems"],
+              `no starting item provides tool kind "${tool}", which "${machine.id}" needs (step "${step.key}")`,
+            ),
+          );
+        }
+      }
+    }
+  }
+}
+
 /** L3: geometry and physical plausibility. */
 export function validatePhysical(bundle: ContentBundle): readonly ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -989,6 +1030,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
   }
   for (const dock of Object.values(bundle.docks ?? {})) checkDockPhysical(dock, bundle, issues);
   checkRecipeToolsSatisfiable(bundle, issues);
+  checkScenarioCarriesRecipeTools(bundle, issues);
 
   return issues;
 }

@@ -39,10 +39,9 @@
  * Overheat is still the only thing that costs integrity.
  */
 import { ticksToSeconds } from "../../core/clock";
-import { isNobodysFreight } from "../../core/freight";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
-import type { ConfigDef, ItemCount, MachineDef } from "../../core/types/content";
+import type { ConfigDef, MachineDef } from "../../core/types/content";
 import type { DerateCause, EventDraft } from "../../core/types/events";
 import type { CommandId, ItemDefId, LocalKey } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
@@ -50,6 +49,7 @@ import type { Machine } from "../../core/types/ship";
 import type { ProblemOfKind } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
+import { repairShortfall, unitsAboard } from "./supplies";
 import { clamp } from "./util";
 
 /** W5 decision: see module doc — pending `MachineDef` field for diagnosis. */
@@ -194,54 +194,21 @@ function ensureSymptomProblems(ctx: StepCtx, machine: Machine, def: MachineDef):
 }
 
 /**
- * Units of each item def physically aboard (on deck or in someone's hands), by def. D61: a part
- * lying on the dock alongside counts too: it is the ship's and within reach while docked, so
- * buying another would be waste. One still there when the dock slides away is left at the port
- * (`leftOnDock`) and the shortfall comes back.
- */
-function unitsAboard(ctx: StepCtx): Map<ItemDefId, number> {
-  const aboard = new Map<ItemDefId, number>();
-  for (const item of Object.values(ctx.state.items)) {
-    const kind = item.location.kind;
-    if (kind !== "onDeck" && kind !== "carriedBy" && kind !== "equippedBy") continue;
-    // D63, D66: freight on offer (or on its way back in) is on the dock but nobody's.
-    if (isNobodysFreight(ctx.state, item)) continue;
-    const units = item.stacking === "stack" ? item.count : 1;
-    aboard.set(item.defId, (aboard.get(item.defId) ?? 0) + units);
-  }
-  return aboard;
-}
-
-/** What the diagnosed faults' remaining repair steps still consume, summed by item def. */
-function partsStillNeeded(machine: Machine, def: MachineDef): Map<ItemDefId, number> {
-  const needed = new Map<ItemDefId, number>();
-  for (const fault of machine.faults) {
-    if (!fault.diagnosed) continue;
-    const steps = def.faults.find((f) => f.key === fault.faultKey)?.repair.steps ?? [];
-    const consumes: readonly ItemCount[] = steps
-      .slice(fault.repairStepIndex)
-      .flatMap((s) => s.consumes);
-    for (const line of consumes) {
-      needed.set(line.itemDefId, (needed.get(line.itemDefId) ?? 0) + line.count);
-    }
-  }
-  return needed;
-}
-
-/**
  * D47: a repair stalls for good when a step consumes a part the ship does not have, so the
  * shortfall is a problem of its own (`partsNeeded`, one per machine and item) that commerce
  * answers from the port market while docked. Raised and revised against truth every tick:
  * aboard counts on deck and in hand, so a stack bought at the ramp or found in stores resolves
- * it, and a fault repaired or still undiagnosed never needs anything.
+ * it, and a fault repaired or still undiagnosed never needs anything. D71: a tool kind the
+ * repair names and nothing aboard provides is a shortfall too, of one supplying item
+ * (`supplies.ts`), bought the same way.
  */
 function updatePartsNeeded(ctx: StepCtx, machine: Machine, def: MachineDef): void {
-  const needed = partsStillNeeded(machine, def);
-  const aboard = needed.size === 0 ? undefined : unitsAboard(ctx);
+  const diagnosed = machine.faults.some((f) => f.diagnosed);
+  const needed = diagnosed
+    ? repairShortfall(ctx.content, def, machine.faults, unitsAboard(ctx.state))
+    : [];
   const open = new Set<ItemDefId>();
-  for (const [itemDefId, count] of needed) {
-    const shortfall = count - (aboard?.get(itemDefId) ?? 0);
-    if (shortfall <= 0) continue;
+  for (const { itemDefId, count: shortfall } of needed) {
     open.add(itemDefId);
     const dedupeKey = `partsNeeded:${machine.id}:${itemDefId}`;
     const existing = Object.values(ctx.state.work.problems).find(

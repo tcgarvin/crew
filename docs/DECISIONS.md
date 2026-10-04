@@ -980,3 +980,39 @@ sessions also ended holding for repairs, one for the fusion generator. At 8x the
 answers at once, so the 30-per-hour story budget ran out four minutes into a session and the game
 waited 30 s per retry (D43, not phase 3). A staging attempt that times out costs the narrator's 25 s
 each; a staging-specific timeout would bound the hold (server and narrator side).
+
+**D71. A hold for repairs never waits on a repair the ship cannot do.** D69's found item: the
+generator's `electrical_short` needs a welder, the ship never carried one and only Ossory sold
+it, so holding for that repair anywhere else never ended. Two halves, per the team lead's
+brief (the owner having delegated):
+*Content.* The default scenario stows a welder torch in the hold's stowage beside the toolkits
+(the Freighter Mk1 has no engineering stores zone), so every repair its machines describe can be
+done from the start. Validation (L3) now requires every scenario to carry, among its starting
+items, a tool of every kind a repair or inspection recipe on its deck names; the stricter of the
+two candidate rules ("carried, or sold at some port") because a tool sold only at a far port still
+leaves the repair impossible everywhere else. Markets may still sell tools, as replacements.
+Old saves (schema 5) are not given a torch; the sim half covers them.
+*Sim.* A diagnosed fault's repair is short of a *tool* when nothing aboard provides a kind its
+recipe names (all its steps, as the repair task asks), wanted as one unit of the most specific
+item def providing it (fewest tool kinds, then id). That shortfall is a `partsNeeded` like a part's
+(D47, same payload), so the crew buy a lost welder at a port that sells one and a voyage waits at
+such a waypoint for the purchase. The departure gate (D36) judges each impairment: *out of reach*
+when a diagnosed fault keeping the machine impaired (any `derate`/`inoperable` fault, an
+`overheat` fault while it is blocked or low on output) is short of a tool or parts that nothing
+aboard covers and the market at the port the ship is at cannot sell in full now (out of stock, or
+more than the ship can pay). The card offers a hold only for an impairment in reach (it names the
+worst of those). When none is left there is nothing to choose, so no card: the departure goes
+ahead, any hold ends, and `departureRepairOutOfReach` (narrative, in the default `hookOnEvents`,
+so the narrator dresses it as it does "leave anyway") says why per machine: "No welder torch
+aboard and none to be had at Kessler Drift: leaving with the fusion generator's electrical short
+unrepaired". It is remembered as "leave anyway" is, against the live impairment set (no new state
+field), so it is said once and a new fault or a repair asks again. A hold whose last in-reach
+repair becomes impossible mid-hold (the only tool lost, the part sold out) ends the same way the
+next tick. An undiagnosed fault is still work aboard (diagnosis needs no tool), so the gate waits
+for the diagnosis before judging, and the card never claims what the crew have not found.
+Chosen over releasing every hold after a timeout (it would cut real repairs short) and over a card
+whose only side is "leave" (D36: do not bother the player when there is no choice). This narrows
+D47's "the narrator stocks the part while the ship holds": a hold no longer waits on a part
+nothing here sells; the hook tells the narrator, who can stock the next port. Not changed: an
+engine or generator impaired by integrity alone, with no fault left to repair (only a completed
+repair restores integrity, D35), still holds for ever if held for; no tour has produced one.

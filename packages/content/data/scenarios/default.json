@@ -22,6 +22,11 @@
       "zoneKey": "cargo_stow"
     },
     {
+      "itemDefId": "item.welder_torch",
+      "count": 1,
+      "zoneKey": "cargo_stow"
+    },
+    {
       "itemDefId": "item.spare_parts_stack",
       "count": 10,
       "zoneKey": "cargo_stow"

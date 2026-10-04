@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadBundle, rawBundle } from "./loader";
+import { validateBundle } from "./schemas/validate";
 
 describe("loadBundle", () => {
   it("loads and validates the authored content bundle clean (L1-L3)", () => {
@@ -10,6 +11,33 @@ describe("loadBundle", () => {
       throw new Error(`content bundle failed validation:\n${details.join("\n")}`);
     }
     expect(result.ok).toBe(true);
+  });
+
+  it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (D71)", () => {
+    const raw = rawBundle() as { scenarios: Record<string, { startingItems: unknown[] }> };
+    const scenario = raw.scenarios["scenario.default_freighter_run"];
+    expect(scenario?.startingItems).toContainEqual(
+      expect.objectContaining({ itemDefId: "item.welder_torch", count: 1 }),
+    );
+    const withoutWelder = {
+      ...raw,
+      scenarios: {
+        ...raw.scenarios,
+        "scenario.default_freighter_run": {
+          ...scenario,
+          startingItems: (scenario?.startingItems ?? []).filter(
+            (line) => (line as { itemDefId: string }).itemDefId !== "item.welder_torch",
+          ),
+        },
+      },
+    };
+    const result = validateBundle(withoutWelder);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((i) => i.message)).toContainEqual(
+        expect.stringContaining('tool kind "welder", which "machine.generator" needs'),
+      );
+    }
   });
 
   it("computes a stable hash across repeated loads", () => {

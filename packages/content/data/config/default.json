@@ -146,6 +146,7 @@
       "contractCompleted",
       "departureRiskAccepted",
       "departureHoldLifted",
+      "departureRepairOutOfReach",
       "passengerReturned"
     ]
   },

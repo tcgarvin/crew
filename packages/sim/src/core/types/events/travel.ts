@@ -1,5 +1,14 @@
 /** Travel events (W6). */
-import type { ActorId, DockDefId, ItemId, LocalId, MachineId, PortDefId } from "../ids";
+import type {
+  ActorId,
+  DockDefId,
+  ItemDefId,
+  ItemId,
+  LocalId,
+  LocalKey,
+  MachineId,
+  PortDefId,
+} from "../ids";
 import type { TravelStage } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
@@ -14,6 +23,21 @@ export interface TravelEventPayloads {
   departureRiskAccepted: { readonly machineId: MachineId };
   /** D36: a hold ended because no engine/generator is impaired any more; departure proceeds. */
   departureHoldLifted: { readonly toPortId: PortDefId };
+  /**
+   * D71: the departure goes ahead with `machineId` impaired because its `faultKey` repair is
+   * short of `itemDefId` (a `tool` nothing aboard provides, or `part`s) and the market at
+   * `portId` cannot supply it. Raised instead of the gate card when no other repair is worth
+   * waiting for, or when it ends a hold for repairs that could no longer finish.
+   */
+  departureRepairOutOfReach: {
+    readonly machineId: MachineId;
+    readonly faultKey: LocalKey;
+    readonly itemDefId: ItemDefId;
+    readonly need: "tool" | "part";
+    readonly portId: PortDefId;
+    readonly toPortId: PortDefId;
+    readonly heldForRepairs: boolean;
+  };
   /**
    * D61: someone on the dock could not walk back aboard while the ship was leaving (they cannot
    * move, or their walk failed), so the dock crew brought them up the ramp. The departure is never
@@ -52,6 +76,7 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   departureHeld: "narrative",
   departureRiskAccepted: "narrative",
   departureHoldLifted: "narrative",
+  departureRepairOutOfReach: "narrative",
   broughtAboard: "notable",
   leftOnDock: "notable",
   gearBroughtAboard: "notable",

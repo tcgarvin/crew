@@ -291,6 +291,12 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Leaving with the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()} as it is`;
     case "departureHoldLifted":
       return `Repairs done: departing for ${n.port(event.payload.toPortId)}`;
+    case "departureRepairOutOfReach": {
+      const { machineId, faultKey, itemDefId, need, portId } = event.payload;
+      const machine = (n.machine(machineId) ?? "machine").toLowerCase();
+      const what = need === "tool" ? "No" : "Not enough";
+      return `${what} ${n.itemDef(itemDefId)} aboard and none to be had at ${n.port(portId)}: leaving with the ${machine}'s ${n.faultName(machineId, faultKey)} unrepaired`;
+    }
     case "broughtAboard":
       return `The dock crew brought ${event.payload.name} back aboard at ${n.port(event.payload.portId)}`;
     case "leftOnDock":

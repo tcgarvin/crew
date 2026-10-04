@@ -8,12 +8,14 @@
  * docked until the part is bought and fitted.
  */
 import { describe, expect, it } from "vitest";
+import { rebuildItemIndexes } from "../../core/caches";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
 import { checkInvariants } from "../../core/invariants";
 import { createKernel } from "../../core/kernel";
 import { effectiveMarket } from "../../core/markets";
 import { createRegistry } from "../../core/registry";
+import { describeEvent } from "../../core/render";
 import type { Command } from "../../core/types/commands";
 import type { ContentBundle, MachineDef } from "../../core/types/content";
 import type { SimEvent } from "../../core/types/events";
@@ -43,10 +45,19 @@ const PARTS = "item.test.parts" as ItemDefId;
 const PORT = TINY.port;
 const PRICE = 120;
 
+const TORCH = "item.test.torch" as ItemDefId;
+const TORCH_PRICE = 200;
+
 interface MarketWorldOptions {
   readonly stock?: number;
   readonly money?: number;
   readonly travel?: boolean;
+  /** D71: the misfire repair also needs a `welder`, which only `TORCH` provides. */
+  readonly needsTorch?: boolean;
+  /** Torches stowed aboard at the start (in engineering stores). */
+  readonly torchesAboard?: number;
+  /** Torches the dock's market sells (no line at all when undefined). */
+  readonly torchStock?: number;
 }
 
 /** Crew deck, engine misfire now consumes one `PARTS`, the dock sells `stock` of them. */
@@ -68,6 +79,7 @@ function marketContent(options: MarketWorldOptions): ContentBundle {
         repair: {
           steps: misfire.repair.steps.map((step) => ({
             ...step,
+            tools: options.needsTorch === true ? ["welder"] : step.tools,
             consumes: [{ itemDefId: PARTS, count: 1 }],
           })),
         },
@@ -88,17 +100,40 @@ function marketContent(options: MarketWorldOptions): ContentBundle {
         toolKinds: [],
         mass: 0.5,
       },
+      [TORCH]: {
+        id: TORCH,
+        name: "Welder Torch",
+        stacking: "unique",
+        maxStack: 1,
+        tags: ["tool"],
+        toolKinds: ["welder"],
+        mass: 4,
+      },
     },
     ports: {
       ...base.ports,
       [PORT]: {
         ...port,
-        market: [{ itemDefId: PARTS, count: options.stock ?? 2, price: PRICE }],
+        market: [
+          { itemDefId: PARTS, count: options.stock ?? 2, price: PRICE },
+          ...(options.torchStock === undefined
+            ? []
+            : [{ itemDefId: TORCH, count: options.torchStock, price: TORCH_PRICE }]),
+        ],
       },
     },
     scenarios: {
       ...base.scenarios,
-      [CREW.scenario2]: { ...scenario, startingMoney: options.money ?? 500 },
+      [CREW.scenario2]: {
+        ...scenario,
+        startingMoney: options.money ?? 500,
+        startingItems: [
+          ...scenario.startingItems,
+          ...(options.torchesAboard === undefined
+            ? []
+            : [{ itemDefId: TORCH, count: options.torchesAboard, zoneKey: "engStores" }]),
+        ],
+      },
     },
     hash: "market-test-v1",
   };
@@ -344,53 +379,172 @@ describe("parts market (D47): a repair that needs a part the ship lacks", () => 
 
 describe("parts market and the departure gate (D36, D47)", () => {
   it("a hold for repairs waits docked until the part is bought and fitted, then lifts", () => {
-    const tw = marketWorld({ stock: 0, money: 500, travel: true });
-    const { kernel, world } = tw;
+    const tw = marketWorld({ stock: 1, money: 500, travel: true });
+    const { world } = tw;
     const { machineId } = addEngineFault(world);
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: TINY.port2 } }),
-    );
-    // The gate card: ack its narration hook, then choose "Hold for repairs" (left).
-    run(tw, 200, (w) => w.state.decisions.queue.length > 0);
-    run(tw, 5);
-    const decisionId = world.state.decisions.queue[0];
-    if (decisionId === undefined) throw new Error("no gate decision queued");
-    expect(world.state.decisions.records[decisionId]?.prompt.key).toBe("travel.departureGate");
-    kernel.enqueueCommand(
-      world,
-      cmd({ source: "player", kind: "resolveDecision", payload: { decisionId, side: "left" } }),
-    );
+    holdForRepairs(tw);
 
-    // Nothing to buy here: the ship waits at the dock with the course kept.
-    const waiting = run(tw, 20 * 30);
-    expect(waiting.some((e) => e.type === "departureHeld")).toBe(true);
-    expect(world.state.travel).toMatchObject({
-      stage: "docked",
-      portId: PORT,
-      plannedDestinationId: TINY.port2,
-      holdForRepairs: true,
-    });
-    expect(openPartsNeeded(world)).toHaveLength(1);
-    expect(engineFaults(world, machineId)).toHaveLength(1);
-
-    // The narrator stocks the part; the crew buy it, fix the engine, and the hold lifts.
-    kernel.enqueueCommand(
-      world,
-      cmd({
-        source: "narrator",
-        kind: "stockMarket",
-        payload: { portId: PORT, itemDefId: PARTS, count: 1, price: PRICE },
-      }),
-    );
+    // Docked with the course kept until the part is bought and the engine fixed.
     const released = run(tw, TWO_MINUTES, (w) => w.state.travel.stage !== "docked");
+    expect(released.some((e) => e.type === "departureHeld")).toBe(true);
     expect(released.some((e) => e.type === "partsBought")).toBe(true);
     expect(released.some((e) => e.type === "faultRepaired")).toBe(true);
     expect(released.find((e) => e.type === "departureHoldLifted")).toMatchObject({
       payload: { toPortId: TINY.port2 },
     });
+    expect(released.some((e) => e.type === "departureRepairOutOfReach")).toBe(false);
+    expect(engineFaults(world, machineId)).toEqual([]);
     expect(world.state.travel.stage).not.toBe("docked");
     expect(world.state.travel.holdForRepairs).toBeUndefined();
     expect(world.state.money.balance).toBe(500 - PRICE);
+  });
+});
+
+/** Plan a departure, wait for the gate card, ack its hook and choose "Hold for repairs". */
+function holdForRepairs(tw: TestWorld): void {
+  const { kernel, world } = tw;
+  setCourseToPort2(tw);
+  // The gate card: ack its narration hook, then choose "Hold for repairs" (left).
+  run(tw, 200, (w) => w.state.decisions.queue.length > 0);
+  run(tw, 5);
+  const decisionId = world.state.decisions.queue[0];
+  if (decisionId === undefined) throw new Error("no gate decision queued");
+  expect(world.state.decisions.records[decisionId]?.prompt.key).toBe("travel.departureGate");
+  kernel.enqueueCommand(
+    world,
+    cmd({ source: "player", kind: "resolveDecision", payload: { decisionId, side: "left" } }),
+  );
+}
+
+function setCourseToPort2({ kernel, world }: TestWorld): void {
+  kernel.enqueueCommand(
+    world,
+    cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: TINY.port2 } }),
+  );
+}
+
+function outOfReachEvents(events: readonly SimEvent[]) {
+  return events.filter(
+    (e): e is Extract<SimEvent, { type: "departureRepairOutOfReach" }> =>
+      e.type === "departureRepairOutOfReach",
+  );
+}
+
+function torches(world: World) {
+  return Object.values(world.state.items).filter((i) => i.defId === TORCH);
+}
+
+describe("repairs out of reach never hold the ship (D71)", () => {
+  it("leaves without a card when the part is short and not for sale here, and says why", () => {
+    const tw = marketWorld({ stock: 0, money: 500, travel: true });
+    const { world } = tw;
+    const { machineId } = addEngineFault(world);
+    setCourseToPort2(tw);
+    const events = run(tw, 200, (w) => w.state.travel.stage !== "docked");
+
+    expect(Object.values(world.state.decisions.records)).toEqual([]);
+    const [why, ...more] = outOfReachEvents(events);
+    expect(more).toEqual([]);
+    expect(why).toMatchObject({
+      significance: "narrative",
+      subjectIds: [machineId],
+      payload: {
+        machineId,
+        faultKey: "misfire",
+        itemDefId: PARTS,
+        need: "part",
+        portId: PORT,
+        toPortId: TINY.port2,
+        heldForRepairs: false,
+      },
+    });
+    expect(world.state.travel.stage).toBe("preparingDeparture");
+    expect(engineFaults(world, machineId)).toHaveLength(1);
+    // Told once: the rest of the departure runs without asking or telling again.
+    const after = run(tw, 20 * 30);
+    expect(outOfReachEvents(after)).toEqual([]);
+    expect(Object.values(world.state.decisions.records)).toEqual([]);
+  });
+
+  it("leaves without a card when no welder is aboard or for sale here, naming the torch", () => {
+    const tw = marketWorld({ stock: 2, money: 500, travel: true, needsTorch: true });
+    const { world } = tw;
+    const { machineId } = addEngineFault(world);
+    setCourseToPort2(tw);
+    const events = run(tw, 200, (w) => w.state.travel.stage !== "docked");
+
+    expect(Object.values(world.state.decisions.records)).toEqual([]);
+    const why = outOfReachEvents(events)[0];
+    expect(why?.payload).toMatchObject({ itemDefId: TORCH, need: "tool", heldForRepairs: false });
+    if (why === undefined) throw new Error("no out-of-reach event");
+    const port = world.content.ports[PORT]?.name;
+    expect(describeEvent(why, world.state, world.content)).toBe(
+      `No welder torch aboard and none to be had at ${port}: leaving with the engine's misfire unrepaired`,
+    );
+    // The missing tool is wanted like a part (for a market that sells one).
+    expect(openPartsNeeded(world)).toContainEqual(
+      expect.objectContaining({ payload: { machineId, itemDefId: TORCH, count: 1 } }),
+    );
+  });
+
+  it("offers the hold when the welder is for sale here, then buys it, repairs and lifts", () => {
+    const money = 500;
+    const tw = marketWorld({ stock: 2, money, travel: true, needsTorch: true, torchStock: 1 });
+    const { world } = tw;
+    const { machineId } = addEngineFault(world);
+    holdForRepairs(tw);
+
+    const released = run(tw, TWO_MINUTES, (w) => w.state.travel.stage !== "docked");
+    const bought = released.filter((e) => e.type === "partsBought").map((e) => e.payload);
+    expect(bought).toContainEqual(
+      expect.objectContaining({ itemDefId: TORCH, count: 1, cost: TORCH_PRICE }),
+    );
+    expect(bought).toContainEqual(expect.objectContaining({ itemDefId: PARTS, count: 1 }));
+    expect(released.some((e) => e.type === "faultRepaired")).toBe(true);
+    expect(released.some((e) => e.type === "departureHoldLifted")).toBe(true);
+    expect(outOfReachEvents(released)).toEqual([]);
+    expect(engineFaults(world, machineId)).toEqual([]);
+    expect(torches(world)).toHaveLength(1); // a tool is kept, never consumed
+    expect(world.state.money.balance).toBe(money - TORCH_PRICE - PRICE);
+  });
+
+  it("ends a hold that becomes impossible mid-hold (the only welder is lost), with the reason", () => {
+    const tw = marketWorld({
+      stock: 2,
+      money: 500,
+      travel: true,
+      needsTorch: true,
+      torchesAboard: 1,
+    });
+    const { world } = tw;
+    const { machineId } = addEngineFault(world);
+    holdForRepairs(tw);
+    const holding = run(tw, 1);
+    expect(holding.some((e) => e.type === "departureHeld")).toBe(true);
+    expect(world.state.travel).toMatchObject({ stage: "docked", holdForRepairs: true });
+
+    // The torch goes ashore to the warehouse (as gear left on a dock does, D61), out of reach.
+    const [torch] = torches(world);
+    if (torch === undefined) throw new Error("no torch aboard");
+    expect(torch.location.kind).toBe("onDeck");
+    torch.location = { kind: "inExternalStore", portId: PORT, storeKey: "warehouse" };
+    rebuildItemIndexes(world.state, world.caches.index);
+
+    const released = run(tw, 20 * 30, (w) => w.state.travel.stage !== "docked");
+    const [why, ...more] = outOfReachEvents(released);
+    expect(more).toEqual([]);
+    expect(why?.payload).toMatchObject({
+      machineId,
+      itemDefId: TORCH,
+      need: "tool",
+      portId: PORT,
+      toPortId: TINY.port2,
+      heldForRepairs: true,
+    });
+    expect(released.some((e) => e.type === "departureHoldLifted")).toBe(false);
+    expect(world.state.travel.stage).toBe("preparingDeparture");
+    expect(world.state.travel.holdForRepairs).toBeUndefined();
+    expect(engineFaults(world, machineId)).toHaveLength(1);
+    expect(Object.values(world.state.decisions.records)).toHaveLength(1); // the one gate card
   });
 });

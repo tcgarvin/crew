@@ -664,5 +664,26 @@ describe("bundle validation", () => {
         expect(issues.some((i) => i.message.includes("no item def provides tool kind"))).toBe(true);
       }
     });
+
+    it("rejects a scenario that does not carry a tool its deck's repair recipes need (D71)", () => {
+      const bareScenario = { ...scenario, startingItems: [] };
+      const parsed = validateStructure({ ...bundle, scenarios: { [scenario.id]: bareScenario } });
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(
+          issues.some((i) => i.message.includes('no starting item provides tool kind "wrench"')),
+        ).toBe(true);
+      }
+    });
+
+    it("accepts a scenario that carries every tool its deck's recipes need", () => {
+      const parsed = validateStructure(bundle);
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) {
+        const issues = validatePhysical(parsed.bundle);
+        expect(issues.filter((i) => i.message.includes("no starting item provides"))).toEqual([]);
+      }
+    });
   });
 });
