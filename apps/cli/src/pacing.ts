@@ -75,26 +75,26 @@ export const HUB_PORT_ID = "port.crossroads_hub" as PortDefId;
 export const FAR_PORT_ID = "port.ossory_station" as PortDefId;
 
 /** Host constants, matching `createHost`'s defaults. */
-export const LOOP_INTERVAL_MS = 50;
-export const RUN_AHEAD_CAP_SECONDS = 60;
-export const BURST_TICKS_PER_LOOP = 40;
+const LOOP_INTERVAL_MS = 50;
+const RUN_AHEAD_CAP_SECONDS = 60;
+const BURST_TICKS_PER_LOOP = 40;
 
 /**
  * Narrator budget caps the report compares against: the pre-D51 default of
  * `CREW_NARRATOR_MAX_CALLS_PER_HOUR` (6) and the current one (30, `packages/server/src/env.ts`).
  * Plain numbers, not an import: the server reads the cap from the environment, not a constant.
  */
-export const HOURLY_CAPS = [6, 30] as const;
+const HOURLY_CAPS = [6, 30] as const;
 
-export const DEFAULT_SPEEDS = [1, 2, 4, 8] as const;
-export const DEFAULT_LATENCY_SECONDS = 25;
-export const DEFAULT_SEED = 1;
+const DEFAULT_SPEEDS = [1, 2, 4, 8] as const;
+const DEFAULT_LATENCY_SECONDS = 25;
+const DEFAULT_SEED = 1;
 
 /** How many ticks of sim time the run may take before it is declared stuck. */
 const MAX_SIM_TICKS = 20 * 60 * 60;
 
-export type PacingScenario = "plain" | "freight";
-export const PACING_SCENARIOS: readonly PacingScenario[] = ["plain", "freight"];
+const PACING_SCENARIOS = ["plain", "freight"] as const;
+export type PacingScenario = (typeof PACING_SCENARIOS)[number];
 
 export interface PacingOptions {
   readonly scenario: PacingScenario;
@@ -157,7 +157,7 @@ interface LoadedContent {
 let cachedContent: LoadedContent | undefined;
 
 /** The authored bundle, validated once per process, with the default (first) scenario. */
-export function loadPacingContent(): LoadedContent {
+function loadPacingContent(): LoadedContent {
   if (cachedContent !== undefined) return cachedContent;
   const result = loadBundle();
   if (!result.ok) {
@@ -280,20 +280,12 @@ class VoyageScript {
         if (travel.stage === "docked" && travel.portId === HUB_PORT_ID) {
           if (travel.plannedDestinationId !== undefined) return;
           if (this.scenario === "plain" && !askedAt(world, HUB_PORT_ID)) return;
-          this.send({
-            source: "scenario",
-            kind: "setCourse",
-            payload: { destinationPortId: FAR_PORT_ID },
-          });
+          this.setCourse(FAR_PORT_ID);
           return;
         }
         if (travel.stage === "docked" && travel.portId === FAR_PORT_ID) {
           if (!askedAt(world, FAR_PORT_ID)) return;
-          this.send({
-            source: "scenario",
-            kind: "setCourse",
-            payload: { destinationPortId: HUB_PORT_ID },
-          });
+          this.setCourse(HUB_PORT_ID);
           this.phase = "homeward";
         }
         return;
@@ -310,6 +302,10 @@ class VoyageScript {
       case "done":
         return;
     }
+  }
+
+  private setCourse(destinationPortId: PortDefId): void {
+    this.send({ source: "scenario", kind: "setCourse", payload: { destinationPortId } });
   }
 
   /** The freight job's status at the end of the run, for the report. */
@@ -369,11 +365,17 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
   let simDone = false;
 
   // --- Stub narrator ---------------------------------------------------------------------------
-  let answerDueAtMs: number | undefined;
+  /** The hook awaiting the stub's answer: what `calls` will record, plus its running stall. */
   let pendingCall:
-    | { kind: NarratorHook["kind"]; tick: number; leg: string; lead: number }
+    | {
+        kind: NarratorHook["kind"];
+        tick: number;
+        leg: string;
+        lead: number;
+        answerDueAtMs: number;
+        stallMs: number;
+      }
     | undefined;
-  let pendingStallMs = 0;
   const calls: HookCall[] = [];
   let decisions = 0;
 
@@ -394,9 +396,9 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
         tick: world.state.tick,
         leg: describeLeg(world),
         lead: lead() / tickRate,
+        answerDueAtMs: wallMs + latencyMs,
+        stallMs: 0,
       };
-      pendingStallMs = 0;
-      answerDueAtMs = wallMs + latencyMs;
     } else {
       const head = world.state.decisions.queue[0];
       if (head === undefined) throw new Error("decision halt without a queued decision");
@@ -461,21 +463,19 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
     if (simDone) return;
     accumulatorMs += LOOP_INTERVAL_MS * speed;
 
-    if (answerDueAtMs !== undefined && wallMs >= answerDueAtMs) {
+    if (pendingCall !== undefined && wallMs >= pendingCall.answerDueAtMs) {
       const hook = world.state.narrator.pendingHook;
       if (hook === undefined) throw new Error("answer due without a pending hook");
       send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
-      if (pendingCall === undefined) throw new Error("unreachable");
       calls.push({
         kind: pendingCall.kind,
         tick: pendingCall.tick,
         tickSeconds: pendingCall.tick / tickRate,
         leg: pendingCall.leg,
         leadSeconds: pendingCall.lead,
-        stallSeconds: pendingStallMs / 1000,
+        stallSeconds: pendingCall.stallMs / 1000,
       });
       pendingCall = undefined;
-      answerDueAtMs = undefined;
     }
 
     if (haltStillHolds()) {
@@ -512,7 +512,7 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
     viewTick += advanced;
     const shortfallMs = ((wanted - advanced) * msPerTick) / speed;
     stallMs += shortfallMs;
-    if (pendingCall !== undefined) pendingStallMs += shortfallMs;
+    if (pendingCall !== undefined) pendingCall.stallMs += shortfallMs;
   }
 
   while (!(simDone && viewTick >= world.state.tick)) {
@@ -624,85 +624,91 @@ export function parsePacingArgs(args: readonly string[]): PacingCliOptions | { e
 
 const fmt = (n: number, digits = 1): string => n.toFixed(digits);
 
+const HOOK_COLUMN_ORDER: readonly NarratorHook["kind"][] = [
+  "stageDock",
+  "captainAshore",
+  "quietTooLong",
+  "notableEvent",
+];
+
+/** The hook kinds that fired in any of `results`, in report order. */
 function hookColumns(results: readonly PacingResult[]): NarratorHook["kind"][] {
-  const kinds = new Set<NarratorHook["kind"]>();
-  for (const r of results) {
-    for (const kind of Object.keys(r.hooksByKind) as NarratorHook["kind"][]) kinds.add(kind);
-  }
-  const order: NarratorHook["kind"][] = [
-    "stageDock",
-    "captainAshore",
-    "quietTooLong",
-    "notableEvent",
+  return HOOK_COLUMN_ORDER.filter((kind) => results.some((r) => r.hooksByKind[kind] !== undefined));
+}
+
+/** One scenario's runs, slowest speed first as given; `sample` is the first. */
+interface ScenarioRows {
+  readonly scenario: PacingScenario;
+  readonly rows: readonly PacingResult[];
+  readonly sample: PacingResult;
+}
+
+/** The speed table, the legs (speed-independent, from the sample) and the calls at both ends. */
+function scenarioSection({ scenario, rows, sample }: ScenarioRows): string[] {
+  const kinds = hookColumns(rows);
+  const lines = [
+    "",
+    `## Scenario: ${scenario}`,
+    "",
+    `| Speed | Sim s | ${kinds.join(" | ")} | Calls | Wall s | Startup s | Stall s | Calls/h | Done |`,
+    `|---|---|${kinds.map(() => "---").join("|")}|---|---|---|---|---|---|`,
   ];
-  return order.filter((k) => kinds.has(k));
+  for (const r of rows) {
+    const counts = kinds.map((k) => String(r.hooksByKind[k] ?? 0));
+    lines.push(
+      `| ${r.speed}x | ${fmt(r.simSeconds)} | ${counts.join(" | ")} | ${r.totalCalls} | ${fmt(r.wallSeconds)} | ${fmt(r.startupSeconds)} | ${fmt(r.stallSeconds)} | ${fmt(r.callsPerHour, 0)} | ${r.completed ? "yes" : "NO"} |`,
+    );
+  }
+  lines.push("", "Legs (sim seconds are speed-independent):", "");
+  lines.push("| Leg | Sim s | Hooks during leg |", "|---|---|---|");
+  for (const leg of sample.legs) {
+    const hooks = Object.entries(leg.hooksByKind)
+      .map(([k, n]) => `${k} ${n}`)
+      .join(", ");
+    lines.push(
+      `| ${leg.fromPortId} → ${leg.toPortId} | ${fmt(leg.simSeconds)} | ${hooks || "none"} |`,
+    );
+  }
+  const fastest = rows.at(-1) ?? sample;
+  for (const r of fastest === sample ? [sample] : [sample, fastest]) {
+    lines.push("", `Calls at ${r.speed}x (sim time, lead in hand when raised, viewer stall):`, "");
+    for (const call of r.calls) {
+      lines.push(
+        `- t=${fmt(call.tickSeconds, 0)}s ${call.kind} at ${call.leg} (lead ${fmt(call.leadSeconds, 0)} s, stall ${fmt(call.stallSeconds)} s)`,
+      );
+    }
+  }
+  return lines;
+}
+
+/** How one round trip, and back-to-back trips, compare with each hourly narrator cap. */
+function budgetLines({ scenario, rows, sample }: ScenarioRows): string[] {
+  const lines = HOURLY_CAPS.map((cap) => {
+    const verdict = sample.totalCalls <= cap ? "within" : "over";
+    return `- ${scenario}: ${sample.totalCalls} calls per round trip is ${verdict} a cap of ${cap}/hour (one trip uses ${fmt((100 * sample.totalCalls) / cap, 0)}% of it).`;
+  });
+  const perHour = rows.map((r) => `${r.speed}x ≈ ${fmt(r.callsPerHour, 0)}/h`).join(", ");
+  lines.push(`- ${scenario}: back-to-back trips would spend ${perHour}.`);
+  return lines;
 }
 
 /** The markdown report: one table per scenario, a legs table, and the cap comparison. */
 export function formatPacingReport(results: readonly PacingResult[]): string {
-  const lines: string[] = [];
   const first = results[0];
   if (first === undefined) return "pacing: no results";
-  lines.push(
+  const groups = PACING_SCENARIOS.flatMap((scenario): ScenarioRows[] => {
+    const rows = results.filter((r) => r.scenario === scenario);
+    const sample = rows[0];
+    return sample === undefined ? [] : [{ scenario, rows, sample }];
+  });
+  return [
     `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quietTooLongSeconds ${first.quietTooLongSeconds})`,
-  );
-  for (const scenario of PACING_SCENARIOS) {
-    const rows = results.filter((r) => r.scenario === scenario);
-    if (rows.length === 0) continue;
-    const kinds = hookColumns(rows);
-    lines.push("", `## Scenario: ${scenario}`, "");
-    lines.push(
-      `| Speed | Sim s | ${kinds.join(" | ")} | Calls | Wall s | Startup s | Stall s | Calls/h | Done |`,
-      `|---|---|${kinds.map(() => "---").join("|")}|---|---|---|---|---|---|`,
-    );
-    for (const r of rows) {
-      const counts = kinds.map((k) => String(r.hooksByKind[k] ?? 0));
-      lines.push(
-        `| ${r.speed}x | ${fmt(r.simSeconds)} | ${counts.join(" | ")} | ${r.totalCalls} | ${fmt(r.wallSeconds)} | ${fmt(r.startupSeconds)} | ${fmt(r.stallSeconds)} | ${fmt(r.callsPerHour, 0)} | ${r.completed ? "yes" : "NO"} |`,
-      );
-    }
-    const sample = rows[0];
-    if (sample !== undefined) {
-      lines.push("", "Legs (sim seconds are speed-independent):", "");
-      lines.push("| Leg | Sim s | Hooks during leg |", "|---|---|---|");
-      for (const leg of sample.legs) {
-        const hooks = Object.entries(leg.hooksByKind)
-          .map(([k, n]) => `${k} ${n}`)
-          .join(", ");
-        lines.push(
-          `| ${leg.fromPortId} → ${leg.toPortId} | ${fmt(leg.simSeconds)} | ${hooks || "none"} |`,
-        );
-      }
-      const fastest = rows[rows.length - 1];
-      for (const r of fastest === sample || fastest === undefined ? [sample] : [sample, fastest]) {
-        lines.push(
-          "",
-          `Calls at ${r.speed}x (sim time, lead in hand when raised, viewer stall):`,
-          "",
-        );
-        for (const call of r.calls) {
-          lines.push(
-            `- t=${fmt(call.tickSeconds, 0)}s ${call.kind} at ${call.leg} (lead ${fmt(call.leadSeconds, 0)} s, stall ${fmt(call.stallSeconds)} s)`,
-          );
-        }
-      }
-    }
-  }
-  lines.push("", "## Narrator budget", "");
-  for (const scenario of PACING_SCENARIOS) {
-    const rows = results.filter((r) => r.scenario === scenario);
-    const sample = rows[0];
-    if (sample === undefined) continue;
-    for (const cap of HOURLY_CAPS) {
-      const verdict = sample.totalCalls <= cap ? "within" : "over";
-      lines.push(
-        `- ${scenario}: ${sample.totalCalls} calls per round trip is ${verdict} a cap of ${cap}/hour (one trip uses ${fmt((100 * sample.totalCalls) / cap, 0)}% of it).`,
-      );
-    }
-    const perHour = rows.map((r) => `${r.speed}x ≈ ${fmt(r.callsPerHour, 0)}/h`).join(", ");
-    lines.push(`- ${scenario}: back-to-back trips would spend ${perHour}.`);
-  }
-  return lines.join("\n");
+    ...groups.flatMap(scenarioSection),
+    "",
+    "## Narrator budget",
+    "",
+    ...groups.flatMap(budgetLines),
+  ].join("\n");
 }
 
 export function runPacingCli(args: readonly string[]): { output: string; exitCode: 0 | 1 } {
