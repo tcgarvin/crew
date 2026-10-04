@@ -2,6 +2,7 @@ import {
   DOCK_FOREGROUND_KINDS,
   DOCK_POST_KINDS,
   DOCK_PROP_KINDS,
+  type DeckDefId,
   type DockDef,
   type DockPropDef,
   HULL_SIZE_BOX,
@@ -32,6 +33,10 @@ if (scenario === undefined) throw new Error("no scenario");
 const deck = bundle.decks[scenario.deckId];
 if (deck === undefined) throw new Error("no deck");
 const layout = buildDeckLayout(deck, bundle);
+// Mk1 is the deck smaller than the M berth box (Mk2, the scenario's, fills it).
+const mk1 = bundle.decks["deck.freighter_mk1" as DeckDefId];
+if (mk1 === undefined) throw new Error("no Mk1 deck");
+const mk1Layout = buildDeckLayout(mk1, bundle);
 const hull = hullGeometry(layout);
 const stars = buildStarField();
 const docks = bundle.docks ?? {};
@@ -382,10 +387,10 @@ describe("dockShape", () => {
         return typeof value === "function" ? value.bind(target) : value;
       },
     });
-    const berth = berthInView(dock, layout);
+    const berth = berthInView(dock, mk1Layout);
     drawDock(recording, dock, {
       origin: { x: 0, y: 0 },
-      ship: shipInDock(berth, layout),
+      ship: shipInDock(berth, mk1Layout),
       alpha: 1,
       clamps: 1,
       px: 0.05,
@@ -400,6 +405,6 @@ describe("dockShape", () => {
     );
     expect(apron?.[3]).toBeCloseTo(maxY - minY, 0);
     // Mk1 is smaller than the M box, so the pad shows round it.
-    expect(layout.width).toBeLessThan(maxX - minX);
+    expect(mk1Layout.width).toBeLessThan(maxX - minX);
   });
 });

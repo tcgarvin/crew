@@ -182,9 +182,14 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
           : row.slice(0, origin.x) + ".".repeat(box.w) + row.slice(origin.x + box.w),
       ),
     };
-    expect(dockGraftIssues({ ...bundle, docks: { [hub.id]: flooded } })).toEqual([
-      expect.stringContaining("overlaps deck"),
-    ]);
+    // The graft is checked against every deck, so each one reports the overlap.
+    const issues = dockGraftIssues({ ...bundle, docks: { [hub.id]: flooded } });
+    expect(issues).toHaveLength(Object.keys(bundle.decks).length);
+    for (const deckId of Object.keys(bundle.decks)) {
+      expect(issues).toContainEqual(
+        expect.stringMatching(new RegExp(`on ${deckId}: .*overlaps deck`)),
+      );
+    }
   });
 });
 

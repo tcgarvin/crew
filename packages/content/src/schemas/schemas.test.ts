@@ -675,9 +675,10 @@ describe("bundle validation", () => {
     it("gives each of a scenario's crew a crew spawn point", () => {
       const crowded = { ...scenario, crew: ["crew.test.mara", "crew.test.mara"] };
       const issues = physicalIssues({ ...bundle, scenarios: { [scenario.id]: crowded } });
-      expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([
+      // Two crew also outgrow the deck's two beds (crew + 1, D73); validate-hull.test.ts covers that.
+      expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toContain(
         'scenarios.scenario.test.default.crew: 2 crew but "deck.test.main" has 1 crew spawn points',
-      ]);
+      );
     });
 
     it("rejects a spawn point off the floor", () => {
