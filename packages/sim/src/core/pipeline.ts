@@ -1,18 +1,18 @@
-import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
-import { configTicks } from "./clock";
 /**
  * The tick pipeline (SD §5.2–5.3). `runStep` executes one tick: every registered entry in
  * `PHASES` order (see `registry.pipeline()`), honouring cadence and actor staggering, then
  * finalises the tick's events (phase 8).
  */
-import { applyDueCommands } from "./commands";
+import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
+import { configTicks } from "./clock";
+import { applyDueCommands, pushCapped } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
 import { raiseHookIfIdle } from "./hooks";
 import type { KernelRegistry } from "./registry";
 import { createRngApi } from "./rng";
-import type { EventDraft, SimEvent } from "./types/events";
+import type { SimEvent } from "./types/events";
 import type { ActorId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { PlannerConfig, PlannerStage, StepCtx, System } from "./types/pipeline";
@@ -146,10 +146,11 @@ function runPlannerStage(
     actor.pendingIntent = intent;
     actor.lastPlannedTick = base.tick;
     if (intent.kind === "task" || intent.kind === "personal") {
-      const traces = caches.diagnostics.plannerTraces;
-      traces.push({ tick: base.tick, actorId, intent });
-      const ringSize = config.events.traceRingSize;
-      if (traces.length > ringSize) traces.splice(0, traces.length - ringSize);
+      pushCapped(
+        caches.diagnostics.plannerTraces,
+        { tick: base.tick, actorId, intent },
+        config.events.traceRingSize,
+      );
     }
   }
 }
@@ -176,7 +177,7 @@ function runPlannerStage(
  * (`stageDock`, `captainAshore`, `notableEvent` in phase 4; `policyDecision` just before this
  * system) wins and the quiet one yields.
  */
-export const quietTimerSystem: System = {
+const quietTimerSystem: System = {
   name: "core.quietTimer",
   phase: "finalize",
   run(ctx) {
@@ -213,14 +214,13 @@ export const decisionPendingSystem: System = {
     if (kernelCache.announcedDecisionId === head) return;
     kernelCache.announcedDecisionId = head;
     const decision = ctx.state.decisions.records[head];
-    const draft: EventDraft = {
+    ctx.emit({
       type: "decisionPending",
       subjectIds: decision === undefined ? [head] : [head, decision.perspectiveActorId],
       causeIds: [],
       source: "sim",
       payload: { decisionId: head },
-    };
-    ctx.emit(draft);
+    });
   },
 };
 
@@ -228,7 +228,7 @@ export const decisionPendingSystem: System = {
  * Index refresh (phase 2): item holder/container indexes when `dirty.inventory`, and the
  * actor-by-compartment index every tick (cheap; actors move every tick).
  */
-export const indexSystem: System = {
+const indexSystem: System = {
   name: "core.indexes",
   phase: "topology",
   run(ctx) {

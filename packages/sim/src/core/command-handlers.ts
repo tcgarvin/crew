@@ -1,18 +1,19 @@
-import { commandActor, isFitForCommand } from "./command-actor";
 /**
  * Handlers for the kernel-owned command kinds: scenario setup (`scenarioSpawn`,
- * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook` and `resolveDecision`. Other kinds
- * belong to their systems and register through the same `registerCommandHandler` path.
+ * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `surfaceDecision` and
+ * `resolveDecision`. Other kinds belong to their systems and register through the same
+ * `registerCommandHandler` path.
  */
+import { commandActor, isFitForCommand } from "./command-actor";
 import {
   type AppliedCommand,
-  type ApplyCtx,
   type CommandHandler,
   NO_TEMP_REFS,
   type ValidateCtx,
   type Validation,
   causedBy,
   ok,
+  pushCapped,
   reject,
   validateCommand,
 } from "./commands";
@@ -31,12 +32,12 @@ import type {
 import { AUTHORITY } from "./types/commands/authority";
 import type { PhysicalLocation } from "./types/common";
 import type { CrewDef } from "./types/content";
-import type { DecisionOption } from "./types/decisions";
+import type { Decision, DecisionOption } from "./types/decisions";
 import type { ActorId, CommandId, DecisionId, EntityId, TempRef } from "./types/ids";
 import type { Item } from "./types/ship";
 
 /** W2 decision: how many resolved hook IDs `narrator.recentHookIds` keeps. */
-export const RECENT_HOOK_IDS_CAP = 16;
+const RECENT_HOOK_IDS_CAP = 16;
 
 const TEMP_REF_PATTERN = /^\$[A-Za-z0-9_]+$/;
 
@@ -331,10 +332,7 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
     const hookId = command.payload.hookId;
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined` (CONTRACTS rule 2).
     delete narrator.pendingHook;
-    narrator.recentHookIds.push(hookId);
-    if (narrator.recentHookIds.length > RECENT_HOOK_IDS_CAP) {
-      narrator.recentHookIds.splice(0, narrator.recentHookIds.length - RECENT_HOOK_IDS_CAP);
-    }
+    pushCapped(narrator.recentHookIds, hookId, RECENT_HOOK_IDS_CAP);
     ctx.emit({
       ...causedBy(command),
       type: "narratorHookResolved",
@@ -356,6 +354,23 @@ function optionFromSide(side: DecisionCardSide): DecisionOption {
     commands: [...side.commands],
     ...(side.aftermath === undefined ? {} : { aftermath: side.aftermath }),
   };
+}
+
+/**
+ * A card option's command draft as a `player` command with id `id`, or `undefined` when the
+ * player may not issue its kind (option commands always run as the player).
+ */
+function asPlayerCommand(
+  id: string,
+  draft: DecisionCardSide["commands"][number],
+): Command | undefined {
+  if (!(AUTHORITY.player as readonly CommandKind[]).includes(draft.kind)) return undefined;
+  return {
+    id: id as CommandId,
+    source: "player",
+    kind: draft.kind,
+    payload: draft.payload,
+  } as Command;
 }
 
 interface SurfaceDecisionPlan {
@@ -380,18 +395,13 @@ function surfaceDecisionHandler(
         ["right", card.right],
       ] as const) {
         for (const [index, draft] of side.commands.entries()) {
-          if (!(AUTHORITY.player as readonly CommandKind[]).includes(draft.kind)) {
+          const sub = asPlayerCommand(`${command.id}#${which}#${index}`, draft);
+          if (sub === undefined) {
             return reject(
               "unauthorized",
               `surfaceDecision: ${which} option ${index} ("${draft.kind}") is not a player command`,
             );
           }
-          const sub = {
-            id: `${command.id}#${which}#${index}` as CommandId,
-            source: "player",
-            kind: draft.kind,
-            payload: draft.payload,
-          } as Command;
           const validation = validateCommand(registry, ctx, sub);
           if (!validation.ok) {
             return reject(
@@ -436,7 +446,7 @@ function surfaceDecisionHandler(
     apply(ctx, command, plan): AppliedCommand {
       const { card } = command.payload;
       const decisionId = allocateId(ctx.state, "decision");
-      ctx.state.decisions.records[decisionId] = {
+      const record: Decision = {
         id: decisionId,
         origin: command.source === "narrator" ? "narrator" : "policy",
         perspectiveActorId: plan.perspectiveActorId,
@@ -447,13 +457,9 @@ function surfaceDecisionHandler(
         createdTick: ctx.tick,
         ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),
       };
-      const record = ctx.state.decisions.records[decisionId];
+      ctx.state.decisions.records[decisionId] = record;
       // D70: a card from one of the port's people waits to be delivered in person.
-      queueOrHold(
-        ctx,
-        decisionId,
-        record === undefined ? undefined : cardSpeaker(ctx.state, record),
-      );
+      queueOrHold(ctx, decisionId, cardSpeaker(ctx.state, record));
       return NO_TEMP_REFS;
     },
   };
@@ -496,15 +502,10 @@ function resolveDecisionHandler(
       }
       const subCommands: { command: Command; plan: unknown }[] = [];
       for (const [index, draft] of option.commands.entries()) {
-        if (!(AUTHORITY.player as readonly CommandKind[]).includes(draft.kind)) {
+        const sub = asPlayerCommand(`${command.id}#${index}`, draft);
+        if (sub === undefined) {
           return reject("unauthorized", `option command "${draft.kind}" is not a player command`);
         }
-        const sub = {
-          id: `${command.id}#${index}` as CommandId,
-          source: "player",
-          kind: draft.kind,
-          payload: draft.payload,
-        } as Command;
         const validation = validateCommand(registry, ctx, sub);
         if (!validation.ok) {
           return reject(

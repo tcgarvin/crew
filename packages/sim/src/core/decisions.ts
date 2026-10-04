@@ -1,5 +1,3 @@
-import { raiseHookIfIdle } from "./hooks";
-import { allocateId } from "./ids";
 /**
  * Kernel-raised ("policy") decisions and their narration (D37, 2026-10-01).
  *
@@ -13,6 +11,8 @@ import { allocateId } from "./ids";
  * (D25), and a narrator call per offer would spend the hourly budget on cards that are dressed
  * already.
  */
+import { raiseHookIfIdle } from "./hooks";
+import { allocateId } from "./ids";
 import type { TextRef } from "./types/common";
 import type { Decision, DecisionOption } from "./types/decisions";
 import type { DecisionId, MachineId } from "./types/ids";
@@ -20,7 +20,7 @@ import type { StepCtx } from "./types/pipeline";
 import type { WorldState } from "./types/state";
 
 /** What a policy decision needs from its system; the kernel fills in the rest. */
-export interface PolicyDecisionDraft {
+interface PolicyDecisionDraft {
   readonly perspectiveActorId: Decision["perspectiveActorId"];
   readonly prompt: TextRef;
   readonly left: DecisionOption;
@@ -57,7 +57,7 @@ export function queuePolicyDecision(ctx: StepCtx, draft: PolicyDecisionDraft): D
 }
 
 /** A kernel-raised decision whose `policyDecision` hook has not been raised yet. */
-export function needsNarration(decision: Decision | undefined): boolean {
+function needsNarration(decision: Decision | undefined): boolean {
   return (
     decision !== undefined &&
     decision.origin === "policy" &&

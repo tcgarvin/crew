@@ -68,18 +68,13 @@ function inventoryOf(state: ReadonlyWorldState, actorId: ActorId): InventoryEntr
   return out;
 }
 
-function buildSelf(
-  world: World,
-  actor: ReadonlyActor,
-  geometry: DeckGeometry | undefined,
-): SelfView {
+function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
   const { state } = world;
   const config = world.config.values;
   const location = actor.location;
   const onDeck = location.kind === "onDeck";
   const tile = onDeck ? tileOf(location) : undefined;
-  const compartmentId =
-    onDeck && geometry !== undefined ? compartmentAt(geometry, location.x, location.y) : undefined;
+  const compartmentId = onDeck ? compartmentAt(geometry, location.x, location.y) : undefined;
   return {
     id: actor.id,
     name: actor.name,

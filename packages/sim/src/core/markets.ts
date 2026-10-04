@@ -21,16 +21,19 @@ export function marketSeed(port: Pick<PortDef, "market">): MarketStock {
   return stock;
 }
 
+/** `portId`'s content seed, or an empty market for a port content does not have. */
+function contentSeed(content: Pick<ContentBundle, "ports">, portId: PortDefId): MarketStock {
+  const port = content.ports[portId];
+  return port === undefined ? {} : marketSeed(port);
+}
+
 /** The live market at `portId`: state if the port has been seeded, else its content seed. */
 export function effectiveMarket(
   state: Pick<ReadonlyWorldState, "markets">,
   content: Pick<ContentBundle, "ports">,
   portId: PortDefId,
 ): Readonly<MarketStock> {
-  const live = state.markets[portId];
-  if (live !== undefined) return live;
-  const port = content.ports[portId];
-  return port === undefined ? {} : marketSeed(port);
+  return state.markets[portId] ?? contentSeed(content, portId);
 }
 
 /** How many of `itemDefId` the crew can buy at `portId` right now toward `wanted` units. */
@@ -53,12 +56,8 @@ export function ensureMarket(
   content: Pick<ContentBundle, "ports">,
   portId: PortDefId,
 ): MarketStock {
-  const live = state.markets[portId];
-  if (live !== undefined) return live;
-  const port = content.ports[portId];
-  const seeded = port === undefined ? {} : marketSeed(port);
-  state.markets[portId] = seeded;
-  return seeded;
+  state.markets[portId] ??= contentSeed(content, portId);
+  return state.markets[portId];
 }
 
 /**

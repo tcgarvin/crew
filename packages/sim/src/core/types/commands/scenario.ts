@@ -1,8 +1,8 @@
-import type { Needs } from "../actor";
 /**
  * Scenario/fixture setup commands (SD §19.2: "scenario setup can spawn entities and faults before
  * execution"). Source `scenario` only; never reachable by the narrator or player.
  */
+import type { Needs } from "../actor";
 import type { PhysicalLocation } from "../common";
 import type { ActorId, CrewDefId, ItemDefId, LocalKey, MachineId, TempRef } from "../ids";
 

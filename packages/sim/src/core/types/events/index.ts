@@ -1,4 +1,3 @@
-import type { CommandSource } from "../commands";
 /**
  * The Event union (SD §19.3, review §C.4).
  *
@@ -8,6 +7,7 @@ import type { CommandSource } from "../commands";
  * default significance. Each system owns one file in this folder exporting `<System>EventPayloads`
  * and a significance catalog; this file merges them.
  */
+import type { CommandSource } from "../commands";
 import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";
@@ -86,18 +86,11 @@ export interface EventEnvelope<T extends EventType = EventType> {
  * W0 decision: named `SimEvent`, not `Event`, to avoid shadowing the DOM `Event` global in web code.
  */
 export type SimEvent = { [T in EventType]: EventEnvelope<T> }[EventType];
-export type EventOfType<T extends EventType> = Extract<SimEvent, { type: T }>;
 
 /** What a system passes to `ctx.emit`; phase 8 completes it. */
 export type EventDraft = {
-  [T in EventType]: {
-    readonly type: T;
-    readonly subjectIds: readonly EntityId[];
-    readonly locationRef?: LocationRef;
-    readonly causeIds: readonly (EventId | CommandId)[];
-    readonly source: EventSource;
+  [T in EventType]: Omit<EventEnvelope<T>, "id" | "tick" | "seq" | "significance"> & {
     /** Override the catalog default. */
     readonly significance?: Significance;
-    readonly payload: EventPayloadMap[T];
   };
 }[EventType];

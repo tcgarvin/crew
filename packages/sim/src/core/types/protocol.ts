@@ -1,4 +1,3 @@
-import type { Command, EnqueueResult } from "./commands";
 /**
  * Worker ↔ main-thread protocol (PLAN §6 W0, D14 run-ahead with buffered playback).
  *
@@ -15,6 +14,7 @@ import type { Command, EnqueueResult } from "./commands";
  *
  * All messages are structured-clone safe plain data. `requestId` correlates replies.
  */
+import type { Command, EnqueueResult } from "./commands";
 import type { Tick } from "./common";
 import type { Decision, NarratorHook } from "./decisions";
 import type { SimEvent } from "./events";

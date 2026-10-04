@@ -7,7 +7,7 @@
  * free dock floor tile to it; never on a freight area, a ramp landing or another post's tile, so
  * crates, the crew's way aboard and the gate stay clear. Every tile is in the deck frame.
  */
-import { dockAreaTiles, dockToDeck, isDockFloor } from "./docks";
+import { EDGE_STEP, dockAreaTiles, dockToDeck, isDockFloorAt } from "./docks";
 import { floorSet } from "./floor-set";
 import { allocateId } from "./ids";
 import { hashString32 } from "./rng";
@@ -43,7 +43,7 @@ export function postFacing(post: Pick<DockPostDef, "facing">): number {
 }
 
 /** A uint32 palette seed for a person's dot, from their name. */
-export function lookSeedOf(name: string): number {
+function lookSeedOf(name: string): number {
   return hashString32(name.toLowerCase());
 }
 
@@ -59,19 +59,13 @@ function rampLandings(
 ): TileCoord[] {
   const deck = content.decks[deckId];
   if (deck === undefined) return [];
-  const step: Readonly<Record<EdgeSide, TileCoord>> = {
-    n: { x: 0, y: -1 },
-    e: { x: 1, y: 0 },
-    s: { x: 0, y: 1 },
-    w: { x: -1, y: 0 },
-  };
   const out: TileCoord[] = [];
   for (const door of deck.doors) {
     if (door.kind !== "ramp" || (only !== undefined && door.key !== only)) continue;
     const { x, y, side } = door.edge;
-    const across = { x: x + step[side].x, y: y + step[side].y };
+    const across = { x: x + EDGE_STEP[side].x, y: y + EDGE_STEP[side].y };
     for (const tile of [{ x, y }, across]) {
-      if (isDockFloor(dock, tile.x + dock.shipAt.x, tile.y + dock.shipAt.y)) out.push(tile);
+      if (isDockFloorAt(dock, tile)) out.push(tile);
     }
   }
   return out;
@@ -149,20 +143,19 @@ export function localTiles(state: Pick<WorldState, "dockside">): Set<string> {
  * when everything near is full. The search walks through taken and reserved tiles, only never
  * stops on one.
  */
-export function freeTileNear(
+function freeTileNear(
   dock: DockDef,
   from: TileCoord,
   taken: ReadonlySet<string>,
   reserved: ReadonlySet<string>,
 ): TileCoord | undefined {
-  const floor = (t: TileCoord) => isDockFloor(dock, t.x + dock.shipAt.x, t.y + dock.shipAt.y);
   const seen = new Set<string>([tileKey(from)]);
   let frontier: TileCoord[] = [from];
   for (let depth = 0; depth <= PLACEMENT_RADIUS && frontier.length > 0; depth++) {
     const next: TileCoord[] = [];
     for (const tile of frontier) {
       const key = tileKey(tile);
-      if (floor(tile) && !taken.has(key) && !reserved.has(key)) return tile;
+      if (isDockFloorAt(dock, tile) && !taken.has(key) && !reserved.has(key)) return tile;
       for (const [dx, dy] of [
         [1, 0],
         [-1, 0],
@@ -171,7 +164,7 @@ export function freeTileNear(
       ] as const) {
         const n = { x: tile.x + dx, y: tile.y + dy };
         const nKey = tileKey(n);
-        if (seen.has(nKey) || !floor(n)) continue;
+        if (seen.has(nKey) || !isDockFloorAt(dock, n)) continue;
         seen.add(nKey);
         next.push(n);
       }
@@ -182,7 +175,7 @@ export function freeTileNear(
 }
 
 /** What a local is, before a tile is chosen for them. */
-export interface LocalSpec {
+interface LocalSpec {
   readonly name: string;
   readonly role: string;
   readonly origin: LocalOrigin;
@@ -239,27 +232,23 @@ function stagedSpec(
   placement: StagedPlacement,
 ): LocalSpec | undefined {
   const who = placement.who;
-  const label = placement.label === undefined ? {} : { label: placement.label };
-  const origin: LocalOrigin = { kind: "staged", source: who.kind };
+  const staged = {
+    origin: { kind: "staged", source: who.kind } satisfies LocalOrigin,
+    postKey: placement.postKey,
+    ...(placement.label === undefined ? {} : { label: placement.label }),
+  };
   switch (who.kind) {
     case "seed": {
       const seed = content.ports[portId]?.castSeed.find(
         (s) => s.name.toLowerCase() === who.name.toLowerCase(),
       );
       if (seed === undefined) return undefined;
-      return { name: seed.name, role: seed.role, origin, postKey: placement.postKey, ...label };
+      return { name: seed.name, role: seed.role, ...staged };
     }
     case "cast":
-      return { name: who.name, role: who.role, origin, postKey: placement.postKey, ...label };
+      return { name: who.name, role: who.role, ...staged };
     case "newFace":
-      return {
-        name: who.name,
-        role: who.role,
-        origin,
-        postKey: placement.postKey,
-        look: who.look,
-        ...label,
-      };
+      return { name: who.name, role: who.role, look: who.look, ...staged };
   }
 }
 
@@ -278,7 +267,7 @@ function floorSpec(entry: FloorSetEntry): LocalSpec {
  * someone already in the floor set moves them (and gives them the plan's label) instead of
  * adding a second one; the plan's people keep the order it gave.
  */
-export function dockPeople(
+function dockPeople(
   state: Pick<WorldState, "seed" | "jobs" | "actors">,
   content: ContentBundle,
   portId: PortDefId,
@@ -356,7 +345,7 @@ function placeProps(
   return props;
 }
 
-export interface DressedDock {
+interface DressedDock {
   readonly locals: readonly Local[];
   /** People the dock had no room for (logged by the caller). */
   readonly unplaced: readonly string[];

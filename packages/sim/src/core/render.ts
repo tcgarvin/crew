@@ -4,8 +4,10 @@
  * Polish A adds the items aboard (D28) and a one-line ship headline (D27). D61 adds the dock
  * alongside, with everyone and everything on it flagged `onDock`.
  */
+import { findItemDef } from "./defs";
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
+import { byId } from "./ids";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation } from "./types/common";
 import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
@@ -182,6 +184,8 @@ const PASSAGE_END_LINES: Readonly<
 type Names = {
   actor(id: string): string | undefined;
   machine(id: string): string | undefined;
+  /** The machine's name in lower case, or "machine", for mid-sentence use. */
+  machineLower(id: string): string;
   port(id: string): string;
   item(id: string): string;
   itemDef(defId: string): string;
@@ -195,24 +199,20 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     const machine = state.machines[id as Machine["id"]];
     return machine === undefined ? undefined : content.machines[machine.defId];
   };
+  const machine = (id: string) => machineDef(id)?.name;
   return {
     actor: (id) => state.actors[id as Actor["id"]]?.name,
-    machine: (id) => machineDef(id)?.name,
-    port: (id) => content.ports[id as keyof ContentBundle["ports"]]?.name ?? id,
+    machine,
+    machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
+    port: (id) => portName(content, id as PortDefId),
     item: (id) => {
       const item = state.items[id as keyof ReadonlyWorldState["items"]];
-      const def =
-        item === undefined
-          ? undefined
-          : (content.items[item.defId] ?? state.defs.dynamic.items[item.defId]);
+      const def = item === undefined ? undefined : findItemDef(content, state, item.defId);
       const name = def?.name.toLowerCase() ?? "cargo";
       return item?.stacking === "stack" && item.count > 1 ? `${item.count}× ${name}` : name;
     },
     itemDef: (defId) =>
-      (
-        content.items[defId as keyof ContentBundle["items"]] ??
-        state.defs.dynamic.items[defId as keyof ReadonlyWorldState["defs"]["dynamic"]["items"]]
-      )?.name.toLowerCase() ?? "parts",
+      findItemDef(content, state, defId as Item["defId"])?.name.toLowerCase() ?? "parts",
     faultName: (machineId, faultKey) =>
       machineDef(machineId)
         ?.faults.find((f) => f.key === faultKey)
@@ -255,9 +255,9 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "faultOccurred":
       return `${n.machine(event.payload.machineId) ?? "A machine"}: ${n.faultName(event.payload.machineId, event.payload.faultKey)}`;
     case "faultObserved":
-      return `${who} noticed ${n.symptomName(event.payload.machineId, event.payload.symptomKey)} from the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}`;
+      return `${who} noticed ${n.symptomName(event.payload.machineId, event.payload.symptomKey)} from the ${n.machineLower(event.payload.machineId)}`;
     case "faultDiagnosed":
-      return `Diagnosed the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}: ${n.faultName(event.payload.machineId, event.payload.faultKey)}`;
+      return `Diagnosed the ${n.machineLower(event.payload.machineId)}: ${n.faultName(event.payload.machineId, event.payload.faultKey)}`;
     case "faultRepaired":
       return `${n.machine(event.payload.machineId) ?? "Machine"} repaired`;
     case "machineDerated": {
@@ -286,14 +286,14 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
     case "departureHeld":
-      return `Holding for repairs to the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()}`;
+      return `Holding for repairs to the ${n.machineLower(event.payload.machineId)}`;
     case "departureRiskAccepted":
-      return `Leaving with the ${(n.machine(event.payload.machineId) ?? "machine").toLowerCase()} as it is`;
+      return `Leaving with the ${n.machineLower(event.payload.machineId)} as it is`;
     case "departureHoldLifted":
       return `Repairs done: departing for ${n.port(event.payload.toPortId)}`;
     case "departureRepairOutOfReach": {
       const { machineId, faultKey, itemDefId, need, portId } = event.payload;
-      const machine = (n.machine(machineId) ?? "machine").toLowerCase();
+      const machine = n.machineLower(machineId);
       const what = need === "tool" ? "No" : "Not enough";
       return `${what} ${n.itemDef(itemDefId)} aboard and none to be had at ${n.port(portId)}: leaving with the ${machine}'s ${n.faultName(machineId, faultKey)} unrepaired`;
     }
@@ -358,6 +358,13 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
   }
 }
 
+/** The event type humanized, followed by the names of its actor and machine subjects. */
+function genericLine(event: SimEvent, n: Names): string {
+  const names = subjectNames(event, n);
+  const head = humanize(event.type);
+  return names.length === 0 ? head : `${head}: ${names.join(", ")}`;
+}
+
 /** One-line ticker text for an event: a specific human line where one exists, else generic. */
 export function describeEvent(
   event: SimEvent,
@@ -365,11 +372,7 @@ export function describeEvent(
   content: ContentBundle,
 ): string {
   const n = namer(state, content);
-  const line = specificLine(event, n);
-  if (typeof line === "string") return line;
-  const names = subjectNames(event, n);
-  const head = humanize(event.type);
-  return names.length === 0 ? head : `${head}: ${names.join(", ")}`;
+  return specificLine(event, n) ?? genericLine(event, n);
 }
 
 /** Ticker text, or `null` for an event the ticker should skip. */
@@ -379,22 +382,14 @@ export function tickerLine(
   content: ContentBundle,
 ): string | null {
   if (!isTickerEvent(event)) return null;
-  const line = specificLine(event, namer(state, content));
-  if (line === null) return null;
-  return describeEvent(event, state, content);
+  const n = namer(state, content);
+  const line = specificLine(event, n);
+  return line === null ? null : (line ?? genericLine(event, n));
 }
 
 // ---------------------------------------------------------------------------------------------
 // Items aboard (Polish A, D28)
 // ---------------------------------------------------------------------------------------------
-
-function itemDef(
-  item: Pick<DeepReadonly<Item>, "defId">,
-  state: ReadonlyWorldState,
-  content: ContentBundle,
-): DeepReadonly<ItemDef> | undefined {
-  return content.items[item.defId] ?? state.defs.dynamic.items[item.defId];
-}
 
 function itemKind(def: DeepReadonly<ItemDef> | undefined): RenderItemKind {
   if (def === undefined) return "other";
@@ -494,7 +489,7 @@ export function renderItems(state: ReadonlyWorldState, content: ContentBundle): 
   for (const item of Object.values(state.items)) {
     const location = renderItemLocation(item, state, content);
     if (location === null || !isOnMap(item, state)) continue;
-    const def = itemDef(item, state, content);
+    const def = findItemDef(content, state, item.defId);
     items.push({
       id: item.id,
       defId: item.defId,
@@ -636,7 +631,7 @@ function awaitedAboard(state: ReadonlyWorldState, content: ContentBundle): strin
   if (state.deck.dock === undefined) return undefined;
   const ashore = Object.values(state.actors)
     .filter((a) => a.disembarking !== true && isOnDock(content, state, a.location))
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+    .sort(byId);
   return ashore[0]?.name;
 }
 
@@ -790,9 +785,9 @@ export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionP
 }
 
 /** D66: the locals on the dock alongside, in id order. */
-export function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
+function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
   return Object.values(state.dockside.locals)
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }))
+    .sort(byId)
     .map((local) => ({
       id: local.id,
       name: local.name,
@@ -810,14 +805,11 @@ export function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
 }
 
 /** D66: the staging plan's props on the dock alongside. */
-export function renderDockProps(
-  state: ReadonlyWorldState,
-  content: ContentBundle,
-): RenderDockProp[] {
+function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): RenderDockProp[] {
   const deckId = state.deck.dock?.deckId;
   if (deckId === undefined) return [];
   return state.dockside.props.map((prop) => {
-    const def = itemDef({ defId: prop.itemDefId }, state, content);
+    const def = findItemDef(content, state, prop.itemDefId);
     return {
       defId: prop.itemDefId,
       name: def?.name ?? "Crate",
@@ -833,11 +825,9 @@ export function renderDockProps(
 
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
-  const actors: RenderActor[] = [];
-  for (const actor of Object.values(state.actors)) {
-    const rendered = renderActor(actor, state, content);
-    if (rendered !== null) actors.push(rendered);
-  }
+  const actors = Object.values(state.actors).flatMap(
+    (actor) => renderActor(actor, state, content) ?? [],
+  );
   const machines: RenderMachine[] = Object.values(state.machines).map((machine) => ({
     id: machine.id,
     state: machineState(machine, content, world.config.values),

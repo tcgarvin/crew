@@ -122,8 +122,6 @@ export interface OnDeckLocation {
   readonly y: number;
 }
 
-export type PhysicalLocationKind = PhysicalLocation["kind"];
-
 export type EquipSlot = "hands" | "body" | "back" | "belt";
 
 // ---------------------------------------------------------------------------------------------

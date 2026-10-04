@@ -15,11 +15,10 @@
  * a port without a dock map.
  */
 import { dockAlongsideAt, dockPost } from "./docks";
-import type { DeepReadonly } from "./types/common";
-import type { Tick } from "./types/common";
+import type { DeepReadonly, Tick } from "./types/common";
 import type { Decision, HeldCard } from "./types/decisions";
 import type { Local } from "./types/dockside";
-import type { CardDeliveryReason, EventDraft } from "./types/events";
+import type { CardDeliveryReason } from "./types/events";
 import type { DecisionId, PortDefId } from "./types/ids";
 import type { ReadonlyWorldState, StepCtx } from "./types/pipeline";
 
@@ -28,7 +27,7 @@ type Ctx = Pick<StepCtx, "state" | "content" | "tick" | "emit">;
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Someone of the ship: crew or a passenger, wherever they are (aboard, on the dock, ashore). */
-export function isShipsPerson(state: Pick<ReadonlyWorldState, "actors">, name: string): boolean {
+function isShipsPerson(state: Pick<ReadonlyWorldState, "actors">, name: string): boolean {
   return Object.values(state.actors).some((a) => sameName(a.name, name));
 }
 
@@ -56,7 +55,7 @@ export function cardSpeaker(
  * once: docked at a port whose dock is alongside, the speaker named and not of the ship, and a
  * way for them to meet (they are on the dock, or it has a gate to the port beyond).
  */
-export function holdingPort(
+function holdingPort(
   state: ReadonlyWorldState,
   content: Ctx["content"],
   speaker: string | undefined,
@@ -144,14 +143,13 @@ export function deliverHeldCard(
   const stale = staleReason(ctx.state, decision);
   if (stale !== undefined) {
     if (decision !== undefined && decision.status === "pending") decision.status = "dropped";
-    const dropped: EventDraft = {
+    ctx.emit({
       type: "decisionDropped",
       subjectIds: [decisionId],
       causeIds: [],
       source: "sim",
       payload: { decisionId, reason: stale },
-    };
-    ctx.emit(dropped);
+    });
     return;
   }
   decisions.queue.push(decisionId);

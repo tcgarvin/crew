@@ -1,64 +1,31 @@
 export * from "./core/index";
-export { SYSTEMS_PLACEHOLDER } from "./systems/index";
-export { PLANNER_PLACEHOLDER } from "./planner/index";
-export { VIEW_PLACEHOLDER } from "./view/index";
 
 /**
- * W0 decision (Integration 1): explicit re-exports from `systems/spatial` for hosts (the web
- * worker, tests). Deliberately not `export *` — `systems/index.ts` also aggregates
- * power/equipment/travel/commerce, which are mid-flight; re-exporting everything from here would
- * make this file's build depend on their in-progress state. Add names here as a host needs them.
+ * W0 decision (Integration 1): explicit re-exports from the systems for hosts (the web worker,
+ * the CLI, other packages' tests), deliberately not `export *` of `systems/index.ts`. Add names
+ * here as a host needs them; `apps/web/src/worker/registry.ts` shows the registration order.
  */
-export {
-  checkDockFitsDeck,
-  compartmentAt,
-  deckGeometry,
-  isWalkable,
-  registerSpatial,
-  requestMove,
-  type MoveTarget,
-} from "./systems/spatial/index";
-// `rotateOffset` isn't re-exported from `systems/spatial/index` yet; import straight from its
-// module rather than editing that aggregator (out of scope for Integration 1).
+export { checkDockFitsDeck, compartmentAt, registerSpatial } from "./systems/spatial/index";
 export { rotateOffset } from "./systems/spatial/geometry";
-
-/** Commerce (W6) is complete enough for hosts to register: the narrator package's own tests need
- * it to enqueue `spawnAtBoundary`/`offerJob`/etc. through a real kernel. */
+export { spatialViolations } from "./systems/spatial/invariants";
 export {
-  PASSENGER_CREW_DEF_ID,
-  PASSENGER_OVERDUE_PROMPT_KEY,
-  affordableUnits,
+  commerceTaskDerivations,
   marketBlock,
+  PASSENGER_OVERDUE_PROMPT_KEY,
   registerCommerce,
 } from "./systems/commerce/index";
-
-/**
- * Integration 2: everything a host needs to build the full V1 registry (see
- * `apps/web/src/worker/registry.ts` for the order).
- */
+export { commerceViolations } from "./systems/commerce/invariants";
 export { equipmentTaskDerivation, registerEquipmentSystems } from "./systems/equipment/index";
 export {
   hopCount,
   jobBlockingAcceptance,
-  nextHop,
   registerTravel,
-  stagingAnswered,
   shortestPath,
   travelTaskDerivations,
-  waitingForPassenger,
-  type ShortestPath,
 } from "./systems/travel/index";
-export { commerceTaskDerivations } from "./systems/commerce/index";
-export { registerNeeds } from "./systems/needs/index";
-export {
-  equipmentStages,
-  registerWork,
-  type RegisterWorkOptions,
-  type StageExecutor,
-} from "./systems/work/index";
-export { workViolations } from "./systems/work/invariants";
-export { spatialViolations } from "./systems/spatial/invariants";
 export { travelViolations } from "./systems/travel/invariants";
-export { commerceViolations } from "./systems/commerce/invariants";
+export { registerNeeds } from "./systems/needs/index";
+export { equipmentStages, registerWork } from "./systems/work/index";
+export { workViolations } from "./systems/work/invariants";
 export { registerPlannerDefaults } from "./planner/index";
-export { registerAgentView, toAgentViewSnapshot } from "./view/index";
+export { toAgentViewSnapshot } from "./view/index";

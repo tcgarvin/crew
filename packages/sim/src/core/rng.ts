@@ -34,7 +34,7 @@ export function hashString32(text: string): number {
 }
 
 /** One sfc32 step. Returns the new state and a 32-bit unsigned output. */
-export function sfc32Next(state: Sfc32State): { state: Sfc32State; value: number } {
+function sfc32Next(state: Sfc32State): { state: Sfc32State; value: number } {
   let [a, b, c, d] = state;
   a |= 0;
   b |= 0;

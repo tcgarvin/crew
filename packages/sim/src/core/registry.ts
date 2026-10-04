@@ -1,4 +1,3 @@
-import { registerCoreCommandHandlers } from "./command-handlers";
 /**
  * The kernel registry: the one way other workstreams plug systems, planners, command handlers,
  * the AgentView builder and cache builders into the kernel.
@@ -6,9 +5,10 @@ import { registerCoreCommandHandlers } from "./command-handlers";
  * W2 decision: registration is explicit but the resulting pipeline is still static per registry:
  * entries are ordered by `PHASES` and, within a phase, by registration order (core entries
  * first). `createKernel(registry)` binds a kernel to one registry; the exported `kernel` uses
- * `defaultRegistry`, which the `register*` free functions write to. Tests build isolated
- * registries with `createRegistry()` so nothing leaks between them.
+ * `defaultRegistry`. Hosts and tests build their own registries with `createRegistry()` so nothing
+ * leaks between them.
  */
+import { registerCoreCommandHandlers } from "./command-handlers";
 import type { CommandHandler } from "./commands";
 import { coreSystems } from "./pipeline";
 import type { CommandKind } from "./types/commands";
@@ -23,7 +23,7 @@ import {
 } from "./types/pipeline";
 import type { AgentView } from "./types/view";
 
-export type AgentViewBuilder = (world: World, actorId: ActorId) => AgentView;
+type AgentViewBuilder = (world: World, actorId: ActorId) => AgentView;
 
 /** Rebuilds one workstream's derived cache from `world.state` + content (e.g. W3 nav). */
 export interface CacheBuilder {
@@ -66,7 +66,7 @@ const notImplementedBuilder: AgentViewBuilder = () => {
   throw new NotImplementedError("buildAgentView (W4a)");
 };
 
-export interface CreateRegistryOptions {
+interface CreateRegistryOptions {
   /** Register the kernel-core systems and command handlers (default true). */
   readonly core?: boolean;
 }
@@ -159,18 +159,5 @@ export function createRegistry(options: CreateRegistryOptions = {}): KernelRegis
   return registry;
 }
 
-/** The registry behind the exported `kernel`. Other workstreams register into this one. */
+/** The registry behind the exported `kernel`: the core systems and command handlers only. */
 export const defaultRegistry: KernelRegistry = createRegistry();
-
-export const registerSystem = (system: System): Unregister =>
-  defaultRegistry.registerSystem(system);
-export const registerPlanner = (planner: Planner): Unregister =>
-  defaultRegistry.registerPlanner(planner);
-export const registerCommandHandler = <K extends CommandKind, P>(
-  kind: K,
-  handler: CommandHandler<K, P>,
-): Unregister => defaultRegistry.registerCommandHandler(kind, handler);
-export const setAgentViewBuilder = (builder: AgentViewBuilder): Unregister =>
-  defaultRegistry.setAgentViewBuilder(builder);
-export const registerCacheBuilder = (builder: CacheBuilder): Unregister =>
-  defaultRegistry.registerCacheBuilder(builder);

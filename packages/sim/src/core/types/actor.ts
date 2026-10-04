@@ -13,7 +13,6 @@ import type {
   CrewDefId,
   DoorId,
   EntityId,
-  ItemId,
   LocalKey,
   MachineId,
   ProblemId,
@@ -223,9 +222,6 @@ export interface Actor {
   disembarking?: true;
 }
 
-/**
- * Inventory is not stored on the actor. W0 decision: an item's `location` is the single source of
- * truth for custody; "what is X carrying" is a derived index in `DerivedCaches`, so the two can
- * never disagree.
- */
-export type CarriedInventory = ItemId[];
+// Inventory is not stored on the actor. W0 decision: an item's `location` is the single source of
+// truth for custody; "what is X carrying" is a derived index in `DerivedCaches`, so the two can
+// never disagree.
