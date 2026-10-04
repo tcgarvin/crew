@@ -361,7 +361,8 @@
         "x": 31,
         "y": 1
       },
-      "rotation": 0
+      "rotation": 0,
+      "powerDomain": "main"
     },
     {
       "key": "mess_table_1",
@@ -674,7 +675,7 @@
     {
       "key": "spawn_captain",
       "tile": {
-        "x": 29,
+        "x": 28,
         "y": 3
       },
       "tags": ["crew"]
@@ -690,7 +691,7 @@
     {
       "key": "spawn_engineer",
       "tile": {
-        "x": 5,
+        "x": 4,
         "y": 5
       },
       "tags": ["crew"]
@@ -714,7 +715,7 @@
     {
       "key": "spawn_cook",
       "tile": {
-        "x": 16,
+        "x": 15,
         "y": 3
       },
       "tags": ["crew"]
@@ -723,7 +724,7 @@
       "key": "spawn_medic",
       "tile": {
         "x": 9,
-        "y": 2
+        "y": 4
       },
       "tags": ["crew"]
     },

@@ -4,7 +4,7 @@
   "name": "Harmonica",
   "stacking": "unique",
   "maxStack": 1,
-  "tags": [],
+  "tags": ["personal"],
   "toolKinds": [],
   "mass": 0.2
 }

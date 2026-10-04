@@ -2,7 +2,7 @@
   "$schema": "../../schema-json/scenario.schema.json",
   "id": "scenario.default_freighter_run",
   "name": "Freighter Run",
-  "deckId": "deck.freighter_mk1",
+  "deckId": "deck.freighter_mk2",
   "startPortId": "port.crossroads_hub",
   "crew": [
     "crew.mara_osei",
@@ -12,7 +12,8 @@
     "crew.jax_okonkwo",
     "crew.bettina_solheim",
     "crew.oyelaran_abiodun",
-    "crew.sunniva_park"
+    "crew.sunniva_park",
+    "crew.noor_haddad"
   ],
   "startingMoney": 5000,
   "startingItems": [
