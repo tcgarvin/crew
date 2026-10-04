@@ -6,6 +6,7 @@ import {
   answerDecision,
   appendDecision,
   appendTicker,
+  clearHighlights,
   highlightEvent,
   visibleLog,
 } from "./log";
@@ -87,6 +88,33 @@ describe("the ship's log (D55)", () => {
     const result = highlightEvent(log, 11 as Tick, "Bell.");
     expect(result.found).toBe(false);
     expect(result.log).toBe(log);
+  });
+
+  it("puts the highlighted line first among its tick's lines, so the compact log shows it", () => {
+    const log = appendTicker(
+      [],
+      [line(4, "earlier"), line(10, "Coolant pump: worn bearing"), line(10, "Coolant pump at 50%")],
+    );
+    expect(texts(visibleLog(log, 10 as Tick))).toEqual([
+      "Coolant pump at 50%",
+      "Coolant pump: worn bearing",
+      "earlier",
+    ]);
+    const marked = highlightEvent(log, 10 as Tick, "Coolant pump: worn bearing").log;
+    expect(texts(visibleLog(marked, 10 as Tick))).toEqual([
+      "Coolant pump: worn bearing",
+      "Coolant pump at 50%",
+      "earlier",
+    ]);
+  });
+
+  it("clears every highlight, leaving an unmarked log as it was (D76 addendum)", () => {
+    const log = appendTicker([], [line(1, "a"), line(2, "b")]);
+    expect(clearHighlights(log)).toBe(log);
+    const marked = highlightEvent(log, 2 as Tick, "b").log;
+    const cleared = clearHighlights(marked);
+    expect(cleared.some((e) => e.kind === "event" && e.highlight === true)).toBe(false);
+    expect(texts(cleared)).toEqual(["a", "b"]);
   });
 
   it("keeps at most LOG_LIMIT entries, dropping the oldest", () => {

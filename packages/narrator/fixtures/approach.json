@@ -11,8 +11,8 @@
   "snapshot": {
     "schemaVersion": 8,
     "simVersion": "0.1.0",
-    "contentHash": "bb30022f55ad977a",
-    "configHash": "bb30022f55ad977a",
+    "contentHash": "2a1cebe8eb3f5f5b",
+    "configHash": "2a1cebe8eb3f5f5b",
     "savedAtTick": 1800,
     "config": {
       "time": {
@@ -185,7 +185,7 @@
         "localSaveEverySeconds": 10,
         "remoteSaveEverySeconds": 60,
         "frameEveryTicks": 2,
-        "slowDownOnEvents": ["navHazard", "faultOccurred", "helmUnattended", "driftingChanged"]
+        "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
       },
       "watches": {
         "dayworkerOnWatches": [0, 1],

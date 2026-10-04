@@ -38,7 +38,12 @@ import {
   readLocalSave,
   writeLocalSave,
 } from "./host/saves";
-import { type SlowdownMark, SlowdownQueue, shouldSlowDown, slowdownToast } from "./host/slowdown";
+import {
+  SLOWDOWN_COOLDOWN_SECONDS,
+  type SlowdownMark,
+  SlowdownQueue,
+  slowdownToast,
+} from "./host/slowdown";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
 import type { DockTable } from "./render/dock";
@@ -58,10 +63,12 @@ import { dockInspection } from "./ui/dockInspection";
 import { inspectItem } from "./ui/itemInspection";
 import {
   type CardEntry,
+  HIGHLIGHT_SECONDS,
   type LogEntry,
   answerDecision,
   appendDecision,
   appendTicker,
+  clearHighlights,
   highlightEvent,
   visibleLog,
 } from "./ui/log";
@@ -143,7 +150,9 @@ export function App() {
   /** The playback speed, for the playback loop's auto-slowdown check (D76). */
   const speedRef = useRef(1);
   /** D76: events on `host.slowDownOnEvents`, queued by tick until playback reaches them. */
-  const slowdownRef = useRef(new SlowdownQueue(config.values.host.slowDownOnEvents));
+  const slowdownRef = useRef(
+    new SlowdownQueue(config.values.host.slowDownOnEvents, SLOWDOWN_COOLDOWN_SECONDS * tickRate),
+  );
   const sections = useMemo(() => clockSections(bundle, scenarioId), [bundle, scenarioId]);
 
   const [frame, setFrame] = useState<RenderFrame>();
@@ -226,6 +235,8 @@ export function App() {
     connectionRef.current = connection;
     const playback = playbackRef.current;
     let disposed = false;
+    /** D76 addendum: clears a slowdown's highlighted lines a few seconds after it. */
+    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     /** Ask the worker for a save envelope (the current, possibly run-ahead, state). */
     function requestEnvelope(): Promise<SaveEnvelope> {
@@ -412,6 +423,13 @@ export function App() {
      */
     function slowDown(due: readonly SlowdownMark[]): void {
       onSetSpeed(1);
+      // The last slowdown's lines are history now; this one's are lit for a few seconds.
+      setLog((prev) => clearHighlights(prev));
+      clearTimeout(highlightTimer);
+      highlightTimer = setTimeout(
+        () => setLog((prev) => clearHighlights(prev)),
+        HIGHLIGHT_SECONDS * 1000,
+      );
       due.forEach(({ event }, index) => {
         request(
           connection,
@@ -438,7 +456,16 @@ export function App() {
       (step) => {
         setFrame(step.frame);
         const due = slowdownRef.current.takeDue(step.viewTick);
-        if (shouldSlowDown(due, speedRef.current, pausedRef.current)) slowDown(due);
+        if (
+          slowdownRef.current.shouldSlowDown(
+            due,
+            step.viewTick,
+            speedRef.current,
+            pausedRef.current,
+          )
+        ) {
+          slowDown(due);
+        }
       },
       (viewTick) => connection.send({ type: "viewProgress", viewTick }),
     );
@@ -482,6 +509,7 @@ export function App() {
       disposed = true;
       answerHookRef.current = undefined;
       clearInterval(remoteTimer);
+      clearTimeout(highlightTimer);
       loop.stop();
       unsubscribe();
       connection.dispose();

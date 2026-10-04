@@ -4,29 +4,62 @@
  * a hazard or a fault flying by. Keyed by view tick: the worker runs ahead (D14), so an event is
  * queued when it arrives and acted on only once the player sees its tick.
  *
+ * D76 addendum (slice-2 QA): slowing is for what the player should stop and see, not for every
+ * listed event. Good news on a listed type does not slow (`worthSlowingFor`: the engines coming
+ * back), and once the game has slowed, nothing slows it again for `SLOWDOWN_COOLDOWN_SECONDS` of
+ * view time, so a fault and the drift it causes are one stop, not two.
+ *
  * Pure, no DOM or timers; `App.tsx` feeds it the worker's `events` and asks it on every playback
  * step. Cards already pause the game on their own (D14), so they are not in the list.
  */
 import type { SimEvent, Tick } from "@crew/sim";
+
+/** View seconds after a slowdown during which further marks fall due without slowing. */
+export const SLOWDOWN_COOLDOWN_SECONDS = 120;
 
 /** One queued event that should slow the game when playback reaches `event.tick`. */
 export interface SlowdownMark {
   readonly event: SimEvent;
 }
 
+/**
+ * Whether a listed event is news the player should stop for. The list says which types matter;
+ * this keeps a type's good news from slowing the game (QA: "Engines back: under way again"
+ * stopped 8× as often as the drift did).
+ */
+export function worthSlowingFor(event: SimEvent): boolean {
+  switch (event.type) {
+    case "driftingChanged":
+      return event.payload.drifting;
+    default:
+      return true;
+  }
+}
+
 export class SlowdownQueue {
   private readonly types: ReadonlySet<string>;
+  private readonly cooldownTicks: number;
   /** Ascending by tick; equal ticks in arrival order. */
   private marks: SlowdownMark[] = [];
+  /** The view tick of the last slowdown; −∞ before the first, so the first always may. */
+  private lastSlowedAt = Number.NEGATIVE_INFINITY;
 
-  constructor(slowDownOnEvents: readonly string[]) {
+  /**
+   * @param slowDownOnEvents the event types that may slow the game (`host.slowDownOnEvents`).
+   * @param cooldownTicks view ticks after a slowdown during which nothing slows it again.
+   */
+  constructor(slowDownOnEvents: readonly string[], cooldownTicks: number) {
+    if (!Number.isFinite(cooldownTicks) || cooldownTicks < 0) {
+      throw new RangeError(`SlowdownQueue: cooldownTicks must be ≥ 0, got ${cooldownTicks}`);
+    }
     this.types = new Set(slowDownOnEvents);
+    this.cooldownTicks = cooldownTicks;
   }
 
-  /** Queue the events of `events` whose type is on the list. */
+  /** Queue the events of `events` whose type is on the list and that are worth slowing for. */
   add(events: readonly SimEvent[]): void {
     for (const event of events) {
-      if (!this.types.has(event.type)) continue;
+      if (!this.types.has(event.type) || !worthSlowingFor(event)) continue;
       let index = this.marks.length;
       while (index > 0 && (this.marks[index - 1]?.event.tick ?? 0) > event.tick) index -= 1;
       this.marks.splice(index, 0, { event });
@@ -42,21 +75,29 @@ export class SlowdownQueue {
     return count === 0 ? [] : this.marks.splice(0, count);
   }
 
+  /**
+   * What to do when marks fall due at `viewTick`: slow down only from fast-forward, only while
+   * playing, and not within the cooldown of the last slowdown. At 1× or paused there is nothing
+   * to slow, and within the cooldown the player has just been stopped once; either way the marks
+   * are dropped (the line is in the log anyway). A `true` answer starts a new cooldown.
+   */
+  shouldSlowDown(
+    due: readonly SlowdownMark[],
+    viewTick: Tick,
+    speed: number,
+    paused: boolean,
+  ): boolean {
+    if (due.length === 0 || speed <= 1 || paused) return false;
+    // A view tick behind the last slowdown is a new game or a loaded save: no cooldown carries.
+    const since = viewTick - this.lastSlowedAt;
+    if (since >= 0 && since < this.cooldownTicks) return false;
+    this.lastSlowedAt = viewTick;
+    return true;
+  }
+
   get size(): number {
     return this.marks.length;
   }
-}
-
-/**
- * What to do when marks fall due: slow down only from fast-forward and only while playing. At 1×
- * or paused there is nothing to slow, and the marks are dropped (the line is in the log anyway).
- */
-export function shouldSlowDown(
-  due: readonly SlowdownMark[],
-  speed: number,
-  paused: boolean,
-): boolean {
-  return due.length > 0 && speed > 1 && !paused;
 }
 
 /** The toast: "Slowed to 1×: Debris field: Noor Haddad took us through clean". */

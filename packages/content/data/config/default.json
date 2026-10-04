@@ -170,7 +170,7 @@
     "localSaveEverySeconds": 10,
     "remoteSaveEverySeconds": 60,
     "frameEveryTicks": 2,
-    "slowDownOnEvents": ["navHazard", "faultOccurred", "helmUnattended", "driftingChanged"]
+    "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
   },
   "watches": {
     "dayworkerOnWatches": [0, 1],

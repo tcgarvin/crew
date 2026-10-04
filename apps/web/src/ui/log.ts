@@ -111,12 +111,53 @@ export function highlightEvent(
   return { log: next, found: true };
 }
 
-/** What playback has reached, newest first. */
+/**
+ * D76 addendum: the slowdown's mark is for the moment it happens. It is cleared when the next
+ * slowdown marks its own lines and after `HIGHLIGHT_SECONDS` (the caller's timer), so old lines do
+ * not stay lit for the rest of the session.
+ */
+export const HIGHLIGHT_SECONDS = 8;
+
+/** Every highlighted line unmarked; the log itself when nothing was marked. */
+export function clearHighlights(log: readonly LogEntry[]): LogEntry[] {
+  if (!log.some((e) => e.kind === "event" && e.highlight === true)) return log as LogEntry[];
+  return log.map((entry) => {
+    if (entry.kind !== "event" || entry.highlight !== true) return entry;
+    const { highlight: _cleared, ...rest } = entry;
+    return rest;
+  });
+}
+
+/**
+ * What playback has reached, newest first. Within one tick a highlighted line comes first: the
+ * fault that slowed the game and the derating it caused share a tick, and on a phone the compact
+ * log shows only its top line or two (D72 addendum), so the line the toast names leads.
+ */
 export function visibleLog(log: readonly LogEntry[], viewTick: Tick): LogEntry[] {
   const shown: LogEntry[] = [];
   for (let i = log.length - 1; i >= 0; i -= 1) {
     const entry = log[i];
     if (entry !== undefined && entry.tick <= viewTick) shown.push(entry);
   }
-  return shown;
+  return leadWithHighlights(shown);
+}
+
+function isHighlighted(entry: LogEntry): boolean {
+  return entry.kind === "event" && entry.highlight === true;
+}
+
+/** Stable: within each run of one tick, highlighted lines first, the rest in their order. */
+function leadWithHighlights(entries: LogEntry[]): LogEntry[] {
+  if (!entries.some(isHighlighted)) return entries;
+  const ordered: LogEntry[] = [];
+  let start = 0;
+  while (start < entries.length) {
+    const tick = entries[start]?.tick;
+    let end = start;
+    while (end < entries.length && entries[end]?.tick === tick) end += 1;
+    const run = entries.slice(start, end);
+    ordered.push(...run.filter(isHighlighted), ...run.filter((e) => !isHighlighted(e)));
+    start = end;
+  }
+  return ordered;
 }
