@@ -6,32 +6,13 @@ import type { NarratorCtx, RunNarrator } from "../narrator";
 import {
   TEST_NOTES,
   buildTestApp,
+  createGame,
   echoNarrator,
   fakeEnvelope,
   mintUser,
   readJson,
+  sendJson,
 } from "../test-helpers";
-
-async function authed(
-  app: ReturnType<typeof buildTestApp>["app"],
-  token: string,
-  path: string,
-  init: RequestInit = {},
-) {
-  return app.request(path, {
-    ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
-  });
-}
-
-async function createGame(app: ReturnType<typeof buildTestApp>["app"], token: string) {
-  const res = await authed(app, token, "/api/games", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ title: "Freighter Run" }),
-  });
-  return (await res.json()) as { game: { id: string } };
-}
 
 function narratorBody(gameId: string, savedAtTick = 0, hookKind = "quietTooLong") {
   return {
@@ -65,11 +46,13 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id)),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id),
+    );
     expect(res.status).toBe(200);
 
     const fallbackLines = warn.mock.calls.filter((call) => call[0] === "[narrator] fallback");
@@ -93,11 +76,13 @@ describe("narrator", () => {
     const { app } = buildTestApp({ runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id)),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id),
+    );
     expect(res.status).toBe(200);
     expect(warn.mock.calls.filter((call) => call[0] === "[narrator] fallback")).toHaveLength(0);
   });
@@ -121,11 +106,13 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id, 0, "quietTooLong")),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id, 0, "quietTooLong"),
+    );
     expect(res.status).toBe(200);
 
     const droppedLines = warn.mock.calls.filter((call) => call[0] === "[narrator] dropped");
@@ -145,11 +132,13 @@ describe("narrator", () => {
     const { app } = buildTestApp({ runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id)),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id),
+    );
     expect(res.status).toBe(200);
     expect(warn.mock.calls.filter((call) => call[0] === "[narrator] dropped")).toHaveLength(0);
   });
@@ -160,11 +149,13 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id)),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id),
+    );
     expect(res.status).toBe(200);
     const body = await readJson(res);
     expect(body.commands).toEqual([]);
@@ -180,18 +171,22 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const first = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id, 0)),
-    });
+    const first = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id, 0),
+    );
     expect(first.status).toBe(200);
 
-    const second = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(narratorBody(game.id, 500)),
-    });
+    const second = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      narratorBody(game.id, 500),
+    );
     expect(second.status).toBe(429);
     const secondBody = await readJson(second);
     expect(secondBody.error.code).toBe("budgetExceeded");
@@ -206,11 +201,7 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
     const post = (body: unknown) =>
-      authed(app, token, `/api/games/${game.id}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, body);
 
     expect((await post(narratorBody(game.id, 0))).status).toBe(200);
 
@@ -229,11 +220,7 @@ describe("narrator", () => {
     const user = await mintUser(second.app);
     const { game: other } = await createGame(second.app, user.token);
     const postOther = (body: unknown) =>
-      authed(second.app, user.token, `/api/games/${other.id}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      sendJson(second.app, user.token, "POST", `/api/games/${other.id}/narrator`, body);
     expect((await postOther(narratorBody(other.id, 0))).status).toBe(200);
     expect((await postOther(narratorBody(other.id, 500, "policyDecision"))).status).toBe(429);
   });
@@ -244,11 +231,7 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
     const post = (body: unknown) =>
-      authed(app, token, `/api/games/${game.id}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, body);
 
     expect((await post(narratorBody(game.id, 0))).status).toBe(200);
     const spaced = await post(narratorBody(game.id, 40));
@@ -287,12 +270,7 @@ describe("narrator", () => {
       token: string,
       gameId: string,
       tick = 0,
-    ) =>
-      authed(app, token, `/api/games/${gameId}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(narratorBody(gameId, tick)),
-      });
+    ) => sendJson(app, token, "POST", `/api/games/${gameId}/narrator`, narratorBody(gameId, tick));
 
     it("503s notConfigured (not retryable) and logs the call as an error", async () => {
       vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -377,10 +355,9 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gameId: game.id, hook: {} }),
+    const res = await sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, {
+      gameId: game.id,
+      hook: {},
     });
     expect(res.status).toBe(400);
   });
@@ -434,11 +411,13 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
     for (const tick of [0, 500]) {
-      const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(narratorBody(game.id, tick)),
-      });
+      const res = await sendJson(
+        app,
+        token,
+        "POST",
+        `/api/games/${game.id}/narrator`,
+        narratorBody(game.id, tick),
+      );
       expect(res.status).toBe(200);
     }
     expect(seen[0]).toEqual({});
@@ -470,11 +449,13 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(bodyWithoutGameId),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "POST",
+      `/api/games/${game.id}/narrator`,
+      bodyWithoutGameId,
+    );
 
     expect(res.status).toBe(200);
     const body = await readJson(res);
@@ -486,10 +467,9 @@ describe("narrator", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gameId: game.id, hook: {} }),
+    const res = await sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, {
+      gameId: game.id,
+      hook: {},
     });
 
     expect(res.status).toBe(400);

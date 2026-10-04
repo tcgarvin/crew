@@ -1,28 +1,16 @@
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { loadEnv } from "../env";
-import { buildTestApp, fakeEnvelope, gzipEnvelope, mintUser, readJson } from "../test-helpers";
-
-async function authed(
-  app: ReturnType<typeof buildTestApp>["app"],
-  token: string,
-  path: string,
-  init: RequestInit = {},
-) {
-  return app.request(path, {
-    ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
-  });
-}
-
-async function createGame(app: ReturnType<typeof buildTestApp>["app"], token: string) {
-  const res = await authed(app, token, "/api/games", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ title: "Freighter Run" }),
-  });
-  return (await res.json()) as { game: { id: string }; leaseEpoch: number };
-}
+import {
+  authed,
+  buildTestApp,
+  createGame,
+  fakeEnvelope,
+  gzipEnvelope,
+  mintUser,
+  readJson,
+  sendJson,
+} from "../test-helpers";
 
 function putBody(overrides: Record<string, unknown> = {}) {
   const envelope = fakeEnvelope(overrides.envelopeOverrides as Record<string, unknown> | undefined);
@@ -50,11 +38,7 @@ describe("saves", () => {
       blob: gzipEnvelope(envelope),
     };
 
-    const putRes = await authed(app, token, `/api/games/${game.id}/save`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const putRes = await sendJson(app, token, "PUT", `/api/games/${game.id}/save`, body);
     expect(putRes.status).toBe(201);
     const putJson = await readJson(putRes);
     expect(putJson.savedAtTick).toBe(42);
@@ -75,11 +59,13 @@ describe("saves", () => {
     // Bump the lease by opening the game.
     await authed(app, token, `/api/games/${game.id}/open`, { method: "POST" });
 
-    const res = await authed(app, token, `/api/games/${game.id}/save`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(putBody({ leaseEpoch: 0 })),
-    });
+    const res = await sendJson(
+      app,
+      token,
+      "PUT",
+      `/api/games/${game.id}/save`,
+      putBody({ leaseEpoch: 0 }),
+    );
     expect(res.status).toBe(409);
     const json = await readJson(res);
     expect(json.error.code).toBe("staleLease");
@@ -90,11 +76,7 @@ describe("saves", () => {
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
 
-    const res = await authed(app, token, `/api/games/${game.id}/save`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(putBody()),
-    });
+    const res = await sendJson(app, token, "PUT", `/api/games/${game.id}/save`, putBody());
     expect(res.status).toBe(413);
   });
 
@@ -104,16 +86,12 @@ describe("saves", () => {
     const { game } = await createGame(app, token);
     const badBlob = Buffer.from(JSON.stringify({ not: "an envelope" })).toString("base64");
 
-    const res = await authed(app, token, `/api/games/${game.id}/save`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        leaseEpoch: 0,
-        schemaVersion: 1,
-        savedAtTick: 0,
-        contentHash: "x",
-        blob: badBlob,
-      }),
+    const res = await sendJson(app, token, "PUT", `/api/games/${game.id}/save`, {
+      leaseEpoch: 0,
+      schemaVersion: 1,
+      savedAtTick: 0,
+      contentHash: "x",
+      blob: badBlob,
     });
     expect(res.status).toBe(400);
   });
@@ -124,17 +102,21 @@ describe("saves", () => {
     const { game } = await createGame(app, token);
 
     // One milestone save, then 8 rolling saves.
-    await authed(app, token, `/api/games/${game.id}/save`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(putBody({ milestone: true, envelopeOverrides: { savedAtTick: 0 } })),
-    });
+    await sendJson(
+      app,
+      token,
+      "PUT",
+      `/api/games/${game.id}/save`,
+      putBody({ milestone: true, envelopeOverrides: { savedAtTick: 0 } }),
+    );
     for (let tick = 1; tick <= 8; tick++) {
-      await authed(app, token, `/api/games/${game.id}/save`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(putBody({ envelopeOverrides: { savedAtTick: tick } })),
-      });
+      await sendJson(
+        app,
+        token,
+        "PUT",
+        `/api/games/${game.id}/save`,
+        putBody({ envelopeOverrides: { savedAtTick: tick } }),
+      );
     }
 
     const memoryDb = db as import("../db/memory").MemoryDb;

@@ -14,7 +14,15 @@ import type { ContentBundle } from "@crew/sim";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../env";
 import type { NarratorCtx, RunNarrator } from "../narrator";
-import { TEST_NOTES, buildTestApp, echoNarrator, mintUser, readJson } from "../test-helpers";
+import {
+  TEST_NOTES,
+  buildTestApp,
+  createGame,
+  echoNarrator,
+  mintUser,
+  readJson,
+  sendJson,
+} from "../test-helpers";
 
 let bundle: ContentBundle | undefined;
 function content(): ContentBundle {
@@ -34,18 +42,9 @@ async function setup(
 ) {
   const { app, db } = buildTestApp({ env, runNarrator });
   const { token } = await mintUser(app);
-  const res = await app.request("/api/games", {
-    method: "POST",
-    headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ title: "Freighter Run" }),
-  });
-  const { game } = (await res.json()) as { game: { id: string } };
+  const { game } = await createGame(app, token);
   const post = (body: unknown) =>
-    app.request(`/api/games/${game.id}/narrator`, {
-      method: "POST",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    });
+    sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, body);
   return { app: app as App, db, gameId: game.id, post };
 }
 

@@ -37,6 +37,36 @@ export function gzipEnvelope(envelope: Record<string, unknown>): string {
   return gzipSync(Buffer.from(JSON.stringify(envelope), "utf8")).toString("base64");
 }
 
+type TestApp = ReturnType<typeof buildTestApp>["app"];
+
+/** A request carrying `token` as its bearer. */
+export function authed(app: TestApp, token: string, path: string, init: RequestInit = {}) {
+  return app.request(path, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+}
+
+/** An authed request with `body` as JSON. */
+export function sendJson(
+  app: TestApp,
+  token: string,
+  method: "POST" | "PUT",
+  path: string,
+  body: unknown,
+) {
+  return authed(app, token, path, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createGame(app: TestApp, token: string) {
+  const res = await sendJson(app, token, "POST", "/api/games", { title: "Freighter Run" });
+  return (await res.json()) as { game: { id: string }; leaseEpoch: number };
+}
+
 export async function mintUser(app: ReturnType<typeof buildTestApp>["app"]) {
   const res = await app.request("/api/auth/anon", { method: "POST" });
   const body = (await res.json()) as { userId: string; token: string };
