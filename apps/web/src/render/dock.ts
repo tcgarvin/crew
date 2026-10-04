@@ -2,18 +2,21 @@
  * Dockside §2.3 layer 4, §2.7 and §3.4 (phase 2): where the dock map is, relative to the ship, at a
  * given moment, and what the camera frames. Pure geometry; the drawing is in `dockArt.ts`.
  *
- * Frames. The sim grafts the dock onto the deck's grid at `shipAt` (D59), so dock tile (x, y) is
- * deck tile (x − shipAt.x, y − shipAt.y) and a person on the dock is an ordinary deck position,
+ * Frames. The sim grafts the dock onto the deck's grid at `shipAt` (D59), the ship's place in the
+ * map's berth box (`berthPlacement`, D72; `berthInView` here), so dock tile (x, y) is deck tile
+ * (x − shipAt.x, y − shipAt.y) and a person on the dock is an ordinary deck position,
  * possibly at negative coordinates. The renderer adds one thing: the scene's berth offset, so the
  * dock (and everyone on it) slides in from the fore while docking and drifts aft while undocking,
  * exactly as the phase 1 berth did. The ship's own tiles never move.
  */
 import {
+  type BerthedDock,
   type DockDef,
   type DockDefId,
   type RenderFrame,
   type RenderTravel,
   type TileCoord,
+  berthPlacement,
   dockForPort,
 } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
@@ -44,17 +47,26 @@ export function dockInView(
   return dockForPort({ docks }, portInView(frame.travel));
 }
 
+/** `dock` with the layout's deck in its berth box, as the sim grafts it (D72). */
+export function berthInView(
+  dock: DockDef,
+  layout: Pick<DeckLayout, "deckId" | "width" | "height" | "hull">,
+): BerthedDock {
+  const deck = { id: layout.deckId, width: layout.width, height: layout.height, hull: layout.hull };
+  return { dock, shipAt: berthPlacement(dock, deck) };
+}
+
 /**
  * Deck-frame position of dock tile (0,0) for this scene: the graft at `shipAt`, slid along the
  * ship by the berth offset (deck lengths, positive aft). 0 slide when docked or under reduced
  * motion.
  */
 export function dockOrigin(
-  dock: Pick<DockDef, "shipAt">,
+  berth: Pick<BerthedDock, "shipAt">,
   scene: Pick<Scene, "portOffset">,
   deckWidth: number,
 ): TileCoord {
-  return { x: -dock.shipAt.x + dockSlide(scene, deckWidth), y: -dock.shipAt.y };
+  return { x: -berth.shipAt.x + dockSlide(scene, deckWidth), y: -berth.shipAt.y };
 }
 
 /** How far the dock and everything on it is drawn from its grafted place, tiles along +x. */
@@ -63,12 +75,12 @@ export function dockSlide(scene: Pick<Scene, "portOffset">, deckWidth: number): 
 }
 
 /** The whole dock map in deck coordinates as grafted (no slide). */
-export function dockRectOnDeck(dock: Pick<DockDef, "shipAt" | "width" | "height">): Bounds {
+export function dockRectOnDeck({ dock, shipAt }: BerthedDock): Bounds {
   return {
-    minX: -dock.shipAt.x,
-    minY: -dock.shipAt.y,
-    maxX: dock.width - dock.shipAt.x,
-    maxY: dock.height - dock.shipAt.y,
+    minX: -shipAt.x,
+    minY: -shipAt.y,
+    maxX: dock.width - shipAt.x,
+    maxY: dock.height - shipAt.y,
   };
 }
 

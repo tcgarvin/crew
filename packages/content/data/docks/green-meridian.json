@@ -13,25 +13,25 @@
   "height": 28,
   "rows": [
     "                                      ",
-    " .................................... ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
     " .................................... ",
     " .................................... ",
     " .................................... ",
@@ -44,12 +44,14 @@
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 3,
-    "y": 2
+  "berth": {
+    "origin": {
+      "x": 1,
+      "y": 0
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -116,30 +118,6 @@
     }
   ],
   "props": [
-    {
-      "key": "planter_fore",
-      "kind": "planter",
-      "rect": {
-        "x": 1,
-        "y": 2,
-        "w": 1,
-        "h": 3
-      },
-      "rot": 0,
-      "blocking": true
-    },
-    {
-      "key": "planter_aft",
-      "kind": "planter",
-      "rect": {
-        "x": 36,
-        "y": 2,
-        "w": 1,
-        "h": 3
-      },
-      "rot": 0,
-      "blocking": true
-    },
     {
       "key": "planters_pad",
       "kind": "planter",

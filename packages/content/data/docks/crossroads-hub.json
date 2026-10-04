@@ -9,27 +9,29 @@
     "accent": "#f2a93b"
   },
   "width": 38,
-  "height": 28,
+  "height": 30,
   "rows": [
     "######################################",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
+    "                                      ",
     "......................................",
     "......................................",
     "......................................",
@@ -43,12 +45,14 @@
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 3,
-    "y": 1
+  "berth": {
+    "origin": {
+      "x": 1,
+      "y": 1
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -57,7 +61,7 @@
       "name": "the queue-board kiosk",
       "tile": {
         "x": 10,
-        "y": 21
+        "y": 23
       },
       "facing": "n"
     },
@@ -67,7 +71,7 @@
       "name": "the night-market stall",
       "tile": {
         "x": 1,
-        "y": 24
+        "y": 26
       },
       "facing": "e"
     },
@@ -77,7 +81,7 @@
       "name": "the transit lounge gate",
       "tile": {
         "x": 6,
-        "y": 26
+        "y": 28
       },
       "facing": "n"
     },
@@ -87,7 +91,7 @@
       "name": "the Co-op dispatch window",
       "tile": {
         "x": 24,
-        "y": 26
+        "y": 28
       },
       "facing": "n"
     },
@@ -97,7 +101,7 @@
       "name": "the bench by the lounge gate",
       "tile": {
         "x": 10,
-        "y": 26
+        "y": 28
       },
       "facing": "n"
     }
@@ -108,7 +112,7 @@
       "kind": "freightStaging",
       "rect": {
         "x": 19,
-        "y": 22,
+        "y": 24,
         "w": 4,
         "h": 3
       }
@@ -118,7 +122,7 @@
       "kind": "deliveryBay",
       "rect": {
         "x": 26,
-        "y": 22,
+        "y": 24,
         "w": 4,
         "h": 3
       }
@@ -130,7 +134,7 @@
       "kind": "crates",
       "rect": {
         "x": 32,
-        "y": 21,
+        "y": 23,
         "w": 3,
         "h": 2
       },
@@ -142,7 +146,7 @@
       "kind": "crates",
       "rect": {
         "x": 35,
-        "y": 24,
+        "y": 26,
         "w": 2,
         "h": 2
       },
@@ -154,7 +158,7 @@
       "kind": "container",
       "rect": {
         "x": 33,
-        "y": 25,
+        "y": 27,
         "w": 2,
         "h": 1
       },
@@ -166,7 +170,7 @@
       "kind": "barrels",
       "rect": {
         "x": 13,
-        "y": 24,
+        "y": 26,
         "w": 2,
         "h": 1
       },
@@ -178,7 +182,7 @@
       "kind": "bollard",
       "rect": {
         "x": 0,
-        "y": 19,
+        "y": 21,
         "w": 1,
         "h": 1
       },
@@ -190,7 +194,7 @@
       "kind": "bollard",
       "rect": {
         "x": 37,
-        "y": 19,
+        "y": 21,
         "w": 1,
         "h": 1
       },
@@ -202,7 +206,7 @@
       "kind": "lamp",
       "rect": {
         "x": 0,
-        "y": 26,
+        "y": 28,
         "w": 1,
         "h": 1
       },
@@ -226,7 +230,7 @@
         "x": 12,
         "y": 0,
         "w": 1,
-        "h": 19
+        "h": 21
       }
     },
     {
@@ -235,14 +239,14 @@
         "x": 28,
         "y": 0,
         "w": 1,
-        "h": 19
+        "h": 21
       }
     },
     {
       "kind": "terminalEdge",
       "rect": {
         "x": 0,
-        "y": 27,
+        "y": 29,
         "w": 38,
         "h": 1
       }

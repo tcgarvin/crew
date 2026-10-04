@@ -1,8 +1,8 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { dockWalkableMask, loadBundle } from "@crew/content";
-import { type DockDefId, dockFloorMask } from "@crew/sim";
+import { HULL_CLASS_BOX, dockWalkableMask, loadBundle, shipAtInBerth } from "@crew/content";
+import { type DockDefId, HULL_SIZE_BOX, berthPlacement, dockFloorMask } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {
   crew,
@@ -97,9 +97,9 @@ describe("crew content render-dock", () => {
       const result = runContentRenderDock("dock.crossroads_hub", dir);
       expect(result.exitCode).toBe(0);
       const readme = readFileSync(path.join(dir, "crossroads-hub.README.md"), "utf8");
-      expect(readme).toContain("Freighter Mk1 (deck.freighter_mk1) docked at (3,1)");
+      expect(readme).toContain("Freighter Mk1 (deck.freighter_mk1) docked at (3,3)");
       expect(readme).toContain("regular: Hal Petrosyan");
-      expect(readme).toContain("personnel_ramp: (5,19)");
+      expect(readme).toContain("personnel_ramp: (32,21)");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -112,15 +112,14 @@ describe("crew content render-dock", () => {
 
   it("has an up-to-date README next to every authored dock", () => {
     const bundle = authoredBundle();
-    const deck = Object.values(bundle.decks)[0];
-    if (deck === undefined) throw new Error("no deck");
+    const decks = Object.values(bundle.decks);
     for (const dock of Object.values(bundle.docks ?? {})) {
       const port = bundle.ports[dock.portId];
       if (port === undefined) throw new Error(`no port ${dock.portId}`);
       const stem = dockFileStem(dock.id);
       const committed = readFileSync(path.join(docksDir(), `${stem}.README.md`), "utf8");
       expect(committed, `${stem}.README.md is stale: crew content render-dock ${dock.id}`).toBe(
-        renderDockReadme(dock, deck, port, `${stem}.json`),
+        renderDockReadme(dock, decks, port, `${stem}.json`),
       );
     }
   });
@@ -135,6 +134,18 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
     }
   });
 
+  it("place every deck in every berth box alike (D72)", () => {
+    expect(HULL_CLASS_BOX).toEqual(HULL_SIZE_BOX);
+    const bundle = authoredBundle();
+    for (const dock of Object.values(bundle.docks ?? {})) {
+      for (const deck of Object.values(bundle.decks)) {
+        expect(shipAtInBerth(dock, deck), `${dock.id} ${deck.id}`).toEqual(
+          berthPlacement(dock, deck),
+        );
+      }
+    }
+  });
+
   it("grafts every authored dock onto the deck", () => {
     expect(dockGraftIssues(authoredBundle())).toEqual([]);
   });
@@ -143,8 +154,17 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
     const bundle = authoredBundle();
     const hub = bundle.docks?.["dock.crossroads_hub" as DockDefId];
     if (hub === undefined) throw new Error("no hub dock");
-    // Floor under the whole ship: the graft overlaps the deck.
-    const flooded = { ...hub, legend: { ...hub.legend, B: "floor" as const } };
+    // Floor over the whole berth box: the graft overlaps the deck.
+    const box = HULL_SIZE_BOX[hub.berth.sizeClass];
+    const { origin } = hub.berth;
+    const flooded = {
+      ...hub,
+      rows: hub.rows.map((row, y) =>
+        y < origin.y || y >= origin.y + box.h
+          ? row
+          : row.slice(0, origin.x) + ".".repeat(box.w) + row.slice(origin.x + box.w),
+      ),
+    };
     expect(dockGraftIssues({ ...bundle, docks: { [hub.id]: flooded } })).toEqual([
       expect.stringContaining("overlaps deck"),
     ]);

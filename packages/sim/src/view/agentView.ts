@@ -68,6 +68,25 @@ function inventoryOf(state: ReadonlyWorldState, actorId: ActorId): InventoryEntr
   return out;
 }
 
+/**
+ * D74: the machine of the actor's berth (`state.berths`), on the deck the view is built for.
+ * Throws if the key names no machine there, which the needs invariants rule out.
+ */
+function berthOf(
+  state: World["state"],
+  actorId: ReadonlyActor["id"],
+  deckId: DeckGeometry["deckId"],
+): SelfView["berth"] {
+  const key = state.berths[actorId];
+  if (key === undefined) return undefined;
+  const machine = Object.values(state.machines).find(
+    (m) => m.deckId === deckId && m.placementKey === key,
+  );
+  if (machine === undefined)
+    throw new Error(`Berth "${key}" of ${actorId} is no machine on ${deckId}`);
+  return { machineId: machine.id };
+}
+
 function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
   const { state } = world;
   const config = world.config.values;
@@ -75,6 +94,7 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
   const onDeck = location.kind === "onDeck";
   const tile = onDeck ? tileOf(location) : undefined;
   const compartmentId = onDeck ? compartmentAt(geometry, location.x, location.y) : undefined;
+  const berth = berthOf(state, actor.id, geometry.deckId);
   return {
     id: actor.id,
     name: actor.name,
@@ -94,6 +114,7 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     ...(actor.workBackoff === undefined ? {} : { backoff: actor.workBackoff }),
     ...(actor.passenger === true ? { passenger: true as const } : {}),
     ...(actor.disembarking === true ? { disembarking: true as const } : {}),
+    ...(berth === undefined ? {} : { berth }),
   };
 }
 

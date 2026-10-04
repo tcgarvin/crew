@@ -61,6 +61,8 @@ export const ITEM_TAGS = [
   "cargo",
   "medical",
   "container",
+  /** Ship life §7: someone's own belongings; `UniqueItem.ownerId` says whose. */
+  "personal",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
 
@@ -85,9 +87,20 @@ export type CargoClass = (typeof CARGO_CLASSES)[number];
 /** Machine behaviour tags the planner/systems branch on (a bed is where you sleep, etc.). */
 export const MACHINE_TAGS = [
   "bed",
-  "galley",
+  /** Ship life §7: the infirmary's bed; a place to be treated, never a sleep target. */
+  "medBed",
+  "stove",
   "messTable",
   "pilotStation",
+  "navStation",
+  "opsStation",
+  "chair",
+  "desk",
+  "gamesTable",
+  "vidScreen",
+  "exerciseRig",
+  "workbench",
+  "console",
   "engine",
   "generator",
   "battery",
@@ -126,6 +139,32 @@ export type SymptomChannel = "visual" | "audible" | "sensor";
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * D72: hull size classes. A deck fits inside its class box; a dock's berth is a class box, so any
+ * ship of that class or smaller docks there (ship life §10).
+ */
+export const HULL_SIZE_CLASSES = ["S", "M", "L"] as const;
+export type HullSizeClass = (typeof HULL_SIZE_CLASSES)[number];
+
+/** D72: the box (width × height, tiles) each size class fits inside. */
+export const HULL_SIZE_BOX: Readonly<
+  Record<HullSizeClass, { readonly w: number; readonly h: number }>
+> = {
+  S: { w: 24, h: 14 },
+  M: { w: 36, h: 20 },
+  L: { w: 40, h: 24 },
+};
+
+/**
+ * D72: what kind of hull a deck is. Orientation is not a field: the bow is always east (high x)
+ * and the ramps always open on the south hull edge, which content validation enforces.
+ */
+export interface HullDef {
+  /** Informational: "light_freighter". */
+  readonly class: string;
+  readonly sizeClass: HullSizeClass;
+}
+
+/**
  * One authored deck (SD §6.2–6.4). Geometry is static; dynamic per-tile state lives sparsely in
  * `WorldState.deck`.
  *
@@ -153,6 +192,7 @@ export interface DeckDef {
   readonly zones: readonly ZoneDef[];
   readonly docking: DockingInterfaceDef;
   readonly spawnPoints: readonly SpawnPointDef[];
+  readonly hull: HullDef;
 }
 
 export interface CompartmentDef {
@@ -196,6 +236,8 @@ export interface ZoneDef {
   /** e.g. `cargoStowage`, `muster`, `boarding`. */
   readonly tags: readonly string[];
   readonly tiles: readonly TileCoord[];
+  /** The machine placement this zone serves (a `locker` names its bed). */
+  readonly machineKey?: LocalKey;
 }
 
 /**
@@ -215,7 +257,7 @@ export interface DockingInterfaceDef {
 // ---------------------------------------------------------------------------------------------
 
 /** What a dock map tile is. Only `floor` is walkable, and only where no blocking prop stands. */
-export const DOCK_TILE_KINDS = ["floor", "wall", "void", "berth"] as const;
+export const DOCK_TILE_KINDS = ["floor", "wall", "void"] as const;
 export type DockTileKind = (typeof DOCK_TILE_KINDS)[number];
 
 /** Where a local stands. The gate and warehouse door are the edge of the simulated world. */
@@ -311,16 +353,18 @@ export interface DockForegroundDef {
 }
 
 /**
- * A port's dock map (Dockside §3.1): `packages/content/data/docks/<port>.json`. Coordinates are
- * in the map's own frame; the sim grafts the map onto the ship's deck at `shipAt`
- * (`systems/spatial/dock.ts`, docs/design/dockside-spike.md), so dock tile (x, y) is deck tile
- * (x − shipAt.x, y − shipAt.y). Walkable dock floor is a `floor` tile under no blocking prop
- * (`dockFloorMask` in `core/docks.ts`; content validation applies the same rule). Whether it is a
- * station or a planet is the port's `setting` (D61: the dock does not repeat it).
+ * A port's dock map (Dockside §3.1, D72): `packages/content/data/docks/<port>.json`. Coordinates
+ * are in the map's own tile frame. `berth` is a size-class box, authored `void`, that any ship of
+ * that class or smaller docks in: the ship's place is not authored but derived
+ * (`berthPlacement` in `core/docks.ts`: flush to the box's south edge, the quay side, and centred
+ * across it). The sim grafts the map onto the ship's deck there (`systems/spatial/dock.ts`), so
+ * with the ship at dock tile `p`, dock tile (x, y) is deck tile (x − p.x, y − p.y). Walkable dock
+ * floor is a `floor` tile under no blocking prop (`dockFloorMask` in `core/docks.ts`; content
+ * validation applies the same rule). Whether it is a station or a planet is the port's `setting`
+ * (D61: the dock does not repeat it).
  *
  * Ramp landings are not listed: each ramp door lands on the dock tile across its hull edge, and
- * both content validation and the nav builder require that tile to be walkable floor. Maps are
- * authored against Freighter Mk1's footprint and ramps; other ship classes are deferred (§3.1).
+ * both content validation and the nav builder require that tile to be walkable floor.
  */
 export interface DockDef {
   readonly id: DockDefId;
@@ -332,14 +376,20 @@ export interface DockDef {
   /** `height` rows of `width` characters, each a key of `legend`. */
   readonly rows: readonly string[];
   readonly legend: Readonly<Record<string, DockTileKind>>;
-  /** Dock tile under deck tile (0,0). The `berth` tiles are exactly the ship's floor from there. */
-  readonly shipAt: TileCoord;
+  /** D72: the box a docked ship lies in: its top-left dock tile and its size class. */
+  readonly berth: DockBerthDef;
   readonly posts: readonly DockPostDef[];
   readonly areas: readonly DockAreaDef[];
   readonly props: readonly DockPropDef[];
   readonly foreground: readonly DockForegroundDef[];
   /** One line the narrator sees about the place. */
   readonly ambience: string;
+}
+
+/** D72: a dock's berth box: `HULL_SIZE_BOX[sizeClass]` tiles from `origin`, all `void`. */
+export interface DockBerthDef {
+  readonly origin: TileCoord;
+  readonly sizeClass: HullSizeClass;
 }
 
 export interface SpawnPointDef {

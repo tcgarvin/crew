@@ -7,6 +7,7 @@
 import type {
   ContentBundle,
   DeckDef,
+  HullDef,
   LocalKey,
   MachineDefId,
   MachineTag,
@@ -78,6 +79,8 @@ export interface DeckLayout {
   readonly deckId: DeckDef["id"];
   readonly width: number;
   readonly height: number;
+  /** D72: the deck's hull class; with a dock's berth box it places the ship (`berthInView`). */
+  readonly hull: HullDef;
   readonly tiles: readonly LayoutTile[];
   readonly compartmentNames: Readonly<Record<string, string>>;
   readonly compartmentBounds: Readonly<Record<string, { readonly x: number; readonly y: number }>>;
@@ -255,6 +258,7 @@ export function buildDeckLayout(deck: DeckDef, content: ContentBundle): DeckLayo
 
   return {
     deckId: deck.id,
+    hull: deck.hull,
     width: deck.width,
     height: deck.height,
     tiles,

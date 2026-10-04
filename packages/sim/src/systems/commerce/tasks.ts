@@ -9,7 +9,6 @@
 import { dockAlongsideAt, dockAreaTiles, marketCounter } from "../../core/docks";
 import { affordableUnits } from "../../core/markets";
 import type { TileCoord } from "../../core/types/common";
-import type { ContentBundle } from "../../core/types/content";
 import type { ItemId } from "../../core/types/ids";
 import type {
   CompletionPredicate,
@@ -17,10 +16,11 @@ import type {
   DeriveTasks,
   TaskSpec,
 } from "../../core/types/work";
+import { shipDeckId } from "../../core/world";
 
-function firstDeck(content: ContentBundle) {
-  const [deck] = Object.values(content.decks);
-  return deck;
+/** The ship's deck (`shipDeckId`), not whichever deck the bundle lists first. */
+function shipDeck(ctx: Pick<DerivationCtx, "content" | "state">) {
+  return ctx.content.decks[shipDeckId(ctx.state)];
 }
 
 // W6 decision: haul tasks carry no skill/tool requirement in V1 (any crew member can carry a
@@ -54,7 +54,7 @@ function haulSpec(
 
 const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
   const { itemId, stowageZoneKey } = problem.payload;
-  const zone = firstDeck(ctx.content)?.zones.find((z) => z.key === stowageZoneKey);
+  const zone = shipDeck(ctx)?.zones.find((z) => z.key === stowageZoneKey);
   const tiles = zone?.tiles ? [...zone.tiles] : [];
   return [
     haulSpec(problem, ctx, "load", itemId, tiles, {
@@ -79,20 +79,20 @@ function rotated<T>(tiles: readonly T[], start: number): T[] {
  */
 const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
   const { itemId, jobId, portId, storeKey } = problem.payload;
-  const dock = dockAlongsideAt(ctx.content, ctx.state, portId);
-  const bay = dock === undefined ? [] : dockAreaTiles(dock, "deliveryBay");
-  if (dock !== undefined && bay.length > 0) {
+  const berth = dockAlongsideAt(ctx.content, ctx.state, portId);
+  const bay = berth === undefined ? [] : dockAreaTiles(berth, "deliveryBay");
+  if (berth !== undefined && bay.length > 0) {
     const index = Math.max(0, ctx.state.jobs[jobId]?.cargoItemIds.indexOf(itemId) ?? 0);
     return [
       haulSpec(problem, ctx, "unload", itemId, rotated(bay, index), {
         kind: "itemInDockArea",
         itemId,
-        dockId: dock.id,
+        dockId: berth.dock.id,
         area: "deliveryBay",
       }),
     ];
   }
-  const tiles = firstDeck(ctx.content)?.docking.cargoTransferTiles ?? [];
+  const tiles = shipDeck(ctx)?.docking.cargoTransferTiles ?? [];
   return [
     haulSpec(problem, ctx, "unload", itemId, [...tiles], {
       kind: "itemInStore",
@@ -121,7 +121,7 @@ const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
   const counter = marketCounter(ctx.content, ctx.state, travel.portId);
   const tiles =
     counter.kind === "transferTile"
-      ? [...(firstDeck(ctx.content)?.docking.cargoTransferTiles ?? [])]
+      ? [...(shipDeck(ctx)?.docking.cargoTransferTiles ?? [])]
       : [counter.tile];
   const spec: TaskSpec = {
     derivationKey: "buy",

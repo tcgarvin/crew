@@ -8,6 +8,9 @@ export { configTicks, ticksToSeconds } from "./clock";
 export { enqueueCommand, ok, reject, type Validation } from "./commands";
 export { findItemDef } from "./defs";
 export {
+  type BerthedDock,
+  berthDock,
+  berthPlacement,
   deckToDock,
   dockAlongside,
   dockAreaTiles,

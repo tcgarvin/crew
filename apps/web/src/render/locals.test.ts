@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
-import { clampEngagement, dockInView, withDockSlide } from "./dock";
+import { berthInView, clampEngagement, dockInView, withDockSlide } from "./dock";
 import {
   CREW_DOT_COLOR,
   PASSENGER_DOT_COLOR,
@@ -55,7 +55,8 @@ const allDocks: DockDef[] = Object.values(docks);
 
 /** Deck-frame centre of a dock tile, as the sim places people and props (D59, D66). */
 function onDeck(dock: DockDef, x: number, y: number) {
-  return { x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 };
+  const { shipAt } = berthInView(dock, layout);
+  return { x: x - shipAt.x + 0.5, y: y - shipAt.y + 0.5 };
 }
 
 function local(overrides: Partial<Omit<RenderLocal, "id">> & { id: string }): RenderLocal {
@@ -144,7 +145,7 @@ function render(dock: DockDef, travel: RenderTravel, width: number, height: numb
   const transform = computeFitTransform(
     width,
     height,
-    cameraBounds(hull, shown, scene.cameraT),
+    cameraBounds(hull, shown === undefined ? undefined : berthInView(shown, layout), scene.cameraT),
     rotated,
   );
   drawFrame(canvas.ctx, transform, layout, frameAt(dock, travel, on), width, height, rotated, {

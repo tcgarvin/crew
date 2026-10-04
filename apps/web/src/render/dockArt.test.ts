@@ -4,6 +4,7 @@ import {
   DOCK_PROP_KINDS,
   type DockDef,
   type DockPropDef,
+  HULL_SIZE_BOX,
   type LocalKey,
   type PortDefId,
   type PortSetting,
@@ -15,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
-import { clampEngagement, dockInView } from "./dock";
+import { berthInView, clampEngagement, dockInView } from "./dock";
 import { drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
 import { dockShape, dockSurface } from "./dockShape";
@@ -61,7 +62,8 @@ function travel(state: TravelStage, progress: number, from: string, to: string):
 
 /** A frame with somebody at every post, a crate in each area and the ramps down. */
 function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
-  const at = (x: number, y: number) => ({ x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 });
+  const { shipAt } = berthInView(dock, layout);
+  const at = (x: number, y: number) => ({ x: x - shipAt.x + 0.5, y: y - shipAt.y + 0.5 });
   return {
     tick: 0 as RenderFrame["tick"],
     actors: dock.posts.map((post, i) => ({
@@ -120,7 +122,7 @@ function render(
   const transform = computeFitTransform(
     width,
     height,
-    cameraBounds(hull, shown, scene.cameraT),
+    cameraBounds(hull, shown === undefined ? undefined : berthInView(shown, layout), scene.cameraT),
     rotated,
   );
   drawFrame(
@@ -179,8 +181,9 @@ describe("every authored dock draws", () => {
 describe("dock layers on their own", () => {
   for (const dock of allDocks) {
     it(`${dock.id}: map and foreground draw, and skip entirely when faded out`, () => {
+      const { shipAt } = berthInView(dock, layout);
       const paint = {
-        origin: { x: -dock.shipAt.x, y: -dock.shipAt.y },
+        origin: { x: -shipAt.x, y: -shipAt.y },
         alpha: 1,
         clamps: 1,
         px: 0.05,
@@ -278,8 +281,9 @@ describe("dock layers on their own", () => {
         rect: { x: i * 3, y: 0, w: i % 2 === 0 ? 3 : 1, h: i % 2 === 0 ? 1 : 6 },
       })),
     };
+    const { shipAt } = berthInView(dock, layout);
     const paint = {
-      origin: { x: -dock.shipAt.x, y: -dock.shipAt.y },
+      origin: { x: -shipAt.x, y: -shipAt.y },
       alpha: 1,
       clamps: 0.5,
       px: 0.05,
@@ -296,14 +300,15 @@ describe("dock layers on their own", () => {
 });
 
 describe("dockShape", () => {
-  it("finds the berth as the ship's footprint in every map", () => {
+  it("finds the berth as the map's berth box in every map (D72)", () => {
     for (const dock of allDocks) {
       const { berth } = dockShape(dock);
+      const { origin, sizeClass } = dock.berth;
       expect(berth, dock.id).toEqual({
-        minX: dock.shipAt.x,
-        minY: dock.shipAt.y,
-        maxX: dock.shipAt.x + layout.width,
-        maxY: dock.shipAt.y + layout.height,
+        minX: origin.x,
+        minY: origin.y,
+        maxX: origin.x + HULL_SIZE_BOX[sizeClass].w,
+        maxY: origin.y + HULL_SIZE_BOX[sizeClass].h,
       });
     }
   });
@@ -315,11 +320,12 @@ describe("dockShape", () => {
       const shape = dockShape(dock);
       return { ...shape, ...dockSurface(shape, settingOf(dock)) };
     };
-    // A farming world's pad set into the field; a pier out into open sky.
+    // A pier out into open sky. Green Meridian's field ring fell inside its berth box at the
+    // conversion (D72), so it reads as open until its map is re-authored with a field round the box.
     expect(byPort("port.green_meridian")).toMatchObject({
-      berthStyle: "pad",
-      floorPattern: "slabs",
-      overSky: false,
+      berthStyle: "open",
+      floorPattern: "planks",
+      overSky: true,
     });
     expect(byPort("port.terns_rest")).toMatchObject({
       berthStyle: "open",

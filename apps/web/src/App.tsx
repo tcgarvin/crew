@@ -467,7 +467,9 @@ export function App() {
       ) {
         // Content and the frame only (the dock map the canvas drew, its people and props), so no
         // snapshot is needed.
-        setInspectorData(frame === undefined ? undefined : dockInspection(frame, docks, next));
+        setInspectorData(
+          frame === undefined ? undefined : dockInspection(frame, docks, layout, next),
+        );
         return;
       }
       setInspectorData({ kind: "loading" });

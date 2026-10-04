@@ -281,6 +281,10 @@
                     "required": ["x", "y"],
                     "additionalProperties": false
                   }
+                },
+                "machineKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
                 }
               },
               "required": ["key", "name", "tags", "tiles"],
@@ -386,6 +390,21 @@
               "required": ["key", "tile", "tags"],
               "additionalProperties": false
             }
+          },
+          "hull": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sizeClass": {
+                "type": "string",
+                "enum": ["S", "M", "L"]
+              }
+            },
+            "required": ["class", "sizeClass"],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -402,7 +421,8 @@
           "powerDomains",
           "zones",
           "docking",
-          "spawnPoints"
+          "spawnPoints",
+          "hull"
         ],
         "additionalProperties": false
       }
@@ -430,9 +450,19 @@
               "type": "string",
               "enum": [
                 "bed",
-                "galley",
+                "medBed",
+                "stove",
                 "messTable",
                 "pilotStation",
+                "navStation",
+                "opsStation",
+                "chair",
+                "desk",
+                "gamesTable",
+                "vidScreen",
+                "exerciseRig",
+                "workbench",
+                "console",
                 "engine",
                 "generator",
                 "battery",
@@ -987,7 +1017,16 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": ["tool", "consumable", "food", "spare", "cargo", "medical", "container"]
+              "enum": [
+                "tool",
+                "consumable",
+                "food",
+                "spare",
+                "cargo",
+                "medical",
+                "container",
+                "personal"
+              ]
             }
           },
           "toolKinds": {
@@ -1585,24 +1624,35 @@
             },
             "additionalProperties": {
               "type": "string",
-              "enum": ["floor", "wall", "void", "berth"]
+              "enum": ["floor", "wall", "void"]
             }
           },
-          "shipAt": {
+          "berth": {
             "type": "object",
             "properties": {
-              "x": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+              "origin": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
               },
-              "y": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991
+              "sizeClass": {
+                "type": "string",
+                "enum": ["S", "M", "L"]
               }
             },
-            "required": ["x", "y"],
+            "required": ["origin", "sizeClass"],
             "additionalProperties": false
           },
           "posts": {
@@ -1827,7 +1877,7 @@
           "height",
           "rows",
           "legend",
-          "shipAt",
+          "berth",
           "posts",
           "areas",
           "props",

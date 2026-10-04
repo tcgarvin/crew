@@ -7,12 +7,19 @@
  * free dock floor tile to it; never on a freight area, a ramp landing or another post's tile, so
  * crates, the crew's way aboard and the gate stay clear. Every tile is in the deck frame.
  */
-import { EDGE_STEP, dockAreaTiles, dockToDeck, isDockFloorAt } from "./docks";
+import {
+  type BerthedDock,
+  EDGE_STEP,
+  dockAlongside,
+  dockAreaTiles,
+  dockToDeck,
+  isDockFloorAt,
+} from "./docks";
 import { floorSet } from "./floor-set";
 import { allocateId } from "./ids";
 import { hashString32 } from "./rng";
 import type { EdgeSide, Tick, TileCoord } from "./types/common";
-import type { ContentBundle, DockDef, DockPostDef } from "./types/content";
+import type { ContentBundle, DockPostDef } from "./types/content";
 import type {
   DockProp,
   FloorSetEntry,
@@ -54,7 +61,7 @@ function lookSeedOf(name: string): number {
 function rampLandings(
   content: ContentBundle,
   deckId: DeckDefId,
-  dock: DockDef,
+  berth: BerthedDock,
   only?: LocalKey,
 ): TileCoord[] {
   const deck = content.decks[deckId];
@@ -65,7 +72,7 @@ function rampLandings(
     const { x, y, side } = door.edge;
     const across = { x: x + EDGE_STEP[side].x, y: y + EDGE_STEP[side].y };
     for (const tile of [{ x, y }, across]) {
-      if (isDockFloorAt(dock, tile)) out.push(tile);
+      if (isDockFloorAt(berth, tile)) out.push(tile);
     }
   }
   return out;
@@ -79,11 +86,11 @@ function rampLandings(
 export function personnelRampFoot(
   content: ContentBundle,
   deckId: DeckDefId,
-  dock: DockDef,
+  berth: BerthedDock,
 ): TileCoord | undefined {
   const key = content.decks[deckId]?.docking.personnelRampDoorKey;
-  const [foot] = key === undefined ? [] : rampLandings(content, deckId, dock, key);
-  return foot ?? rampLandings(content, deckId, dock)[0];
+  const [foot] = key === undefined ? [] : rampLandings(content, deckId, berth, key);
+  return foot ?? rampLandings(content, deckId, berth)[0];
 }
 
 /**
@@ -94,15 +101,15 @@ export function waitingSpotByRamp(
   state: Pick<WorldState, "dockside">,
   content: ContentBundle,
   deckId: DeckDefId,
-  dock: DockDef,
+  berth: BerthedDock,
 ): TileCoord | undefined {
-  const foot = personnelRampFoot(content, deckId, dock);
+  const foot = personnelRampFoot(content, deckId, berth);
   if (foot === undefined) return undefined;
   return freeTileNear(
-    dock,
+    berth,
     foot,
     localTiles(state),
-    reservedTiles(content, deckId, dock, undefined),
+    reservedTiles(content, deckId, berth, undefined),
   );
 }
 
@@ -110,15 +117,15 @@ export function waitingSpotByRamp(
 function reservedTiles(
   content: ContentBundle,
   deckId: DeckDefId,
-  dock: DockDef,
+  berth: BerthedDock,
   own: LocalKey | undefined,
 ): Set<string> {
   const out = new Set<string>();
-  for (const tile of dockAreaTiles(dock, "freightStaging")) out.add(tileKey(tile));
-  for (const tile of dockAreaTiles(dock, "deliveryBay")) out.add(tileKey(tile));
-  for (const tile of rampLandings(content, deckId, dock)) out.add(tileKey(tile));
-  for (const post of dock.posts) {
-    if (post.key !== own) out.add(tileKey(dockToDeck(dock, post.tile)));
+  for (const tile of dockAreaTiles(berth, "freightStaging")) out.add(tileKey(tile));
+  for (const tile of dockAreaTiles(berth, "deliveryBay")) out.add(tileKey(tile));
+  for (const tile of rampLandings(content, deckId, berth)) out.add(tileKey(tile));
+  for (const post of berth.dock.posts) {
+    if (post.key !== own) out.add(tileKey(dockToDeck(berth, post.tile)));
   }
   return out;
 }
@@ -144,7 +151,7 @@ export function localTiles(state: Pick<WorldState, "dockside">): Set<string> {
  * stops on one.
  */
 function freeTileNear(
-  dock: DockDef,
+  berth: BerthedDock,
   from: TileCoord,
   taken: ReadonlySet<string>,
   reserved: ReadonlySet<string>,
@@ -155,7 +162,7 @@ function freeTileNear(
     const next: TileCoord[] = [];
     for (const tile of frontier) {
       const key = tileKey(tile);
-      if (isDockFloorAt(dock, tile) && !taken.has(key) && !reserved.has(key)) return tile;
+      if (isDockFloorAt(berth, tile) && !taken.has(key) && !reserved.has(key)) return tile;
       for (const [dx, dy] of [
         [1, 0],
         [-1, 0],
@@ -164,7 +171,7 @@ function freeTileNear(
       ] as const) {
         const n = { x: tile.x + dx, y: tile.y + dy };
         const nKey = tileKey(n);
-        if (seen.has(nKey) || !isDockFloorAt(dock, n)) continue;
+        if (seen.has(nKey) || !isDockFloorAt(berth, n)) continue;
         seen.add(nKey);
         next.push(n);
       }
@@ -292,20 +299,20 @@ function dockPeople(
   return people;
 }
 
-/** Place `spec` at its post on `dock` (or as near as there is room). Undefined if no room. */
+/** Place `spec` at its post on the dock (or as near as there is room). Undefined if no room. */
 export function placeLocal(
   state: WorldState,
   content: ContentBundle,
   presence: DockPresence,
-  dock: DockDef,
+  berth: BerthedDock,
   spec: LocalSpec,
   tick: Tick,
   shuffleTicks: number,
 ): Local | undefined {
-  const post = dock.posts.find((p) => p.key === spec.postKey);
+  const post = berth.dock.posts.find((p) => p.key === spec.postKey);
   if (post === undefined) return undefined;
-  const reserved = reservedTiles(content, presence.deckId, dock, post.key);
-  const tile = freeTileNear(dock, dockToDeck(dock, post.tile), localTiles(state), reserved);
+  const reserved = reservedTiles(content, presence.deckId, berth, post.key);
+  const tile = freeTileNear(berth, dockToDeck(berth, post.tile), localTiles(state), reserved);
   if (tile === undefined) return undefined;
   return spawnLocal(state, presence.deckId, spec, tile, postFacing(post), tick, shuffleTicks);
 }
@@ -315,7 +322,7 @@ function placeProps(
   state: WorldState,
   content: ContentBundle,
   presence: DockPresence,
-  dock: DockDef,
+  berth: BerthedDock,
   plan: StagingPlan,
 ): DockProp[] {
   const props: DockProp[] = [];
@@ -324,18 +331,18 @@ function placeProps(
     const l = item.location;
     if (l.kind === "onDeck") taken.add(tileKey({ x: Math.floor(l.x), y: Math.floor(l.y) }));
   }
-  const staging = dockAreaTiles(dock, "freightStaging");
+  const staging = dockAreaTiles(berth, "freightStaging");
   for (const prop of plan.props) {
     let tile: TileCoord | undefined;
     if (prop.at.kind === "staging") {
       tile = staging.find((t) => !taken.has(tileKey(t)));
     } else {
       const postKey = prop.at.postKey;
-      const post = dock.posts.find((p) => p.key === postKey);
+      const post = berth.dock.posts.find((p) => p.key === postKey);
       if (post !== undefined) {
-        const reserved = reservedTiles(content, presence.deckId, dock, undefined);
+        const reserved = reservedTiles(content, presence.deckId, berth, undefined);
         // Every post's tile is reserved (it is its local's), so the prop lands beside it.
-        tile = freeTileNear(dock, dockToDeck(dock, post.tile), taken, reserved);
+        tile = freeTileNear(berth, dockToDeck(berth, post.tile), taken, reserved);
       }
     }
     if (tile === undefined) continue;
@@ -365,18 +372,19 @@ export function dressDock(
 ): DressedDock {
   const presence = state.deck.dock;
   if (presence === undefined) throw new Error("dressDock: no dock is alongside");
-  const dock = content.docks?.[presence.dockId];
-  if (dock === undefined) throw new Error(`dressDock: no dock layout "${presence.dockId}"`);
+  const berth = dockAlongside(content, state);
+  if (berth === undefined) throw new Error("dressDock: no dock is alongside");
+  const { dock } = berth;
   state.dockside = { dockId: dock.id, locals: {}, props: [] };
   const locals: Local[] = [];
   const unplaced: string[] = [];
   for (const spec of dockPeople(state, content, dock.portId, plan)) {
-    const local = placeLocal(state, content, presence, dock, spec, tick, shuffleTicks);
+    const local = placeLocal(state, content, presence, berth, spec, tick, shuffleTicks);
     if (local === undefined) unplaced.push(spec.name);
     else locals.push(local);
   }
   if (plan !== undefined) {
-    state.dockside.props = placeProps(state, content, presence, dock, plan);
+    state.dockside.props = placeProps(state, content, presence, berth, plan);
     if (plan.ambience !== undefined) state.dockside.ambience = plan.ambience;
   }
   return { locals, unplaced };

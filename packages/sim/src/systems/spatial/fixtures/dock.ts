@@ -9,13 +9,16 @@
  *   6 HHrHHHHHHpHH
  *   7 (void: the quay runs under it once docked)
  *
- * Dock, in its own frame; shipAt (2,1), so dock (dx, dy) = deck (dx − 2, dy − 1):
+ * Dock, in its own frame. Its berth is an S box (24×14) at (−4,−5): the 12×8 deck lies flush to
+ * its south edge and centred, at dock (2,1) (`berthPlacement`), so dock (dx, dy) = deck
+ * (dx − 2, dy − 1). The box overhangs this tight map, which the sim allows (content validation
+ * would not; this map only has to graft):
  *
  *   dx 0123456789ABCDEF
  *    0 ################   bay wall
- *    1 ..bbbbbbbbbbbb##   b = berth (the ship's footprint), not walkable
+ *    1 ..            ##   void under the ship, not walkable
  *    …  (rows 2–6 alike)
- *    7 ..bbbbbbbbbbbb##
+ *    7 ..            ##
  *    8 ................   quay, under deck row 7; the ramps land at deck (2,7) and (9,7)
  *    9 ................
  *   10 ......ccc.......   a stack of crates: floor under a blocking prop
@@ -53,8 +56,8 @@ export const QUAY: DockDef = {
   palette: { floor: "#444444", wall: "#222222", accent: "#ffaa00" },
   width: 16,
   height: 12,
-  shipAt: { x: 2, y: 1 },
-  legend: { ".": "floor", "#": "wall", b: "berth" },
+  berth: { origin: { x: -4, y: -5 }, sizeClass: "S" },
+  legend: { ".": "floor", "#": "wall", " ": "void" },
   posts: [],
   areas: [],
   props: [
@@ -64,13 +67,13 @@ export const QUAY: DockDef = {
   ambience: "A test quay.",
   rows: [
     "################",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
-    "..bbbbbbbbbbbb##",
+    "..            ##",
+    "..            ##",
+    "..            ##",
+    "..            ##",
+    "..            ##",
+    "..            ##",
+    "..            ##",
     "................",
     "................",
     "................",

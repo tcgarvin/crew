@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { isInDockArea, isOnDock } from "../../core/docks";
+import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY } from "../../core/fixtures/tiny-content";
 import { checkInvariants } from "../../core/invariants";
@@ -473,7 +474,11 @@ describe("a schema-3 save (D65)", () => {
     const state = structuredClone(envelope.state);
     state.schemaVersion = 3;
     const nextItem = state.nextId.item;
-    const restored = kernel.restore({ ...envelope, schemaVersion: 3, state }, world.content);
+    const restored = restoreThroughSchema6(
+      { ...envelope, schemaVersion: 3, state },
+      world.content,
+      test.registry,
+    );
     const trucks = Object.values(restored.state.items).filter((i) => i.defId === TRUCK);
     expect(trucks.map((t) => t.id)).toEqual([`i${nextItem}`]);
     expect(restored.state.nextId.item).toBe(nextItem + 1);
@@ -481,9 +486,10 @@ describe("a schema-3 save (D65)", () => {
     expect(checkInvariants(restored.state)).toEqual([]);
     // A save that already has one keeps just that one.
     const again = kernel.serialize(restored);
-    const twice = kernel.restore(
+    const twice = restoreThroughSchema6(
       { ...again, schemaVersion: 3, state: { ...structuredClone(again.state), schemaVersion: 3 } },
       world.content,
+      test.registry,
     );
     expect(Object.values(twice.state.items).filter((i) => i.defId === TRUCK)).toHaveLength(1);
     // And it is used.

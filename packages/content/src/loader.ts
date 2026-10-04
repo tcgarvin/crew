@@ -11,15 +11,17 @@ import { type ValidationResult, validateBundle } from "./schemas/validate";
 import deckFreighterMk1 from "../data/decks/freighter-mk1.json";
 
 import machineBatteryBank from "../data/machines/battery-bank.json";
-import machineBridgeConsole from "../data/machines/bridge-console.json";
 import machineBunk from "../data/machines/bunk.json";
 import machineCargoCrane from "../data/machines/cargo-crane.json";
 import machineCoolantPump from "../data/machines/coolant-pump.json";
 import machineEngine from "../data/machines/engine.json";
 import machineGalleyStove from "../data/machines/galley-stove.json";
 import machineGenerator from "../data/machines/generator.json";
+import machineHelm from "../data/machines/helm.json";
 import machineLifeSupport from "../data/machines/life-support.json";
 import machineMedbayBed from "../data/machines/medbay-bed.json";
+import machineMessTable from "../data/machines/mess-table.json";
+import machineNavTerminal from "../data/machines/nav-terminal.json";
 
 import itemCoolantCanister from "../data/items/coolant-canister.json";
 import itemCrateFragile from "../data/items/crate-fragile.json";
@@ -89,7 +91,9 @@ const MACHINES = [
   machineBunk,
   machineMedbayBed,
   machineCargoCrane,
-  machineBridgeConsole,
+  machineHelm,
+  machineNavTerminal,
+  machineMessTable,
 ];
 const ITEMS = [
   itemToolkit,

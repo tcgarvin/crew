@@ -57,7 +57,7 @@ function sectionOf(text: string, heading: string): string[] {
 describe('"On the dock" (D67)', () => {
   it("lists who is on the dock, where, doing what and why, the props and the arrival line", () => {
     const { req, snapshot, bundle } = dressedKessler(KESSLER_PLAN);
-    const dock = dockAlongside(bundle, snapshot.state);
+    const dock = dockAlongside(bundle, snapshot.state)?.dock;
     if (dock === undefined) throw new Error("fixture: no dock");
     const { text } = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook);
     expect(sectionOf(text, `On the dock (${dock.name})`)).toEqual([

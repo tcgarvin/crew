@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { isInDockArea, isOnDock } from "../../core/docks";
+import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
 import { TINY } from "../../core/fixtures/tiny-content";
 import { getRenderFrame } from "../../core/render";
 import type { ActorId, JobId } from "../../core/types/ids";
@@ -490,7 +491,11 @@ describe("a schema-3 save docked mid-loading (D63)", () => {
       }
     }
     state.schemaVersion = 3;
-    const restored = kernel.restore({ ...envelope, schemaVersion: 3, state }, world.content);
+    const restored = restoreThroughSchema6(
+      { ...envelope, schemaVersion: 3, state },
+      world.content,
+      test.registry,
+    );
     for (const itemId of job(restored, id).cargoItemIds) {
       const location = restored.state.items[itemId]?.location;
       if (location === undefined) throw new Error(`lost ${itemId}`);

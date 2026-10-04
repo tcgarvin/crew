@@ -7,12 +7,13 @@
  * dock's areas and posts rather than looked up as a room.
  */
 import {
+  type BerthedDock,
   type ContentBundle,
   type DeepReadonly,
-  type DockDef,
   type ItemId,
   type PhysicalLocation,
   type WorldState,
+  dockAlongside,
   isOnDock,
 } from "@crew/sim";
 import type { DeckLayout } from "../render/deckLayout";
@@ -28,9 +29,9 @@ const AREA_WORDS = {
 const NEAR_POST_TILES = 2;
 
 /** Words for a point on the dock, in the deck frame: its area, else the nearest post, else "on the dock". */
-export function dockWhere(dock: DockDef, deckX: number, deckY: number): string {
-  const x = Math.floor(deckX) + dock.shipAt.x;
-  const y = Math.floor(deckY) + dock.shipAt.y;
+export function dockWhere({ dock, shipAt }: BerthedDock, deckX: number, deckY: number): string {
+  const x = Math.floor(deckX) + shipAt.x;
+  const y = Math.floor(deckY) + shipAt.y;
   for (const area of dock.areas) {
     const r = area.rect;
     if (x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h) {
@@ -55,12 +56,8 @@ function whereOnDeck(
   layout: DeckLayout,
   onDock: boolean,
 ): string {
-  const presence = state.deck.dock;
-  if (onDock && presence !== undefined) {
-    const dock = content.docks?.[presence.dockId];
-    if (dock === undefined) throw new Error(`inspectItem: unknown dock "${presence.dockId}"`);
-    return dockWhere(dock, location.x, location.y);
-  }
+  const berth = onDock ? dockAlongside(content, state) : undefined;
+  if (berth !== undefined) return dockWhere(berth, location.x, location.y);
   // Bounds first: indexing by y * width + x would wrap an off-ship tile into another row's room.
   if (!isShipTile(layout, location.x, location.y)) return "on deck";
   const tile = layout.tiles[Math.floor(location.y) * layout.width + Math.floor(location.x)];

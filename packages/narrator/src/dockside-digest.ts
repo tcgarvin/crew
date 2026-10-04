@@ -9,6 +9,7 @@
  *   place, its posts by key, its areas, and the floor set the sim will place anyway.
  */
 import {
+  type BerthedDock,
   type ContentBundle,
   type DeepReadonly,
   type DockDef,
@@ -133,8 +134,9 @@ function localLine(dock: DockDef, local: DeepReadonly<Local>): string {
 }
 
 /** Where a staged prop stands: on the staging area, or by the nearest post. */
-function propSpot(dock: DockDef, prop: DeepReadonly<DockProp>): string {
-  const tile = deckToDock(dock, prop.tile);
+function propSpot(berth: BerthedDock, prop: DeepReadonly<DockProp>): string {
+  const { dock } = berth;
+  const tile = deckToDock(berth, prop.tile);
   const staging = dock.areas.find((a) => a.kind === "freightStaging")?.rect;
   if (
     staging !== undefined &&
@@ -156,8 +158,9 @@ function propSpot(dock: DockDef, prop: DeepReadonly<DockProp>): string {
 
 /** "On the dock (<name>)": undefined with no dock alongside. */
 export function onDockLines(state: State, content: ContentBundle): DockLines | undefined {
-  const dock = dockAlongside(content, state);
-  if (dock === undefined) return undefined;
+  const berth = dockAlongside(content, state);
+  if (berth === undefined) return undefined;
+  const { dock } = berth;
   const lines = [`the place: ${dock.ambience}`];
   const side = state.dockside;
   if (side.ambience !== undefined) lines.push(`as the ship came in: ${side.ambience}`);
@@ -168,7 +171,7 @@ export function onDockLines(state: State, content: ContentBundle): DockLines | u
   for (const local of locals) lines.push(localLine(dock, local));
   if (side.props.length > 0) lines.push("set dressing (nobody's; nobody aboard can use it):");
   for (const prop of side.props) {
-    lines.push(`- ${prop.count}x ${itemName(content, prop.itemDefId)} ${propSpot(dock, prop)}`);
+    lines.push(`- ${prop.count}x ${itemName(content, prop.itemDefId)} ${propSpot(berth, prop)}`);
   }
   const freight = freightLines(state, content);
   if (freight.length > 0) lines.push("freight:");

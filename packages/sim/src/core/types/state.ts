@@ -30,6 +30,7 @@ import type {
   ItemDefId,
   ItemId,
   JobId,
+  LocalKey,
   MachineId,
   NextIdCounters,
   PortDefId,
@@ -52,8 +53,11 @@ import type { Claim, Problem, Task } from "./work";
  * 6 (2026-10-03): `captainAshore` replaces `jobBoard` (and `captainAshoreLastAsk` the board's
  * last ask), `decisions.held` holds cards waiting to be delivered in person, and D42's
  * `Job.surfaceWhenDocked` is gone (D70).
+ * 7 (2026-10-04): ship life slice 1 (D72, D74): Freighter Mk1 is mirrored bow-east, dock maps
+ * declare a berth box, `berths` assigns beds and items may have an `ownerId`. Older saves are
+ * refused rather than migrated (their tile coordinates are in the old frames).
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
 export interface MarketLine {
@@ -105,6 +109,11 @@ export interface WorldState {
   power: PowerState;
   /** Owner: inventory transfers (unique items and stacks share the table). */
   items: Record<ItemId, Item>;
+  /**
+   * Owner: needs (D74). Each berthed actor's bed: the `MachinePlacementDef.key` of a `bed`-tagged
+   * machine on the ship's deck. No two actors share one; an actor without a berth has no key.
+   */
+  berths: Record<ActorId, LocalKey>;
   /** Owner: work (W4), problems by their owning systems. */
   work: WorkState;
   /** Owner: travel (W6). */

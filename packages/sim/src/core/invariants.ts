@@ -174,6 +174,22 @@ function actorViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
+/**
+ * D74: every berth belongs to an actor that exists, and no two actors share a bed. That each value
+ * is a `bed` placement on the ship's deck needs content: `systems/needs` checks it.
+ */
+export function berthViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  const holder = new Map<string, string>();
+  for (const [actorId, placementKey] of Object.entries(state.berths)) {
+    if (!(actorId in state.actors)) out.push(`berths.${actorId} is not an actor`);
+    const other = holder.get(placementKey);
+    if (other !== undefined) out.push(`berths: ${other} and ${actorId} share "${placementKey}"`);
+    else holder.set(placementKey, actorId);
+  }
+  return out;
+}
+
 function taskCycleViolations(state: ReadonlyWorldState): string[] {
   const tasks = state.work.tasks;
   const out: string[] = [];
@@ -248,6 +264,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...itemViolations(state),
     ...actorViolations(state),
     ...marketViolations(state),
+    ...berthViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

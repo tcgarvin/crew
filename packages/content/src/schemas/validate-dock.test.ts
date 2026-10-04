@@ -9,9 +9,9 @@ type MutableDock = { -readonly [K in keyof DockDef]: DockDef[K] };
 
 const HUB = "dock.crossroads_hub";
 const HUB_PORT = "port.crossroads_hub";
-/** Freighter Mk1 docked at the Hub (shipAt (3,1)): its ramps land at these dock tiles. */
-const PERSONNEL_LANDING = { x: 5, y: 19 };
-const CARGO_LANDING = { x: 16, y: 19 };
+/** Freighter Mk1 in the Hub's berth box (box (1,1), ship at (3,3)): its ramps land here. */
+const PERSONNEL_LANDING = { x: 32, y: 21 };
+const CARGO_LANDING = { x: 21, y: 21 };
 
 function hubDock(raw: Raw): MutableDock {
   return raw.docks?.[HUB] as MutableDock;
@@ -43,7 +43,7 @@ describe("dock map validation", () => {
     );
     expect(messages).toContainEqual(
       expect.stringContaining(
-        'ramp "personnel_ramp" of "deck.freighter_mk1" lands at (5,19), which is wall',
+        'ramp "personnel_ramp" of "deck.freighter_mk1" lands at (32,21), which is wall',
       ),
     );
   });
@@ -68,54 +68,54 @@ describe("dock map validation", () => {
 
   it("rejects a post that the landings cannot reach", () => {
     const messages = messagesAfter((dock) => {
-      // Wall the lounge gate (6,26) into its corner of the quay.
+      // Wall the lounge gate (6,28) into its corner of the quay.
       for (const [x, y] of [
-        [5, 25],
-        [6, 25],
-        [7, 25],
-        [5, 26],
-        [7, 26],
+        [5, 27],
+        [6, 27],
+        [7, 27],
+        [5, 28],
+        [7, 28],
       ] as const) {
         setTile(dock, x, y, "#");
       }
     });
     expect(messages).toContainEqual(
-      expect.stringContaining('post "lounge_gate" at (6,26) cannot be reached from ramp'),
+      expect.stringContaining('post "lounge_gate" at (6,28) cannot be reached from ramp'),
     );
   });
 
   it("rejects a post or area on anything but walkable floor", () => {
     const messages = messagesAfter((dock) => {
       dock.posts = dock.posts.map((p) =>
-        p.key === "bench" ? { ...p, tile: { x: 15, y: 26 } } : p,
+        p.key === "bench" ? { ...p, tile: { x: 15, y: 28 } } : p,
       );
       dock.areas = dock.areas.map((a) =>
-        a.key === "delivery" ? { ...a, rect: { x: 31, y: 24, w: 2, h: 3 } } : a,
+        a.key === "delivery" ? { ...a, rect: { x: 31, y: 26, w: 2, h: 3 } } : a,
       );
     });
     expect(messages).toContainEqual(
-      expect.stringContaining('post "bench" at (15,26) is wall, not walkable floor'),
+      expect.stringContaining('post "bench" at (15,28) is wall, not walkable floor'),
     );
     expect(messages).toContainEqual(
-      expect.stringContaining('area "delivery" tile (31,26) is wall, not walkable floor'),
+      expect.stringContaining('area "delivery" tile (31,28) is wall, not walkable floor'),
     );
   });
 
   it("rejects a ramp landing inside an area", () => {
     const messages = messagesAfter((dock) => {
       dock.areas = dock.areas.map((a) =>
-        a.key === "staging" ? { ...a, rect: { x: 15, y: 19, w: 3, h: 2 } } : a,
+        a.key === "staging" ? { ...a, rect: { x: 20, y: 21, w: 3, h: 2 } } : a,
       );
     });
     expect(messages).toContainEqual(expect.stringContaining('inside area "staging"'));
   });
 
-  it("rejects a berth that does not match the ship at shipAt", () => {
+  it("rejects a berth box over anything but void (D72)", () => {
     const messages = messagesAfter((dock) => {
-      dock.shipAt = { x: 4, y: 1 };
+      dock.berth = { origin: { x: 1, y: 2 }, sizeClass: "M" };
     });
     expect(messages).toContainEqual(
-      expect.stringContaining('berth at (3,1) is not under "deck.freighter_mk1" docked at (4,1)'),
+      expect.stringContaining("berth.origin: berth box tile (1,21) is floor, not void"),
     );
   });
 
@@ -124,7 +124,7 @@ describe("dock map validation", () => {
       dock.width = 50;
       dock.rows = dock.rows.map((r) => `${r}${r[0] === "#" ? "#" : " "}`.padEnd(50, "#"));
     });
-    expect(messages).toContainEqual(expect.stringContaining("50 x 28 exceeds the 48 x 36 cap"));
+    expect(messages).toContainEqual(expect.stringContaining("50 x 30 exceeds the 48 x 36 cap"));
   });
 
   it("rejects characters missing from the legend and rows of the wrong width", () => {

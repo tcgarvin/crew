@@ -1,10 +1,10 @@
 /**
  * Dockside §3.1 (phase 2): what the renderer reads off a dock map once, memoized per def: the tile
- * grid as row runs per kind, the berth's box, the edges where the berth meets the quay and where
- * walls meet floor, and how the berth is drawn; `dockSurface` adds the floor's look once the
+ * grid as row runs per kind, the berth's box (D72: `DockDef.berth`, a size-class box of void), the
+ * edges where the box meets the quay and where walls meet floor, and how the berth is drawn; `dockSurface` adds the floor's look once the
  * port's setting is known. Pure; dock frame (tile (0,0) is the map's top-left).
  */
-import type { DockDef, DockTileKind, PortSetting } from "@crew/sim";
+import { type DockDef, type DockTileKind, HULL_SIZE_BOX, type PortSetting } from "@crew/sim";
 import type { Bounds } from "./hull";
 
 /** `y` row, tiles `x0` to `x1` (exclusive). */
@@ -28,8 +28,7 @@ export interface FloorEdge {
 }
 
 /**
- * How the berth (the ship's footprint) is drawn when the hull does not cover it, which is while
- * the dock slides: a `pad` set into the floor when the quay surrounds it, an `open` slot (a bay
+ * How the berth box is drawn where the hull does not cover it (all of it while the dock slides): a `pad` set into the floor when the quay surrounds it, an `open` slot (a bay
  * pit at a station, sky at a pier) when it mostly borders walls or void.
  */
 export type BerthStyle = "pad" | "open";
@@ -41,10 +40,10 @@ export interface DockShape {
   /** Row-major tile kinds, `width × height`. */
   readonly kinds: readonly DockTileKind[];
   readonly runs: Readonly<Record<DockTileKind, readonly TileRun[]>>;
-  /** Tile box of the berth tiles (exclusive max). */
+  /** Tile box of the berth (`DockDef.berth`, exclusive max). */
   readonly berth: Bounds;
   readonly berthStyle: BerthStyle;
-  /** Where the berth meets floor: the quay's edge, hazard-striped. */
+  /** Where the berth box meets floor: the quay's edge, hazard-striped. */
   readonly quay: readonly FloorEdge[];
   /** Where a wall meets floor: the wall's lit lip and its shadow on the floor. */
   readonly lips: readonly FloorEdge[];
@@ -71,7 +70,7 @@ function tileKinds(dock: DockDef): DockTileKind[] {
 }
 
 function rowRuns(kinds: readonly DockTileKind[], width: number, height: number) {
-  const runs: Record<DockTileKind, TileRun[]> = { floor: [], wall: [], void: [], berth: [] };
+  const runs: Record<DockTileKind, TileRun[]> = { floor: [], wall: [], void: [] };
   for (let y = 0; y < height; y++) {
     let x0 = 0;
     for (let x = 1; x <= width; x++) {
@@ -93,14 +92,14 @@ const SIDES = [
 ] as const;
 
 /**
- * Every edge between a `kind` tile and a floor tile, merged into straight runs. The normal points
- * from the `kind` tile into the floor.
+ * Every edge between a `source` tile and a floor tile outside the source, merged into straight
+ * runs. The normal points from the source tile into the floor.
  */
 function edgesToFloor(
   kinds: readonly DockTileKind[],
   width: number,
   height: number,
-  kind: DockTileKind,
+  source: (x: number, y: number) => boolean,
 ): FloorEdge[] {
   const at = (x: number, y: number) =>
     x < 0 || y < 0 || x >= width || y >= height ? undefined : kinds[y * width + x];
@@ -114,7 +113,8 @@ function edgesToFloor(
       for (let i = 0; i <= along; i++) {
         const x = dy !== 0 ? i : line;
         const y = dy !== 0 ? line : i;
-        const hit = i < along && at(x, y) === kind && at(x + dx, y + dy) === "floor";
+        const hit =
+          i < along && source(x, y) && !source(x + dx, y + dy) && at(x + dx, y + dy) === "floor";
         if (hit && start < 0) start = i;
         if (!hit && start >= 0) {
           if (dy !== 0) {
@@ -132,22 +132,15 @@ function edgesToFloor(
   return edges;
 }
 
-function berthBox(kinds: readonly DockTileKind[], width: number, dockId: string): Bounds {
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  kinds.forEach((kind, i) => {
-    if (kind !== "berth") return;
-    const x = i % width;
-    const y = Math.floor(i / width);
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x + 1);
-    maxY = Math.max(maxY, y + 1);
-  });
-  if (minX === Number.POSITIVE_INFINITY) throw new Error(`Dock "${dockId}" has no berth tiles`);
-  return { minX, minY, maxX, maxY };
+/** D72: the berth's tile box, from its origin and size class. */
+function berthBox(dock: Pick<DockDef, "berth">): Bounds {
+  const { origin, sizeClass } = dock.berth;
+  const box = HULL_SIZE_BOX[sizeClass];
+  return { minX: origin.x, minY: origin.y, maxX: origin.x + box.w, maxY: origin.y + box.h };
+}
+
+function inBox(box: Bounds, x: number, y: number): boolean {
+  return x >= box.minX && x < box.maxX && y >= box.minY && y < box.maxY;
 }
 
 /** The share of tiles around the berth's box that are floor. */
@@ -181,14 +174,19 @@ export function dockShape(dock: DockDef): DockShape {
   const { width, height } = dock;
   const kinds = tileKinds(dock);
   const runs = rowRuns(kinds, width, height);
-  const berth = berthBox(kinds, width, dock.id);
+  const berth = berthBox(dock);
   const shape: DockShape = {
     kinds,
     runs,
     berth,
     berthStyle: quayShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
-    quay: edgesToFloor(kinds, width, height, "berth"),
-    lips: edgesToFloor(kinds, width, height, "wall"),
+    quay: edgesToFloor(kinds, width, height, (x, y) => inBox(berth, x, y)),
+    lips: edgesToFloor(
+      kinds,
+      width,
+      height,
+      (x, y) => x >= 0 && y >= 0 && x < width && y < height && kinds[y * width + x] === "wall",
+    ),
   };
   shapes.set(dock, shape);
   return shape;

@@ -63,11 +63,11 @@ function holdingPort(
   if (speaker === undefined || speaker.trim() === "") return undefined;
   const travel = state.travel;
   if (travel.stage !== "docked") return undefined;
-  const dock = dockAlongsideAt(content, state, travel.portId);
-  if (dock === undefined) return undefined;
+  const berth = dockAlongsideAt(content, state, travel.portId);
+  if (berth === undefined) return undefined;
   if (isShipsPerson(state, speaker)) return undefined;
   const reachable =
-    localNamed(state, speaker) !== undefined || dockPost(dock, "gate") !== undefined;
+    localNamed(state, speaker) !== undefined || dockPost(berth.dock, "gate") !== undefined;
   return reachable ? travel.portId : undefined;
 }
 

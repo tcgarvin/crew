@@ -19,7 +19,7 @@
  *   witness, and a local who cannot leave must not stand there forever.
  */
 import { configTicks } from "../../core/clock";
-import { dockAlongside, postTile } from "../../core/docks";
+import { type BerthedDock, dockAlongside, postTile } from "../../core/docks";
 import {
   clearDockside,
   dockNeedsDressing,
@@ -28,7 +28,6 @@ import {
   nextShuffleTick,
 } from "../../core/locals";
 import type { TileCoord } from "../../core/types/common";
-import type { DockDef } from "../../core/types/content";
 import type { Local, LocalBehaviour, StagingPlan } from "../../core/types/dockside";
 import type { LocalId, PortDefId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
@@ -186,7 +185,7 @@ function shuffleSpot(
   ctx: Ctx,
   local: Local,
   home: TileCoord,
-  dock: DockDef,
+  berth: BerthedDock,
 ): TileCoord | undefined {
   const geometry = deckGeometry(ctx.caches, local.location.deckId);
   const taken = localTiles(ctx.state);
@@ -200,7 +199,7 @@ function shuffleSpot(
   for (let i = 0; i < around.length; i++) {
     const tile = around[(start + i) % around.length] as TileCoord;
     const onDock = isDockTile(geometry, tile.x, tile.y) && isWalkable(geometry, tile.x, tile.y);
-    const isPost = dock.posts.some((p) => sameTile(postTile(dock, p), tile));
+    const isPost = berth.dock.posts.some((p) => sameTile(postTile(berth, p), tile));
     if (onDock && !isPost && !taken.has(`${tile.x},${tile.y}`)) return tile;
   }
   return undefined;
@@ -217,7 +216,7 @@ function sought(ctx: Ctx, local: Local): boolean {
 }
 
 /** `atPost`: the idle shuffle, out to a neighbouring tile and back. */
-function shuffle(ctx: Ctx, local: Local, dock: DockDef): void {
+function shuffle(ctx: Ctx, local: Local, berth: BerthedDock): void {
   const behaviour = local.behaviour;
   if (behaviour.kind !== "atPost" || local.movement.kind !== "stationary") return;
   if (ctx.tick < behaviour.nextShuffleTick) return;
@@ -227,17 +226,17 @@ function shuffle(ctx: Ctx, local: Local, dock: DockDef): void {
   behaviour.nextShuffleTick = nextShuffleTick(local.id, ctx.tick, every);
   const here = tileOf(local.location);
   const target = sameTile(here, behaviour.home)
-    ? shuffleSpot(ctx, local, behaviour.home, dock)
+    ? shuffleSpot(ctx, local, behaviour.home, berth)
     : behaviour.home;
   if (target !== undefined) walkLocal(ctx, local, target);
 }
 
 /** One local's tick of behaviour, after they have walked. */
-function behave(ctx: Ctx, local: Local, dock: DockDef): void {
+function behave(ctx: Ctx, local: Local, berth: BerthedDock): void {
   const behaviour = local.behaviour;
   switch (behaviour.kind) {
     case "atPost":
-      shuffle(ctx, local, dock);
+      shuffle(ctx, local, berth);
       return;
     case "walkTo":
       // A dock hand's errand decides what happens on arrival, or when the walk stops short.
@@ -264,7 +263,7 @@ function behave(ctx: Ctx, local: Local, dock: DockDef): void {
 export function dressDockAlongside(ctx: Ctx, plan: StagingPlan | undefined): void {
   const shuffleTicks = configTicks(ctx.config, ctx.config.travel.localShuffleSeconds);
   const dressed = dressDock(ctx.state, ctx.content, plan, ctx.tick, shuffleTicks);
-  const dock = dockAlongside(ctx.content, ctx.state);
+  const dock = dockAlongside(ctx.content, ctx.state)?.dock;
   if (dock === undefined) throw new Error("dressDockAlongside: the dock went while dressing it");
   ctx.emit({
     type: "dockDressed",
@@ -329,8 +328,8 @@ export const localsSystem: System = {
   run(ctx) {
     // A new game's dock is dressed at creation; one restored from before D66 is dressed here.
     if (dockNeedsDressing(ctx.state)) dressDockAlongside(ctx, undefined);
-    const dock = dockAlongside(ctx.content, ctx.state);
-    if (dock === undefined) return;
+    const berth = dockAlongside(ctx.content, ctx.state);
+    if (berth === undefined) return;
     const dt = ctx.elapsedTicks / ctx.config.time.tickRate;
     const others = bodies(ctx);
     const passing = overlapSpeedFactor(ctx.config);
@@ -342,7 +341,7 @@ export const localsSystem: System = {
     }
     for (const id of Object.keys(ctx.state.dockside.locals) as LocalId[]) {
       const local = ctx.state.dockside.locals[id];
-      if (local !== undefined) behave(ctx, local, dock);
+      if (local !== undefined) behave(ctx, local, berth);
     }
   },
 };

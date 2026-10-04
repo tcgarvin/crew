@@ -5,8 +5,9 @@
  * narrator draws from the content name table, tested in `@crew/narrator`).
  */
 import { describe, expect, it } from "vitest";
+import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
 import { migrateJobsToPeople } from "../../core/migrations";
-import { migrateState } from "../../core/save";
+import { migrateState, migrations } from "../../core/save";
 import type { Command } from "../../core/types/commands";
 import type { CommandId } from "../../core/types/ids";
 import { SCHEMA_VERSION } from "../../core/types/state";
@@ -145,15 +146,18 @@ describe("save migration 1 → 2 (D25)", () => {
   }
 
   it("turns an old issuer string into a person and keeps it as the label", () => {
-    const migrated = migrateState(schemaOneState(), 1, {
-      content: freightTestWorld().world.content,
-    }) as {
+    const migrated = migrateState(
+      schemaOneState(),
+      1,
+      { content: freightTestWorld().world.content },
+      migrations,
+      6,
+    ) as {
       schemaVersion: number;
       jobs: Record<string, Job>;
       markets: Record<string, unknown>;
     };
-    // D47 (schema 3) added `markets`; a 1 → 4 upgrade passes through every migration.
-    expect(SCHEMA_VERSION).toBe(6);
+    // D47 (schema 3) added `markets`; a 1 → 6 upgrade passes through every frozen migration.
     expect(migrated.schemaVersion).toBe(6);
     expect(migrated.markets).toEqual({});
     expect(migrated.jobs.j1).toMatchObject({
@@ -173,10 +177,10 @@ describe("save migration 1 → 2 (D25)", () => {
   });
 
   it("a schema-1 save restores through the kernel", () => {
-    const { world, kernel } = freightTestWorld();
+    const { world, kernel, registry } = freightTestWorld();
     const envelope = kernel.serialize(world);
     const old = { ...envelope, schemaVersion: 1, state: schemaOneState() as never };
-    const restored = kernel.restore(old, world.content);
+    const restored = restoreThroughSchema6(old, world.content, registry);
     expect(restored.state.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.values(restored.state.jobs)[0]?.issuerPerson.name).toBe("Rendell Freight Co.");
   });

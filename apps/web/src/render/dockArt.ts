@@ -75,15 +75,15 @@ function drawVoidAndBerth(
   px: number,
 ) {
   if (setting === "station") {
+    // The berth box is void too (D72), so an open berth is part of this pit.
     ctx.fillStyle = pitColor(dock);
     fillRuns(ctx, shape.runs.void, px);
-    if (shape.berthStyle === "open") fillRuns(ctx, shape.runs.berth, px);
   }
   if (shape.berthStyle !== "pad") return;
   // A pad set into the quay: a darker apron with a painted frame and centreline.
   const b = shape.berth;
   ctx.fillStyle = mixHex(dock.palette.floor, BLACK, 0.18);
-  fillRuns(ctx, shape.runs.berth, px);
+  ctx.fillRect(b.minX, b.minY, b.maxX - b.minX + px, b.maxY - b.minY + px);
   ctx.strokeStyle = rgba(dock.palette.accent, 0.75);
   ctx.lineWidth = 0.14;
   ctx.setLineDash([0.9, 0.5]);
@@ -776,7 +776,7 @@ const STRUCTURAL: Readonly<Record<DockForegroundKind, boolean>> = {
 /** Clip to `r` minus its floor tiles (dock frame). */
 function clipToStructure(ctx: CanvasRenderingContext2D, shape: DockShape, r: DockRect): void {
   ctx.beginPath();
-  for (const kind of ["wall", "void", "berth"] as const) {
+  for (const kind of ["wall", "void"] as const) {
     for (const run of shape.runs[kind]) {
       if (run.y < r.y || run.y >= r.y + r.h) continue;
       const x0 = Math.max(run.x0, r.x);

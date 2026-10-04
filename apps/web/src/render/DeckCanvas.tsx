@@ -19,7 +19,14 @@ import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { cameraBounds } from "./camera";
 import type { DeckLayout } from "./deckLayout";
-import { type DockTable, clampEngagement, dockInView, dockSlide, withDockSlide } from "./dock";
+import {
+  type DockTable,
+  berthInView,
+  clampEngagement,
+  dockInView,
+  dockSlide,
+  withDockSlide,
+} from "./dock";
 import {
   type DrawSelection,
   computeFitTransform,
@@ -153,7 +160,11 @@ export function DeckCanvas({
           const transform = computeFitTransform(
             width,
             height,
-            cameraBounds(hull, dock, scene.cameraT),
+            cameraBounds(
+              hull,
+              dock === undefined ? undefined : berthInView(dock, layout),
+              scene.cameraT,
+            ),
             rotatedRef.current,
           );
           drawnRef.current = {

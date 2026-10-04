@@ -16,7 +16,7 @@ import type {
 } from "@crew/sim";
 import { drawBadge, drawCrate, drawLoadedTruck, itemColor, loadedTruckRise } from "./crates";
 import type { DeckLayout } from "./deckLayout";
-import { dockOrigin, dockSlide, withDockSlide } from "./dock";
+import { berthInView, dockOrigin, dockSlide, withDockSlide } from "./dock";
 import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
@@ -741,7 +741,7 @@ export function drawFrame(
     dock === undefined
       ? undefined
       : {
-          origin: dockOrigin(dock, scene, layout.width),
+          origin: dockOrigin(berthInView(dock, layout), scene, layout.width),
           alpha: scene.portAlpha,
           clamps: scenery.clamps,
           setting: scene.setting,

@@ -9,19 +9,27 @@ import type {
   RenderLocal,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
+import { buildDeckLayout } from "../render/deckLayout";
+import { berthInView } from "../render/dock";
 import { dockPropKey } from "../render/locals";
 import { loadWebContent } from "../worker/content";
 import { dockInspection } from "./dockInspection";
 import { inspectDockProp, inspectLocal } from "./localInspection";
 
-const { bundle } = loadWebContent();
+const { bundle, scenarioId } = loadWebContent();
 const docks = bundle.docks ?? {};
 const hub = Object.values(docks).find((d) => d.portId === "port.crossroads_hub");
 if (hub === undefined) throw new Error("no hub dock");
 const dock: DockDef = hub;
+const scenario = bundle.scenarios[scenarioId];
+const scenarioDeck = scenario === undefined ? undefined : bundle.decks[scenario.deckId];
+if (scenarioDeck === undefined) throw new Error("no scenario deck");
+const layout = buildDeckLayout(scenarioDeck, bundle);
+/** The Hub with the scenario deck in its berth box (D72). */
+const berth = berthInView(dock, layout);
 
 function onDeck(x: number, y: number) {
-  return { x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 };
+  return { x: x - berth.shipAt.x + 0.5, y: y - berth.shipAt.y + 0.5 };
 }
 
 function post(key: string) {
@@ -53,12 +61,12 @@ const crates: RenderDockProp = {
   cargoClass: "general",
   count: 3,
   deckId: "deck.test" as RenderDockProp["deckId"],
-  ...onDeck(20, 23),
+  ...onDeck(20, 25),
 };
 
 describe("inspectLocal", () => {
   it("names a regular at their post: Hal at the queue kiosk", () => {
-    expect(inspectLocal(dock, local({}))).toEqual({
+    expect(inspectLocal(berth, local({}))).toEqual({
       name: "Hal Petrosyan",
       role: "berth agent",
       where: "at the queue-board kiosk",
@@ -68,7 +76,7 @@ describe("inspectLocal", () => {
   it("still says at their post while they shuffle about it", () => {
     const kiosk = post("queue_kiosk");
     const near = local(onDeck(kiosk.tile.x + 1, kiosk.tile.y - 1));
-    expect(inspectLocal(dock, near).where).toBe("at the queue-board kiosk");
+    expect(inspectLocal(berth, near).where).toBe("at the queue-board kiosk");
   });
 
   it("says where a dock hand is and what they are doing when away from their post", () => {
@@ -78,9 +86,9 @@ describe("inspectLocal", () => {
       postKey: "dispatch" as LocalKey,
       label: "bringing out 3 crates",
       carrying: 3,
-      ...onDeck(20, 23),
+      ...onDeck(20, 25),
     });
-    expect(inspectLocal(dock, hand)).toEqual({
+    expect(inspectLocal(berth, hand)).toEqual({
       name: "Ilse Brandt",
       role: "dock hand",
       where: "in the freight staging area on the dock",
@@ -90,19 +98,19 @@ describe("inspectLocal", () => {
   });
 
   it("carries a new face's look line", () => {
-    expect(inspectLocal(dock, local({ look: "a courier in a rain-dark coat" })).look).toBe(
+    expect(inspectLocal(berth, local({ look: "a courier in a rain-dark coat" })).look).toBe(
       "a courier in a rain-dark coat",
     );
   });
 
   it("throws on a post the dock does not have", () => {
-    expect(() => inspectLocal(dock, local({ postKey: "nope" as LocalKey }))).toThrow(/no post/);
+    expect(() => inspectLocal(berth, local({ postKey: "nope" as LocalKey }))).toThrow(/no post/);
   });
 });
 
 describe("inspectDockProp", () => {
   it("says how many, where, and whose", () => {
-    expect(inspectDockProp(dock, crates)).toEqual({
+    expect(inspectDockProp(berth, crates)).toEqual({
       title: "General freight crate",
       subtitle: "on the dock",
       text: "Three of them, in the freight staging area on the dock. The port's, not the ship's.",
@@ -110,7 +118,7 @@ describe("inspectDockProp", () => {
   });
 
   it("needs no count for one", () => {
-    expect(inspectDockProp(dock, { ...crates, count: 1 }).text).toBe(
+    expect(inspectDockProp(berth, { ...crates, count: 1 }).text).toBe(
       "In the freight staging area on the dock. The port's, not the ship's.",
     );
   });
@@ -131,16 +139,16 @@ describe("dockInspection", () => {
   } as unknown as RenderFrame;
 
   it("finds the tapped local and prop in the frame", () => {
-    expect(dockInspection(frame, docks, { kind: "local", id: "o1" })).toMatchObject({
+    expect(dockInspection(frame, docks, layout, { kind: "local", id: "o1" })).toMatchObject({
       kind: "local",
       local: { name: "Hal Petrosyan" },
     });
     expect(
-      dockInspection(frame, docks, { kind: "dockProp", id: dockPropKey(crates, 0) }),
+      dockInspection(frame, docks, layout, { kind: "dockProp", id: dockPropKey(crates, 0) }),
     ).toMatchObject({ kind: "place", place: { title: "General freight crate" } });
   });
 
   it("has nothing to show for someone who has left the dock", () => {
-    expect(dockInspection(frame, docks, { kind: "local", id: "o9" })).toBeUndefined();
+    expect(dockInspection(frame, docks, layout, { kind: "local", id: "o9" })).toBeUndefined();
   });
 });

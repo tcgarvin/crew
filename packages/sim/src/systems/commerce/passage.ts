@@ -89,7 +89,7 @@ function rampTiles(deck: DeckDef): readonly TileCoord[] {
   return tiles;
 }
 
-function theDeck(ctx: Pick<StepCtx, "content">): DeckDef {
+function theDeck(ctx: Pick<StepCtx, "content" | "state">): DeckDef {
   const deck = ctx.content.decks[theDeckId(ctx)];
   if (deck === undefined) throw new Error("passage: content bundle has no deck");
   return deck;

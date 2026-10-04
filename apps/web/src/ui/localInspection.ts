@@ -3,7 +3,7 @@
  * prop the staging call set out. Both come from the render frame and the dock map alone, so, like
  * a post, they need no snapshot from the worker.
  */
-import type { DockDef, RenderDockProp, RenderLocal } from "@crew/sim";
+import type { BerthedDock, RenderDockProp, RenderLocal } from "@crew/sim";
 import { dockWhere } from "./itemInspection";
 import type { PlaceInspection } from "./placeInspection";
 
@@ -29,16 +29,17 @@ const AT_POST_TILES = 2;
  * slid one the canvas draws). Throws if their post is not on this dock: the sim only places locals
  * at posts of the dock alongside (D66).
  */
-export function inspectLocal(dock: DockDef, local: RenderLocal): LocalInspection {
+export function inspectLocal(berth: BerthedDock, local: RenderLocal): LocalInspection {
+  const { dock, shipAt } = berth;
   const post = dock.posts.find((p) => p.key === local.postKey);
   if (post === undefined) throw new Error(`Dock "${dock.id}" has no post "${local.postKey}"`);
-  const tileX = Math.floor(local.x) + dock.shipAt.x;
-  const tileY = Math.floor(local.y) + dock.shipAt.y;
+  const tileX = Math.floor(local.x) + shipAt.x;
+  const tileY = Math.floor(local.y) + shipAt.y;
   const atPost = Math.hypot(post.tile.x - tileX, post.tile.y - tileY) <= AT_POST_TILES;
   return {
     name: local.name,
     role: local.role,
-    where: atPost ? `at ${post.name}` : dockWhere(dock, local.x, local.y),
+    where: atPost ? `at ${post.name}` : dockWhere(berth, local.x, local.y),
     ...(atPost ? {} : { post: post.name }),
     ...(local.label === undefined ? {} : { doing: local.label }),
     ...(local.look === undefined ? {} : { look: local.look }),
@@ -55,8 +56,8 @@ function capitalise(text: string): string {
  * The inspector's view of a staged prop: what it is, how many and where, and that it is the
  * port's (it is set dressing, never an item: nobody aboard can pick it up or use it).
  */
-export function inspectDockProp(dock: DockDef, prop: RenderDockProp): PlaceInspection {
-  const where = dockWhere(dock, prop.x, prop.y);
+export function inspectDockProp(berth: BerthedDock, prop: RenderDockProp): PlaceInspection {
+  const where = dockWhere(berth, prop.x, prop.y);
   const count = COUNT_WORDS[prop.count];
   const amount = prop.count > 1 && count !== undefined ? `${count} of them, ${where}` : where;
   return {

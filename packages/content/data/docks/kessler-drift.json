@@ -9,27 +9,29 @@
     "accent": "#d9a441"
   },
   "width": 36,
-  "height": 25,
+  "height": 27,
   "rows": [
     "####################################",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
-    "##BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB##",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
+    "                                    ",
     "#..................................#",
     "#..................................#",
     "##.................................#",
@@ -40,12 +42,14 @@
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 2,
-    "y": 1
+  "berth": {
+    "origin": {
+      "x": 0,
+      "y": 1
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -54,7 +58,7 @@
       "name": "the assay window",
       "tile": {
         "x": 9,
-        "y": 23
+        "y": 25
       },
       "facing": "n"
     },
@@ -64,7 +68,7 @@
       "name": "the shift board",
       "tile": {
         "x": 21,
-        "y": 20
+        "y": 22
       },
       "facing": "w"
     },
@@ -74,7 +78,7 @@
       "name": "the hatch to the canteen ring",
       "tile": {
         "x": 5,
-        "y": 23
+        "y": 25
       },
       "facing": "n"
     },
@@ -84,7 +88,7 @@
       "name": "the ore-store lock",
       "tile": {
         "x": 27,
-        "y": 23
+        "y": 25
       },
       "facing": "n"
     }
@@ -95,7 +99,7 @@
       "kind": "freightStaging",
       "rect": {
         "x": 13,
-        "y": 22,
+        "y": 24,
         "w": 4,
         "h": 2
       }
@@ -105,7 +109,7 @@
       "kind": "deliveryBay",
       "rect": {
         "x": 32,
-        "y": 21,
+        "y": 23,
         "w": 3,
         "h": 2
       }
@@ -117,7 +121,7 @@
       "kind": "conveyor",
       "rect": {
         "x": 18,
-        "y": 21,
+        "y": 23,
         "w": 12,
         "h": 1
       },
@@ -129,7 +133,7 @@
       "kind": "barrels",
       "rect": {
         "x": 1,
-        "y": 19,
+        "y": 21,
         "w": 1,
         "h": 2
       },
@@ -141,7 +145,7 @@
       "kind": "crates",
       "rect": {
         "x": 34,
-        "y": 19,
+        "y": 21,
         "w": 1,
         "h": 2
       },
@@ -153,7 +157,7 @@
       "kind": "lamp",
       "rect": {
         "x": 11,
-        "y": 23,
+        "y": 25,
         "w": 1,
         "h": 1
       },
@@ -175,7 +179,7 @@
       "kind": "rockWall",
       "rect": {
         "x": 0,
-        "y": 21,
+        "y": 23,
         "w": 4,
         "h": 4
       }
@@ -184,7 +188,7 @@
       "kind": "rockWall",
       "rect": {
         "x": 29,
-        "y": 23,
+        "y": 25,
         "w": 3,
         "h": 2
       }
@@ -193,7 +197,7 @@
       "kind": "rockWall",
       "rect": {
         "x": 0,
-        "y": 24,
+        "y": 26,
         "w": 36,
         "h": 1
       }

@@ -207,11 +207,12 @@ describe("buildDigest", () => {
     const req = farCaptainAshoreRequest(bundle);
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     const state = snapshot.state;
-    const dock = dockAlongside(bundle, state);
-    if (dock === undefined || state.deck.dock === undefined) throw new Error("fixture: no dock");
+    const berth = dockAlongside(bundle, state);
+    if (berth === undefined || state.deck.dock === undefined) throw new Error("fixture: no dock");
+    const { dock } = berth;
     const deckId = state.deck.dock.deckId;
-    const staging = dockAreaTiles(dock, "freightStaging");
-    const bay = dockAreaTiles(dock, "deliveryBay");
+    const staging = dockAreaTiles(berth, "freightStaging");
+    const bay = dockAreaTiles(berth, "deliveryBay");
     const crate = (id: string, jobId: string, tile: { x: number; y: number } | undefined) => {
       if (tile === undefined) throw new Error("fixture: dock area too small");
       state.items[id as ItemId] = {

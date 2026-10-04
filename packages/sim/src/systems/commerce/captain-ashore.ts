@@ -22,12 +22,11 @@
 import { configTicks } from "../../core/clock";
 import { commandActor, isFitForCommand } from "../../core/command-actor";
 import { deliverHeldCard, localNamed } from "../../core/delivery";
-import { dockAlongsideAt, dockPost, isOnDock, postTile } from "../../core/docks";
+import { type BerthedDock, dockAlongsideAt, dockPost, isOnDock, postTile } from "../../core/docks";
 import { raiseHookIfIdle } from "../../core/hooks";
 import { postFacing, spawnLocal, waitingSpotByRamp } from "../../core/locals";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
-import type { DockDef } from "../../core/types/content";
 import type { HeldCard } from "../../core/types/decisions";
 import type { Local } from "../../core/types/dockside";
 import type { CardDeliveryReason } from "../../core/types/events";
@@ -171,26 +170,27 @@ function freeForMeeting(ctx: Ctx, actor: Actor): boolean {
 }
 
 /** A speaker who came over is done: a visitor goes back out, anyone else back to their post. */
-function releaseSpeaker(ctx: Ctx, held: HeldCard, dock: DockDef | undefined): void {
+function releaseSpeaker(ctx: Ctx, held: HeldCard, berth: BerthedDock | undefined): void {
   const delivery = held.delivery;
   if (delivery?.via !== "speaker") return;
   const local = ctx.state.dockside.locals[delivery.localId];
   if (local === undefined) return;
   // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
   delete local.label;
-  const post = dock?.posts.find((p) => p.key === local.postKey);
+  const post = berth?.dock.posts.find((p) => p.key === local.postKey);
+  const postAt = berth === undefined || post === undefined ? undefined : postTile(berth, post);
   if (local.origin.kind === "visitor") {
-    if (post !== undefined) sendLocalAway(ctx, local, postTile(dock as DockDef, post));
+    if (postAt !== undefined) sendLocalAway(ctx, local, postAt);
     else delete ctx.state.dockside.locals[local.id];
     return;
   }
-  if (post === undefined || !sendLocalTo(ctx, local, postTile(dock as DockDef, post))) {
+  if (postAt === undefined || !sendLocalTo(ctx, local, postAt)) {
     settleLocal(ctx, local);
   }
 }
 
-function finish(ctx: Ctx, held: HeldCard, reason: CardDeliveryReason, dock?: DockDef): void {
-  releaseSpeaker(ctx, held, dock);
+function finish(ctx: Ctx, held: HeldCard, reason: CardDeliveryReason, berth?: BerthedDock): void {
+  releaseSpeaker(ctx, held, berth);
   deliverHeldCard(ctx, held.decisionId, reason);
 }
 
@@ -202,13 +202,13 @@ function visitorRole(ctx: Ctx, held: HeldCard): string {
 }
 
 /** The speaker who will walk to the ramp: the local with their name, or a visitor at the gate. */
-function speakerToWalk(ctx: Ctx, held: HeldCard, dock: DockDef): Local | undefined {
+function speakerToWalk(ctx: Ctx, held: HeldCard, berth: BerthedDock): Local | undefined {
   const named = localNamed(ctx.state, held.speaker);
   if (named !== undefined) {
     // A dock hand carting freight finishes that first; the give-up clock covers a long errand.
     return named.errand === undefined ? ctx.state.dockside.locals[named.id] : undefined;
   }
-  const gate = dockPost(dock, "gate");
+  const gate = dockPost(berth.dock, "gate");
   const presence = ctx.state.deck.dock;
   if (gate === undefined || presence === undefined) return undefined;
   const shuffle = configTicks(ctx.config, ctx.config.travel.localShuffleSeconds);
@@ -221,7 +221,7 @@ function speakerToWalk(ctx: Ctx, held: HeldCard, dock: DockDef): Local | undefin
       origin: { kind: "visitor" },
       postKey: gate.key,
     },
-    postTile(dock, gate),
+    postTile(berth, gate),
     postFacing(gate),
     ctx.tick,
     shuffle,
@@ -229,11 +229,11 @@ function speakerToWalk(ctx: Ctx, held: HeldCard, dock: DockDef): Local | undefin
 }
 
 /** Start the speaker's walk to the foot of the ramp. False when there is no way to. */
-function sendSpeaker(ctx: Ctx, held: HeldCard, dock: DockDef): boolean {
+function sendSpeaker(ctx: Ctx, held: HeldCard, berth: BerthedDock): boolean {
   const presence = ctx.state.deck.dock;
   if (presence === undefined) return false;
-  const spot = waitingSpotByRamp(ctx.state, ctx.content, presence.deckId, dock);
-  const local = spot === undefined ? undefined : speakerToWalk(ctx, held, dock);
+  const spot = waitingSpotByRamp(ctx.state, ctx.content, presence.deckId, berth);
+  const local = spot === undefined ? undefined : speakerToWalk(ctx, held, berth);
   if (spot === undefined || local === undefined) return false;
   const fromGate = local.origin.kind === "visitor";
   if (!sendLocalTo(ctx, local, spot)) {
@@ -258,13 +258,13 @@ const within = (local: Local, tile: TileCoord, reach: number) =>
   Math.abs(local.location.y - (tile.y + 0.5)) <= reach;
 
 /** One tick of the oldest held card's meeting. */
-function advanceMeeting(ctx: Ctx, held: HeldCard, dock: DockDef): void {
+function advanceMeeting(ctx: Ctx, held: HeldCard, berth: BerthedDock): void {
   if (held.delivery === undefined) {
     const walker = walkerFor(ctx, held.portId);
     if (meetingUnderWay(ctx, held.decisionId) || (walker !== undefined && isAshore(ctx, walker))) {
       held.delivery = { via: "captain", sinceTick: ctx.tick };
-    } else if (!sendSpeaker(ctx, held, dock)) {
-      finish(ctx, held, "noWayToMeet", dock);
+    } else if (!sendSpeaker(ctx, held, berth)) {
+      finish(ctx, held, "noWayToMeet", berth);
       return;
     }
   }
@@ -286,17 +286,17 @@ function advanceMeeting(ctx: Ctx, held: HeldCard, dock: DockDef): void {
   }
   const local = ctx.state.dockside.locals[delivery.localId];
   if (local === undefined) {
-    finish(ctx, held, "noWayToMeet", dock);
+    finish(ctx, held, "noWayToMeet", berth);
     return;
   }
   if (local.movement.kind === "moving") return;
   if (standingOn(local, delivery.tile) || within(local, delivery.tile, 1.5)) {
     local.label = "waiting at the ramp";
-    finish(ctx, held, "met", dock);
+    finish(ctx, held, "met", berth);
     return;
   }
   // Stopped short (someone in the way, a tile gone): try again, or give the word where they are.
-  if (!sendLocalTo(ctx, local, delivery.tile)) finish(ctx, held, "noWayToMeet", dock);
+  if (!sendLocalTo(ctx, local, delivery.tile)) finish(ctx, held, "noWayToMeet", berth);
 }
 
 /** Once a tick: retire what cannot wait, then move the oldest held card's meeting along. */
@@ -305,14 +305,14 @@ function sweepHeldCards(ctx: Ctx): void {
   const giveUp = configTicks(ctx.config, ctx.config.travel.cardDeliveryGiveUpSeconds);
   for (const held of [...ctx.state.decisions.held]) {
     const docked = travel.stage === "docked" && travel.portId === held.portId;
-    const dock = docked ? dockAlongsideAt(ctx.content, ctx.state, held.portId) : undefined;
-    if (dock === undefined) finish(ctx, held, "leaving");
-    else if (ctx.tick - held.heldTick >= giveUp) finish(ctx, held, "gaveUp", dock);
+    const berth = docked ? dockAlongsideAt(ctx.content, ctx.state, held.portId) : undefined;
+    if (berth === undefined) finish(ctx, held, "leaving");
+    else if (ctx.tick - held.heldTick >= giveUp) finish(ctx, held, "gaveUp", berth);
   }
   const head = ctx.state.decisions.held[0];
   if (head === undefined) return;
-  const dock = dockAlongsideAt(ctx.content, ctx.state, head.portId);
-  if (dock !== undefined) advanceMeeting(ctx, head, dock);
+  const berth = dockAlongsideAt(ctx.content, ctx.state, head.portId);
+  if (berth !== undefined) advanceMeeting(ctx, head, berth);
 }
 
 /** The captain ashore: looking for work, and cards delivered in person (D70). */

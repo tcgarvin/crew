@@ -24,6 +24,7 @@ import {
   configTicks,
   createKernel,
   createRegistry,
+  dockAlongside,
   dockForPort,
   dressDock,
   expectedDock,
@@ -273,11 +274,11 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
 function captainSteppedAshore(state: WorldState, content: ContentBundle): ActorId {
   const captain = Object.values(state.actors).find((a) => a.roleTags.includes("captain"));
   const presence = state.deck.dock;
-  const dock = presence === undefined ? undefined : content.docks?.[presence.dockId];
-  if (captain === undefined || presence === undefined || dock === undefined) {
+  const berth = dockAlongside(content, state);
+  if (captain === undefined || presence === undefined || berth === undefined) {
     throw new Error("captainAshore fixture: no captain or no dock alongside");
   }
-  const foot = personnelRampFoot(content, presence.deckId, dock);
+  const foot = personnelRampFoot(content, presence.deckId, berth);
   if (foot === undefined) throw new Error("captainAshore fixture: the dock has no ramp foot");
   captain.location = { kind: "onDeck", deckId: presence.deckId, x: foot.x + 0.5, y: foot.y + 0.5 };
   return captain.id;

@@ -272,6 +272,10 @@
               "required": ["x", "y"],
               "additionalProperties": false
             }
+          },
+          "machineKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
           }
         },
         "required": ["key", "name", "tags", "tiles"],
@@ -377,6 +381,21 @@
         "required": ["key", "tile", "tags"],
         "additionalProperties": false
       }
+    },
+    "hull": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sizeClass": {
+          "type": "string",
+          "enum": ["S", "M", "L"]
+        }
+      },
+      "required": ["class", "sizeClass"],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -393,7 +412,8 @@
     "powerDomains",
     "zones",
     "docking",
-    "spawnPoints"
+    "spawnPoints",
+    "hull"
   ],
   "additionalProperties": false
 }

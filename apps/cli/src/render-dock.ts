@@ -1,17 +1,27 @@
 /**
- * ASCII rendering for a `DockDef` with the ship composited at `shipAt` (used by
- * `crew content render-dock`, which writes it into the README next to each dock file under
- * `packages/content/data/docks/`).
+ * ASCII rendering for a `DockDef` with every deck in the bundle composited in its berth box, one
+ * map per deck, each where `berthPlacement` puts it (D72; used by `crew content render-dock`,
+ * which writes it into the README next to each dock file under `packages/content/data/docks/`).
  */
 import { dockRampLandings } from "@crew/content";
-import type { DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
+import {
+  type DeckDef,
+  type DockDef,
+  type DockRect,
+  HULL_SIZE_BOX,
+  type PortDef,
+  type TileCoord,
+  berthPlacement,
+} from "@crew/sim";
 
 const BASE_CHAR: Readonly<Record<string, string>> = {
   floor: ".",
   wall: "#",
   void: " ",
-  berth: "=",
 };
+
+/** A berth box tile no ship floor covers. */
+const BERTH_CHAR = "=";
 
 const AREA_CHAR: Readonly<Record<DockDef["areas"][number]["kind"], string>> = {
   freightStaging: "s",
@@ -32,6 +42,11 @@ function rectText(rect: DockRect): string {
   return `(${rect.x},${rect.y}) ${rect.w} x ${rect.h}`;
 }
 
+function berthRect(dock: DockDef): DockRect {
+  const box = HULL_SIZE_BOX[dock.berth.sizeClass];
+  return { x: dock.berth.origin.x, y: dock.berth.origin.y, w: box.w, h: box.h };
+}
+
 /** The map grid with the ship, areas, props, landings and posts drawn in, plus rulers. */
 function compositeMap(dock: DockDef, deck: DeckDef): string[] {
   const grid = dock.rows.map((row) =>
@@ -41,9 +56,11 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
     const row = grid[t.y];
     if (row !== undefined && t.x >= 0 && t.x < row.length) row[t.x] = ch;
   };
+  for (const t of rectTiles(berthRect(dock))) put(t, BERTH_CHAR);
+  const shipAt = berthPlacement(dock, deck);
   deck.tiles.forEach((row, y) => {
     [...row].forEach((ch, x) => {
-      if (ch !== " ") put({ x: x + dock.shipAt.x, y: y + dock.shipAt.y }, ch);
+      if (ch !== " ") put({ x: x + shipAt.x, y: y + shipAt.y }, ch);
     });
   });
   for (const area of dock.areas) {
@@ -65,19 +82,29 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
   ];
 }
 
-/** Renders the dock map with the ship docked, and every post, area, prop and landing listed. */
-export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string {
+/**
+ * Renders the dock map with each deck docked in its berth box (one map per deck), and every
+ * post, area, prop and landing listed.
+ */
+export function renderDock(dock: DockDef, decks: readonly DeckDef[], port: PortDef): string {
   const lines: string[] = [];
+  const box = berthRect(dock);
   lines.push(`${dock.name} (${dock.id})`);
   lines.push(`${port.setting} dock for ${port.name} (${port.id})`);
   lines.push(
-    `${dock.width} x ${dock.height} tiles; ${deck.name} (${deck.id}) docked at (${dock.shipAt.x},${dock.shipAt.y})`,
+    `${dock.width} x ${dock.height} tiles; ${dock.berth.sizeClass} berth box ${box.w} x ${box.h} at (${box.x},${box.y})`,
   );
-  lines.push("");
-  lines.push(...compositeMap(dock, deck));
+  for (const deck of decks) {
+    const shipAt = berthPlacement(dock, deck);
+    lines.push("");
+    lines.push(`${deck.name} (${deck.id}) docked at (${shipAt.x},${shipAt.y})`);
+    lines.push("");
+    lines.push(...compositeMap(dock, deck));
+  }
   lines.push("");
   lines.push("Key:");
   lines.push("  .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)");
+  lines.push("  =  berth box tile no ship floor covers");
   lines.push("  v  ramp landing     s  freight staging     d  delivery bay");
   lines.push("  %  blocking prop    :  prop you can walk past    1-9  posts (below)");
   lines.push("");
@@ -89,10 +116,12 @@ export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string 
       `  ${POST_CHARS[i] ?? "*"}  ${post.key}: ${post.kind}, ${post.name}, at (${post.tile.x},${post.tile.y}) facing ${post.facing}${who}`,
     );
   });
-  lines.push("");
-  lines.push("Ramp landings:");
-  for (const landing of dockRampLandings(dock, deck)) {
-    lines.push(`  ${landing.key}: (${landing.tile.x},${landing.tile.y})`);
+  for (const deck of decks) {
+    lines.push("");
+    lines.push(`Ramp landings (${deck.id}):`);
+    for (const landing of dockRampLandings(dock, deck)) {
+      lines.push(`  ${landing.key}: (${landing.tile.x},${landing.tile.y})`);
+    }
   }
   lines.push("");
   lines.push(`Areas (${dock.areas.length}):`);
@@ -118,7 +147,7 @@ export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string 
 /** The README written next to the dock's JSON file. */
 export function renderDockReadme(
   dock: DockDef,
-  deck: DeckDef,
+  decks: readonly DeckDef[],
   port: PortDef,
   fileName: string,
 ): string {
@@ -126,13 +155,13 @@ export function renderDockReadme(
     `# ${dock.name}: dock map`,
     "",
     `Generated by \`crew content render-dock ${dock.id}\` from \`${fileName}\`; do not edit by hand.`,
-    "Regenerate after any change to the map or the deck (a CLI test fails while this is stale).",
-    "West (low x) is fore. The ship's ramps open on its south flank onto the quay.",
+    "Regenerate after any change to the map or a deck (a CLI test fails while this is stale).",
+    "East (high x) is fore. The ship's ramps open on its south flank onto the quay; each deck lies in the berth box flush to its south edge and centred.",
     "",
     `> ${dock.ambience}`,
     "",
     "```",
-    renderDock(dock, deck, port),
+    renderDock(dock, decks, port),
     "```",
     "",
   ].join("\n");

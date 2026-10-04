@@ -3,6 +3,7 @@ import type { DeckDef } from "@crew/sim";
 import { z } from "zod";
 import {
   deckDefIdSchema,
+  hullSizeClassSchema,
   localKeySchema,
   machineDefIdSchema,
   positiveInt,
@@ -53,6 +54,8 @@ export const deckDefSchema = z.strictObject({
       name: z.string().min(1),
       tags: z.array(z.string()),
       tiles: z.array(tileCoordSchema).min(1),
+      /** The machine placement this zone serves (a `locker` names its bed); checked at L2. */
+      machineKey: localKeySchema.exactOptional(),
     }),
   ),
   docking: z.strictObject({
@@ -68,4 +71,9 @@ export const deckDefSchema = z.strictObject({
       tags: z.array(z.enum(["crew", "passenger", "cargo"])),
     }),
   ),
+  /** D72: bow east and ramps south are invariants, not fields; the hull contract checks them. */
+  hull: z.strictObject({
+    class: z.string().min(1),
+    sizeClass: hullSizeClassSchema,
+  }),
 }) satisfies z.ZodType<DeckDef>;

@@ -2,7 +2,7 @@
   "$schema": "../../schema-json/machine.schema.json",
   "id": "machine.medbay_bed",
   "name": "Medbay Bed",
-  "tags": ["bed"],
+  "tags": ["medBed"],
   "footprint": [
     {
       "x": 0,

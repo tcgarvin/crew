@@ -1,7 +1,7 @@
 /**
  * `DockDef` schema (Dockside §3.1; sim `core/types/content.ts`). Shape only: the map's geometry
- * (rows against the legend, the berth against the ship, landings, reachability, size) is checked
- * at L3 in `validate-dock.ts`.
+ * (rows against the legend, the berth box and every deck placed in it, landings, reachability,
+ * size) is checked at L3 in `validate-dock.ts`.
  */
 import type {
   DockAreaKind,
@@ -16,6 +16,7 @@ import {
   type AssertEqual,
   dockDefIdSchema,
   edgeSideSchema,
+  hullSizeClassSchema,
   localKeySchema,
   portDefIdSchema,
   positiveInt,
@@ -23,7 +24,7 @@ import {
   tileCoordSchema,
 } from "./primitives";
 
-export const dockTileKindSchema = z.enum(["floor", "wall", "void", "berth"]);
+export const dockTileKindSchema = z.enum(["floor", "wall", "void"]);
 export const dockPostKindSchema = z.enum([
   "gate",
   "warehouseDoor",
@@ -77,7 +78,11 @@ export const dockDefSchema = z.strictObject({
   height: positiveInt,
   rows: z.array(z.string()).min(1),
   legend: z.record(z.string().length(1), dockTileKindSchema),
-  shipAt: tileCoordSchema,
+  /** D72: the box a docked ship lies in; the box and the ship's place are checked at L3. */
+  berth: z.strictObject({
+    origin: z.strictObject({ x: z.number().int().min(0), y: z.number().int().min(0) }),
+    sizeClass: hullSizeClassSchema,
+  }),
   posts: z.array(
     z.strictObject({
       key: localKeySchema,

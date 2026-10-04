@@ -13,11 +13,16 @@
  */
 import { configTicks } from "../../core/clock";
 import { heldCard, localNamed } from "../../core/delivery";
-import { dockAlongside, dockPost, postServiceTile, postTile } from "../../core/docks";
+import {
+  type BerthedDock,
+  dockAlongside,
+  dockPost,
+  postServiceTile,
+  postTile,
+} from "../../core/docks";
 import { personnelRampFoot } from "../../core/locals";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
-import type { DockDef } from "../../core/types/content";
 import type { DecisionId, DeckDefId, DoorId, PortDefId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { StepCtx } from "../../core/types/pipeline";
@@ -41,7 +46,7 @@ const move = (tile: TileCoord): ActivityStep => ({
 /** The docked port, its dock and the ramp tiles a walk ashore needs, or undefined. */
 interface Shore {
   readonly portId: PortDefId;
-  readonly dock: DockDef;
+  readonly berth: BerthedDock;
   readonly geometry: DeckGeometry;
   /** The dock tile at the foot of the personnel ramp. */
   readonly foot: TileCoord;
@@ -66,22 +71,22 @@ function personnelRamp(
 function shoreHere(ctx: StepCtx): Shore | undefined {
   const travel = ctx.state.travel;
   const presence = ctx.state.deck.dock;
-  const dock = dockAlongside(ctx.content, ctx.state);
-  if (travel.stage !== "docked" || presence === undefined || dock === undefined) return undefined;
-  if (dock.portId !== travel.portId) return undefined;
+  const berth = dockAlongside(ctx.content, ctx.state);
+  if (travel.stage !== "docked" || presence === undefined || berth === undefined) return undefined;
+  if (berth.dock.portId !== travel.portId) return undefined;
   const geometry = deckGeometry(ctx.caches, presence.deckId);
   const rampId = personnelRamp(ctx, presence.deckId, geometry);
   if (rampId === undefined) return undefined;
   const foot =
-    personnelRampFoot(ctx.content, presence.deckId, dock) ?? rampLanding(geometry, rampId);
-  const gatePost = dockPost(dock, "gate");
+    personnelRampFoot(ctx.content, presence.deckId, berth) ?? rampLanding(geometry, rampId);
+  const gatePost = dockPost(berth.dock, "gate");
   return {
     portId: travel.portId,
-    dock,
+    berth,
     geometry,
     foot,
     top: rampTop(geometry, rampId),
-    gate: gatePost === undefined ? undefined : postTile(dock, gatePost),
+    gate: gatePost === undefined ? undefined : postTile(berth, gatePost),
   };
 }
 
@@ -102,11 +107,11 @@ function throughGate(ctx: StepCtx, shore: Shore, gate: TileCoord): ActivityStep 
  * it is built.
  */
 function lookRoundTile(ctx: StepCtx, actor: Actor, shore: Shore): TileCoord | undefined {
-  const posts = shore.dock.posts.filter((p) => p.kind !== "gate");
+  const posts = shore.berth.dock.posts.filter((p) => p.kind !== "gate");
   if (posts.length === 0) return undefined;
   const draw = ctx.rng.keyedFloat("social", `lookRound:${actor.id}:${shore.portId}`, ctx.tick);
   const post = posts[Math.min(posts.length - 1, Math.floor(draw * posts.length))];
-  return post === undefined ? undefined : postServiceTile(shore.dock, post);
+  return post === undefined ? undefined : postServiceTile(shore.berth, post);
 }
 
 /** D70 `lookForWork`: ashore, wait for the narrator's word, then a look round and back aboard. */

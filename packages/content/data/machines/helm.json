@@ -1,7 +1,7 @@
 {
   "$schema": "../../schema-json/machine.schema.json",
-  "id": "machine.bridge_console",
-  "name": "Bridge Console",
+  "id": "machine.helm",
+  "name": "Helm",
   "tags": ["pilotStation"],
   "footprint": [
     {
@@ -13,10 +13,19 @@
     {
       "key": "seat",
       "offset": {
-        "x": 1,
+        "x": -1,
         "y": 0
       },
       "purposes": ["operate", "repair"],
+      "capacity": 1
+    },
+    {
+      "key": "standby",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["use"],
       "capacity": 1
     }
   ],

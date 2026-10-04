@@ -1,6 +1,7 @@
-import type { DeepReadonly, DockDef, ItemId, WorldState } from "@crew/sim";
+import type { BerthedDock, DeepReadonly, DockDef, ItemId, WorldState } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildDeckLayout } from "../render/deckLayout";
+import { berthInView } from "../render/dock";
 import { loadWebContent } from "../worker/content";
 import { dockWhere, inspectItem } from "./itemInspection";
 import { inspectPlace, postTitle } from "./placeInspection";
@@ -11,8 +12,8 @@ const hub = docks.find((d) => d.portId === "port.crossroads_hub");
 if (hub === undefined) throw new Error("no hub dock");
 
 /** Deck-frame centre of a dock tile. */
-function onDeck(dock: DockDef, x: number, y: number) {
-  return { x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 };
+function onDeck(berth: BerthedDock, x: number, y: number) {
+  return { x: x - berth.shipAt.x + 0.5, y: y - berth.shipAt.y + 0.5 };
 }
 
 describe("inspectPlace", () => {
@@ -49,11 +50,13 @@ describe("dockWhere (items on the dock)", () => {
   const deck = scenario === undefined ? undefined : bundle.decks[scenario.deckId];
   if (deck === undefined) throw new Error("no deck");
   const layout = buildDeckLayout(deck, bundle);
+  /** The Hub with the scenario deck in its berth box (D72). */
+  const hubBerth = berthInView(hub, layout);
 
   it("names the area an item sits in", () => {
     for (const area of hub.areas) {
-      const p = onDeck(hub, area.rect.x, area.rect.y);
-      const words = dockWhere(hub, p.x, p.y);
+      const p = onDeck(hubBerth, area.rect.x, area.rect.y);
+      const words = dockWhere(hubBerth, p.x, p.y);
       expect(words).toMatch(area.kind === "freightStaging" ? /staging/ : /delivery bay/);
     }
   });
@@ -61,9 +64,9 @@ describe("dockWhere (items on the dock)", () => {
   it("names the nearest post at negative deck coordinates, and stays off the ship's rooms", () => {
     const stall = hub.posts.find((p) => p.kind === "marketStall");
     if (stall === undefined) throw new Error("hub has a stall");
-    const p = onDeck(hub, stall.tile.x, stall.tile.y);
+    const p = onDeck(hubBerth, stall.tile.x, stall.tile.y);
     expect(p.x).toBeLessThan(0);
-    expect(dockWhere(hub, p.x, p.y)).toBe(`on the dock by ${stall.name}`);
+    expect(dockWhere(hubBerth, p.x, p.y)).toBe(`on the dock by ${stall.name}`);
     // Indexing the deck's tiles by y * width + x would wrap a negative x into the row above
     // and name a room; an item there is on the dock.
     const snapshot = (dock: { dockId: string; deckId: string } | undefined) =>
@@ -89,7 +92,7 @@ describe("dockWhere (items on the dock)", () => {
   });
 
   it("falls back to plain words in the open", () => {
-    const p = onDeck(hub, 30, 19);
-    expect(dockWhere(hub, p.x, p.y)).toBe("on the dock");
+    const p = onDeck(hubBerth, 30, 21);
+    expect(dockWhere(hubBerth, p.x, p.y)).toBe("on the dock");
   });
 });

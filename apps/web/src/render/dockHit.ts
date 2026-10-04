@@ -3,7 +3,7 @@
  * (the inspector names it) or bare dock floor (the inspector describes the place). Coordinates
  * are in the grafted deck frame, so the caller removes the dock's slide first.
  */
-import type { DockDef } from "@crew/sim";
+import type { BerthedDock } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
 import { isShipTile } from "./dock";
 import { dockTileKind } from "./dockShape";
@@ -16,14 +16,14 @@ export type DockTarget =
   | { readonly kind: "dock"; readonly id: string };
 
 export function dockTargetAt(
-  dock: DockDef,
+  { dock, shipAt }: BerthedDock,
   layout: Pick<DeckLayout, "width" | "height" | "tiles">,
   deckX: number,
   deckY: number,
 ): DockTarget | undefined {
   if (isShipTile(layout, deckX, deckY)) return undefined;
-  const x = deckX + dock.shipAt.x;
-  const y = deckY + dock.shipAt.y;
+  const x = deckX + shipAt.x;
+  const y = deckY + shipAt.y;
   let best: DockTarget | undefined;
   let bestDist = POST_HIT_RADIUS_TILES;
   for (const post of dock.posts) {

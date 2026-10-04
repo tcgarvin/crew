@@ -1,5 +1,6 @@
 import type {
   ActorId,
+  BerthedDock,
   DeckDefId,
   DockDef,
   DockDefId,
@@ -17,6 +18,7 @@ import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
 import {
+  berthInView,
   clampEngagement,
   dockInView,
   dockOrigin,
@@ -48,6 +50,8 @@ function dockOf(portId: string): DockDef {
 const HUB = "port.crossroads_hub" as PortDefId;
 const DRIFT = "port.kessler_drift" as PortDefId;
 const hubDock = dockOf(HUB);
+/** The Hub with the scenario deck in its berth box, as the sim grafts it (D72). */
+const hubBerth = berthInView(hubDock, layout);
 
 function travel(
   state: TravelStage,
@@ -99,8 +103,8 @@ function frameWith(actors: RenderActor[], items: RenderItem[], t: RenderTravel):
 }
 
 /** Deck-frame centre of a dock tile, as the sim grafts it. */
-function onDeck(dock: DockDef, x: number, y: number) {
-  return { x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 };
+function onDeck(berth: BerthedDock, x: number, y: number) {
+  return { x: x - berth.shipAt.x + 0.5, y: y - berth.shipAt.y + 0.5 };
 }
 
 describe("dockInView (the render-frame seam)", () => {
@@ -142,13 +146,13 @@ describe("dockInView (the render-frame seam)", () => {
 describe("dock placement", () => {
   it("grafts dock tile (0,0) at −shipAt when docked, and slides it from the fore while docking", () => {
     const docked = sceneAt(travel("docked", 0, HUB, HUB), bundle.ports, { reducedMotion: false });
-    expect(dockOrigin(hubDock, docked, layout.width)).toEqual({
-      x: -hubDock.shipAt.x,
-      y: -hubDock.shipAt.y,
+    expect(dockOrigin(hubBerth, docked, layout.width)).toEqual({
+      x: -hubBerth.shipAt.x,
+      y: -hubBerth.shipAt.y,
     });
     const start = sceneAt(travel("docking", 0, DRIFT, HUB), bundle.ports, { reducedMotion: false });
     expect(dockSlide(start, layout.width)).toBeCloseTo(DOCKING_START_OFFSET * layout.width);
-    expect(dockOrigin(hubDock, start, layout.width).x).toBeLessThan(-hubDock.shipAt.x - 40);
+    expect(dockOrigin(hubBerth, start, layout.width).x).toBeLessThan(-hubBerth.shipAt.x - 40);
   });
 
   it("tells the ship's floor from the dock's, negative coordinates included", () => {
@@ -164,8 +168,8 @@ describe("dock placement", () => {
 describe("withDockSlide", () => {
   const stall = hubDock.posts.find((p) => p.kind === "marketStall");
   if (stall === undefined) throw new Error("hub has a stall");
-  // The night-market stall is fore of the ship: negative deck x.
-  const atStall = onDeck(hubDock, stall.tile.x, stall.tile.y);
+  // The night-market stall is west of the ship: negative deck x.
+  const atStall = onDeck(hubBerth, stall.tile.x, stall.tile.y);
   const t = travel("docking", 0.5, DRIFT, HUB);
   const frame = frameWith(
     [actor("aboard", 10.5, 5.5), actor("local", atStall.x, atStall.y, true)],
@@ -196,9 +200,9 @@ describe("dock to screen and back", () => {
   ] as const) {
     it(`puts negative-coordinate dock tiles on screen and inverts them (${width}×${height})`, () => {
       const rotated = shouldRotate(width, height, layout);
-      const t = computeFitTransform(width, height, cameraBounds(hull, hubDock, 1), rotated);
+      const t = computeFitTransform(width, height, cameraBounds(hull, hubBerth, 1), rotated);
       for (const post of hubDock.posts) {
-        const p = onDeck(hubDock, post.tile.x, post.tile.y);
+        const p = onDeck(hubBerth, post.tile.x, post.tile.y);
         const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, width);
         expect(sx, post.key).toBeGreaterThanOrEqual(0);
         expect(sx, post.key).toBeLessThanOrEqual(width);
@@ -208,12 +212,12 @@ describe("dock to screen and back", () => {
         expect(back.x).toBeCloseTo(p.x);
         expect(back.y).toBeCloseTo(p.y);
       }
-      // The map's corners, fore corner at negative x, are inside the view too.
+      // The map's corners, the west one at negative x, are inside the view too.
       for (const [x, y] of [
         [0, 0],
         [hubDock.width, hubDock.height],
       ] as const) {
-        const p = { x: x - hubDock.shipAt.x, y: y - hubDock.shipAt.y };
+        const p = { x: x - hubBerth.shipAt.x, y: y - hubBerth.shipAt.y };
         const [sx, sy] = toScreenPx(t, p.x, p.y, rotated, width);
         expect(sx).toBeGreaterThanOrEqual(-0.001);
         expect(sx).toBeLessThanOrEqual(width + 0.001);
@@ -227,8 +231,8 @@ describe("dock to screen and back", () => {
 describe("dockTargetAt (taps on the dock)", () => {
   it("picks a post near its tile, negative coordinates included", () => {
     for (const post of hubDock.posts) {
-      const p = onDeck(hubDock, post.tile.x, post.tile.y);
-      expect(dockTargetAt(hubDock, layout, p.x + 0.2, p.y - 0.2)).toEqual({
+      const p = onDeck(hubBerth, post.tile.x, post.tile.y);
+      expect(dockTargetAt(hubBerth, layout, p.x + 0.2, p.y - 0.2)).toEqual({
         kind: "post",
         id: post.key,
       });
@@ -238,11 +242,11 @@ describe("dockTargetAt (taps on the dock)", () => {
   it("describes bare dock floor, and ignores the ship and the bay beyond", () => {
     const staging = hubDock.areas.find((a) => a.kind === "freightStaging");
     if (staging === undefined) throw new Error("hub has staging");
-    const p = onDeck(hubDock, staging.rect.x, staging.rect.y);
-    expect(dockTargetAt(hubDock, layout, p.x, p.y)).toEqual({ kind: "dock", id: hubDock.id });
-    expect(dockTargetAt(hubDock, layout, 5.5, 5.5)).toBeUndefined();
+    const p = onDeck(hubBerth, staging.rect.x, staging.rect.y);
+    expect(dockTargetAt(hubBerth, layout, p.x, p.y)).toEqual({ kind: "dock", id: hubDock.id });
+    expect(dockTargetAt(hubBerth, layout, 5.5, 5.5)).toBeUndefined();
     // Void beside the berth, fore of the ship.
-    expect(dockTargetAt(hubDock, layout, -2.5, 5.5)).toBeUndefined();
+    expect(dockTargetAt(hubBerth, layout, -2.5, 5.5)).toBeUndefined();
   });
 });
 
