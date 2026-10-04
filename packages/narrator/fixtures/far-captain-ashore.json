@@ -12,8 +12,8 @@
   "snapshot": {
     "schemaVersion": 8,
     "simVersion": "0.1.0",
-    "contentHash": "6fce21442a5d7155",
-    "configHash": "6fce21442a5d7155",
+    "contentHash": "bb30022f55ad977a",
+    "configHash": "bb30022f55ad977a",
     "savedAtTick": 2400,
     "config": {
       "time": {
@@ -144,7 +144,7 @@
           "ashoreDaysMax": 0.15,
           "overdueDays": 0.1
         },
-        "sparesReserve": 2,
+        "sparesReserve": 3,
         "foodReserve": {
           "lowBelowDays": 2,
           "restockToDays": 5
