@@ -13,9 +13,9 @@ import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import {
   approachRequest,
+  captainAshoreRequest,
   departureGateRequest,
-  farJobBoardRequest,
-  jobBoardRequest,
+  farCaptainAshoreRequest,
   passengerAboardRequest,
   quietTooLongRequest,
   stageDockRequest,
@@ -152,7 +152,7 @@ describe("runNarrator", () => {
       notes: { summary: "Arrived at the Drift.", threads: [assayThread], cast: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
-    const req = approachRequest(content());
+    const req = captainAshoreRequest(content());
     const res = await runNarrator(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
     expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
@@ -180,7 +180,7 @@ describe("runNarrator", () => {
     const [call] = transport.calls;
     expect(call?.system).toHaveLength(2);
     expect(call?.user).toContain("## Why you were called");
-    expect(call?.user).toContain("quietTooLong");
+    expect(call?.user).toContain("captainAshore");
     expect(call?.jsonSchema.additionalProperties).toBe(false);
     expect(call?.jsonSchema).not.toHaveProperty("$schema");
   });
@@ -203,7 +203,7 @@ describe("runNarrator", () => {
       intents: [passage] as never,
       notes: { summary: "A passenger at the Hub.", threads: [], cast: [] },
     });
-    const req = farJobBoardRequest(content());
+    const req = farCaptainAshoreRequest(content());
     const res = await runNarrator(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
@@ -791,11 +791,18 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("at most one beat card before its payoff");
   });
 
-  it("tells the model it is the only source of work at the board (D40), never on arrival (D66)", () => {
+  it("tells the model it is the only source of work when the captain goes ashore (D40, D70), never on arrival (D66)", () => {
     expect(STATIC_RULES).not.toContain("approachingPort");
     expect(STATIC_RULES).not.toContain("stageDock");
+    expect(STATIC_RULES).not.toContain("jobBoard:");
     expect(STATIC_RULES).toContain(
-      "jobBoard: The ship is docked and the captain is looking for work",
+      "captainAshore: The captain has walked down the ramp and out onto this dock looking for work",
+    );
+    expect(HOOK_INSTRUCTIONS.captainAshore).toContain("the card comes up when they meet");
+    expect(HOOK_INSTRUCTIONS.captainAshore).toContain("beyond the gate is the port itself");
+    expect(STATIC_RULES).toContain("is delivered in person");
+    expect(STATIC_RULES).toContain(
+      "Work is only offered while the ship is docked: never in flight.",
     );
     expect(STATIC_RULES).toContain("there is no work at this port until the next call");
     expect(STATIC_RULES).toContain("offering nothing must be a deliberate story choice");
@@ -808,7 +815,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.18");
+    expect(PROMPT_VERSION).toBe("v0.19");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -849,8 +856,10 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("Say which you chose and why in rationale");
     // v0.14: one job at a time, so every hook asks for one offer and none with a job in hand.
     for (const text of Object.values(HOOK_INSTRUCTIONS)) expect(text).not.toContain("one or two");
-    expect(HOOK_INSTRUCTIONS.jobBoard).toContain("one job from this port");
-    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("idle at a port with no job in hand");
+    expect(HOOK_INSTRUCTIONS.captainAshore).toContain("one job from this port");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain(
+      "captain idle with no job in hand, never in flight",
+    );
     expect(HOOK_INSTRUCTIONS.quietTooLong).not.toContain("Prefer advancing a thread");
   });
 
@@ -880,7 +889,7 @@ describe("prompt text (D29, D31, D32)", () => {
 describe("the null path hands out work (D40)", () => {
   it("still offers a job at the board after a provider error", async () => {
     const transport = fakeTransport(new TransportError("apiError", "HTTP 502"));
-    const res = await runNarrator(jobBoardRequest(content()), ctx(transport));
+    const res = await runNarrator(captainAshoreRequest(content()), ctx(transport));
     expect(res.fallback).toBe("apiError");
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
     expect(res.commands).toHaveLength(1);

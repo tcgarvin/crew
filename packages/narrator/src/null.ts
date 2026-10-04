@@ -2,7 +2,7 @@
  * The deterministic null narrator (PLAN §3 `NullNarrator`, review N3): the answer when no model
  * is configured and the fallback for every model failure, so the game stays playable with the
  * LLM unavailable. For a policy decision it writes a template card. D40: the narrator is the
- * only source of work, so for `jobBoard` it makes one job offer from the
+ * only source of work, so for `captainAshore` it makes one job offer from the
  * port's `jobTemplates` and the content name table (D25), built as an `offerJob` intent and run
  * through the same translator as a model's offer, so pay, clamps and the person/pitch shape are
  * identical. The draw is seeded from the snapshot's tick and the port, so the same snapshot
@@ -52,7 +52,7 @@ export interface NullNarratorOptions {
   readonly callId?: string;
   readonly fallback?: FallbackReason;
   /**
-   * Enables port names in template text and, for `jobBoard`, the offline job offer (D40);
+   * Enables port names in template text and, for `captainAshore`, the offline job offer (D40);
    * without it that hook gets no commands.
    */
   readonly content?: ContentBundle;
@@ -168,7 +168,8 @@ function offerIntent(
     urgency,
     // A surfaced offer is the card; while another card is already queued it posts quietly, as a
     // model's offer would.
-    surface: snapshot.state.decisions.queue.length === 0,
+    surface:
+      snapshot.state.decisions.queue.length === 0 && snapshot.state.decisions.held.length === 0,
     // Passengers-and-galaxy §4.4: the null narrator never offers passages.
     passenger: false,
     roundTrip: false,
@@ -224,7 +225,7 @@ export function nullNarratorResponse(
   }
   // D66: the staging call is answered with an empty plan: the dock is the sim's floor set.
   if (hook.kind === "stageDock") return base;
-  if (hook.kind === "jobBoard" && options.content) {
+  if (hook.kind === "captainAshore" && options.content) {
     const offer = nullOffer(req, hook.context.portId, options.content, base.callId);
     return offer === undefined ? base : { ...base, ...offer };
   }

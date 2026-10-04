@@ -115,7 +115,12 @@ export type LocalOrigin =
   | FloorSetReason
   | { readonly kind: "staged"; readonly source: StagedPersonSpec["kind"] }
   /** Spawned at the warehouse door for one carting errand, gone when it is done. */
-  | { readonly kind: "dockHand" };
+  | { readonly kind: "dockHand" }
+  /**
+   * D70: someone from the port beyond the gate who walked in to the foot of the ramp with word
+   * for the captain (a held card's speaker); they go back out through the gate once it is given.
+   */
+  | { readonly kind: "visitor" };
 
 /** A local's walk, as `MovementState` for the crew (tile centres, continuous position). */
 export type LocalMovement =

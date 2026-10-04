@@ -8,7 +8,9 @@
  * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "fetching the hand truck",
  * "loading <item>", "hauling <n> crates", "unloading <item>", "returning the hand truck",
  * "parking the hand truck" (D65), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
- * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>". Names are
+ * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>", and the captain
+ * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
+ * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
  */
@@ -154,6 +156,9 @@ function taskStepLabel(
         : `manning ${machineName(ctx, task.target.machineId)}`;
     }
     case "consume":
+    case "awaitWord":
+    case "talk":
+    case "deliverCard":
       return "working";
   }
 }
@@ -186,6 +191,12 @@ function personalStepLabel(
       return "moving crates";
     case "hold":
       return HOLD_LABEL[step.hold];
+    case "awaitWord":
+      return "looking for work";
+    case "talk":
+      return `talking with ${step.withName}`;
+    case "deliverCard":
+      return "talking";
   }
 }
 
@@ -225,5 +236,51 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
     }
     return taskStepLabel(ctx, actor, ctx.state.work.tasks[activity.taskId], step);
   }
+  if (activity.activity === "lookForWork" || activity.activity === "meetSpeaker") {
+    return shoreLabel(ctx, actor, activity.plan?.steps.slice(activity.plan.stepIndex) ?? [], step);
+  }
   return personalStepLabel(ctx, actor, step);
+}
+
+/** The speaker of the held card a meeting still ahead in `rest` is for, if any. */
+function meetingWith(
+  ctx: LabelCtx,
+  rest: readonly DeepReadonly<ActivityStep>[],
+): string | undefined {
+  const deliver = rest.find((s) => s.kind === "deliverCard");
+  if (deliver?.kind !== "deliverCard") return undefined;
+  return ctx.state.decisions.held.find((h) => h.decisionId === deliver.decisionId)?.speaker;
+}
+
+/**
+ * D70: the captain ashore. "going ashore to look for work", "looking for work" (on the dock,
+ * waiting for word), "looking round the dock", "going to see Fenwick Adair", "talking with
+ * Fenwick Adair", "ashore to see Fenwick Adair" (through the gate), "looking round the port";
+ * the walk back aboard is "coming aboard".
+ */
+function shoreLabel(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  rest: readonly DeepReadonly<ActivityStep>[],
+  step: DeepReadonly<ActivityStep>,
+): string {
+  const seeing = meetingWith(ctx, rest);
+  switch (step.kind) {
+    case "awaitWord":
+      return "looking for work";
+    case "talk":
+      return `talking with ${step.withName}`;
+    case "deliverCard":
+      return seeing === undefined ? "talking" : `talking with ${seeing}`;
+    case "throughGate":
+      return seeing === undefined ? "looking round the port" : `ashore to see ${seeing}`;
+    case "moveTo": {
+      if (seeing !== undefined) return `going to see ${seeing}`;
+      if (rest.some((s) => s.kind === "awaitWord")) return "going ashore to look for work";
+      const place = placeLabel(ctx, actor, step.target);
+      return place === "walking on the dock" ? "looking round the dock" : place;
+    }
+    default:
+      return personalStepLabel(ctx, actor, step);
+  }
 }

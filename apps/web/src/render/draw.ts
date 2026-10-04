@@ -526,6 +526,20 @@ function truncateLabel(label: string, maxChars: number): string {
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
+/** D70: the captain ashore meeting someone; the label names them. */
+const MEETING_LABEL = /^(talking with|going to see|ashore to see) (\S+)/;
+
+/**
+ * The text over a crew member's dot: name and what they are doing, cut to 26 characters. D70: a
+ * label that names who they are meeting ("talking with Fenwick Adair") keeps the verb and that
+ * person's first name, up to a local's 34 (D68), so the meeting reads rather than an ellipsis.
+ */
+export function crewLabelText(actor: Pick<RenderActor, "name" | "actionLabel">): string {
+  const meeting = MEETING_LABEL.exec(actor.actionLabel);
+  if (meeting !== null) return truncateLabel(`${actor.name} — ${meeting[1]} ${meeting[2]}`, 34);
+  return truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26);
+}
+
 /** One label over a person's dot, deck frame. */
 interface PersonLabel {
   readonly x: number;
@@ -557,7 +571,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
   const labels: PersonLabel[] = frame.actors.map((actor) => ({
     x: actor.x,
     y: actor.y,
-    text: truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26),
+    text: crewLabelText(actor),
     local: false,
     pushing: pushers.has(actor.id),
   }));

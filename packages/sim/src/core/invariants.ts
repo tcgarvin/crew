@@ -205,6 +205,17 @@ function queueViolations(state: ReadonlyWorldState): string[] {
     if (record === undefined) out.push(`decisions.queue names missing decision ${id}`);
     else if (record.status !== "pending") out.push(`decisions.queue holds ${record.status} ${id}`);
   }
+  // D70: a held card is pending, held once, and never on the queue at the same time.
+  const held = new Set<string>();
+  for (const card of state.decisions.held) {
+    const id = card.decisionId;
+    if (held.has(id)) out.push(`decisions.held lists ${id} twice`);
+    held.add(id);
+    if (seen.has(id)) out.push(`decision ${id} is both held and queued`);
+    const record = state.decisions.records[id];
+    if (record === undefined) out.push(`decisions.held names missing decision ${id}`);
+    else if (record.status !== "pending") out.push(`decisions.held holds ${record.status} ${id}`);
+  }
   const hook = state.narrator.pendingHook;
   if (hook !== undefined) {
     const parsed = parseInstanceId(hook.id);

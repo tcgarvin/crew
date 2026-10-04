@@ -94,6 +94,8 @@ function originPhrase(local: DeepReadonly<Local>): string {
       return "a passenger the ship left here";
     case "dockHand":
       return "a dock hand";
+    case "visitor":
+      return "came in from the port with word for the captain";
     case "staged":
       switch (origin.source) {
         case "seed":

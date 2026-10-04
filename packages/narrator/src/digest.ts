@@ -7,6 +7,7 @@
  * labelled `[undiscovered]`; the prompt forbids mentioning those in player-facing text.
  */
 import {
+  type ActorId,
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
@@ -136,8 +137,10 @@ function hookLine(
   switch (hook.kind) {
     case "stageDock":
       return `stageDock: dressing the dock at ${portName(content, hook.context.portId)} (${hook.context.portId}) before the ship comes alongside`;
-    case "jobBoard":
-      return `jobBoard: docked at ${portName(content, hook.context.portId)} (${hook.context.portId}) with no job offers`;
+    case "captainAshore": {
+      const who = state.actors[hook.context.actorId as ActorId]?.name ?? "The captain";
+      return `captainAshore: ${who} has walked down the ramp onto the dock at ${portName(content, hook.context.portId)} (${hook.context.portId}) looking for work; nothing is on offer here`;
+    }
     case "quietTooLong":
       return `quietTooLong: nothing story-worthy since tick ${hook.context.quietSinceTick}`;
     case "notableEvent":
@@ -199,7 +202,7 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
   const offerPort = offerPortNow(state);
   lines.push(
     offerPort === undefined
-      ? "job offers possible now: none (not at or approaching a port)"
+      ? "job offers possible now: none (not docked; offers are made in person at the dock)"
       : `job offers possible now: fromPort ${offerPort}`,
   );
   return { heading: "Ship", lines, priority: Number.POSITIVE_INFINITY, trimFrom: "end" };
@@ -590,6 +593,30 @@ function decisionSection(state: State, content: ContentBundle): Section {
   return { heading: "Pending decisions", lines, priority: 9, trimFrom: "end" };
 }
 
+/**
+ * D70: cards held to be delivered in person. They are not on screen yet (not "Pending decisions",
+ * not seen), so the model must not treat them as shown; they are this call's card if it has one.
+ */
+function heldSection(state: State): Section {
+  const lines = state.decisions.held.map((held) => {
+    const d = state.decisions.records[held.decisionId];
+    const what = d?.prompt.prose ?? (d?.jobId === undefined ? "a card" : `the offer ${d.jobId}`);
+    const how =
+      held.delivery === undefined
+        ? "about to meet the captain"
+        : held.delivery.via === "captain"
+          ? "the captain is on the way to them"
+          : "walking over to the ship";
+    return `- ${held.decisionId} from ${held.speaker} (${how}; not shown yet): ${what}`;
+  });
+  return {
+    heading: "Cards on their way to the captain in person",
+    lines,
+    priority: 9,
+    trimFrom: "end",
+  };
+}
+
 function eventSection(events: readonly SimEvent[], state: State, content: ContentBundle): Section {
   const lines = events
     .filter((e) => e.significance !== "trace")
@@ -696,6 +723,7 @@ export function buildDigest(
     shipSection(snapshot, content),
     ...(staging ? [] : [budgetSection(state)]),
     decisionSection(state, content),
+    heldSection(state),
     machineSection(state, content, snapshot.config.time.tickRate),
     jobSection(state, content),
     crewSection(snapshot, content),

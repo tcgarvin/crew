@@ -78,7 +78,7 @@ function content(): ContentBundle {
 
 /**
  * Deterministic offline narrator: a template card for policy decisions and, for
- * `jobBoard`, one templated job offer (D40: the narrator is the only source of
+ * `captainAshore`, one templated job offer (D40: the narrator is the only source of
  * work, so the offline path must still hand out work).
  */
 export const nullNarrator: RunNarrator = async (req) => ({

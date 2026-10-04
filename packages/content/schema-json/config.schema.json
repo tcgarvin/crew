@@ -412,6 +412,18 @@
         "dockHandGiveUpSeconds": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "talkSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "gateVisitSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cardDeliveryGiveUpSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
       "required": [
@@ -425,7 +437,10 @@
         "departureMinOutput",
         "recallAboardSeconds",
         "localShuffleSeconds",
-        "dockHandGiveUpSeconds"
+        "dockHandGiveUpSeconds",
+        "talkSeconds",
+        "gateVisitSeconds",
+        "cardDeliveryGiveUpSeconds"
       ],
       "additionalProperties": false
     },

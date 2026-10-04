@@ -594,7 +594,7 @@ export interface PortDef {
   readonly market: readonly MarketLineDef[];
   /**
    * Offline job templates (W6, D40): the null narrator draws from these when it answers an
-   * `jobBoard` hook. Pay is not authored: it comes from price bands.
+   * `captainAshore` hook. Pay is not authored: it comes from price bands.
    */
   readonly jobTemplates: readonly JobTemplateDef[];
   /**
@@ -806,6 +806,21 @@ export interface ConfigDef {
      * does it instead, with a `dockHandGaveUp` event, so nothing waits forever on a blocked walk.
      */
     readonly dockHandGiveUpSeconds: Seconds;
+    /**
+     * D70: how long the captain and someone on the dock talk before that person's card comes up
+     * ("talking with Fenwick Adair").
+     */
+    readonly talkSeconds: Seconds;
+    /**
+     * D70: how long the captain is out through the gate: to see someone in the port beyond it
+     * before their card comes up, or for a look round when nothing was on offer.
+     */
+    readonly gateVisitSeconds: Seconds;
+    /**
+     * D70: how long a card may wait to be delivered in person (the captain walking over, or the
+     * speaker walking to the ramp) before it comes up anyway, so no card waits forever on a walk.
+     */
+    readonly cardDeliveryGiveUpSeconds: Seconds;
   };
   readonly commerce: {
     /**
@@ -826,7 +841,7 @@ export interface ConfigDef {
     readonly haulEstimateSeconds: Seconds;
     /**
      * How long after a declined or expired offer at a port before the narrator is asked again
-     * there (the `jobBoard` hook, D40).
+     * there (the `captainAshore` hook, D40).
      */
     readonly reofferSeconds: Seconds;
     /**

@@ -45,11 +45,13 @@ import type {
 import type {
   ActorId,
   ClaimId,
+  DecisionId,
   DockDefId,
   DoorId,
   ItemDefId,
   ItemId,
   JobId,
+  LocalId,
   LocalKey,
   MachineId,
   PortDefId,
@@ -345,6 +347,11 @@ export type Action = { [K in ActionKind]: ActionBase<K> }[ActionKind];
 /**
  * `comeAboard` (D61) is never planned: departure prep gives it to someone on the dock, a walk
  * back up the nearest ramp, so a stroll on the quay cannot hold the ship.
+ *
+ * D70: neither are `lookForWork` (commerce gives it to the command actor once per docking: down
+ * the personnel ramp, which raises `captainAshore`, then whatever the answer calls for) and
+ * `meetSpeaker` (commerce gives it to the command actor for a card held for delivery in person:
+ * over to the speaker, or out through the gate, and the card comes up when they meet).
  */
 export const PERSONAL_ACTIVITIES = [
   "eat",
@@ -353,6 +360,8 @@ export const PERSONAL_ACTIVITIES = [
   "socialize",
   "wander",
   "comeAboard",
+  "lookForWork",
+  "meetSpeaker",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -424,6 +433,31 @@ export type ActivityStep =
   | { kind: "unloadTruck"; itemId: ItemId; truckId: ItemId }
   /** D65: set the (empty) hand truck down here, aboard. */
   | { kind: "parkTruck"; truckId: ItemId }
+  /**
+   * D70, `lookForWork`: standing on the dock, wait for the narrator's answer to this docking's
+   * `captainAshore` ask (raised by commerce the tick the actor first stands on dock floor). Then
+   * the plan goes on to whatever the answer calls for: the meeting for a card held for the
+   * captain, else the look round that follows it in the plan.
+   */
+  | { kind: "awaitWord"; portId: PortDefId }
+  /**
+   * D70: talk with `withName` (a local on the dock, `localId`) for `ticksNeeded`, standing beside
+   * them; the card comes up at the following `deliverCard`. Fails if they are no longer within
+   * reach.
+   */
+  | {
+      kind: "talk";
+      decisionId: DecisionId;
+      withName: string;
+      localId: LocalId;
+      ticksDone: number;
+      ticksNeeded: number;
+    }
+  /**
+   * D70 commit point: the held card `decisionId` comes up now (`deliverHeldCard`). A card already
+   * delivered some other way (given up waiting, the dock leaving) makes this a no-op.
+   */
+  | { kind: "deliverCard"; decisionId: DecisionId }
   | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
 
 /**
@@ -509,6 +543,8 @@ export type Intent =
       itemId?: ItemId;
       /** W4a addition: where to go for rest/socialize (a floor tile in a mess or quarters). */
       tile?: TileCoord;
+      /** D70, `meetSpeaker`: the held card the meeting delivers. */
+      decisionId?: DecisionId;
       urgency: UrgencyClass;
       trace: PlannerTrace;
     };

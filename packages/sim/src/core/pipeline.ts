@@ -170,7 +170,7 @@ function runPlannerStage(
  * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongSeconds`
  * with no narrator contact at all, so every hook kind re-arms the timer (see `core/hooks.ts`),
  * and the timer runs last in the tick so that any other hook raised in the same tick
- * (`stageDock`, `jobBoard`, `notableEvent` in phase 4; `policyDecision` just before this
+ * (`stageDock`, `captainAshore`, `notableEvent` in phase 4; `policyDecision` just before this
  * system) wins and the quiet one yields.
  */
 export const quietTimerSystem: System = {

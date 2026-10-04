@@ -32,6 +32,7 @@ import { rebuildItemIndexes } from "../../core/caches";
  * cover all of them, and a stopped trip sets the truck and its load down where the pusher is.
  */
 import { configTicks } from "../../core/clock";
+import { deliverHeldCard, heldCard } from "../../core/delivery";
 import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
@@ -72,6 +73,7 @@ import {
   carriedItems,
   tileOf,
 } from "./plans";
+import { meetingAhead } from "./shore";
 import {
   buildTruckPlan,
   dropLeg,
@@ -280,6 +282,11 @@ function actionFor(
       return makeAction("putDown", "placing", tick, step.itemId);
     case "parkTruck":
       return makeAction("putDown", "placing", tick, step.truckId);
+    case "awaitWord":
+    case "deliverCard":
+      return makeAction("wait", "waiting", tick);
+    case "talk":
+      return makeAction("chat", "talking", tick);
     case "work": {
       if (step.stage === "eat") return makeAction("eat", "eating", tick);
       if (step.stage === "buy") return makeAction("wait", "waiting", tick);
@@ -747,11 +754,26 @@ function runThroughGate(ctx: StepCtx, actor: Actor, step: StepOf<"throughGate">)
     const here = actorTile(actor);
     if (here === undefined || !near(here, step.gate)) return { fail: "unreachableTarget" };
     stepOutThroughGate(ctx, actor, step.portId);
+    noteGoingToSee(ctx, actor);
   }
   step.ticksDone += 1;
   if (step.ticksDone < step.ticksNeeded) return "wait";
   stepBackThroughGate(ctx, actor, step.gate);
   return "done";
+}
+
+/** D70: out through the gate to see a held card's speaker: say so in the log. */
+function noteGoingToSee(ctx: StepCtx, actor: Actor): void {
+  const decisionId = meetingAhead(actor);
+  const held = decisionId === undefined ? undefined : heldCard(ctx.state, decisionId);
+  if (held === undefined) return;
+  ctx.emit({
+    type: "wentToSee",
+    subjectIds: [actor.id],
+    causeIds: [],
+    source: "sim",
+    payload: { actorId: actor.id, name: actor.name, withName: held.speaker },
+  });
 }
 
 /** D63: the bought units are aboard; set them down here. Nothing in hand is a lost purchase. */
@@ -854,6 +876,43 @@ function singleHaulFallback(ctx: StepCtx, actor: Actor): boolean {
   return true;
 }
 
+/**
+ * D70 `lookForWork`: on the dock, waiting for the answer to this docking's `captainAshore` ask.
+ * Commerce raises the ask the tick the actor stands on dock floor; the world halts on it, so the
+ * first tick this sees it recorded the answer is in. A card the answer held for the captain ends
+ * the activity here (commerce sends them to the speaker next, `meetSpeaker`); otherwise the look
+ * round that follows in the plan goes ahead.
+ */
+function runAwaitWord(ctx: StepCtx, actor: Actor, step: StepOf<"awaitWord">): StepResult {
+  if (ctx.state.narrator.captainAshoreLastAsk?.portId !== step.portId) return "wait";
+  const activity = actor.activity;
+  const waiting = ctx.state.decisions.held.some(
+    (h) => h.portId === step.portId && h.delivery?.via !== "speaker",
+  );
+  if (waiting && activity.kind !== "idle" && activity.plan !== undefined) {
+    activity.plan.steps = activity.plan.steps.slice(0, activity.plan.stepIndex + 1);
+  }
+  return "done";
+}
+
+/**
+ * D70: talking with someone on the dock before their card comes up. The first tick says so in the
+ * log; the talk runs its course even if they shuffle a step away.
+ */
+function runTalk(ctx: StepCtx, actor: Actor, step: StepOf<"talk">): StepResult {
+  if (step.ticksDone === 0) {
+    ctx.emit({
+      type: "talkingWith",
+      subjectIds: [actor.id, step.localId],
+      causeIds: [],
+      source: "sim",
+      payload: { actorId: actor.id, name: actor.name, withName: step.withName },
+    });
+  }
+  step.ticksDone += 1;
+  return step.ticksDone >= step.ticksNeeded ? "done" : "wait";
+}
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -905,6 +964,13 @@ function runStep(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: ActivityStep)
       return runUnloadTruck(ctx, actor, step);
     case "parkTruck":
       return runParkTruck(ctx, actor, step);
+    case "awaitWord":
+      return runAwaitWord(ctx, actor, step);
+    case "talk":
+      return runTalk(ctx, actor, step);
+    case "deliverCard":
+      deliverHeldCard(ctx, step.decisionId, "met");
+      return "done";
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
   }
@@ -1059,7 +1125,9 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
 }
 
 function samePersonal(activity: Activity, intent: Extract<Intent, { kind: "personal" }>): boolean {
-  return activity.kind === "personal" && activity.activity === intent.activity;
+  if (activity.kind !== "personal" || activity.activity !== intent.activity) return false;
+  // D70: a meeting for another card (this one's delivered, they are walking back) is not the same.
+  return intent.activity !== "meetSpeaker" || meetingAhead({ activity }) === intent.decisionId;
 }
 
 function startPersonal(

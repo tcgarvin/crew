@@ -105,8 +105,8 @@ pnpm test:live
 ```
 
 It runs `packages/narrator/src/live/narrator.live.test.ts` through the root
-`vitest.live.config.ts`: one real OpenRouter call per story hook kind (`jobBoard`,
-`quietTooLong`, `notableEvent`, `policyDecision`; `stageDock` joins once its prompt exists, D66) with the production `openRouterTransport`,
+`vitest.live.config.ts`: one real OpenRouter call per story hook kind (`captainAshore`,
+`quietTooLong`, `notableEvent`, `policyDecision`, and `stageDock`; D66, D70) with the production `openRouterTransport`,
 prompt and JSON schema, plus one repeated call that checks prompt caching reports cache-read
 tokens. Each test fails on any fallback and prints the narrator's error, which includes the
 provider's own text in brackets, so the reason is visible without reading the call log. Tests

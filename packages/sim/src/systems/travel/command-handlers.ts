@@ -26,6 +26,7 @@ import { shortestPath } from "./graph";
 import { livePassage } from "./in-hand";
 import {
   beginDeparture,
+  cardsAwaitingDelivery,
   carriedVoyageFields,
   hasOpenCargoWork,
   requestRamps,
@@ -83,11 +84,16 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     if (plan.voyageDestinationId !== undefined) {
       travel.voyageDestinationId = plan.voyageDestinationId;
     }
-    if (hasOpenCargoWork(ctx) || waitingForPassenger(ctx.state) !== undefined) {
+    if (
+      hasOpenCargoWork(ctx) ||
+      waitingForPassenger(ctx.state) !== undefined ||
+      cardsAwaitingDelivery(ctx)
+    ) {
       // Integration 2: freight is still moving through the open ramp; stay docked with the
       // course planned. The travel system begins departure prep once the cargo work is done.
       // Passengers §3.3: likewise while a passenger is ashore; the ship never leaves them
-      // quietly, only through the overdue card or `endPassage`.
+      // quietly, only through the overdue card or `endPassage`. D70: and while a card is on its
+      // way to the captain in person.
       ctx.state.travel = {
         stage: "docked",
         portId: travel.portId,

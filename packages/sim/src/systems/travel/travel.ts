@@ -342,10 +342,18 @@ export function waitingForPassenger(
   return undefined;
 }
 
-/** A decision card is queued for the captain (any origin). */
+/**
+ * A decision card is queued for the captain (any origin), or (D70) one is on its way to them in
+ * person: the ship does not leave while someone is walking over with word.
+ */
 export function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
-  const { records, queue } = ctx.state.decisions;
-  return queue.some((id) => records[id]?.status === "pending");
+  const { records, queue, held } = ctx.state.decisions;
+  return held.length > 0 || queue.some((id) => records[id]?.status === "pending");
+}
+
+/** D70: a card is waiting to be delivered in person; departure waits for the meeting. */
+export function cardsAwaitingDelivery(ctx: Pick<StepCtx, "state">): boolean {
+  return ctx.state.decisions.held.length > 0;
 }
 
 /**
@@ -471,6 +479,8 @@ function advanceTravel(ctx: StepCtx): void {
     }
     // Passengers §3.3: a planned voyage home waits docked for the passenger ashore.
     if (planned !== undefined && waitingForPassenger(ctx.state) !== undefined) return;
+    // D70: nor while someone is on their way to the captain with word (a held card).
+    if (planned !== undefined && cardsAwaitingDelivery(ctx)) return;
     // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
     if (planned !== undefined && !hasOpenCargoWork(ctx) && departureCleared(ctx)) {
       beginDeparture(ctx, planned);

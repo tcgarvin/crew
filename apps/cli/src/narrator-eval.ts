@@ -19,7 +19,7 @@ import {
   type ModelTransport,
   type NarratorRequest,
   approachRequest,
-  farJobBoardRequest,
+  farCaptainAshoreRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
   runNarratorWithTrace,
@@ -45,7 +45,7 @@ export function runNarratorFixtures(outDir?: string): CliResult {
     "approach.json": approachRequest(bundle),
     "stage-dock.json": stageDockRequest(bundle),
     "quiet-too-long-pump.json": quietTooLongRequest(bundle),
-    "far-job-board.json": farJobBoardRequest(bundle),
+    "far-captain-ashore.json": farCaptainAshoreRequest(bundle),
     "passenger-overdue.json": passengerOverdueRequest(bundle),
   };
   for (const [name, request] of Object.entries(fixtures)) {

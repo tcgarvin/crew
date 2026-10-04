@@ -1,7 +1,7 @@
 /**
  * Commerce tests (PLAN §6 W6 "Tests"): price bands, the offer/accept/decline decision path, the
  * full freight loop (offer -> accept -> load -> travel -> unload -> pay exactly once), and the
- * `jobBoard` hook.
+ * `captainAshore` hook.
  */
 import { describe, expect, it } from "vitest";
 import type { Command } from "../../core/types/commands";
@@ -133,15 +133,15 @@ describe("commerce: decision perspective (D8)", () => {
   });
 });
 
-describe("commerce: jobBoard hook", () => {
-  it("raises jobBoard when docked with nothing on, and not again within the cooldown", () => {
+describe("commerce: captainAshore hook", () => {
+  it("raises captainAshore when docked with nothing on, and not again within the cooldown", () => {
     // D40/D46: the narrator is the only source of work, so a fresh world docked at its start
     // port asks for an offer on the first tick, and asks again only after reofferSeconds.
     const { world, kernel } = freightTestWorld();
 
     const first = kernel.advance(world, 1);
     expect(first.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("jobBoard");
+    expect(world.state.narrator.pendingHook?.kind).toBe("captainAshore");
 
     const hookId = world.state.narrator.pendingHook?.id as HookId;
     kernel.enqueueCommand(
@@ -174,7 +174,7 @@ describe("commerce: full freight loop", () => {
       world,
       cmd({ source: "player", kind: "resolveDecision", payload: { decisionId, side: "left" } }),
     );
-    // D40: `jobBoard` stays quiet while an offer or an accepted job is open, so nothing halts
+    // D40: `captainAshore` stays quiet while an offer or an accepted job is open, so nothing halts
     // here; the helper only guards against an incidental hook.
     advanceThroughHooks(kernel, world, 30);
 
@@ -212,7 +212,7 @@ describe("commerce: full freight loop", () => {
     advanceToStage(kernel, world, "approaching");
     // D52: freight under way is the one job in hand until the ship docks at its destination.
     expect(jobBlockingAcceptance(world.state)?.id).toBe(jobId);
-    // Docking at B with nothing on raises `jobBoard` (D40); acknowledge that too.
+    // Docking at B with nothing on raises `captainAshore` (D40); acknowledge that too.
     advanceThroughHooks(kernel, world, 1000);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
     expect(job.status).toBe("inTransit");
@@ -261,7 +261,7 @@ describe("commerce: full freight loop", () => {
   });
 });
 
-describe("commerce: offers surfaced on approach wait for the dock (D42)", () => {
+describe("commerce: offers are made at the dock, never in flight (D70, retiring D42)", () => {
   function jobDraftFrom(fromPortId: typeof PORTS.a, toPortId: typeof PORTS.a, pay: number) {
     return { ...jobDraft(pay), fromPortId, toPortId };
   }
@@ -289,7 +289,7 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
     return { world, kernel };
   }
 
-  it("records the offer without a card, then shows exactly one card once docked", () => {
+  it("refuses a surfaced offer in flight: offers are put to the captain at the dock", () => {
     const { world, kernel } = approachB();
     const offer = kernel.enqueueCommand(
       world,
@@ -299,68 +299,30 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
         payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: true },
       }),
     );
-    expect(offer.status).toBe("accepted");
+    expect(offer.status).toBe("rejected");
     kernel.advance(world, 1);
-
-    const job = Object.values(world.state.jobs)[0];
-    if (job === undefined) throw new Error("no job offered");
-    expect(job.status).toBe("offered");
-    expect(job.surfaceWhenDocked).toBe(true);
+    expect(Object.values(world.state.jobs)).toEqual([]);
     expect(world.state.decisions.queue).toEqual([]);
-
-    const untilDocked = advanceThroughHooks(kernel, world, 2000);
-    expect(untilDocked.halt).toEqual({ kind: "decision" });
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
-    expect(world.state.decisions.queue).toHaveLength(1);
-    const decisionId = world.state.decisions.queue[0] as string;
-    const decision = world.state.decisions.records[decisionId as never];
-    expect(decision?.jobId).toBe(job.id);
-    expect(decision?.origin).toBe("narrator");
-    expect(job.surfaceWhenDocked).toBeUndefined();
-
-    // "Take the job" now accepts and plans the course home.
-    const resolve = kernel.enqueueCommand(
-      world,
-      cmd({
-        source: "player",
-        kind: "resolveDecision",
-        payload: { decisionId: decisionId as never, side: "left" },
-      }),
-    );
-    expect(resolve.status).toBe("accepted");
-    advanceThroughHooks(kernel, world, 1);
-    expect(world.state.jobs[job.id]?.status).toBe("accepted");
-    expect(world.state.travel).toMatchObject({
-      stage: "docked",
-      portId: PORTS.b,
-      plannedDestinationId: PORTS.a,
-    });
-    expect(world.state.decisions.queue).toEqual([]);
+    expect(world.state.decisions.held).toEqual([]);
   });
 
-  it("never shows a card for a deferred offer that expired on the way in", () => {
+  it("still posts a quiet offer in flight, with no card", () => {
     const { world, kernel } = approachB();
     kernel.enqueueCommand(
       world,
       cmd({
-        source: "narrator",
+        source: "scenario",
         kind: "offerJob",
-        payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: true },
+        payload: { job: jobDraftFrom(PORTS.b, PORTS.a, 100), surface: false },
       }),
     );
     kernel.advance(world, 1);
-    const job = Object.values(world.state.jobs)[0];
-    if (job === undefined) throw new Error("no job offered");
-    job.expiresAtTick = world.state.tick + 1;
-
-    advanceThroughHooks(kernel, world, 2000);
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
-    expect(job.status).toBe("expired");
-    expect(job.surfaceWhenDocked).toBeUndefined();
+    expect(Object.values(world.state.jobs).map((j) => j.status)).toEqual(["offered"]);
     expect(world.state.decisions.queue).toEqual([]);
+    expect(world.state.decisions.held).toEqual([]);
   });
 
-  it("shows the card at once when surfaced while docked at the job's port", () => {
+  it("shows the card at once when surfaced while docked at a port with no dock map", () => {
     const { world, kernel } = freightTestWorld();
     kernel.enqueueCommand(
       world,
@@ -369,7 +331,6 @@ describe("commerce: offers surfaced on approach wait for the dock (D42)", () => 
     const result = kernel.advance(world, 1);
     expect(result.halt).toEqual({ kind: "decision" });
     expect(world.state.decisions.queue).toHaveLength(1);
-    const job = Object.values(world.state.jobs)[0];
-    expect(job?.surfaceWhenDocked).toBeUndefined();
+    expect(world.state.decisions.held).toEqual([]);
   });
 });

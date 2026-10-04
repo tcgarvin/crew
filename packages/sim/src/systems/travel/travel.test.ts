@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Command } from "../../core/types/commands";
-import type { CommandId, HookId } from "../../core/types/ids";
+import type { ActorId, CommandId, HookId } from "../../core/types/ids";
 import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "./fixtures";
 import { raiseHookIfIdle } from "./hooks";
 
@@ -45,7 +45,7 @@ describe("travel state machine", () => {
     expect(world.state.travel.stage).toBe("approaching");
     expect(world.state.narrator.pendingHook).toBeUndefined();
 
-    // Docking at B with nothing on raises `jobBoard` (D40); acknowledge it.
+    // Docking at B with nothing on raises `captainAshore` (D40); acknowledge it.
     const after = advanceThroughHooks(kernel, world, 1000);
     expect(after.halt).toEqual({ kind: "completed" });
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
@@ -262,13 +262,14 @@ describe("departure gate (D36)", () => {
       name: "earlyHook",
       phase: "topology",
       run: (ctx) => {
-        if (ctx.tick === 1) raiseHookIfIdle(ctx, "jobBoard", { portId: PORTS.a });
+        if (ctx.tick === 1)
+          raiseHookIfIdle(ctx, "captainAshore", { portId: PORTS.a, actorId: "a1" as ActorId });
       },
     });
 
     const first = kernel.advance(world, 50);
     expect(first.halt).toEqual({ kind: "hook" });
-    expect(world.state.narrator.pendingHook?.kind).toBe("jobBoard");
+    expect(world.state.narrator.pendingHook?.kind).toBe("captainAshore");
     const gate = pendingGate(world);
     expect(gate).toBeDefined();
     expect(gate?.narratorHookId).toBeUndefined();
@@ -520,7 +521,7 @@ describe("voyages: a destination beyond one hop (§2.3)", () => {
     const toD = advanceUntil(kernel, world, dockedAt(PORTS.d));
     expect(toD.haltedOnDecision).toBe(false);
     // The waypoint is a stop on the way: the board was not asked there, only at the end.
-    expect(toC.hooks).not.toContain("jobBoard");
+    expect(toC.hooks).not.toContain("captainAshore");
     expect(world.state.money.balance).toBe(90);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.d });
   });

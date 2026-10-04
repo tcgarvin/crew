@@ -121,7 +121,7 @@ describe("save migration 4 → 5 (D66)", () => {
     };
     raw.schemaVersion = 4;
     const migrated = migrateState(raw, 4, { content: world.content }) as WorldState;
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
     expect(migrated.dockside).toEqual({ locals: {}, props: [] });
     expect(migrated.nextId.local).toBe(1);
     expect(migrated.narrator.pendingHook).toBeUndefined();

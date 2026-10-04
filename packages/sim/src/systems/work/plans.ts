@@ -20,6 +20,7 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { lookForWorkPlan, meetingPlan } from "./shore";
 
 export type PlanResult =
   | { readonly ok: true; readonly plan: ActivityPlan }
@@ -305,6 +306,10 @@ export function buildPersonalPlan(
         { kind: "hold", hold: "sleep", sinceTick: ctx.tick },
       ]);
     }
+    case "lookForWork":
+      return lookForWorkPlan(ctx, actor);
+    case "meetSpeaker":
+      return meetingPlan(ctx, intent.decisionId);
     case "rest":
     case "socialize":
     case "wander":

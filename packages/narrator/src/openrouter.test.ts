@@ -54,7 +54,7 @@ function laterInTheSameGame(req: NarratorRequest): NarratorRequest {
   state.narrator.budget.faultsRemaining -= 1;
   const hook = {
     id: req.hook.id,
-    kind: "jobBoard" as const,
+    kind: "captainAshore" as const,
     context: { portId },
     tick: state.tick,
   } as NarratorRequest["hook"];

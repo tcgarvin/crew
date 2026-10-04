@@ -127,6 +127,9 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
       dockHandGiveUpSeconds: 30,
+      talkSeconds: 3,
+      gateVisitSeconds: 4,
+      cardDeliveryGiveUpSeconds: 45,
     },
     commerce: {
       priceBands: {
@@ -443,7 +446,7 @@ export function freightTestWorld(overrides: FixtureConfigOverrides = {}): Fixtur
 
 /**
  * Test helper: advance up to `ticks`, transparently acknowledging any hooks raised along the way
- * (e.g. `jobBoard` firing on arrival at a port with no job templates) so a test can drive travel
+ * (e.g. `captainAshore` firing on arrival at a port with no job templates) so a test can drive travel
  * without reacting to every incidental hook. Stops early on a `decision` halt (the caller must
  * resolve it) or once `ticks` is exhausted.
  */

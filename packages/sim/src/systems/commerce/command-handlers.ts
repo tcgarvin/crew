@@ -63,6 +63,15 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     if (issuer.name === "" || issuer.role === "") {
       return reject("invalidPayload", "offerJob: the issuer needs a name and a role");
     }
+    // D70 (retiring D42's wait for the dock): an offer is put to the captain in person, at the
+    // dock, so a surfaced offer needs the ship docked at its origin. A quiet one may be posted
+    // anywhere (scenarios and tests use that).
+    if (command.payload.surface && !dockedAtOrigin(ctx.state, job)) {
+      return reject(
+        "preconditionFailed",
+        `offerJob: a surfaced offer is made in person, docked at "${job.fromPortId}"`,
+      );
+    }
     const passenger = job.passenger === true;
     const roundTrip = job.roundTrip === true;
     if (roundTrip && !passenger) {
@@ -141,13 +150,8 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     // D63, D66: alongside the origin's dock, commerce's sweep this tick sends a dock hand out with
     // the freight (or sets it out at once at a dock with no warehouse door); an offer made in
     // flight is staged the same way when that dock comes alongside.
-    if (surface) {
-      // D42: the card can only be taken at the dock (`acceptContract` and `setCourse` need the
-      // ship docked at the origin), so an offer surfaced on approach waits for it; commerce
-      // builds the card the first tick the ship is docked there (`surfaceDeferredOffers`).
-      if (dockedAtOrigin(ctx.state, job)) surfaceOfferCard(ctx, job);
-      else job.surfaceWhenDocked = true;
-    }
+    // D70: validated docked at the origin; the card is held until the captain meets the issuer.
+    if (surface) surfaceOfferCard(ctx, job);
     return NO_TEMP_REFS;
   },
 };

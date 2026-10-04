@@ -18,7 +18,7 @@ import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
 import {
   FIXTURE_PASSENGER,
   approachRequest,
-  farJobBoardRequest,
+  farCaptainAshoreRequest,
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
@@ -188,7 +188,7 @@ describe("buildDigest", () => {
   });
 
   it("says a crew member on the dock alongside is on the dock (D61)", () => {
-    const req = farJobBoardRequest(content());
+    const req = farCaptainAshoreRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     expect(snapshot.state.deck.dock?.dockId).toBe("dock.crossroads_hub");
     const mara = Object.values(snapshot.state.actors).find((a) => a.name === "Mara Osei");
@@ -204,7 +204,7 @@ describe("buildDigest", () => {
 
   it("describes the dock alongside: its ambience and the freight on it, by standing (D63)", () => {
     const bundle = content();
-    const req = farJobBoardRequest(bundle);
+    const req = farCaptainAshoreRequest(bundle);
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     const state = snapshot.state;
     const dock = dockAlongside(bundle, state);

@@ -17,7 +17,7 @@ export { HOOK_INSTRUCTIONS, type StoryHookKind } from "./hooks";
 export { PROMPT_VERSION, SYSTEM_PROMPT } from "./system";
 
 const HOOK_ORDER: readonly StoryHookKind[] = [
-  "jobBoard",
+  "captainAshore",
   "quietTooLong",
   "notableEvent",
   "policyDecision",

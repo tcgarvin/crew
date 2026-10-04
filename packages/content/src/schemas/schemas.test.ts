@@ -247,6 +247,9 @@ const config = {
     recallAboardSeconds: 60,
     localShuffleSeconds: 8,
     dockHandGiveUpSeconds: 30,
+    talkSeconds: 3,
+    gateVisitSeconds: 4,
+    cardDeliveryGiveUpSeconds: 45,
   },
   commerce: {
     priceBands: {

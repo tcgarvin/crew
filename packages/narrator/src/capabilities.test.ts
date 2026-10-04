@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCapabilities } from "./capabilities";
-import { jobBoardRequest, quietTooLongRequest } from "./fixtures";
+import { captainAshoreRequest, quietTooLongRequest } from "./fixtures";
 import { content } from "./test-support";
 
 describe("buildCapabilities", () => {
@@ -113,7 +113,7 @@ describe("buildCapabilities", () => {
   });
 
   it("measures distance from the docked port when docked", () => {
-    const req = jobBoardRequest(content());
+    const req = captainAshoreRequest(content());
     const docked = buildCapabilities(req.snapshot.state, content(), req.snapshot.config);
     expect(docked).toContain('"From here" is measured from port.kessler_drift (Kessler Drift)');
     expect(docked).toContain('port.ossory_station "Ossory Station"');

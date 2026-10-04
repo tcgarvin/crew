@@ -2,16 +2,17 @@
  * The commerce system (PLAN §6 W6 items 3–5): one per-tick pass that
  *  1. moves accepted jobs to `inTransit` once the ship leaves dock, raises `cargoToUnload`
  *     problems on arrival at the destination, and pays a delivered job exactly once,
- *  2. expires stale offers and surfaces the cards of offers that waited for the dock (D42),
- *  3. raises the `jobBoard` hook when the captain is docked with nothing to do (see
- *     `travel/hooks.ts` `raiseJobBoardHookIfNeeded`),
+ *  2. expires stale offers,
+ *  3. sends the captain ashore to look for work when docked with nothing to do, raising the
+ *     `captainAshore` hook the tick they step onto the dock, and delivers held cards in person
+ *     (D70, `captain-ashore.ts`; this replaced `jobBoard` and D42's wait for the dock),
  *  4. walks passengers off and on, times their stay ashore and raises the overdue card
  *     (passengers-and-galaxy §3, `passage.ts`); it runs before the job sweep so a passage that
  *     completes this tick is paid this tick.
  *
  * D40 (2026-10-01): the narrator is the only source of work. The deterministic job source that
- * used to live beside this system (posting template offers while docked) is gone; `jobBoard` is
- * the sim asking the narrator for an offer, and the null narrator answers it offline from the
+ * used to live beside this system (posting template offers while docked) is gone; `captainAshore`
+ * is the sim asking the narrator for an offer, and the null narrator answers it offline from the
  * port's `jobTemplates`. Nothing here ever creates a job on its own.
  *
  * Runs in the same phase as travel (`equipment`), after it (registration order), so a job
@@ -19,9 +20,9 @@
  * this runs.
  */
 import type { StepCtx, System } from "../../core/types/pipeline";
-import { raiseJobBoardHookIfNeeded } from "../travel/hooks";
+import { sweepCaptainAshore } from "./captain-ashore";
 import { syncDockFreight } from "./dock-hands";
-import { expireStaleOffers, payJobIfDue, raiseUnloadProblems, surfaceDeferredOffers } from "./jobs";
+import { expireStaleOffers, payJobIfDue, raiseUnloadProblems } from "./jobs";
 import { sweepPassages } from "./passage";
 
 function sweepJobs(ctx: StepCtx): void {
@@ -41,7 +42,6 @@ function sweepJobs(ctx: StepCtx): void {
   // D63, D66: after payment, so the bay is what is paid on; dock hands then cart the delivered
   // crates in, and an offer's crates out or back.
   syncDockFreight(ctx);
-  surfaceDeferredOffers(ctx);
 }
 
 export const commerceSystem: System = {
@@ -50,6 +50,6 @@ export const commerceSystem: System = {
   run(ctx) {
     sweepPassages(ctx);
     sweepJobs(ctx);
-    raiseJobBoardHookIfNeeded(ctx);
+    sweepCaptainAshore(ctx);
   },
 };

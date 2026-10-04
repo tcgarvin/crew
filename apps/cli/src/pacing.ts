@@ -26,12 +26,14 @@
  *   While the sim is halted the viewer keeps playing into the lead; the stall per call is
  *   therefore `max(0, latency − lead / speed)`, where `lead` is the sim-seconds in hand when the
  *   hook fired (60 s if the sim had been unhindered for ~1.5 s of wall time; less when hooks
- *   fall close together, e.g. `stageDock` then `jobBoard` at one docking). With a 60 s
+ *   fall close together, e.g. `stageDock` then `captainAshore` at one docking). With a 60 s
  *   lead and 25 s latency: 0 s at 1x and 2x, 10 s at 4x, 17.5 s at 8x: spec §2.2.
- * - The viewer starts playing when the sim has produced its first tick. The `jobBoard` hook of
- *   the initial docking fires at tick 0, before any lead exists, so its latency is paid in full
- *   at every speed; that is a load-time cost (the player is still looking at the loading screen)
- *   and is reported as `startupSeconds`, not as stall.
+ * - The viewer starts playing when the sim has produced its first tick. A hook at tick 0 (before
+ *   any lead exists) would be paid in full at every speed as a load-time cost, reported as
+ *   `startupSeconds`, not as stall. Since D70 none does: the first `captainAshore` comes when the
+ *   captain steps onto the dock, some seconds in, so it is stall, partly hidden by the lead built
+ *   while they walked. The script waits for each port's ask to be answered before it takes work or
+ *   sets course, as a player answering the offer card would.
  * - Policy decisions halt the sim as hooks do; the stub resolves them by their left side at once
  *   (a real player's thinking time is not modelled, and none fire on this voyage anyway).
  * - Wall seconds for the run is the wall time at which the viewer has played the final tick, so
@@ -227,6 +229,16 @@ function freightDraft(world: World): Omit<Command, "id"> {
 }
 
 /**
+ * D70: the captain has gone ashore at `portId` this docking and the narrator's answer is in (the
+ * `captainAshore` ask is recorded and no hook is pending). The script takes work or sets course
+ * only then, as a player answering the offer card would; the stub narrator offers nothing.
+ */
+function askedAt(world: World, portId: PortDefId): boolean {
+  const narrator = world.state.narrator;
+  return narrator.captainAshoreLastAsk?.portId === portId && narrator.pendingHook === undefined;
+}
+
+/**
  * The scripted voyage: a tiny state machine driven from the ship's travel state after each
  * advance. Plain: set course to the far port, and back once docked there. Freight: first offer
  * and accept a hub → far-port job so cargo work happens at both ends.
@@ -251,6 +263,8 @@ class VoyageScript {
     const travel = world.state.travel;
     switch (this.phase) {
       case "offer":
+        // D70: the captain walks ashore first, and the narrator is asked; then the work is taken.
+        if (!askedAt(world, HUB_PORT_ID)) return;
         this.send(freightDraft(world));
         this.phase = "accept";
         return;
@@ -265,6 +279,7 @@ class VoyageScript {
       case "outbound":
         if (travel.stage === "docked" && travel.portId === HUB_PORT_ID) {
           if (travel.plannedDestinationId !== undefined) return;
+          if (this.scenario === "plain" && !askedAt(world, HUB_PORT_ID)) return;
           this.send({
             source: "scenario",
             kind: "setCourse",
@@ -273,6 +288,7 @@ class VoyageScript {
           return;
         }
         if (travel.stage === "docked" && travel.portId === FAR_PORT_ID) {
+          if (!askedAt(world, FAR_PORT_ID)) return;
           this.send({
             source: "scenario",
             kind: "setCourse",
@@ -613,7 +629,12 @@ function hookColumns(results: readonly PacingResult[]): NarratorHook["kind"][] {
   for (const r of results) {
     for (const kind of Object.keys(r.hooksByKind) as NarratorHook["kind"][]) kinds.add(kind);
   }
-  const order: NarratorHook["kind"][] = ["stageDock", "jobBoard", "quietTooLong", "notableEvent"];
+  const order: NarratorHook["kind"][] = [
+    "stageDock",
+    "captainAshore",
+    "quietTooLong",
+    "notableEvent",
+  ];
   return order.filter((k) => kinds.has(k));
 }
 

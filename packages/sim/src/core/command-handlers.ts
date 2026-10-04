@@ -1,3 +1,4 @@
+import { commandActor, isFitForCommand } from "./command-actor";
 /**
  * Handlers for the kernel-owned command kinds: scenario setup (`scenarioSpawn`,
  * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook` and `resolveDecision`. Other kinds
@@ -16,6 +17,7 @@ import {
   validateCommand,
 } from "./commands";
 import { findCrewDef, findItemDef } from "./defs";
+import { cardSpeaker, queueOrHold } from "./delivery";
 import { allocateId } from "./ids";
 import type { KernelRegistry } from "./registry";
 import type { Actor, Needs } from "./types/actor";
@@ -347,33 +349,6 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
 // surfaceDecision
 // ---------------------------------------------------------------------------------------------
 
-/**
- * True when an actor is asleep right now (sleeping is an activity, not an `Availability`). Takes
- * just the two `activity` fields it reads (rather than `Pick<Actor, "activity">`) so it accepts
- * both a mutable `Actor` and the `DeepReadonly<Actor>` a `ValidateCtx.state` lookup returns.
- */
-function isAsleepNow(activity: { readonly kind: string; readonly activity?: string }): boolean {
-  return activity.kind === "personal" && activity.activity === "sleep";
-}
-
-/**
- * D8's perspective fallback (captain, else first officer), duplicated from
- * `systems/travel/roster.ts`'s `commandActor` because `core` may not import from `systems`
- * (dependency-cruiser boundary: systems depend on core, never the reverse). Keep the two in sync
- * if D8's rule changes.
- */
-function defaultPerspectiveActor(state: ValidateCtx["state"]): ActorId {
-  const actors = Object.values(state.actors) as Actor[];
-  const captain = actors.find((a) => a.roleTags.includes("captain"));
-  if (captain === undefined) {
-    throw new Error("surfaceDecision: no crew member has the captain role tag");
-  }
-  const fit = captain.availability === "available" && !isAsleepNow(captain.activity);
-  if (fit) return captain.id;
-  const firstOfficer = actors.find((a) => a.roleTags.includes("firstOfficer"));
-  return firstOfficer?.id ?? captain.id;
-}
-
 /** A card side as a decision option; `aftermath` (D26) only when the side has one (JSON-safe). */
 function optionFromSide(side: DecisionCardSide): DecisionOption {
   return {
@@ -435,7 +410,7 @@ function surfaceDecisionHandler(
             `surfaceDecision: unknown perspective actor "${card.perspectiveActorId}"`,
           );
         }
-        if (actor.availability !== "available" || isAsleepNow(actor.activity)) {
+        if (!isFitForCommand(actor)) {
           return reject(
             "preconditionFailed",
             `surfaceDecision: perspective actor "${card.perspectiveActorId}" is not available`,
@@ -443,7 +418,7 @@ function surfaceDecisionHandler(
         }
         perspectiveActorId = actor.id;
       } else {
-        perspectiveActorId = defaultPerspectiveActor(ctx.state);
+        perspectiveActorId = commandActor(ctx.state);
       }
       if (card.jobId !== undefined) {
         const duplicate = Object.values(ctx.state.decisions.records).find(
@@ -472,7 +447,13 @@ function surfaceDecisionHandler(
         createdTick: ctx.tick,
         ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),
       };
-      ctx.state.decisions.queue.push(decisionId);
+      const record = ctx.state.decisions.records[decisionId];
+      // D70: a card from one of the port's people waits to be delivered in person.
+      queueOrHold(
+        ctx,
+        decisionId,
+        record === undefined ? undefined : cardSpeaker(ctx.state, record),
+      );
       return NO_TEMP_REFS;
     },
   };

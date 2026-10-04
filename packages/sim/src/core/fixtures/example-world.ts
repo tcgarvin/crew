@@ -371,9 +371,15 @@ export function exampleWorldState(): WorldState {
         },
       },
       queue: [x1],
+      held: [],
     },
     narrator: {
-      pendingHook: { id: k1, kind: "jobBoard", context: { portId: port }, tick: 400 },
+      pendingHook: {
+        id: k1,
+        kind: "captainAshore",
+        context: { portId: port, actorId: a1 },
+        tick: 400,
+      },
       lastNarrativeTick: 250,
       budget: { spawnsRemaining: 3, faultsRemaining: 1 },
       recentHookIds: [],
