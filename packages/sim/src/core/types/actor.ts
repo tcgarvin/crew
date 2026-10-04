@@ -13,7 +13,6 @@ import type {
   CrewDefId,
   DoorId,
   EntityId,
-  ItemId,
   LocalKey,
   MachineId,
   ProblemId,

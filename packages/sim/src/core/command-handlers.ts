@@ -7,7 +7,6 @@
 import { commandActor, isFitForCommand } from "./command-actor";
 import {
   type AppliedCommand,
-  type ApplyCtx,
   type CommandHandler,
   NO_TEMP_REFS,
   type ValidateCtx,
