@@ -43,7 +43,7 @@ import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
 import type { ConfigDef, MachineDef } from "../../core/types/content";
 import type { DerateCause, EventDraft } from "../../core/types/events";
-import type { CommandId, ItemDefId, LocalKey } from "../../core/types/ids";
+import type { CommandId, ItemDefId, LocalKey, MachineId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
 import type { ProblemOfKind } from "../../core/types/work";
@@ -103,16 +103,45 @@ function derateCause(factors: readonly (readonly [DerateCause, number])[]): Dera
   return worst[0];
 }
 
-function coolantAvailable(ctx: StepCtx, machine: Machine): boolean {
-  const domainKey = domainKeyOf(ctx, machine);
+/**
+ * Where each machine's coolant comes from, for one equipment run: its power domain, and the
+ * `"cooling"`-tagged machines on each domain. Domains and tags come from content and placements,
+ * which nothing in this phase changes, so the index is built once per run rather than scanning
+ * every machine for every machine (that all-pairs scan was the system's main cost on a Freighter
+ * Mk2). It holds the live `Machine` objects, so a pump this run has already switched off reads as
+ * off to every machine ticked after it, exactly as a fresh scan would.
+ */
+interface CoolantIndex {
+  readonly domainOf: ReadonlyMap<MachineId, LocalKey>;
+  readonly coolersByDomain: ReadonlyMap<LocalKey, readonly Machine[]>;
+}
+
+function buildCoolantIndex(ctx: StepCtx, machines: readonly Machine[]): CoolantIndex {
+  const domainOf = new Map<MachineId, LocalKey>();
+  const coolersByDomain = new Map<LocalKey, Machine[]>();
+  for (const machine of machines) {
+    const domainKey = domainKeyOf(ctx, machine);
+    if (domainKey === undefined) continue;
+    domainOf.set(machine.id, domainKey);
+    if (!ctx.defs.machine(machine.defId).tags.includes("cooling")) continue;
+    const coolers = coolersByDomain.get(domainKey);
+    if (coolers === undefined) coolersByDomain.set(domainKey, [machine]);
+    else coolers.push(machine);
+  }
+  return { domainOf, coolersByDomain };
+}
+
+/** Full cooling unless other `"cooling"` machines share this one's domain and none is on. */
+function coolantAvailable(index: CoolantIndex, machine: Machine): boolean {
+  const domainKey = index.domainOf.get(machine.id);
   if (domainKey === undefined) return true;
-  const coolants = Object.values(ctx.state.machines).filter((m) => {
-    if (m.id === machine.id) return false;
-    if (domainKeyOf(ctx, m) !== domainKey) return false;
-    return ctx.defs.machine(m.defId).tags.includes("cooling");
-  });
-  if (coolants.length === 0) return true;
-  return coolants.some((m) => m.actualMode === "on");
+  let hasCooler = false;
+  for (const cooler of index.coolersByDomain.get(domainKey) ?? []) {
+    if (cooler.id === machine.id) continue;
+    if (cooler.actualMode === "on") return true;
+    hasCooler = true;
+  }
+  return !hasCooler;
 }
 
 /**
@@ -281,6 +310,7 @@ function powerFraction(machine: Machine, def: MachineDef): number {
  */
 function updateHeat(
   ctx: StepCtx,
+  coolant: CoolantIndex,
   machine: Machine,
   def: MachineDef,
   faults: FaultEffects,
@@ -292,7 +322,7 @@ function updateHeat(
     : 0;
   const coolRate =
     def.heat.coolPerSecond *
-    (coolantAvailable(ctx, machine) ? 1 : COOLANT_OFFLINE_COOLING_FRACTION);
+    (coolantAvailable(coolant, machine) ? 1 : COOLANT_OFFLINE_COOLING_FRACTION);
   machine.temperature = clamp(machine.temperature + (riseRate - coolRate) * dtSeconds, 0, 1.5);
   if (machine.temperature > 1) {
     machine.integrity = clamp(
@@ -400,13 +430,18 @@ function updateMaintenanceDue(ctx: StepCtx, machine: Machine, def: MachineDef): 
   if (event !== undefined) ctx.emit(event);
 }
 
-function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
+function tickMachine(
+  ctx: StepCtx,
+  coolant: CoolantIndex,
+  machine: Machine,
+  dtSeconds: number,
+): void {
   const def = ctx.defs.machine(machine.defId);
   fireScheduledFaults(ctx, machine, def);
   ensureSymptomProblems(ctx, machine, def);
   updatePartsNeeded(ctx, machine, def);
   const faults = faultEffects(machine, def);
-  updateHeat(ctx, machine, def, faults, dtSeconds);
+  updateHeat(ctx, coolant, machine, def, faults, dtSeconds);
   updateMode(ctx, machine, def);
   updateOutput(ctx, machine, def, faults);
   updateHazard(ctx, machine, def, dtSeconds);
@@ -418,9 +453,9 @@ export const equipmentSystem: System = {
   phase: "equipment",
   run(ctx) {
     const dtSeconds = ticksToSeconds(ctx.elapsedTicks, ctx.config.time.tickRate);
-    for (const machine of Object.values(ctx.state.machines)) {
-      tickMachine(ctx, machine, dtSeconds);
-    }
+    const machines = Object.values(ctx.state.machines);
+    const coolant = buildCoolantIndex(ctx, machines);
+    for (const machine of machines) tickMachine(ctx, coolant, machine, dtSeconds);
   },
 };
 

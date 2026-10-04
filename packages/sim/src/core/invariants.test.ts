@@ -26,6 +26,17 @@ describe("checkInvariants", () => {
     ]);
   });
 
+  it("names nested JSON-unsafe values by their full path and skips array holes", () => {
+    const holey: unknown[] = new Array(3);
+    holey[1] = Number.NEGATIVE_INFINITY;
+    expect(
+      jsonSafetyViolations(
+        { a: { b: [1, { c: undefined }], ok: "x" }, "7": [holey], f: () => 0 },
+        "root",
+      ),
+    ).toEqual(["root.7[0][1] is -Infinity", "root.a.b[1].c is undefined", "root.f is a function"]);
+  });
+
   it("flags items with a missing holder, containment cycles and bad counts", () => {
     const state = exampleWorldState();
     const i1 = "i1" as ItemId;

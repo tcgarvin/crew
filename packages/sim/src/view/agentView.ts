@@ -21,9 +21,10 @@
  */
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
+import type { DeckDef, MachinePlacementDef } from "../core/types/content";
 import type { ActorId, EntityId, ItemId, MachineId, ProblemId } from "../core/types/ids";
 import type { World } from "../core/types/kernel";
-import type { DeckGeometry } from "../core/types/nav";
+import type { DeckGeometry, NavInteractionPosition } from "../core/types/nav";
 import type { ReadonlyWorldState } from "../core/types/pipeline";
 import type {
   AgentView,
@@ -95,9 +96,59 @@ function bedMachine(
   return machine.id;
 }
 
-/** D74: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`). */
+/**
+ * D74: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`): one pass
+ * over the machines rather than one per berth, with `bedMachine`'s first match and its error.
+ */
 function assignedBeds(state: World["state"], deckId: DeckGeometry["deckId"]): MachineId[] {
-  return Object.values(state.berths).map((key) => bedMachine(state, key, deckId));
+  const byKey = new Map<string, MachineId>();
+  for (const machine of Object.values(state.machines)) {
+    if (machine.deckId !== deckId || byKey.has(machine.placementKey)) continue;
+    byKey.set(machine.placementKey, machine.id);
+  }
+  return Object.values(state.berths).map((key) => {
+    const machineId = byKey.get(key);
+    if (machineId === undefined) throw new Error(`Berth "${key}" is no machine on ${deckId}`);
+    return machineId;
+  });
+}
+
+/** Placements by key per deck def; content is immutable, so never stale (first key wins). */
+const placementsByDeck = new WeakMap<DeckDef, ReadonlyMap<string, MachinePlacementDef>>();
+
+function placementsByKey(deck: DeckDef): ReadonlyMap<string, MachinePlacementDef> {
+  const cached = placementsByDeck.get(deck);
+  if (cached !== undefined) return cached;
+  const byKey = new Map<string, MachinePlacementDef>();
+  for (const placement of deck.machines) {
+    if (!byKey.has(placement.key)) byKey.set(placement.key, placement);
+  }
+  placementsByDeck.set(deck, byKey);
+  return byKey;
+}
+
+/**
+ * Interaction positions by machine, in geometry order, per built geometry. A geometry's positions
+ * are fixed when it is built and a rebuild makes a new object, so the entry cannot go stale.
+ */
+const interactionsByGeometry = new WeakMap<
+  DeckGeometry,
+  ReadonlyMap<MachineId, readonly NavInteractionPosition[]>
+>();
+
+function interactionsByMachine(
+  geometry: DeckGeometry,
+): ReadonlyMap<MachineId, readonly NavInteractionPosition[]> {
+  const cached = interactionsByGeometry.get(geometry);
+  if (cached !== undefined) return cached;
+  const byMachine = new Map<MachineId, NavInteractionPosition[]>();
+  for (const position of geometry.interactionPositions) {
+    const list = byMachine.get(position.machineId);
+    if (list === undefined) byMachine.set(position.machineId, [position]);
+    else list.push(position);
+  }
+  interactionsByGeometry.set(geometry, byMachine);
+  return byMachine;
 }
 
 function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
@@ -139,10 +190,12 @@ function buildSchematic(world: World, geometry: DeckGeometry): SchematicView {
   const allMachines = (): MachinePlacementView[] => {
     if (machines !== undefined) return machines;
     machines = [];
+    const placements = placementsByKey(deck);
+    const interactions = interactionsByMachine(geometry);
     for (const machine of Object.values(state.machines)) {
       if (machine.deckId !== geometry.deckId) continue;
       const def = content.machines[machine.defId];
-      const placement = deck.machines.find((p) => p.key === machine.placementKey);
+      const placement = placements.get(machine.placementKey);
       if (def === undefined || placement === undefined) continue;
       machines.push({
         machineId: machine.id,
@@ -152,9 +205,10 @@ function buildSchematic(world: World, geometry: DeckGeometry): SchematicView {
           const r = rotateOffset(offset, placement.rotation);
           return { x: placement.origin.x + r.x, y: placement.origin.y + r.y };
         }),
-        interactionTiles: geometry.interactionPositions
-          .filter((p) => p.machineId === machine.id)
-          .map((p) => ({ tile: p.tile, purposes: p.purposes })),
+        interactionTiles: (interactions.get(machine.id) ?? []).map((p) => ({
+          tile: p.tile,
+          purposes: p.purposes,
+        })),
       });
     }
     return machines;

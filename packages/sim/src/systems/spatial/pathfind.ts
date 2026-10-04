@@ -7,18 +7,15 @@
  * (estimates) and an actor's knowledge (routes). A door the policy says "will open for me" costs
  * its opening time converted to tiles at walking speed; `null` means impassable (e.g. jammed).
  */
-import type { TileCoord } from "../../core/types/common";
+import type { EdgeSide, TileCoord } from "../../core/types/common";
 import type { DoorId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { DerivedCaches } from "../../core/types/pipeline";
 import {
   SIDE_BIT,
   doorOnEdge,
-  hasWall,
   inBounds,
-  indexAt,
   isStaticWalkable,
-  sideTowards,
   tileAtIndex,
   tileIndex,
 } from "./geometry";
@@ -72,12 +69,18 @@ class NodeHeap {
     return (this.gs[i] as number) > (this.gs[j] as number);
   }
 
+  // Unrolled over the three arrays: this runs on every heap step, so no per-call array literal.
   private swap(i: number, j: number): void {
-    for (const arr of [this.nodes, this.fs, this.gs]) {
-      const t = arr[i] as number;
-      arr[i] = arr[j] as number;
-      arr[j] = t;
-    }
+    const { nodes, fs, gs } = this;
+    const node = nodes[i] as number;
+    nodes[i] = nodes[j] as number;
+    nodes[j] = node;
+    const f = fs[i] as number;
+    fs[i] = fs[j] as number;
+    fs[j] = f;
+    const g = gs[i] as number;
+    gs[i] = gs[j] as number;
+    gs[j] = g;
   }
 
   push(node: number, f: number, g: number): void {
@@ -115,17 +118,19 @@ class NodeHeap {
   }
 }
 
-const CARDINALS: readonly [number, number][] = [
-  [0, -1],
-  [1, 0],
-  [0, 1],
-  [-1, 0],
+/** Each cardinal step with the side of the current tile it crosses. */
+const CARDINALS: readonly (readonly [number, number, EdgeSide])[] = [
+  [0, -1, "n"],
+  [1, 0, "e"],
+  [0, 1, "s"],
+  [-1, 0, "w"],
 ];
-const DIAGONALS: readonly [number, number][] = [
-  [1, -1],
-  [1, 1],
-  [-1, 1],
-  [-1, -1],
+/** Each diagonal step with the edge bits of its horizontal (`e`/`w`) and vertical (`n`/`s`) sides. */
+const DIAGONALS: readonly (readonly [number, number, number, number])[] = [
+  [1, -1, SIDE_BIT.e, SIDE_BIT.n],
+  [1, 1, SIDE_BIT.e, SIDE_BIT.s],
+  [-1, 1, SIDE_BIT.w, SIDE_BIT.s],
+  [-1, -1, SIDE_BIT.w, SIDE_BIT.n],
 ];
 
 /**
@@ -148,7 +153,7 @@ export function findPath(
   if (!walkable(to.x, to.y)) return null;
   if (from.x === to.x && from.y === to.y) return [{ x: from.x, y: from.y }];
 
-  const { width, originX, originY } = geometry;
+  const { width, originX, originY, walls, doorSides } = geometry;
   // `indexAt` inlined for the inner loops (callers have bounds-checked through `walkable`).
   const indexOf = (x: number, y: number) => (y - originY) * width + (x - originX);
   const size = width * geometry.height;
@@ -184,43 +189,40 @@ export function findPath(
     const gx = node % width;
     const x = gx + originX;
     const y = (node - gx) / width + originY;
-    const here = { x, y };
+    // Edge bits read straight from the grids: `node` and every walkable neighbour are on the
+    // grid, so `hasWall`'s off-grid case never applies, and the string-keyed `doorByEdge` lookup
+    // is only worth doing where `doorSides` says a door is.
+    const wallsHere = walls[node] as number;
+    const doorsHere = doorSides[node] as number;
 
-    for (const [dx, dy] of CARDINALS) {
+    for (const [dx, dy, side] of CARDINALS) {
       const nx = x + dx;
       const ny = y + dy;
       if (!walkable(nx, ny)) continue;
-      const side = sideTowards(here, { x: nx, y: ny });
-      if (side === undefined) continue;
+      const bit = SIDE_BIT[side];
       let cost = 1;
-      const doorId = doorOnEdge(geometry, here, side);
+      const doorId = (doorsHere & bit) !== 0 ? doorOnEdge(geometry, { x, y }, side) : undefined;
       if (doorId !== undefined) {
         const extra = policy.doorCost(doorId);
         if (extra === null) continue;
         cost += extra;
-      } else if (hasWall(geometry, here, side)) {
+      } else if ((wallsHere & bit) !== 0) {
         continue;
       }
       relax(node, indexOf(nx, ny), cost);
     }
 
-    for (const [dx, dy] of DIAGONALS) {
+    const edgesHere = wallsHere | doorsHere;
+    for (const [dx, dy, xBit, yBit] of DIAGONALS) {
       const nx = x + dx;
       const ny = y + dy;
       if (!walkable(nx, ny) || !walkable(nx, y) || !walkable(x, ny)) continue;
-      const sx = dx > 0 ? "e" : "w";
-      const sy = dy > 0 ? "s" : "n";
-      const blocked = (tile: TileCoord, side: "n" | "e" | "s" | "w") =>
-        hasWall(geometry, tile, side) ||
-        ((geometry.doorSides[indexOf(tile.x, tile.y)] ?? 0) & SIDE_BIT[side]) !== 0;
-      if (
-        blocked(here, sx) ||
-        blocked(here, sy) ||
-        blocked({ x: nx, y }, sy) ||
-        blocked({ x, y: ny }, sx)
-      ) {
-        continue;
-      }
+      // Refused if any of the four edges the diagonal slips past is a wall or a door.
+      if ((edgesHere & (xBit | yBit)) !== 0) continue;
+      const besideX = indexOf(nx, y);
+      if ((((walls[besideX] as number) | (doorSides[besideX] as number)) & yBit) !== 0) continue;
+      const besideY = indexOf(x, ny);
+      if ((((walls[besideY] as number) | (doorSides[besideY] as number)) & xBit) !== 0) continue;
       relax(node, indexOf(nx, ny), SQRT2);
     }
   }
