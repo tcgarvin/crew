@@ -35,7 +35,7 @@ station dock for Kessler Drift (port.kessler_drift)
 19 #%..v..........v..................%#
 20 #%...................2............%#
 21 ##................%%%%%%%%%%%%..ddd#
-22 ###..........ssss.............#.ddd#
+22 ###..........ssss...............ddd#
 23 ####.3...1.%.ssss..........4.###...#
 24 ####################################
 
@@ -67,7 +67,7 @@ Props (4):
 Foreground (4):
   rockWall (0,0) 36 x 1
   rockWall (0,21) 4 x 4
-  rockWall (30,22) 3 x 3
+  rockWall (29,23) 3 x 2
   rockWall (0,24) 36 x 1
 
 Palette: floor #4a4640, wall #2b2724, accent #d9a441

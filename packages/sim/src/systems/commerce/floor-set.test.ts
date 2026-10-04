@@ -126,5 +126,23 @@ describe("save migration 4 → 5 (D66)", () => {
     expect(migrated.nextId.local).toBe(1);
     expect(migrated.narrator.pendingHook).toBeUndefined();
     expect(migrated.narrator.recentHookIds).toContain("k7");
+    expect(migrated.narrator.pendingNotable).toBeUndefined();
+  });
+
+  it("owes a notableEvent for a narrative event in the save's last tick (D69)", () => {
+    const { world } = dockWorkWorld();
+    const raw = JSON.parse(JSON.stringify(world.state)) as Record<string, unknown> & {
+      narrator: Record<string, unknown>;
+    };
+    const event = { tick: raw.tick, type: "driftingChanged", eventId: "e42" };
+    raw.narrator.lastNarrativeEvent = event;
+    raw.schemaVersion = 4;
+    const older = JSON.parse(JSON.stringify(raw)) as typeof raw;
+    const migrated = migrateState(raw, 4, { content: world.content }) as WorldState;
+    expect(migrated.narrator.pendingNotable).toEqual(event);
+    // An older one was already checked the tick after it.
+    older.narrator.lastNarrativeEvent = { ...event, tick: (raw.tick as number) - 1 };
+    const done = migrateState(older, 4, { content: world.content }) as WorldState;
+    expect(done.narrator.pendingNotable).toBeUndefined();
   });
 });

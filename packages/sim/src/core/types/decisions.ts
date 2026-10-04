@@ -129,9 +129,17 @@ export interface NarratorState {
    * The most recent `narrative`-significance event committed (phase 8, `core/pipeline.ts`),
    * preferring within one tick an event whose type is in `config.narrator.hookOnEvents`. Travel
    * raises the `notableEvent` hook from it the following tick (events are stamped after the
-   * systems run, so a hook cannot be raised in the same tick).
+   * systems run, so a hook cannot be raised in the same tick), by way of `pendingNotable`.
    */
   lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
+  /**
+   * D69: the latest hookable event (type in `config.narrator.hookOnEvents`) still owed a
+   * `notableEvent` hook. Set when it is committed (phase 8); travel raises the hook from it the
+   * first tick no other hook is pending, so a staging call raised the tick after the event no
+   * longer swallows it. A story hook raised after the event clears it, since that call reads
+   * the event anyway. Absent when nothing is owed.
+   */
+  pendingNotable?: { tick: Tick; type: string; eventId?: EventId };
   /**
    * The `jobBoard` ask of the current docking (port and tick), so the board asks once per
    * docking; cleared the moment travel leaves `docked`, so the next docking at any port asks

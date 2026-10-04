@@ -81,9 +81,9 @@ export function runStep(world: World, registry: KernelRegistry): SimEvent[] {
 }
 
 /**
- * Bookkeeping over the committed events: the quiet timer's input, the last narrative event (the
- * `notableEvent` hook's input; a type in `config.narrator.hookOnEvents` wins within a tick) and
- * the trace ring.
+ * Bookkeeping over the committed events: the quiet timer's input, the last narrative event (a
+ * type in `config.narrator.hookOnEvents` wins within a tick), the `notableEvent` owed for a
+ * hookable one (D69) and the trace ring.
  */
 function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void {
   const { state, caches } = world;
@@ -106,6 +106,9 @@ function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void 
       caches.diagnostics.traceEvents.push(event);
     }
   }
+  // D69: owed a `notableEvent` until travel raises it (or a later story hook covers it).
+  const last = state.narrator.lastNarrativeEvent;
+  if (hookableSeen && last !== undefined) state.narrator.pendingNotable = { ...last };
   const ring = caches.diagnostics.traceEvents;
   if (ring.length > ringSize) ring.splice(0, ring.length - ringSize);
 }

@@ -7,6 +7,7 @@ import {
   RETRY_DELAYS_MS,
   type RetryAction,
   type RetryState,
+  STAGING_RETRY_DELAYS_MS,
   nextRetryAction,
   resetRetry,
   stagingRetryAction,
@@ -84,8 +85,10 @@ describe("nextRetryAction (D43)", () => {
   });
 });
 
-describe("stagingRetryAction (D67)", () => {
-  it("retries a staging call on the D43 schedule, then falls back to the floor set, never the panel", () => {
+describe("stagingRetryAction (D67, D69)", () => {
+  it("retries a staging call twice, quickly, then falls back to the floor set, never the panel", () => {
+    // D69: the sim is halted on the call, so D43's minute-long schedule froze the ship in
+    // transit (27 s in the playthrough with fast failures); staging is dressing, not story.
     const actions: RetryAction[] = [];
     let state = INITIAL_RETRY_STATE;
     for (let i = 0; i < 100; i += 1) {
@@ -95,9 +98,18 @@ describe("stagingRetryAction (D67)", () => {
       state = action.state;
     }
     const retries = actions.filter((a) => a.type === "retry");
-    expect(retries.map((a) => a.delayMs)).toEqual([...RETRY_DELAYS_MS]);
+    expect(retries.map((a) => a.delayMs)).toEqual([...STAGING_RETRY_DELAYS_MS]);
+    expect(STAGING_RETRY_DELAYS_MS.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(6_000);
     expect(actions.at(-1)).toEqual({ type: "floorSet", reason: "timeout", message: "timed out" });
     expect(actions.some((a) => a.type === "fail")).toBe(false);
+  });
+
+  it("falls back at once over the hourly budget rather than waiting it out (D69)", () => {
+    expect(stagingRetryAction(INITIAL_RETRY_STATE, budget)).toEqual({
+      type: "floorSet",
+      reason: "budget",
+      message: "cap",
+    });
   });
 
   it("falls back at once where a story call would fail at once, and still honours spacing", () => {

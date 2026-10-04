@@ -301,17 +301,29 @@ const drawConveyor: PropDrawer = (ctx, prop, look) => {
     }
   }
   ctx.stroke();
+  // Ore as small angular chunks in dull rock colours (D69): round gold lumps read as crew dots
+  // at phone scale, so no discs and nothing near the accent's gold.
   const seed = hashKey(prop.key);
-  const ore = mixHex(look.palette.accent, "#6d5b4a", 0.55);
-  for (let s = 0.3; s < length - 0.2; s += 0.55) {
+  const ores = ["#6d5b4a", "#5a5550", "#7a6a58"].map((c) => mixHex(c, look.palette.wall, 0.25));
+  for (let s = 0.3; s < length - 0.2; s += 0.42) {
     const jitter = hash01(seed, Math.round(s * 10));
-    const along = s + jitter * 0.2;
-    const across = (hash01(seed, Math.round(s * 10), 1) - 0.5) * 0.25;
+    const along = s + jitter * 0.15;
+    const across = (hash01(seed, Math.round(s * 10), 1) - 0.5) * 0.2;
     const x = lengthX ? belt.x + along : belt.x + belt.w / 2 + across;
     const y = lengthX ? belt.y + belt.h / 2 + across : belt.y + along;
-    ctx.fillStyle = jitter < 0.3 ? look.palette.accent : ore;
+    const size = 0.07 + jitter * 0.04;
+    const turn = hash01(seed, Math.round(s * 10), 2) * Math.PI;
+    ctx.fillStyle = ores[Math.floor(jitter * ores.length)] ?? ores[0] ?? "#6d5b4a";
     ctx.beginPath();
-    ctx.arc(x, y, 0.1 + jitter * 0.07, 0, Math.PI * 2);
+    for (let k = 0; k < 4; k++) {
+      const angle = turn + (k * Math.PI) / 2 + (hash01(seed, k, Math.round(s * 10)) - 0.5) * 0.6;
+      const reach = size * (k % 2 === 0 ? 1.3 : 0.8);
+      const px = x + Math.cos(angle) * reach;
+      const py = y + Math.sin(angle) * reach;
+      if (k === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
     ctx.fill();
   }
   ctx.strokeStyle = rgba(look.palette.accent, 0.5);

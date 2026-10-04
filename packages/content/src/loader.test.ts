@@ -156,6 +156,50 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     expect(planets.sort()).toEqual(["port.green_meridian", "port.terns_rest"]);
   });
 
+  it("puts every dock's warehouse door a short walk from its delivery bay (D69)", () => {
+    // The delivery's receiver waits at the warehouse door and is sent for the crates only once
+    // the hand truck is parked, which is when departure prep begins: a long walk (Kessler's was
+    // 27 steps round the conveyor) loses the race to the cast-off.
+    for (const dock of Object.values(result.bundle.docks ?? {})) {
+      const blocked = new Set<string>();
+      for (const prop of dock.props) {
+        if (!prop.blocking) continue;
+        for (let dy = 0; dy < prop.rect.h; dy++) {
+          for (let dx = 0; dx < prop.rect.w; dx++)
+            blocked.add(`${prop.rect.x + dx},${prop.rect.y + dy}`);
+        }
+      }
+      const floor = (x: number, y: number) =>
+        dock.legend[dock.rows[y]?.[x] ?? " "] === "floor" && !blocked.has(`${x},${y}`);
+      const door = dock.posts.find((p) => p.kind === "warehouseDoor");
+      const bay = dock.areas.find((a) => a.kind === "deliveryBay")?.rect;
+      if (door === undefined || bay === undefined) throw new Error(`${dock.id}: no door or bay`);
+      const inBay = (x: number, y: number) =>
+        x >= bay.x && x < bay.x + bay.w && y >= bay.y && y < bay.y + bay.h;
+      const steps = new Map<string, number>([[`${door.tile.x},${door.tile.y}`, 0]]);
+      const queue = [door.tile];
+      let found: number | undefined;
+      for (let head = 0; head < queue.length && found === undefined; head++) {
+        const t = queue[head] as { x: number; y: number };
+        const here = steps.get(`${t.x},${t.y}`) ?? 0;
+        if (inBay(t.x, t.y)) found = here;
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const n = { x: t.x + dx, y: t.y + dy };
+          if (!floor(n.x, n.y) || steps.has(`${n.x},${n.y}`)) continue;
+          steps.set(`${n.x},${n.y}`, here + 1);
+          queue.push(n);
+        }
+      }
+      expect(found, dock.id).toBeDefined();
+      expect(found, dock.id).toBeLessThanOrEqual(8);
+    }
+  });
+
   it("stocks each port differently (D47)", () => {
     const stock = Object.values(ports).map((p) =>
       p.market.map((l) => `${l.itemDefId}:${l.count}:${l.price}`).join(","),

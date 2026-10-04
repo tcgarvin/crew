@@ -22,6 +22,13 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
   context: HookContexts[K],
 ): boolean {
   if (ctx.state.narrator.pendingHook !== undefined) return false;
+  // D69: a story call made after a hookable event reads it, so no `notableEvent` is owed for it
+  // any more. The staging call cannot tell the story, so it leaves the debt standing.
+  const owed = ctx.state.narrator.pendingNotable;
+  if (kind !== "stageDock" && owed !== undefined && owed.tick < ctx.tick) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete ctx.state.narrator.pendingNotable;
+  }
   const hookId = allocateId(ctx.state, "hook");
   ctx.state.narrator.pendingHook = { id: hookId, kind, context, tick: ctx.tick } as never;
   ctx.state.narrator.lastNarrativeTick = ctx.tick;
