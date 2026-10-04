@@ -65,6 +65,7 @@ import {
   payFor,
   portName,
 } from "./lookups";
+import { clipWords } from "./notes";
 import { NARRATOR_TEXT_KEYS, templateCard } from "./templates";
 
 const LABEL_MAX_CHARS = 48;
@@ -107,11 +108,6 @@ const NUMERIC_CONSEQUENCE = /[+-]\s?\d|\d[\d,.]*\s*(credits?\b|cr\b|%|percent\b)
 export function clipChars(text: string, max: number): string {
   const t = collapseWhitespace(text);
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
-}
-
-function clipWords(text: string, max: number): string {
-  const words = text.trim().split(/\s+/);
-  return words.length <= max ? words.join(" ") : `${words.slice(0, max).join(" ")}…`;
 }
 
 /**
