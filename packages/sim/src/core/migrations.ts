@@ -226,9 +226,64 @@ export function addDockside(raw: unknown): unknown {
   return raw;
 }
 
+/** The id of the save's `captain`-tagged actor (D8's captain), read from untrusted JSON. */
+function captainIdOf(raw: Record<string, unknown>): string | undefined {
+  if (!isRecord(raw.actors)) return undefined;
+  for (const actor of Object.values(raw.actors)) {
+    if (!isRecord(actor) || typeof actor.id !== "string" || !Array.isArray(actor.roleTags))
+      continue;
+    if (actor.roleTags.includes("captain")) return actor.id;
+  }
+  return undefined;
+}
+
+/**
+ * 5 → 6 (D70): the captain goes ashore to look for work.
+ * - `jobBoard` is now `captainAshore`, whose context also names who went ashore: a save halted
+ *   on a `jobBoard` hook keeps it as a `captainAshore` hook from the captain (the narrator answers
+ *   it the same way), and `jobBoardLastAsk` becomes `captainAshoreLastAsk` with the captain as the
+ *   one who asked.
+ * - `decisions.held` is new and empty: nothing was held before.
+ * - D42's `surfaceWhenDocked` is retired: an offer surfaced in flight whose card was waiting for
+ *   the dock never had a decision record, and offers are now only made at the dock, so it is
+ *   withdrawn as expired at the save's tick (the narrator is asked again when the captain goes
+ *   ashore). An offer no longer open just loses the flag.
+ */
+export function captainAshore(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const captainId = captainIdOf(raw);
+  const narrator = raw.narrator;
+  if (isRecord(narrator)) {
+    const hook = narrator.pendingHook;
+    if (isRecord(hook) && hook.kind === "jobBoard" && isRecord(hook.context)) {
+      hook.kind = "captainAshore";
+      if (captainId !== undefined) hook.context.actorId = captainId;
+    }
+    const ask = narrator.jobBoardLastAsk;
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete narrator.jobBoardLastAsk;
+    if (isRecord(ask) && captainId !== undefined) {
+      narrator.captainAshoreLastAsk = { ...ask, actorId: captainId };
+    }
+  }
+  if (isRecord(raw.decisions) && !Array.isArray(raw.decisions.held)) raw.decisions.held = [];
+  if (isRecord(raw.jobs)) {
+    for (const job of Object.values(raw.jobs)) {
+      if (!isRecord(job) || job.surfaceWhenDocked === undefined) continue;
+      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+      delete job.surfaceWhenDocked;
+      if (job.status !== "offered") continue;
+      job.status = "expired";
+      if (typeof raw.tick === "number") job.closedTick = raw.tick;
+    }
+  }
+  return raw;
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
   3: migrateToDockside,
   4: addDockside,
+  5: captainAshore,
 };

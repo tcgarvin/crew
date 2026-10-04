@@ -4,7 +4,7 @@ import type { CommandDraft } from "./commands";
  * pause survives save/load. Ownership: the decisions system (W6 builds it with the hook points;
  * W2 wires `resolveDecision` through the command path).
  */
-import type { TextRef, Tick } from "./common";
+import type { TextRef, Tick, TileCoord } from "./common";
 import type { FloorSetEntry } from "./dockside";
 import type {
   ActorId,
@@ -13,6 +13,7 @@ import type {
   EventId,
   HookId,
   JobId,
+  LocalId,
   MachineId,
   PortDefId,
 } from "./ids";
@@ -51,6 +52,11 @@ export interface Decision {
   right: DecisionOption;
   status: DecisionStatus;
   createdTick: Tick;
+  /**
+   * D70: the tick a card held for delivery in person came onto the queue (the meeting); the
+   * card is shown from then, not from `createdTick`. Absent for a card queued when created.
+   */
+  deliveredTick?: Tick;
   resolvedTick?: Tick;
   chosen?: "left" | "right";
   /** The job this decision is about, if any (job offers are decisions, review §D.6.7). */
@@ -63,6 +69,49 @@ export interface Decision {
   narratorHookId?: HookId;
 }
 
+/**
+ * D70: who walks so that a held card's speaker and the captain meet. `captain`: the command
+ * actor goes to them (across the dock to a local, or out through the gate to someone in the port
+ * beyond it), as they do when ashore looking for work. `speaker`: they come to the foot of the
+ * personnel ramp (a local on the dock walks over; anyone else walks in from the gate).
+ */
+export type CardDeliveryVia = "captain" | "speaker";
+
+/**
+ * D70 (replaces D42's `Job.surfaceWhenDocked`): a card from one of the port's people, waiting to
+ * be delivered in person. Its decision record exists (status `pending`) but it is not in the
+ * queue, so nothing halts until the meeting puts it there (`core/delivery.ts` `deliverHeldCard`).
+ */
+export interface HeldCard {
+  decisionId: DecisionId;
+  /** The person the card names (an offer's issuer, a card's speaker), as written. */
+  speaker: string;
+  /** The port it is delivered at, the one the ship was docked at when it was held. */
+  portId: PortDefId;
+  heldTick: Tick;
+  /**
+   * How the meeting is happening, once it has begun (absent until then): decided from where the
+   * walker is when the delivery starts, not when the card is held, so a captain who came back
+   * aboard in between is not sent out again for nothing.
+   */
+  delivery?: CardDelivery;
+}
+
+/** D70: a held card's meeting, under way. */
+export type CardDelivery =
+  | {
+      via: "captain";
+      sinceTick: Tick;
+    }
+  | {
+      via: "speaker";
+      sinceTick: Tick;
+      /** The local walking to the ramp: one already on the dock, or a visitor from the gate. */
+      localId: LocalId;
+      /** Where they are walking to: the foot of the personnel ramp (deck frame). */
+      tile: TileCoord;
+    };
+
 export interface DecisionsState {
   records: Record<DecisionId, Decision>;
   /**
@@ -70,6 +119,12 @@ export interface DecisionsState {
    * non-empty. Queued entries are revalidated on presentation and dropped with an event if stale.
    */
   queue: DecisionId[];
+  /**
+   * D70: cards waiting to be delivered in person, oldest first. Never in `queue` at the same
+   * time; delivered (moved onto the queue) when the captain and the speaker meet, or after
+   * `travel.cardDeliveryGiveUpSeconds`.
+   */
+  held: HeldCard[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -87,7 +142,12 @@ export interface HookContexts {
    * at the raise tick.
    */
   stageDock: { portId: PortDefId; dockId: DockDefId; floorSet: FloorSetEntry[] };
-  jobBoard: { portId: PortDefId };
+  /**
+   * D70 (replaces `jobBoard`): the captain (or the command actor, D8) walked down the ramp
+   * looking for work and stepped onto the dock this tick. Raised once per docking
+   * (`NarratorState.captainAshoreLastAsk`).
+   */
+  captainAshore: { portId: PortDefId; actorId: ActorId };
   quietTooLong: { quietSinceTick: Tick };
   notableEvent: { eventIds: EventId[] };
   policyDecision: { decisionId: DecisionId; machineId?: MachineId };
@@ -141,11 +201,12 @@ export interface NarratorState {
    */
   pendingNotable?: { tick: Tick; type: string; eventId?: EventId };
   /**
-   * The `jobBoard` ask of the current docking (port and tick), so the board asks once per
-   * docking; cleared the moment travel leaves `docked`, so the next docking at any port asks
-   * again. D46 briefly re-asked on a timer; the owner withdrew that (D46 amendment): pacing is
-   * the narrator's judgement, not a timer's. A stale `jobBoardHookRaisedAtPortId` from an older
-   * save is ignored.
+   * The `captainAshore` ask of the current docking (port, tick, and who walked ashore), so the
+   * narrator is asked once per docking; cleared the moment travel leaves `docked`, so the next
+   * docking at any port asks again. D46 briefly re-asked on a timer; the owner withdrew that
+   * (D46 amendment): pacing is the narrator's judgement, not a timer's. D70 renamed it from
+   * `jobBoardLastAsk` (same lifetime) and added `actorId`: whoever went ashore meets the people
+   * the answer names, for the rest of the docking, even if the command perspective (D8) moves.
    */
-  jobBoardLastAsk?: { portId: PortDefId; tick: Tick };
+  captainAshoreLastAsk?: { portId: PortDefId; tick: Tick; actorId: ActorId };
 }

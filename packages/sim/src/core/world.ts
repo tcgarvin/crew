@@ -55,7 +55,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     money: { balance: 0, transactions: {} },
     markets: {},
     dockside: { locals: {}, props: [] },
-    decisions: { records: {}, queue: [] },
+    decisions: { records: {}, queue: [], held: [] },
     narrator: {
       lastNarrativeTick: 0,
       budget: { spawnsRemaining: 0, faultsRemaining: 0 },

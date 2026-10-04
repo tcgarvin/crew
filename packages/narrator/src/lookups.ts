@@ -92,12 +92,13 @@ export function faultDiscovery(
   return noticed ? "symptomNoticed" : "undiscovered";
 }
 
-/** The port a job offer can originate from right now: docked port, or the approach target. */
+/**
+ * The port a job offer can originate from right now: the docked port. D70: offers are made in
+ * person at the dock, so never in flight (D42's offer on approach is gone).
+ */
 export function offerPortNow(state: State): PortDefId | undefined {
   const travel = state.travel;
-  if (travel.stage === "docked") return travel.portId;
-  if (travel.stage === "approaching" || travel.stage === "docking") return travel.toPortId;
-  return undefined;
+  return travel.stage === "docked" ? travel.portId : undefined;
 }
 
 /** The length of a direct leg between two ports, or `undefined` when no route joins them. */

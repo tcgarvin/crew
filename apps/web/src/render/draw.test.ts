@@ -1,8 +1,25 @@
 import type { RenderFrame, RenderItem } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { DeckLayout } from "./deckLayout";
-import { type ViewTransform, actorDotColor, deckPiles, drawDeckItems } from "./draw";
+import { type ViewTransform, actorDotColor, crewLabelText, deckPiles, drawDeckItems } from "./draw";
 import { mockCanvas } from "./testCanvas";
+
+describe("crewLabelText (D70)", () => {
+  it("keeps a meeting readable: the verb and the other person's first name", () => {
+    expect(crewLabelText({ name: "Mara Osei", actionLabel: "talking with Fenwick Adair" })).toBe(
+      "Mara Osei — talking with Fenwick",
+    );
+    expect(crewLabelText({ name: "Mara Osei", actionLabel: "ashore to see Ilse Brandt" })).toBe(
+      "Mara Osei — ashore to see Ilse",
+    );
+  });
+
+  it("cuts any other label at 26 characters as before", () => {
+    expect(crewLabelText({ name: "Mara Osei", actionLabel: "looking round the dock" })).toBe(
+      "Mara Osei — looking round…",
+    );
+  });
+});
 
 describe("actorDotColor", () => {
   it("draws passengers in a different colour from crew", () => {

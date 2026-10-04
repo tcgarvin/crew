@@ -32,6 +32,7 @@ import { newActor } from "../../core/command-handlers";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
 import { findCrewDef } from "../../core/defs";
+import { localNamed } from "../../core/delivery";
 import { gateTileAt, isDockPoint, isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
@@ -151,7 +152,15 @@ export function spawnPassenger(
   const def = findCrewDef(ctx.content, ctx.state, PASSENGER_CREW_DEF_ID);
   if (def === undefined) throw new Error(`passage: no "${PASSENGER_CREW_DEF_ID}" crew template`);
   const deck = theDeck(ctx);
-  const tile = arrivalTile(ctx);
+  // D70: a passenger who came over with their offer (or was on the dock already) is a local until
+  // the captain takes them on; they board from where they stand, and the local goes, so the dock
+  // never has the same person twice.
+  const local = localNamed(ctx.state, job.issuerPerson.name);
+  const tile =
+    local === undefined
+      ? arrivalTile(ctx)
+      : { x: Math.floor(local.location.x), y: Math.floor(local.location.y) };
+  if (local !== undefined) delete ctx.state.dockside.locals[local.id];
   const id: ActorId = allocateId(ctx.state, "actor");
   const actor = newActor(id, def, {
     kind: "onDeck",
@@ -307,7 +316,7 @@ function endPassageWith(
 /**
  * Plan the voyage home from the far port the moment the ship docks there (before the passenger
  * has even reached the ramp), so the course is held and the headline reads "bound for home"
- * from the first docked tick and `jobBoard` never sees an idle captain here; travel waits for
+ * from the first docked tick and `captainAshore` never sees an idle captain here; travel waits for
  * the passenger before leaving (`waitingForPassenger`). Idempotent: a course already planned
  * (a detour card, a save from mid-stay) is left alone.
  */
@@ -563,7 +572,7 @@ export function endPassageEarly(
   if (aboard && travel.stage === "docked") actor.disembarking = true;
   if (reason === "putOff") {
     // The passage was the voyage: putting them off cancels it. Docked, the course goes too (the
-    // captain gets a `jobBoard` once they are off and nothing else holds); in transit the ship
+    // captain gets a `captainAshore` once they are off and nothing else holds); in transit the ship
     // finishes the leg it is on, and stops there instead of routing on to the far end.
     // `leftBehind` keeps the voyage home that was planned when they went ashore.
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.

@@ -15,6 +15,11 @@
  * alongside with its regulars and the delivery's receiver, who carts the crates in; and back at
  * the Hub, Hal is at his kiosk again.
  *
+ * D70 (Dockside phase 4): the same run with the work offered in person: the captain walks ashore,
+ * is asked about once, walks over to Hal at his kiosk, and his card comes up there; loaded,
+ * delivered, paid once, and no card ever comes up in flight. The rest of D70 is
+ * `captain-ashore.test.ts`.
+ *
  * It lives here, not in `packages/sim`, for the same reason `fullSim.test.ts` does: the kernel
  * package may not depend on `@crew/content`.
  */
@@ -66,9 +71,9 @@ function nearPost(world: World, local: { x: number; y: number }, postKey: string
   return Math.abs(local.x - px) <= 2 && Math.abs(local.y - py) <= 2;
 }
 
-/** The stand-in narrator of `fullSim.test.ts`: one surfaced freight offer per `jobBoard`. */
+/** The stand-in narrator of `fullSim.test.ts`: one surfaced freight offer per `captainAshore`. */
 function answerHook(world: World, hook: NarratorHook): Omit<Command, "id"> | undefined {
-  if (hook.kind !== "jobBoard") return undefined;
+  if (hook.kind !== "captainAshore") return undefined;
   const portId = hook.context.portId as PortDefId;
   const port = world.content.ports[portId];
   if (port === undefined) return undefined;
@@ -531,5 +536,108 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
     expect(hal?.postKey).toBe("queue_kiosk");
     if (hal !== undefined) expect(nearPost(world, hal, "queue_kiosk")).toBe(true);
     expect(travelViolations(world)).toEqual([]);
+  });
+});
+
+describe("the captain ashore on real content (D70)", { timeout: 30_000 }, () => {
+  it("runs Hub → Kessler with the offer made in person on the dock: loaded, delivered, paid once", () => {
+    const { bundle, config, scenarioId } = loadWebContent();
+    const kernel = createKernel(createFullRegistry());
+    const world = kernel.createWorld(scenarioId, 20261003, bundle, config);
+    const send = (command: Omit<Command, "id">) => {
+      n += 1;
+      const result = kernel.enqueueCommand(world, {
+        ...command,
+        id: `cmd:d70:${n}` as CommandId,
+      } as Command);
+      if (result.status !== "accepted")
+        throw new Error(`${command.kind}: ${JSON.stringify(result)}`);
+    };
+    const captain = Object.values(world.state.actors).find((a) => a.roleTags.includes("captain"));
+    if (captain === undefined) throw new Error("no captain");
+    const band = world.config.values.commerce.priceBands.general;
+    const events: SimEvent[] = [];
+    const asks: { portId: string; tick: number; captainOnDock: boolean }[] = [];
+    const cards: { tick: number; docked: boolean; captainOnDock: boolean }[] = [];
+    let jobId: string | undefined;
+    for (let i = 0; i < 20 * 900; i++) {
+      const result = kernel.advance(world, 1);
+      events.push(...result.events);
+      const violations = [
+        ...checkInvariants(world.state),
+        ...spatialViolations(world),
+        ...workViolations(world),
+        ...travelViolations(world),
+        ...commerceViolations(world),
+      ];
+      if (violations.length > 0) {
+        throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
+      }
+      const where = world.state.actors[captain.id]?.location;
+      const onDock = where !== undefined && isOnDock(bundle, world.state, where);
+      for (const e of result.events) {
+        if (e.type === "decisionPending") {
+          cards.push({
+            tick: e.tick,
+            docked: world.state.travel.stage === "docked",
+            captainOnDock: onDock,
+          });
+        }
+      }
+      if (result.halt.kind === "hook") {
+        const hook = world.state.narrator.pendingHook;
+        if (hook === undefined) throw new Error("hook halt without a pending hook");
+        if (hook.kind === "captainAshore") {
+          asks.push({ portId: hook.context.portId, tick: hook.tick, captainOnDock: onDock });
+          // Hal Petrosyan, at his kiosk on the dock, has work for the Drift.
+          if (hook.context.portId === HUB && jobId === undefined) {
+            send({
+              source: "narrator",
+              kind: "offerJob",
+              payload: {
+                job: {
+                  issuer: { name: "Hal Petrosyan", role: "queue clerk" },
+                  description: { key: "test.job", params: {} },
+                  fromPortId: HUB,
+                  toPortId: KESSLER,
+                  cargo: [{ itemDefId: CRATE as never, count: 3 }],
+                  pay: Math.ceil(band.min * 25 * 3),
+                },
+                surface: true,
+              },
+            });
+          }
+        }
+        send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
+      } else if (result.halt.kind === "decision") {
+        const head = world.state.decisions.queue[0];
+        if (head === undefined) throw new Error("decision halt without a queued decision");
+        jobId ??= world.state.decisions.records[head]?.jobId;
+        send({
+          source: "player",
+          kind: "resolveDecision",
+          payload: { decisionId: head, side: "left" },
+        });
+      }
+      if (jobId !== undefined && world.state.jobs[jobId as never]?.status === "paid") break;
+    }
+    // Asked once at the Hub, as the captain stepped onto the dock, and offered work there.
+    const hubAsks = asks.filter((a) => a.portId === HUB);
+    expect(hubAsks).toHaveLength(1);
+    expect(hubAsks[0]?.captainOnDock).toBe(true);
+    // The card came up on the dock, after the captain had walked over and talked with Hal.
+    const talk = events.find((e) => e.type === "talkingWith");
+    expect(talk?.type === "talkingWith" ? talk.payload.withName : undefined).toBe("Hal Petrosyan");
+    expect(cards.length).toBeGreaterThan(0);
+    expect(cards[0]?.captainOnDock).toBe(true);
+    expect(cards[0]?.tick ?? 0).toBeGreaterThan(talk?.tick ?? Number.POSITIVE_INFINITY);
+    // Nothing arrives in flight.
+    expect(cards.every((c) => c.docked)).toBe(true);
+    // Taken, loaded, delivered, paid once.
+    if (jobId === undefined) throw new Error("the offer was never carded");
+    expect(world.state.jobs[jobId as never]?.status).toBe("paid");
+    const paid = events.filter((e) => e.type === "contractCompleted");
+    expect(paid).toHaveLength(1);
+    expect(world.state.decisions.held).toEqual([]);
   });
 });

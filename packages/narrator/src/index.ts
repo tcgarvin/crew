@@ -29,6 +29,7 @@ export {
 export {
   DEFAULT_NARRATOR_MODEL,
   NARRATOR_TIMEOUT_MS,
+  STAGING_TIMEOUT_MS,
   type NarratorRun,
   type NarratorTrace,
   type RunNarratorCtx,
@@ -49,8 +50,8 @@ export {
   FAR_FIXTURE_PORT,
   FIXTURE_PASSENGER,
   FIXTURE_SCENARIO,
-  farJobBoardRequest,
-  jobBoardRequest,
+  farCaptainAshoreRequest,
+  captainAshoreRequest,
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,

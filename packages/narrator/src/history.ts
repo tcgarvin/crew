@@ -29,7 +29,7 @@ function fromRecord(
   if (record === undefined) return undefined;
   const text = templateCard(record, content);
   return {
-    tick: record.createdTick,
+    tick: record.deliveredTick ?? record.createdTick,
     decisionId,
     title: text.title,
     speaker: text.speaker ?? null,
@@ -98,6 +98,16 @@ export function applyDecisionEvents(
 ): CardShown[] {
   const next = [...cards];
   for (const event of events) {
+    if (event.type === "decisionDropped") {
+      // D70: a card held for delivery in person that never came up (its offer closed first) was
+      // never seen: forget it, by ID or, for an entry still waiting for its ID, by title.
+      const record = fromRecord(state, event.payload.decisionId, content);
+      const byId = next.findIndex((c) => c.decisionId === event.payload.decisionId);
+      const index =
+        byId >= 0 ? byId : record === undefined ? -1 : unmatchedByTitle(next, record.title);
+      if (index >= 0 && next[index]?.chosen === null) next.splice(index, 1);
+      continue;
+    }
     if (event.type !== "decisionPending" && event.type !== "decisionResolved") continue;
     const decisionId = event.payload.decisionId;
     const known = next.findIndex((c) => c.decisionId === decisionId);

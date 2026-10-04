@@ -35,8 +35,8 @@ const MAX_TICKS = 20 * 900;
 interface RunLog {
   readonly events: SimEvent[];
   readonly hooks: string[];
-  /** Where `jobBoard` was asked, in order: the home port only, never a waypoint or the far port. */
-  readonly jobBoardPorts: PortDefId[];
+  /** Where `captainAshore` was asked, in order: the home port only, never a waypoint or the far port. */
+  readonly captainAshorePorts: PortDefId[];
   readonly headlines: Set<string>;
   readonly arrivals: PortDefId[];
 }
@@ -86,7 +86,7 @@ function runPassage(overdueChoice: "left" | "right"): { world: World; log: RunLo
   const log: RunLog = {
     events: [],
     hooks: [],
-    jobBoardPorts: [],
+    captainAshorePorts: [],
     headlines: new Set(),
     arrivals: [],
   };
@@ -103,7 +103,7 @@ function runPassage(overdueChoice: "left" | "right"): { world: World; log: RunLo
   };
   let offered = false;
   const answerHook = (hook: NarratorHook): Omit<Command, "id"> | undefined => {
-    if (hook.kind !== "jobBoard" || offered || hook.context.portId !== HUB) return undefined;
+    if (hook.kind !== "captainAshore" || offered || hook.context.portId !== HUB) return undefined;
     offered = true;
     return passageOffer(world);
   };
@@ -140,7 +140,7 @@ function runPassage(overdueChoice: "left" | "right"): { world: World; log: RunLo
       const hook = world.state.narrator.pendingHook;
       if (hook === undefined) throw new Error("hook halt without a pending hook");
       log.hooks.push(hook.kind);
-      if (hook.kind === "jobBoard") log.jobBoardPorts.push(hook.context.portId);
+      if (hook.kind === "captainAshore") log.captainAshorePorts.push(hook.context.portId);
       const answer = answerHook(hook);
       if (answer !== undefined) send(answer);
       send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
@@ -208,8 +208,8 @@ describe("round-trip passage Hub -> Ossory through Kessler (real content, every 
       expect([...log.headlines].some((h) => h.startsWith("Waiting for Halla Thorne"))).toBe(true);
       // The passage is the job in hand: the board asks at the home port only, never at Kessler
       // on the way or at Ossory on arrival.
-      expect(log.jobBoardPorts[0]).toBe(HUB);
-      expect(log.jobBoardPorts.filter((p) => p !== HUB)).toEqual([]);
+      expect(log.captainAshorePorts[0]).toBe(HUB);
+      expect(log.captainAshorePorts.filter((p) => p !== HUB)).toEqual([]);
       expect(checkInvariants(world.state)).toEqual([]);
     },
     REAL_CONTENT_TIMEOUT_MS,
@@ -240,7 +240,7 @@ describe("round-trip passage Hub -> Ossory through Kessler (real content, every 
         availability: "offShip",
         location: { kind: "inExternalStore", portId: OSSORY, storeKey: "lounge" },
       });
-      expect(log.jobBoardPorts.filter((p) => p !== HUB)).toEqual([]);
+      expect(log.captainAshorePorts.filter((p) => p !== HUB)).toEqual([]);
       expect(checkInvariants(world.state)).toEqual([]);
     },
     REAL_CONTENT_TIMEOUT_MS,

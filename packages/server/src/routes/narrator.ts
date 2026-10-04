@@ -156,6 +156,7 @@ export function registerNarratorRoutes(
         gameId,
         notes: game.narrativeNotes,
         model: staging ? env.stagingModel : env.narratorModel,
+        ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
       });
       const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;

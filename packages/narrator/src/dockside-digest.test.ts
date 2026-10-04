@@ -8,7 +8,7 @@ import {
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildDigest } from "./digest";
-import { jobBoardRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
+import { captainAshoreRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { content } from "./test-support";
 
@@ -44,7 +44,7 @@ const KESSLER_PLAN: StagingPlan = {
 /** The docked Kessler job-board fixture with its dock dressed by `plan` on top of the floor set. */
 function dressedKessler(plan: StagingPlan | undefined) {
   const bundle = content();
-  const req = jobBoardRequest(bundle);
+  const req = captainAshoreRequest(bundle);
   const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
   dressDock(snapshot.state, bundle, plan, snapshot.state.tick, 1);
   return { req, snapshot, bundle };
@@ -75,7 +75,7 @@ describe('"On the dock" (D67)', () => {
 
   it("is in every docked call's digest, story calls included, and in no call in flight", () => {
     const { req, snapshot, bundle } = dressedKessler(undefined);
-    expect(req.hook.kind).toBe("jobBoard");
+    expect(req.hook.kind).toBe("captainAshore");
     const docked = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook).text;
     expect(docked).toContain("## On the dock (");
     expect(docked).toContain("- Greta Lindholm (shift foreman) at the shift board: a regular here");
@@ -118,7 +118,7 @@ describe('"The dock you are dressing" (stageDock, D67)', () => {
 
   it("is only in the staging call's digest", () => {
     const bundle = content();
-    const req = jobBoardRequest(bundle);
+    const req = captainAshoreRequest(bundle);
     expect(buildDigest(req.snapshot, [], EMPTY_NOTES, bundle, req.hook).text).not.toContain(
       "## The dock you are dressing",
     );

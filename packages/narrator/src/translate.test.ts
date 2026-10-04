@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
 import {
   approachRequest,
-  farJobBoardRequest,
+  farCaptainAshoreRequest,
   passengerAboardRequest,
   quietTooLongRequest,
 } from "./fixtures";
@@ -166,7 +166,7 @@ describe("translateIntents: far ports (passengers-and-galaxy §2.3)", () => {
 
 describe("translateIntents: valid intents", () => {
   it("offerJob → offerJob with pay inside the kernel price band", () => {
-    const req = approachRequest(content());
+    const req = docked(approachRequest(content()));
     const result = translateIntents(plan([job]), ctxOf(req));
     expect(result.dropped).toEqual([]);
     const [command] = result.commands;
@@ -194,7 +194,7 @@ describe("translateIntents: valid intents", () => {
   });
 
   it("offerJob without an organisation leaves org out, and clips a long pitch", () => {
-    const req = approachRequest(content());
+    const req = docked(approachRequest(content()));
     const long = {
       ...job,
       issuerOrg: "",
@@ -207,7 +207,7 @@ describe("translateIntents: valid intents", () => {
   });
 
   it("drops an offer whose pitch talks pay (D24)", () => {
-    const req = approachRequest(content());
+    const req = docked(approachRequest(content()));
     const paid = {
       ...job,
       pitch: "Four hundred's too low. I'll make it 500 credits if you leave now.",
@@ -523,7 +523,7 @@ describe("translateIntents: beat cards (D39)", () => {
 
 describe("translateIntents: drops with reasons", () => {
   it("drops an offer from a port the ship is not at", () => {
-    const req = approachRequest(content());
+    const req = docked(approachRequest(content()));
     const result = translateIntents(
       plan([{ ...job, fromPort: "port.green_meridian", toPort: "port.crossroads_hub" }]),
       ctxOf(req),
@@ -532,8 +532,18 @@ describe("translateIntents: drops with reasons", () => {
     expect(result.dropped[0]?.reason).toMatch(/fromPort must be port\.kessler_drift/);
   });
 
-  it("drops an out-of-band price smuggled in as a raw number", () => {
+  it("drops an offer made in flight: offers are made in person at the dock (D70)", () => {
     const req = approachRequest(content());
+    expect(req.snapshot.state.travel.stage).not.toBe("docked");
+    const result = translateIntents(plan([job]), ctxOf(req));
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "offerJob: the ship is not docked; offers are made in person at the dock",
+    );
+  });
+
+  it("drops an out-of-band price smuggled in as a raw number", () => {
+    const req = docked(approachRequest(content()));
     const result = translateIntents(plan([{ ...job, pay: 999_999 }]), ctxOf(req));
     expect(result.commands).toEqual([]);
     expect(result.dropped[0]?.kind).toBe("offerJob");
@@ -623,7 +633,7 @@ describe("translateIntents: drops with reasons", () => {
   });
 
   it("drops a known item that is not cargo", () => {
-    const req = approachRequest(content());
+    const req = docked(approachRequest(content()));
     const tool = Object.values(content().items).find((i) => i.cargoClass === undefined);
     expect(tool).toBeDefined();
     const result = translateIntents(plan([{ ...job, cargoItem: tool?.id }]), ctxOf(req));
@@ -814,7 +824,7 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     passenger: true,
     roundTrip: true,
   };
-  const atHub = () => ctxOf(farJobBoardRequest(content()));
+  const atHub = () => ctxOf(farCaptainAshoreRequest(content()));
 
   it("passenger offer → a passage draft: passenger and roundTrip set, surface forced true, no luggage for an empty cargoItem", () => {
     const result = translateIntents(plan([passage]), atHub());
@@ -833,7 +843,7 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
   });
 
   it("prices a passage by the passenger band over path distance, doubled for a round trip", () => {
-    const config = farJobBoardRequest(content()).snapshot.config;
+    const config = farCaptainAshoreRequest(content()).snapshot.config;
     const path = pathBetween(content(), "port.crossroads_hub", "port.ossory_station");
     if (path === undefined) throw new Error("no path");
     expect(path.hops).toBe(2);

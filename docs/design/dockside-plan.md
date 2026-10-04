@@ -122,7 +122,8 @@ would put them, and no card appears on arrival.
 
 ## Phase 4: The captain ashore
 
-Save schema 5 → 6 (`jobBoardLastAsk` becomes `captainAshoreLastAsk`).
+Save schema 5 → 6 (`jobBoardLastAsk` becomes `captainAshoreLastAsk`). Landed as D70 (playtest
+pending; `pnpm test:live` not yet run, the key being at its weekly limit).
 
 1. **`lookForWork` task** for the command actor when docked, idle (`captainIsIdleAt`), with a ramp
    open, at essential-operation urgency; it walks to the dock and fires `captainAshore` on the

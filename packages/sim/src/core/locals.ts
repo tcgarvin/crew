@@ -47,8 +47,16 @@ export function lookSeedOf(name: string): number {
   return hashString32(name.toLowerCase());
 }
 
-/** Dock tiles (deck frame) just outside each ramp door: where the crew step off. */
-function rampLandings(content: ContentBundle, deckId: DeckDefId, dock: DockDef): TileCoord[] {
+/**
+ * Dock tiles (deck frame) just outside each ramp door: where the crew step off. `only` limits it
+ * to one ramp, by its door placement key.
+ */
+function rampLandings(
+  content: ContentBundle,
+  deckId: DeckDefId,
+  dock: DockDef,
+  only?: LocalKey,
+): TileCoord[] {
   const deck = content.decks[deckId];
   if (deck === undefined) return [];
   const step: Readonly<Record<EdgeSide, TileCoord>> = {
@@ -59,7 +67,7 @@ function rampLandings(content: ContentBundle, deckId: DeckDefId, dock: DockDef):
   };
   const out: TileCoord[] = [];
   for (const door of deck.doors) {
-    if (door.kind !== "ramp") continue;
+    if (door.kind !== "ramp" || (only !== undefined && door.key !== only)) continue;
     const { x, y, side } = door.edge;
     const across = { x: x + step[side].x, y: y + step[side].y };
     for (const tile of [{ x, y }, across]) {
@@ -67,6 +75,41 @@ function rampLandings(content: ContentBundle, deckId: DeckDefId, dock: DockDef):
     }
   }
   return out;
+}
+
+/**
+ * D70: the dock tile at the foot of the personnel ramp (deck frame), where the captain steps off
+ * to look for work and where people with word for the captain come to. Any ramp's foot when the
+ * deck names no personnel ramp on this dock.
+ */
+export function personnelRampFoot(
+  content: ContentBundle,
+  deckId: DeckDefId,
+  dock: DockDef,
+): TileCoord | undefined {
+  const key = content.decks[deckId]?.docking.personnelRampDoorKey;
+  const [foot] = key === undefined ? [] : rampLandings(content, deckId, dock, key);
+  return foot ?? rampLandings(content, deckId, dock)[0];
+}
+
+/**
+ * D70: where someone with word for the captain waits: the free dock floor nearest the foot of
+ * the personnel ramp, off the landing itself so the way aboard stays clear.
+ */
+export function waitingSpotByRamp(
+  state: Pick<WorldState, "dockside">,
+  content: ContentBundle,
+  deckId: DeckDefId,
+  dock: DockDef,
+): TileCoord | undefined {
+  const foot = personnelRampFoot(content, deckId, dock);
+  if (foot === undefined) return undefined;
+  return freeTileNear(
+    dock,
+    foot,
+    localTiles(state),
+    reservedTiles(content, deckId, dock, undefined),
+  );
 }
 
 /** Tiles nothing staged may stand on: freight areas, ramp landings, every post but `own`. */

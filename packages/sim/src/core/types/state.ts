@@ -49,8 +49,11 @@ import type { Claim, Problem, Task } from "./work";
  * port with a dock map (D61), so a save docked at one gets it on load.
  * 5 (2026-10-03): `dockside` (locals and props on the dock alongside), `narrator.staging` and the
  * `stageDock` hook, which replaces `approachingPort` (D66).
+ * 6 (2026-10-03): `captainAshore` replaces `jobBoard` (and `captainAshoreLastAsk` the board's
+ * last ask), `decisions.held` holds cards waiting to be delivered in person, and D42's
+ * `Job.surfaceWhenDocked` is gone (D70).
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
 export interface MarketLine {

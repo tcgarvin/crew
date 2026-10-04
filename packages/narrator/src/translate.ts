@@ -204,7 +204,9 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const { snapshot, content } = env;
   const config = snapshot.config;
   const here = offerPortNow(snapshot.state);
-  if (here === undefined) return no("offerJob: the ship is not at or approaching a port");
+  if (here === undefined) {
+    return no("offerJob: the ship is not docked; offers are made in person at the dock");
+  }
   // D16/D50/D52: one job at a time. The kernel rejects `acceptContract` while a job is in hand,
   // so an offer made now could only be declined; drop it here with the job it would collide
   // with. The kernel's own rule, so a job being finished at this port (freight unloading at its
@@ -221,7 +223,7 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (!toPort.ok) return no(`offerJob: toPort: ${toPort.reason}`);
   if (intent.fromPort !== here) {
     return no(
-      `offerJob: fromPort must be ${here} (${portName(content, here)}), the port the ship is at or approaching`,
+      `offerJob: fromPort must be ${here} (${portName(content, here)}), the port the ship is docked at`,
     );
   }
   if (intent.toPort === intent.fromPort) return no("offerJob: toPort equals fromPort");
@@ -235,8 +237,8 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (intent.roundTrip && !intent.passenger) {
     return no("offerJob: roundTrip needs passenger (freight has no return)");
   }
-  // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (D42 holds the card
-  // until the ship is docked at fromPort).
+  // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (D70: the card comes
+  // up when the captain meets them).
   const surface = intent.passenger || intent.surface;
   if (surface && env.hook?.kind === "policyDecision") {
     return no("offerJob: cannot surface a new card while a policy decision is pending");
@@ -749,7 +751,9 @@ export const translateIntents: TranslateIntents = (
     tally: {
       spawns: 0,
       faults: 0,
-      cardUsed: snapshot.state.decisions.queue.length > 0,
+      // D70: a card on its way to the captain in person is as good as on screen.
+      cardUsed:
+        snapshot.state.decisions.queue.length > 0 || snapshot.state.decisions.held.length > 0,
       beatCardThread: undefined,
       closedThread: undefined,
     },

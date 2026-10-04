@@ -53,13 +53,13 @@ describe("crew pacing: there-and-back voyage", () => {
   );
 
   it(
-    "raises stageDock at every docking and jobBoard at the hub and the far port only",
+    "raises stageDock at every docking and captainAshore at the hub and the far port only",
     () => {
       const { slow } = results();
       // D66: the staging call is guaranteed, waypoints included.
       expect(slow.hooksByKind.stageDock).toBe(4);
-      // Waypoint dockings do not ask the job board (§2.3).
-      expect(slow.hooksByKind.jobBoard).toBe(2);
+      // Waypoint dockings do not send the captain ashore for work (§2.3).
+      expect(slow.hooksByKind.captainAshore).toBe(2);
       expect(slow.totalCalls).toBeGreaterThanOrEqual(6);
     },
     SLOW_TEST_TIMEOUT_MS,
@@ -90,11 +90,16 @@ describe("crew pacing: there-and-back voyage", () => {
     "hides narrator latency inside the run-ahead lead at 1x and not at 8x",
     () => {
       const { slow, fast } = results();
-      expect(slow.stallSeconds).toBe(0);
-      expect(fast.stallSeconds).toBeGreaterThan(0);
-      // The tick-0 jobBoard is a load-time wait at every speed, not a stall.
-      expect(slow.startupSeconds).toBeGreaterThanOrEqual(LATENCY);
-      expect(fast.startupSeconds).toBeGreaterThanOrEqual(LATENCY);
+      // D70: the first ask comes when the captain steps onto the dock, some seconds into the game,
+      // not at tick 0: no load-time wait, and at 1x only that first call (raised before a full
+      // lead has built) shows through as stall.
+      expect(slow.startupSeconds).toBe(0);
+      expect(fast.startupSeconds).toBe(0);
+      const [first, ...rest] = slow.calls;
+      expect(first?.kind).toBe("captainAshore");
+      expect(first?.stallSeconds ?? 0).toBeLessThan(LATENCY);
+      expect(rest.every((c) => c.stallSeconds === 0)).toBe(true);
+      expect(fast.stallSeconds).toBeGreaterThan(slow.stallSeconds);
       expect(fast.wallSeconds).toBeLessThan(slow.wallSeconds);
       // wall ≈ startup + sim / speed + stall (the loop's 50 ms grain and the first lead's fill
       // account for the slack).

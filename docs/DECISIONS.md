@@ -980,6 +980,143 @@ sessions also ended holding for repairs, one for the fusion generator. At 8x the
 answers at once, so the 30-per-hour story budget ran out four minutes into a session and the game
 waited 30 s per retry (D43, not phase 3). A staging attempt that times out costs the narrator's 25 s
 each; a staging-specific timeout would bound the hold (server and narrator side).
+**D70. Phase 4 of Dockside: the captain goes ashore, and cards from the port come in person.**
+Plan items 1–6 (design §6.2–6.4; owner ruling D57: "the captain should leave the ship to go look
+for work, and [their] leaving the ship should trigger narration").
+*Looking for work.* `lookForWork` is a personal activity the planner never chooses: commerce
+(`systems/commerce/captain-ashore.ts`) hands it to the command actor (D8) at essential-operation
+urgency, every tick until it starts, while docked at a port with a dock map, `captainIsIdleAt`
+holds (it now also counts held cards), the personnel ramp is fully down and nobody is on the walk already,
+and only once the actor is idle or passing the time ("they finish what they are doing"). The walk
+goes to the foot of the personnel ramp; `captainAshore` (which replaces `jobBoard`; context: port
+and the actor who went) is raised the tick they stand on dock floor, retried every tick while
+another hook is pending, and `narrator.captainAshoreLastAsk` (was `jobBoardLastAsk`, same
+lifetime) records port, tick and who went. If the captain is no longer idle before stepping off
+(an offer or a course came up), the walk is cancelled and the ask stays unspent. On the dock the
+activity waits (`awaitWord`) for the answer; with nothing held for them it goes on to a look
+round: over to one of the dock's posts, half the time out through the gate for
+`travel.gateVisitSeconds`, and back aboard. No second ask. A port with no dock map (hand-built
+test content) has nowhere to walk, so the ask is raised on the first idle docked tick, as before.
+*Cards in person.* While docked at a port whose dock is alongside, a card whose speaker is one of
+the port's people (an offer's issuer; a narrator card's `speaker` who is not the name of any crew
+member or passenger, wherever they are) is held: its decision record exists, pending, but it sits
+in `decisions.held`, not the queue, so nothing halts on it and every reader of the queue keeps
+meaning "on screen now" (Fable's review preferred this to a flag on queued cards: a reader that
+missed a flag would halt on an invisible card). `core/delivery.ts` holds (`queueOrHold`, used by
+`surfaceDecision` and `surfaceOfferCard`) and delivers (`deliverHeldCard`). Crew and passengers
+bring cards as before, and so do observed scenes, in-flight cards, docks with neither the speaker
+nor a gate, and kernel-raised policy cards (D37: brought by crew, unchanged). Delivery is one card
+at a time, oldest first, and how is decided when the meeting starts, not when the card is held,
+from where the walker is (whoever went ashore this docking, else the command actor): on the dock,
+out through the gate or on the way, and they go (`meetSpeaker`: walk up beside a local on the
+dock, `talk` for `travel.talkSeconds` ("talking with Fenwick Adair"), and the card comes up at the
+`deliverCard` step; anyone else is beyond the gate: out through it for `gateVisitSeconds`, and the
+card comes up on the way back in; then back aboard). With the walker aboard (a `quietTooLong`
+offer while docked), the speaker comes: a local already on the dock walks to a free tile by the
+foot of the personnel ramp, or someone from the port walks in from the gate as a `visitor` local;
+the card comes up when they get there, after which a visitor goes back out and a local back to
+their post. The local the captain is walking to stands still for it. The hand-out follows D61's
+`comeAboard` pattern (re-handed until it starts); it gives way to anything at essential operation
+or above and to the call aboard, and overrides routine work, since someone is waiting with word.
+*Nothing waits forever, nothing goes stale.* A card held `travel.cardDeliveryGiveUpSeconds` (45 s)
+comes up anyway (`cardDelivered`, reason `gaveUp`), and one whose port the ship is no longer docked
+at comes up at once (`leaving`). An offer card whose job closed while it waited is dropped
+(`decisionDropped`) rather than queued, since neither side could be answered and the world would
+halt on it for good (Fable's catch); the server's card history forgets a dropped card that never
+came up. Departure from the dock waits while a card is held (the travel gate and `setCourse`),
+and so does a voyage at a waypoint. An interrupted walker (a survival need, an emergency,
+incapacity, the call aboard) just stops; the next free tick the walk is handed out again, to the
+first officer if the captain is no longer fit. A captain out through the gate is still fit for
+command (`isFitForCommand`, now in `core/command-actor.ts`, shared by core and systems: it used to
+be written twice), so going ashore never hands the ship or a card's perspective to the first
+officer. Meetings are plain state, so a save mid-walk restores and finishes the same way.
+*Offers never arrive in flight.* `offerJob` with `surface: true` is refused unless docked at its
+origin (a quiet offer may still be posted anywhere, for scenarios), the translator drops an offer
+in flight ("offers are made in person at the dock") and the digest says so; D42's
+`Job.surfaceWhenDocked` and commerce's deferred-offer sweep are gone. Departing with a card held is
+impossible by the gate above.
+*Passengers.* A passenger who walked over with their offer (or a local of that name) becomes the
+passenger on acceptance: the local goes and the passenger boards from where they stood, so the
+dock never has one person twice.
+*Log, headline, labels.* New notable events (never narrative, so they do not wake `notableEvent`
+or reset the quiet timer): `lookingForWork` ("Mara Osei is ashore looking for work"),
+`talkingWith` ("Mara Osei is talking with Fenwick Adair"), `wentToSee`, `cameToSee`; trace
+`cardHeld` and `cardDelivered`. The docked headline reads "Docked at Crossroads Hub — Mara Osei is
+ashore looking for work", or "… is talking with Fenwick Adair". Labels: "going ashore to look for
+work", "looking for work", "looking round the dock", "going to see <name>", "talking with <name>",
+"ashore to see <name>", "looking round the port". On the canvas a meeting label keeps the verb and
+the other person's first name ("Mara Osei — talking with Fenwick", up to 34 characters); every
+other crew label is cut at 26 as before. A visitor is drawn as any local ("coming over to the
+ship"). No other renderer change.
+*Narrator.* Prompt v0.19: `captainAshore` is the `jobBoard` text reframed (the captain has walked
+out onto the dock; "On the dock" is who is there; the port lies beyond the gate; the issuer or
+speaker named is who the captain meets; offer work, advance a ready thread from one of its people,
+or deliberately nothing); a static rule says port people's cards are delivered in person while
+docked and that work is only offered docked; `quietTooLong` says offers are never made in flight;
+the capability list says the same. The hook line names who walked ashore. Held cards are listed
+apart ("Cards on their way to the captain in person … not shown yet") and count as this call's
+one card in the translator and the null narrator, which still offers work at the ask. Fixtures:
+the captain stands at the foot of the ramp; `far-job-board.json` is `far-captain-ashore.json`. A
+`visitor` local reads "came in from the port with word for the captain" under "On the dock".
+*Save schema 6:* a pending `jobBoard` hook becomes `captainAshore` from the captain, and
+`jobBoardLastAsk` becomes `captainAshoreLastAsk` with the captain as the one who went;
+`decisions.held` starts empty; a `surfaceWhenDocked` offer (never carded, no decision record) is
+withdrawn as expired at the save's tick (Fable's call: converting it would mean holding cards in
+flight), and the flag is dropped from closed ones.
+*Pacing* (`crew pacing`, stub narrator, 25 s latency). The script now waits for each port's ask to
+be answered before it takes work or sets course, as a player answering the card would (the old
+script set course before the tick-0 `jobBoard`, which only counted because it fired first). Calls
+per round trip are unchanged: plain 8 (4 staging, 2 `captainAshore`, 2 quiet), freight 9 (plus
+one notable), within D51's 10 and D65's 10. Sim time per trip: plain 478.8 s against 430.0, freight
+532.8 s against 494.7; the difference is the captain's walk ashore and back before each departure
+(the Hub leg 52 s → 75 s on the plain trip). The first call no longer costs a 25 s loading screen
+at tick 0: it comes about 17 s in, when the captain steps off (the walk from the bridge), with a
+17 s lead, so 8 s of stall at 1x and 23 s at 8x; every later call at 1x is fully hidden as before.
+*Tests:* the walk and the one ask per docking, its tick and log line, the headline, the first
+officer going when the captain sleeps, a card delivered on meeting a local, through the gate, by a
+visitor and by a local walking to the ramp (and back to their post), no card in flight, a save
+and restore mid-walk, the first officer finishing a walk the captain was taken off, the give-up
+clock with nobody able to walk (`apps/web/src/worker/captain-ashore.test.ts`, real content); the
+kernel integration run Hub → Kessler with the offer made in person by Hal Petrosyan at his kiosk,
+loaded, delivered and paid once (`dockside.test.ts`); the 5 → 6 migration; surfaced offers refused
+in flight; the digest, translator, null narrator and history over a held card; the canvas label.
+*Live:* the live `captainAshore` case now asserts an offer from the docked port or a stated reason,
+and logs whether the issuer is on the dock or beyond the gate. Not run: the OpenRouter key is at
+its weekly limit.
+*Merged with D69:* captainAshore is a story hook, so raising it settles a `pendingNotable` debt
+like any story call, and an owed `notableEvent` (travel raises it first in the tick) simply makes
+the ask retry the next tick; the walk waits on the dock meanwhile. D69's `finishActivity` setting
+down a task's supplies does not touch the personal shore activities.
+*Staging timeout:* a staging attempt now gives up after 10 s (`STAGING_TIMEOUT_MS` in the narrator,
+the default when a `stageDock` call is given no timeout; the server's `CREW_STAGING_TIMEOUT_MS`
+overrides it and the route passes it only for staging), not the story call's 25 s, which over
+D69's retry schedule could hold the ship at the end of transit for over a minute.
+*Browser verification* (dev servers on spare ports, null narrator, headless Playwright at 8x,
+1280×800 and 390×700, about seven minutes each, fourteen dockings over the Hub, Green Meridian and
+Kessler Drift): every docking asked once, on the tick the captain stepped off; eight cards came up
+on meeting a regular at their post (Hal Petrosyan, Anneke Vos, Osric Tan, Greta Lindholm, Bo
+Sandoval), six after the gate; once the captain was asleep and the first officer went; no card in
+flight, no card dropped, no error panel. Found and fixed, each with a test:
+- *The card came up ahead of the meeting.* The client showed a card once playback reached its
+  `createdTick`, the tick it was held, so with the worker running ahead the card covered a captain
+  still walking down the ramp. `Decision.deliveredTick` (set when a held card comes onto the queue)
+  is now when the card is due and when the log shows it (`decisionShownTick`).
+- *The label dropped the meeting while the card was up:* the walk back aboard began the tick the
+  card came up, so the headline read "looking for work" over the card. `deliverCard` now stays
+  current for that tick and names who the captain is with ("talking with Anneke Vos").
+- *The log announced the offer before the meeting* ("X has freight for Y" the moment it was held):
+  a held offer's `jobOffered` is trace; the card is its first word.
+- *At a destination the headline hid the captain ashore* behind the unloading count; the ashore
+  line now comes first while it lasts.
+- *Offline, every offer came from beyond the gate*, so the talk was never seen: the null narrator
+  now takes its issuer from someone standing on the dock (a regular, or someone staged there) half
+  the time.
+*Found, not changed:* a departure-gate "hold for repairs" at a port whose market sells no part for
+the fault parks the ship until the narrator acts (D64); the hourly story budget (30) runs out in
+about six minutes of 8x play because quiet check-ins come every 60 sim-seconds.
+*Not done:* the design's phone playtest by the owner; the captain's walk is fixed (the bridge to
+the ramp, about 17 s), not tuned.
+
 
 **D71. A hold for repairs never waits on a repair the ship cannot do.** D69's found item: the
 generator's `electrical_short` needs a welder, the ship never carried one and only Ossory sold

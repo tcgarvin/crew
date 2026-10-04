@@ -34,7 +34,7 @@ function makeFakeKernel(hookAtTick: number) {
             budget: { spawnsRemaining: 0, faultsRemaining: 0 },
             recentHookIds: [],
           },
-          decisions: { records: {}, queue: [] },
+          decisions: { records: {}, queue: [], held: [] },
         } as unknown as WorldState,
         caches: {} as World["caches"],
         content: {} as ContentBundle,
@@ -57,7 +57,7 @@ function makeFakeKernel(hookAtTick: number) {
         if (state.tick === hookAtTick) {
           state.narrator.pendingHook = {
             id: `k${state.tick}`,
-            kind: "jobBoard",
+            kind: "captainAshore",
             context: {},
             tick: state.tick,
           };

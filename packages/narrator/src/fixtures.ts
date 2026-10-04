@@ -28,6 +28,7 @@ import {
   dressDock,
   expectedDock,
   floorSet,
+  personnelRampFoot,
 } from "@crew/sim";
 import type { NarratorRequest } from "./contract";
 
@@ -265,18 +266,39 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
   return { gameId: "fixture-quiet", hook, snapshot: kernel.serialize(world), recentEvents };
 }
 
-/** Docked at Kessler Drift with nothing on offer, so the captain is looking for work (D40). */
-export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequest {
+/**
+ * D70: the captain has walked down the personnel ramp and stands at its foot on the dock alongside,
+ * looking for work: the moment `captainAshore` is raised. Returns the captain's id.
+ */
+function captainSteppedAshore(state: WorldState, content: ContentBundle): ActorId {
+  const captain = Object.values(state.actors).find((a) => a.roleTags.includes("captain"));
+  const presence = state.deck.dock;
+  const dock = presence === undefined ? undefined : content.docks?.[presence.dockId];
+  if (captain === undefined || presence === undefined || dock === undefined) {
+    throw new Error("captainAshore fixture: no captain or no dock alongside");
+  }
+  const foot = personnelRampFoot(content, presence.deckId, dock);
+  if (foot === undefined) throw new Error("captainAshore fixture: the dock has no ramp foot");
+  captain.location = { kind: "onDeck", deckId: presence.deckId, x: foot.x + 0.5, y: foot.y + 0.5 };
+  return captain.id;
+}
+
+/**
+ * Docked at Kessler Drift with nothing on offer; the captain has just stepped onto the dock to
+ * look for work (D40, D70).
+ */
+export function captainAshoreRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const base = approachRequest(content, seed);
   const tick = 2_400;
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: DRIFT };
   alignDock(snapshot.state, content);
+  const actorId = captainSteppedAshore(snapshot.state, content);
   const hook = {
     id: allocateId(snapshot.state, "hook"),
-    kind: "jobBoard" as const,
-    context: { portId: DRIFT },
+    kind: "captainAshore" as const,
+    context: { portId: DRIFT, actorId },
     tick,
   };
   snapshot.state.narrator.pendingHook = hook;
@@ -286,20 +308,21 @@ export function jobBoardRequest(content: ContentBundle, seed = 11): NarratorRequ
 /**
  * Passengers-and-galaxy §9 (live suite): docked at Crossroads Hub with nothing on offer, where
  * Ossory Station is two hops away (Hub, Kessler Drift, Ossory) and Tern's Rest one long leg, so
- * a `jobBoard` answer can reach for a far port. The approach fixture's crew and money, but the
+ * a `captainAshore` answer can reach for a far port. The approach fixture's crew and money, but the
  * ship never left the Hub.
  */
-export function farJobBoardRequest(content: ContentBundle, seed = 11): NarratorRequest {
+export function farCaptainAshoreRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const base = approachRequest(content, seed);
   const tick = 2_400;
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: HUB };
   alignDock(snapshot.state, content);
+  const actorId = captainSteppedAshore(snapshot.state, content);
   const hook = {
     id: allocateId(snapshot.state, "hook"),
-    kind: "jobBoard" as const,
-    context: { portId: HUB },
+    kind: "captainAshore" as const,
+    context: { portId: HUB, actorId },
     tick,
   };
   snapshot.state.narrator.pendingHook = hook;

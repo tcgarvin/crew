@@ -44,6 +44,13 @@ describe("the ship's log (D55)", () => {
     expect(texts(visibleLog(log, 30 as Tick))).toEqual(["c", "card d1", "a"]);
   });
 
+  it("logs a card delivered in person at its meeting, not when it was made (D70)", () => {
+    const held = { ...decision("d1", 20), deliveredTick: 60 as Tick };
+    const log = appendDecision([], held);
+    expect(texts(visibleLog(log, 59 as Tick))).toEqual([]);
+    expect(texts(visibleLog(log, 60 as Tick))).toEqual(["card d1"]);
+  });
+
   it("logs a card once and records the captain's answer on it", () => {
     let log = appendDecision([], decision("d1", 5));
     log = appendDecision(log, decision("d1", 5));

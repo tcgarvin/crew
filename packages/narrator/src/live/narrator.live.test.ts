@@ -17,9 +17,9 @@ import { describe, expect, it } from "vitest";
 import type { NarratorRequest, NarratorResponse } from "../contract";
 import {
   approachRequest,
+  captainAshoreRequest,
   departureGateRequest,
-  farJobBoardRequest,
-  jobBoardRequest,
+  farCaptainAshoreRequest,
   notableEventRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
@@ -120,20 +120,6 @@ function req(run: NarratorRun): string {
   return run.trace.digest.split("\n")[0] ?? "call";
 }
 
-/** D40: on arrival and at the board the narrator hands out work unless it says why not. */
-function expectWorkOffered(run: NarratorRun): void {
-  const response = expectModelAnswered(run);
-  const offers = response.commands.filter((c) => c.kind === "offerJob");
-  const rationale = run.trace.plan?.rationale ?? "";
-  expect(
-    offers.length > 0 || rationale.length > 0,
-    `no offerJob command and no rationale explaining why (dropped: ${JSON.stringify(response.dropped)})`,
-  ).toBe(true);
-  if (offers.length === 0) {
-    console.log(`no offer made for ${req(run)}; rationale: ${rationale}`);
-  }
-}
-
 suite(`live narrator (${model}; staging ${stagingModel})${skipReason}`, () => {
   it(
     "stageDock: a staging-only plan that names a real post of the dock (D67)",
@@ -174,9 +160,30 @@ suite(`live narrator (${model}; staging ${stagingModel})${skipReason}`, () => {
   );
 
   it(
-    "jobBoard: the model answers with an offer",
+    "captainAshore: the captain on the dock gets an offer, or the model says why not (D70)",
     async () => {
-      expectWorkOffered(await liveRun(jobBoardRequest(content())));
+      const request = captainAshoreRequest(content());
+      const run = await liveRun(request);
+      const response = expectModelAnswered(run);
+      const offer = response.commands.find((c) => c.kind === "offerJob");
+      const rationale = run.trace.plan?.rationale?.trim() ?? "";
+      expect(
+        offer !== undefined || rationale.length > 0,
+        `no offer and no stated reason (dropped: ${JSON.stringify(response.dropped)})`,
+      ).toBe(true);
+      if (offer?.kind !== "offerJob") {
+        console.log(`no offer for ${req(run)}; rationale: ${rationale}`);
+        return;
+      }
+      // The issuer is who the captain meets: someone on the dock, or someone beyond the gate.
+      const issuer = offer.payload.job.issuer;
+      const name = typeof issuer === "string" ? issuer : issuer.name;
+      const locals = Object.values(request.snapshot.state.dockside.locals).map((l) => l.name);
+      console.log(
+        `offer from ${name} (${locals.includes(name) ? "on the dock" : "beyond the gate"})`,
+      );
+      if (request.hook.kind !== "captainAshore") throw new Error("fixture hook kind");
+      expect(offer.payload.job.fromPortId).toBe(request.hook.context.portId);
     },
     LIVE_TIMEOUT_MS,
   );
@@ -217,9 +224,9 @@ suite(`live narrator (${model}; staging ${stagingModel})${skipReason}`, () => {
   );
 
   it(
-    "jobBoard at the hub with a far port two hops away: a passenger offer, or a rationale (passengers §9)",
+    "captainAshore at the hub with a far port two hops away: a passenger offer, or a rationale (passengers §9)",
     async () => {
-      const run = await liveRun(farJobBoardRequest(content()));
+      const run = await liveRun(farCaptainAshoreRequest(content()));
       const response = expectModelAnswered(run);
       const offers = response.commands.filter((c) => c.kind === "offerJob");
       const passage = offers.find((c) => c.payload.job.passenger === true);

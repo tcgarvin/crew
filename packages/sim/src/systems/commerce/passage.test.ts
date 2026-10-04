@@ -597,14 +597,14 @@ function offeredJob(world: World) {
   return job;
 }
 
-const jobBoardPorts = (hooks: readonly NarratorHook[]) =>
-  hooks.filter((h) => h.kind === "jobBoard").map((h) => h.context.portId);
+const captainAshorePorts = (hooks: readonly NarratorHook[]) =>
+  hooks.filter((h) => h.kind === "captainAshore").map((h) => h.context.portId);
 
 const openProblems = (world: World, kind: "cargoToUnload" | "cargoToLoad") =>
   Object.values(world.state.work.problems).filter((p) => p.kind === kind && p.status === "open");
 
 describe("the board at the far port of a round trip", () => {
-  it("plans the voyage home on the arrival tick, before the passenger reaches the ramp, and never asks jobBoard there", () => {
+  it("plans the voyage home on the arrival tick, before the passenger reaches the ramp, and never asks captainAshore there", () => {
     const { world, kernel } = offerAndAccept(150, { roundTrip: true });
     const actorId = passengerOf(world).actor?.id as ActorId;
     giveTheDeckANavCache(world);
@@ -629,22 +629,22 @@ describe("the board at the far port of a round trip", () => {
     expect(passengerOf(world).passage.leg).toBe("out");
     const walking = runUntil(kernel, world, 3 * TICK_RATE);
     expect(walking.halted).toBe("ticks");
-    expect(jobBoardPorts([...arrived.hooks, ...walking.hooks])).toEqual([]);
+    expect(captainAshorePorts([...arrived.hooks, ...walking.hooks])).toEqual([]);
     expect(world.state.travel.stage).toBe("docked");
     // At the ramp at last: ashore, and the course planned at arrival is the one home.
     placeOnDeck(world, actorId, 0.5, 1.5);
     const ashore = runUntil(kernel, world, 3, (w) => passengerOf(w).passage.leg === "ashore");
     expect(ashore.halted).toBe("until");
-    expect(jobBoardPorts(ashore.hooks)).toEqual([]);
+    expect(captainAshorePorts(ashore.hooks)).toEqual([]);
     expect(world.state.travel).toMatchObject({ stage: "docked", plannedDestinationId: PORTS.a });
   });
 
-  it("does not ask jobBoard while a passenger is ashore, even with the walk instant", () => {
+  it("does not ask captainAshore while a passenger is ashore, even with the walk instant", () => {
     const { world, kernel } = offerAndAccept(150, { roundTrip: true });
     const arrived = runUntil(kernel, world, 2000, (w) => passengerOf(w).passage.leg === "ashore");
     expect(arrived.halted).toBe("until");
     const waiting = runUntil(kernel, world, 2 * TICK_RATE);
-    expect(jobBoardPorts([...arrived.hooks, ...waiting.hooks])).toEqual([]);
+    expect(captainAshorePorts([...arrived.hooks, ...waiting.hooks])).toEqual([]);
   });
 
   it("treats a passage in any live status as the job in hand, course or no course", () => {
@@ -666,7 +666,7 @@ describe("the board at the far port of a round trip", () => {
       2 * TICK_RATE,
       (w) => passengerOf(w).passage.leg === "back",
     );
-    expect(jobBoardPorts(waiting.hooks)).toEqual([]);
+    expect(captainAshorePorts(waiting.hooks)).toEqual([]);
   });
 });
 
@@ -834,7 +834,7 @@ describe("endPassage and the course", () => {
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.a });
   });
 
-  it("in transit: the voyage is dropped, the ship stops at the next port, the passenger and their luggage leave there and jobBoard asks", () => {
+  it("in transit: the voyage is dropped, the ship stops at the next port, the passenger and their luggage leave there and captainAshore asks", () => {
     const { world, kernel } = offerAndAccept(190, { luggage: 1, toPortId: PORTS.d });
     const job = theJob(world);
     const actorId = passengerOf(world).actor?.id as ActorId;
@@ -864,7 +864,7 @@ describe("endPassage and the course", () => {
       { payload: { jobId: job.id, itemId: job.cargoItemIds[0], portId: PORTS.c } },
     ]);
     const after = runUntil(kernel, world, 2 * TICK_RATE);
-    expect(jobBoardPorts([...docked.hooks, ...after.hooks])).toEqual([PORTS.c]);
+    expect(captainAshorePorts([...docked.hooks, ...after.hooks])).toEqual([PORTS.c]);
     expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.c });
   });
 });

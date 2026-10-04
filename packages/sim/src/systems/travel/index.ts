@@ -30,7 +30,7 @@ export {
 } from "./travel";
 export { hopCount, nextHop, shortestPath, type ShortestPath } from "./graph";
 export { commandActor, isFitForCommand } from "./roster";
-export { raiseHookIfIdle, raiseJobBoardHookIfNeeded } from "./hooks";
+export { captainIsIdleAt, raiseHookIfIdle } from "./hooks";
 export {
   DEPARTURE_GATE_PROMPT_KEY,
   departureCleared,

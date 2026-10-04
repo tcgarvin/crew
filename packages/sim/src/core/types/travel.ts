@@ -213,16 +213,10 @@ export interface Job {
   cargoItemIds: ItemId[];
   paymentTransactionId?: TransactionId;
   /**
-   * Integration 2 addition: tick the offer was declined or expired. Drives the `jobBoard`
+   * Integration 2 addition: tick the offer was declined or expired. Drives the `captainAshore`
    * re-ask cooldown (`config.commerce.reofferSeconds`, D40).
    */
   closedTick?: Tick;
-  /**
-   * D42: the offer was surfaced (`offerJob` with `surface: true`) while the ship was not docked
-   * at `fromPortId`, so its card waits: commerce builds it the first tick the ship is docked
-   * there and clears this. Absent otherwise; never `false`.
-   */
-  surfaceWhenDocked?: true;
   /** Command that created it (narrator audit). */
   causeCommandId?: CommandId;
   /**

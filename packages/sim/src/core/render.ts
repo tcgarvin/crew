@@ -303,6 +303,16 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Left ${n.item(event.payload.itemId)} on the dock at ${n.port(event.payload.portId)}`;
     case "dockAmbience":
       return event.payload.line;
+    case "lookingForWork":
+      return `${event.payload.name} is ashore looking for work`;
+    case "talkingWith":
+      return `${event.payload.name} is talking with ${event.payload.withName}`;
+    case "wentToSee":
+      return `${event.payload.name} went out through the gate to see ${event.payload.withName}`;
+    case "cameToSee":
+      return event.payload.fromGate
+        ? `${event.payload.name} came in through the gate to see the captain`
+        : `${event.payload.name} is coming over to the ship`;
     case "gearBroughtAboard":
       return `The dock crew handed ${n.item(event.payload.itemId)} aboard at ${n.port(event.payload.portId)}`;
     case "jobOffered": {
@@ -638,6 +648,24 @@ function waitingOnRamps(state: ReadonlyWorldState): boolean {
 }
 
 /**
+ * D70: the captain ashore, for the headline: "Mara Osei is ashore looking for work", and on the
+ * way to (or with) someone a held card names, "Mara Osei is talking with Fenwick Adair" (the
+ * activity's own label, `systems/work/labels.ts`). Undefined when nobody is.
+ */
+function captainAshoreLine(state: ReadonlyWorldState): string | undefined {
+  for (const actor of Object.values(state.actors)) {
+    const activity = actor.activity;
+    if (activity.kind !== "personal") continue;
+    if (activity.activity === "lookForWork") return `${actor.name} is ashore looking for work`;
+    const label = activity.label;
+    if (activity.activity !== "meetSpeaker" || label === undefined) continue;
+    if (/^(talking with|going to see|ashore to see) /.test(label))
+      return `${actor.name} is ${label}`;
+  }
+  return undefined;
+}
+
+/**
  * One plain-language line of what the ship is doing (D27), derived from travel stage, open
  * freight problems and the job board. Pure; cheap enough to compute every frame.
  */
@@ -649,6 +677,9 @@ export function shipHeadline(
   const travel = state.travel;
   if (travel.stage === "docked") {
     const here = `Docked at ${portName(content, travel.portId)}`;
+    // D70: the captain ashore is the moment to watch; the freight count comes back after.
+    const ashore = captainAshoreLine(state);
+    if (ashore !== undefined) return `${here} — ${ashore}`;
     const unloading = freightProgress(state, content, "cargoToUnload");
     if (unloading !== undefined) {
       return `${here} — unloading cargo (${unloading.done} of ${unloading.total} ${crates(unloading.total)} ashore)`;

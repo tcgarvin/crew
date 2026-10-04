@@ -56,7 +56,22 @@ export {
 } from "./docks";
 export { basePriceFor, effectiveMarket, ensureMarket, marketSeed } from "./markets";
 export { DOCK_HAND_ROLE, dockHandName, floorSet } from "./floor-set";
-export { clearDockside, dockNeedsDressing, dockPeople, dressDock, lookSeedOf } from "./locals";
+export {
+  clearDockside,
+  dockNeedsDressing,
+  dockPeople,
+  dressDock,
+  lookSeedOf,
+  personnelRampFoot,
+} from "./locals";
+export {
+  cardSpeaker,
+  decisionShownTick,
+  heldCard,
+  isShipsPerson,
+  localNamed,
+} from "./delivery";
+export { commandActor, isFitForCommand } from "./command-actor";
 export { isNobodysFreight } from "./freight";
 export { renderDockProps, renderLocals } from "./render";
 export { raiseHookIfIdle } from "./hooks";

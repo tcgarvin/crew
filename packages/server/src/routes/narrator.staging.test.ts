@@ -75,6 +75,7 @@ function realNarrator(transport: ModelTransport, seen: NarratorCtx[] = []): RunN
       transport,
       content: content(),
       ...(ctx.model === undefined ? {} : { model: ctx.model }),
+      ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
     });
     return { response: run.response, ...(run.error === undefined ? {} : { error: run.error }) };
   };
@@ -216,5 +217,43 @@ describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
       hookKind: "stageDock",
       status: "error",
     });
+  });
+
+  it("gives a staging attempt CREW_STAGING_TIMEOUT_MS, not the story call's 25 s (D70)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const hang: ModelTransport = (request) =>
+      new Promise((_, reject) => {
+        request.signal.addEventListener("abort", () => reject(request.signal.reason));
+      });
+    const seen: NarratorCtx[] = [];
+    const { db, gameId, post } = await setup(
+      loadEnv({
+        CREW_DB: "memory",
+        CREW_NARRATOR_FALLBACK: "error",
+        CREW_STAGING_TIMEOUT_MS: "50",
+      }),
+      realNarrator(hang, seen),
+    );
+    const started = Date.now();
+    const res = await post(stagingBody(gameId, 1600));
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(seen[0]?.timeoutMs).toBe(50);
+    expect(res.status).toBe(502);
+    expect((await readJson(res)).error).toMatchObject({ reason: "timeout", retryable: true });
+    expect(await db.getLastNarratorCall(gameId)).toMatchObject({
+      hookKind: "stageDock",
+      status: "error",
+    });
+  });
+
+  it("gives a story call no staging timeout: it keeps the narrator's own (D70)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const seen: NarratorCtx[] = [];
+    const { gameId, post } = await setup(
+      loadEnv({ CREW_DB: "memory", CREW_STAGING_TIMEOUT_MS: "50" }),
+      realNarrator(staged, seen),
+    );
+    await post(storyBody(gameId, 5000));
+    expect(seen[0]?.timeoutMs).toBeUndefined();
   });
 });

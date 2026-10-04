@@ -15,6 +15,7 @@
  */
 import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
+import { queueOrHold } from "../../core/delivery";
 import { dockAlongside, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -551,8 +552,6 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
     if (job.status === "offered" && ctx.tick > job.expiresAtTick) {
       job.status = "expired";
       job.closedTick = ctx.tick;
-      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-      delete job.surfaceWhenDocked;
       ctx.emit({
         type: "jobExpired",
         subjectIds: [job.id],
@@ -566,7 +565,7 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Offer cards (D42)
+// Offer cards (D42, D70)
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -596,15 +595,19 @@ function offerPromptParams(job: Readonly<Job>): Record<string, string> {
 }
 
 /** Whether the ship is docked at the port the job departs from. */
-export function dockedAtOrigin(state: ReadonlyWorldState, job: Readonly<Job>): boolean {
+export function dockedAtOrigin(
+  state: Pick<ReadonlyWorldState, "travel">,
+  job: { readonly fromPortId: PortDefId },
+): boolean {
   const travel = state.travel;
   return travel.stage === "docked" && travel.portId === job.fromPortId;
 }
 
 /**
- * Queue the offer's decision card: "Take the job" accepts and sets course for the destination,
- * "Pass" declines. The one place a job card is built, whether `offerJob` surfaces it at once or
- * commerce surfaces it later at the dock (D42).
+ * Build the offer's decision card: "Take the job" accepts and sets course for the destination,
+ * "Pass" declines. The one place a job card is built. D70 (replacing D42's wait for the dock):
+ * offers are only surfaced while docked at their origin, and the card is held until the captain
+ * meets the issuer (`core/delivery.ts`), unless the issuer is aboard already.
  */
 export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
   const decisionId: DecisionId = allocateId(ctx.state, "decision");
@@ -633,25 +636,7 @@ export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
     createdTick: ctx.tick,
     jobId: job.id,
   };
-  ctx.state.decisions.queue.push(decisionId);
-  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete job.surfaceWhenDocked;
+  // D70: the issuer is one of the port's people, so the card waits to be delivered in person.
+  queueOrHold(ctx, decisionId, job.issuerPerson.name);
   return decisionId;
-}
-
-/**
- * D42: surface the cards of offers that were surfaced on approach, now that the ship is docked
- * at their port. Runs after `expireStaleOffers`, so an offer that expired on the way in never
- * gets a card.
- */
-export function surfaceDeferredOffers(ctx: ApplyCtx): void {
-  for (const job of Object.values(ctx.state.jobs)) {
-    if (job.surfaceWhenDocked !== true) continue;
-    if (job.status !== "offered") {
-      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-      delete job.surfaceWhenDocked;
-      continue;
-    }
-    if (dockedAtOrigin(ctx.state, job)) surfaceOfferCard(ctx, job);
-  }
 }

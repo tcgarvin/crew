@@ -219,20 +219,21 @@ describe("quiet-too-long timer", () => {
     expect(world.state.narrator.pendingHook?.context).toEqual({ quietSinceTick: 15 });
   });
 
-  it("does not fire within quietTooLongSeconds of another hook (jobBoard here)", () => {
+  it("does not fire within quietTooLongSeconds of another hook (captainAshore here)", () => {
     // Any hook raised is narrator contact: the quiet window restarts from its raise tick.
     const { world, kernel, registry } = tinyTestWorld({ quietTooLongSeconds: 1 });
     registry.registerSystem({
       name: "approach",
       phase: "equipment",
       run: (ctx) => {
-        if (ctx.tick === 15) raiseHookIfIdle(ctx, "jobBoard", { portId: TINY.port });
+        if (ctx.tick === 15)
+          raiseHookIfIdle(ctx, "captainAshore", { portId: TINY.port, actorId: "a1" as ActorId });
       },
     });
     const approach = kernel.advance(world, 200);
     expect(approach).toMatchObject({ ticksAdvanced: 15, halt: { kind: "hook" } });
     const hook = world.state.narrator.pendingHook;
-    expect(hook).toMatchObject({ kind: "jobBoard", tick: 15 });
+    expect(hook).toMatchObject({ kind: "captainAshore", tick: 15 });
     expect(world.state.narrator.lastNarrativeTick).toBe(15);
     acknowledge(kernel, world, hook?.id);
 
@@ -253,14 +254,15 @@ describe("quiet-too-long timer", () => {
       phase: "equipment",
       run: (ctx) => {
         // Tick 20 is exactly when the quiet timer is due.
-        if (ctx.tick === 20) raiseHookIfIdle(ctx, "jobBoard", { portId: TINY.port });
+        if (ctx.tick === 20)
+          raiseHookIfIdle(ctx, "captainAshore", { portId: TINY.port, actorId: "a1" as ActorId });
       },
     });
     const result = kernel.advance(world, 200);
     expect(result).toMatchObject({ ticksAdvanced: 20, halt: { kind: "hook" } });
     expect(result.events.filter((e) => e.type === "narratorHookRaised")).toHaveLength(1);
     const hook = world.state.narrator.pendingHook;
-    expect(hook).toMatchObject({ kind: "jobBoard", tick: 20 });
+    expect(hook).toMatchObject({ kind: "captainAshore", tick: 20 });
     acknowledge(kernel, world, hook?.id);
 
     const next = kernel.advance(world, 200);

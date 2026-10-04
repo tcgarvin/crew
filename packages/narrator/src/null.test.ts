@@ -1,10 +1,10 @@
 /**
- * D40: the null narrator is the only offline source of work. For `jobBoard` it answers with one
+ * D40: the null narrator is the only offline source of work. For `captainAshore` it answers with one
  * templated `offerJob` through the real translator; for other hooks it keeps its old behaviour
  * (no commands; a template card for a policy decision). D66: it stages nothing, so a dock is
  * the sim's floor set, and it never offers on the way in.
  */
-import type { ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
+import type { ActorId, ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { approachRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
@@ -15,15 +15,15 @@ import { content } from "./test-support";
 const DRIFT = "port.kessler_drift" as PortDefId;
 
 /** Docked at Kessler Drift with nothing on, the sim asking for work. */
-function jobBoardRequest(tick = 2_400): NarratorRequest {
+function captainAshoreRequest(tick = 2_400): NarratorRequest {
   const base = approachRequest(content());
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
   snapshot.state.travel = { stage: "docked", portId: DRIFT };
   const hook: NarratorHook = {
     id: "k2" as never,
-    kind: "jobBoard",
-    context: { portId: DRIFT },
+    kind: "captainAshore",
+    context: { portId: DRIFT, actorId: "a1" as ActorId },
     tick,
   };
   snapshot.state.narrator.pendingHook = hook;
@@ -51,8 +51,8 @@ describe("null narrator offers work (D40)", () => {
     expect(res.commands).toEqual([]);
   });
 
-  it("answers jobBoard with one translated, surfaced offerJob from the port's templates", () => {
-    const req = jobBoardRequest();
+  it("answers captainAshore with one translated, surfaced offerJob from the port's templates", () => {
+    const req = captainAshoreRequest();
     const { res, command } = offerOf(req);
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
     expect(command).toMatchObject({
@@ -71,7 +71,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("gives the offer the D25 person and pitch shape from the name table, with no numbers", () => {
-    const { command } = offerOf(jobBoardRequest());
+    const { command } = offerOf(captainAshoreRequest());
     const { job } = command.payload;
     const people = content().people;
     if (people === undefined) throw new Error("content has no name table");
@@ -88,7 +88,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("pays inside the price band, as a model's offer would", () => {
-    const { command } = offerOf(jobBoardRequest());
+    const { command } = offerOf(captainAshoreRequest());
     const { job } = command.payload;
     const bundle = content();
     const line = job.cargo[0];
@@ -102,12 +102,12 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("is deterministic for the same snapshot and varies with the tick", () => {
-    const a = offerOf(jobBoardRequest()).command.payload;
-    const b = offerOf(jobBoardRequest()).command.payload;
+    const a = offerOf(captainAshoreRequest()).command.payload;
+    const b = offerOf(captainAshoreRequest()).command.payload;
     expect(a).toEqual(b);
     const offers = new Set(
       [1, 2, 3, 4, 5, 6, 7, 8].map((n) => {
-        const { job } = offerOf(jobBoardRequest(1_000 * n)).command.payload;
+        const { job } = offerOf(captainAshoreRequest(1_000 * n)).command.payload;
         return typeof job.issuer === "string" ? job.issuer : job.issuer.name;
       }),
     );
@@ -115,7 +115,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("never offers passages: passenger and roundTrip are false on every offline offer (§4.4)", () => {
-    for (const req of [jobBoardRequest(), jobBoardRequest(3_000)]) {
+    for (const req of [captainAshoreRequest(), captainAshoreRequest(3_000)]) {
       const { job } = offerOf(req).command.payload;
       expect(job.passenger ?? false).toBe(false);
       expect(job.roundTrip ?? false).toBe(false);
@@ -124,7 +124,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("posts the offer quietly when a card is already queued", () => {
-    const req = jobBoardRequest();
+    const req = captainAshoreRequest();
     const snapshot = req.snapshot as SaveEnvelope;
     snapshot.state.decisions.queue.push("d-queued" as never);
     const { command } = offerOf(req);
@@ -144,10 +144,14 @@ describe("null narrator offers work (D40)", () => {
       ...bundle,
       ports: { ...bundle.ports, [TERNS]: { ...terns, jobTemplates: twoHop } },
     };
-    const req = jobBoardRequest();
+    const req = captainAshoreRequest();
     const snapshot = req.snapshot as SaveEnvelope;
     snapshot.state.travel = { stage: "docked", portId: TERNS };
-    const hook: NarratorHook = { ...req.hook, kind: "jobBoard", context: { portId: TERNS } };
+    const hook: NarratorHook = {
+      ...req.hook,
+      kind: "captainAshore",
+      context: { portId: TERNS, actorId: "a1" as ActorId },
+    };
     snapshot.state.narrator.pendingHook = hook;
     const res = nullNarratorResponse({ ...req, hook }, { callId: "c", content: farOnly });
     expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
@@ -165,7 +169,7 @@ describe("null narrator offers work (D40)", () => {
   });
 
   it("offers nothing without content, at a port with no templates, or on other hooks", () => {
-    expect(nullNarratorResponse(jobBoardRequest(), { callId: "c" }).commands).toEqual([]);
+    expect(nullNarratorResponse(captainAshoreRequest(), { callId: "c" }).commands).toEqual([]);
     const bundle = content();
     const drift = bundle.ports[DRIFT];
     if (drift === undefined) throw new Error("fixture port");
@@ -174,7 +178,7 @@ describe("null narrator offers work (D40)", () => {
       ports: { ...bundle.ports, [DRIFT]: { ...drift, jobTemplates: [] } },
     };
     expect(
-      nullNarratorResponse(jobBoardRequest(), { callId: "c", content: bare }).commands,
+      nullNarratorResponse(captainAshoreRequest(), { callId: "c", content: bare }).commands,
     ).toEqual([]);
     expect(
       nullNarratorResponse(quietTooLongRequest(content()), { callId: "c", content: content() })

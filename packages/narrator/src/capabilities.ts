@@ -142,7 +142,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push("## 1. offerJob: a freight contract, or a passenger");
   lines.push(
-    '- fromPort must be the port the ship is docked at or approaching (see the digest). toPort may be any port reachable from fromPort (see "from here" above); a far port means a voyage with real stops on the way, which the ship routes by itself.',
+    '- fromPort must be the port the ship is docked at (see the digest): offers are made in person at the dock, never in flight. toPort may be any port reachable from fromPort (see "from here" above); a far port means a voyage with real stops on the way, which the ship routes by itself.',
   );
   lines.push(`- One cargo item kind per job. quantity: ${q(JOB_QUANTITY_UNITS)} units.`);
   lines.push(
@@ -152,7 +152,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     `- issuerName, issuerRole and issuerOrg (or empty) name the one person offering it; pitch is one line they say to the captain. urgency ${JOB_URGENCIES.join(" | ")} colours the card only; nothing enforces a deadline.`,
   );
   lines.push(
-    "- surface=true shows it to the captain now as an accept/decline card (counts as this call's one card). surface=false posts it quietly on the port board. One offer per call.",
+    "- surface=true puts it to the captain as an accept/decline card (counts as this call's one card), which comes up when the captain meets the issuer: on the dock, beyond the gate, or at the foot of the ramp. surface=false posts it quietly on the port board. One offer per call.",
   );
   lines.push(
     "- passenger=true makes it a passage: the issuer rides. They board at fromPort when the job is accepted, live aboard like crew (eat, sleep, walk the deck, talk) and never work; cargoItem is their luggage (one unit of a cargo item, hauled like freight) or empty for none, and quantity is ignored. roundTrip=true (passenger only) takes them to toPort, where they go ashore for a while and the ship waits for them, then home to fromPort; roundTrip without passenger is dropped. The fare is private, by distance (doubled for a round trip), placed by payTier. A passenger offer is always surfaced: it is a person at the ramp. The ship carries one job at a time, so a passenger competes with freight for the ship: any offerJob while a job is in hand (accepted, under way, or delivered and not yet paid) is dropped, and a port that is a waypoint of a voyage gets no offer. A passenger offer whose card is already taken this call is dropped, not posted quietly. The sim raises its own card, brought by the first officer, if a round-trip passenger is overdue ashore (Wait for them / Leave without them); you dress it on that policyDecision call, you never cause it.",

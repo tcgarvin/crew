@@ -7,6 +7,7 @@
  * Pure data and functions, no React; `Log.tsx` renders it.
  */
 import type { Decision, DeepReadonly, Significance, Tick, TickerEntry } from "@crew/sim";
+import { decisionShownTick } from "@crew/sim";
 
 /** Entries kept; the oldest go first. Plenty for a session, small enough to filter every frame. */
 export const LOG_LIMIT = 200;
@@ -72,7 +73,7 @@ export function appendDecision(
 ): LogEntry[] {
   if (log.some((e) => e.kind === "card" && e.decision.id === decision.id)) return log as LogEntry[];
   return insert(log, [
-    { kind: "card", key: `card:${decision.id}`, tick: decision.createdTick, decision },
+    { kind: "card", key: `card:${decision.id}`, tick: decisionShownTick(decision), decision },
   ]);
 }
 

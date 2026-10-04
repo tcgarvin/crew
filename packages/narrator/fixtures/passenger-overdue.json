@@ -9,10 +9,10 @@
     "tick": 9430
   },
   "snapshot": {
-    "schemaVersion": 5,
+    "schemaVersion": 6,
     "simVersion": "0.1.0",
-    "contentHash": "844cca8af4a9f89c",
-    "configHash": "844cca8af4a9f89c",
+    "contentHash": "3aad0af79e160231",
+    "configHash": "3aad0af79e160231",
     "savedAtTick": 9430,
     "config": {
       "time": {
@@ -102,7 +102,10 @@
         "departureMinOutput": 0.5,
         "recallAboardSeconds": 60,
         "localShuffleSeconds": 8,
-        "dockHandGiveUpSeconds": 30
+        "dockHandGiveUpSeconds": 30,
+        "talkSeconds": 3,
+        "gateVisitSeconds": 4,
+        "cardDeliveryGiveUpSeconds": 45
       },
       "commerce": {
         "priceBands": {
@@ -209,7 +212,7 @@
       }
     },
     "state": {
-      "schemaVersion": 5,
+      "schemaVersion": 6,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 29,
       "tick": 9430,
@@ -1675,7 +1678,8 @@
             "createdTick": 9430
           }
         },
-        "queue": ["x1"]
+        "queue": ["x1"],
+        "held": []
       },
       "narrator": {
         "lastNarrativeTick": 7000,

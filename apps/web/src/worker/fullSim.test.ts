@@ -5,7 +5,7 @@
  * throws.
  *
  * D40: the narrator is the only source of work, and `apps/web` may not import `@crew/narrator`,
- * so `answerHook` plays the narrator here: it answers each `jobBoard` hook with one offer built
+ * so `answerHook` plays the narrator here: it answers each `captainAshore` hook with one offer built
  * from the port's first job template, the way the null narrator does offline.
  */
 import type {
@@ -40,12 +40,12 @@ type Policy = (world: World) => "left" | "right";
 const autoAccept: Policy = () => "left";
 
 /**
- * The stand-in narrator's answer to a hook: for `jobBoard`, one surfaced offer of the port's
+ * The stand-in narrator's answer to a hook: for `captainAshore`, one surfaced offer of the port's
  * first freight template (an item with a cargo class and a route) at its maximum count (the
  * kernel clamps to `maxCratesPerJob`) and the band's lowest pay; nothing for other hooks.
  */
 function answerHook(world: World, hook: NarratorHook): Omit<Command, "id"> | undefined {
-  if (hook.kind !== "jobBoard") return undefined;
+  if (hook.kind !== "captainAshore") return undefined;
   const portId = hook.context.portId as PortDefId;
   const port = world.content.ports[portId];
   if (port === undefined) return undefined;

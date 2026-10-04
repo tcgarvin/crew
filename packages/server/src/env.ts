@@ -2,6 +2,7 @@
  * Environment configuration (W8). Read once at startup; every value the rest of the package
  * needs is derived here so nothing else touches `process.env` directly.
  */
+import { STAGING_TIMEOUT_MS } from "@crew/narrator";
 
 function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): number {
   const raw = source[name];
@@ -57,6 +58,11 @@ export interface Env {
    */
   readonly stagingModel: string;
   /**
+   * D70: `CREW_STAGING_TIMEOUT_MS`, how long one staging attempt may take before it gives up
+   * (milliseconds); unset = the narrator's `STAGING_TIMEOUT_MS` (10 s). Story calls keep 25 s.
+   */
+  readonly stagingTimeoutMs: number;
+  /**
    * `CREW_NARRATOR_FALLBACK` (D43): `"error"` or `"null"`; unset = `"error"` when
    * `NODE_ENV=production`, `"null"` otherwise (local dev without a key and the test suite).
    */
@@ -90,6 +96,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     openRouterApiKey: source.OPENROUTER_API_KEY,
     narratorModel,
     stagingModel: readModel(source, "CREW_STAGING_MODEL", narratorModel),
+    stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 30),

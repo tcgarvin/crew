@@ -216,11 +216,23 @@ function shuffleSpot(
   return undefined;
 }
 
+/** D70: an actor's meeting with this local (a `talk` step with them) is still ahead or under way. */
+function sought(ctx: Ctx, local: Local): boolean {
+  return Object.values(ctx.state.actors).some((actor) => {
+    const activity = actor.activity;
+    if (activity.kind !== "personal" || activity.plan === undefined) return false;
+    const { steps, stepIndex } = activity.plan;
+    return steps.some((s, i) => i >= stepIndex && s.kind === "talk" && s.localId === local.id);
+  });
+}
+
 /** `atPost`: the idle shuffle, out to a neighbouring tile and back. */
 function shuffle(ctx: Ctx, local: Local, dock: DockDef): void {
   const behaviour = local.behaviour;
   if (behaviour.kind !== "atPost" || local.movement.kind !== "stationary") return;
   if (ctx.tick < behaviour.nextShuffleTick) return;
+  // D70: someone the captain is walking over to, or talking with, stands still for it.
+  if (sought(ctx, local)) return;
   const every = configTicks(ctx.config, ctx.config.travel.localShuffleSeconds);
   behaviour.nextShuffleTick = nextShuffleTick(local.id, ctx.tick, every);
   const here = tileOf(local.location);
