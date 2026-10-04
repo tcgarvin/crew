@@ -21,6 +21,17 @@ import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
+import {
+  type Box,
+  LABEL_COSTS,
+  type LabelRequest,
+  type LabelText,
+  type Obstacle,
+  type PlacedLabel,
+  boxesOverlap,
+  centredBox,
+  placeLabels,
+} from "./labels";
 import { drawDockProps, drawLocalDots, drawLocalTrolleys, localLabelText } from "./locals";
 import { drawRamps } from "./ramps";
 import type { Scene } from "./scene";
@@ -163,24 +174,29 @@ function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: Deck
   ctx.lineCap = "butt";
 }
 
+/** A room's name plate where it will be drawn, screen space. */
+interface RoomPlate {
+  readonly text: string;
+  readonly box: Box;
+  readonly color: string;
+}
+
 /**
- * Compartment names in each room's top-left corner (as seen on screen) on a subtle plate, drawn in
- * real screen space so text always reads upright (task item 5). Machine labels sit at machine
- * centres, so corner plates keep the two apart.
+ * Compartment names in each room's top-left corner (as seen on screen), each only where its plate
+ * fits inside its own room on screen (D72). Measured in the plate font, which is left set.
  */
-export function drawCompartmentLabels(
+function roomPlates(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
   rotated: boolean,
   viewportHeight: number,
-): void {
-  if (t.scale <= 8) return;
+): RoomPlate[] {
+  if (t.scale <= 8) return [];
   const fontPx = Math.max(10, Math.min(14, t.scale * 0.42));
   ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "left";
   const roomAt = tileRooms(layout);
+  const plates: RoomPlate[] = [];
   for (const [key, name] of Object.entries(layout.compartmentNames)) {
     const box = layout.compartmentBoxes[key];
     if (box === undefined) continue;
@@ -207,11 +223,48 @@ export function drawCompartmentLabels(
       return roomAt.get(`${Math.floor(at.x)},${Math.floor(at.y)}`) === key;
     });
     if (!inRoom) continue;
-    ctx.fillStyle = ROOM_PLATE_BG;
-    ctx.fillRect(x + 3, y + 3, w, h);
-    ctx.fillStyle = roomStyle(layout.compartmentTags[key]).label;
-    ctx.fillText(label, x + 7, y + 3 + h / 2);
+    plates.push({
+      text: label,
+      box: { left: x + 3, top: y + 3, right: x + 3 + w, bottom: y + 3 + h },
+      color: roomStyle(layout.compartmentTags[key]).label,
+    });
   }
+  return plates;
+}
+
+/** Draw the plates, leaving out any a person's label covers (slice-2 QA). */
+function drawRoomPlates(
+  ctx: CanvasRenderingContext2D,
+  plates: readonly RoomPlate[],
+  covered: readonly Box[],
+): void {
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  for (const plate of plates) {
+    if (covered.some((box) => boxesOverlap(box, plate.box))) continue;
+    const { left, top, right, bottom } = plate.box;
+    ctx.fillStyle = ROOM_PLATE_BG;
+    ctx.fillRect(left, top, right - left, bottom - top);
+    ctx.fillStyle = plate.color;
+    ctx.fillText(plate.text, left + 4, (top + bottom) / 2);
+  }
+}
+
+/**
+ * Compartment names in each room's top-left corner (as seen on screen) on a subtle plate, drawn in
+ * real screen space so text always reads upright (task item 5). Machine labels sit at machine
+ * centres, so corner plates keep the two apart. A plate under one of `covered` (people's labels)
+ * is left out.
+ */
+export function drawCompartmentLabels(
+  ctx: CanvasRenderingContext2D,
+  t: ViewTransform,
+  layout: DeckLayout,
+  rotated: boolean,
+  viewportHeight: number,
+  covered: readonly Box[] = [],
+): void {
+  drawRoomPlates(ctx, roomPlates(ctx, t, layout, rotated, viewportHeight), covered);
 }
 
 const tileRoomCache = new WeakMap<DeckLayout, ReadonlyMap<string, string>>();
@@ -328,39 +381,67 @@ function drawMachines(
   }
 }
 
+/** A machine's name where it will be drawn, screen space. */
+interface MachineName {
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly box: Box;
+}
+
 /**
- * Machine short-name labels, drawn in real screen space (after any rotation is undone) so text
- * always reads upright, per task item 5. Only drawn "when there is room" (task item 4).
+ * Machine short names at machine centres, only "when there is room" (task item 4). Measured in
+ * the machine-name font, which is left set.
  */
-function drawMachineLabels(
+function machineNames(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
   rotated: boolean,
   viewportHeight: number,
-): void {
-  if (t.scale <= 14) return;
-  const fontPx = Math.max(9, Math.min(13, t.scale * 0.3));
+): MachineName[] {
+  if (t.scale <= 14) return [];
+  const fontPx = machineFontPx(t);
   ctx.font = `${fontPx}px system-ui, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
   // Rows of identical machines (four bunks) would print on top of each other: skip a label that
-  // would overlap one already drawn.
-  const placed: { x: number; y: number; w: number }[] = [];
+  // would overlap one already placed.
+  const names: MachineName[] = [];
   for (const placement of layout.machines) {
     const [cx, cy] = toScreenPx(t, placement.center.x, placement.center.y, rotated, viewportHeight);
-    const w = ctx.measureText(placement.name).width + 6;
-    if (placed.some((p) => Math.abs(p.x - cx) < (p.w + w) / 2 && Math.abs(p.y - cy) < fontPx + 2)) {
-      continue;
-    }
-    placed.push({ x: cx, y: cy, w });
+    const box = centredBox(cx, cy, ctx.measureText(placement.name).width + 6, fontPx + 2);
+    if (names.some((n) => boxesOverlap(n.box, box))) continue;
+    names.push({ text: placement.name, x: cx, y: cy, box });
+  }
+  return names;
+}
+
+function machineFontPx(t: ViewTransform): number {
+  return Math.max(9, Math.min(13, t.scale * 0.3));
+}
+
+/**
+ * Machine short-name labels, drawn in real screen space (after any rotation is undone) so text
+ * always reads upright, per task item 5. A name under a person's label is left out (slice-2 QA):
+ * the label says more, and the two together read as neither.
+ */
+function drawMachineNames(
+  ctx: CanvasRenderingContext2D,
+  t: ViewTransform,
+  names: readonly MachineName[],
+  covered: readonly Box[],
+): void {
+  ctx.font = `${machineFontPx(t)}px system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const name of names) {
+    if (covered.some((box) => boxesOverlap(box, name.box))) continue;
     // Outlined rather than on a plate, so the label never hides the machine it names.
     ctx.strokeStyle = "rgba(5, 7, 10, 0.9)";
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
-    ctx.strokeText(placement.name, cx, cy);
+    ctx.strokeText(name.text, name.x, name.y);
     ctx.fillStyle = TEXT_COLOR;
-    ctx.fillText(placement.name, cx, cy);
+    ctx.fillText(name.text, name.x, name.y);
   }
   ctx.textAlign = "left";
 }
@@ -560,25 +641,58 @@ function truncateLabel(label: string, maxChars: number): string {
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
-/** D70: the captain ashore meeting someone; the label names them. */
-const MEETING_LABEL = /^(talking with|going to see|ashore to see) (\S+)/;
+/**
+ * D70: the captain ashore meeting someone; D77: the oncoming watch relieving the helm. The label
+ * names the other person by first name.
+ */
+const NAMED_LABEL = /^(talking with|going to see|ashore to see|relieving) (\S+)/;
+/** D78: "plotting a course to Kessler Drift" says where in the inspector; the dot says enough. */
+const PLOTTING_LABEL = /^plotting a course\b/;
+/** D77: the watch's own labels, short and the point of the bridge, are never cut. */
+const WATCH_LABEL = /^(at the helm|taking the helm|leaving the helm|on the gangway|doing rounds)$/;
+
+/** The action in as few words as still say it: "relieving Noor", "plotting a course". */
+function compactAction(actionLabel: string): string | undefined {
+  const named = NAMED_LABEL.exec(actionLabel);
+  if (named !== null) return `${named[1]} ${named[2]}`;
+  if (PLOTTING_LABEL.test(actionLabel)) return "plotting a course";
+  if (WATCH_LABEL.test(actionLabel)) return actionLabel;
+  return undefined;
+}
 
 /**
  * The text over a crew member's dot: name and what they are doing, cut to 26 characters. D70: a
- * label that names who they are meeting ("talking with Fenwick Adair") keeps the verb and that
- * person's first name, up to a local's 34 (D68), so the meeting reads rather than an ellipsis.
+ * label that names someone ("talking with Fenwick Adair", "relieving Noor Haddad at the helm")
+ * keeps the verb and that person's first name, plotting keeps "plotting a course", and the
+ * watch's labels ("at the helm") stay whole, up to a local's 34 (D68), so the action reads
+ * rather than an ellipsis.
  */
 export function crewLabelText(actor: Pick<RenderActor, "name" | "actionLabel">): string {
-  const meeting = MEETING_LABEL.exec(actor.actionLabel);
-  if (meeting !== null) return truncateLabel(`${actor.name} — ${meeting[1]} ${meeting[2]}`, 34);
+  const compact = compactAction(actor.actionLabel);
+  if (compact !== undefined) return truncateLabel(`${actor.name} — ${compact}`, 34);
   return truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26);
+}
+
+/**
+ * The texts to try over a crew member's dot, preferred first: `crewLabelText`, then for a crowd
+ * the first name and the compact action ("Jax — relieving Noor"), when that is shorter.
+ */
+export function crewLabelTexts(actor: Pick<RenderActor, "name" | "actionLabel">): string[] {
+  const full = crewLabelText(actor);
+  const first = actor.name.split(/\s+/)[0] ?? actor.name;
+  const short = truncateLabel(
+    `${first} — ${compactAction(actor.actionLabel) ?? actor.actionLabel}`,
+    26,
+  );
+  return short.length < full.length ? [full, short] : [full];
 }
 
 /** One label over a person's dot, deck frame. */
 interface PersonLabel {
   readonly x: number;
   readonly y: number;
-  readonly text: string;
+  /** Preferred first (`crewLabelTexts`). */
+  readonly texts: readonly string[];
   /** The dock's own people (D68) are labelled in a dimmer colour, so the crew read first. */
   readonly local: boolean;
   /** Pushing a loaded hand truck or trolley, drawn beside the dot: the label clears its handle. */
@@ -605,7 +719,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
   const labels: PersonLabel[] = frame.actors.map((actor) => ({
     x: actor.x,
     y: actor.y,
-    text: crewLabelText(actor),
+    texts: crewLabelTexts(actor),
     local: false,
     pushing: pushers.has(actor.id),
   }));
@@ -615,7 +729,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
       labels.push({
         x: local.x,
         y: local.y,
-        text: truncateLabel(text, 34),
+        texts: [truncateLabel(text, 34)],
         local: true,
         pushing: local.carrying > 0,
       });
@@ -624,10 +738,93 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
   return labels;
 }
 
+/** A person's label where it will be drawn. */
+interface PersonPlate extends PlacedLabel {
+  readonly local: boolean;
+  readonly dotX: number;
+  readonly dotY: number;
+}
+
+function personFontPx(t: ViewTransform): number {
+  return Math.max(MIN_LABEL_FONT_PX, t.scale * 0.32);
+}
+
+/**
+ * Where each visible person's label goes (`placeLabels`), clear of each other and, where it can,
+ * of people's dots and of `obstacles` (room plates, machine names). Crew first, bottom of the
+ * screen first, so a crowd's labels fan upward from the lowest; locals (D68) after the crew.
+ */
+function placePersonLabels(
+  ctx: CanvasRenderingContext2D,
+  t: ViewTransform,
+  frame: RenderFrame,
+  rotated: boolean,
+  viewportWidth: number,
+  viewportHeight: number,
+  obstacles: readonly Obstacle[],
+): PersonPlate[] {
+  const radius = dotRadius(t);
+  const fontPx = personFontPx(t);
+  ctx.font = `${fontPx}px system-ui, sans-serif`;
+  // A label sits radius + 6 above the dot's centre; a truck's handle rises higher (D68 check).
+  const truckLift = Math.max(0, loadedTruckRise(carriedSize(t)) + fontPx / 2 + 4 - radius - 6);
+  const shown = personLabels(frame)
+    .map((entry) => ({ entry, at: toScreenPx(t, entry.x, entry.y, rotated, viewportHeight) }))
+    // D72: a label names a dot the player can see. While the dock slides in, its people are still
+    // off the canvas, and a label clamped onto the edge would float there on its own.
+    .filter(({ at: [x, y] }) => x >= 0 && x <= viewportWidth && y >= 0 && y <= viewportHeight)
+    .sort(
+      (a, b) =>
+        Number(a.entry.local) - Number(b.entry.local) || b.at[1] - a.at[1] || a.at[0] - b.at[0],
+    );
+  const requests: LabelRequest[] = shown.map(({ entry, at: [dotX, dotY] }) => ({
+    dotX,
+    dotY,
+    texts: entry.texts.map((text): LabelText => ({ text, width: ctx.measureText(text).width + 8 })),
+    lift: entry.pushing ? truckLift : 0,
+  }));
+  const space = { viewportWidth, viewportHeight, plateHeight: fontPx + 4, dotRadius: radius };
+  return placeLabels(requests, space, obstacles).map((label) => {
+    const { entry, at } = shown[label.index] as (typeof shown)[number];
+    return { ...label, local: entry.local, dotX: at[0], dotY: at[1] };
+  });
+}
+
+/** Draw placed person labels, with a thin leader back to the dot for one set away from it. */
+function drawPersonPlates(
+  ctx: CanvasRenderingContext2D,
+  t: ViewTransform,
+  plates: readonly PersonPlate[],
+): void {
+  ctx.font = `${personFontPx(t)}px system-ui, sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  for (const plate of plates) {
+    const { left, top, right, bottom } = plate.box;
+    if (plate.leader) {
+      const toX = Math.max(left, Math.min(right, plate.dotX));
+      const toY = Math.max(top, Math.min(bottom, plate.dotY));
+      ctx.strokeStyle = LEADER_COLOR;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(plate.dotX, plate.dotY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+    }
+    ctx.fillStyle = LABEL_BG;
+    ctx.fillRect(left, top, right - left, bottom - top);
+    ctx.fillStyle = plate.local ? LOCAL_TEXT_COLOR : TEXT_COLOR;
+    ctx.fillText(plate.text, (left + right) / 2, (top + bottom) / 2);
+  }
+  ctx.textAlign = "left";
+}
+
+const LEADER_COLOR = "rgba(231, 237, 243, 0.55)";
+
 /**
  * Name/action labels for the crew and passengers, and for the dock's locals while they are doing
  * something (D68), drawn in real screen space (after any rotation is undone) so text always reads
- * upright, per task item 5. Overlapping labels stack upward.
+ * upright, per task item 5. Crowded labels move around their dots and shorten (`placeLabels`).
  */
 export function drawActorLabels(
   ctx: CanvasRenderingContext2D,
@@ -637,48 +834,8 @@ export function drawActorLabels(
   viewportWidth: number,
   viewportHeight: number,
 ): void {
-  const radius = dotRadius(t);
-  const fontPx = Math.max(MIN_LABEL_FONT_PX, t.scale * 0.32);
-  ctx.font = `${fontPx}px system-ui, sans-serif`;
-  ctx.textBaseline = "middle";
-
-  // Bottom of the screen first, so a crowded label stacks upward over the labels below it
-  // rather than pushing one of them up past its own dot; the same whichever way the deck turns.
-  const sorted = personLabels(frame)
-    .map((entry) => ({
-      entry,
-      at: toScreenPx(t, entry.x, entry.y, rotated, viewportHeight),
-    }))
-    .sort((a, b) => b.at[1] - a.at[1] || a.at[0] - b.at[0]);
-  const placed: { x: number; y: number; w: number }[] = [];
-  // A label sits radius + 6 above the dot's centre; a truck's handle rises higher (D68 check).
-  const truckLift = Math.max(0, loadedTruckRise(carriedSize(t)) + fontPx / 2 + 4 - radius - 6);
-
-  for (const { entry, at } of sorted) {
-    const [dotX, cy] = at;
-    // D72: a label names a dot the player can see. While the dock slides in, its people are still
-    // off the canvas, and a label clamped onto the edge would float there on its own.
-    if (dotX < 0 || dotX > viewportWidth || cy < 0 || cy > viewportHeight) continue;
-    const labelW = ctx.measureText(entry.text).width + 8;
-    // Kept on screen: the docked camera puts people on the dock's far edges.
-    const cx = Math.max(labelW / 2 + 2, Math.min(viewportWidth - labelW / 2 - 2, dotX));
-    let labelY = cy - radius - 6 - (entry.pushing ? truckLift : 0);
-    for (const p of placed) {
-      if (Math.abs(p.x - cx) < (p.w + labelW) / 2 && Math.abs(p.y - labelY) < fontPx + 4) {
-        labelY = p.y - (fontPx + 4);
-      }
-    }
-    // Nor off the top, where a crowd near the bow stacks its labels.
-    labelY = Math.max(fontPx / 2 + 2, labelY);
-    placed.push({ x: cx, y: labelY, w: labelW });
-
-    ctx.fillStyle = LABEL_BG;
-    ctx.fillRect(cx - labelW / 2, labelY - fontPx / 2 - 2, labelW, fontPx + 4);
-    ctx.fillStyle = entry.local ? LOCAL_TEXT_COLOR : TEXT_COLOR;
-    ctx.textAlign = "center";
-    ctx.fillText(entry.text, cx, labelY);
-    ctx.textAlign = "left";
-  }
+  const plates = placePersonLabels(ctx, t, frame, rotated, viewportWidth, viewportHeight, []);
+  drawPersonPlates(ctx, t, plates);
 }
 
 /** Dockside (D58): what `drawFrame` needs for everything outside the deck itself. */
@@ -835,8 +992,17 @@ export function drawFrame(
   // Everything with text (and the dots and crates that text and badges sit on) is drawn after
   // `ctx.restore()`, in real screen space, so labels stay upright under rotation (task item 5).
   // They sit above the foreground too, so bay walls and clouds never hide the crew.
-  drawCompartmentLabels(ctx, t, layout, rotated, viewportHeight);
-  drawMachineLabels(ctx, t, layout, rotated, viewportHeight);
+  // People's labels are placed first, around room plates and machine names where they can be;
+  // a plate or a name a label still covers is left out rather than drawn under it (slice-2 QA).
+  const plates = roomPlates(ctx, t, layout, rotated, viewportHeight);
+  const names = machineNames(ctx, t, layout, rotated, viewportHeight);
+  const people = placePersonLabels(ctx, t, shown, rotated, viewportWidth, viewportHeight, [
+    ...plates.map((p) => ({ box: p.box, cost: LABEL_COSTS.roomPlate })),
+    ...names.map((n) => ({ box: n.box, cost: LABEL_COSTS.machineName })),
+  ]);
+  const covered = people.map((p) => p.box);
+  drawRoomPlates(ctx, plates, covered);
+  drawMachineNames(ctx, t, names, covered);
   drawDockProps(
     ctx,
     t,
@@ -848,7 +1014,7 @@ export function drawFrame(
   drawDeckItems(ctx, t, layout, shown, rotated, viewportHeight, selectedIdOf(selected, "item"));
   drawLocalDots(ctx, t, shown.locals, rotated, viewportHeight, selectedIdOf(selected, "local"));
   drawActorDots(ctx, t, shown, rotated, viewportHeight, selectedIdOf(selected, "actor"));
-  drawActorLabels(ctx, t, shown, rotated, viewportWidth, viewportHeight);
+  drawPersonPlates(ctx, t, people);
   // After the labels: a label plate sits just above the dot and would hide the load.
   drawCarriedItems(ctx, t, shown, rotated, viewportHeight);
   drawLocalTrolleys(ctx, t, shown.locals, rotated, viewportHeight);

@@ -4,6 +4,7 @@ import type { DeckLayout } from "./deckLayout";
 import {
   actorDotColor,
   crewLabelText,
+  crewLabelTexts,
   deckPiles,
   drawActorLabels,
   drawCompartmentLabels,
@@ -20,6 +21,26 @@ describe("crewLabelText (D70)", () => {
     expect(crewLabelText({ name: "Mara Osei", actionLabel: "ashore to see Ilse Brandt" })).toBe(
       "Mara Osei — ashore to see Ilse",
     );
+  });
+
+  it("names the watch being relieved by first name, and plotting without the port (slice-2 QA)", () => {
+    const jax = { name: "Jax Okonkwo", actionLabel: "relieving Noor Haddad at the helm" };
+    expect(crewLabelText(jax)).toBe("Jax Okonkwo — relieving Noor");
+    expect(crewLabelTexts(jax)).toEqual(["Jax Okonkwo — relieving Noor", "Jax — relieving Noor"]);
+    expect(
+      crewLabelText({ name: "Dane Whitcross", actionLabel: "plotting a course to Kessler Drift" }),
+    ).toBe("Dane Whitcross — plotting a course");
+    expect(crewLabelText({ name: "Dane Whitcross", actionLabel: "at the helm" })).toBe(
+      "Dane Whitcross — at the helm",
+    );
+  });
+
+  it("offers a first-name label for a crowd only when it is shorter", () => {
+    expect(crewLabelTexts({ name: "Mara Osei", actionLabel: "idle" })).toEqual([
+      "Mara Osei — idle",
+      "Mara — idle",
+    ]);
+    expect(crewLabelTexts({ name: "Halla", actionLabel: "idle" })).toEqual(["Halla — idle"]);
   });
 
   it("cuts any other label at 26 characters as before", () => {
