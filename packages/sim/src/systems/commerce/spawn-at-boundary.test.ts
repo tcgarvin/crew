@@ -3,16 +3,10 @@
  * or an accepted job's manifest, gated by the narrator spawn budget and `maxSpawnsPerCommand`.
  */
 import { describe, expect, it } from "vitest";
-import type { Command } from "../../core/types/commands";
+import { cmd } from "../../core/fixtures/test-world";
 import type { BoundaryLocation } from "../../core/types/commands/spawn";
-import type { CommandId, ItemDefId, TempRef } from "../../core/types/ids";
+import type { ItemDefId, TempRef } from "../../core/types/ids";
 import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "../travel/fixtures";
-
-let counter = 0;
-function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
-  counter += 1;
-  return { ...command, id: `cmd:spawn-at-boundary-test:${counter}` as CommandId };
-}
 
 function spawnItemCommand(
   tempRef: string,

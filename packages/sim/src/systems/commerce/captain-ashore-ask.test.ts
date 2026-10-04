@@ -11,8 +11,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { configTicks } from "../../core/clock";
-import type { Command } from "../../core/types/commands";
-import type { CommandId, HookId, JobId } from "../../core/types/ids";
+import { cmd } from "../../core/fixtures/test-world";
+import type { HookId, JobId } from "../../core/types/ids";
 import type { Kernel, World } from "../../core/types/kernel";
 import {
   FIX,
@@ -21,12 +21,6 @@ import {
   advanceToStage,
   freightTestWorld,
 } from "../travel/fixtures";
-
-let counter = 0;
-function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
-  counter += 1;
-  return { ...command, id: `cmd:job-board-test:${counter}` as CommandId };
-}
 
 function jobDraft() {
   return {

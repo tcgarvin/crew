@@ -4,8 +4,8 @@
  * `captainAshore` hook.
  */
 import { describe, expect, it } from "vitest";
-import type { Command } from "../../core/types/commands";
-import type { CommandId, HookId, JobId } from "../../core/types/ids";
+import { cmd } from "../../core/fixtures/test-world";
+import type { HookId, JobId } from "../../core/types/ids";
 import type { Item } from "../../core/types/ship";
 import {
   FIX,
@@ -15,12 +15,6 @@ import {
   freightTestWorld,
 } from "../travel/fixtures";
 import { jobBlockingAcceptance } from "../travel/in-hand";
-
-let counter = 0;
-function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
-  counter += 1;
-  return { ...command, id: `cmd:commerce-test:${counter}` as CommandId };
-}
 
 function jobDraft(pay: number) {
   return {
