@@ -8,7 +8,6 @@
  */
 import { type ValidationResult, validateBundle } from "./schemas/validate";
 
-// Decks
 import deckFreighterMk1 from "../data/decks/freighter-mk1.json";
 
 import machineBatteryBank from "../data/machines/battery-bank.json";
@@ -16,7 +15,6 @@ import machineBridgeConsole from "../data/machines/bridge-console.json";
 import machineBunk from "../data/machines/bunk.json";
 import machineCargoCrane from "../data/machines/cargo-crane.json";
 import machineCoolantPump from "../data/machines/coolant-pump.json";
-// Machines
 import machineEngine from "../data/machines/engine.json";
 import machineGalleyStove from "../data/machines/galley-stove.json";
 import machineGenerator from "../data/machines/generator.json";
@@ -34,14 +32,12 @@ import itemMedKit from "../data/items/med-kit.json";
 import itemOldPhotograph from "../data/items/old-photograph.json";
 import itemRationPack from "../data/items/ration-pack.json";
 import itemSparePartsStack from "../data/items/spare-parts-stack.json";
-// Items
 import itemToolkit from "../data/items/toolkit.json";
 import itemWelderTorch from "../data/items/welder-torch.json";
 
 import crewBettinaSolheim from "../data/crew/bettina-solheim.json";
 import crewDaneWhitcross from "../data/crew/dane-whitcross.json";
 import crewJaxOkonkwo from "../data/crew/jax-okonkwo.json";
-// Crew
 import crewMaraOsei from "../data/crew/mara-osei.json";
 import crewOyelaranAbiodun from "../data/crew/oyelaran-abiodun.json";
 import crewPassenger from "../data/crew/passenger.json";
@@ -58,10 +54,8 @@ import traitMethodical from "../data/traits/methodical.json";
 import traitNightOwl from "../data/traits/night-owl.json";
 import traitRestless from "../data/traits/restless.json";
 import traitSocialButterfly from "../data/traits/social-butterfly.json";
-// Traits
 import traitSteady from "../data/traits/steady.json";
 
-// Ports
 import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
 import portKesslerDrift from "../data/ports/kessler-drift.json";
@@ -77,13 +71,11 @@ import dockOssoryStation from "../data/docks/ossory-station.json";
 import dockTernsRest from "../data/docks/terns-rest.json";
 import dockVesperGate from "../data/docks/vesper-gate.json";
 
-// Scenarios
 import scenarioDefault from "../data/scenarios/default.json";
 
 // People (D25)
 import peopleNameTable from "../data/people/name-table.json";
 
-// Config
 import configDefault from "../data/config/default.json";
 
 const DECKS = [deckFreighterMk1];

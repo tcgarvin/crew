@@ -216,31 +216,38 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
   [PASSENGER_OVERDUE_KEY]: (p) => (p.name === undefined ? "Overdue" : `Overdue: ${String(p.name)}`),
 };
 
+const speakerParam = (p: Params) => (p.speaker === undefined ? undefined : String(p.speaker));
+
 /** D29: who is speaking, per prompt key; the offer card's issuer, or the narrator's param. */
 const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
   "job.offer": (p) => (p.name === undefined ? undefined : String(p.name)),
-  [NARRATOR_TEXT_KEYS.situation]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+  [NARRATOR_TEXT_KEYS.situation]: speakerParam,
   // D36: the engineer brings the gate card (D29), when the ship has one.
-  [DEPARTURE_GATE_KEY]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+  [DEPARTURE_GATE_KEY]: speakerParam,
   // Passengers §3.3: the first officer brings the overdue card (D29).
-  [PASSENGER_OVERDUE_KEY]: (p) => (p.speaker === undefined ? undefined : String(p.speaker)),
+  [PASSENGER_OVERDUE_KEY]: speakerParam,
 };
 
 const GENERIC_TITLE = "The captain's call";
 
 function humanize(key: string): string {
   const last = key.split(".").pop() ?? key;
-  const words = last
-    .replace(/([A-Z])/g, " $1")
-    .replace(/_/g, " ")
-    .trim()
-    .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return capitalise(
+    last
+      .replace(/([A-Z])/g, " $1")
+      .replace(/_/g, " ")
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+function hasProse(ref: DeepReadonly<TextRef>): ref is DeepReadonly<TextRef> & { prose: string } {
+  return ref.prose !== undefined && ref.prose.trim() !== "";
 }
 
 /** Prose if present, else the template, else a humanized key. Never throws. */
 export function renderTextRef(ref: DeepReadonly<TextRef>, content?: ContentBundle): string {
-  if (ref.prose !== undefined && ref.prose.trim() !== "") return ref.prose;
+  if (hasProse(ref)) return ref.prose;
   const template = TEMPLATES[ref.key];
   return template === undefined ? humanize(ref.key) : template(ref.params, content);
 }
@@ -260,8 +267,7 @@ export function templateCard(
       : undefined;
   const side = (ref: DeepReadonly<TextRef>): string => {
     const text = passage ? PASSAGE_SIDE_TEXT[ref.key] : undefined;
-    const hasProse = ref.prose !== undefined && ref.prose.trim() !== "";
-    return text === undefined || hasProse ? renderTextRef(ref, content) : text;
+    return text === undefined || hasProse(ref) ? renderTextRef(ref, content) : text;
   };
   return {
     decisionId: decision.id,
