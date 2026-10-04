@@ -681,18 +681,28 @@ function advanceStage(ctx: StepCtx): void {
 }
 
 /**
- * Raise `notableEvent` the tick after a hookable narrative event was committed. Core's phase 8
- * records `lastNarrativeEvent` for every `narrative`-significance event, preferring one whose type
- * is in `config.narrator.hookOnEvents` (see `core/pipeline.ts`).
+ * Raise `notableEvent` for a hookable narrative event committed in an earlier tick. Core's phase
+ * 8 records it as `narrator.pendingNotable` (see `core/pipeline.ts`); it waits there while
+ * another hook is pending, so a staging call raised the tick after the event (D69) delays the
+ * notable hook rather than swallowing it. A story hook raised after the event clears it
+ * (`core/hooks.ts`).
  */
 function checkNotableEventHook(ctx: StepCtx): void {
-  const last = ctx.state.narrator.lastNarrativeEvent;
-  if (last === undefined || last.tick !== ctx.tick - 1) return;
-  const kinds = ctx.config.narrator.hookOnEvents;
-  if (!kinds.includes(last.type)) return;
-  raiseHookIfIdle(ctx, "notableEvent", {
-    eventIds: last.eventId === undefined ? [] : [last.eventId],
-  });
+  const owed = ctx.state.narrator.pendingNotable;
+  if (owed === undefined || owed.tick >= ctx.tick) return;
+  if (!ctx.config.narrator.hookOnEvents.includes(owed.type)) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete ctx.state.narrator.pendingNotable;
+    return;
+  }
+  if (
+    raiseHookIfIdle(ctx, "notableEvent", {
+      eventIds: owed.eventId === undefined ? [] : [owed.eventId],
+    })
+  ) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete ctx.state.narrator.pendingNotable;
+  }
 }
 
 export const travelSystem: System = {

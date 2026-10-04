@@ -200,12 +200,19 @@ function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
  * - `approachingPort` is retired. A save halted on one has it dropped as answered (its id joins
  *   `recentHookIds`), so the game runs on: a save past the transit lead point simply docks
  *   without staging, and one before it raises `stageDock` as usual.
+ * - D69: a narrative event committed in the save's last tick has not been checked for a
+ *   `notableEvent` yet; it becomes `narrator.pendingNotable` (travel checks its type against
+ *   `hookOnEvents` when it raises the hook).
  */
 export function addDockside(raw: unknown): unknown {
   if (!isRecord(raw)) return raw;
   if (!isRecord(raw.dockside)) raw.dockside = { locals: {}, props: [] };
   if (isRecord(raw.nextId) && typeof raw.nextId.local !== "number") raw.nextId.local = 1;
   const narrator = raw.narrator;
+  const last = isRecord(narrator) ? narrator.lastNarrativeEvent : undefined;
+  if (isRecord(narrator) && isRecord(last) && last.tick === raw.tick) {
+    narrator.pendingNotable = { ...last };
+  }
   if (isRecord(narrator) && isRecord(narrator.pendingHook)) {
     const hook = narrator.pendingHook;
     if (hook.kind === "approachingPort") {

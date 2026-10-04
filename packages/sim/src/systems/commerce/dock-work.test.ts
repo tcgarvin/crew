@@ -354,6 +354,38 @@ describe("parts are bought on the dock (D63)", () => {
     ).toBe(true);
   });
 
+  it("sets the leftover parts down when the repair is done, not carried off to bed (D69)", () => {
+    // The verifier's 8x playthroughs held for repairs indefinitely: the last repairer kept the
+    // ship's only stack of spares in hand through meals, sleep and rest, and every other repair
+    // was blocked on an inaccessible supply.
+    const test = dockWorkWorld();
+    const { world } = test;
+    const { problemId } = addEngineFault(world);
+    // A stack bigger than the repair needs: the stall's one part, made three once bought.
+    run(test, 3 * MINUTE, (w) => Object.values(w.state.items).some((i) => i.defId === PARTS));
+    const stack = Object.values(world.state.items).find((i) => i.defId === PARTS);
+    if (stack?.stacking !== "stack") throw new Error("no stack of parts bought");
+    stack.count = 3;
+    run(test, 3 * MINUTE, (w) => w.state.work.problems[problemId]?.status === "resolved");
+    expect(world.state.work.problems[problemId]?.status).toBe("resolved");
+    run(test, 20);
+    const left = Object.values(world.state.items).filter(
+      (i) => i.defId === PARTS && (i.stacking !== "stack" || i.count > 0),
+    );
+    expect(left.length).toBeGreaterThan(0);
+    for (const item of left) {
+      expect(item.location.kind, item.id).not.toBe("carriedBy");
+      // And the whole crew heard where they were left, so the next repairer can fetch them.
+      for (const actor of Object.values(world.state.actors)) {
+        if (!actor.crew) continue;
+        const fact = actor.knowledge[`${item.id}/itemLocation`];
+        expect(fact?.factType === "itemLocation" && fact.value.location, actor.name).toEqual(
+          item.location,
+        );
+      }
+    }
+  });
+
   it("sets the part down when the repairer gives up the repair, so someone else can fit it", () => {
     const test = dockWorkWorld();
     const { world } = test;

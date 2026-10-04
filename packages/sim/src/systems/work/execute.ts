@@ -65,6 +65,7 @@ import { claimTask, completeTask, isCompletionMet, releaseActorClaim, renewClaim
 import { claimantsOf, isTerminal } from "./derivation";
 import { directSight, writeFact } from "./facts";
 import { labelFor } from "./labels";
+import { awaitsFamiliarityBrief } from "./perception";
 import {
   type PlanResult,
   believedLocation,
@@ -374,9 +375,11 @@ function dropHaulCargo(ctx: StepCtx, actor: Actor, task: Task): void {
 }
 
 /**
- * Set down the tools and consumables the actor picked up for a task they are giving up, where
- * they stand: carried on, the ship's only spares (or wrench) would be out of everyone else's
- * reach until this actor happened to take the task up again.
+ * Set down the tools and consumables the actor picked up for a task they are giving up or have
+ * finished (D64, D69), where they stand: carried on, the ship's only spares (or wrench) would be
+ * out of everyone else's reach until this actor happened to take the task up again. D69: they
+ * say where they left them, so the rest of the crew, whose last belief was "in their hands" or
+ * "not where it was", can fetch them for the next repair.
  */
 function dropTaskSupplies(ctx: StepCtx, actor: Actor, task: Task): void {
   if (task.consumables.length === 0 && task.requiredTools.length === 0) return;
@@ -396,9 +399,26 @@ function dropTaskSupplies(ctx: StepCtx, actor: Actor, task: Task): void {
       { location: item.location },
       directSight(actor, ctx.tick),
     );
+    tellCrew(ctx, actor, item);
     dropped = true;
   }
   if (dropped) touchInventory(ctx);
+}
+
+/** D69: the rest of the crew hear where `item` was left (a report, like D63's freight brief). */
+function tellCrew(ctx: StepCtx, teller: Actor, item: Item): void {
+  const source = {
+    tick: ctx.tick,
+    sourceId: teller.id,
+    evidence: "report",
+    certainty: "reported",
+  } as const;
+  for (const other of Object.values(ctx.state.actors)) {
+    if (other.id === teller.id || !other.crew || other.passenger === true) continue;
+    // Their first look's familiarity brief covers it; a fact written first would stop that brief.
+    if (awaitsFamiliarityBrief(other)) continue;
+    writeFact(other, item.id, "itemLocation", { location: item.location }, source);
+  }
 }
 
 function leaveHold(ctx: StepCtx, actor: Actor): void {
@@ -476,6 +496,9 @@ function finishActivity(ctx: StepCtx, actor: Actor): void {
     if (task !== undefined && !isTerminal(task)) {
       if (isCompletionMet(ctx.state, ctx.content, task)) completeTask(ctx, task);
       else releaseActorClaim(ctx, actor.id, task, "failed");
+      // D69: done or not, what is left of its tools and parts goes down here, as when it is
+      // given up (D64); kept in hand, the ship's only spares went to meals and bed with them.
+      dropTaskSupplies(ctx, actor, task);
     }
   }
   actor.activity = { kind: "idle" };

@@ -19,7 +19,7 @@ import { clampEngagement, dockInView } from "./dock";
 import { drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
 import { dockShape, dockSurface } from "./dockShape";
-import { computeFitTransform, drawFrame, shouldRotate } from "./draw";
+import { CREW_DOT_COLOR, computeFitTransform, drawFrame, shouldRotate } from "./draw";
 import { hullGeometry } from "./hull";
 import { sceneAt, withDockSky } from "./scene";
 import { buildStarField } from "./stars";
@@ -225,6 +225,38 @@ describe("dock layers on their own", () => {
           expect(calls.size, `${kind} ${rot}`).toBeGreaterThan(0);
         }
       }
+    }
+  });
+
+  it("draws the ore conveyor with nothing that reads as a person's dot (D69)", () => {
+    // Round gold lumps on Kessler's belt read as crew dots at phone scale: the ore is drawn as
+    // angular chunks (no arcs), in colours well away from crew gold.
+    const kessler = allDocks.find((d) => d.props.some((p) => p.kind === "conveyor"));
+    const conveyor = kessler?.props.find((p) => p.kind === "conveyor");
+    if (kessler === undefined || conveyor === undefined) throw new Error("no conveyor");
+    const { ctx, calls } = mockCanvas();
+    const fills: string[] = [];
+    const recording = new Proxy(ctx, {
+      set(target, prop, value) {
+        if (prop === "fillStyle" && typeof value === "string") fills.push(value);
+        return Reflect.set(target, prop, value);
+      },
+      get(target, prop) {
+        const value = Reflect.get(target, prop);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    drawProp(recording, conveyor, {
+      palette: kessler.palette,
+      setting: settingOf(kessler),
+      px: 0.05,
+    });
+    expect(calls.get("arc") ?? 0).toBe(0);
+    const rgb = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+    const [gr = 0, gg = 0, gb = 0] = rgb(CREW_DOT_COLOR);
+    for (const fill of fills.filter((f) => /^#[0-9a-f]{6}$/i.test(f))) {
+      const [r = 0, g = 0, b = 0] = rgb(fill);
+      expect(Math.hypot(r - gr, g - gg, b - gb), fill).toBeGreaterThan(80);
     }
   });
 

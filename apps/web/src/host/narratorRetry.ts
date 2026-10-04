@@ -77,14 +77,28 @@ export function nextRetryAction(state: RetryState, failure: NarratorFailure): Re
 }
 
 /**
- * D67 (D57's exception to D43): the staging call (`stageDock`) retries exactly as a story call
- * does, but never ends on the error panel. Where a story call would give up, the hook is
+ * D69: the staging call's own, short schedule. The sim is halted on it and it only dresses the
+ * dock, so a blip gets two quick retries and anything longer gets the floor set; D43's schedule
+ * (a minute of waits) froze the ship at the end of transit.
+ */
+export const STAGING_RETRY_DELAYS_MS: readonly number[] = [2_000, 4_000];
+
+/**
+ * D67 (D57's exception to D43): the staging call (`stageDock`) never ends on the error panel.
+ * D69: it retries a transient failure on `STAGING_RETRY_DELAYS_MS`, and where that runs out, or
+ * the failure is fatal or the hourly budget (which a story call waits out), the hook is
  * acknowledged with no plan and the dock is the sim's floor set: staging is not story.
  */
 export function stagingRetryAction(state: RetryState, failure: NarratorFailure): RetryAction {
-  const action = nextRetryAction(state, failure);
-  if (action.type !== "fail") return action;
-  return { type: "floorSet", reason: action.reason, message: action.message };
+  if (failure.kind === "spacing") return { type: "acknowledge" };
+  if (failure.kind === "retryable") {
+    const delayMs = STAGING_RETRY_DELAYS_MS[state.failures];
+    if (delayMs !== undefined) {
+      const next = { ...state, failures: state.failures + 1 };
+      return { type: "retry", delayMs, attempt: attemptsMade(next), state: next };
+    }
+  }
+  return { type: "floorSet", reason: failure.reason, message: failure.message };
 }
 
 /** The Retry button: start the whole sequence over from attempt 1. */

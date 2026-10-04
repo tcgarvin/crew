@@ -263,6 +263,97 @@ describe("the staging call (D66)", () => {
   });
 });
 
+/**
+ * D69: a hookable narrative event committed in the tick a hook is raised (here the staging call)
+ * keeps its `notableEvent`: it is raised once the call is answered, not dropped because the
+ * check only looked one tick back. A story hook raised after the event covers it instead.
+ */
+describe("a notable event beside the staging call (D69)", () => {
+  function notableWorld(): TestWorld {
+    const base = docksideConfig({});
+    const config: ConfigDef = {
+      ...base,
+      narrator: {
+        ...base.narrator,
+        approachHookLeadSeconds: 0.5,
+        hookOnEvents: ["driftingChanged"],
+      },
+    };
+    return dockWorkWorld({ dockHands: true, castSeed: SEEDS }, config);
+  }
+
+  /** Emit a hookable event (after travel, in its phase) on the first tick `when` holds. */
+  function emitOnce(test: TestWorld, when: (world: World) => boolean): { tick?: number } {
+    const at: { tick?: number } = {};
+    test.registry.registerSystem({
+      name: "test.notable",
+      phase: "equipment",
+      run(ctx) {
+        if (at.tick !== undefined || !when(test.world)) return;
+        at.tick = ctx.tick;
+        ctx.emit({
+          type: "driftingChanged",
+          subjectIds: [],
+          causeIds: [],
+          source: "sim",
+          payload: { drifting: false },
+        });
+      },
+    });
+    return at;
+  }
+
+  it("raises notableEvent once a staging call raised the next tick is answered", () => {
+    const test = notableWorld();
+    let fire = false;
+    const at = emitOnce(test, () => fire);
+    setCourse(test, FAR);
+    run(test, 20 * 60, (w) => w.state.travel.stage === "transit");
+    const { world } = test;
+    fire = true;
+    test.kernel.advance(world, 1);
+    expect(at.tick).toBe(world.state.tick);
+    // The next tick travel reaches the end of the route and raises the staging call first.
+    const travel = world.state.travel;
+    if (travel.stage !== "transit") throw new Error("not in transit");
+    travel.routeProgress = travel.routeDistance;
+    expect(test.kernel.advance(world, 1).halt).toEqual({ kind: "hook" });
+    const staging = world.state.narrator.pendingHook;
+    if (staging?.kind !== "stageDock") throw new Error("no staging hook");
+    ack(test, staging.id);
+    expect(test.kernel.advance(world, 1).halt).toEqual({ kind: "hook" });
+    const hook = world.state.narrator.pendingHook;
+    if (hook?.kind !== "notableEvent") throw new Error(`expected notableEvent, got ${hook?.kind}`);
+    expect(hook.context.eventIds).toHaveLength(1);
+    // Raised once: answering it does not raise it again.
+    ack(test, hook.id);
+    const events = run(test, 20 * 60, (w) => w.state.travel.stage === "docking", true);
+    expect(
+      events.filter((e) => e.type === "narratorHookRaised" && e.payload.kind === "notableEvent"),
+    ).toEqual([]);
+  });
+
+  it("lets a story hook raised after the event cover it", () => {
+    const test = notableWorld();
+    const at = emitOnce(test, (w) => w.state.travel.stage === "transit");
+    test.registry.registerSystem({
+      name: "test.storyHook",
+      phase: "topology",
+      run(ctx) {
+        if (at.tick !== undefined && ctx.tick === at.tick + 1) {
+          raiseHookIfIdle(ctx, "quietTooLong", { quietSinceTick: 0 });
+        }
+      },
+    });
+    setCourse(test, FAR);
+    const events = run(test, 20 * 60, stagingPending);
+    const kinds = events
+      .filter((e) => e.type === "narratorHookRaised")
+      .map((e) => (e.type === "narratorHookRaised" ? e.payload.kind : ""));
+    expect(kinds).toEqual(["quietTooLong", "stageDock"]);
+  });
+});
+
 describe("the stageDock command (D66)", () => {
   it("places the plan's people and props with the floor set and logs the ambience", () => {
     const test = stagingWorld();

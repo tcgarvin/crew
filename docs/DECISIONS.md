@@ -934,6 +934,52 @@ Playback's interpolation of locals by id (D66) is now tested.
 *Found, not changed:* Kessler Drift's ore conveyor is drawn with round yellow rollers that read
 like crew dots at phone scale (phase 2 prop art).
 
+**D69. Phase 3 verified end to end; what the playthrough turned up.** Browser playthroughs of
+the real app at 8x (landscape 1280×800 and 390×700): the null narrator; a fixture staging model
+behind the real route and staging translator (new face, port seed, props, ambience, a story intent
+to drop); and a staging model that always times out, in `error` mode. Headless tours of all six
+ports (seeds 3, 5, 7, 11, 13; the departure gate answered both ways), every invariant checked each
+tick, with fixture plans (new face, seed, a regular moved to another post, props by post and on
+the staging area, ambience), empty plans and a plan the kernel refuses (a post not on the dock),
+and save and restore mid-hold and mid-carting run side by side with the unrestored world for 600
+ticks (identical but once, where a contested interaction position changed hands across the
+restore, which W3 accepts). Seen working: the regulars at their posts at every docking, the
+receiver waiting by the warehouse door, dock hands carting offers out and withdrawn crates back,
+the staging hold one tick when answered in the run-ahead, no card from the staging call, nobody
+waiting on a local at departure, the locals gone with the dock, no console errors.
+Fixes, each with a test that failed before:
+*Kessler's receiver lost the race to the cast-off.* The ore-store lock was 27 steps from the
+delivery bay, round the conveyor, and the receiver is only sent once the hand truck is parked,
+which is when prep begins: in three of seven Kessler calls the crates were taken in by
+`dockHandGaveUp` (`castOff`) as the dock left. The rock at (30, 22) is floor now (the outcrop's
+foreground moves onto the walls it stands for), five steps; content's tests hold every dock's
+door within eight steps of its bay. No dock hand gave up in any later run.
+*The ore conveyor* draws its ore as small angular chunks in dull rock colours (D68's found item):
+no discs, nothing within 80 RGB units of crew gold.
+*A notable event beside the staging call* (D66's found item): a hookable event committed the tick
+before travel raised `stageDock` lost its `notableEvent`. Phase 8 now records
+`narrator.pendingNotable` for a hookable event; travel raises the hook from it the first tick no
+hook is pending and clears it; a story hook raised after the event clears it too (that call reads
+the event), so the call count is unchanged except for staging. Folded into 4 → 5: a narrative
+event in a save's last tick becomes the pending one.
+*Staging retries froze the ship.* The sim is halted on the call, so D43's schedule (a minute of
+waits, more with 25 s timeouts) held the ship visibly at the end of transit, 27 s in the
+playthrough with fast failures, and an hourly budget refusal would have waited up to five
+minutes. Staging now has its own schedule, two retries after 2 s and 4 s, and falls back to the
+floor set at once on the budget (D67's failure rule otherwise unchanged); after the change the
+failing run fell back within 7 s with no visible hold.
+*Holding for repairs held for ever* in tours that answered the departure gate with a hold: the
+last repairer kept the ship's only stack of spares in hand through meals, sleep and rest, and
+every other repair was blocked on an inaccessible supply. Finishing a task now sets its tools
+and parts down as giving one up does (D64), and the crew are told where (a report, like D63's
+freight brief), since the others last believed them in someone's hands.
+*Found, not changed:* the generator's `electrical_short` needs a welder, which the ship does not
+carry and only Ossory sells, so holding for that repair anywhere else never ends (every
+remaining stall in the tours; content or departure-gate design). Three of the four 8x browser
+sessions also ended holding for repairs, one for the fusion generator. At 8x the null narrator
+answers at once, so the 30-per-hour story budget ran out four minutes into a session and the game
+waited 30 s per retry (D43, not phase 3). A staging attempt that times out costs the narrator's 25 s
+each; a staging-specific timeout would bound the hold (server and narrator side).
 **D70. Phase 4 of Dockside: the captain goes ashore, and cards from the port come in person.**
 Plan items 1–6 (design §6.2–6.4; owner ruling D57: "the captain should leave the ship to go look
 for work, and [their] leaving the ship should trigger narration").
