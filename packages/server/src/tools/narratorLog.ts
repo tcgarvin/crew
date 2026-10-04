@@ -156,7 +156,7 @@ function headerLine(call: NarratorCallRow): string {
 }
 
 /** The block `calls` prints for one call; `call` and `digest` build on it. */
-export function renderCallSummary(call: NarratorCallRow): string {
+function renderCallSummary(call: NarratorCallRow): string {
   const response = call.response;
   const lines = [
     headerLine(call),
@@ -233,7 +233,7 @@ function rationaleOf(response: unknown): string {
 }
 
 /** `call`: the summary block plus rationale and the full notes update. */
-export function renderCallDetail(call: NarratorCallRow, raw: boolean): string {
+function renderCallDetail(call: NarratorCallRow, raw: boolean): string {
   const parts = [renderCallSummary(call), `rationale: ${rationaleOf(call.response)}`];
   const notesUpdate = field(call.response, "notesUpdate");
   parts.push(
@@ -245,37 +245,35 @@ export function renderCallDetail(call: NarratorCallRow, raw: boolean): string {
   return parts.join("\n");
 }
 
-function gameLine(
-  game: GameRow,
-  callCount: string,
-  lastCall: string,
-  promptVersion: string,
-): string {
-  return [
-    pad(game.id, 36),
-    pad(game.userId.slice(0, 8), 8),
-    pad(iso(game.createdAt), 24),
-    pad(iso(game.updatedAt), 24),
-    pad(callCount, 5),
-    pad(lastCall, 24),
-    promptVersion,
-  ].join("  ");
+/** Column widths of the `games` table; the last column (prompt) is unpadded. */
+const GAME_COLUMN_WIDTHS = [36, 8, 24, 24, 5, 24] as const;
+
+function gameTableRow(cells: readonly string[]): string {
+  return cells.map((cell, i) => pad(cell, GAME_COLUMN_WIDTHS[i] ?? 0)).join("  ");
 }
 
-export async function renderGames(db: Db): Promise<string> {
+async function renderGames(db: Db): Promise<string> {
   const summaries = await db.listGamesWithNarratorStats();
   if (summaries.length === 0) return "(no games)";
-  const header = [
-    pad("game", 36),
-    pad("user", 8),
-    pad("created", 24),
-    pad("updated", 24),
-    pad("calls", 5),
-    pad("last call", 24),
+  const header = gameTableRow([
+    "game",
+    "user",
+    "created",
+    "updated",
+    "calls",
+    "last call",
     "prompt",
-  ].join("  ");
-  const rows = summaries.map((s) =>
-    gameLine(s.game, String(s.callCount), iso(s.lastCallAt), s.lastPromptVersion ?? MISSING),
+  ]);
+  const rows = summaries.map(({ game, callCount, lastCallAt, lastPromptVersion }) =>
+    gameTableRow([
+      game.id,
+      game.userId.slice(0, 8),
+      iso(game.createdAt),
+      iso(game.updatedAt),
+      String(callCount),
+      iso(lastCallAt),
+      lastPromptVersion ?? MISSING,
+    ]),
   );
   return [header, ...rows].join("\n");
 }
@@ -284,37 +282,44 @@ export async function renderGames(db: Db): Promise<string> {
 // Lookups
 // ---------------------------------------------------------------------------------------------
 
+/** The one row an id prefix matched; none or several is an error naming `noun` / `plural`. */
+function uniqueMatch<T extends { readonly id: string }>(
+  matches: readonly T[],
+  idOrPrefix: string,
+  noun: string,
+  plural: string,
+): T {
+  const [only] = matches;
+  if (matches.length === 1 && only !== undefined) return only;
+  if (matches.length === 0) throw new NarratorLogError(`No ${noun} matches ${idOrPrefix}.`);
+  throw new NarratorLogError(
+    `${matches.length} ${plural} match ${idOrPrefix}: ${matches.map((m) => m.id).join(", ")}`,
+  );
+}
+
 async function resolveGame(db: Db, idOrPrefix: string | undefined): Promise<GameRow> {
   if (idOrPrefix === undefined) {
     const [latest] = await db.listGamesWithNarratorStats();
     if (latest === undefined) throw new NarratorLogError("No games in the database.");
     return latest.game;
   }
-  const matches = await db.findGamesByIdPrefix(idOrPrefix);
-  if (matches.length === 1 && matches[0] !== undefined) return matches[0];
-  if (matches.length === 0) throw new NarratorLogError(`No game matches ${idOrPrefix}.`);
-  throw new NarratorLogError(
-    `${matches.length} games match ${idOrPrefix}: ${matches.map((g) => g.id).join(", ")}`,
-  );
+  return uniqueMatch(await db.findGamesByIdPrefix(idOrPrefix), idOrPrefix, "game", "games");
 }
 
 async function resolveCall(db: Db, idOrPrefix: string): Promise<NarratorCallRow> {
   const matches = await db.findNarratorCallsByIdPrefix(idOrPrefix);
-  if (matches.length === 1 && matches[0] !== undefined) return matches[0];
-  if (matches.length === 0) throw new NarratorLogError(`No narrator call matches ${idOrPrefix}.`);
-  throw new NarratorLogError(
-    `${matches.length} calls match ${idOrPrefix}: ${matches.map((c) => c.id).join(", ")}`,
-  );
+  return uniqueMatch(matches, idOrPrefix, "narrator call", "calls");
 }
 
-export interface CallsOptions {
-  readonly game?: string;
-  readonly last?: number;
-  readonly hook?: string;
-  readonly status?: NarratorCallStatus;
+/** `calls` flags; an absent flag is `undefined`. */
+interface CallsOptions {
+  readonly game: string | undefined;
+  readonly last: number | undefined;
+  readonly hook: string | undefined;
+  readonly status: NarratorCallStatus | undefined;
 }
 
-export async function renderCalls(db: Db, options: CallsOptions): Promise<string> {
+async function renderCalls(db: Db, options: CallsOptions): Promise<string> {
   const game = await resolveGame(db, options.game);
   const filter: NarratorCallFilter = {
     gameId: game.id,
@@ -328,11 +333,7 @@ export async function renderCalls(db: Db, options: CallsOptions): Promise<string
   return [heading, ...calls.map(renderCallSummary)].join("\n\n");
 }
 
-export async function renderCall(db: Db, idOrPrefix: string, raw: boolean): Promise<string> {
-  return renderCallDetail(await resolveCall(db, idOrPrefix), raw);
-}
-
-export async function renderGameNotes(db: Db, idOrPrefix: string | undefined): Promise<string> {
+async function renderGameNotes(db: Db, idOrPrefix: string | undefined): Promise<string> {
   const game = await resolveGame(db, idOrPrefix);
   return `game ${game.id} (${game.name}) — narrative notes\n${renderNotes(game.narrativeNotes)}`;
 }
@@ -392,7 +393,7 @@ function contentBundle() {
   return result.bundle;
 }
 
-export async function renderDigest(db: Db, idOrPrefix: string): Promise<string> {
+async function renderDigest(db: Db, idOrPrefix: string): Promise<string> {
   const call = await resolveCall(db, idOrPrefix);
   const snapshot = snapshotOf(call.request);
   const hook = field(call.request, "hook");
@@ -507,20 +508,17 @@ export async function runNarratorLog(db: Db, argv: readonly string[]): Promise<s
   switch (command) {
     case "games":
       return renderGames(db);
-    case "calls": {
-      const game = stringFlag(args.flags, "game");
-      const last = lastFlag(args.flags);
-      const hook = stringFlag(args.flags, "hook");
-      const status = statusFlag(args.flags);
+    case "calls":
       return renderCalls(db, {
-        ...(game === undefined ? {} : { game }),
-        ...(last === undefined ? {} : { last }),
-        ...(hook === undefined ? {} : { hook }),
-        ...(status === undefined ? {} : { status }),
+        game: stringFlag(args.flags, "game"),
+        last: lastFlag(args.flags),
+        hook: stringFlag(args.flags, "hook"),
+        status: statusFlag(args.flags),
       });
+    case "call": {
+      const call = await resolveCall(db, requirePositional(args, 1, "call id"));
+      return renderCallDetail(call, args.flags.get("raw") === true);
     }
-    case "call":
-      return renderCall(db, requirePositional(args, 1, "call id"), args.flags.get("raw") === true);
     case "notes":
       return renderGameNotes(db, stringFlag(args.flags, "game"));
     case "digest":
