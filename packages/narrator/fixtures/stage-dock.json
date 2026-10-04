@@ -30,8 +30,8 @@
   "snapshot": {
     "schemaVersion": 8,
     "simVersion": "0.1.0",
-    "contentHash": "558f49afaed0a580",
-    "configHash": "558f49afaed0a580",
+    "contentHash": "6fce21442a5d7155",
+    "configHash": "6fce21442a5d7155",
     "savedAtTick": 1600,
     "config": {
       "time": {
@@ -121,6 +121,7 @@
         "nominalSpeed": 1,
         "staffEstimateSeconds": 0,
         "departureMinOutput": 0.5,
+        "limpSpeedFraction": 0.2,
         "recallAboardSeconds": 60,
         "localShuffleSeconds": 8,
         "dockHandGiveUpSeconds": 30,
@@ -161,6 +162,11 @@
           "ashoreDaysMax": 0.15,
           "overdueDays": 0.1
         },
+        "sparesReserve": 2,
+        "foodReserve": {
+          "lowBelowDays": 2,
+          "restockToDays": 5
+        },
         "market": {
           "priceTiers": {
             "cheap": 0.6,
@@ -182,6 +188,7 @@
         "budgetRefillDays": 0.25,
         "hookOnEvents": [
           "driftingChanged",
+          "shipLimping",
           "contractCompleted",
           "departureRiskAccepted",
           "departureHoldLifted",
@@ -260,7 +267,7 @@
       "nextId": {
         "actor": 10,
         "machine": 34,
-        "item": 13,
+        "item": 22,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -2005,6 +2012,123 @@
         },
         "i10": {
           "id": "i10",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 9.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i11": {
+          "id": "i11",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 10.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i12": {
+          "id": "i12",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 11.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i13": {
+          "id": "i13",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 12.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i14": {
+          "id": "i14",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 13.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i15": {
+          "id": "i15",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 14.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i16": {
+          "id": "i16",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 15.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i17": {
+          "id": "i17",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 16.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i18": {
+          "id": "i18",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 17.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i19": {
+          "id": "i19",
           "defId": "item.coolant_canister",
           "stacking": "stack",
           "location": {
@@ -2016,8 +2140,8 @@
           "count": 4,
           "reserved": 0
         },
-        "i11": {
-          "id": "i11",
+        "i20": {
+          "id": "i20",
           "defId": "item.med_kit",
           "stacking": "stack",
           "location": {
@@ -2029,8 +2153,8 @@
           "count": 3,
           "reserved": 0
         },
-        "i12": {
-          "id": "i12",
+        "i21": {
+          "id": "i21",
           "defId": "item.hand_truck",
           "stacking": "unique",
           "location": {
@@ -2101,7 +2225,7 @@
             "price": 60
           },
           "item.ration_pack": {
-            "count": 20,
+            "count": 160,
             "price": 8
           },
           "item.med_kit": {
@@ -2117,6 +2241,10 @@
           "item.coolant_canister": {
             "count": 2,
             "price": 75
+          },
+          "item.ration_pack": {
+            "count": 60,
+            "price": 10
           }
         },
         "port.green_meridian": {
@@ -2125,7 +2253,7 @@
             "price": 150
           },
           "item.ration_pack": {
-            "count": 30,
+            "count": 200,
             "price": 6
           }
         },
@@ -2143,7 +2271,7 @@
             "price": 110
           },
           "item.ration_pack": {
-            "count": 6,
+            "count": 40,
             "price": 14
           }
         },
@@ -2153,7 +2281,7 @@
             "price": 55
           },
           "item.ration_pack": {
-            "count": 12,
+            "count": 80,
             "price": 9
           },
           "item.spare_parts_stack": {
@@ -2163,7 +2291,7 @@
         },
         "port.terns_rest": {
           "item.ration_pack": {
-            "count": 10,
+            "count": 60,
             "price": 12
           },
           "item.coolant_canister": {

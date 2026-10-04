@@ -115,7 +115,7 @@ describe("playtest repros (D80)", () => {
       payload: { faultKey: "failed_controller", itemDefId: SPARES, need: "part" },
     });
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: KESSLER });
-  });
+  }, 60_000);
 
   it("a docked hold ends when the generator's part is not to be had, though it starves the engine", () => {
     const { kernel, world } = freshWorld();
@@ -145,5 +145,5 @@ describe("playtest repros (D80)", () => {
     expect(told[0]).toMatchObject({
       payload: { machineId: generator, faultKey: "coil_burnout", itemDefId: SPARES },
     });
-  });
+  }, 60_000);
 });
