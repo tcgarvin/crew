@@ -4,7 +4,8 @@
  * voyage stays and the sim routes on from wherever the ship docks). A port beyond one hop
  * (passengers-and-galaxy §2.3) sets `voyageDestinationId` and makes the first hop of
  * `shortestPath` the leg. Either way this enters `preparingDeparture` (or, while cargo work is
- * open, plans the course and waits docked — see `apply`); the travel system (`travel.ts`) then
+ * open or (D78) the course has yet to be plotted at the nav terminal, plans the course and waits
+ * docked — see `apply`; a course set is always unplotted); the travel system (`travel.ts`) then
  * holds progress there until ramps are closed, cargo is loaded and (if required) the bridge is
  * staffed.
  */
@@ -21,6 +22,7 @@ import {
 } from "../../core/commands";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { MachineId, PortDefId } from "../../core/types/ids";
+import { coursePlotRequired } from "./course";
 import { impairmentKey } from "./departure-gate";
 import { shortestPath } from "./graph";
 import { livePassage } from "./in-hand";
@@ -77,7 +79,9 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     if (plan.voyageDestinationId !== undefined) {
       travel.voyageDestinationId = plan.voyageDestinationId;
     }
-    if (departureWaits(ctx)) {
+    // D78: a new course is an unplotted one (a detour too: it re-raises `courseToPlot`), and with
+    // a nav terminal aboard departure prep waits for the plot as it waits for cargo.
+    if (departureWaits(ctx) || coursePlotRequired(ctx)) {
       // Stay docked with the course planned; the travel system begins departure prep once
       // nothing holds the ship any more.
       ctx.state.travel = {
@@ -134,6 +138,8 @@ export const holdDepartureForRepairs: CommandHandler<"holdDepartureForRepairs", 
         stage: "docked",
         portId: fromPortId,
         plannedDestinationId: toPortId,
+        // D78: prep only began on a plotted course, and it is the same course.
+        ...(coursePlotRequired(ctx) ? { coursePlotted: true as const } : {}),
         ...carriedVoyageFields(travel),
       };
       ctx.state.travel = travel;
