@@ -89,14 +89,8 @@ export type SimEvent = { [T in EventType]: EventEnvelope<T> }[EventType];
 
 /** What a system passes to `ctx.emit`; phase 8 completes it. */
 export type EventDraft = {
-  [T in EventType]: {
-    readonly type: T;
-    readonly subjectIds: readonly EntityId[];
-    readonly locationRef?: LocationRef;
-    readonly causeIds: readonly (EventId | CommandId)[];
-    readonly source: EventSource;
+  [T in EventType]: Omit<EventEnvelope<T>, "id" | "tick" | "seq" | "significance"> & {
     /** Override the catalog default. */
     readonly significance?: Significance;
-    readonly payload: EventPayloadMap[T];
   };
 }[EventType];
