@@ -141,12 +141,14 @@ function isKnownCommandId(state: ReadonlyWorldState, id: CommandId): boolean {
   );
 }
 
+/** Append `value` to `list`, dropping the oldest entries beyond `cap`. */
+export function pushCapped<T>(list: T[], value: T, cap: number): void {
+  list.push(value);
+  if (list.length > cap) list.splice(0, list.length - cap);
+}
+
 function rememberCommandId(world: Pick<World, "state">, id: CommandId): void {
-  const recent = world.state.commands.recentIds;
-  recent.push(id);
-  if (recent.length > RECENT_COMMAND_IDS_CAP) {
-    recent.splice(0, recent.length - RECENT_COMMAND_IDS_CAP);
-  }
+  pushCapped(world.state.commands.recentIds, id, RECENT_COMMAND_IDS_CAP);
 }
 
 /** Validate and queue. No state change on rejection. */
