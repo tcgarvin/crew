@@ -5,14 +5,14 @@
  */
 import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
 import { configTicks } from "./clock";
-import { applyDueCommands } from "./commands";
+import { applyDueCommands, pushCapped } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
 import { createEventBuffer } from "./events";
 import { raiseHookIfIdle } from "./hooks";
 import type { KernelRegistry } from "./registry";
 import { createRngApi } from "./rng";
-import type { EventDraft, SimEvent } from "./types/events";
+import type { SimEvent } from "./types/events";
 import type { ActorId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { PlannerConfig, PlannerStage, StepCtx, System } from "./types/pipeline";
@@ -146,10 +146,11 @@ function runPlannerStage(
     actor.pendingIntent = intent;
     actor.lastPlannedTick = base.tick;
     if (intent.kind === "task" || intent.kind === "personal") {
-      const traces = caches.diagnostics.plannerTraces;
-      traces.push({ tick: base.tick, actorId, intent });
-      const ringSize = config.events.traceRingSize;
-      if (traces.length > ringSize) traces.splice(0, traces.length - ringSize);
+      pushCapped(
+        caches.diagnostics.plannerTraces,
+        { tick: base.tick, actorId, intent },
+        config.events.traceRingSize,
+      );
     }
   }
 }
@@ -213,14 +214,13 @@ export const decisionPendingSystem: System = {
     if (kernelCache.announcedDecisionId === head) return;
     kernelCache.announcedDecisionId = head;
     const decision = ctx.state.decisions.records[head];
-    const draft: EventDraft = {
+    ctx.emit({
       type: "decisionPending",
       subjectIds: decision === undefined ? [head] : [head, decision.perspectiveActorId],
       causeIds: [],
       source: "sim",
       payload: { decisionId: head },
-    };
-    ctx.emit(draft);
+    });
   },
 };
 
