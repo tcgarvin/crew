@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { loadBundle, rawBundle } from "./loader";
 import { validateBundle } from "./schemas/validate";
+import { dockWalkableMask } from "./schemas/validate-dock";
+
+/** The authored bundle, which must validate. */
+function authoredBundle() {
+  const result = loadBundle();
+  if (!result.ok) throw new Error("content bundle failed validation");
+  return result.bundle;
+}
 
 describe("loadBundle", () => {
   it("loads and validates the authored content bundle clean (L1-L3)", () => {
@@ -45,18 +53,16 @@ describe("loadBundle", () => {
   });
 
   it("gives every crew member a voice of their own (D38)", () => {
-    const result = loadBundle();
-    if (!result.ok) throw new Error("content bundle failed validation");
-    const voices = Object.values(result.bundle.crew).map((c) => c.voice);
+    const bundle = authoredBundle();
+    const voices = Object.values(bundle.crew).map((c) => c.voice);
     expect(voices).toHaveLength(9);
     for (const voice of voices) expect(voice.trim().split(/\s+/).length).toBeLessThan(60);
     expect(new Set(voices).size).toBe(9);
   });
 
   it("ships a generic passenger template with no skills, role tags or inventory", () => {
-    const result = loadBundle();
-    if (!result.ok) throw new Error("content bundle failed validation");
-    const passenger = result.bundle.crew["crew.passenger" as keyof typeof result.bundle.crew];
+    const bundle = authoredBundle();
+    const passenger = bundle.crew["crew.passenger" as keyof typeof bundle.crew];
     expect(passenger).toBeDefined();
     expect(passenger?.skills).toEqual({});
     expect(passenger?.roleTags).toEqual([]);
@@ -65,22 +71,21 @@ describe("loadBundle", () => {
   });
 
   it("gives every port a market, well stocked at the Hub and bare at Green Meridian (D47)", () => {
-    const result = loadBundle();
-    if (!result.ok) throw new Error("content bundle failed validation");
+    const bundle = authoredBundle();
     const parts = (portId: string) =>
-      result.bundle.ports[portId as keyof typeof result.bundle.ports]?.market.find(
+      bundle.ports[portId as keyof typeof bundle.ports]?.market.find(
         (line) => line.itemDefId === "item.spare_parts_stack",
       );
     expect(parts("port.crossroads_hub")).toMatchObject({ count: 4 });
     expect(parts("port.kessler_drift")).toMatchObject({ count: 1 });
     expect(parts("port.green_meridian")).toMatchObject({ count: 0 });
-    for (const port of Object.values(result.bundle.ports)) {
+    for (const port of Object.values(bundle.ports)) {
       for (const line of port.market) {
-        expect(result.bundle.items[line.itemDefId]).toBeDefined();
+        expect(bundle.items[line.itemDefId]).toBeDefined();
         expect(line.price).toBeGreaterThan(0);
       }
     }
-    expect(result.bundle.config.commerce.market.maxStockPerCommand).toBe(4);
+    expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
   it("has 8 crew plus the passenger template, 10 traits and the default scenario", () => {
@@ -124,9 +129,8 @@ describe("port distances (D10: short hop <= ~30s)", () => {
 });
 
 describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
-  const result = loadBundle();
-  if (!result.ok) throw new Error("content bundle failed validation");
-  const ports = result.bundle.ports;
+  const bundle = authoredBundle();
+  const ports = bundle.ports;
   const ids = Object.keys(ports).sort();
 
   it("has the three core ports and three far ports", () => {
@@ -172,7 +176,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
   });
 
   it("gives every port one dock map, with at least one regular posted on it (Dockside §3.3)", () => {
-    const docks = Object.values(result.bundle.docks ?? {});
+    const docks = Object.values(bundle.docks ?? {});
     for (const port of Object.values(ports)) {
       expect(docks.filter((d) => d.portId === port.id).length, port.id).toBe(1);
       expect(
@@ -188,17 +192,10 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     // The delivery's receiver waits at the warehouse door and is sent for the crates only once
     // the hand truck is parked, which is when departure prep begins: a long walk (Kessler's was
     // 27 steps round the conveyor) loses the race to the cast-off.
-    for (const dock of Object.values(result.bundle.docks ?? {})) {
-      const blocked = new Set<string>();
-      for (const prop of dock.props) {
-        if (!prop.blocking) continue;
-        for (let dy = 0; dy < prop.rect.h; dy++) {
-          for (let dx = 0; dx < prop.rect.w; dx++)
-            blocked.add(`${prop.rect.x + dx},${prop.rect.y + dy}`);
-        }
-      }
+    for (const dock of Object.values(bundle.docks ?? {})) {
+      const mask = dockWalkableMask(dock);
       const floor = (x: number, y: number) =>
-        dock.legend[dock.rows[y]?.[x] ?? " "] === "floor" && !blocked.has(`${x},${y}`);
+        x >= 0 && y >= 0 && x < dock.width && y < dock.height && mask[y * dock.width + x] === 1;
       const door = dock.posts.find((p) => p.kind === "warehouseDoor");
       const bay = dock.areas.find((a) => a.kind === "deliveryBay")?.rect;
       if (door === undefined || bay === undefined) throw new Error(`${dock.id}: no door or bay`);

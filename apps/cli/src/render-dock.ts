@@ -3,6 +3,7 @@
  * `crew content render-dock`, which writes it into the README next to each dock file under
  * `packages/content/data/docks/`).
  */
+import { dockRampLandings } from "@crew/content";
 import type { DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
 
 const BASE_CHAR: Readonly<Record<string, string>> = {
@@ -31,20 +32,6 @@ function rectText(rect: DockRect): string {
   return `(${rect.x},${rect.y}) ${rect.w} x ${rect.h}`;
 }
 
-/** Dock-frame landing tile of each ramp door on the deck. */
-export function rampLandings(dock: DockDef, deck: DeckDef): { key: string; tile: TileCoord }[] {
-  const delta = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
-  return deck.doors
-    .filter((door) => door.kind === "ramp")
-    .map((door) => {
-      const [dx, dy] = delta[door.edge.side];
-      return {
-        key: door.key,
-        tile: { x: door.edge.x + dx + dock.shipAt.x, y: door.edge.y + dy + dock.shipAt.y },
-      };
-    });
-}
-
 /** The map grid with the ship, areas, props, landings and posts drawn in, plus rulers. */
 function compositeMap(dock: DockDef, deck: DeckDef): string[] {
   const grid = dock.rows.map((row) =>
@@ -65,7 +52,7 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
   for (const prop of dock.props) {
     for (const t of rectTiles(prop.rect)) put(t, prop.blocking ? "%" : ":");
   }
-  for (const landing of rampLandings(dock, deck)) put(landing.tile, "v");
+  for (const landing of dockRampLandings(dock, deck)) put(landing.tile, "v");
   dock.posts.forEach((post, i) => put(post.tile, POST_CHARS[i] ?? "*"));
 
   const xs = [...Array(dock.width).keys()];
@@ -104,7 +91,7 @@ export function renderDock(dock: DockDef, deck: DeckDef, port: PortDef): string 
   });
   lines.push("");
   lines.push("Ramp landings:");
-  for (const landing of rampLandings(dock, deck)) {
+  for (const landing of dockRampLandings(dock, deck)) {
     lines.push(`  ${landing.key}: (${landing.tile.x},${landing.tile.y})`);
   }
   lines.push("");

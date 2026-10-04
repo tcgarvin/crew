@@ -27,7 +27,7 @@ export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
 export * from "./validate";
-export { DOCK_MAX_HEIGHT, DOCK_MAX_WIDTH, dockOfPort, dockWalkableMask } from "./validate-dock";
+export { dockRampLandings, dockWalkableMask } from "./validate-dock";
 
 /** Every def schema by name; the JSON Schema export and tests iterate this. */
 export const DEF_SCHEMAS = {

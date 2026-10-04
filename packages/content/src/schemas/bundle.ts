@@ -34,6 +34,6 @@ export const contentBundleSchema = z.strictObject({
   /** Dockside §3: required for authored content (it may be empty); optional in the sim type. */
   docks: z.record(dockDefIdSchema, dockDefSchema),
   config: configDefSchema,
-  /** SHA-256 hex of the canonical bundle, filled in by the bundle compiler. */
+  /** Cache-busting fingerprint of the canonical bundle, filled in by `loader.ts` (D4/D13). */
   hash: z.string(),
 }) satisfies z.ZodType<ContentBundle>;

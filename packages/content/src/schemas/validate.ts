@@ -31,11 +31,14 @@ import type {
   TraitDef,
 } from "@crew/sim";
 import { contentBundleSchema } from "./bundle";
+import { neighborTile, tileKey } from "./geometry";
 import {
   type Path,
   type ValidationIssue,
   type ValidationLevel,
   checkDuplicateLocalKeys,
+  checkLocalKeyLists,
+  checkRef,
   issue,
 } from "./issues";
 import { checkCastSeedPosts, checkDockPhysical, checkDockReferences } from "./validate-dock";
@@ -45,14 +48,6 @@ export type { ValidationIssue, ValidationLevel };
 export type ValidationResult =
   | { readonly ok: true; readonly bundle: ContentBundle }
   | { readonly ok: false; readonly issues: readonly ValidationIssue[] };
-
-/** Thrown by validation levels that are not built yet. */
-export class NotImplementedError extends Error {
-  constructor(what: string) {
-    super(`${what} is not implemented yet`);
-    this.name = "NotImplementedError";
-  }
-}
 
 /** L1: shape, types, enums, bounds. */
 export function validateStructure(input: unknown): ValidationResult {
@@ -86,22 +81,15 @@ function checkNamespaces(bundle: ContentBundle, issues: ValidationIssue[]): void
   for (const [table, namespace] of Object.entries(NAMESPACE_BY_TABLE)) {
     const defs = (bundle as unknown as Record<string, Record<string, { id: string }>>)[table] ?? {};
     for (const [key, def] of Object.entries(defs)) {
+      const path: Path = [table, key, "id"];
       if (key !== def.id) {
         issues.push(
-          issue(
-            "referential",
-            [table, key, "id"],
-            `record key "${key}" does not match id "${def.id}"`,
-          ),
+          issue("referential", path, `record key "${key}" does not match id "${def.id}"`),
         );
       }
       if (!def.id.startsWith(`${namespace}.`) && !def.id.startsWith("gen.")) {
         issues.push(
-          issue(
-            "referential",
-            [table, key, "id"],
-            `id "${def.id}" must start with "${namespace}." or "gen."`,
-          ),
+          issue("referential", path, `id "${def.id}" must start with "${namespace}." or "gen."`),
         );
       }
     }
@@ -128,156 +116,92 @@ function checkFiniteNumbers(value: unknown, path: Path, issues: ValidationIssue[
 
 function checkDeck(deck: DeckDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   const path: Path = ["decks", deck.id];
-  const doorKeys = new Set(deck.doors.map((d) => d.key));
+  checkLocalKeyLists(
+    path,
+    [
+      ["compartments", "compartment", deck.compartments.map((c) => c.key)],
+      ["doors", "door", deck.doors.map((d) => d.key)],
+      ["machines", "machine placement", deck.machines.map((m) => m.key)],
+      ["zones", "zone", deck.zones.map((z) => z.key)],
+      ["spawnPoints", "spawn point", deck.spawnPoints.map((s) => s.key)],
+      ["powerDomains", "power domain", deck.powerDomains.map((p) => p.key)],
+    ],
+    issues,
+  );
+
   const powerDomainKeys = new Set(deck.powerDomains.map((p) => p.key));
-
-  checkDuplicateLocalKeys(
-    deck.compartments.map((c) => c.key),
-    [...path, "compartments"],
-    "compartment",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    deck.doors.map((d) => d.key),
-    [...path, "doors"],
-    "door",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    deck.machines.map((m) => m.key),
-    [...path, "machines"],
-    "machine placement",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    deck.zones.map((z) => z.key),
-    [...path, "zones"],
-    "zone",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    deck.spawnPoints.map((s) => s.key),
-    [...path, "spawnPoints"],
-    "spawn point",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    deck.powerDomains.map((p) => p.key),
-    [...path, "powerDomains"],
-    "power domain",
-    issues,
-  );
-
+  const checkPowerDomain = (domain: string | undefined, domainPath: Path) => {
+    if (domain !== undefined && !powerDomainKeys.has(domain)) {
+      issues.push(issue("referential", domainPath, `unknown power domain "${domain}"`));
+    }
+  };
   deck.doors.forEach((door, i) => {
-    if (door.powerDomain !== undefined && !powerDomainKeys.has(door.powerDomain)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "doors", i, "powerDomain"],
-          `unknown power domain "${door.powerDomain}"`,
-        ),
-      );
-    }
+    checkPowerDomain(door.powerDomain, [...path, "doors", i, "powerDomain"]);
   });
-
   deck.machines.forEach((placement, i) => {
-    if (!(placement.machineDefId in bundle.machines)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "machines", i, "machineDefId"],
-          `unknown machine def "${placement.machineDefId}"`,
-        ),
-      );
-    }
-    if (placement.powerDomain !== undefined && !powerDomainKeys.has(placement.powerDomain)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "machines", i, "powerDomain"],
-          `unknown power domain "${placement.powerDomain}"`,
-        ),
-      );
-    }
+    const placementPath: Path = [...path, "machines", i];
+    checkRef(
+      bundle.machines,
+      placement.machineDefId,
+      "machine def",
+      [...placementPath, "machineDefId"],
+      issues,
+    );
+    checkPowerDomain(placement.powerDomain, [...placementPath, "powerDomain"]);
   });
 
-  if (!doorKeys.has(deck.docking.cargoRampDoorKey)) {
-    issues.push(
-      issue(
-        "referential",
-        [...path, "docking", "cargoRampDoorKey"],
-        `unknown door key "${deck.docking.cargoRampDoorKey}"`,
-      ),
-    );
-  }
-  if (!doorKeys.has(deck.docking.personnelRampDoorKey)) {
-    issues.push(
-      issue(
-        "referential",
-        [...path, "docking", "personnelRampDoorKey"],
-        `unknown door key "${deck.docking.personnelRampDoorKey}"`,
-      ),
-    );
+  const doorKeys = new Set(deck.doors.map((d) => d.key));
+  for (const field of ["cargoRampDoorKey", "personnelRampDoorKey"] as const) {
+    const doorKey = deck.docking[field];
+    if (!doorKeys.has(doorKey)) {
+      issues.push(
+        issue("referential", [...path, "docking", field], `unknown door key "${doorKey}"`),
+      );
+    }
   }
 }
 
 function checkMachine(machine: MachineDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   const path: Path = ["machines", machine.id];
-  checkDuplicateLocalKeys(
-    machine.interactionPositions.map((p) => p.key),
-    [...path, "interactionPositions"],
-    "interaction position",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    machine.faults.map((f) => f.key),
-    [...path, "faults"],
-    "fault",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    machine.components.map((c) => c.slot),
-    [...path, "components"],
-    "component slot",
+  checkLocalKeyLists(
+    path,
+    [
+      [
+        "interactionPositions",
+        "interaction position",
+        machine.interactionPositions.map((p) => p.key),
+      ],
+      ["faults", "fault", machine.faults.map((f) => f.key)],
+      ["components", "component slot", machine.components.map((c) => c.slot)],
+    ],
     issues,
   );
 
   machine.components.forEach((c, i) => {
-    if (!(c.itemDefId in bundle.items)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "components", i, "itemDefId"],
-          `unknown item "${c.itemDefId}"`,
-        ),
-      );
-    }
+    checkRef(bundle.items, c.itemDefId, "item", [...path, "components", i, "itemDefId"], issues);
   });
 
   const checkStep = (stepPath: Path, step: { consumes: readonly { itemDefId: string }[] }) => {
     step.consumes.forEach((c, i) => {
-      if (!(c.itemDefId in bundle.items)) {
-        issues.push(
-          issue(
-            "referential",
-            [...stepPath, "consumes", i, "itemDefId"],
-            `unknown item "${c.itemDefId}"`,
-          ),
-        );
-      }
+      checkRef(
+        bundle.items,
+        c.itemDefId,
+        "item",
+        [...stepPath, "consumes", i, "itemDefId"],
+        issues,
+      );
     });
   };
 
   machine.faults.forEach((fault, fi) => {
+    const stepsPath: Path = [...path, "faults", fi, "repair", "steps"];
     checkDuplicateLocalKeys(
       fault.repair.steps.map((s) => s.key),
-      [...path, "faults", fi, "repair", "steps"],
+      stepsPath,
       "recipe step",
       issues,
     );
-    fault.repair.steps.forEach((step, si) =>
-      checkStep([...path, "faults", fi, "repair", "steps", si], step),
-    );
+    fault.repair.steps.forEach((step, si) => checkStep([...stepsPath, si], step));
   });
 
   if (machine.maintenance !== undefined) {
@@ -286,31 +210,26 @@ function checkMachine(machine: MachineDef, bundle: ContentBundle, issues: Valida
 }
 
 function checkItem(item: ItemDef, issues: ValidationIssue[]): void {
+  const path: Path = ["items", item.id];
   if (item.stacking === "unique" && item.maxStack !== 1) {
     issues.push(
-      issue(
-        "referential",
-        ["items", item.id, "maxStack"],
-        `unique item "${item.id}" must have maxStack 1`,
-      ),
+      issue("referential", [...path, "maxStack"], `unique item "${item.id}" must have maxStack 1`),
     );
   }
   // D65: a hand truck is one unique thing with a load it can carry, and only a hand truck has one.
   const truck = item.toolKinds.includes("handTruck");
-  const path: Path = ["items", item.id, "capacityUnits"];
+  const capacityPath: Path = [...path, "capacityUnits"];
   if (truck && (item.capacityUnits === undefined || item.capacityUnits < 2)) {
     issues.push(
-      issue("physical", path, `hand truck "${item.id}" needs capacityUnits of at least 2`),
+      issue("physical", capacityPath, `hand truck "${item.id}" needs capacityUnits of at least 2`),
     );
   }
   if (truck && item.stacking !== "unique") {
-    issues.push(
-      issue("physical", ["items", item.id, "stacking"], `hand truck "${item.id}" must be unique`),
-    );
+    issues.push(issue("physical", [...path, "stacking"], `hand truck "${item.id}" must be unique`));
   }
   if (!truck && item.capacityUnits !== undefined) {
     issues.push(
-      issue("referential", path, `only a handTruck tool has capacityUnits ("${item.id}")`),
+      issue("referential", capacityPath, `only a handTruck tool has capacityUnits ("${item.id}")`),
     );
   }
 }
@@ -318,20 +237,16 @@ function checkItem(item: ItemDef, issues: ValidationIssue[]): void {
 function checkCrew(crew: CrewDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   const path: Path = ["crew", crew.id];
   (crew.traits ?? []).forEach((traitId, i) => {
-    if (!(traitId in bundle.traits)) {
-      issues.push(issue("referential", [...path, "traits", i], `unknown trait "${traitId}"`));
-    }
+    checkRef(bundle.traits, traitId, "trait", [...path, "traits", i], issues);
   });
   crew.startingInventory.forEach((ic, i) => {
-    if (!(ic.itemDefId in bundle.items)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "startingInventory", i, "itemDefId"],
-          `unknown item "${ic.itemDefId}"`,
-        ),
-      );
-    }
+    checkRef(
+      bundle.items,
+      ic.itemDefId,
+      "item",
+      [...path, "startingInventory", i, "itemDefId"],
+      issues,
+    );
   });
   if (!bundle.config.shifts.shifts.some((s) => s.key === crew.shift)) {
     issues.push(issue("referential", [...path, "shift"], `unknown shift "${crew.shift}"`));
@@ -340,41 +255,25 @@ function checkCrew(crew: CrewDef, bundle: ContentBundle, issues: ValidationIssue
 
 function checkTrait(trait: TraitDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   trait.excludes.forEach((traitId, i) => {
-    if (!(traitId in bundle.traits)) {
-      issues.push(
-        issue("referential", ["traits", trait.id, "excludes", i], `unknown trait "${traitId}"`),
-      );
-    }
+    checkRef(bundle.traits, traitId, "trait", ["traits", trait.id, "excludes", i], issues);
   });
 }
 
 function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   const path: Path = ["ports", port.id];
-  checkDuplicateLocalKeys(
-    port.externalStores.map((s) => s.key),
-    [...path, "externalStores"],
-    "external store",
-    issues,
-  );
-  checkDuplicateLocalKeys(
-    port.jobTemplates.map((j) => j.key),
-    [...path, "jobTemplates"],
-    "job template",
+  checkLocalKeyLists(
+    path,
+    [
+      ["externalStores", "external store", port.externalStores.map((s) => s.key)],
+      ["jobTemplates", "job template", port.jobTemplates.map((j) => j.key)],
+    ],
     issues,
   );
 
   // D47: a market line names a real item, once per port.
   const marketItems = new Set<string>();
   port.market.forEach((line, i) => {
-    if (!(line.itemDefId in bundle.items)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "market", i, "itemDefId"],
-          `unknown item "${line.itemDefId}"`,
-        ),
-      );
-    }
+    checkRef(bundle.items, line.itemDefId, "item", [...path, "market", i, "itemDefId"], issues);
     if (marketItems.has(line.itemDefId)) {
       issues.push(
         issue("referential", [...path, "market", i], `duplicate market item "${line.itemDefId}"`),
@@ -384,30 +283,16 @@ function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue
   });
 
   port.jobTemplates.forEach((job, i) => {
-    if (!(job.toPortId in bundle.ports)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "jobTemplates", i, "toPortId"],
-          `unknown port "${job.toPortId}"`,
-        ),
-      );
-    }
+    const jobPath: Path = [...path, "jobTemplates", i];
+    checkRef(bundle.ports, job.toPortId, "port", [...jobPath, "toPortId"], issues);
     job.cargo.forEach((c, ci) => {
-      if (!(c.itemDefId in bundle.items)) {
-        issues.push(
-          issue(
-            "referential",
-            [...path, "jobTemplates", i, "cargo", ci, "itemDefId"],
-            `unknown item "${c.itemDefId}"`,
-          ),
-        );
-      }
+      const cargoPath: Path = [...jobPath, "cargo", ci];
+      checkRef(bundle.items, c.itemDefId, "item", [...cargoPath, "itemDefId"], issues);
       if (c.countMin > c.countMax) {
         issues.push(
           issue(
             "referential",
-            [...path, "jobTemplates", i, "cargo", ci],
+            cargoPath,
             `countMin (${c.countMin}) exceeds countMax (${c.countMax})`,
           ),
         );
@@ -416,30 +301,18 @@ function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue
   });
 
   port.routes.forEach((route, i) => {
-    if (!(route.toPortId in bundle.ports)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "routes", i, "toPortId"],
-          `unknown port "${route.toPortId}"`,
-        ),
-      );
-      return;
-    }
+    const routePath: Path = [...path, "routes", i];
+    if (!checkRef(bundle.ports, route.toPortId, "port", [...routePath, "toPortId"], issues)) return;
     const back = bundle.ports[route.toPortId]?.routes.find((r) => r.toPortId === port.id);
     if (back === undefined) {
       issues.push(
-        issue(
-          "referential",
-          [...path, "routes", i],
-          `route to "${route.toPortId}" has no return route from it`,
-        ),
+        issue("referential", routePath, `route to "${route.toPortId}" has no return route from it`),
       );
     } else if (back.distance !== route.distance) {
       issues.push(
         issue(
           "referential",
-          [...path, "routes", i, "distance"],
+          [...routePath, "distance"],
           `route distance ${route.distance} does not match return distance ${back.distance}`,
         ),
       );
@@ -457,47 +330,29 @@ function checkScenario(
   if (deck === undefined) {
     issues.push(issue("referential", [...path, "deckId"], `unknown deck "${scenario.deckId}"`));
   }
-  if (!(scenario.startPortId in bundle.ports)) {
-    issues.push(
-      issue("referential", [...path, "startPortId"], `unknown port "${scenario.startPortId}"`),
-    );
-  }
+  checkRef(bundle.ports, scenario.startPortId, "port", [...path, "startPortId"], issues);
   scenario.crew.forEach((crewId, i) => {
-    if (!(crewId in bundle.crew)) {
-      issues.push(issue("referential", [...path, "crew", i], `unknown crew "${crewId}"`));
-    }
+    checkRef(bundle.crew, crewId, "crew", [...path, "crew", i], issues);
   });
 
   const zoneKeys = new Set((deck?.zones ?? []).map((z) => z.key));
   scenario.startingItems.forEach((si, i) => {
-    if (!(si.itemDefId in bundle.items)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "startingItems", i, "itemDefId"],
-          `unknown item "${si.itemDefId}"`,
-        ),
-      );
-    }
+    const itemPath: Path = [...path, "startingItems", i];
+    checkRef(bundle.items, si.itemDefId, "item", [...itemPath, "itemDefId"], issues);
     if (deck !== undefined && !zoneKeys.has(si.zoneKey)) {
-      issues.push(
-        issue(
-          "referential",
-          [...path, "startingItems", i, "zoneKey"],
-          `unknown zone "${si.zoneKey}"`,
-        ),
-      );
+      issues.push(issue("referential", [...itemPath, "zoneKey"], `unknown zone "${si.zoneKey}"`));
     }
   });
 
   const placementByKey = new Map((deck?.machines ?? []).map((m) => [m.key, m]));
   scenario.initialFaults.forEach((fault, i) => {
+    const faultPath: Path = [...path, "initialFaults", i];
     const placement = placementByKey.get(fault.placementKey);
     if (placement === undefined) {
       issues.push(
         issue(
           "referential",
-          [...path, "initialFaults", i, "placementKey"],
+          [...faultPath, "placementKey"],
           `unknown machine placement "${fault.placementKey}"`,
         ),
       );
@@ -508,7 +363,7 @@ function checkScenario(
       issues.push(
         issue(
           "referential",
-          [...path, "initialFaults", i, "faultKey"],
+          [...faultPath, "faultKey"],
           `machine "${machine.id}" has no fault "${fault.faultKey}"`,
         ),
       );
@@ -535,9 +390,7 @@ function checkPeople(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const people = bundle.people;
   if (people === undefined) return;
   for (const portId of Object.keys(people.ports)) {
-    if (!(portId in bundle.ports)) {
-      issues.push(issue("referential", ["people", "ports", portId], `unknown port "${portId}"`));
-    }
+    checkRef(bundle.ports, portId, "port", ["people", "ports", portId], issues);
   }
   for (const port of Object.values(bundle.ports)) {
     if (port.jobTemplates.length > 0 && people.ports[port.id] === undefined) {
@@ -579,22 +432,6 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
 // L3: physical / geometric plausibility
 // -------------------------------------------------------------------------------------------
 
-const NEIGHBOR_OFFSET: Record<TileEdge["side"], TileCoord> = {
-  n: { x: 0, y: -1 },
-  s: { x: 0, y: 1 },
-  e: { x: 1, y: 0 },
-  w: { x: -1, y: 0 },
-};
-
-function neighborTile(edge: TileEdge): TileCoord {
-  const d = NEIGHBOR_OFFSET[edge.side];
-  return { x: edge.x + d.x, y: edge.y + d.y };
-}
-
-function tileKey(t: TileCoord): string {
-  return `${t.x},${t.y}`;
-}
-
 /** Rotates an offset clockwise (y grows south) by 0/90/180/270 degrees. */
 function rotateOffset(offset: TileCoord, rotation: 0 | 90 | 180 | 270): TileCoord {
   switch (rotation) {
@@ -609,24 +446,10 @@ function rotateOffset(offset: TileCoord, rotation: 0 | 90 | 180 | 270): TileCoor
   }
 }
 
-function absoluteFootprint(placement: MachinePlacementDef, machine: MachineDef): TileCoord[] {
-  return machine.footprint.map((tile) => {
-    const rotated = rotateOffset(tile, placement.rotation);
-    return { x: placement.origin.x + rotated.x, y: placement.origin.y + rotated.y };
-  });
-}
-
-function absoluteInteractionTiles(
-  placement: MachinePlacementDef,
-  machine: MachineDef,
-): { key: string; tile: TileCoord }[] {
-  return machine.interactionPositions.map((pos) => {
-    const rotated = rotateOffset(pos.offset, placement.rotation);
-    return {
-      key: pos.key,
-      tile: { x: placement.origin.x + rotated.x, y: placement.origin.y + rotated.y },
-    };
-  });
+/** A machine-frame offset in deck coordinates, for this placement. */
+function placeOffset(placement: MachinePlacementDef, offset: TileCoord): TileCoord {
+  const rotated = rotateOffset(offset, placement.rotation);
+  return { x: placement.origin.x + rotated.x, y: placement.origin.y + rotated.y };
 }
 
 function isAdjacent(a: TileCoord, b: TileCoord): boolean {
@@ -635,31 +458,27 @@ function isAdjacent(a: TileCoord, b: TileCoord): boolean {
   return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
 }
 
-/** Deck geometry index: per-tile compartment symbol, bounds and helpers. Rebuilt once per deck. */
+/** Deck geometry index: the compartment under each tile, and floor. Rebuilt once per deck. */
 function buildDeckIndex(deck: DeckDef) {
   const symbolToCompartment = new Map(deck.compartments.map((c) => [c.symbol, c]));
-  const rows = deck.tiles;
 
-  function symbolAt(t: TileCoord): string | undefined {
+  /** Undefined off the grid and on void (symbols are never whitespace). */
+  function compartmentAt(t: TileCoord) {
     if (t.y < 0 || t.y >= deck.height || t.x < 0 || t.x >= deck.width) {
       return undefined;
     }
-    const row = rows[t.y];
-    const ch = row?.[t.x];
-    return ch === " " || ch === undefined ? undefined : ch;
-  }
-
-  function compartmentAt(t: TileCoord) {
-    const sym = symbolAt(t);
-    return sym === undefined ? undefined : symbolToCompartment.get(sym);
+    const ch = deck.tiles[t.y]?.[t.x];
+    return ch === undefined ? undefined : symbolToCompartment.get(ch);
   }
 
   function isFloor(t: TileCoord): boolean {
     return compartmentAt(t) !== undefined;
   }
 
-  return { symbolToCompartment, symbolAt, compartmentAt, isFloor };
+  return { compartmentAt, isFloor };
 }
+
+type DeckIndex = ReturnType<typeof buildDeckIndex>;
 
 function checkDeckTiles(deck: DeckDef, issues: ValidationIssue[]): void {
   const path: Path = ["decks", deck.id];
@@ -698,49 +517,29 @@ function checkDeckTiles(deck: DeckDef, issues: ValidationIssue[]): void {
   });
 }
 
-function checkDeckEdges(
-  deck: DeckDef,
-  index: ReturnType<typeof buildDeckIndex>,
-  issues: ValidationIssue[],
-): void {
+function checkDeckEdges(deck: DeckDef, index: DeckIndex, issues: ValidationIssue[]): void {
   const path: Path = ["decks", deck.id];
 
   function checkBoundary(edgePath: Path, edge: TileEdge, expectHull: boolean, label: string): void {
-    const here = { x: edge.x, y: edge.y };
-    const there = neighborTile(edge);
-    const hereComp = index.compartmentAt(here);
-    const thereComp = index.compartmentAt(there);
+    const hereComp = index.compartmentAt(edge);
+    const thereComp = index.compartmentAt(neighborTile(edge));
     if (hereComp === undefined) {
       issues.push(
-        issue("physical", edgePath, `${label} edge tile (${here.x},${here.y}) is not floor`),
+        issue("physical", edgePath, `${label} edge tile (${edge.x},${edge.y}) is not floor`),
       );
       return;
     }
-    const isHull = thereComp === undefined;
-    if (expectHull && !isHull) {
-      issues.push(
-        issue(
-          "physical",
-          edgePath,
-          `${label} must be on a hull edge (adjacent to void), found compartment "${thereComp?.key}"`,
-        ),
-      );
-    }
-    if (!expectHull) {
-      if (isHull) {
-        issues.push(
-          issue("physical", edgePath, `${label} must be between two compartments, found hull`),
-        );
-      } else if (thereComp !== undefined && thereComp.key === hereComp.key) {
-        issues.push(
-          issue(
-            "physical",
-            edgePath,
-            `${label} must be on a boundary between two different compartments`,
-          ),
-        );
+    let problem: string | undefined;
+    if (expectHull) {
+      if (thereComp !== undefined) {
+        problem = `${label} must be on a hull edge (adjacent to void), found compartment "${thereComp.key}"`;
       }
+    } else if (thereComp === undefined) {
+      problem = `${label} must be between two compartments, found hull`;
+    } else if (thereComp.key === hereComp.key) {
+      problem = `${label} must be on a boundary between two different compartments`;
     }
+    if (problem !== undefined) issues.push(issue("physical", edgePath, problem));
   }
 
   deck.doors.forEach((door, i) => {
@@ -759,15 +558,14 @@ function checkDeckEdges(
 function checkDeckMachines(
   deck: DeckDef,
   bundle: ContentBundle,
-  index: ReturnType<typeof buildDeckIndex>,
+  index: DeckIndex,
   issues: ValidationIssue[],
 ): void {
-  const path: Path = ["decks", deck.id];
   const occupied = new Map<string, string>();
   // A door is "covered" only when a single footprint spans both tiles it connects (blocking the
   // aperture itself); merely sitting on one side of a doorway is ordinary floor use.
   const doorSpans: [string, string][] = deck.doors.map((door) => [
-    tileKey({ x: door.edge.x, y: door.edge.y }),
+    tileKey(door.edge),
     tileKey(neighborTile(door.edge)),
   ]);
 
@@ -776,83 +574,51 @@ function checkDeckMachines(
     if (machine === undefined) {
       return; // reported by L2
     }
-    const footprint = absoluteFootprint(placement, machine);
+    const report = (message: string) =>
+      issues.push(issue("physical", ["decks", deck.id, "machines", i], message));
+    const name = `machine "${placement.key}"`;
+    const footprint = machine.footprint.map((offset) => placeOffset(placement, offset));
     const footprintKeys = new Set(footprint.map(tileKey));
     for (const tile of footprint) {
       if (!index.isFloor(tile)) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "machines", i],
-            `machine "${placement.key}" footprint tile (${tile.x},${tile.y}) is not floor`,
-          ),
-        );
+        report(`${name} footprint tile (${tile.x},${tile.y}) is not floor`);
         continue;
       }
       const key = tileKey(tile);
       const existing = occupied.get(key);
       if (existing !== undefined) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "machines", i],
-            `machine "${placement.key}" footprint tile (${tile.x},${tile.y}) overlaps "${existing}"`,
-          ),
-        );
+        report(`${name} footprint tile (${tile.x},${tile.y}) overlaps "${existing}"`);
       } else {
         occupied.set(key, placement.key);
       }
     }
     for (const [a, b] of doorSpans) {
       if (footprintKeys.has(a) && footprintKeys.has(b)) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "machines", i],
-            `machine "${placement.key}" footprint spans and covers a door`,
-          ),
-        );
+        report(`${name} footprint spans and covers a door`);
       }
     }
 
-    const interactions = absoluteInteractionTiles(placement, machine);
-    for (const { key: posKey, tile } of interactions) {
+    for (const pos of machine.interactionPositions) {
+      const tile = placeOffset(placement, pos.offset);
       if (!index.isFloor(tile)) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "machines", i],
-            `machine "${placement.key}" interaction position "${posKey}" at (${tile.x},${tile.y}) is not walkable`,
-          ),
+        report(
+          `${name} interaction position "${pos.key}" at (${tile.x},${tile.y}) is not walkable`,
         );
-        continue;
-      }
-      if (!footprint.some((f) => isAdjacent(f, tile))) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "machines", i],
-            `machine "${placement.key}" interaction position "${posKey}" is not adjacent to its footprint`,
-          ),
-        );
+      } else if (!footprint.some((f) => isAdjacent(f, tile))) {
+        report(`${name} interaction position "${pos.key}" is not adjacent to its footprint`);
       }
     }
   });
 }
 
 /** BFS over the compartment graph induced by doors and openings; every compartment must be reachable. */
-function checkDeckConnectivity(
-  deck: DeckDef,
-  index: ReturnType<typeof buildDeckIndex>,
-  issues: ValidationIssue[],
-): void {
-  const path: Path = ["decks", deck.id];
+function checkDeckConnectivity(deck: DeckDef, index: DeckIndex, issues: ValidationIssue[]): void {
   const adjacency = new Map<string, Set<string>>();
   for (const c of deck.compartments) {
     adjacency.set(c.key, new Set());
   }
   const link = (edge: TileEdge) => {
-    const a = index.compartmentAt({ x: edge.x, y: edge.y });
+    const a = index.compartmentAt(edge);
     const b = index.compartmentAt(neighborTile(edge));
     if (a !== undefined && b !== undefined && a.key !== b.key) {
       adjacency.get(a.key)?.add(b.key);
@@ -868,15 +634,13 @@ function checkDeckConnectivity(
     link(opening);
   }
 
-  const keys = [...adjacency.keys()];
-  if (keys.length === 0) {
+  const [start] = adjacency.keys();
+  if (start === undefined) {
     return;
   }
-  const start = keys[0] as string;
   const seen = new Set([start]);
   const stack = [start];
-  while (stack.length > 0) {
-    const current = stack.pop() as string;
+  for (let current = stack.pop(); current !== undefined; current = stack.pop()) {
     for (const next of adjacency.get(current) ?? []) {
       if (!seen.has(next)) {
         seen.add(next);
@@ -884,12 +648,12 @@ function checkDeckConnectivity(
       }
     }
   }
-  for (const key of keys) {
+  for (const key of adjacency.keys()) {
     if (!seen.has(key)) {
       issues.push(
         issue(
           "physical",
-          [...path, "compartments"],
+          ["decks", deck.id, "compartments"],
           `compartment "${key}" is not reachable from "${start}" via doors/openings`,
         ),
       );
@@ -897,57 +661,34 @@ function checkDeckConnectivity(
   }
 }
 
-function checkDeckZonesAndSpawns(
-  deck: DeckDef,
-  index: ReturnType<typeof buildDeckIndex>,
-  issues: ValidationIssue[],
-): void {
+function checkDeckZonesAndSpawns(deck: DeckDef, index: DeckIndex, issues: ValidationIssue[]): void {
   const path: Path = ["decks", deck.id];
+  const requireFloor = (tile: TileCoord, tilePath: Path, what: string) => {
+    if (!index.isFloor(tile)) {
+      issues.push(issue("physical", tilePath, `${what} (${tile.x},${tile.y}) is not floor`));
+    }
+  };
   deck.zones.forEach((zone, zi) => {
     zone.tiles.forEach((tile, ti) => {
-      if (!index.isFloor(tile)) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "zones", zi, "tiles", ti],
-            `zone "${zone.key}" tile (${tile.x},${tile.y}) is not floor`,
-          ),
-        );
-      }
+      requireFloor(tile, [...path, "zones", zi, "tiles", ti], `zone "${zone.key}" tile`);
     });
   });
   deck.spawnPoints.forEach((sp, i) => {
-    if (!index.isFloor(sp.tile)) {
-      issues.push(
-        issue(
-          "physical",
-          [...path, "spawnPoints", i],
-          `spawn point "${sp.key}" tile (${sp.tile.x},${sp.tile.y}) is not floor`,
-        ),
-      );
-    }
+    requireFloor(sp.tile, [...path, "spawnPoints", i], `spawn point "${sp.key}" tile`);
   });
-  const cargoTiles = [...deck.docking.cargoTransferTiles, ...deck.docking.personnelTransferTiles];
-  cargoTiles.forEach((tile, i) => {
-    if (!index.isFloor(tile)) {
-      issues.push(
-        issue(
-          "physical",
-          [...path, "docking"],
-          `transfer tile ${i} at (${tile.x},${tile.y}) is not floor`,
-        ),
-      );
-    }
+  const transferTiles = [
+    ...deck.docking.cargoTransferTiles,
+    ...deck.docking.personnelTransferTiles,
+  ];
+  transferTiles.forEach((tile, i) => {
+    requireFloor(tile, [...path, "docking"], `transfer tile ${i} at`);
   });
 }
 
 function checkRecipeToolsSatisfiable(bundle: ContentBundle, issues: ValidationIssue[]): void {
-  const availableToolKinds = new Set<string>();
-  for (const item of Object.values(bundle.items)) {
-    for (const kind of item.toolKinds) {
-      availableToolKinds.add(kind);
-    }
-  }
+  const availableToolKinds = new Set<string>(
+    Object.values(bundle.items).flatMap((item) => item.toolKinds),
+  );
   const checkSteps = (path: Path, steps: readonly { key: string; tools: readonly string[] }[]) => {
     steps.forEach((step, i) => {
       for (const tool of step.tools) {
@@ -986,11 +727,9 @@ function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: Validati
   for (const scenario of Object.values(bundle.scenarios)) {
     const deck = bundle.decks[scenario.deckId];
     if (deck === undefined) continue;
-    const carried = new Set<string>();
-    for (const line of scenario.startingItems) {
-      for (const kind of bundle.items[line.itemDefId]?.toolKinds ?? []) carried.add(kind);
-    }
-    const reported = new Set<string>();
+    const carried = new Set(
+      scenario.startingItems.flatMap((line) => bundle.items[line.itemDefId]?.toolKinds ?? []),
+    );
     for (const machineDefId of new Set(deck.machines.map((m) => m.machineDefId))) {
       const machine = bundle.machines[machineDefId];
       if (machine === undefined) continue;
@@ -998,11 +737,11 @@ function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: Validati
         ...machine.faults.flatMap((fault) => fault.repair.steps),
         ...(machine.maintenance === undefined ? [] : [machine.maintenance.inspect]),
       ];
+      const reported = new Set<string>();
       for (const step of steps) {
         for (const tool of step.tools) {
-          const key = `${machine.id}:${tool}`;
-          if (carried.has(tool) || reported.has(key)) continue;
-          reported.add(key);
+          if (carried.has(tool) || reported.has(tool)) continue;
+          reported.add(tool);
           issues.push(
             issue(
               "physical",
