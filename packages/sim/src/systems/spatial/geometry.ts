@@ -36,7 +36,8 @@ export { dockFloorMask, isDockFloor } from "../../core/docks";
 
 export const SIDE_BIT: Readonly<Record<EdgeSide, number>> = { n: 1, e: 2, s: 4, w: 8 };
 
-const SIDE_DELTA: Readonly<Record<EdgeSide, TileCoord>> = {
+/** The step to the tile across each side. */
+export const SIDE_DELTA: Readonly<Record<EdgeSide, TileCoord>> = {
   n: { x: 0, y: -1 },
   e: { x: 1, y: 0 },
   s: { x: 0, y: 1 },
@@ -72,7 +73,6 @@ export function sideTowards(from: TileCoord, to: TileCoord): EdgeSide | undefine
   return undefined;
 }
 
-/** Static floor that no machine stands on. */
 /**
  * Grid index of tile (x, y), or -1 off the grid. Same arithmetic as `grid.ts`, kept local
  * because these predicates are pathfinding's innermost calls and a cross-module call costs a
@@ -85,6 +85,7 @@ function cell(geometry: Grid, x: number, y: number): number {
   return gy * geometry.width + gx;
 }
 
+/** Static floor that no machine stands on. */
 export function isStaticWalkable(geometry: DeckGeometry, x: number, y: number): boolean {
   const i = cell(geometry, x, y);
   return i >= 0 && geometry.floor[i] === 1 && geometry.footprint[i] === 0;

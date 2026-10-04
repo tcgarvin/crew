@@ -9,7 +9,7 @@
  * (world creation and the 3 → 4 save migration set it directly, before any cache exists). The
  * travel system calls them at the start of `docking` and the end of `undocking` (D61).
  */
-import type { EdgeSide, TileCoord } from "../../core/types/common";
+import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
 import type { DoorId } from "../../core/types/ids";
 import type { DeckGeometry } from "../../core/types/nav";
@@ -18,6 +18,7 @@ import type { DockPresence } from "../../core/types/ship";
 import type { WorldState } from "../../core/types/state";
 import {
   SIDES,
+  SIDE_DELTA,
   checkDockGraft,
   deckGeometry,
   doorOnEdge,
@@ -26,13 +27,6 @@ import {
 } from "./geometry";
 
 export { deckToDock, dockToDeck, isOnDock } from "../../core/docks";
-
-const STEP: Readonly<Record<EdgeSide, TileCoord>> = {
-  n: { x: 0, y: -1 },
-  e: { x: 1, y: 0 },
-  s: { x: 0, y: 1 },
-  w: { x: -1, y: 0 },
-};
 
 /** What attaching or detaching needs: live state, the caches to rebuild, and content. */
 export interface DockHost {
@@ -58,7 +52,7 @@ export function rampTop(geometry: DeckGeometry, rampId: DoorId): TileCoord {
   const landing = rampLanding(geometry, rampId);
   for (const side of SIDES) {
     if (doorOnEdge(geometry, landing, side) !== rampId) continue;
-    const delta = STEP[side];
+    const delta = SIDE_DELTA[side];
     return { x: landing.x + delta.x, y: landing.y + delta.y };
   }
   throw new Error(`Ramp ${rampId} is not on an edge of its landing ${landing.x},${landing.y}`);
@@ -91,20 +85,16 @@ export function occupantsOfDock(host: Pick<DockHost, "state" | "caches">): strin
   const presence = host.state.deck.dock;
   if (presence === undefined) return [];
   const geometry = deckGeometry(host.caches, presence.deckId);
-  const out: string[] = [];
-  for (const actor of Object.values(host.state.actors)) {
-    const l = actor.location;
-    if (l.kind === "onDeck" && l.deckId === presence.deckId && isDockTile(geometry, l.x, l.y)) {
-      out.push(`actor:${actor.id}`);
-    }
-  }
-  for (const item of Object.values(host.state.items)) {
-    const l = item.location;
-    if (l.kind === "onDeck" && l.deckId === presence.deckId && isDockTile(geometry, l.x, l.y)) {
-      out.push(`item:${item.id}`);
-    }
-  }
-  return out;
+  const onDock = ({ location: l }: { location: PhysicalLocation }) =>
+    l.kind === "onDeck" && l.deckId === presence.deckId && isDockTile(geometry, l.x, l.y);
+  return [
+    ...Object.values(host.state.actors)
+      .filter(onDock)
+      .map((actor) => `actor:${actor.id}`),
+    ...Object.values(host.state.items)
+      .filter(onDock)
+      .map((item) => `item:${item.id}`),
+  ];
 }
 
 /**
