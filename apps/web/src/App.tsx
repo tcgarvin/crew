@@ -17,7 +17,7 @@ import type {
   ToWorker,
 } from "@crew/sim";
 import { decisionShownTick } from "@crew/sim";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
 import {
@@ -61,6 +61,7 @@ import {
   appendTicker,
   visibleLog,
 } from "./ui/log";
+import { portraitCssVars } from "./ui/portraitLayout";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
@@ -68,6 +69,9 @@ import { loadWebContent } from "./worker/content";
 const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
 const SERVER_OPEN_GRACE_MS = 3_000;
+
+/** D72: the portrait chrome heights, which the stylesheet reads from these properties. */
+const APP_STYLE = portraitCssVars() as CSSProperties;
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -578,7 +582,7 @@ export function App() {
   );
 
   return (
-    <div className="app">
+    <div className="app" style={APP_STYLE}>
       <TopBar
         speed={speed}
         paused={paused}

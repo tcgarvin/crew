@@ -39,4 +39,11 @@ describe("Log", () => {
     expect(render({ ...text, closesThread: "" })).toContain("✓ Story closed</span>");
     expect(render(text)).not.toContain("Story closed");
   });
+
+  it("starts compact, with a toggle to show more (D72: the portrait strip under the canvas)", () => {
+    const html = render(text);
+    expect(html).toContain('<section class="log-panel">');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-label="Show more of the log"');
+  });
 });

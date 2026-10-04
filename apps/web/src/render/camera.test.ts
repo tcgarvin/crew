@@ -1,5 +1,6 @@
 import type { BerthedDock, PortDefId, RenderTravel, TravelStage } from "@crew/sim";
 import { describe, expect, it } from "vitest";
+import { portraitCanvasSize } from "../ui/portraitLayout";
 import { loadWebContent } from "../worker/content";
 import { DOCKED_MARGIN_TILES, cameraBounds, dockedBounds, flightBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
@@ -81,19 +82,41 @@ describe("camera framing at both ends", () => {
   it("keeps the flight framing when the port has no dock map (the stand-in berth)", () => {
     expect(dockedBounds(hull, undefined)).toEqual(flightBounds(hull));
   });
+});
 
-  it("stays legible on a 390×700 portrait phone at the biggest dock", () => {
-    const area = (b: BerthedDock) => b.dock.width * b.dock.height;
-    const biggest = allDocks.reduce((a, b) => (area(a) >= area(b) ? a : b));
-    for (const dock of [biggest, ...allDocks]) {
-      const rotated = shouldRotate(390, 700, layout);
-      expect(rotated).toBe(true);
-      const t = computeFitTransform(390, 700, dockedBounds(hull, dock), rotated);
-      // Dots are at least 8 px across and labels 11 px whatever the scale; at 12 px a tile the
-      // compartment labels still show (they need more than 8). The Hub converted to its berth
-      // box (D72) sits exactly at 12; its re-authored map is to bring it back above.
+describe("legibility on a 390×700 portrait phone (D72)", () => {
+  // The canvas the app lays out under its portrait chrome (top bar, headline, travel bar, compact
+  // log), not the whole window. Dots are at least 8 px across and labels 11 px whatever the scale;
+  // at 12 px a tile the compartment labels show and the ship reads.
+  const [width, height] = [390, 700];
+  const rotated = shouldRotate(width, height, layout);
+
+  it("turns the deck and leaves the canvas most of the height", () => {
+    expect(rotated).toBe(true);
+    const docked = portraitCanvasSize(width, height, { travelBar: false, logExpanded: false });
+    expect(docked.width).toBe(390);
+    expect(docked.height).toBeGreaterThan(560);
+  });
+
+  it("frames ship and dock map at more than 12 px a tile at every dock", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: false, logExpanded: false });
+    for (const dock of allDocks) {
+      const t = computeFitTransform(canvas.width, canvas.height, dockedBounds(hull, dock), rotated);
       expect(t.scale, dock.dock.id).toBeGreaterThan(12);
     }
+  });
+
+  it("frames the ship in flight at more than 12 px a tile", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: true, logExpanded: false });
+    const t = computeFitTransform(canvas.width, canvas.height, flightBounds(hull), rotated);
+    expect(t.scale).toBeGreaterThan(12);
+  });
+
+  it("still shows the whole ship, smaller, with the log opened out", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: true, logExpanded: true });
+    const t = computeFitTransform(canvas.width, canvas.height, flightBounds(hull), rotated);
+    expect(t.scale).toBeGreaterThan(9);
+    expect(t.scale).toBeLessThan(12);
   });
 });
 

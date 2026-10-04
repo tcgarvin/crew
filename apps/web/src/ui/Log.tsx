@@ -1,4 +1,5 @@
 import type { DecisionCardText } from "@crew/content";
+import { useState } from "react";
 import type { CardEntry, LogEntry } from "./log";
 
 export interface LogProps {
@@ -12,17 +13,31 @@ export interface LogProps {
 
 /**
  * D55: the ship's log, one feed newest on top: event lines, and the cards the captain was shown
- * with how they answered.
+ * with how they answered. D72: on a portrait screen it is a compact strip under the canvas, so the
+ * ship stays legible, with a toggle to open it out (the stylesheet hides the toggle in landscape,
+ * where the log is a full-height column).
  */
 export function Log({ entries, cardText, onOpenDecision }: LogProps) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <ul className="log" aria-label="Ship's log">
-      {entries.map((entry) => (
-        <li key={entry.key} className={`log-item log-${entry.kind}`}>
-          <LogItem entry={entry} cardText={cardText} onOpenDecision={onOpenDecision} />
-        </li>
-      ))}
-    </ul>
+    <section className={expanded ? "log-panel log-panel-expanded" : "log-panel"}>
+      <ul className="log" aria-label="Ship's log">
+        {entries.map((entry) => (
+          <li key={entry.key} className={`log-item log-${entry.kind}`}>
+            <LogItem entry={entry} cardText={cardText} onOpenDecision={onOpenDecision} />
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="log-toggle"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Show less of the log" : "Show more of the log"}
+        onClick={() => setExpanded((was) => !was)}
+      >
+        {expanded ? "▾" : "▴"}
+      </button>
+    </section>
   );
 }
 
