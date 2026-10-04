@@ -1,4 +1,5 @@
 import type { HealthState } from "../health";
+import type { ShipClock } from "./clock";
 
 const SPEEDS = [1, 2, 4, 8] as const;
 
@@ -7,19 +8,12 @@ export interface TopBarProps {
   readonly paused: boolean;
   readonly onSetSpeed: (speed: number) => void;
   readonly onTogglePause: () => void;
-  readonly simTick: number;
-  readonly tickRate: number;
+  /** D76/D77: the ship's day and watch at the tick playback has reached. */
+  readonly clock: ShipClock;
   readonly money: number;
   readonly runAheadBufferedSeconds: number;
   readonly health: HealthState;
   readonly onNewGame: () => void;
-}
-
-function formatClock(simTick: number, tickRate: number): string {
-  const totalSeconds = Math.floor(simTick / tickRate);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 export function TopBar({
@@ -27,8 +21,7 @@ export function TopBar({
   paused,
   onSetSpeed,
   onTogglePause,
-  simTick,
-  tickRate,
+  clock,
   money,
   runAheadBufferedSeconds,
   health,
@@ -57,7 +50,21 @@ export function TopBar({
         ))}
       </div>
       <div className="top-bar-group top-bar-clock">
-        <span className="sim-clock">{formatClock(simTick, tickRate)}</span>
+        {/* D72: in portrait the day and the watch stack on two short lines in the 36 px bar. */}
+        <span
+          className="sim-clock"
+          title={`${clock.whoIsOn} (${clock.elapsed} since the start)`}
+          aria-label={clock.text}
+        >
+          <span className="sim-clock-day">Day {clock.day}</span>
+          <span className="sim-clock-sep" aria-hidden="true">
+            {" · "}
+          </span>
+          <span className="sim-clock-watch">{clock.watch}</span>
+          <span className="sim-clock-watch-short" aria-hidden="true">
+            {clock.watchShort}
+          </span>
+        </span>
         <span className="run-ahead" title="Sim run-ahead buffer (D14)">
           ▶ +{runAheadBufferedSeconds.toFixed(0)}s buffered
         </span>

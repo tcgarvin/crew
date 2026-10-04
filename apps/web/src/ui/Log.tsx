@@ -48,7 +48,13 @@ function LogItem({
 }: { readonly entry: LogEntry } & Omit<LogProps, "entries">) {
   switch (entry.kind) {
     case "event":
-      return <p className={`log-line log-line-${entry.significance}`}>{entry.text}</p>;
+      return (
+        <p
+          className={`log-line log-line-${entry.significance}${entry.highlight === true ? " log-line-highlight" : ""}`}
+        >
+          {entry.text}
+        </p>
+      );
     case "card":
       return <LoggedCard entry={entry} card={cardText(entry)} onOpenDecision={onOpenDecision} />;
   }

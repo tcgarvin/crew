@@ -199,7 +199,7 @@ const EIGHT_MINUTES = TICK_RATE * 480;
 // vitest's default 5 s, so the suite gets headroom rather than flaking on a slow runner.
 describe(
   "full sim: real content, every system, auto-accept (Integration 2)",
-  { timeout: 20_000 },
+  { timeout: 45_000 },
   () => {
     it("runs the freight loop and the crew's day for eight sim-minutes", () => {
       const { world, log } = runFullSim(20260930, EIGHT_MINUTES, autoAccept);
@@ -280,7 +280,7 @@ describe(
       );
       expect(gaveUp).toEqual([]);
       expect(log.hooks.filter((h) => h === "stageDock").length).toBeGreaterThanOrEqual(2);
-    }, 30_000);
+    }, 60_000);
 
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
       // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
@@ -288,7 +288,9 @@ describe(
       // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. `travel.ts`
       // now raises `stationToStaff` as soon as a course is planned, so the pilot (idle, with
       // nothing else essential to do) walks there while the crew is still loading; by the time
-      // `preparingDeparture` starts the console should already be staffed.
+      // `preparingDeparture` starts the console should already be staffed. D77: the helm
+      // stander now walks up from the gangway, two rooms away, but the watch problem still opens
+      // when the course is planned, so the walk is still hidden inside the loading.
       const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
       const stageChanges = log.events.filter(
         (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
@@ -311,6 +313,59 @@ describe(
         // D61's call aboard (someone still on the dock as prep begins) is not counted here.
         expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
       }
+    });
+
+    // D77, W1's "done when": a 400 s spur leg is a whole watch long, so the bell rings at sea
+    // and the oncoming stander relieves the helm in transit. Skipped until W1's helm lands
+    // (Gate B's stub never emits `helmRelieved`); at integration it is unskipped as it stands.
+    it.skip("hands over the helm at sea on the 400 s Kessler–Ossory leg", () => {
+      const { kernel, world } = newGame(20261004);
+      const ossory = "port.ossory_station" as PortDefId;
+      const kessler = "port.kessler_drift" as PortDefId;
+      let n = 0;
+      const send = (command: Omit<Command, "id">) => {
+        n += 1;
+        const result = kernel.enqueueCommand(world, {
+          ...command,
+          id: `cmd:sea:${n}` as CommandId,
+        } as Command);
+        if (result.status !== "accepted") throw new Error(`${command.kind} rejected`);
+      };
+      const atSea: SimEvent[] = [];
+      let courseSet = false;
+      const limit = TICK_RATE * 1500;
+      while (world.state.tick < limit) {
+        const result = kernel.advance(world, 10);
+        const travel = world.state.travel;
+        const spur = travel.stage === "transit" && travel.fromPortId === kessler;
+        if (spur) atSea.push(...result.events);
+        if (travel.stage === "docked" && travel.portId === ossory) break;
+        // D70: as a player would, set course once the captain's ask at the hub is answered.
+        const narrator = world.state.narrator;
+        if (!courseSet && narrator.captainAshoreLastAsk !== undefined && !narrator.pendingHook) {
+          courseSet = true;
+          send({ source: "scenario", kind: "setCourse", payload: { destinationPortId: ossory } });
+        }
+        const hook = world.state.narrator.pendingHook;
+        if (result.halt.kind === "hook" && hook !== undefined) {
+          send({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
+        }
+        const head = world.state.decisions.queue[0];
+        if (result.halt.kind === "decision" && head !== undefined) {
+          send({
+            source: "player",
+            kind: "resolveDecision",
+            payload: { decisionId: head, side: "left" },
+          });
+        }
+      }
+      expect(world.state.travel).toMatchObject({ stage: "docked", portId: ossory });
+      expect(atSea.some((e) => e.type === "bell")).toBe(true);
+      const relieved = atSea.filter(
+        (e): e is Extract<SimEvent, { type: "helmRelieved" }> => e.type === "helmRelieved",
+      );
+      expect(relieved.length).toBeGreaterThanOrEqual(1);
+      expect(relieved.some((e) => e.payload.fromActorId !== undefined)).toBe(true);
     });
 
     it("never lets one actor claim a multi-crate job's whole stack at once", () => {

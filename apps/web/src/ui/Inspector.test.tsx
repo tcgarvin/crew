@@ -2,6 +2,7 @@ import type { AgentViewSnapshot } from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Inspector } from "./Inspector";
+import type { PersonWords } from "./actorWords";
 
 /** The fields `ActorInspector` reads; a passenger has no skills, tasks or post. */
 function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnapshot {
@@ -11,6 +12,9 @@ function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnaps
     needs: { hunger: 0.2, fatigue: 0.1, comfort: 0.9, social: 0.5 },
     mood: 0.25,
     activity: { kind: "idle" },
+    onDuty: false,
+    watch: { onWatch: false, dayworker: true, helmRole: "none", officerOfTheWatch: false },
+    thoughts: [],
     ...who,
   };
   return {
@@ -26,11 +30,17 @@ function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnaps
   } as unknown as AgentViewSnapshot;
 }
 
+const steady: PersonWords = { watch: "Dayworker, off duty", mood: "steady", thoughts: [] };
+
 describe("Inspector actor sheet", () => {
   it("shows a passenger without crew-only fields and tags them in the roster", () => {
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: [], passenger: true }) }}
+        data={{
+          kind: "actor",
+          view: snapshot({ roleTags: [], passenger: true }),
+          person: steady,
+        }}
         onClose={() => {}}
       />,
     );
@@ -38,17 +48,55 @@ describe("Inspector actor sheet", () => {
     expect(html).toContain('class="inspector-subtitle">passenger<');
     expect(html).toContain('<span class="inspector-tag">passenger</span>');
     expect(html).toContain("Mara Osei — pilot");
+    // Passengers stand no watch.
+    expect(html).not.toContain("<dt>Watch</dt>");
   });
 
   it("shows crew by their role tags with no tag", () => {
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["pilot"] }) }}
+        data={{ kind: "actor", view: snapshot({ roleTags: ["pilot"] }), person: steady }}
         onClose={() => {}}
       />,
     );
     expect(html).toContain('class="inspector-subtitle">pilot<');
     expect(html.match(/inspector-tag/g)).toHaveLength(1);
+  });
+
+  it("shows a crew member's watch, helm role, mood word and top thoughts (D77, D79)", () => {
+    const person: PersonWords = {
+      watch: "Red section, on watch",
+      helm: "stands this watch's helm",
+      mood: "low",
+      thoughts: [
+        { key: "doubleWatch", label: "double watch", value: -0.25, count: 1 },
+        { key: "helmCleanPass", label: "brought the ship through clean", value: 0.2, count: 2 },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{ kind: "actor", view: snapshot({ roleTags: ["pilot"] }), person }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<dt>Watch</dt><dd>Red section, on watch</dd>");
+    expect(html).toContain("<dt>Duty</dt><dd>stands this watch&#x27;s helm</dd>");
+    expect(html).toContain('<dd class="inspector-mood inspector-mood-low">low</dd>');
+    expect(html).toContain('<li class="thought-down">double watch</li>');
+    expect(html).toContain('<li class="thought-up">brought the ship through clean ×2</li>');
+  });
+
+  it("leaves out the helm line when the sim has no helm role for them, and says when nothing is on their mind", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{ kind: "actor", view: snapshot({ roleTags: ["cook"] }), person: steady }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<dt>Watch</dt><dd>Dayworker, off duty</dd>");
+    expect(html).not.toContain("<dt>Duty</dt>");
+    expect(html).toContain('<dd class="inspector-mood inspector-mood-steady">steady</dd>');
+    expect(html).toContain("nothing in particular");
   });
 });
 

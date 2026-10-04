@@ -75,6 +75,14 @@ body {
 .sim-clock {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
+}
+.sim-clock-day,
+.sim-clock-watch {
+  display: inline-block;
+}
+.sim-clock-watch-short {
+  display: none;
 }
 
 .run-ahead {
@@ -205,6 +213,13 @@ body {
   border-left-color: var(--text-dim);
   color: var(--text-dim);
 }
+/* D76: the line that dropped fast-forward to 1×. */
+.log-line.log-line-highlight {
+  background: rgba(242, 193, 78, 0.18);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
 
 /* A card the captain was shown: same face as the modal, small. */
 .log-card {
@@ -292,6 +307,16 @@ body {
     margin-left: 2px;
     white-space: nowrap;
   }
+  /* D76/D77: "Day 2" over "White watch", two 13 px lines inside the 36 px bar. */
+  .sim-clock {
+    display: flex;
+    flex-direction: column;
+    font-size: 11px;
+    line-height: 13px;
+  }
+  .sim-clock-sep {
+    display: none;
+  }
   .headline {
     height: var(--portrait-headline);
     padding: 4px 12px;
@@ -363,6 +388,16 @@ body {
   }
 }
 
+/* D76/D77: below 390 px "White watch" pushes New game off the bar: "Day 2" over "White". */
+@media (orientation: portrait) and (max-width: 389px) {
+  .sim-clock-watch {
+    display: none;
+  }
+  .sim-clock-watch-short {
+    display: inline-block;
+  }
+}
+
 /* ---------------------------------------------------------------- inspector */
 
 .inspector-backdrop {
@@ -423,6 +458,33 @@ body {
 .inspector-empty {
   color: var(--text-dim);
   font-size: 13px;
+}
+
+/* D79: mood as a word, and the thoughts behind it. */
+.inspector-mood {
+  text-transform: capitalize;
+}
+.inspector-mood-low {
+  color: #e8846f;
+}
+.inspector-mood-high {
+  color: var(--ok);
+}
+.inspector-thoughts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inspector-thoughts li::before {
+  display: inline-block;
+  width: 1em;
+  color: var(--text-dim);
+}
+.inspector-thoughts li.thought-down::before {
+  content: "−";
+}
+.inspector-thoughts li.thought-up::before {
+  content: "+";
 }
 
 /* Passengers §3.2: a small tag beside a roster name that is not crew. */

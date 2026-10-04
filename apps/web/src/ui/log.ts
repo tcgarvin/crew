@@ -22,6 +22,8 @@ export interface EventEntry extends EntryBase {
   readonly kind: "event";
   readonly text: string;
   readonly significance: Significance;
+  /** D76: the line that slowed fast-forward to 1× (`host.slowDownOnEvents`). */
+  readonly highlight?: true;
 }
 
 /** A decision card, logged when it is raised and updated with the captain's answer. */
@@ -86,6 +88,27 @@ export function answerDecision(
   return log.map((entry) =>
     entry.kind === "card" && entry.decision.id === decisionId ? { ...entry, answer } : entry,
   );
+}
+
+/**
+ * D76: mark the event line at `tick` reading `text` as the one that slowed the game down. The
+ * first such line not already marked is marked (two identical lines in one tick are two events);
+ * with no such line the log is returned unchanged, and the caller says so.
+ */
+export function highlightEvent(
+  log: readonly LogEntry[],
+  tick: Tick,
+  text: string,
+): { readonly log: LogEntry[]; readonly found: boolean } {
+  const index = log.findIndex(
+    (e) => e.kind === "event" && e.tick === tick && e.text === text && e.highlight !== true,
+  );
+  const entry = log[index];
+  if (entry === undefined || entry.kind !== "event")
+    return { log: log as LogEntry[], found: false };
+  const next = [...log];
+  next[index] = { ...entry, highlight: true };
+  return { log: next, found: true };
 }
 
 /** What playback has reached, newest first. */

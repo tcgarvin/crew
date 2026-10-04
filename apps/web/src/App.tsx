@@ -16,7 +16,7 @@ import type {
   Tick,
   ToWorker,
 } from "@crew/sim";
-import { decisionShownTick } from "@crew/sim";
+import { decisionShownTick, describeEvent } from "@crew/sim";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
@@ -38,6 +38,7 @@ import {
   readLocalSave,
   writeLocalSave,
 } from "./host/saves";
+import { type SlowdownMark, SlowdownQueue, shouldSlowDown, slowdownToast } from "./host/slowdown";
 import { DeckCanvas, type Selection } from "./render/DeckCanvas";
 import { buildDeckLayout } from "./render/deckLayout";
 import type { DockTable } from "./render/dock";
@@ -50,7 +51,9 @@ import { NarratorOverlay } from "./ui/NarratorOverlay";
 import { Toast, useToast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
+import { personWords } from "./ui/actorWords";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
+import { clockSections, shipClock } from "./ui/clock";
 import { dockInspection } from "./ui/dockInspection";
 import { inspectItem } from "./ui/itemInspection";
 import {
@@ -59,6 +62,7 @@ import {
   answerDecision,
   appendDecision,
   appendTicker,
+  highlightEvent,
   visibleLog,
 } from "./ui/log";
 import { portraitCssVars } from "./ui/portraitLayout";
@@ -136,6 +140,11 @@ export function App() {
   const recentEventsRef = useRef<SimEvent[]>([]);
   const staleRef = useRef(false);
   const pausedRef = useRef(false);
+  /** The playback speed, for the playback loop's auto-slowdown check (D76). */
+  const speedRef = useRef(1);
+  /** D76: events on `host.slowDownOnEvents`, queued by tick until playback reaches them. */
+  const slowdownRef = useRef(new SlowdownQueue(config.values.host.slowDownOnEvents));
+  const sections = useMemo(() => clockSections(bundle, scenarioId), [bundle, scenarioId]);
 
   const [frame, setFrame] = useState<RenderFrame>();
   const [speed, setSpeedState] = useState(1);
@@ -197,6 +206,18 @@ export function App() {
     playbackRef.current.setPaused(next);
     connectionRef.current?.setUserPaused(next);
     connectionRef.current?.send({ type: next ? "pause" : "resume" });
+  }, []);
+
+  const onSetSpeed = useCallback((next: number) => {
+    setSpeedState(next);
+    speedRef.current = next;
+    setPausedState(false);
+    pausedRef.current = false;
+    playbackRef.current.setSpeed(next);
+    playbackRef.current.setPaused(false);
+    connectionRef.current?.setUserPaused(false);
+    connectionRef.current?.send({ type: "setSpeed", speed: next });
+    connectionRef.current?.send({ type: "resume" });
   }, []);
 
   // -------------------------------------------------------------- worker connection + playback
@@ -340,6 +361,7 @@ export function App() {
         }
         case "events": {
           appendRecentEvents(recentEventsRef.current, message.events);
+          slowdownRef.current.add(message.events);
           if (message.events.some((e) => e.type === "arrived")) save("milestone");
           else if (message.events.some((e) => e.type === "decisionResolved")) save("routine");
           return;
@@ -382,9 +404,42 @@ export function App() {
       }
     });
 
+    /**
+     * D76: playback reached events on `host.slowDownOnEvents` while fast-forwarding. Drop to 1×
+     * at once; then name each event with `describeEvent` against the view-time snapshot (the main
+     * thread holds no state), which is the text the ticker gave it, so its log line can be found
+     * and highlighted, and the first one says why in a toast.
+     */
+    function slowDown(due: readonly SlowdownMark[]): void {
+      onSetSpeed(1);
+      due.forEach(({ event }, index) => {
+        request(
+          connection,
+          (requestId) => ({ type: "requestSnapshotAt", requestId, tick: event.tick }),
+          (msg) => {
+            if (msg.type !== "snapshot") {
+              const why = msg.type === "error" ? msg.message : `unexpected ${msg.type}`;
+              console.warn(`[slowdown] could not name ${event.type} at ${event.tick}: ${why}`);
+              if (index === 0) showToast(slowdownToast(event.type));
+              return;
+            }
+            const text = describeEvent(event, msg.state, bundle);
+            // A line missing from the log (dropped past LOG_LIMIT) leaves it as it was; the toast
+            // below still says what happened.
+            setLog((prev) => highlightEvent(prev, event.tick, text).log);
+            if (index === 0) showToast(slowdownToast(text));
+          },
+        );
+      });
+    }
+
     const loop = runPlaybackLoop(
       playback,
-      (step) => setFrame(step.frame),
+      (step) => {
+        setFrame(step.frame);
+        const due = slowdownRef.current.takeDue(step.viewTick);
+        if (shouldSlowDown(due, speedRef.current, pausedRef.current)) slowDown(due);
+      },
       (viewTick) => connection.send({ type: "viewProgress", viewTick }),
     );
 
@@ -432,20 +487,9 @@ export function App() {
       connection.dispose();
     };
     // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once, so they never change.
-  }, [scenarioId, saveEveryTicks, showToast, applyPause, request, sendCommand]);
+  }, [scenarioId, saveEveryTicks, bundle, showToast, applyPause, onSetSpeed, request, sendCommand]);
 
-  // -------------------------------------------------------------- speed / pause
-  const onSetSpeed = useCallback((next: number) => {
-    setSpeedState(next);
-    setPausedState(false);
-    pausedRef.current = false;
-    playbackRef.current.setSpeed(next);
-    playbackRef.current.setPaused(false);
-    connectionRef.current?.setUserPaused(false);
-    connectionRef.current?.send({ type: "setSpeed", speed: next });
-    connectionRef.current?.send({ type: "resume" });
-  }, []);
-
+  // -------------------------------------------------------------- pause
   const onTogglePause = useCallback(() => {
     applyPause(!pausedRef.current);
   }, [applyPause]);
@@ -493,10 +537,12 @@ export function App() {
           (requestId) => ({ type: "requestAgentView", requestId, actorId, tick }),
           (msg) => {
             if (msg.type === "agentViewResult") {
+              const view = msg.view as AgentViewSnapshot;
               setInspectorData({
                 kind: "actor",
-                view: msg.view as AgentViewSnapshot,
+                view,
                 ...(label === undefined ? {} : { label }),
+                person: personWords(view, bundle.thoughts, config.values.mood),
               });
             } else if (msg.type === "error") {
               setInspectorData(undefined);
@@ -526,7 +572,7 @@ export function App() {
         },
       );
     },
-    [frame, runAhead.viewTick, bundle, layout, docks, request],
+    [frame, runAhead.viewTick, bundle, config, layout, docks, request],
   );
 
   const onCloseInspector = useCallback(() => {
@@ -593,8 +639,7 @@ export function App() {
         paused={paused}
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
-        simTick={viewTick}
-        tickRate={tickRate}
+        clock={shipClock(viewTick, config.values, sections)}
         money={money}
         runAheadBufferedSeconds={runAheadSeconds}
         health={health}

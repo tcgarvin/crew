@@ -6,6 +6,7 @@ import {
   answerDecision,
   appendDecision,
   appendTicker,
+  highlightEvent,
   visibleLog,
 } from "./log";
 
@@ -57,6 +58,35 @@ describe("the ship's log (D55)", () => {
     expect(log).toHaveLength(1);
     log = answerDecision(log, "d1", { side: "left", caption: "Taken." });
     expect(log[0]).toMatchObject({ kind: "card", answer: { side: "left", caption: "Taken." } });
+  });
+
+  it("highlights the line that slowed the game, matched by tick and text (D76)", () => {
+    const log = appendTicker(
+      [],
+      [line(10, "Coolant pump: seized bearing"), line(10, "Coolant pump at 50% (fault)")],
+    );
+    const { log: marked, found } = highlightEvent(log, 10 as Tick, "Coolant pump: seized bearing");
+    expect(found).toBe(true);
+    expect(marked.map((e) => (e.kind === "event" ? (e.highlight ?? false) : false))).toEqual([
+      true,
+      false,
+    ]);
+    // The input is not mutated.
+    expect(log.every((e) => e.kind !== "event" || e.highlight === undefined)).toBe(true);
+  });
+
+  it("marks a second identical line in the same tick on the second slowdown (D76)", () => {
+    const log = appendTicker([], [line(5, "Nobody at the helm"), line(5, "Nobody at the helm")]);
+    const once = highlightEvent(log, 5 as Tick, "Nobody at the helm").log;
+    const twice = highlightEvent(once, 5 as Tick, "Nobody at the helm").log;
+    expect(twice.filter((e) => e.kind === "event" && e.highlight === true)).toHaveLength(2);
+  });
+
+  it("reports a slowdown whose line is not in the log rather than marking another (D76)", () => {
+    const log = appendTicker([], [line(10, "Bell.")]);
+    const result = highlightEvent(log, 11 as Tick, "Bell.");
+    expect(result.found).toBe(false);
+    expect(result.log).toBe(log);
   });
 
   it("keeps at most LOG_LIMIT entries, dropping the oldest", () => {

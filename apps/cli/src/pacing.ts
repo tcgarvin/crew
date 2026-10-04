@@ -151,7 +151,7 @@ export interface PacingResult {
   readonly callsPerHour: number;
 }
 
-interface LoadedContent {
+export interface LoadedContent {
   readonly bundle: ContentBundle;
   readonly config: EffectiveConfig;
   readonly scenarioId: ScenarioDefId;
@@ -160,7 +160,7 @@ interface LoadedContent {
 let cachedContent: LoadedContent | undefined;
 
 /** The authored bundle, validated once per process, with the default (first) scenario. */
-function loadPacingContent(): LoadedContent {
+export function loadPacingContent(): LoadedContent {
   if (cachedContent !== undefined) return cachedContent;
   const result = loadBundle();
   if (!result.ok) {
@@ -247,7 +247,7 @@ function askedAt(world: World, portId: PortDefId): boolean {
  * advance. Plain: set course to the far port, and back once docked there. Freight: first offer
  * and accept a hub → far-port job so cargo work happens at both ends.
  */
-class VoyageScript {
+export class VoyageScript {
   private phase: "offer" | "accept" | "outbound" | "homeward" | "done";
   private jobId: JobId | undefined;
 

@@ -20,10 +20,11 @@ const LATENCY = 10;
 const kernel = createKernel(createPacingRegistry());
 
 /**
- * The first test to call `results()` pays for both runs (about 5 s of real work on a quiet
- * machine, more under the full parallel `pnpm test`), well past Vitest's 5 s default.
+ * The first test to call `results()` pays for both runs (about 10 s of real work on a quiet
+ * machine since D76 made Kessler–Ossory a 400 s spur, more under the full parallel `pnpm test`),
+ * well past Vitest's 5 s default.
  */
-const SLOW_TEST_TIMEOUT_MS = 20_000;
+const SLOW_TEST_TIMEOUT_MS = 90_000;
 
 let cached: { slow: PacingResult; fast: PacingResult } | undefined;
 function results(): { slow: PacingResult; fast: PacingResult } {

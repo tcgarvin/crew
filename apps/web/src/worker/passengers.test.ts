@@ -17,7 +17,13 @@ import type {
   SimEvent,
   World,
 } from "@crew/sim";
-import { checkInvariants, createKernel, spatialViolations, workViolations } from "@crew/sim";
+import {
+  checkInvariants,
+  createKernel,
+  shortestPath,
+  spatialViolations,
+  workViolations,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { loadWebContent } from "./content";
 import { createFullRegistry } from "./registry";
@@ -27,8 +33,15 @@ const KESSLER = "port.kessler_drift" as PortDefId;
 const OSSORY = "port.ossory_station" as PortDefId;
 const OVERDUE_KEY = "commerce.passengerOverdue";
 
-/** Hub -> Kessler -> Ossory is 145; the round trip is banded over 290. */
-const ROUND_TRIP_DISTANCE = 290;
+/**
+ * The round trip is banded over twice the path Hub -> Kessler -> Ossory, read from content (D76:
+ * Kessler–Ossory is a spur a watch long, so the number moves with the authored legs).
+ */
+function roundTripDistance(world: World): number {
+  const path = shortestPath(world.content.ports, HUB, OSSORY);
+  if (path === undefined) throw new Error(`no path ${HUB} -> ${OSSORY}`);
+  return 2 * path.distance;
+}
 
 const MAX_TICKS = 20 * 900;
 
@@ -58,7 +71,7 @@ function passageOffer(world: World): Omit<Command, "id"> {
         fromPortId: HUB,
         toPortId: OSSORY,
         cargo: [],
-        pay: Math.ceil(band.min * ROUND_TRIP_DISTANCE),
+        pay: Math.ceil(band.min * roundTripDistance(world)),
         passenger: true,
         roundTrip: true,
       },
@@ -163,8 +176,11 @@ function runPassage(overdueChoice: "left" | "right"): { world: World; log: RunLo
 const ofType = <T extends SimEvent["type"]>(log: RunLog, type: T) =>
   log.events.filter((e): e is Extract<SimEvent, { type: T }> => e.type === type);
 
-/** Real content and every system: a few seconds alone, longer under the parallel suite. */
-const REAL_CONTENT_TIMEOUT_MS = 20_000;
+/**
+ * Real content and every system: 5-10 s alone since D76 made Kessler–Ossory a 400 s spur (the
+ * passage is ~400 sim-s, was ~320), and 2-3× that under the full parallel suite.
+ */
+const REAL_CONTENT_TIMEOUT_MS = 45_000;
 
 describe("round-trip passage Hub -> Ossory through Kessler (real content, every system)", () => {
   it(
