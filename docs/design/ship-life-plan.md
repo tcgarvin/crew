@@ -3,10 +3,11 @@
 Status: plan, 2026-10-04. Design and rationale: `docs/design/ship-life.md` (section references
 below are to that file unless marked Dockside). Five slices, as §12. Each slice ends deployed,
 with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
-playtest, and a pause to take stock. Slices 1–3 are planned in full below; slices 4 and 5 are
-sequenced and will be refined after the slice before them lands. Each slice adds its own
-`D<n>` entries. Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74); slice 3 was
-planned the same day against slice 2's gate and plan, before its workstreams merged.
+playtest, and a pause to take stock. Slices 1–4 are planned in full below; slice 5 is
+sequenced and will be refined after slice 4 lands. Each slice adds its own `D<n>` entries.
+Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74); slices 3 and 4 were planned
+the same day against slice 2's gate and plan, before its workstreams merged, slice 4 also
+against slice 3's plan.
 
 Slice 1 is built by one serial *contract gate* followed by parallel workstreams in separate
 worktrees. The gate changes every shared type and leaves the repo green; each workstream then owns
@@ -1625,16 +1626,816 @@ columns, and the lead runs `pnpm test:live` once.
 
 ## Slice 4: Off watch
 
-Save schema 9 → 10 (recreation, interests, relationships, sessions, rivalries).
+Scope (§12.4, §3, §7, §11 items 5, 8, 10): a fifth need, `recreation`; interests and value axes
+per person with the nine hand-authored; topics as content; relationships (directed affinity) fed
+by ambient chat, seats and activities; `ActivityDef` content and the twelve starter activities;
+group sessions announced ship-wide, joined, started, collapsed to solo; contest, bond, debate and
+perform outcomes with rivalries; the lounge, gym, workbench, book shelf and viewport live; cabin
+thoughts (own cabin, noisy bunkroom, no bunk); the harmonica fetched from Bettina's locker and a
+book from the shelf; the captain's table; `privateTalk` as a card side effect in the captain's
+cabin; the digest's off-watch, interest, relationship, rivalry and berth lines; the beats report
+as the tuning tool. Save schema 9 → 10 (migrated). Prompt v0.23 (`pnpm test:live` once). Built on
+slice 2 as its gate notes say it was built and on slice 3 as planned (`systems/galley/eat.ts`,
+`planner/galley.ts`, `depositDirt`, `Item.meal`, `crew beats`); if a slice 3 name moved at its
+integration, the gate follows the code and says so.
 
-1. Recreation need; `interests`/`values` per actor with the hand-authored nine; topics content.
-2. `ActivityDef` content and the twelve activities; `GroupSession`; joining and collapse to solo;
-   contest/bond/debate/perform outcomes; rivalries; affinity from ambient chat.
-3. Cabin thoughts (own cabin, noisy bunkroom); the harmonica fetched from Bettina's locker;
-   `privateTalk` command in the captain's cabin.
-4. Digest lines for mood, rivalries, cabin status; narrator capability text; `pnpm test:live`.
+Fixes the slice 1 QA note: `rest` and `socialize` leave the bunkroom for the lounge, and the
+furniture placed in slice 1 (games table, vid screen, exercise rig, workbench, desks, the book
+shelf, viewport and sparring mat zones) is used.
 
-Checkpoint: two people keep ending up at the same card table and the digest names the rivalry.
+Built as one serial gate commit, then six parallel workstreams, then a tuning commit by the lead.
+
+### Calls made
+
+1. **Recreation is a need, not a problem, and it never goes above routine class.**
+   `Needs.recreation` rises at `needs.recreationPerDay` (0.6: the seek threshold in a bit under
+   a day). The planner's `recreationCandidate` (`planner/recreation.ts`) is offered off duty
+   only: `routineObligation` above `seekThreshold`, `voluntaryActivity` above
+   `recreation.joinAbove` (0.25, so a game fills the way the mess call fills), nothing below.
+   `needUrgency` is not used for it: nobody leaves the helm or a crate to play cards, and the
+   watch's relief rule (hunger, fatigue, comfort, social past `needEssentialAbove`) does not
+   know the new key. On-duty crew with nothing to do still walk rounds (slice 2); recreation is
+   what the off-going watch does. Restoring is per tick while the activity runs
+   (`restores.<need> / durationDays` per day, from the def), so an interrupted game restores in
+   proportion; `fatigueCost` is charged the same way. Needs reads this through one hook,
+   `recreationRatesFor(ctx, actor)` in `systems/recreation/needs.ts`, called from
+   `needRatesPerDay`.
+2. **One candidate per person: the best-scored activity, not one per activity.** Candidates in a
+   class rank by travel estimate, which would make the nearest game the chosen one. So
+   `recreationCandidate` scores every `ActivityDef` itself (interest: strong like 3, like 2,
+   neutral 1, dislike 0; a dislike is never chosen; +1 for an open session with room, +0.5 for
+   a session holding someone the actor likes (affinity > 0), −∞ for one holding someone at or
+   below `social.avoidBelow` (−3); hosts with mood above `mood.highAbove` add 1 to group
+   activities; mood below `mood.lowBelow` removes group activities altogether, solo only) and
+   emits one candidate (`recreate:<activityId>`), ties broken by join over host over solo, then
+   travel. Joining an open session needs score ≥ 1 and recreation above `joinAbove` (a neutral
+   player makes up the table when they have time on their hands); hosting needs a like (score
+   ≥ 2). The design's "score ≥ 2 to walk over" is kept for hosting and relaxed for joining so a
+   two-person game is not a coin toss on who likes what.
+3. **Sessions are common knowledge, like the roster.** `WorldState.social.sessions` (owner:
+   recreation) holds every open or running `GroupSession`; `AgentView.sessions()` returns them
+   all (the intercom: on a 36-tile ship everyone knows cards are on). No facts, no messages:
+   the planner reads truth here as it reads `assignedBeds`. `docs/CONTRACTS.md` says so.
+4. **The session row is the venue's, the hold is the person's.** `GroupSession { id; activityId;
+   venue: SessionVenue; hostId; members: ActorId[]; openedTick; startedTick?; endsAtTick?;
+   topicId? }` with `SessionVenue = { compartmentId } & ({ machineId } | { zoneKey } | {})`.
+   A member's plan ends in a `recreate` step (`{ kind: "recreate"; activityId; role: "host" |
+   "join" | "solo"; sessionId?; ticksDone; ticksNeeded }`; a step kind, not a hold, because it
+   carries the activity). On its first tick a `host` opens a session (or joins one already open
+   for the activity at the venue), a `join` joins (full, gone or already running past
+   `recreation.lateJoinSeconds`: fail `occupiedPosition`, backoff), a `solo` just starts
+   counting. Members are the people at the venue; nobody en route counts. The `recreationSystem`
+   (needs phase, every tick) starts a session at `participants.max` members or at `openedTick +
+   gatherSeconds` with at least `min`, collapses it at `gatherSeconds` with fewer (the host's
+   step becomes `solo` with the def's `solo` variant, or fails; the others' steps fail), ends a
+   contest or debate at once with no result when a member leaves and fewer than `min` remain,
+   and resolves it at `endsAtTick`. `leaveRecreation(ctx, actor)` is called from
+   `abortActivity` so a bell, a meal call or an essential task takes the member out of the
+   session the tick they leave; it also sets down a book or instrument they were holding.
+5. **Outcomes are the social system's, resolved at the end.** `resolveOutcome(ctx, session, def)`
+   in `systems/social/outcomes.ts`: *contest* picks the winner by `rng.weighted("social")` over
+   members with weight `1 + interestScore`, records the tally for winner against each loser,
+   gives `thoughts.win`/`thoughts.lose`, moves affinity by `def.affinity`
+   (`winnerToLoser`, `loserToWinner`, `participants`), and at a streak of
+   `social.rivalry.streakFor` (3) gives the loser `keepsBeatingMe` (refId the winner), −1
+   affinity and `rivalryStreak`; *debate* picks a topic from `def.topics` (`rng.pick`),
+   computes each member's stance (the dot product of their `values` and the topic's `weights`),
+   and for each pair: |Δ| ≤ `social.debate.agreeWithin` (2) → `spiritedTalk` (+) and +2 both
+   ways; |Δ| ≥ `argueBeyond` (4) → `argued` (−, refId the other) and −2 both ways, one
+   `argument` event per session (narrative); between: nothing; anyone awake in the venue
+   compartment who is not a member and does not like debate gets `gotLectured` (−) — the
+   design's lectured partner, moved to the bystander since members chose to be there;
+   *perform* gives everyone awake in the compartment who is not the performer `enjoyedMusic`
+   (+, music likers) or `hatedTheNoise` (−, dislikers), likers +1 to the performer; *bond*
+   gives members `goodCompany` (+) and +1 affinity all round; *none* nothing. Then
+   `skillGain` (`perDay × durationDays`, capped at 10), `dirt` (`depositDirt` at the venue
+   tile), `produces` (a stack spawned on the zone's first tile with `Item.meal` set so the
+   galley sweeps it), and `risk` (per member, `rng.chance("social", injuryChance)` →
+   `sparringBruise` and `tookAKnock`).
+6. **Sparring injuries are a thought and a ticker line this slice; the medic's work is slice 5.**
+   There is no injury state (bodies are deferred, PLAN §7), and a fake `incapacitated` would
+   stop needs, perception and the planner for the person. `risk.injuryChance` stays in the def
+   and the sim's whole effect is `sparringBruise` (−0.1, 0.5 day) and "Tomas Ruiz took a knock
+   sparring" (notable). Slice 5 adds `patientToTreat`, the medbay bed and first-aid skill with
+   drills, and reads the same field. Honest and visible, nothing pretended.
+7. **Baking is in: the twelfth activity, and its treat is a snack.** Venue the stove, solo,
+   interest cooking, `blockedByProblems: ["mealToCook"]` so it never competes with dinner (the
+   planner sees public problems), `produces: { itemDefId: "item.treat", count: 4, zoneTag:
+   "serving" }`. `item.treat` (`food`, `consumable`, `treat`; nutrition 0.05) spoils like a
+   serving (`Item.meal` set at the bake, so slice 3's sweep clears leftovers). Anyone with
+   hunger above `galley.treatHungerAbove` (0.1) and a known treat takes it as an `eat`
+   candidate at voluntary class, eaten where found (`planner/galley.ts` gains the rule, three
+   lines; `consumeServing` gives `ateATreat` (+0.1) for a `treat`-tagged item). "Bettina
+   Solheim baked a tray of treats" is the ticker line. First thing to cut if the slice runs
+   long: delete one JSON file and the three planner lines.
+8. **Interests and values are state on the actor, authored for the nine, generated for the
+   rest.** `Actor.interests = { likes: InterestTag[]; strong?: InterestTag; dislikes:
+   InterestTag[] }` (`strong` ∈ `likes`, invariant) and `Actor.values = { orderFreedom;
+   faithReason; loyaltyAmbition }` (integers in [−2, 2]; the positive end is the second word).
+   `CrewDef.interests?` and `CrewDef.values?`; absent, `core/interests.ts`
+   `generateInterests(rng)` draws two likes (the first strong), a dislike with probability 0.5,
+   values uniform, on the `setup` stream at spawn (`scenarioSpawn`, the narrator's spawn path
+   through the same handler). The migration uses `interestsFromSeed(actorId)` (a keyed hash,
+   no rng) for an unauthored def. Soft state: the narrator does not edit it this slice
+   (GDD §17 waits for a lever).
+9. **Relationships live in `WorldState.social`, sparse and directed, not on the actor.**
+   `social.relationships: Record<ActorId, Record<ActorId, Relationship>>` with `Relationship =
+   { affinity: number; lastChatTick?: Tick }`, an entry only once something moved it; affinity
+   an integer clamped to `social.affinityRange` (±10). `social.rivalries:
+   Record<RivalryKey, Rivalry>` with `RivalryKey = "<a>|<b>|<activityId>"` (ids in ascending
+   order) and `Rivalry = { wins: number; losses: number; streak: number }` (`a`'s wins, `a`'s
+   losses, streak positive for `a`'s run and negative for `b`'s). Nine people make at most 72
+   relationship entries and a handful of rivalries: under 4 KB of JSON in a save, which the
+   snapshot ring and remote saves carry without noticing. The actor sees their own side as
+   `SelfView.affinity: Readonly<Record<ActorId, number>>` (what they feel; nobody reads the
+   other direction). `pruneSocial` drops entries for ids no longer in `actors` (a passenger who
+   walked off). `moodWorkFactor` is untouched; affinity has no effect on work.
+10. **Ambient chat moves affinity, once a day per pair.** `onConversation(ctx, a, b)` in
+    `systems/social/chat.ts`, called from `ambientChatSystem` after it emits `conversation`:
+    +1 both ways unless the pair's `lastChatTick` is within `social.chatAffinityEveryDays` (1).
+    Nothing else about ambient chat changes; members of a running session still chat, which is
+    the table talk.
+11. **Seats and partners prefer friends and avoid enemies, and the captain keeps a table.** The
+    galley's `eatPlan` (slice 3 call 6) picks its seat through `seatPreference(ctx, actor,
+    seats)` in `systems/social/seating.ts`: a free seat adjacent to someone the actor has
+    affinity > 0 with first, never one adjacent to someone at or below `avoidBelow`, else the
+    nearest. Once a day (`social.captainsTableDay`, the ship's day of the last one), the
+    captain's seat is the one beside the crew member at the tables with the highest affinity
+    (on even days) or the lowest (odd days); both get +1 and the crew member `satWithTheCaptain`
+    (+0.05, 0.5 day); `captainsTable { withActorId }` (trace). §11 item 8 at its smallest: a
+    seat choice and a thought, no new activity.
+12. **Venues are resolved from content tags at plan time, against the reservation cache.**
+    `ActivityDef.venue` is an ordered list of alternatives, each `{ machineTag?; zoneTag?;
+    compartmentTag?; own?: true }` (`own` restricts a machine to the actor's berth compartment:
+    reading at one's own desk); the first alternative present on the deck wins
+    (`venues.ts` `resolveVenue`). A machine venue stands at a `use` position not reserved and
+    not under another member; a zone venue at a free zone tile; a compartment venue at a
+    `loungeTile`-style floor tile. A session's venue is fixed when it opens; a joiner's plan
+    takes a free position of that venue. A seat lost on the way (`occupiedPosition`) backs off
+    and replans, as the mess seat does. `participants.max` ≤ the venue's positions is W4's
+    L3 rule; a deck lacking a venue (Mk1 has no lounge or gym) simply never offers that
+    activity, and the validator says which.
+13. **Items an activity needs are fetched and put back.** `ActivityDef.requires?: { itemTag:
+    ItemTag; own?: true }`: reading takes a `book` (split off the shelf's stack), music takes
+    the `instrument` whose `ownerId` is the actor (`KnownItemView.ownerId` is added so the
+    planner can see it is hers). The plan is acquire (slice 3's shape: `moveTo` the believed
+    tile, `pickUp`) → venue → `recreate` → carry it home → `putDown`: home is the item's
+    locker tile for an owned item (`berths.ts` exposes `lockerTileOf(deck, bedKey)`), the first
+    tile of the `bookShelf` zone for a book. The walk from the bunkroom locker to the lounge
+    with a harmonica is the visible fetch §7 asks for. An item not where believed fails the
+    plan (`inaccessibleSupply`) and backs off; a person interrupted carrying one sets it down
+    where they stand (`leaveRecreation`).
+14. **Cabin thoughts come at waking and from the berth rule.** `ownCabin` (+0.1, 0.5 day) when a
+    sleep hold ends in the actor's own berth and the bed stands in a `cabin`-tagged compartment;
+    `noisyBunkroom` (−0.1, 0.5 day) when a sleep hold ends in a `quarters` compartment and the
+    sleeper was disturbed for at least `cabins.noisySeconds` (60): the sleep hold step carries
+    `disturbedTicks`, which `cabinsSystem` (needs phase, every tick) advances while anyone
+    awake and not asleep is in the sleeper's compartment (`caches.index.actorsByCompartment`);
+    both through `onWoke(ctx, actor)` in `systems/cabins/cabins.ts`, called from `leaveHold`.
+    `noBunkOfMyOwn` (−0.1, 1 day, non-stacking, refreshed) is given by `cabinsSystem` every
+    `cabins.checkEverySeconds` (60) to crew with no `berths` entry. "Sleeping in the bunkroom
+    while someone in it is awake" is the design's rule; a minute's threshold keeps a single
+    passer-by from counting.
+15. **`privateTalk` is a card side effect, not a seventh lever.** Card options run as the
+    `player` (D-entries on `surfaceDecision`), so the narrator offers a side with `effect:
+    "privateTalk"` and `talkWith` (a crew name) and `tone` (`warm` | `stern`), and the player's
+    choice issues `privateTalk { actorId; tone }`, a player-authority command (also allowed to
+    `system` and `scenario`, not to `narrator` directly: the player chooses who is called in).
+    Validation: `actorId` is crew aboard, available, not the command actor; no talk pending;
+    the command actor has a cabin (`captainsCabin` for the captain, `officersCabin` for the
+    first officer standing in, D8) → `preconditionFailed` otherwise. Apply writes
+    `social.privateTalk = { captainId; actorId; tone; requestedTick }` and emits
+    `privateTalkCalled` (notable: "Mara Osei asked Priya Kessler for a word in the captain's
+    cabin"). Both see it as `SelfView.summons` and take a `privateTalk` personal candidate at
+    `essentialOperation` (it interrupts cards, rounds and rest; it does not interrupt the helm,
+    same class). Plans: the captain to their desk's `seat`, the other to the cabin floor tile
+    nearest the desk, then a `confer` step that counts `cabins.privateTalkSeconds` (20) only
+    while both are in the cabin; the captain's step applies the outcome: `warm` → +2 crew to
+    captain, +1 captain to crew, `heardOut` (+0.1, 1 day); `stern` → −2 and 0, `dressedDown`
+    (−0.15, 1 day); `privateTalkHeld` (narrative), and clears the talk, which ends the other's
+    step. Not both in the cabin by `requestedTick + privateTalkWaitSeconds` (120): `cabinsSystem`
+    clears it with `privateTalkMissed` (notable) and both steps fail `dependencyPending`. The
+    narrator sees the result at its next call and can build on it; the capabilities text under
+    `surfaceDecision` names the effect and the two tones. Lever count stays six.
+16. **Rest and chat move to the lounge.** `leisureCandidate` tags become `rest: ["lounge",
+    "mess", "quarters"]` and `socialize: ["lounge", "mess"]`; `loungeTile` already skips
+    interaction tiles, so resters stand clear of the seats. A one-line gate change that
+    empties the bunkroom of idlers.
+17. **Group sessions render as one plate, members' labels drop.** `RenderFrame.sessions:
+    RenderSession[] { id; activityId; label; x; y; memberIds; running }` (the venue tile
+    centre; `label` "playing cards" or the def's `waitingLabel`), built by `getRenderFrame`
+    from `social.sessions`. The canvas draws one plate per session at the venue
+    (`"cards — Jax, Tomas, Dane"`, first names, 34 characters, the same plate style) and skips
+    the per-actor label of anyone in `memberIds` (their `actionLabel` still feeds the
+    inspector). Four stacked "Name — playing cards" plates over a 2×1 table at phone scale were
+    the alternative. Solo activities keep the ordinary label ("reading", "playing the
+    harmonica"). A tap on the venue machine shows the session in the machine inspector.
+18. **The ticker says who won and little else.** Per group session at most two lines:
+    `sessionStarted` (notable; "Jax Okonkwo, Tomas Ruiz and Dane Whitcross are playing cards in
+    the lounge") and `sessionEnded` (notable for `contest` with a winner, `debate` with an
+    argument or a spirited talk, `perform`; null, so no line, for `bond`, `none`, `abandoned`).
+    `rivalryStreak` (notable), `tookAKnock` (notable), `treatsBaked` (notable),
+    `privateTalkCalled`/`privateTalkMissed` (notable), `privateTalkHeld` and `argument`
+    (narrative: digest and the quiet timer), everything else trace (`sessionOpened`,
+    `sessionJoined`, `sessionCollapsed`, `sessionLeft`, `captainsTable`, `affinityChanged`,
+    `interestsAssigned`). `host.slowDownOnEvents` + `argument`. Solo recreation makes no ticker
+    line at all. The beats report counts notable-or-better lines per watch (call 22) and the
+    target is twelve.
+19. **Thought keys stay a closed set; activities reference them.** `ActivityDef.thoughts` names
+    keys from `THOUGHT_KEYS`, never new ids (D79 made the set closed and the table required;
+    per-activity thought ids would reopen it). Seventeen new keys: `wonContest` (+0.1, 0.3 day,
+    stacks), `lostContest` (−0.05, 0.3, stacks), `keepsBeatingMe` (−0.15, 1, refId),
+    `goodCompany` (+0.05, 0.3), `spiritedTalk` (+0.1, 0.5), `argued` (−0.15, 0.5, refId),
+    `gotLectured` (−0.05, 0.3), `enjoyedMusic` (+0.1, 0.3), `hatedTheNoise` (−0.1, 0.3),
+    `sparringBruise` (−0.1, 0.5), `ownCabin` (+0.1, 0.5), `noisyBunkroom` (−0.1, 0.5),
+    `noBunkOfMyOwn` (−0.1, 1), `satWithTheCaptain` (+0.05, 0.5), `heardOut` (+0.1, 1),
+    `dressedDown` (−0.15, 1), `ateATreat` (+0.1, 0.3). Labels are lower-case phrases; a
+    `{ref}` placeholder in a label ("{ref} keeps beating me") is filled with the refId's name by
+    the inspector and the digest, else the key's label stands alone. `thoughts.*` in a def is
+    L2-checked against the key set.
+20. **Topics are a content table with a weight vector; stance is a dot product.** `TopicDef {
+    id; label; weights: { orderFreedom; faithReason; loyaltyAmbition } }` (weights in [−1, 1]),
+    seven authored: `the_guild` (orderFreedom −1, loyaltyAmbition +0.5), `politics` (orderFreedom +1, loyaltyAmbition −0.5), `faith`
+    (faithReason −1), `philosophy` (faithReason +0.5, orderFreedom +0.5), `the_league`
+    (loyaltyAmbition +1), `old_captains` (loyaltyAmbition −0.5, orderFreedom −0.5), `the_vid`
+    (all 0: watching together always agrees, which is the bond). Debate names its topics; vids
+    name `the_vid` and resolve as `bond`, so a vid is never an argument. `seedTopic` (slice 5)
+    adds to the same table at run time.
+21. **Units.** Days (D76): `recreationPerDay`, `durationDays` and `solo.durationDays`,
+    `collapseBackoffDays`, `chatAffinityEveryDays`, `skillGain.perDay`. Seconds (a wait at a
+    place, a real-time feel): `gatherSeconds` (30), `lateJoinSeconds` (20), `noisySeconds`,
+    `checkEverySeconds`, `privateTalkSeconds`, `privateTalkWaitSeconds`. Unitless: scores,
+    affinity, stances, restores.
+22. **Beats report is the tuning instrument.** `crew beats` gains per watch: sessions opened,
+    started, collapsed, abandoned, by activity; contests, arguments, spirited talks,
+    performances; solo activities by kind; ticker lines (notable or narrative events) per
+    watch; per person the share of time `recreating` (label class from the activity labels)
+    and the longest stretch with recreation above `seekThreshold`; affinity extremes and
+    rivalries at the end. Targets for the tuning commit: at least one group session per watch;
+    every off-watch person recreates at least once a day; collapses under 30% of sessions;
+    ticker lines at most twelve per watch; nobody with recreation above 0.8 for more than a
+    day; the checkpoint ("two people keep ending up at the same card table and the digest
+    names the rivalry") visible in a three-day run as a `Jax Okonkwo vs Tomas Ruiz at cards`
+    line.
+23. **Schema 10 migrates.** `needs.recreation: 0.3` for everyone; `interests`/`values` from the
+    crew def (`MigrationContext.content` gains `crew`) or `interestsFromSeed`; `social:
+    emptySocial()`; `nextId.session: 1`; `item.book × 3` spawned on the `bookShelf` zone's tiles
+    the way slice 3 spawns provisions (ids from `nextId.item`, `warnings` says so); the sleep
+    hold step's `disturbedTicks` absent means 0. The harmonica already lies in Bettina's locker
+    (D74). Narrator fixtures regenerated, never hand-edited.
+24. **The digest sees off-watch life; the prompt gets an off-watch paragraph.** Ship section
+    gains `off watch: cards in the lounge (Jax Okonkwo, Tomas Ruiz, Dane Whitcross); Bettina
+    Solheim playing the harmonica in the lounge` (sessions and solo recreation now) and
+    `rivalries: Tomas Ruiz vs Jax Okonkwo at cards (0–3, Jax Okonkwo's run of 3)` (any rivalry
+    with ≥ 3 games or a streak ≥ 2). Crew lines gain, after `good at`, `likes: cards (keen),
+    vids; dislikes: exercise`, `close to: Jax Okonkwo; at odds with: Priya Kessler` (affinity
+    ≥ 3 and ≤ −3, two each at most), and `berth: own cabin | bunkroom | none`. Mood lines
+    already show the new thoughts' labels with `{ref}` filled. Prompt v0.23: cards, vids,
+    arguments and rivalries are the sim's and the crew's story to tell, never invented; an
+    argument or a rivalry is the kind of thing a card is made of; `privateTalk` is a side
+    effect the captain's cabin makes possible, warm or stern, and its outcome shows in
+    affinity next call; interests are who people are and the narrator writes to them.
+    `quietTooLong` may make a rivalry or an argument the beat. `capabilities.ts` describes the
+    `privateTalk` side effect under `surfaceDecision` and lists each person's likes in the crew
+    block it already writes. Lever count unchanged.
+25. **Cut.** `ActivityDef.noise` (no reader; the noisy bunkroom counts people, not activities);
+    `loner` restoring recreation faster in a cabin (no trait modifier reads recreation yet;
+    `recreationRate` is added as a modifier key for symmetry and `loner` gets 0.8 on it);
+    `gossip` and `stargazing` as interest tags stay (stargazing is an activity; gossip scores
+    nothing until a `gossip` activity exists); a card made from a rivalry (the narrator's,
+    through the digest); the captain's table as an activity.
+
+### Gate: contracts (one agent, serial)
+
+Everything below lands as one commit with all four checks green. Stubs are fine where behaviour
+is a workstream's; types, schemas, generated schemas, the migration, the ticker lines, the
+protocol, the command and the minimum content to keep the bundle valid are not. Every stub is a
+named function in a file its stream owns, called from the shared file, so no stream edits
+`candidates.ts`, `common.ts`, `plans.ts`, `steps.ts`, `actions.ts`, `execute.ts`, `labels.ts`,
+`needs.ts`, `ambient.ts`, `render.ts`, `agentView.ts`, `world.ts`, `migrations.ts`,
+`command-handlers.ts`, `systems/galley/eat.ts` or `planner/galley.ts` after the gate.
+
+**Sim types.**
+
+- `core/types/actor.ts`: `Needs.recreation`; `Actor.interests: Interests`, `Actor.values:
+  Values`; `Interests = { likes: InterestTag[]; strong?: InterestTag; dislikes: InterestTag[] }`,
+  `Values = { orderFreedom: number; faithReason: number; loyaltyAmbition: number }`.
+- `core/types/content.ts`: `INTEREST_TAGS = ["cards", "boardgames", "vids", "debate", "music",
+  "exercise", "sparring", "reading", "tinkering", "cooking", "stargazing", "gossip"]` /
+  `InterestTag`; `ITEM_TAGS` + `book`, `instrument`, `treat`; `TRAIT_MODIFIERS` +
+  `recreationRate`; `THOUGHT_KEYS` + the seventeen keys of call 19; `ACTIVITY_OUTCOMES =
+  ["contest", "bond", "debate", "perform", "none"]`; `ActivityDef { id: ActivityDefId; label;
+  waitingLabel; interest: InterestTag; venue: VenueDef[]; participants: { min; max };
+  durationDays: Days; restores: Partial<Record<"recreation" | "social" | "comfort", number>>;
+  fatigueCost?: number; solo?: { label; durationDays: Days; restores }; outcome:
+  ActivityOutcome; thoughts?: Partial<Record<"win" | "lose" | "joined" | "listened" |
+  "listenedDislike", ThoughtKey>>; affinity?: { participants: number; winnerToLoser: number;
+  loserToWinner: number }; topics?: TopicDefId[]; skillGain?: { skill: SkillId; perDay: number
+  }; risk?: { injuryChance: number }; dirt?: number; requires?: { itemTag: ItemTag; own?: true
+  }; produces?: { itemDefId: ItemDefId; count: number; zoneTag: string }; transitOnly?: true;
+  blockedByProblems?: ProblemKind[] }`; `VenueDef`; `TopicDef`; `CrewDef.interests?`,
+  `CrewDef.values?`; `ContentBundle.activities: Readonly<Record<ActivityDefId, ActivityDef>>`
+  and `topics: Readonly<Record<TopicDefId, TopicDef>>` (both required); `ConfigDef.needs.
+  recreationPerDay` and `initialRange.recreation`; `ConfigDef.recreation { joinAbove;
+  gatherSeconds; lateJoinSeconds; collapseBackoffDays }`; `ConfigDef.social` gains
+  `chatAffinity; chatAffinityEveryDays; affinityRange; avoidBelow; preferAbove; rivalry {
+  streakFor }; debate { agreeWithin; argueBeyond }` (the chat template block stays);
+  `ConfigDef.cabins { noisySeconds; checkEverySeconds; privateTalkSeconds;
+  privateTalkWaitSeconds }`; `ConfigDef.galley.treatHungerAbove`. `core/types/ids.ts`:
+  `ActivityDefId`, `TopicDefId`, `SessionId`, `NextIdCounters` + `session`.
+- `core/types/state.ts`: `WorldState.social: SocialState = { relationships; rivalries; sessions:
+  Record<SessionId, GroupSession>; captainsTableDay: number; privateTalk?: PrivateTalk }`
+  (calls 4, 9, 15; owners: recreation for `sessions`, social for the rest, cabins for
+  `privateTalk`), `SCHEMA_VERSION = 10` and its history line. `core/types/ship.ts`: nothing
+  (`ownerId` and `meal` exist).
+- `core/types/work.ts`: `PERSONAL_ACTIVITIES` + `recreate`, `privateTalk`; `ActivityStep` +
+  `{ kind: "recreate"; activityId; role; sessionId?; ticksDone; ticksNeeded }` and `{ kind:
+  "confer"; ticksDone; ticksNeeded }`; the `hold` step gains `disturbedTicks?: number`;
+  `ActionStages` + `recreate: "waiting" | "playing"`, `confer: "talking"`; the personal
+  `Intent` and the `Candidate` choice gain `activityId?: ActivityDefId` and `sessionId?:
+  SessionId`. `core/types/view.ts`: `SelfView.interests`, `values`, `affinity`, `summons?: {
+  withActorId: ActorId; compartmentId: CompartmentId; captain: boolean }`;
+  `KnownItemView.ownerId?`; `SessionView` (the row plus the def's label) and
+  `AgentView.sessions()`; `AgentView.travel(): { stage: TravelStage }` unless slice 2's W1
+  added an equivalent (the gate uses it then); `RenderSession` and `RenderFrame.sessions`;
+  `AgentViewSnapshot.sessions`.
+- Commands: `core/types/commands/cabins.ts` (new) with `privateTalk { actorId: ActorId; tone:
+  "warm" | "stern" }`; `commands/index.ts` merges it; `authority.ts`: `AUTHORITY.player`,
+  `system` and `scenario` + `privateTalk` (not `narrator`); `contracts.test.ts` lists follow.
+  The handler (validate per call 15, apply) is complete at the gate in
+  `systems/cabins/private-talk.ts` (owner W3 fills the plan and step; the command itself is a
+  contract), registered by `registerCabins`.
+- Events: new `core/types/events/recreation.ts` with `sessionOpened { sessionId; activityId;
+  hostId }` (trace), `sessionJoined { sessionId; actorId }` (trace), `sessionStarted {
+  sessionId; activityId; memberIds; compartmentId }` (notable), `sessionCollapsed { sessionId;
+  activityId; toSolo: boolean }` (trace), `sessionLeft { sessionId; actorId }` (trace),
+  `sessionEnded { sessionId; activityId; outcome: ActivityOutcome | "abandoned"; memberIds;
+  winnerId?; topicId?; argued?: boolean }` (notable), `tookAKnock { actorId; activityId }`
+  (notable), `treatsBaked { cookId; count }` (notable); new `events/social.ts` with
+  `affinityChanged { fromActorId; toActorId; delta; affinity }` (trace), `rivalryStreak {
+  winnerId; loserId; activityId; streak }` (notable), `argument { aId; bId; topicId }`
+  (narrative), `captainsTable { captainId; withActorId }` (trace); new `events/cabins.ts` with
+  `privateTalkCalled { captainId; actorId }` (notable), `privateTalkHeld { captainId;
+  actorId; tone }` (narrative), `privateTalkMissed { captainId; actorId }` (notable),
+  `interestsAssigned { actorId }` (trace); `events/index.ts` merges all three.
+- `core/interests.ts` (owner W3): `generateInterests(rng, stream)`, `interestsFromSeed(id)`,
+  `interestScore(interests, tag)` (3/2/1/0), `stanceOn(values, topic)`; `core/social.ts`
+  (owner W2): `emptySocial()`, `affinityOf(social, from, to)`, `rivalryKey(a, b, activityId)`;
+  `core/world.ts`: `emptyState` gains `social` and `nextId.session`; `createWorld`/the spawn
+  handler write `interests`, `values` (from the def or generated) and `needs.recreation` (from
+  `initialRange`). `core/berths.ts`: `lockerTileOf(deck, bedKey)` exported (the existing lookup,
+  named).
+- `core/migrations.ts` `9:` (call 23); `core/types/save.ts` `MigrationContext.content` + `crew`;
+  `save.test.ts` adds a 9 → 10 case. `core/invariants.ts`: `needs.recreation` in [0, 1];
+  `interests.strong` ∈ `likes`, likes and dislikes disjoint, tags in the enum; values integers
+  in [−2, 2]; `social.relationships` keys are actors and affinities integers within
+  `affinityRange`; every session's members are actors on deck, ids below `nextId.session`,
+  `startedTick ≤ endsAtTick`; `privateTalk` names two actors.
+- `systems/recreation/` (new; owner W1): `recreation.ts` (`recreationSystem`, needs phase after
+  mood; stub no-op), `sessions.ts` (`openSession`, `joinSession`, `leaveRecreation` stubs:
+  the leave stub is a no-op), `plans.ts` (`recreatePlan` stub blocked), `steps.ts`
+  (`runRecreate` throws `NotImplementedError`), `needs.ts` (`recreationRatesFor` returning
+  undefined), `venues.ts` (`resolveVenue` stub), `index.ts` with `registerRecreation(registry)`.
+- `systems/social/` (new; owner W2): `relationships.ts` (`moveAffinity`, `pruneSocial` stubs),
+  `outcomes.ts` (`resolveOutcome` stub: deletes nothing, returns), `chat.ts`
+  (`onConversation` no-op), `seating.ts` (`seatPreference` returning `seats[0]`),
+  `social.ts` (`socialSystem`, needs phase, every 100 ticks; stub no-op), `index.ts` with
+  `registerSocial`.
+- `systems/cabins/` (new; owner W3): `cabins.ts` (`cabinsSystem` needs phase, stub no-op;
+  `onWoke` no-op), `private-talk.ts` (the command handler, complete; `privateTalkPlan` stub
+  blocked; `runConfer` throws; `leaveTalk` no-op), `index.ts` with `registerCabins`
+  (the system and the command). `apps/web/src/worker/registry.ts` and `apps/cli/src/pacing.ts`
+  register recreation, social and cabins after needs (and after galley, if slice 3 placed it
+  there); `packages/sim/src/index.ts` exports `registerRecreation`, `registerSocial`,
+  `registerCabins`, `INTEREST_TAGS`, `ACTIVITY_OUTCOMES`, `interestScore`, `affinityOf`.
+- `planner/recreation.ts` (owner W1): `recreationCandidate(view, config)` stub undefined;
+  `planner/cabins.ts` (owner W3): `summonsCandidate(view)` stub undefined. `candidates.ts`:
+  `enumerateCandidates` adds both (summons before the task loop so it ranks with its class;
+  recreation after `leisureCandidate`); `leisureCandidate` tags per call 16; `PlannerConfig`
+  gains `recreation`, `social`, `mood` (the planner reads `avoidBelow`, `preferAbove`,
+  `joinAbove`, the mood bands). `planner/galley.ts`: the treat rule (call 7).
+- `systems/work/plans.ts`: `buildPersonalPlan` `recreate` → `recreatePlan`, `privateTalk` →
+  `privateTalkPlan`; `steps.ts`: `recreate` → `runRecreate`, `confer` → `runConfer`;
+  `actions.ts`: the two action kinds; `labels.ts`: the strings of W1 and W3 below (text
+  only: `recreateLabel(ctx, step)` reads the def's `label`/`waitingLabel`/`solo.label`;
+  `conferLabel`); `execute.ts`: `abortActivity` calls `leaveRecreation` and `leaveTalk` before
+  the activity is cleared; `leaveHold` calls `onWoke` for a sleep hold. `systems/needs/needs.ts`:
+  `RATE_MODIFIER.recreation = "recreationRate"`, `needRatesPerDay` merges
+  `recreationRatesFor`'s rates when it returns them, else `recreation: recreationPerDay`.
+  `systems/work/ambient.ts`: the `onConversation` call. `systems/galley/eat.ts`: the seat is
+  `seatPreference`'s; `consumeServing` gives `ateATreat` for a `treat`.
+- `view/agentView.ts`: the new `SelfView` fields, `sessions()`, `travel()`, `ownerId` on known
+  items; `toAgentViewSnapshot` carries sessions. `core/render.ts`: `RenderFrame.sessions`
+  (venue tile centre from the machine footprint, zone or compartment; `label` from the def by
+  `startedTick`); ticker lines (streams write none): `sessionStarted` → "Jax Okonkwo, Tomas
+  Ruiz and Dane Whitcross are playing cards in the lounge" (two: "X and Y are…"),
+  `sessionEnded` → contest "Jax Okonkwo won at cards" / debate argued "Priya Kessler and Dane
+  Whitcross argued about the Guild", not argued "Priya Kessler and Oyelaran Abiodun had a
+  spirited talk about faith" / perform "Bettina Solheim played the harmonica in the lounge" /
+  null otherwise, `rivalryStreak` → "Jax Okonkwo has beaten Tomas Ruiz three times running at
+  cards", `tookAKnock` → "Tomas Ruiz took a knock sparring", `treatsBaked` → "Bettina Solheim
+  baked a tray of treats", `argument` → null (the `sessionEnded` line carries it),
+  `privateTalkCalled` → "Mara Osei asked Priya Kessler for a word in the captain's cabin",
+  `privateTalkHeld` → "Mara Osei had a word with Priya Kessler", `privateTalkMissed` → "Priya
+  Kessler never made it to the captain's cabin"; `describeEvent` falls back to the generic line
+  for the trace kinds. `docs/CONTRACTS.md`: sessions are common knowledge (call 3); the
+  `AgentView` list gains `sessions()`.
+
+**Content and schemas (`packages/content`).**
+
+- `schemas/primitives.ts` enums for the interest tags, item tags, trait modifier, thought keys,
+  outcomes (`AssertEqual` guards); new `schemas/activity.ts` (`activityDefSchema`, strict:
+  `participants.min ≥ 1`, `max ≥ min`, `durationDays` positive, `restores` values in [0, 1],
+  `affinity` integers in [−3, 3], `risk.injuryChance` in [0, 1], `solo` forbidden when `min ===
+  1`) and `schemas/topic.ts` (weights in [−1, 1]); `schemas/crew.ts` `interests?` (likes 1–3,
+  `strong` ∈ likes, dislikes 0–2, disjoint) and `values?` (integers in [−2, 2]);
+  `schemas/config.ts` the new blocks and keys; `schemas/bundle.ts` `activities`, `topics` as
+  records and `thoughts` strict over every key; `crew content schemas` regenerated.
+  `validate.ts` L2: `thoughts.*` keys exist, `topics` refs, `produces.itemDefId` refs,
+  `requires.itemTag` names a tag some item def carries, `blockedByProblems` kinds; the L3 venue
+  rules are W4's.
+- Data: `activities/` twelve files — `cards` (gamesTable + lounge; 2–4; 0.1 day; contest; solo
+  "playing solitaire" 0.06; restores recreation 0.4, social 0.3; win/lose thoughts; affinity
+  participants +1, loserToWinner −1), `board_game` (gamesTable; 2; 0.08; contest; same
+  thoughts; no solo), `vids` (vidScreen; 1–4; 0.12; bond; topics `the_vid`; `joined`
+  `goodCompany`), `video_game` (vidScreen; 1–2; 0.06; contest; win/lose), `debate` (lounge,
+  mess; 2–3; 0.06; debate; topics the six; restores recreation 0.3, social 0.4), `exercise`
+  (exerciseRig; 1; 0.05; none; fatigueCost 0.1; dirt 0.03), `sparring` (sparringMat zone; 2;
+  0.04; contest; win/lose; risk 0.05; dirt 0.05; fatigueCost 0.1), `reading` (desk own, then
+  lounge; 1; 0.08; none; requires `book`; restores recreation 0.35, comfort 0.1), `music`
+  (lounge, mess; 1; 0.05; perform; requires `instrument` own; listened `enjoyedMusic`,
+  listenedDislike `hatedTheNoise`), `tinkering` (workbench; 1; 0.1; none; skillGain
+  engineering 0.2/day), `stargazing` (viewport zone; 1–2; 0.06; bond; transitOnly; joined
+  `goodCompany`), `baking` (stove; 1; 0.05; none; blockedByProblems `mealToCook`; produces
+  `item.treat` × 4 at `serving`); `topics/` seven files (call 20); `thoughts/` seventeen
+  files (call 19); `items/book.json` (stackable, `maxStack` 6, tag `book`, mass 0.3),
+  `items/treat.json` (call 7); `harmonica.json` gains the `instrument` tag; the nine crew files
+  gain `interests` and `values` (Bettina: strong music, cooking, dislikes sparring; Mara:
+  strong stargazing, reading, dislikes vids; Jax: strong cards, vids, dislikes reading; Tomas:
+  strong sparring, cards, dislikes debate; Priya: strong tinkering, debate, dislikes cards;
+  Oyelaran: strong reading, debate, dislikes sparring; Sunniva: strong exercise, gossip,
+  dislikes music; Dane: strong boardgames, music, dislikes exercise; Noor: strong vids,
+  stargazing, dislikes boardgames; values: Mara (−1, 0, −2), Dane (−2, 0, −1), Priya (1, 2,
+  1), Tomas (1, −1, 0), Jax (2, 1, 2), Bettina (0, −2, −1), Oyelaran (−1, 1, −1), Sunniva (1,
+  0, 1), Noor (0, −1, 1)); `passenger.json` untouched (generated); `traits/loner.json`
+  `recreationRate: 0.8`; `scenarios/default.json` `startingItems` + `book × 3` in
+  `book_shelf`; `config/default.json`: `needs.recreationPerDay: 0.6`,
+  `initialRange.recreation: { min: 0.2, max: 0.5 }`, `recreation { joinAbove: 0.25,
+  gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 }`, `social` +
+  `chatAffinity: 1, chatAffinityEveryDays: 1, affinityRange: 10, avoidBelow: -3, preferAbove:
+  0, rivalry { streakFor: 3 }, debate { agreeWithin: 2, argueBeyond: 4 }`, `cabins {
+  noisySeconds: 60, checkEverySeconds: 60, privateTalkSeconds: 20, privateTalkWaitSeconds: 120
+  }`, `galley.treatHungerAbove: 0.1`, `host.slowDownOnEvents` + `argument`; `loader.ts`
+  imports; `loader.test.ts` counts (items 18, thoughts 26, activities 12, topics 7).
+- Hand-built sim bundles: `core/fixtures/ship-life.ts` `FIXTURE_THOUGHTS` gains the seventeen
+  defs and the module gains `FIXTURE_ACTIVITIES` (cards, reading, exercise: enough for the
+  three outcomes the fixtures exercise), `FIXTURE_TOPICS`, `FIXTURE_RECREATION`,
+  `FIXTURE_SOCIAL`, `FIXTURE_CABINS`; every fixture config and content spreads them;
+  `example-world.ts` actors' `interests`, `values`, `needs.recreation`, state `social`;
+  `frozen-migrations.ts` untouched.
+
+**Tests the gate must fix to stay green** (literals and renames only): `loader.test.ts` and
+`schemas.test.ts` counts; `contracts.test.ts` command lists; `kernel.test.ts`/
+`pipeline.test.ts` if they build `emptyState` by hand; `needs.test.ts` if it enumerates need
+keys; `planner/boundary.test.ts` if it builds a `PlannerConfig` by hand; `save.test.ts` 9 → 10;
+`integration.test.ts` registers nothing new (the registry does); narrator `digest.test.ts` is
+untouched (nothing new is read yet); `Inspector.test.tsx` if it lists the need rows; fixtures
+under `packages/narrator/fixtures/` load through the migration (regenerated at integration).
+
+### Workstreams (parallel after the gate)
+
+No two streams edit the same file. `docs/DECISIONS.md`, `packages/content/schema-json/*`,
+`packages/content/data/config/default.json`, `packages/narrator/fixtures/*` and the deck
+READMEs are the lead's at integration. Each stream's report names the files it touched, the
+D-entry text it proposes, and the beats it saw in a headless run.
+
+**W1 — Sim: the recreation need, venues, sessions, the recreate step, the planner's choice.**
+Owns `packages/sim/src/systems/recreation/**` (+ tests and `fixtures/lounge-deck.ts`: a small
+deck with a lounge holding a games table with four seats, a vid screen, a `bookShelf` zone with
+a book stack and a `viewport` zone; a gym with an exercise rig and a `sparringMat` zone; a
+bunkroom with four bunks and lockers; six crew in two sections with authored interests, one
+with an owned `instrument` in their locker) and `planner/recreation.ts` (+ test).
+- `recreation.ts` (`recreationSystem`): the lifecycle of call 4 (start, collapse, abandon,
+  end), `endsAtTick` from `durationDays`, `sessionStarted`/`sessionCollapsed`/`sessionEnded`,
+  `resolveOutcome` at the end (W2's), the host's collapse backoff
+  (`recreate:<activityId>` for `collapseBackoffDays`).
+- `sessions.ts`: `openSession` (allocates `nextId.session`; a session already open for the
+  activity at the venue is joined instead), `joinSession` (room, not running past
+  `lateJoinSeconds`, `sessionJoined`), `leaveRecreation` (remove from `members`, `sessionLeft`;
+  set down a carried `book`/`instrument` where the actor stands and `seeItem`; a contest or
+  debate under `min` ends `abandoned`).
+- `venues.ts`: `resolveVenue(ctx, actor, def, session?)` → `{ venue: SessionVenue; target:
+  StepTarget | TileCoord }` by call 12 (machine `use` positions through the reservation cache
+  and members' tiles; zone tiles free of actors; compartment floor by `loungeTile`'s rule
+  computed over state; `own` against `state.berths` and the bed's compartment).
+- `plans.ts`: `recreatePlan` (requires → acquire; venue; `recreate`; home → `putDown`; the
+  home tile by call 13; `transitOnly` against `state.travel.stage`; `blockedByProblems`
+  against open problems).
+- `steps.ts`: `runRecreate` (first tick by role; waiting while the session is open; counting
+  while solo or started; done when the session is gone after starting or `ticksDone ≥
+  ticksNeeded` solo; the collapse-to-solo rewrite of the step; `occupiedPosition` on a failed
+  join).
+- `needs.ts`: `recreationRatesFor` (call 1).
+- `planner/recreation.ts`: `recreationCandidate` (call 2), reading `self.interests`,
+  `self.affinity`, `sessions()`, `travel()`, known items (`ownerId` for `own`),
+  `knownProblems()` for `blockedByProblems`, the deck's zones and machines for venue presence.
+- Labels: the def's `label` while playing, `waitingLabel` while the session is open, the
+  `solo.label` after a collapse; "fetching the harmonica" / "fetching a book" on the acquire
+  walk (`labels.ts` `recreateLabel`, which the gate wrote; W1 may ask for a string).
+- Tests (`recreation.test.ts`, `sessions.test.ts`, `venues.test.ts`, `plans.test.ts`,
+  `planner/recreation.test.ts` on the lounge fixture and on `crewWorld`): off watch with
+  recreation above the threshold, the cards-liker hosts at the games table and the ticker is
+  quiet until a second arrives; the second (a neutral with time on their hands) joins and the
+  session starts with `sessionStarted` once; a third who dislikes cards never comes; a session
+  nobody joins collapses at `gatherSeconds` to solitaire for the host and the host backs off
+  hosting; a bell pulls the oncoming stander out mid-game (`sessionLeft`) and a two-hand
+  contest ends `abandoned` with no winner; recreation falls during the game by the def's
+  restores and not while waiting; a low-mood person plays solitaire rather than hosting; a
+  high-mood person hosts rather than sitting alone; stargazing is offered in transit and not
+  docked; the harmonica owner fetches it from her locker, plays in the lounge and puts it
+  back, and nobody else ever picks it up; a reader takes a book to her own desk when she has a
+  cabin and to the lounge when she has not; an interrupted reader sets the book down where
+  she stands and the shelf's stack is one short; baking is not offered while `mealToCook` is
+  open; on `crewWorld` a day shows at least one `sessionStarted`.
+Done when the sim suite is green and the lounge fixture shows a game of cards start, end with
+a winner (W2's stub makes it `none` until W2 merges: the test pins the winner only after), and
+collapse, each in one headless run.
+
+**W2 — Sim: relationships, outcomes, rivalries, ambient affinity, seats, the captain's table.**
+Owns `packages/sim/src/systems/social/**` (+ tests), `core/social.ts` (+ test),
+`systems/needs/invariants.ts` (the social invariants beside mood and berths).
+- `relationships.ts`: `moveAffinity(ctx, from, to, delta)` (clamped, integer, entry created on
+  first move, `affinityChanged` trace), `pruneSocial`; `social.ts` (`socialSystem`, every 100
+  ticks: prune).
+- `outcomes.ts`: `resolveOutcome` per call 5; the rivalry tally and `rivalryStreak`; debate
+  stances through `stanceOn`; bystanders from `caches.index.actorsByCompartment`, awake only;
+  `skillGain`, `dirt` (slice 3's `depositDirt`), `produces` (a stack at the zone's first tile,
+  `Item.meal` from the baker's skill and the galley tier through slice 3's quality rule,
+  `treatsBaked`), `risk` (`tookAKnock`, `sparringBruise`).
+- `chat.ts`: `onConversation` (call 10). `seating.ts`: `seatPreference` and the captain's table
+  (call 11), `captainsTable` trace.
+- Tests (`outcomes.test.ts`, `relationships.test.ts`, `seating.test.ts`, `chat.test.ts` on
+  W1's lounge fixture with hand-built sessions, and on `crewWorld`): a contest between a keen
+  player and a neutral one is won by the keen one more often than not over twenty seeded
+  rolls, each loss gives `lostContest` and −1 toward the winner; the third straight loss gives
+  `keepsBeatingMe` with the winner's id as `refId`, `rivalryStreak`, and the tally reads
+  (0–3); a win by the loser resets the streak; a debate between values (2, 1, 2) and (−2, 0,
+  −1) on `the_guild` is an `argument` with −2 each way and `argued` on both, between (1, 2,
+  1) and (−1, 1, −1) on `philosophy` a `spiritedTalk`; a bystander who does not like debate is
+  `gotLectured`; a performance gives the music-liker in the room `enjoyedMusic` and +1 toward
+  the player, the disliker `hatedTheNoise`, the neutral nothing, and someone asleep nothing; a
+  vid session is a bond: `goodCompany` and +1 all round, never an argument; ambient chat gives
+  +1 each way once and not again within a day; affinity never leaves [−10, 10]; an eater sits
+  beside a friend and never beside an enemy when a seat is free; the captain's first meal of
+  the day seats her beside her highest-affinity crew member and the next day's beside the
+  lowest, each with `satWithTheCaptain`; a passenger who left is pruned from
+  `relationships`; sparring at 1.0 injury chance gives both `sparringBruise` and two
+  `tookAKnock` lines; tinkering raises engineering by `perDay × durationDays`.
+Done when the sim suite is green and `crewWorld` over three days shows a rivalry key with three
+or more games.
+
+**W3 — Sim: cabins, `privateTalk`, interests generation.**
+Owns `packages/sim/src/systems/cabins/**` (+ tests), `planner/cabins.ts` (+ test),
+`core/interests.ts` (+ test), `core/berths.ts` for `lockerTileOf` only (+ a case in
+`berths.test.ts`).
+- `cabins.ts` (`cabinsSystem`): `disturbedTicks` on sleep holds; `noBunkOfMyOwn` every
+  `checkEverySeconds`; the private-talk timeout (`privateTalkMissed`); `onWoke` (`ownCabin`,
+  `noisyBunkroom`).
+- `private-talk.ts`: `privateTalkPlan` (the captain to the desk `seat` of their cabin, the
+  other to the free cabin floor tile nearest the desk, then `confer`), `runConfer` (counts
+  only while both are in the cabin compartment; the captain's step applies the outcome of
+  call 15 through W2's `moveAffinity`, `privateTalkHeld`, clears `social.privateTalk`; the
+  other's step is done once it is cleared), `leaveTalk` (an aborted party: the talk stays
+  pending until the timeout; nothing else).
+- `planner/cabins.ts`: `summonsCandidate` (essential class; the captain's and the other's;
+  rejected `notAboard` when the summons names someone not on the roster).
+- `core/interests.ts`: `generateInterests`, `interestsFromSeed` (deterministic: the same id
+  gives the same interests), `interestScore`, `stanceOn`.
+- Labels: "going to the captain's cabin" (the walk, both; "going to the first officer's cabin"
+  when the FO holds it), "having a word with Priya Kessler" / "having a word with the captain"
+  (`confer`).
+- Tests (`cabins.test.ts`, `private-talk.test.ts`, `planner/cabins.test.ts`,
+  `interests.test.ts` on `berthContent`/`crewWorld`): the captain wakes in her cabin with
+  `ownCabin`; a bunkroom sleeper with someone awake in the room for a minute wakes with
+  `noisyBunkroom`, one with a passer-by for five seconds does not; the tenth crew member on an
+  eight-bunk deck gets `noBunkOfMyOwn`, refreshed daily, and loses it when a bunk frees; a
+  `privateTalk` card side, chosen, sends both to the cabin, the talk takes twenty seconds with
+  both present, `warm` moves affinity +2/+1 with `heardOut`, `stern` −2/0 with `dressedDown`,
+  the ticker shows the call and the talk; the command is rejected for a passenger, for the
+  captain herself, for someone ashore, and while a talk is pending; a talk whose crew member
+  is at the helm waits and times out with `privateTalkMissed` (the helm is not interrupted);
+  with the captain asleep the first officer holds it in the officers' cabin; generated
+  interests always have a strong like inside the likes and never a tag both liked and
+  disliked; `interestsFromSeed` is stable.
+Done when the sim suite is green.
+
+**W4 — Content: validator rules, data tuning, READMEs.**
+Owns `packages/content/src/schemas/validate.ts`, `validate-hull.ts` and their tests,
+`packages/content/data/activities/*`, `data/topics/*`, `data/crew/*.json` (interests and
+values after the gate's first pass), `data/decks/freighter-mk1.json` (if a zone is needed),
+`README`s under `data/`.
+- L3 (per deck, per activity): a `machineTag` venue names a tag some machine on the deck
+  carries with at least `participants.max` `use` positions; a `zoneTag` venue a zone with at
+  least `max` tiles; a `compartmentTag` venue a compartment; an activity with no venue present
+  on a deck is a `physical` *note* naming the deck and activity (Mk1 lacks the lounge and gym),
+  not an error, and the authored Mk2 must have every one (an error for the default scenario's
+  deck). `requires.own` only with a `personal`-tagged item def carrying the tag; `produces.
+  zoneTag` present on the deck. L2: `participants.max ≤ 4` (the legibility ceiling for one
+  plate), `solo` present when `min ≥ 2` and `outcome` is not `contest` (a game that can be
+  played alone must say how).
+- Data: a second pass over values and interests so every group activity has at least two
+  likers across the off-watch overlaps (Red+Blue, White+Blue, all off on the third watch),
+  and no two people are alike; the twelve defs' durations and restores against call 22's
+  targets after W1 lands (the lead's tuning commit moves them further).
+- Tests: one failing synthetic case per rule; the authored bundle passes; README regeneration
+  for Mk2 (`crew content render-deck`) listing which activities each room hosts.
+Done when `crew content validate` is green and every rule has a failing test.
+
+**W5 — Narrator and CLI: the digest's off-watch lines, the `privateTalk` side effect, the
+prompt, the beats report.**
+Owns `packages/narrator/**`, `packages/server/src/routes/narrator*.test.ts`, `apps/cli/**`.
+- `digest.ts`: the lines of call 24 (`off watch:` from `social.sessions` and the actors'
+  `recreate` steps; `rivalries:` from `social.rivalries` with the names in the key's order;
+  crew `likes`/`dislikes`, `close to`/`at odds with` from `social.relationships`, `berth` from
+  `berths` and the bed's compartment tags), `{ref}` in thought labels filled from `refId`;
+  `contract.ts`: `decisionSide.effect` + `privateTalk`, `talkWith: idOf("crew member name,
+  or empty")`, `tone: z.enum(["warm", "stern", ""])` (empty for none, D45); `translate.ts`:
+  `privateTalkSide` resolving the name to an aboard crew member (dropped with a reason for the
+  captain, a passenger, someone ashore, a pending talk) through `playerSide`;
+  `capabilities.ts`: the side effect under `## 4. surfaceDecision` ("a private word in the
+  captain's cabin, warm or stern; the crew member walks there and the talk moves how they
+  feel about the captain") and `likes:` in the crew lines it writes; `prompts/system.ts` v0.23
+  (call 24); `prompts/hooks.ts` `quietTooLong` may build a card from a rivalry or an argument,
+  `notableEvent` text for `argument`.
+- `apps/cli/src/beats.ts`: the counters and shares of call 22; `pacing.test.ts` hook-count and
+  timing pins if the lounge changes walks; `index.test.ts` usage string unchanged.
+- Tests: `digest.test.ts` off-watch, rivalry, likes and berth lines on a fixture with a
+  running session and a rivalry (the crew-line regexes keep `; mood: …; good at: ` intact: the
+  new clauses follow `good at`); `translate.test.ts` `privateTalk` side cases (unknown name,
+  the captain, a passenger, pending talk, warm and stern); `capabilities.test.ts` text (six
+  levers still); `run.test.ts` and `kernel-integration.test.ts` on regenerated fixtures;
+  server tests on the new player command kind; `beats.test.ts` a one-day run reports at least
+  one session started.
+Done when the narrator, server and CLI suites are green, `crew beats --days 3` prints the new
+columns, and the lead runs `pnpm test:live` once.
+
+**W6 — Web: the session plate, the inspector's people, the machine inspector's gathering.**
+Owns `apps/web/**` except `worker/registry.ts` (the gate's).
+- `render/draw.ts` (+ `draw.test.ts`): `drawSessionPlates` after `drawActorLabels`, one plate
+  per `frame.sessions` at the venue's screen point, text `"${label} — ${first names}"` (34
+  characters; waiting: `"${waitingLabel} — ${host's first name}"`), the same plate style and
+  overlap push; `drawActorLabels` skips actors whose id is in any session's `memberIds`
+  (`sessionMemberIds(frame)` in `render/sessions.ts`, + test). `host/playback.ts`
+  `interpolateFrame`: `sessions` snap to `next`.
+- `ui/Inspector.tsx`, `actorWords.ts` (+ tests): a Recreation need row; `interestsLine`
+  ("likes cards (keen), vids; dislikes reading"); `relationshipsLines` ("close to Jax Okonkwo
+  (+4)", "at odds with Priya Kessler (−3)", top two each way, from `self.affinity` and the
+  roster's names); `thoughtText` fills `{ref}`; `MachineInspector` gains a "Gathering" line
+  when a session's venue is the machine ("cards: Jax, Tomas, Dane, 40 s in" from the frame
+  and view tick); `pick.ts` unchanged.
+- `log.ts`/`Log.tsx`: nothing new (the slowdown highlight is slice 2's; `argument` arrives
+  through config).
+- Test pins: `fullSim.test.ts` (off-watch walks change the lounge's traffic; haul and
+  departure bounds rechecked), `integration.test.ts` registers nothing new, `dockside.test.ts`
+  and `captain-ashore.test.ts` tick budgets if the captain now plays cards between asks.
+Done when the web suite is green, a browser run at 390×700 shows one plate over the games
+table reading "cards — Jax, Tomas" with no name labels under it, a tap on the table shows the
+gathering, and a tap on Jax shows his likes and who he is close to.
+
+### Integration order
+
+1. **Gate** on `ship-life-4` (branched from `main` after slice 3 merges): the four checks;
+   `crew content validate`; a browser smoke run (nobody plays yet: the stubs keep today's
+   behaviour except that resters now stand in the lounge).
+2. **W4** (content) first: its venue rules hold on the gate content; the four checks; `crew
+   content validate` reports Mk1's missing venues as notes and nothing else; READMEs
+   regenerated.
+3. **W3** (cabins, interests), then **W2** (social), then **W1** (recreation): the four checks
+   after each; `crew pacing` after W1 shows `sessionStarted` in a day with no
+   `invariantViolated`; after W2 the first `rivalryStreak` in a three-day `crew beats` is
+   recorded for the tuning commit.
+4. **W6** (web): the four checks; browser at 390×700 and 1280×800 with a game on.
+5. **W5**: regenerate `packages/narrator/fixtures/*` with `crew narrator fixtures` first (schema
+   9 → 10, books on the shelf, interests on everyone), then the four checks; `pnpm test:live`
+   once; `crew beats --days 3 --scenario both`, numbers recorded for the D-entry.
+6. **Tuning commit (lead):** against the call 22 targets: `recreationPerDay` and `joinAbove`
+   until every off-watch person recreates daily and sessions fill; `gatherSeconds` and
+   `durationDays` until collapses are under 30% and the lounge is busy without one game
+   running into the next bell; `chatAffinity` and the outcome deltas until affinities spread
+   over a week without pinning at ±10; ticker lines per watch under twelve, or
+   `sessionStarted` for `bond` sessions goes trace; `pacing.test.ts` and `beats.test.ts`
+   expectations moved; both reports kept beside the D-entry.
+7. D-entries, `README.md` note ("off watch, the crew play cards, spar and read; the digest
+   names rivalries"), deploy via the `ops` agent, phone playtest: a 10-minute 1× session shows
+   a plate over the games table with two or three first names on it, a ticker line naming a
+   winner, and Bettina walking from the bunkroom to the lounge with the harmonica.
+
+### Risks and hidden coupling
+
+- **Hot files with one owner and gate stubs**: `planner/candidates.ts`, `planner/common.ts`,
+  `planner/galley.ts`, `systems/work/plans.ts`, `steps.ts`, `actions.ts`, `execute.ts`,
+  `labels.ts`, `systems/needs/needs.ts`, `systems/work/ambient.ts`, `systems/galley/eat.ts`,
+  `core/render.ts`, `view/agentView.ts`, `core/world.ts`, `core/migrations.ts`,
+  `core/command-handlers.ts`, `apps/web/src/worker/registry.ts`. The gate writes every call
+  site and the streams reach them only through their own files (`systems/recreation/*`,
+  `systems/social/*`, `systems/cabins/*`, `planner/recreation.ts`, `planner/cabins.ts`,
+  `core/interests.ts`, `core/social.ts`). A stream that finds it needs a line in another's file
+  asks the lead, who adds it at integration.
+- **Slice 3 is not merged while this is planned.** The gate assumes `systems/galley/eat.ts`'s
+  seat choice, `consumeServing`, `planner/galley.ts`'s `eatCandidate`, `Item.meal`,
+  `depositDirt`, `galley.mealCallHungerAbove` and `crew beats` exist as the slice 3 plan
+  describes. If a name moved at slice 3 integration, the gate follows the code and says so.
+  If slice 2's W6 left `beats.ts` elsewhere, W5 follows it.
+- **Sessions and the step share a lifecycle across two owners.** W1 owns the row and the step,
+  W2 owns what happens at the end. The contract is `resolveOutcome(ctx, session, def)` called
+  exactly once, after which W1 deletes the row; W2 never touches `sessions`. The gate's stub
+  returns without effect, so W1's tests see `outcome: "none"`-shaped endings until W2 merges
+  (W1 pins the winner only in a test marked for W2).
+- **Members are the people at the venue, and arrivals race the gather timer.** A joiner who
+  walks twenty tiles can arrive after a two-hand session collapsed to solitaire; they fail
+  `occupiedPosition`, back off, and may host their own. `gatherSeconds` 30 covers the
+  bunkroom-to-lounge walk on Mk2 (about 12 tiles); the beats report's collapse share is the
+  tripwire, and the next step if it is high is counting a planned joiner as `coming` on the
+  row (a `joinSession` at plan time with a release on abort), not a longer timer.
+- **Same-class commitment and the lounge.** Recreation is routine at most; the mess call,
+  hauling and gangway watch are routine too, so nobody is pulled off a crate for cards, and a
+  game already running is not interrupted by a meal call (same class). A player leaves a game
+  only for essential work, the bell (duty) or a survival need. If the beats report shows
+  people skipping dinner for cards, `mealCallHungerAbove` is not the knob: the eat candidate's
+  age (`ageTick`) already ranks it ahead of a younger game in the same class.
+- **Reservation of `use` positions by several personal activities.** Sleep, eat (slice 3) and
+  now recreation all pick machine positions against the reservation cache at plan time and
+  find out on arrival. Four seats at the games table with four would-be players converging is
+  the first time four reservations race; `occupiedPosition` backoff and the `max` cap
+  (`joinSession` refuses the fifth) keep it bounded. W1 measures it on the lounge fixture with
+  five hosts.
+- **`Needs` gains a key, and every place that enumerates needs must follow**: `RATE_MODIFIER`,
+  `initialRange`, the migration, invariants, `needs.test.ts`, the inspector's rows, the digest's
+  `needs:` clause (`needWord` over the keys it lists; `recreation` reads "bored" above the
+  threshold), `scenarioSetNeeds`'s payload (scenario-only). TypeScript catches the typed ones;
+  the digest's word list and the inspector rows are W5's and W6's to find.
+- **`THOUGHT_KEYS` is a required content table**: seventeen new keys mean seventeen defs in
+  every hand-built bundle through `FIXTURE_THOUGHTS`; `schemas/bundle.ts` lists them; a missed
+  one fails at `createWorld` with a clear message.
+- **`{ref}` in thought labels** is a convention three readers share (inspector, digest, and
+  the beats report if it prints thoughts); a label with `{ref}` on a thought without `refId`
+  renders the placeholder, so the validator (W4) rejects `{ref}` in the label of a key the sim
+  never gives a `refId` (the gate lists `keepsBeatingMe` and `argued` as the two that get one).
+- **Ambient chat inside a session gives affinity twice a day at most** (once from the chat,
+  once from the outcome); with `chatAffinityEveryDays` 1 and bond +1, two friends who play
+  nightly reach +10 in a week. The tuning commit watches the affinity spread; `affinityRange`
+  is the cap, not the cure.
+- **The treat and the mess call share the serving zone**: four treats on the counter next to
+  ten servings. `eatCandidate` prefers a `meal`-tagged item over a `treat` when hungry enough
+  for a meal, and the treat rule fires only below the meal call's threshold, so a treat never
+  replaces dinner. The galley's sweep spoils both.
+- **`privateTalk` is the first player command that moves people.** It writes an intent through
+  the planner (a summons the view carries), never `pendingIntent` directly (D70's shore walk
+  does that from commerce; the cabin keeps to the planner so the helm rule stands). A captain
+  at the helm never answers her own summons: the command actor is never the stander while a
+  hand qualifies (D77), and the FO case is tested.
+- **Save size**: `social` is under 4 KB of JSON at nine people and grows with the square of
+  the crew; at the legibility ceiling of nine that is the design's bound. Sessions are at most
+  three or four rows. Nothing typed-array, nothing in caches.
+- **Counts and literals pinned in tests**: items 16 → 18 (book and treat),
+  thoughts 9 → 26; `contracts.test.ts` player command list; `capabilities.test.ts` keeps "six
+  levers"; `digest.test.ts` the crew-line regexes (new clauses after `good at`);
+  `loader.test.ts` `personal` tags (the harmonica gains `instrument`, keeps `personal`).
+- **Narrator call volume**: `argument` and `privateTalkHeld` are narrative (digest, quiet
+  timer) and not hooked; no new call sources. `sessionStarted` is notable and reaches the
+  ticker and the uploaded events; at three to five sessions a watch that is the loudest new
+  source, and the tuning commit's twelve-line target is where it is held.
+- **Mk1 never recreates** beyond compartment-venue activities (debate in the mess, music in
+  the mess): it has no lounge, gym, book shelf or viewport. Mk1 keeps no scenario, so nothing
+  depends on it; the validator's notes say which activities it lacks.
+
+### D-entries for slice 4 (D83 onward, provisional; the lead renumbers at integration)
+
+- **D83.** Off watch: a fifth need, recreation, met by activities from a content table
+  (`ActivityDef`: venue tags, participants, duration, restores, outcome, thoughts, affinity,
+  topics, skill gain, risk, dirt, a required item, a product); interests and value axes per
+  person, authored for the nine and generated for the rest; one planner candidate per person,
+  the best-scored activity by interest, mood and company; group sessions are common knowledge
+  (the intercom), opened by a host at the venue, joined by whoever walks over, started at the
+  gather timer or when full, collapsed to the solo variant, ended by the bell or an essential
+  task; the rest and chat candidates move to the lounge; a session renders as one plate at the
+  venue and the ticker says who won.
+- **D84.** Relationships: directed affinity in `WorldState.social`, sparse, ±10, moved by
+  ambient chat once a day per pair, by outcomes (contest, bond, debate on a topic by the dot
+  product of values and weights, perform for whoever is in the room), by seats (friends
+  beside, enemies apart; the captain's table once a day) and by `privateTalk`; a per-pair
+  per-activity tally with a streak that becomes a rivalry thought and a ticker line; a
+  sparring injury is a thought and a line this slice, the medic's work waits for slice 5;
+  baking makes treats eaten as snacks.
+- **D85.** Cabins: own-cabin and noisy-bunkroom thoughts at waking, no-bunk daily; personal
+  items are fetched from lockers and put back (the harmonica), books from the shelf;
+  `privateTalk` is a card side effect the player chooses, a player-authority command that
+  summons a crew member to the command actor's cabin for a warm or stern word with an affinity
+  outcome; the lever count stays six.
+- **D86.** Save schema 10 migrates 9 (recreation, interests, `social`, books on the shelf);
+  the digest's off-watch, rivalry, likes, relationship and berth lines and prompt v0.23;
+  `crew beats` counts sessions, outcomes, solo recreation and ticker lines per watch and is
+  the instrument the tuning commit answers to.
 
 ## Slice 5: The bridge, later stations
 
