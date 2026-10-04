@@ -12,12 +12,12 @@ import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
 import { createKernel } from "../../core/kernel";
 import { createRegistry } from "../../core/registry";
-import type { ConfigDef, ContentBundle, DeckDef, DockDef } from "../../core/types/content";
+import type { ConfigDef, ContentBundle, DockDef } from "../../core/types/content";
 import type { CommandId, DockDefId, PortDefId } from "../../core/types/ids";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerNeeds } from "../needs/index";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
-import { QUAY } from "../spatial/fixtures/dock";
+import { QUAY, withRamps } from "../spatial/fixtures/dock";
 import { registerSpatial } from "../spatial/index";
 import { ALL_DERIVATIONS, CREW, crewConfig, crewContent } from "../work/fixtures/crew-deck";
 import { registerWork } from "../work/index";
@@ -30,27 +30,6 @@ export const FAR_DOCK: DockDef = {
   portId: TINY.port2,
   name: "Far quay",
 };
-
-function withRamps(deck: DeckDef): DeckDef {
-  const ramp = (key: string, x: number) => ({
-    key,
-    edge: { x, y: 6, side: "s" as const },
-    kind: "ramp" as const,
-    powerDomain: "main",
-    manualOperationSupported: true,
-    initialState: "closed" as const,
-  });
-  return {
-    ...deck,
-    doors: [...deck.doors, ramp("cargoRamp", 2), ramp("personnelRamp", 9)],
-    docking: {
-      cargoRampDoorKey: "cargoRamp",
-      personnelRampDoorKey: "personnelRamp",
-      cargoTransferTiles: [{ x: 2, y: 6 }],
-      personnelTransferTiles: [{ x: 9, y: 6 }],
-    },
-  };
-}
 
 /** Fast travel so a round trip fits in a few hundred ticks. */
 export function docksideConfig(travel: Partial<ConfigDef["travel"]> = {}): ConfigDef {
