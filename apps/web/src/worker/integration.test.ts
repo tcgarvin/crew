@@ -15,7 +15,7 @@ describe("worker registry + real content", () => {
     const kernel = createKernel(createFullRegistry());
     const world = kernel.createWorld(scenarioId, 12345, bundle, config);
     const actorIds = Object.keys(world.state.actors) as ActorId[];
-    expect(actorIds.length).toBe(8);
+    expect(actorIds.length).toBe(9);
 
     // Initial needs come from `config.needs.initialRange`, so nobody starts at zero hunger.
     const range = config.values.needs.initialRange.hunger;
