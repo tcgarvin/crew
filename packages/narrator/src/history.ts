@@ -27,17 +27,11 @@ function fromRecord(
 ): CardShown | undefined {
   const record = state.decisions.records[decisionId];
   if (record === undefined) return undefined;
-  const text = templateCard(record, content);
+  const tick = record.deliveredTick ?? record.createdTick;
   return {
-    tick: record.deliveredTick ?? record.createdTick,
+    ...fromCard(templateCard(record, content), tick),
     decisionId,
-    title: text.title,
-    speaker: text.speaker ?? null,
-    gist: clipWords(text.situation, NOTES_LIMITS.gistWords),
-    leftLabel: text.leftLabel,
-    rightLabel: text.rightLabel,
     chosen: record.chosen ?? null,
-    closedThread: null,
   };
 }
 
