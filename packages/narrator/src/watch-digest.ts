@@ -1,6 +1,6 @@
 /**
  * The watch, the helm and mood in the digest (D77-D79). Pure reads of the snapshot's state
- * shapes: sections and duty off `Actor.schedule`, the helm off the actors' current plan steps,
+ * shapes: sections and duty off `Actor.schedule`, the helm by the sim's own `whoHasTheHelm`,
  * mood off `Actor.mood` and `Actor.thoughts`, hazards off `WorldState.hazards` and the
  * `navHazard`/`helmUnattended` events since the last call.
  */
@@ -14,6 +14,7 @@ import {
   isOnDuty,
   watchOfDay,
   watchTicks,
+  whoHasTheHelm,
 } from "@crew/sim";
 import { type State, machineName } from "./lookups";
 
@@ -57,27 +58,21 @@ function currentStep(actor: Actor) {
 }
 
 /**
- * Who holds the helm, and since when: a crew member whose current step is a `staff` hold on a
- * `staffStation` task at the helm (the watch or a relief for needs). The same rule as the sim's
- * `whoHasTheHelm`, read off the state the snapshot carries.
+ * Who holds the helm, and since when: the sim's `whoHasTheHelm` (a `staff` hold on a helm task,
+ * in the seat), with the hold's start.
  */
 export function helmHolder(
   state: State,
   content: ContentBundle,
 ): { readonly actor: Actor; readonly sinceTick: number } | undefined {
-  const helm = helmOf(state, content);
-  if (helm === undefined) return undefined;
-  for (const actor of sortedCrew(state)) {
-    const activity = actor.activity;
-    if (activity.kind !== "task") continue;
-    const step = currentStep(actor);
-    if (step?.kind !== "hold" || step.hold !== "staff") continue;
-    const task = state.work.tasks[activity.taskId];
-    if (task?.type !== "staffStation") continue;
-    if (task.target.kind !== "machine" || task.target.machineId !== helm.id) continue;
-    return { actor, sinceTick: step.sinceTick };
+  const id = whoHasTheHelm(state, content);
+  if (id === undefined) return undefined;
+  const actor = state.actors[id];
+  const step = actor === undefined ? undefined : currentStep(actor);
+  if (actor === undefined || step?.kind !== "hold") {
+    throw new Error(`whoHasTheHelm named ${id}, who is not in a hold`);
   }
-  return undefined;
+  return { actor, sinceTick: step.sinceTick };
 }
 
 /** Who stands gangway watch: a crew member holding `gangway` at the airlock. */

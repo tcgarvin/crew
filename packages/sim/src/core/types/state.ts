@@ -71,7 +71,10 @@ export interface WatchState {
   /** `watchIndexAt` of the last bell rung; the bell rings when the live index differs. */
   lastBellWatch: number;
   helm: {
-    /** The tick the helm fell empty in transit; absent while manned or not underway. */
+    /**
+     * The tick the helm fell empty while its watch is wanted (course plotted, or underway);
+     * absent while manned or not wanted.
+     */
     unattendedSinceTick?: Tick;
     /** The last handover: who took the seat, and when (ends the off-going's hold). */
     relievedAt?: { tick: Tick; byActorId: ActorId };

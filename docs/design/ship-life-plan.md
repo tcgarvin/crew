@@ -1041,7 +1041,8 @@ with thoughts; `compartmentDirty` → mopping with the mop from the cleaning loc
 affinity, by on-duty crew with nothing better to do; the grime tint, the room inspector, ticker
 lines on tier changes; the digest's galley and dirt lines; the beats report as the tuning tool.
 Save schema 8 → 9 (migrated). Prompt v0.22 (`pnpm test:live` once). Built on slice 2 as planned
-and as its gate notes say it was built (`ship-life-slice2-gate-notes.md`): sections and the bell,
+and as its gate notes said it was built (`ship-life-slice2-gate-notes.md`, deleted at slice 2's
+integration; read it in git history): sections and the bell,
 `helmRoleOf`/`whoHasTheHelm`, `addThought`, `crew beats`, day-relative knobs.
 
 Built as one serial gate commit, then five parallel workstreams, then a tuning commit by the lead.

@@ -33,6 +33,7 @@ describe("activity classes from canvas labels", () => {
     ["idle", "idle"],
     ["walking to the mess", "walking"],
     ["coming aboard", "walking"],
+    ["leaving the helm", "walking"],
     ["going ashore to look for work", "ashore"],
     ["talking with Fenwick Adair", "ashore"],
     ["on station", "other"],

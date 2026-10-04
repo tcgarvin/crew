@@ -654,6 +654,15 @@ function hasOpenProblem(state: ReadonlyWorldState, kind: ProblemKind): boolean {
 }
 
 /**
+ * D77: the helm is empty while its watch is wanted. The watch post is open for the whole of
+ * underway, so an open `stationToStaff` problem no longer means nobody is at the helm; the
+ * watch system's vacancy mark does.
+ */
+function helmWaiting(state: ReadonlyWorldState): boolean {
+  return state.watch.helm.unattendedSinceTick !== undefined;
+}
+
+/**
  * Passengers §3.3: the name of the passenger the docked ship is waiting for: one ashore at this
  * port whose passage is still live, or one walking down the ramp. Mirrors `systems/travel`
  * `waitingForPassenger` (core may not import systems).
@@ -765,7 +774,7 @@ export function shipHeadline(
       if (ashore !== undefined) {
         return `Waiting for ${ashore} to come aboard — preparing to depart for ${to}`;
       }
-      if (hasOpenProblem(state, "stationToStaff")) {
+      if (helmWaiting(state)) {
         return `Preparing to depart for ${to} — waiting for someone at the helm`;
       }
       if (waitingOnRamps(state)) return `Preparing to depart for ${to} — raising the ramps`;
@@ -789,7 +798,7 @@ export function shipHeadline(
     case "approaching":
       return `Approaching ${to}`;
     case "docking":
-      return hasOpenProblem(state, "stationToStaff")
+      return helmWaiting(state)
         ? `Docking at ${to} — waiting for someone at the helm`
         : `Docking at ${to}`;
   }

@@ -121,6 +121,8 @@ export function taskUrgency(
     case "cargoToUnload":
       return "routineObligation";
     case "stationToStaff":
+      // D77: the watch post is essential and the relief post routine; the watch says which.
+      return problem.baseUrgency;
     case "courseToPlot":
       return "essentialOperation";
     case "partsNeeded":

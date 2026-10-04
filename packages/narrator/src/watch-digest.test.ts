@@ -11,6 +11,7 @@ import {
   type SimEvent,
   type TaskId,
   type ThoughtKey,
+  rotateOffset,
   watchTicks,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
@@ -47,9 +48,35 @@ function atWatch(snapshot: SaveEnvelope, index: number, secondsLeft: number): vo
   snapshot.state.tick = day + length * (index + 1) - secondsLeft * config.time.tickRate;
 }
 
-/** Put `actor` in the helm seat: a `staff` hold on a `staffStation` task at the helm. */
+/** The helm's seat: its first `operate` position, placed and turned as the deck has it. */
+function helmSeat(state: State): { x: number; y: number; deckId: string } {
+  const helm = state.machines[machineOf(state, "machine.helm")];
+  if (helm === undefined) throw new Error("fixture: no helm");
+  const def = content().machines[helm.defId];
+  const placement = content().decks[helm.deckId]?.machines.find((p) => p.key === helm.placementKey);
+  const seat = def?.interactionPositions.find((p) => p.purposes.includes("operate"));
+  if (placement === undefined || seat === undefined) throw new Error("fixture: no helm seat");
+  const offset = rotateOffset(seat.offset, placement.rotation);
+  return {
+    x: placement.origin.x + offset.x,
+    y: placement.origin.y + offset.y,
+    deckId: helm.deckId,
+  };
+}
+
+/**
+ * Put `actor` in the helm seat: standing on it, in a `staff` hold on a `staffStation` task at
+ * the helm (what the sim's `whoHasTheHelm` reads).
+ */
 function takeHelm(state: State, actor: Actor, sinceTick: number): void {
   const helm = machineOf(state, "machine.helm");
+  const seat = helmSeat(state);
+  actor.location = {
+    kind: "onDeck",
+    deckId: seat.deckId as never,
+    x: seat.x + 0.5,
+    y: seat.y + 0.5,
+  };
   const taskId = "t900" as TaskId;
   state.work.tasks[taskId] = {
     id: taskId,

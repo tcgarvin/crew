@@ -95,7 +95,7 @@ const LABEL_CLASSES: readonly (readonly [RegExp, ActivityClass])[] = [
     /^(going ashore to look for work|looking for work|looking round|going to see|talking|ashore|buying)/,
     "ashore",
   ],
-  [/^(walking|going ashore|coming aboard)/, "walking"],
+  [/^(walking|going ashore|coming aboard|leaving the helm)/, "walking"],
 ];
 
 export function activityClass(label: string): ActivityClass {

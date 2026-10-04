@@ -206,6 +206,37 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Docking at Far Dock");
   });
 
+  it("waits for the helm in prep and docking only while it is empty, not while its post is open (D77)", () => {
+    const { world } = tinyTestWorld();
+    // The watch post is open for the whole of underway; on its own it says nothing.
+    const id = "p.watch" as ProblemId;
+    world.state.work.problems[id] = {
+      id,
+      kind: "stationToStaff",
+      payload: { machineId: "m.helm" as MachineId, post: "watch" },
+      owner: "watch",
+      visibility: "public",
+      dedupeKey: "stationToStaff:watch",
+      status: "open",
+      createdTick: 0,
+      revision: 1,
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId: "m.helm" as MachineId },
+    };
+    underway(world.state, "preparingDeparture");
+    expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
+    underway(world.state, "docking");
+    expect(headline(world.state)).toBe("Docking at Far Dock");
+
+    world.state.watch.helm.unattendedSinceTick = 0;
+    underway(world.state, "preparingDeparture");
+    expect(headline(world.state)).toBe(
+      "Preparing to depart for Far Dock — waiting for someone at the helm",
+    );
+    underway(world.state, "docking");
+    expect(headline(world.state)).toBe("Docking at Far Dock — waiting for someone at the helm");
+  });
+
   it("gives an ETA in transit, and says so when adrift", () => {
     const { world } = tinyTestWorld();
     underway(world.state, "transit", 12);
