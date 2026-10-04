@@ -19,7 +19,12 @@ import type { AppEnv } from "../auth";
 import { type Db, type LogNarratorCallInput, narratorCallKind } from "../db/types";
 import type { Env } from "../env";
 import { apiError, loadOwnedGame, parseJsonBody } from "../http";
-import { type RunNarrator, isRetryableFailure, narratorFailure } from "../narrator";
+import {
+  type NarratorOutcome,
+  type RunNarrator,
+  isRetryableFailure,
+  narratorFailure,
+} from "../narrator";
 import { saveEnvelopeSchema } from "../validation";
 import { runAfterResponse } from "../waitUntil";
 
@@ -63,6 +68,56 @@ const UNANSWERED = {
   outputTokens: null,
   response: null,
 } as const;
+
+/**
+ * The warn lines a narrator answer can leave in the server log. `stagingFloor`: a staging call
+ * in `null` mode, whose failure is answered with the floor set.
+ */
+function warnAboutAnswer(
+  gameId: string,
+  hookKind: string,
+  outcome: NarratorOutcome,
+  latencyMs: number,
+  { stagingFloor }: { readonly stagingFloor: boolean },
+): void {
+  const response = outcome.response;
+  const failure = narratorFailure(outcome);
+  if (stagingFloor && failure !== undefined) {
+    // D67: the server answers with the floor set (the null narrator's empty plan) and says
+    // so; never an error panel for staging.
+    console.warn(`[narrator] staging fallback ${failure.reason}`, {
+      gameId,
+      model: response.model,
+      promptVersion: response.promptVersion,
+      latencyMs,
+      error: failure.message,
+    });
+  } else if (response.fallback !== undefined) {
+    // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
+    // the API key: `error` is the narrator's own failure text (for a transport failure,
+    // `OpenRouter <status>: <response body>`), never the request or its headers.
+    console.warn("[narrator] fallback", {
+      gameId,
+      hookKind,
+      fallback: response.fallback,
+      model: response.model,
+      promptVersion: response.promptVersion,
+      latencyMs,
+      error: outcome.error ?? null,
+    });
+  }
+
+  if (response.dropped !== undefined && response.dropped.length > 0) {
+    // D46: an intent the translator dropped is otherwise only visible in the call log's
+    // response jsonb. Kinds and reasons only: the reasons are the translator's own text,
+    // never the model's prose or the request.
+    console.warn("[narrator] dropped", {
+      gameId,
+      hookKind,
+      dropped: response.dropped.map((d) => ({ kind: d.kind, reason: d.reason })),
+    });
+  }
+}
 
 export function registerNarratorRoutes(
   app: Hono<AppEnv>,
@@ -160,41 +215,9 @@ export function registerNarratorRoutes(
       const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;
       const failure = narratorFailure(outcome);
-      if (failure !== undefined && staging && env.narratorFallback === "null") {
-        // D67: the server answers with the floor set (the null narrator's empty plan) and says
-        // so; never an error panel for staging.
-        console.warn(`[narrator] staging fallback ${failure.reason}`, {
-          gameId,
-          model: response.model,
-          promptVersion: response.promptVersion,
-          latencyMs,
-          error: failure.message,
-        });
-      } else if (response.fallback !== undefined) {
-        // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
-        // the API key: `error` is the narrator's own failure text (for a transport failure,
-        // `OpenRouter <status>: <response body>`), never the request or its headers.
-        console.warn("[narrator] fallback", {
-          gameId,
-          hookKind: reqBody.hook.kind,
-          fallback: response.fallback,
-          model: response.model,
-          promptVersion: response.promptVersion,
-          latencyMs,
-          error: outcome.error ?? null,
-        });
-      }
-
-      if (response.dropped !== undefined && response.dropped.length > 0) {
-        // D46: an intent the translator dropped is otherwise only visible in the call log's
-        // response jsonb. Kinds and reasons only: the reasons are the translator's own text,
-        // never the model's prose or the request.
-        console.warn("[narrator] dropped", {
-          gameId,
-          hookKind: reqBody.hook.kind,
-          dropped: response.dropped.map((d) => ({ kind: d.kind, reason: d.reason })),
-        });
-      }
+      warnAboutAnswer(gameId, reqBody.hook.kind, outcome, latencyMs, {
+        stagingFloor: staging && env.narratorFallback === "null",
+      });
 
       // D43: in `error` mode a fallback is refused, never served. The call is logged as an
       // error with its reason; the client retries (the sim stays halted) or pauses the game, or
