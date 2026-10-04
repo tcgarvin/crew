@@ -376,11 +376,16 @@ const betterBed = (a: BedChoice, b: BedChoice | undefined): boolean =>
  * backing off; otherwise in the unassigned pool, a quarters bunk before a nearer bed elsewhere.
  * A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is for
  * patients).
+ *
+ * D77: on duty, nobody turns in while tiredness is merely routine; they sleep when the watch (or
+ * a dayworker's hours) ends, so a sleep a day settles into the same off-watch window ("Priya
+ * sleeps after her watch"). Pressing fatigue still sends them, through relief at the helm.
  */
 function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const fatigue = view.self.needs.fatigue;
   const urgency = needUrgency(fatigue, config);
   if (urgency === undefined) return undefined;
+  if (view.self.onDuty && urgency === "routineObligation") return undefined;
   const occupied = occupiedTiles(view);
   const mine = view.self.berth?.machineId;
   const assigned = new Set(view.assignedBeds());

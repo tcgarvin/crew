@@ -284,6 +284,11 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
       );
     });
     expect(isOnDock(world.content, world.state, captainOf(world).location)).toBe(false);
+    // D77: she has the watch and, awake (tiredness waits for the watch's end), would walk her
+    // rounds, and her way to the hold runs out of the personnel ramp and along the dock to the
+    // cargo ramp while both are down. Hold her rounds so she stays aboard for this case.
+    const captain = captainOf(world);
+    captain.workBackoff = { ...(captain.workBackoff ?? {}), rounds: Number.MAX_SAFE_INTEGER };
     // A quiet check-in's offer, from someone beyond the gate: they walk in as a visitor.
     send(kernel, world, hubOffer(world, { name: "Ilse Brandt", role: "broker" }));
     const run = drive(kernel, world, 20 * 120, answerNothing, (_w, r) => r.cards.length > 0);

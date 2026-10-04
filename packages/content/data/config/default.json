@@ -24,14 +24,14 @@
     "hungerPerDay": 0.9996,
     "fatiguePerDayAwake": 0.6672,
     "fatiguePerDayWorking": 0.9996,
-    "fatigueRecoveryPerDayAsleep": 9.996,
+    "fatigueRecoveryPerDayAsleep": 4.25,
     "comfortPerDay": 0.6672,
     "comfortRecoveryPerDayResting": 20.04,
     "socialPerDay": 0.5004,
     "socialRecoveryPerDayChatting": 9.996,
     "seekThreshold": 0.5,
     "mealDays": 0.0125,
-    "sleepDays": 0.075,
+    "sleepDays": 0.2,
     "wakeBelow": 0.15,
     "initialRange": {
       "hunger": {
@@ -139,7 +139,7 @@
     }
   },
   "narrator": {
-    "quietTooLongDays": 0.05,
+    "quietTooLongDays": 0.333333,
     "approachHookLeadSeconds": 10,
     "maxSpawnsPerCommand": 3,
     "maxFaultWindowSeconds": 90,

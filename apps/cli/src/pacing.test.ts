@@ -67,11 +67,18 @@ describe("crew pacing: there-and-back voyage", () => {
   );
 
   it(
-    "raises quietTooLong on the long legs",
+    "raises quietTooLong on the watch-long spur legs, at most once per quiet window (a watch, D76)",
     () => {
       const { slow } = results();
-      const longLeg = slow.legs.find((leg) => leg.toPortId === FAR_PORT_ID);
-      expect(longLeg?.hooksByKind.quietTooLong ?? 0).toBeGreaterThanOrEqual(1);
+      const spurLegs = slow.legs.filter(
+        (leg) => leg.toPortId === FAR_PORT_ID || leg.fromPortId === FAR_PORT_ID,
+      );
+      const quiet = spurLegs.map((leg) => leg.hooksByKind.quietTooLong ?? 0);
+      expect(quiet.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(1);
+      for (const leg of slow.legs) {
+        const watches = Math.ceil(leg.simSeconds / slow.quietTooLongSeconds);
+        expect(leg.hooksByKind.quietTooLong ?? 0).toBeLessThanOrEqual(watches);
+      }
     },
     SLOW_TEST_TIMEOUT_MS,
   );

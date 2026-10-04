@@ -709,7 +709,7 @@ export function formatPacingReport(results: readonly PacingResult[]): string {
     return sample === undefined ? [] : [{ scenario, rows, sample }];
   });
   return [
-    `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quiet window ${first.quietTooLongSeconds} s)`,
+    `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quiet window ${Number(first.quietTooLongSeconds.toFixed(1))} s)`,
     ...groups.flatMap(scenarioSection),
     "",
     "## Narrator budget",

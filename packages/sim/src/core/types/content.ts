@@ -834,7 +834,10 @@ export interface ConfigDef {
     readonly fatiguePerDayAwake: number;
     /** About 1 a day while on a task, half again the idle rate. */
     readonly fatiguePerDayWorking: number;
-    /** About 10 a day asleep: from `seekThreshold` 0.5 to `wakeBelow` 0.15 in about 0.035 day. */
+    /**
+     * About 4.25 a day asleep, `(1 − wakeBelow) / sleepDays`: one `sleepDays` sleep clears a
+     * day's fatigue, so one sleep a day suffices.
+     */
     readonly fatigueRecoveryPerDayAsleep: number;
     /** About 2/3 a day: from comfortable to `seekThreshold` 0.5 in three quarters of a day. */
     readonly comfortPerDay: number;
@@ -848,7 +851,10 @@ export interface ConfigDef {
     readonly seekThreshold: number;
     /** D76: how long a meal takes, in days (0.0125 day is 15 s of a 1200 s day). */
     readonly mealDays: Days;
-    /** D76: the shortest sleep, in days, before waking below `wakeBelow` ends it. */
+    /**
+     * D76: the shortest sleep, in days, before waking below `wakeBelow` ends it (0.2 day is a
+     * fifth of the day, 240 s of a 1200 s day: ship life §2's one full sleep a day).
+     */
     readonly sleepDays: Days;
     /** Wake when fatigue falls below this. */
     readonly wakeBelow: number;
@@ -1012,8 +1018,8 @@ export interface ConfigDef {
   };
   readonly narrator: {
     /**
-     * Quiet-too-long hook fires after this many days without a narrative event (D76; 0.05 day
-     * is a minute of a 1200 s day, about seven times a watch at most).
+     * Quiet-too-long hook fires after this many days without a narrative event (D76; a third
+     * of a day is one watch, so at most once a watch).
      */
     readonly quietTooLongDays: Days;
     /**
