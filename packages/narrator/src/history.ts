@@ -11,12 +11,10 @@ import { templateCard } from "@crew/content";
  * has no decision ID when it is recorded (the kernel mints it on apply), so it is matched to its
  * decision later by title and the ID is filled in then.
  */
-import type { DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
+import type { ContentBundle, DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
 import type { DecisionCardProse } from "./contract";
 import type { State } from "./lookups";
 import { type CardShown, NOTES_LIMITS, clipWords } from "./notes";
-
-type ContentBundle = Parameters<typeof templateCard>[1];
 
 const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
