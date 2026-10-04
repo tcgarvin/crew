@@ -2,6 +2,9 @@ import type {
   AgentViewSnapshot,
   DeepReadonly,
   HelmRole,
+  ProblemKind,
+  ProblemView,
+  RoleTag,
   RosterEntry,
   SelfView,
   Thought,
@@ -10,6 +13,22 @@ import type {
   Tick,
   WatchView,
 } from "@crew/sim";
+
+/** Role tags as the inspector says them ("firstOfficer" reads "first officer"). */
+const ROLE_WORDS: Readonly<Record<RoleTag, string>> = {
+  captain: "captain",
+  firstOfficer: "first officer",
+  engineer: "engineer",
+  pilot: "pilot",
+  deckhand: "deckhand",
+  cook: "cook",
+  medic: "medic",
+};
+
+/** "engineer, deckhand"; "crew" with no role tags. */
+export function roleWords(tags: readonly RoleTag[]): string {
+  return tags.map((tag) => ROLE_WORDS[tag]).join(", ") || "crew";
+}
 
 /**
  * Plain words for who an actor is, for the inspector. Passengers (passengers-and-galaxy §3.2)
@@ -21,13 +40,45 @@ export function actorSubtitle(
   if (self.passenger === true) {
     return self.disembarking === true ? "passenger, going ashore" : "passenger";
   }
-  return self.roleTags.join(", ") || "crew";
+  return roleWords(self.roleTags);
 }
 
 /** The roster line's role words: "passenger" for a passenger, else the role tags or "crew". */
 export function rosterRole(entry: Pick<RosterEntry, "roleTags" | "passenger">): string {
   if (entry.passenger === true) return "passenger";
-  return entry.roleTags.join(", ") || "crew";
+  return roleWords(entry.roleTags);
+}
+
+/** A known problem's kind in words, for the inspector's "Known problems" list. */
+const PROBLEM_WORDS: Readonly<Record<ProblemKind, string>> = {
+  machineSymptom: "something wrong with a machine",
+  machineFault: "a fault to repair",
+  maintenanceDue: "maintenance due",
+  cargoToLoad: "cargo to load",
+  cargoToUnload: "cargo to unload",
+  stationToStaff: "the helm to stand",
+  courseToPlot: "a course to plot",
+  partsNeeded: "parts to buy for a repair",
+  reserveLow: "stores to restock",
+};
+
+/** One line of the known-problems list: a kind in words and how many of it are known. */
+export interface ProblemLine {
+  readonly kind: ProblemKind;
+  readonly text: string;
+}
+
+/**
+ * Known problems as words, one line per kind in first-seen order, with a count when there are
+ * several ("cargo to load ×6"), rather than the raw kind once per problem.
+ */
+export function problemLines(problems: readonly Pick<ProblemView, "kind">[]): ProblemLine[] {
+  const counts = new Map<ProblemKind, number>();
+  for (const problem of problems) counts.set(problem.kind, (counts.get(problem.kind) ?? 0) + 1);
+  return [...counts].map(([kind, count]) => ({
+    kind,
+    text: count > 1 ? `${PROBLEM_WORDS[kind]} ×${count}` : PROBLEM_WORDS[kind],
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -415,3 +415,52 @@ describe("createHost hook halt", () => {
     expect(frameTicks(messages).at(-1)).toBe(45);
   });
 });
+
+describe("createHost agent view (slice-2 QA)", () => {
+  /** The fake kernel with an agent view that reports the tick of the world it was taken on. */
+  function viewingKernel(hookAtTick: number): Kernel {
+    const { kernel } = makeFakeKernel(hookAtTick);
+    return {
+      ...kernel,
+      getAgentView: (world) =>
+        ({
+          tick: world.state.tick,
+          self: {},
+          facts: () => [],
+          knownProblems: () => [],
+          knownTasks: () => [],
+          roster: () => [],
+        }) as never,
+    };
+  }
+
+  const ask = (tick: number): ToWorker => ({
+    type: "requestAgentView",
+    requestId: `v${tick}`,
+    actorId: "actor:mara" as never,
+    tick: tick as never,
+  });
+
+  it("answers at the tick asked for, not the snapshot before it", () => {
+    const { host, messages, advance } = startHost(viewingKernel(10_000), {
+      runAheadCapSeconds: 60,
+      snapshotIntervalSeconds: 2,
+    });
+    for (let i = 0; i < 5; i++) advance(50);
+    host.handleMessage(ask(57));
+    const reply = ofType(messages, "agentViewResult").find((m) => m.requestId === "v57");
+    expect(reply?.tick).toBe(57);
+    expect(reply?.view.tick).toBe(57);
+  });
+
+  it("stops at a halt on the way, where the view stood too", () => {
+    const { host, messages, advance } = startHost(viewingKernel(30), {
+      runAheadCapSeconds: 60,
+      snapshotIntervalSeconds: 2,
+    });
+    advance(50);
+    host.handleMessage(ask(35));
+    const reply = ofType(messages, "agentViewResult").find((m) => m.requestId === "v35");
+    expect(reply?.tick).toBeLessThanOrEqual(30);
+  });
+});

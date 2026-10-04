@@ -14,6 +14,7 @@ import {
   helmLine,
   moodWord,
   personWords,
+  problemLines,
   rosterRole,
   thoughtText,
   topThoughts,
@@ -39,6 +40,31 @@ describe("actorSubtitle", () => {
     expect(actorSubtitle({ roleTags: [], passenger: true, disembarking: true })).toBe(
       "passenger, going ashore",
     );
+  });
+});
+
+describe("role and problem words (slice-2 QA)", () => {
+  it("says a role in words, not its key", () => {
+    expect(actorSubtitle({ roleTags: tags("firstOfficer") })).toBe("first officer");
+    expect(rosterRole({ roleTags: tags("captain", "firstOfficer") })).toBe(
+      "captain, first officer",
+    );
+  });
+
+  it("lists each kind of known problem once, in words, with a count", () => {
+    const kinds = [
+      "cargoToLoad",
+      "stationToStaff",
+      "cargoToLoad",
+      "cargoToLoad",
+      "courseToPlot",
+    ] as const;
+    expect(problemLines(kinds.map((kind) => ({ kind }))).map((l) => l.text)).toEqual([
+      "cargo to load ×3",
+      "the helm to stand",
+      "a course to plot",
+    ]);
+    expect(problemLines([])).toEqual([]);
   });
 });
 

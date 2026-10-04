@@ -5,7 +5,10 @@ import { Inspector } from "./Inspector";
 import type { PersonWords } from "./actorWords";
 
 /** The fields `ActorInspector` reads; a passenger has no skills, tasks or post. */
-function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnapshot {
+function snapshot(
+  who: { roleTags: string[]; passenger?: true },
+  problems: readonly { id: string; kind: string }[] = [],
+): AgentViewSnapshot {
   const self = {
     id: "actor:halla",
     name: "Halla Thorne",
@@ -21,7 +24,7 @@ function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnaps
     tick: 0,
     self,
     facts: [],
-    problems: [],
+    problems,
     tasks: [],
     roster: [
       { actorId: "actor:mara", name: "Mara Osei", roleTags: ["pilot"], skills: {} },
@@ -33,6 +36,29 @@ function snapshot(who: { roleTags: string[]; passenger?: true }): AgentViewSnaps
 const steady: PersonWords = { watch: "Dayworker, off duty", mood: "steady", thoughts: [] };
 
 describe("Inspector actor sheet", () => {
+  it("says roles and known problems in words, each kind once", () => {
+    const problems = [
+      { id: "p1", kind: "cargoToLoad" },
+      { id: "p2", kind: "cargoToLoad" },
+      { id: "p3", kind: "stationToStaff" },
+    ];
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "actor",
+          view: snapshot({ roleTags: ["firstOfficer"] }, problems),
+          person: steady,
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain('class="inspector-subtitle">first officer<');
+    expect(html).toContain("<li>cargo to load ×2</li>");
+    expect(html).toContain("<li>the helm to stand</li>");
+    expect(html).not.toContain("cargoToLoad");
+    expect(html).not.toContain("firstOfficer");
+  });
+
   it("shows a passenger without crew-only fields and tags them in the roster", () => {
     const html = renderToStaticMarkup(
       <Inspector

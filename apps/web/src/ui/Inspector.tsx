@@ -1,5 +1,11 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
-import { type PersonWords, actorSubtitle, rosterRole, thoughtText } from "./actorWords";
+import {
+  type PersonWords,
+  actorSubtitle,
+  problemLines,
+  rosterRole,
+  thoughtText,
+} from "./actorWords";
 import type { LocalInspection } from "./localInspection";
 import type { PlaceInspection } from "./placeInspection";
 
@@ -132,8 +138,8 @@ function ActorInspector({
       <h3>Known problems</h3>
       {view.problems.length === 0 && <p className="inspector-empty">None known.</p>}
       <ul>
-        {view.problems.map((p) => (
-          <li key={p.id}>{p.kind}</li>
+        {problemLines(view.problems).map((line) => (
+          <li key={line.kind}>{line.text}</li>
         ))}
       </ul>
       <h3>Roster</h3>
