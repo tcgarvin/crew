@@ -5,7 +5,6 @@
 import type { Planner } from "../core/types/pipeline";
 import { selectIntent } from "./select";
 
-export const PLANNER_PLACEHOLDER = { planner: "planner" } as const;
 export { compareCandidates, selectIntent } from "./select";
 export { enumerateCandidates, needUrgency, taskUrgency } from "./candidates";
 export type { Candidate, CandidateSet, Rejection } from "./candidates";

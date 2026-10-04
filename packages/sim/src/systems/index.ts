@@ -1,8 +1,4 @@
-/**
- * Kernel systems: spatial, power, equipment, needs, work, travel, decisions.
- * Placeholder for the V1 slice.
- */
-export const SYSTEMS_PLACEHOLDER = "systems" as const;
+/** Kernel systems: spatial, power, equipment, needs, work, travel, commerce. */
 export * from "./spatial/index";
 export * from "./equipment/index";
 export * from "./power/index";
