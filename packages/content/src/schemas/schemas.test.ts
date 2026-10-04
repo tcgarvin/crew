@@ -132,12 +132,21 @@ const inertMachine = (name: string, tag: string) => ({
   tags: [tag],
   faults: [],
 });
+/** The helm: a seat, a standby tile apart from it (D77), and piloting 3 to stand it. */
+const helm = {
+  ...inertMachine("helm", "pilotStation"),
+  interactionPositions: [
+    { key: "seat", offset: { x: -1, y: 0 }, purposes: ["operate", "repair"], capacity: 1 },
+    { key: "standby", offset: { x: 0, y: 1 }, purposes: ["use"], capacity: 1 },
+  ],
+  operation: { requiresOperator: true, operatorSkill: { skill: "piloting", min: 3 } },
+};
 const furniture = [
   inertMachine("engine", "engine"),
   inertMachine("stove", "stove"),
   inertMachine("table", "messTable"),
   inertMachine("bunk", "bed"),
-  inertMachine("helm", "pilotStation"),
+  helm,
   inertMachine("nav", "navStation"),
 ];
 
@@ -508,6 +517,13 @@ describe("bundle validation", () => {
     expect(validateStructure(bill([], [])).ok).toBe(false);
     expect(validateStructure(bill([red, { key: "red", members: [] }], [])).ok).toBe(false);
     expect(validateStructure(bill([red], ["crew.test.mara"])).ok).toBe(false);
+    expect(
+      validateStructure(bill([red, { key: "white", members: ["crew.test.mara"] }], [])).ok,
+    ).toBe(false);
+    expect(
+      validateStructure(bill([{ key: "red", members: ["crew.test.mara", "crew.test.mara"] }], []))
+        .ok,
+    ).toBe(false);
   });
 
   it("L1 reports issues with paths", () => {
@@ -798,6 +814,89 @@ describe("bundle validation", () => {
     it("accepts a scenario that carries every tool its deck's recipes need", () => {
       const issues = physicalIssues(bundle);
       expect(issues.filter((i) => i.message.includes("no starting item provides"))).toEqual([]);
+    });
+
+    it("holds the pilot station to its standby position (D77)", () => {
+      const seatOnly = { ...helm, interactionPositions: helm.interactionPositions.slice(0, 1) };
+      const issues = physicalIssues({
+        ...bundle,
+        machines: { ...bundle.machines, [helm.id]: seatOnly },
+      });
+      expect(issues.map((i) => i.message)).toContain(
+        'pilot station "helm1" (machine.test.helm) has no standby position: a "use" position apart from its "operate" seat',
+      );
+    });
+
+    describe("the watch bill (D77)", () => {
+      /** Hands with the given piloting; the helm needs 3. */
+      const hand = (name: string, piloting: number) => ({
+        ...crew,
+        id: `crew.test.${name}`,
+        name,
+        roleTags: ["deckhand"],
+        skills: { piloting },
+      });
+      const hands = [hand("jon", 1), hand("kit", 3), hand("lee", 0), hand("max", 4)];
+      const crewTable = Object.fromEntries([crew, ...hands].map((c) => [c.id, c]));
+      const crewIds = Object.keys(crewTable);
+      const section = (key: string, ...names: string[]) => ({
+        key,
+        members: names.map((n) => `crew.test.${n}`),
+      });
+
+      /** Watch-bill issues (path under `watchBill`, or the no-bill rule) for this scenario. */
+      const billIssues = (patch: Record<string, unknown>) =>
+        physicalIssues({
+          ...bundle,
+          crew: crewTable,
+          scenarios: { [scenario.id]: { ...scenario, crew: crewIds, ...patch } },
+        })
+          .filter((i) => i.path.includes("watchBill") || i.message.includes("watch bill"))
+          .map((i) => `${i.path.join(".")}: ${i.message}`);
+
+      const AT = "scenarios.scenario.test.default";
+
+      it("accepts a section per watch, each with a qualified helm-stander", () => {
+        const watchBill = {
+          sections: [
+            section("red", "mara", "lee"),
+            section("white", "kit"),
+            section("blue", "max"),
+          ],
+          dayworkers: ["crew.test.jon"],
+        };
+        expect(billIssues({ watchBill })).toEqual([]);
+      });
+
+      it("rejects a bill with fewer or more sections than watches a day", () => {
+        const two = { sections: [section("red", "mara"), section("white", "kit")], dayworkers: [] };
+        expect(billIssues({ watchBill: two })).toEqual([
+          `${AT}.watchBill.sections: 2 watch-bill sections for 3 watches a day; each watch needs its section`,
+        ]);
+        const four = {
+          sections: [section("a", "mara"), section("b", "kit"), section("c"), section("d")],
+          dayworkers: [],
+        };
+        expect(billIssues({ watchBill: four })[0]).toContain("4 watch-bill sections for 3");
+      });
+
+      it("rejects a section with nobody qualified to stand the helm", () => {
+        const watchBill = {
+          sections: [section("red", "mara"), section("white", "jon", "lee"), section("blue")],
+          dayworkers: ["crew.test.kit"],
+        };
+        expect(billIssues({ watchBill })).toEqual([
+          `${AT}.watchBill.sections.1.members: no qualified helm-stander in section "white" (needs piloting 3)`,
+          `${AT}.watchBill.sections.2.members: no qualified helm-stander in section "blue" (needs piloting 3)`,
+        ]);
+      });
+
+      it("allows no bill for a fixture of at most three crew, and requires one above", () => {
+        expect(billIssues({ crew: crewIds.slice(0, 3) })).toEqual([]);
+        expect(billIssues({})).toEqual([
+          `${AT}.crew: 5 crew and no watch bill: author one (a section per watch, each with a helm-stander, and dayworkers); a generated bill is for fixtures of at most 3 crew`,
+        ]);
+      });
     });
   });
 });

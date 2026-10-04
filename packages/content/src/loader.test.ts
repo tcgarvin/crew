@@ -228,13 +228,15 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     ]);
   });
 
-  it("puts every far port on a single long spur off one core port", () => {
+  it("puts every far port on a single long spur off one core port, a watch long (D76)", () => {
     const spur = (id: string) => ports[id as keyof typeof ports]?.routes;
     expect(spur("port.ossory_station")).toEqual([
-      { toPortId: "port.kessler_drift", distance: 120 },
+      { toPortId: "port.kessler_drift", distance: 400 },
     ]);
-    expect(spur("port.vesper_gate")).toEqual([{ toPortId: "port.green_meridian", distance: 120 }]);
-    expect(spur("port.terns_rest")).toEqual([{ toPortId: "port.crossroads_hub", distance: 90 }]);
+    expect(spur("port.vesper_gate")).toEqual([{ toPortId: "port.green_meridian", distance: 400 }]);
+    expect(spur("port.terns_rest")).toEqual([{ toPortId: "port.crossroads_hub", distance: 400 }]);
+    const { time, travel } = bundle.config;
+    expect(400 / travel.nominalSpeed).toBe(time.daySeconds / time.watchesPerDay);
   });
 
   it("lists every route in both directions with the same distance", () => {

@@ -94,7 +94,7 @@
   "routes": [
     {
       "toPortId": "port.crossroads_hub",
-      "distance": 90
+      "distance": 400
     }
   ]
 }

@@ -15,11 +15,14 @@
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
  *   some item def, and carried from the start by every scenario whose deck has the machine
  *   (D71). The hull contract (`validate-hull.ts`, D72): size class, bow east, ramps south, the
- *   rooms, stations, zones and spawn points every deck needs, lockers serving beds; a scenario's
- *   crew each get a crew spawn point. Dock maps (`validate-dock.ts`): rows against the legend,
- *   the berth box on the map and void, each deck's ramp landings on floor, posts and areas on
- *   floor and reachable from both landings, the quay row under the box walkable, the size cap; a
- *   scenario's ship fits every berth box and has beds for its crew + 1 (`checkScenarioBeds`).
+ *   rooms, stations, zones and spawn points every deck needs, the helm's standby position (D77),
+ *   lockers serving beds; a scenario's crew each get a crew spawn point. D77: a scenario's watch
+ *   bill has a section per watch of the day, each with a helm-qualified member, and only a
+ *   fixture-sized crew may go without one (`checkScenarioWatchBill`). Dock maps
+ *   (`validate-dock.ts`): rows against the legend, the berth box on the map and void, each deck's
+ *   ramp landings on floor, posts and areas on floor and reachable from both landings, the quay
+ *   row under the box walkable, the size cap; a scenario's ship fits every berth box and has beds
+ *   for its crew + 1 (`checkScenarioBeds`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -31,6 +34,7 @@ import type {
   MachinePlacementDef,
   PortDef,
   ScenarioDef,
+  SkillId,
   TileCoord,
   TileEdge,
   TraitDef,
@@ -844,6 +848,75 @@ function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: Validati
   }
 }
 
+/** D77: more crew than this need an authored watch bill; the generated one is for test fixtures. */
+const MAX_CREW_WITHOUT_WATCH_BILL = 3;
+
+/** The skill and level a helm-stander needs on `deck`: its pilot station's operator requirement. */
+function helmRequirement(
+  deck: DeckDef,
+  bundle: ContentBundle,
+): { readonly skill: SkillId; readonly min: number } | undefined {
+  for (const placement of deck.machines) {
+    const def = bundle.machines[placement.machineDefId];
+    if (def?.tags.includes("pilotStation") !== true) continue;
+    return def.operation.operatorSkill ?? { skill: "piloting", min: 0 };
+  }
+  return undefined; // the hull contract reports a deck without a pilot station
+}
+
+/**
+ * D77 (ship life plan, slice 2 call 4): section `i` stands watch `i` of the day with no wrap, so
+ * an authored bill has exactly `time.watchesPerDay` sections or some watch has nobody on it; each
+ * section needs a member qualified for the helm, or its watch has no stander. Membership, nobody
+ * listed twice and dayworkers apart from the sections are L1 and L2. A scenario without a bill
+ * gets a generated one, which is for fixtures of at most `MAX_CREW_WITHOUT_WATCH_BILL` crew.
+ */
+function checkScenarioWatchBill(
+  scenario: ScenarioDef,
+  deck: DeckDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const path: Path = ["scenarios", scenario.id];
+  const bill = scenario.watchBill;
+  if (bill === undefined) {
+    if (scenario.crew.length <= MAX_CREW_WITHOUT_WATCH_BILL) return;
+    issues.push(
+      issue(
+        "physical",
+        [...path, "crew"],
+        `${scenario.crew.length} crew and no watch bill: author one (a section per watch, each with a helm-stander, and dayworkers); a generated bill is for fixtures of at most ${MAX_CREW_WITHOUT_WATCH_BILL} crew`,
+      ),
+    );
+    return;
+  }
+  const watches = bundle.config.time.watchesPerDay;
+  if (bill.sections.length !== watches) {
+    issues.push(
+      issue(
+        "physical",
+        [...path, "watchBill", "sections"],
+        `${bill.sections.length} watch-bill sections for ${watches} watches a day; each watch needs its section`,
+      ),
+    );
+  }
+  const helm = helmRequirement(deck, bundle);
+  if (helm === undefined) return;
+  bill.sections.forEach((section, i) => {
+    const qualified = section.members.some(
+      (id) => (bundle.crew[id]?.skills[helm.skill] ?? 0) >= helm.min,
+    );
+    if (qualified) return;
+    issues.push(
+      issue(
+        "physical",
+        [...path, "watchBill", "sections", i, "members"],
+        `no qualified helm-stander in section "${section.key}" (needs ${helm.skill} ${helm.min})`,
+      ),
+    );
+  });
+}
+
 /** L3: geometry and physical plausibility. */
 export function validatePhysical(bundle: ContentBundle): readonly ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -864,6 +937,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     if (deck === undefined) continue; // reported by L2
     checkScenarioCrewSpawns(scenario, deck, issues);
     checkScenarioBeds(scenario, deck, bundle.machines, issues);
+    checkScenarioWatchBill(scenario, deck, bundle, issues);
   }
   checkRecipeToolsSatisfiable(bundle, issues);
   checkScenarioCarriesRecipeTools(bundle, issues);

@@ -92,7 +92,7 @@
     },
     {
       "toPortId": "port.ossory_station",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

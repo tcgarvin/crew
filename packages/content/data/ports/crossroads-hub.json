@@ -115,7 +115,7 @@
     },
     {
       "toPortId": "port.terns_rest",
-      "distance": 90
+      "distance": 400
     }
   ]
 }

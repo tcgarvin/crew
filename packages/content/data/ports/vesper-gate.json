@@ -89,7 +89,7 @@
   "routes": [
     {
       "toPortId": "port.green_meridian",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

@@ -92,7 +92,7 @@
     },
     {
       "toPortId": "port.vesper_gate",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

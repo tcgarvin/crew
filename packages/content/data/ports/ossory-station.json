@@ -94,7 +94,7 @@
   "routes": [
     {
       "toPortId": "port.kessler_drift",
-      "distance": 120
+      "distance": 400
     }
   ]
 }
