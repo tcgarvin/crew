@@ -35,9 +35,6 @@ import {
 import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
 import { type StarLayer, drawStars } from "./stars";
 
-export { CARGO_COLORS, itemColor } from "./crates";
-export { type ViewTransform, toScreenPx } from "./screen";
-
 /**
  * Whether the deck's drawing should be rotated 90° to fill a portrait viewport (task item 5:
  * the deck is landscape 32×18; phones are portrait). Desktop (landscape viewport) never rotates.
@@ -81,7 +78,7 @@ const DEFAULT_ROOM = { fill: "#1b2430", label: "#a9b8c8" } as const;
  * the yellow crew dots and white labels to stay readable, different enough in hue to tell rooms
  * apart on a phone.
  */
-export const ROOM_PALETTE: Readonly<Record<string, { fill: string; label: string }>> = {
+const ROOM_PALETTE: Readonly<Record<string, { fill: string; label: string }>> = {
   bridge: { fill: "#1c2d4d", label: "#9dbdff" },
   quarters: { fill: "#2c2347", label: "#c7b0ff" },
   galley: { fill: "#3a2b17", label: "#f2c787" },
@@ -92,7 +89,7 @@ export const ROOM_PALETTE: Readonly<Record<string, { fill: string; label: string
   airlock: { fill: "#183426", label: "#8fe3ae" },
 };
 
-export function roomStyle(tags: readonly string[] | undefined): { fill: string; label: string } {
+function roomStyle(tags: readonly string[] | undefined): { fill: string; label: string } {
   for (const tag of tags ?? []) {
     const style = ROOM_PALETTE[tag];
     if (style !== undefined) return style;
@@ -121,7 +118,7 @@ const MACHINE_COLORS: Record<RenderMachineState, string> = {
   off: "#5b6b7a",
 };
 
-export function drawCompartments(
+function drawCompartments(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -138,7 +135,7 @@ export function drawCompartments(
 }
 
 /** Polish A (D28): 2px walls along compartment and hull boundaries (doors/openings are gaps). */
-export function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: DeckLayout) {
+function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: DeckLayout) {
   ctx.lineCap = "square";
   for (const hull of [false, true]) {
     ctx.strokeStyle = hull ? HULL_COLOR : WALL_COLOR;
@@ -161,7 +158,7 @@ export function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layou
  * real screen space so text always reads upright (task item 5). Machine labels sit at machine
  * centres, so corner plates keep the two apart.
  */
-export function drawCompartmentLabels(
+function drawCompartmentLabels(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -206,7 +203,7 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxPx: number): st
  * Doors as apertures in the wall (Polish A): the one-tile gap carries a bar in the door-state
  * colour, thick when shut, a thin line when open, so an open door reads as a passage.
  */
-export function drawDoors(
+function drawDoors(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -256,7 +253,7 @@ export function drawDoors(
   }
 }
 
-export function drawMachines(
+function drawMachines(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -296,7 +293,7 @@ export function drawMachines(
  * Machine short-name labels, drawn in real screen space (after any rotation is undone) so text
  * always reads upright, per task item 5. Only drawn "when there is room" (task item 4).
  */
-export function drawMachineLabels(
+function drawMachineLabels(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -342,7 +339,7 @@ export function actorDotColor(actor: Pick<RenderActor, "passenger">): string {
   return actor.passenger ? PASSENGER_DOT_COLOR : CREW_DOT_COLOR;
 }
 
-export function drawActorDots(
+function drawActorDots(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   frame: RenderFrame,
@@ -664,6 +661,14 @@ export type DrawSelection =
   | { readonly kind: "dockProp"; readonly id: string }
   | DockTarget;
 
+/** The id of `selected` when it is of `kind`, for the layer that draws that kind's highlight. */
+function selectedIdOf(
+  selected: DrawSelection | undefined,
+  kind: DrawSelection["kind"],
+): string | undefined {
+  return selected?.kind === kind ? selected.id : undefined;
+}
+
 /** The fit-space rectangle the canvas shows, in tile units. */
 function visibleTiles(t: ViewTransform, fitW: number, fitH: number): Bounds {
   return {
@@ -766,7 +771,7 @@ export function drawFrame(
   drawCompartments(ctx, t, layout);
   drawWalls(ctx, t, layout);
   drawDoors(ctx, t, layout, frame);
-  drawMachines(ctx, t, layout, frame, selected?.kind === "machine" ? selected.id : undefined);
+  drawMachines(ctx, t, layout, frame, selectedIdOf(selected, "machine"));
   inTileSpace(ctx, t, () => {
     if (dock !== undefined && dockPaint !== undefined) {
       drawDockForeground(ctx, dock, dockPaint, hull.bounds, sceneryFrame.view);
@@ -786,33 +791,11 @@ export function drawFrame(
     shown.dockProps,
     rotated,
     viewportWidth,
-    selected?.kind === "dockProp" ? selected.id : undefined,
+    selectedIdOf(selected, "dockProp"),
   );
-  drawDeckItems(
-    ctx,
-    t,
-    layout,
-    shown,
-    rotated,
-    viewportWidth,
-    selected?.kind === "item" ? selected.id : undefined,
-  );
-  drawLocalDots(
-    ctx,
-    t,
-    shown.locals,
-    rotated,
-    viewportWidth,
-    selected?.kind === "local" ? selected.id : undefined,
-  );
-  drawActorDots(
-    ctx,
-    t,
-    shown,
-    rotated,
-    viewportWidth,
-    selected?.kind === "actor" ? selected.id : undefined,
-  );
+  drawDeckItems(ctx, t, layout, shown, rotated, viewportWidth, selectedIdOf(selected, "item"));
+  drawLocalDots(ctx, t, shown.locals, rotated, viewportWidth, selectedIdOf(selected, "local"));
+  drawActorDots(ctx, t, shown, rotated, viewportWidth, selectedIdOf(selected, "actor"));
   drawActorLabels(ctx, t, shown, rotated, viewportWidth);
   // After the labels: a label plate sits just above the dot and would hide the load.
   drawCarriedItems(ctx, t, shown, rotated, viewportWidth);
@@ -833,5 +816,3 @@ export function screenToWorld(
   const [lx, ly] = rotated ? [screenY, viewportWidth - screenX] : [screenX, screenY];
   return { x: (lx - t.offsetX) / t.scale, y: (ly - t.offsetY) / t.scale };
 }
-
-export type { DeckLayout };

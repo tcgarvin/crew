@@ -25,9 +25,10 @@ import {
   withDockSlide,
 } from "./dock";
 import { dockTargetAt } from "./dockHit";
-import { computeFitTransform, screenToWorld, shouldRotate, toScreenPx } from "./draw";
+import { computeFitTransform, screenToWorld, shouldRotate } from "./draw";
 import { hullGeometry } from "./hull";
 import { DOCKING_START_OFFSET, sceneAt } from "./scene";
+import { toScreenPx } from "./screen";
 
 const { bundle, scenarioId } = loadWebContent();
 const scenario = bundle.scenarios[scenarioId];
