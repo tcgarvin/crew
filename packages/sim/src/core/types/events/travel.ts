@@ -43,7 +43,9 @@ export interface TravelEventPayloads {
    * D71: the departure goes ahead with `machineId` impaired because its `faultKey` repair is
    * short of `itemDefId` (a `tool` nothing aboard provides, or `part`s) and the market at
    * `portId` cannot supply it. Raised instead of the gate card when no other repair is worth
-   * waiting for, or when it ends a hold for repairs that could no longer finish.
+   * waiting for, or when it ends a hold for repairs that could no longer finish. D80: one per
+   * fault; a machine impaired only by another's (an engine starved by the generator) is told
+   * through the other's.
    */
   departureRepairOutOfReach: {
     readonly machineId: MachineId;

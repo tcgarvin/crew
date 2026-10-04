@@ -29,6 +29,10 @@
  * remembered as "leave anyway" is, against the live impairment set, so it is said once, and a
  * new fault or a repair asks again. An undiagnosed fault is still work aboard (diagnosis needs no
  * tool), so the gate waits for the diagnosis before it judges.
+ *
+ * D80: an impairment with no fault of its own that another machine's impairment causes (an
+ * engine starved of power by a derated generator, a machine overheating with every coolant pump
+ * on its bus down) is in reach only if its cause is; the reason told is the cause's fault, once.
  */
 import { queuePolicyDecision } from "../../core/decisions";
 import type { Actor } from "../../core/types/actor";
@@ -39,7 +43,11 @@ import type { Machine } from "../../core/types/ship";
 import type { TravelState } from "../../core/types/travel";
 import { isMachineBlocked } from "../equipment/equipment";
 import { type RepairOutOfReach, repairOutOfReach } from "../equipment/supplies";
+import { domainKeyOf } from "../power/power";
 import { commandActor } from "./roster";
+
+/** Allocation this close to a consumer's draw is full power, not starvation (float noise). */
+const POWER_SLACK = 1e-6;
 
 /** Prompt key of the gate card; `@crew/content` `templates.ts` renders it. */
 const DEPARTURE_GATE_PROMPT_KEY = "travel.departureGate";
@@ -165,14 +173,71 @@ export function impairmentOutOfReach(
   machineId: MachineId,
   portId: PortDefId | undefined,
 ): RepairOutOfReach | undefined {
+  return outOfReach(ctx, machineId, portId, new Set());
+}
+
+function outOfReach(
+  ctx: GateCtx,
+  machineId: MachineId,
+  portId: PortDefId | undefined,
+  seen: Set<MachineId>,
+): RepairOutOfReach | undefined {
   const machine = ctx.state.machines[machineId];
   const def = machine === undefined ? undefined : ctx.content.machines[machine.defId];
-  if (machine === undefined || def === undefined) return undefined;
+  if (machine === undefined || def === undefined || seen.has(machineId)) return undefined;
+  seen.add(machineId);
   const impairment = impairmentOf(ctx, machine, def);
   if (impairment === undefined) return undefined;
   const faultKeys = heldForFaults(machine, def, impairment.reason);
-  if (faultKeys.size === 0) return undefined;
-  return repairOutOfReach(ctx.state, ctx.content, machine, def, faultKeys, portId);
+  if (faultKeys.size > 0) {
+    return repairOutOfReach(ctx.state, ctx.content, machine, def, faultKeys, portId);
+  }
+  // D80: no fault of its own. Starved by another machine's impairment, it is in reach only if
+  // that cause is: every cause out of reach puts it out of reach, naming the first cause's fault.
+  // No cause found (integrity alone, an overloaded bus, a cycle) keeps D71's answer: in reach.
+  const causes = impairedCauses(ctx, machine, def);
+  let first: RepairOutOfReach | undefined;
+  for (const cause of causes) {
+    const why = outOfReach(ctx, cause.id, portId, seen);
+    if (why === undefined) return undefined;
+    first ??= why;
+  }
+  return first;
+}
+
+/**
+ * D80: the impaired machines a fault-free impairment comes from. Power: a consumer allocated less
+ * than its draw is starved by its domain's impaired generators. Coolant: a machine hot enough to
+ * derate (or blocked at its limit) on a domain whose `"cooling"` machines are all off is
+ * overheating for want of them (equipment's coolant rule), so the impaired ones among them are
+ * its causes. In machine id order.
+ */
+function impairedCauses(ctx: GateCtx, machine: Machine, def: MachineDef): Machine[] {
+  const domain = domainKeyOf(ctx, machine);
+  if (domain === undefined) return [];
+  const sameDomain = Object.values(ctx.state.machines)
+    .filter((m) => m.id !== machine.id && domainKeyOf(ctx, m) === domain)
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  const impaired = (m: Machine): boolean => {
+    const mDef = ctx.content.machines[m.defId];
+    return mDef !== undefined && impairmentOf(ctx, m, mDef) !== undefined;
+  };
+  const causes = new Set<Machine>();
+  const starved =
+    def.power.role === "consumer" &&
+    def.power.drawKw > 0 &&
+    machine.powerAllocatedKw < def.power.drawKw * (1 - POWER_SLACK);
+  if (starved) {
+    for (const m of sameDomain) {
+      if (ctx.content.machines[m.defId]?.power.role === "generator" && impaired(m)) causes.add(m);
+    }
+  }
+  const coolers = sameDomain.filter((m) => ctx.content.machines[m.defId]?.tags.includes("cooling"));
+  const hot = machine.temperature >= 1 || machine.temperature > def.heat.derateAbove;
+  if (hot && coolers.length > 0 && coolers.every((m) => m.actualMode !== "on")) {
+    for (const m of coolers) if (impaired(m)) causes.add(m);
+  }
+  return [...causes];
 }
 
 function worstOf(found: readonly Impairment[]): Impairment | undefined {
@@ -302,15 +367,21 @@ function leaveWithRepairsOutOfReach(
   travel.departureRiskAccepted = true;
   travel.acceptedImpairmentKey = impairmentKey(ctx);
   if (portId === undefined || toPortId === undefined) return;
-  for (const [impairment, why] of outOfReach) {
+  // D80: told per fault out of reach, so an engine starved by the generator's burnt-out coil is
+  // the generator's story, told once.
+  const told = new Set<string>();
+  for (const why of outOfReach.values()) {
+    const key = `${why.machineId}:${why.faultKey}`;
+    if (told.has(key)) continue;
+    told.add(key);
     ctx.emit({
       type: "departureRepairOutOfReach",
-      subjectIds: [impairment.machineId],
+      subjectIds: [why.machineId],
       causeIds: [],
       source: "sim",
-      locationRef: { kind: "machine", machineId: impairment.machineId },
+      locationRef: { kind: "machine", machineId: why.machineId },
       payload: {
-        machineId: impairment.machineId,
+        machineId: why.machineId,
         faultKey: why.faultKey,
         itemDefId: why.itemDefId,
         need: why.need,

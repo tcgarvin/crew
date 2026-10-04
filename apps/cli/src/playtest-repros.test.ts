@@ -116,4 +116,34 @@ describe("playtest repros (D80)", () => {
     });
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: KESSLER });
   });
+
+  it("a docked hold ends when the generator's part is not to be had, though it starves the engine", () => {
+    const { kernel, world } = freshWorld();
+    noSparesAnywhere(world);
+    const generator = machineTagged(world, "generator");
+    // The battery is flat, so a derated generator starves the engine (output 1/6, no fault).
+    for (const machine of Object.values(world.state.machines)) {
+      if (machine.roleState.role === "battery") machine.roleState.storedKj = 0;
+    }
+    send(kernel, world, {
+      source: "scenario",
+      kind: "scenarioInjectFault",
+      payload: { machineId: generator, faultKey: "coil_burnout" },
+    });
+    send(kernel, world, {
+      source: "player",
+      kind: "setCourse",
+      payload: { destinationPortId: KESSLER },
+    });
+    const events = drive(kernel, world, 600, (w) => w.state.travel.stage !== "docked");
+    expect(world.state.travel.stage).not.toBe("docked");
+    const engine = world.state.machines[machineTagged(world, "engine")];
+    expect(engine?.faults).toEqual([]);
+    expect(engine?.output ?? 1).toBeLessThan(world.config.values.travel.departureMinOutput);
+    const told = events.filter((e) => e.type === "departureRepairOutOfReach");
+    expect(told).toHaveLength(1);
+    expect(told[0]).toMatchObject({
+      payload: { machineId: generator, faultKey: "coil_burnout", itemDefId: SPARES },
+    });
+  });
 });
