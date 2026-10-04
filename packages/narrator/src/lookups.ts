@@ -6,6 +6,7 @@ import {
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  type ItemDefId,
   type Job,
   type Machine,
   type MachineFault,
@@ -24,6 +25,10 @@ export type State = DeepReadonly<WorldState>;
 
 export function portName(content: ContentBundle, portId: string): string {
   return content.ports[portId as PortDefId]?.name ?? portId;
+}
+
+export function itemName(content: ContentBundle, itemDefId: string): string {
+  return content.items[itemDefId as ItemDefId]?.name ?? itemDefId;
 }
 
 export function machineName(content: ContentBundle, machine: DeepReadonly<Machine>): string {
