@@ -12,8 +12,8 @@
   "snapshot": {
     "schemaVersion": 8,
     "simVersion": "0.1.0",
-    "contentHash": "bb30022f55ad977a",
-    "configHash": "bb30022f55ad977a",
+    "contentHash": "2bd588b79ed61c55",
+    "configHash": "2bd588b79ed61c55",
     "savedAtTick": 2400,
     "config": {
       "time": {
@@ -49,6 +49,7 @@
         "mealDays": 0.0125,
         "sleepDays": 0.2,
         "wakeBelow": 0.15,
+        "bedtimeAbove": 0.3,
         "initialRange": {
           "hunger": {
             "min": 0.2,
@@ -655,7 +656,12 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
-          "schedule": {},
+          "schedule": {
+            "section": {
+              "key": "blue",
+              "index": 2
+            }
+          },
           "activity": {
             "kind": "idle"
           },

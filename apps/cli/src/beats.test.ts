@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BeatsTally,
   type PersonSample,
+  type ShipSample,
   activityClass,
   formatBeatsReport,
   parseBeatsArgs,
@@ -43,8 +44,15 @@ describe("activity classes from canvas labels", () => {
 });
 
 describe("the beats tally", () => {
-  // Three watches of 100 ticks at 20 Hz.
-  const tally = () => new BeatsTally(3, 100, 20);
+  // Three watches of 100 ticks at 20 Hz, a day of three watches.
+  const tally = () => new BeatsTally(3, 100, 20, 3);
+  const underway: ShipSample = {
+    tick: 0,
+    docked: false,
+    helmEmpty: false,
+    helmWatchOpen: true,
+    cargoOpen: false,
+  };
 
   it("counts each beat in the watch whose step produced it, the closing bell included", () => {
     const t = tally();
@@ -72,11 +80,11 @@ describe("the beats tally", () => {
 
   it("shares a person's time by class and finds their longest idle stretch", () => {
     const t = tally();
-    t.sample(20, [mara("idle")], false);
-    t.sample(20, [mara("idle")], false);
-    t.sample(40, [mara("at the helm")], false);
-    t.sample(20, [mara("idle")], true);
-    t.sample(100, [mara("on station")], false);
+    t.sample(20, [mara("idle")], { ...underway, tick: 20 });
+    t.sample(20, [mara("idle")], { ...underway, tick: 40 });
+    t.sample(40, [mara("at the helm")], { ...underway, tick: 80 });
+    t.sample(20, [mara("idle")], { ...underway, tick: 100, helmEmpty: true });
+    t.sample(100, [mara("on station")], { ...underway, tick: 200 });
     const [person] = t.result().people;
     expect(person?.name).toBe("Mara Osei");
     expect(person?.shares.idle).toBeCloseTo(60 / 200);
@@ -84,6 +92,54 @@ describe("the beats tally", () => {
     expect(person?.longestIdleSeconds).toBe(2);
     expect(t.result().helmUnattendedSeconds).toBe(1);
     expect(t.result().otherLabels).toEqual({ "on station": 5 });
+  });
+
+  it("tallies port calls by watch of the day: cargo open, a stall while nobody hauls, and the gangway", () => {
+    const t = tally();
+    const docked = { ...underway, docked: true, helmWatchOpen: false, cargoOpen: true };
+    const jax = (label: string): PersonSample => ({ id: "actor:jax", name: "Jax", label });
+    // Watch 0: 2 s docked with cargo open, 1 s of it stalled, Jax on the gangway throughout.
+    t.sample(20, [mara("idle"), jax("on the gangway")], { ...docked, tick: 20 });
+    t.sample(20, [mara("hauling 2 crates"), jax("on the gangway")], { ...docked, tick: 40 });
+    // Watch 2 (tick 201..300): 1 s docked with a course plotted (the helm watch, no gangway
+    // wanted), cargo done, nobody on the gangway.
+    t.sample(20, [mara("idle"), jax("at the helm")], {
+      ...docked,
+      tick: 220,
+      cargoOpen: false,
+      helmWatchOpen: true,
+    });
+    const { port } = t.result();
+    expect(port).toHaveLength(3);
+    expect(port[0]).toEqual({
+      dockedSeconds: 2,
+      cargoOpenSeconds: 2,
+      cargoStallSeconds: 1,
+      longestCargoStallSeconds: 1,
+      gangwayWantedSeconds: 2,
+      gangwaySeconds: 2,
+    });
+    expect(port[1]?.dockedSeconds).toBe(0);
+    expect(port[2]).toMatchObject({
+      dockedSeconds: 1,
+      cargoOpenSeconds: 0,
+      gangwayWantedSeconds: 0,
+      gangwaySeconds: 0,
+    });
+  });
+
+  it("records each sleep start as a day and a second of that day", () => {
+    const t = tally();
+    t.sample(20, [mara("idle")], { ...underway, tick: 20 });
+    t.sample(20, [mara("asleep in her cabin")], { ...underway, tick: 40 });
+    t.sample(20, [mara("asleep in her cabin")], { ...underway, tick: 60 });
+    t.sample(20, [mara("idle")], { ...underway, tick: 80 });
+    // A second sleep on the next day (a day is 300 ticks, 15 s).
+    t.sample(20, [mara("asleep")], { ...underway, tick: 340 });
+    expect(t.result().people[0]?.sleepStarts).toEqual([
+      { day: 1, secondOfDay: 1 },
+      { day: 2, secondOfDay: 1 },
+    ]);
   });
 });
 
