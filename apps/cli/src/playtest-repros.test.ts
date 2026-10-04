@@ -13,9 +13,9 @@ import type {
   SimEvent,
   World,
 } from "@crew/sim";
-import { createKernel, effectiveMarket } from "@crew/sim";
+import { createKernel, effectiveMarket, watchTicks } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { createPacingRegistry, loadPacingContent } from "./pacing";
+import { createPacingRegistry, freightDraft, loadPacingContent } from "./pacing";
 
 const SPARES = "item.spare_parts_stack" as ItemDefId;
 const KESSLER = "port.kessler_drift" as PortDefId;
@@ -145,5 +145,47 @@ describe("playtest repros (D80)", () => {
     expect(told[0]).toMatchObject({
       payload: { machineId: generator, faultKey: "coil_burnout", itemDefId: SPARES },
     });
+  }, 60_000);
+});
+
+describe("slice-2 QA repros (D77 addendum)", () => {
+  it("a port call in the Blue watch loads its cargo within the watch: cargo is all hands awake", () => {
+    const { kernel, world } = freshWorld();
+    const watch = watchTicks(world.config.values);
+    // Docked at the hub as the Blue watch begins: the first officer and the deckhand on the
+    // bill, Red and White and the dayworkers off duty.
+    world.state.tick = 2 * watch;
+    send(kernel, world, freightDraft(world));
+    const offered = drive(kernel, world, 30, (_w, events) =>
+      events.some((e) => e.type === "jobOffered"),
+    );
+    const offer = offered.find((e) => e.type === "jobOffered");
+    if (offer?.type !== "jobOffered") throw new Error("no job offered");
+    send(kernel, world, {
+      source: "scenario",
+      kind: "acceptContract",
+      payload: { jobId: offer.payload.jobId },
+    });
+    const accepted = world.state.tick;
+    drive(kernel, world, 1, () => false);
+    const crates = world.state.jobs[offer.payload.jobId]?.cargoItemIds.length ?? 0;
+    expect(crates).toBeGreaterThan(0);
+    const events = drive(
+      kernel,
+      world,
+      300,
+      (_w, all) =>
+        all.filter((e) => e.type === "taskCompleted" && e.payload.haul?.to === "ship").length >=
+        crates,
+    );
+    const firstAboard = events.find(
+      (e) => e.type === "taskCompleted" && e.payload.haul?.to === "ship",
+    );
+    expect(firstAboard).toBeDefined();
+    expect((firstAboard?.tick ?? Number.POSITIVE_INFINITY) - accepted).toBeLessThan(
+      120 * world.config.values.time.tickRate,
+    );
+    // All aboard before the Red bell, so it was not the Red watch coming on that loaded.
+    expect(world.state.tick).toBeLessThan(3 * watch);
   }, 60_000);
 });

@@ -67,6 +67,7 @@ const config: PlannerConfig = {
     mealDays: 10 / 1200,
     sleepDays: 0.05,
     wakeBelow: 0.1,
+    bedtimeAbove: 0.3,
     initialRange: {
       hunger: { min: 0, max: 0 },
       fatigue: { min: 0, max: 0 },

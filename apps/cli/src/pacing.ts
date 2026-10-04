@@ -206,7 +206,7 @@ function describeLeg(world: World): string {
 }
 
 /** A freight draft hub → far port that passes the path-distance pay band at its minimum. */
-function freightDraft(world: World): Omit<Command, "id"> {
+export function freightDraft(world: World): Omit<Command, "id"> {
   const itemDefId = Object.values(world.content.items).find(
     (item) => item.cargoClass === "general",
   )?.id;

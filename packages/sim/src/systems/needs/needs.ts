@@ -6,8 +6,9 @@
  * activities are planner candidates, not problems (W0 decision 23).
  *
  * - hunger: rises at `hungerPerDay`; eating reduces it at the meal's commit point (work).
- * - fatigue: rises at `fatiguePerDayWorking` while on a task, `fatiguePerDayAwake`
- *   otherwise; falls at `fatigueRecoveryPerDayAsleep` while asleep in a bunk.
+ * - fatigue: rises at `fatiguePerDayWorking` while on a task's hands-on steps,
+ *   `fatiguePerDayAwake` otherwise (a watch stood at the helm or the gangway included, D77
+ *   addendum); falls at `fatigueRecoveryPerDayAsleep` while asleep in a bunk.
  * - comfort: falls at `comfortRecoveryPerDayResting` while resting, socializing or asleep;
  *   rises at `comfortPerDay` otherwise.
  * - social: falls at `socialRecoveryPerDayChatting` while socializing; rises otherwise.
@@ -56,7 +57,10 @@ function needRatesPerDay(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
   const hold = currentHold(actor.activity);
   const asleep = hold === "sleep";
   const resting = asleep || hold === "rest" || hold === "socialize";
-  const working = actor.activity.kind === "task";
+  // D77 addendum: standing a watch (a `staff` or `gangway` hold) tires at the awake rate; it is
+  // hands-on work that tires at the working rate. A stander's watch plus a day awake then stays
+  // below pressing tiredness, so the one sleep a day falls in their sleep watch.
+  const working = actor.activity.kind === "task" && hold === undefined;
   const fatigue = asleep
     ? -needs.fatigueRecoveryPerDayAsleep
     : working

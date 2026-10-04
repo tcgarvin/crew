@@ -45,6 +45,7 @@ export const configDefSchema = z.strictObject({
     mealDays: positive,
     sleepDays: positive,
     wakeBelow: unitInterval,
+    bedtimeAbove: unitInterval,
     initialRange: z.strictObject({
       hunger: unitRange,
       fatigue: unitRange,

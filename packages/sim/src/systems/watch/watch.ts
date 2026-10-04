@@ -5,9 +5,10 @@
  * - the helm's `watch` post: open while a course is planned (and no passenger keeps the ship in)
  *   or the ship is underway, resolved once it is docked with no course (moved from travel);
  * - the `relief` post: raised when whoever holds the watch post has hunger, fatigue, comfort or
- *   social past `urgency.needEssentialAbove`, resolved once a watch-post stander is back in the
- *   seat (by a handover since it was raised), after `watches.reliefMaxDays`, or when the helm
- *   watch ends;
+ *   social past `urgency.needEssentialAbove`, unless the bell is within the handover lead plus
+ *   `reliefNoShowSeconds` (the oncoming relieves them instead); resolved once a watch-post
+ *   stander is back in the seat (by a handover since it was raised), after
+ *   `watches.reliefMaxDays`, or when the helm watch ends;
  * - vacancy: `helm.unattendedSinceTick` while the helm watch is wanted and nobody has the helm,
  *   and `helmUnattended` once per vacancy after `watches.helmUnattendedSeconds` of it in transit;
  * - the long-watch thoughts: `stoodLongWatch` once a hold at the helm passes `longWatchFactor`
@@ -135,8 +136,22 @@ function updateRelief(
   }
   const holderActor = holder === undefined ? undefined : ctx.state.actors[holder];
   if (holderActor !== undefined && onWatchPost(holder)) {
-    if (needsPastEssential(ctx.config, holderActor)) raisePost(ctx, machineId, "relief");
+    if (needsPastEssential(ctx.config, holderActor) && !bellNear(ctx)) {
+      raisePost(ctx, machineId, "relief");
+    }
   }
+}
+
+/**
+ * Is the bell within `handoverLeadSeconds + reliefNoShowSeconds`? Then no relief is raised: the
+ * oncoming will relieve the stander sooner than a relief could be counted on, and a relief sent
+ * now is relieved in turn moments later (the slice-2 QA double handover).
+ */
+function bellNear(ctx: StepCtx): boolean {
+  const watches = ctx.config.watches;
+  const nextBell = (watchIndexAt(ctx.config, ctx.tick) + 1) * watchTicks(ctx.config);
+  const lead = configTicks(ctx.config, watches.handoverLeadSeconds + watches.reliefNoShowSeconds);
+  return nextBell - ctx.tick <= lead;
 }
 
 /** Did `elapsed` (ticks) reach `threshold` this tick? */

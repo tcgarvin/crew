@@ -8,7 +8,10 @@
  *   the total and the mean, least and most over the run's watches;
  * - per person, the share of sim time in each activity class (read from the canvas label, which
  *   is what the player sees) and the longest idle stretch;
- * - how long the helm stood empty while the ship was not docked.
+ * - how long the helm stood empty while the ship was not docked;
+ * - port calls by watch of the day: time docked, with cargo to move, with cargo to move and
+ *   nobody hauling (a stall), and with someone on the gangway;
+ * - each person's sleep starts, as seconds into each day (the rhythm's anchor, D77).
  *
  * Unlike `crew pacing` there is no wall clock: the sim simply advances, so the numbers are sim
  * time and independent of playback speed. An event at tick T happened in the step ending at T,
@@ -119,6 +122,39 @@ export interface PersonBeats {
   /** Share of sampled sim time in each class, 0..1; the classes sum to 1. */
   readonly shares: Readonly<Record<ActivityClass, number>>;
   readonly longestIdleSeconds: number;
+  /** When they fell asleep, in sim time: the day (from 1) and the second of that day. */
+  readonly sleepStarts: readonly SleepStart[];
+}
+
+export interface SleepStart {
+  readonly day: number;
+  readonly secondOfDay: number;
+}
+
+/** Port calls on one watch of the day, in sim seconds over the run. */
+export interface PortWatchBeats {
+  readonly dockedSeconds: number;
+  /** Docked with cargo to load or unload. */
+  readonly cargoOpenSeconds: number;
+  /** Docked with cargo to move and nobody hauling. */
+  readonly cargoStallSeconds: number;
+  readonly longestCargoStallSeconds: number;
+  /** Docked with no helm watch open (no course plotted): a gangway watch is wanted. */
+  readonly gangwayWantedSeconds: number;
+  /** Docked with someone on the gangway. */
+  readonly gangwaySeconds: number;
+}
+
+/** The ship at the end of a sample. */
+export interface ShipSample {
+  readonly tick: number;
+  readonly docked: boolean;
+  /** Not docked and nobody at the helm. */
+  readonly helmEmpty: boolean;
+  /** The helm's `watch` post is open (a course plotted in port, or underway). */
+  readonly helmWatchOpen: boolean;
+  /** A `cargoToLoad` or `cargoToUnload` problem is open. */
+  readonly cargoOpen: boolean;
 }
 
 export interface BeatsTallyResult {
@@ -126,6 +162,8 @@ export interface BeatsTallyResult {
   readonly beats: Readonly<Record<BeatKind, BeatStats>>;
   readonly people: readonly PersonBeats[];
   readonly helmUnattendedSeconds: number;
+  /** Port calls by watch of the day (index = watch of the day). */
+  readonly port: readonly PortWatchBeats[];
   /** Labels that matched no class, with the sim-seconds spent in each. */
   readonly otherLabels: Readonly<Record<string, number>>;
 }
@@ -142,6 +180,18 @@ interface PersonTally {
   readonly ticks: Record<ActivityClass, number>;
   idleRun: number;
   longestIdle: number;
+  asleep: boolean;
+  readonly sleepStartTicks: number[];
+}
+
+interface PortWatchTally {
+  docked: number;
+  cargoOpen: number;
+  cargoStall: number;
+  stallRun: number;
+  longestStall: number;
+  gangwayWanted: number;
+  gangway: number;
 }
 
 const EVENT_TO_BEAT: ReadonlyMap<string, BeatKind> = new Map(
@@ -152,21 +202,38 @@ export class BeatsTally {
   private readonly perWatch: Record<BeatKind, number[]>;
   private readonly people = new Map<string, PersonTally>();
   private readonly other = new Map<string, number>();
+  private readonly port: PortWatchTally[];
   private unattendedTicks = 0;
 
   /**
    * @param watches the run's watches; events in later watches (none, if the run stops at the
    *   end of its last watch) are an error.
    * @param ticksPerWatch from the config (`watchTicks`).
+   * @param watchesPerDay from the config (`time.watchesPerDay`), for the port calls by watch.
    */
   constructor(
     private readonly watches: number,
     private readonly ticksPerWatch: number,
     private readonly tickRate: number,
+    private readonly watchesPerDay: number,
   ) {
     if (!Number.isInteger(watches) || watches <= 0) {
       throw new RangeError(`BeatsTally: watches must be a positive integer, got ${watches}`);
     }
+    if (!Number.isInteger(watchesPerDay) || watchesPerDay <= 0) {
+      throw new RangeError(
+        `BeatsTally: watchesPerDay must be a positive integer, got ${watchesPerDay}`,
+      );
+    }
+    this.port = Array.from({ length: watchesPerDay }, () => ({
+      docked: 0,
+      cargoOpen: 0,
+      cargoStall: 0,
+      stallRun: 0,
+      longestStall: 0,
+      gangwayWanted: 0,
+      gangway: 0,
+    }));
     this.perWatch = Object.fromEntries(
       BEAT_KINDS.map((kind) => [kind, new Array<number>(watches).fill(0)]),
     ) as Record<BeatKind, number[]>;
@@ -191,15 +258,19 @@ export class BeatsTally {
   }
 
   /**
-   * `ticks` of sim time ending now, with each person's label at its end; `helmEmpty` is true
-   * when the ship is not docked and nobody is at the helm.
+   * `ticks` of sim time ending at `ship.tick`, with each person's label at its end and the
+   * ship's state then.
    */
-  sample(ticks: number, people: readonly PersonSample[], helmEmpty: boolean): void {
-    if (helmEmpty) this.unattendedTicks += ticks;
+  sample(ticks: number, people: readonly PersonSample[], ship: ShipSample): void {
+    if (ship.helmEmpty) this.unattendedTicks += ticks;
+    let hauling = false;
+    let gangway = false;
     for (const person of people) {
       const tally = this.personTally(person);
       const cls = activityClass(person.label);
       tally.ticks[cls] += ticks;
+      if (cls === "hauling") hauling = true;
+      if (cls === "gangway") gangway = true;
       if (cls === "other")
         this.other.set(person.label, (this.other.get(person.label) ?? 0) + ticks);
       if (cls === "idle") {
@@ -208,6 +279,26 @@ export class BeatsTally {
       } else {
         tally.idleRun = 0;
       }
+      const asleep = cls === "asleep";
+      if (asleep && !tally.asleep) tally.sleepStartTicks.push(ship.tick - ticks);
+      tally.asleep = asleep;
+    }
+    const port = this.port[this.watchOf(ship.tick) % this.watchesPerDay];
+    if (port === undefined) throw new RangeError(`no port tally for tick ${ship.tick}`);
+    if (!ship.docked) {
+      port.stallRun = 0;
+      return;
+    }
+    port.docked += ticks;
+    if (!ship.helmWatchOpen) port.gangwayWanted += ticks;
+    if (gangway) port.gangway += ticks;
+    if (ship.cargoOpen) port.cargoOpen += ticks;
+    if (ship.cargoOpen && !hauling) {
+      port.cargoStall += ticks;
+      port.stallRun += ticks;
+      port.longestStall = Math.max(port.longestStall, port.stallRun);
+    } else {
+      port.stallRun = 0;
     }
   }
 
@@ -222,6 +313,8 @@ export class BeatsTally {
       >,
       idleRun: 0,
       longestIdle: 0,
+      asleep: false,
+      sleepStartTicks: [],
     };
     this.people.set(person.id, fresh);
     return fresh;
@@ -248,8 +341,26 @@ export class BeatsTally {
       const shares = Object.fromEntries(
         ACTIVITY_CLASSES.map((c) => [c, sampled === 0 ? 0 : p.ticks[c] / sampled]),
       ) as Record<ActivityClass, number>;
-      return { name: p.name, shares, longestIdleSeconds: p.longestIdle / this.tickRate };
+      const dayTicks = this.ticksPerWatch * this.watchesPerDay;
+      const sleepStarts = p.sleepStartTicks.map((tick) => ({
+        day: Math.floor(tick / dayTicks) + 1,
+        secondOfDay: Math.round((tick % dayTicks) / this.tickRate),
+      }));
+      return {
+        name: p.name,
+        shares,
+        longestIdleSeconds: p.longestIdle / this.tickRate,
+        sleepStarts,
+      };
     });
+    const port = this.port.map((w) => ({
+      dockedSeconds: w.docked / this.tickRate,
+      cargoOpenSeconds: w.cargoOpen / this.tickRate,
+      cargoStallSeconds: w.cargoStall / this.tickRate,
+      longestCargoStallSeconds: w.longestStall / this.tickRate,
+      gangwayWantedSeconds: w.gangwayWanted / this.tickRate,
+      gangwaySeconds: w.gangway / this.tickRate,
+    }));
     const otherLabels = Object.fromEntries(
       [...this.other].sort((a, b) => b[1] - a[1]).map(([label, t]) => [label, t / this.tickRate]),
     );
@@ -258,6 +369,7 @@ export class BeatsTally {
       beats,
       people,
       helmUnattendedSeconds: this.unattendedTicks / this.tickRate,
+      port,
       otherLabels,
     };
   }
@@ -310,7 +422,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
   const watches = options.days * values.time.watchesPerDay;
   const ticksPerWatch = watchTicks(values);
   const endTick = watches * ticksPerWatch;
-  const tally = new BeatsTally(watches, ticksPerWatch, tickRate);
+  const tally = new BeatsTally(watches, ticksPerWatch, tickRate, values.time.watchesPerDay);
   const hooksByKind: Partial<Record<NarratorHook["kind"], number>> = {};
 
   let commandCount = 0;
@@ -338,7 +450,20 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
       const people = crewSamples(world);
       const underway = world.state.travel.stage !== "docked";
       const helmEmpty = underway && !people.some((p) => p.label === "at the helm");
-      tally.sample(advanced, people, helmEmpty);
+      const problems = Object.values(world.state.work.problems).filter((p) => p.status === "open");
+      const cargoOpen = problems.some(
+        (p) => p.kind === "cargoToLoad" || p.kind === "cargoToUnload",
+      );
+      const helmWatchOpen = problems.some(
+        (p) => p.kind === "stationToStaff" && p.payload.post === "watch",
+      );
+      tally.sample(advanced, people, {
+        tick: world.state.tick,
+        docked: !underway,
+        helmEmpty,
+        helmWatchOpen,
+        cargoOpen,
+      });
     }
     script.step(world, result.events);
     if (script.done) {
@@ -457,12 +582,31 @@ function scenarioSection(r: BeatsResult): string[] {
         .join(", ") || "none"
     }.`,
     "",
-    `| Person | ${ACTIVITY_CLASSES.join(" | ")} | Longest idle s |`,
-    `|---|${ACTIVITY_CLASSES.map(() => "---").join("|")}|---|`,
+    "| Watch of day | Docked s | Cargo open s | Cargo stall s | Longest stall s | Gangway wanted s | Gangway stood s |",
+    "|---|---|---|---|---|---|---|",
+  );
+  r.port.forEach((w, i) => {
+    const cells = [
+      w.dockedSeconds,
+      w.cargoOpenSeconds,
+      w.cargoStallSeconds,
+      w.longestCargoStallSeconds,
+      w.gangwayWantedSeconds,
+      w.gangwaySeconds,
+    ].map((s) => fmt(s, 0));
+    lines.push(`| ${i} | ${cells.join(" | ")} |`);
+  });
+  lines.push(
+    "",
+    `| Person | ${ACTIVITY_CLASSES.join(" | ")} | Longest idle s | Sleep starts (s of day) |`,
+    `|---|${ACTIVITY_CLASSES.map(() => "---").join("|")}|---|---|`,
   );
   for (const p of r.people) {
     const shares = ACTIVITY_CLASSES.map((c) => (p.shares[c] === 0 ? "" : pct(p.shares[c])));
-    lines.push(`| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} |`);
+    const sleeps = p.sleepStarts.map((s) => `d${s.day} ${s.secondOfDay}`).join(", ");
+    lines.push(
+      `| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} | ${sleeps} |`,
+    );
   }
   const other = Object.entries(r.otherLabels);
   if (other.length > 0) {

@@ -2175,6 +2175,11 @@
               "minimum": 0,
               "maximum": 1
             },
+            "bedtimeAbove": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
             "initialRange": {
               "type": "object",
               "properties": {
@@ -2264,6 +2269,7 @@
             "mealDays",
             "sleepDays",
             "wakeBelow",
+            "bedtimeAbove",
             "initialRange"
           ],
           "additionalProperties": false

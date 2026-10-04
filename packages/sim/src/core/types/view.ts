@@ -68,6 +68,16 @@ export interface WatchView {
   readonly helmRole: HelmRole;
   /** Captain or first officer in the section on watch, and not its helm-stander. */
   readonly officerOfTheWatch: boolean;
+  /**
+   * D77 addendum: this is their sleep watch (the one after their own), when routine tiredness
+   * is slept off; outside it only pressing tiredness sends them to bed. Present when true.
+   */
+  readonly sleepWatch?: true;
+  /**
+   * D77 addendum: they stand gangway watch now: docked with no helm watch wanted, and the
+   * section on watch's gangway stander (`gangwayStanderOf`). Present when true.
+   */
+  readonly gangway?: true;
 }
 
 /** The actor's own state: they always know their body, needs and what they carry. */
@@ -99,6 +109,8 @@ export interface SelfView {
   readonly passenger?: true;
   /** Passengers §3.5: walking off the ship; the planner keeps out of the way. */
   readonly disembarking?: true;
+  /** D61: standing out on the dock alongside rather than aboard. Present when true. */
+  readonly onDock?: true;
   /** D74: the bed assigned to this actor (`WorldState.berths`); absent while unberthed. */
   readonly berth?: { readonly machineId: MachineId };
 }

@@ -98,6 +98,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       mealDays: 10 / FIXTURE_DAY,
       sleepDays: 60 / FIXTURE_DAY,
       wakeBelow: 0.1,
+      bedtimeAbove: 0.3,
       initialRange: {
         hunger: { min: 0, max: 0 },
         fatigue: { min: 0, max: 0 },

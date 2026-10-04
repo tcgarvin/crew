@@ -58,8 +58,8 @@
     "sections": [
       { "key": "red", "members": ["crew.noor_haddad", "crew.mara_osei", "crew.priya_kessler"] },
       { "key": "white", "members": ["crew.jax_okonkwo", "crew.tomas_ruiz"] },
-      { "key": "blue", "members": ["crew.dane_whitcross"] }
+      { "key": "blue", "members": ["crew.dane_whitcross", "crew.sunniva_park"] }
     ],
-    "dayworkers": ["crew.bettina_solheim", "crew.sunniva_park", "crew.oyelaran_abiodun"]
+    "dayworkers": ["crew.bettina_solheim", "crew.oyelaran_abiodun"]
   }
 }
