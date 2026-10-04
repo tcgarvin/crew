@@ -107,11 +107,17 @@ export interface PlaybackStep {
  * Buffers frames by tick and advances through them at `tickRate` (sim ticks/sec) × `speed`,
  * regardless of how far ahead the worker has buffered — the run-ahead cap (D14) is the worker's
  * job; this just plays the queue back at human speed.
+ *
+ * Paused, it holds the picture it last showed: pausing the worker alone left seconds of buffered
+ * run-ahead still playing after the player pressed pause.
  */
 export class FramePlayback {
   private readonly buffer: RenderFrame[] = [];
   private elapsedMs = 0;
   private speed = 1;
+  private paused = false;
+  /** The step last returned, held (the same object, so the view does not re-render) while paused. */
+  private shown: PlaybackStep | undefined;
 
   constructor(private readonly tickRate = 20) {}
 
@@ -136,13 +142,24 @@ export class FramePlayback {
     this.speed = speed;
   }
 
+  /** Freeze (or resume) playback where it is; resuming carries on from the same view tick. */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+  }
+
   get bufferedFrameCount(): number {
     return this.buffer.length;
   }
 
-  /** Advance by `deltaMs` of real time. Returns the frame to render, or `undefined` if nothing
-   * has been buffered yet. */
+  /** Advance by `deltaMs` of real time (none while paused). Returns the frame to render, or
+   * `undefined` if nothing has been buffered yet. */
   advance(deltaMs: number): PlaybackStep | undefined {
+    if (this.paused && this.shown !== undefined) return this.shown;
+    this.shown = this.step(this.paused ? 0 : deltaMs);
+    return this.shown;
+  }
+
+  private step(deltaMs: number): PlaybackStep | undefined {
     if (this.buffer.length === 0) return undefined;
     const only = this.buffer[0];
     if (this.buffer.length === 1 && only) {

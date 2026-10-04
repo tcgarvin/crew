@@ -187,10 +187,14 @@ export function App() {
     connection.send({ type: "command", requestId, command });
   }, []);
 
-  /** What the pause button does, also used when the narrator error panel pauses the game. */
+  /**
+   * What the pause button does, also used when the narrator error panel pauses the game. The
+   * playback freezes too, or the run-ahead already buffered would keep playing after the pause.
+   */
   const applyPause = useCallback((next: boolean) => {
     setPausedState(next);
     pausedRef.current = next;
+    playbackRef.current.setPaused(next);
     connectionRef.current?.setUserPaused(next);
     connectionRef.current?.send({ type: next ? "pause" : "resume" });
   }, []);
@@ -436,6 +440,7 @@ export function App() {
     setPausedState(false);
     pausedRef.current = false;
     playbackRef.current.setSpeed(next);
+    playbackRef.current.setPaused(false);
     connectionRef.current?.setUserPaused(false);
     connectionRef.current?.send({ type: "setSpeed", speed: next });
     connectionRef.current?.send({ type: "resume" });
