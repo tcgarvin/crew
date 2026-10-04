@@ -110,7 +110,7 @@ describe('"The dock you are dressing" (stageDock, D67)', () => {
     expect(text).not.toContain("## Your budget");
     // It reads what the story narrator reads: the port's people, the crew, the notes.
     expect(text).toContain("## People you know here (Kessler Drift)");
-    expect(text).toContain("## Crew (8)");
+    expect(text).toContain("## Crew (9)");
     expect(text).toContain("## Your notes so far");
     // The dock is not alongside yet: nothing is "on" it.
     expect(text).not.toContain("## On the dock");

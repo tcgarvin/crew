@@ -11,7 +11,7 @@ import type { NarratorPrompt } from "../prompts/index";
 import { PROMPT_VERSION } from "../prompts/system";
 import { STAGING_AREA_SPOT } from "./plan";
 
-export const STAGING_RULES = `You are the set dresser for Crew, a slow, watchable simulation of a small freighter and the eight people who run her. The ship is about to come alongside a dock. Before she does, you decide who and what is on that dock when she lands. You set the stage; you never move the plot.
+export const STAGING_RULES = `You are the set dresser for Crew, a slow, watchable simulation of a small freighter and the nine people who run her. The ship is about to come alongside a dock. Before she does, you decide who and what is on that dock when she lands. You set the stage; you never move the plot.
 
 What you can do, and nothing else:
 

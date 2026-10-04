@@ -12,6 +12,7 @@ import {
   configTicks,
   dockAlongside,
   dockAreaTiles,
+  personnelRampFoot,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
@@ -181,21 +182,27 @@ describe("buildDigest", () => {
       ?.split("\n\n")[0]
       ?.split("\n")
       .filter((line) => line.startsWith("- ") && !line.startsWith("- passengers"));
-    expect(crewLines?.length).toBe(8);
+    expect(crewLines?.length).toBe(9);
     for (const line of crewLines ?? []) expect(line).toMatch(/\. .+ voice: .+/);
     const dane = content().crew["crew.dane_whitcross" as keyof ReturnType<typeof content>["crew"]];
     expect(text).toContain(`${dane?.bio} voice: ${dane?.voice}`);
   });
 
   it("says a crew member on the dock alongside is on the dock (D61)", () => {
-    const req = farCaptainAshoreRequest(content());
+    const bundle = content();
+    const req = farCaptainAshoreRequest(bundle);
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
-    expect(snapshot.state.deck.dock?.dockId).toBe("dock.crossroads_hub");
-    const mara = Object.values(snapshot.state.actors).find((a) => a.name === "Mara Osei");
+    const state = snapshot.state;
+    expect(state.deck.dock?.dockId).toBe("dock.crossroads_hub");
+    const berth = dockAlongside(bundle, state);
+    if (berth === undefined || state.deck.dock === undefined) throw new Error("fixture: no dock");
+    const foot = personnelRampFoot(bundle, state.deck.dock.deckId, berth);
+    if (foot === undefined) throw new Error("fixture: the dock has no personnel ramp foot");
+    const mara = Object.values(state.actors).find((a) => a.name === "Mara Osei");
     if (mara === undefined || mara.location.kind !== "onDeck") throw new Error("fixture: no Mara");
-    // The personnel ramp's landing: deck (2,18), just outside the airlock's south wall.
-    mara.location = { ...mara.location, x: 2.5, y: 18.5 };
-    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
+    // The personnel ramp's landing: the first dock tile off the ship, wherever the berth puts it.
+    mara.location = { ...mara.location, x: foot.x + 0.5, y: foot.y + 0.5 };
+    const { text } = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook);
     const line = text.split("\n").find((l) => l.startsWith("- Mara Osei"));
     expect(line).toMatch(
       /: this is the captain, the player; never a speaker\. \w+ on the dock; needs/,
@@ -511,7 +518,7 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
     expect(aboard).toMatch(/now (idle|wandering|walking|eating|sleeping|resting)/);
     expect(aboard).toContain("Says: Passage to Ossory Station and home again.");
     // Not a crew line: no role tags, needs or voice; the crew count leaves her out.
-    expect(text).toContain("## Crew (8)");
+    expect(text).toContain("## Crew (9)");
     expect(text).not.toMatch(new RegExp(`^- ${FIXTURE_PASSENGER}[ :\\[]`, "m"));
     expect(text).not.toContain("passengers/NPCs");
   });
@@ -560,7 +567,7 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
     (reason) => {
       const text = digestOf(ended(reason, "ashore"));
       expect(text).not.toContain("- Aboard:");
-      expect(text).toContain("## Crew (8)");
+      expect(text).toContain("## Crew (9)");
       const section = text.split("## People you know here (Ossory Station)\n")[1]?.split("\n\n")[0];
       const how = reason === "putOff" ? "put off the ship" : "left behind";
       expect(section).toContain(
