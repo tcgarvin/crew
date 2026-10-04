@@ -1,4 +1,3 @@
-import type { CommandSource } from "../commands";
 /**
  * The Event union (SD §19.3, review §C.4).
  *
@@ -8,6 +7,7 @@ import type { CommandSource } from "../commands";
  * default significance. Each system owns one file in this folder exporting `<System>EventPayloads`
  * and a significance catalog; this file merges them.
  */
+import type { CommandSource } from "../commands";
 import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";

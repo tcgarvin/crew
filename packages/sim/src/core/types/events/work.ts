@@ -1,5 +1,5 @@
-import type { ClaimId, ItemId, ProblemId, TaskId } from "../ids";
 /** Work events (W4): problems, tasks, claims, actions. */
+import type { ClaimId, ItemId, ProblemId, TaskId } from "../ids";
 import type {
   ActionKind,
   BlockageReason,

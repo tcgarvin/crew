@@ -1,5 +1,5 @@
-import type { NarratorHookKind } from "../decisions";
 /** Decision and narrator-hook events. */
+import type { NarratorHookKind } from "../decisions";
 import type { ActorId, DecisionId, HookId, LocalId, PortDefId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 

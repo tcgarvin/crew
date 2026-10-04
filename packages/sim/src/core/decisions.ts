@@ -1,5 +1,3 @@
-import { raiseHookIfIdle } from "./hooks";
-import { allocateId } from "./ids";
 /**
  * Kernel-raised ("policy") decisions and their narration (D37, 2026-10-01).
  *
@@ -13,6 +11,8 @@ import { allocateId } from "./ids";
  * (D25), and a narrator call per offer would spend the hourly budget on cards that are dressed
  * already.
  */
+import { raiseHookIfIdle } from "./hooks";
+import { allocateId } from "./ids";
 import type { TextRef } from "./types/common";
 import type { Decision, DecisionOption } from "./types/decisions";
 import type { DecisionId, MachineId } from "./types/ids";

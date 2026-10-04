@@ -1,5 +1,5 @@
-import type { CommandKind, CommandRejection } from "../commands";
 /** Kernel-core events (W2): command lifecycle and invariant checks. */
+import type { CommandKind, CommandRejection } from "../commands";
 import type { EntityId, TempRef } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 

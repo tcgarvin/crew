@@ -1,10 +1,10 @@
-import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
-import { configTicks } from "./clock";
 /**
  * The tick pipeline (SD §5.2–5.3). `runStep` executes one tick: every registered entry in
  * `PHASES` order (see `registry.pipeline()`), honouring cadence and actor staggering, then
  * finalises the tick's events (phase 8).
  */
+import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
+import { configTicks } from "./clock";
 import { applyDueCommands } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";

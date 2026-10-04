@@ -1,9 +1,9 @@
-import type { CommandDraft } from "./commands";
 /**
  * Decisions and narrator hooks (PLAN §3, review §D.6, D5). Both are first-class sim state so a
  * pause survives save/load. Ownership: the decisions system (W6 builds it with the hook points;
  * W2 wires `resolveDecision` through the command path).
  */
+import type { CommandDraft } from "./commands";
 import type { TextRef, Tick, TileCoord } from "./common";
 import type { FloorSetEntry } from "./dockside";
 import type {

@@ -1,9 +1,9 @@
-import { emptyCaches, rebuildCaches } from "./caches";
-import { configTicks } from "./clock";
 /**
  * World creation and `advance` (SD §19.1). `createWorld` builds an empty `WorldState`,
  * instantiates the scenario deck, then spawns crew, stores and faults through the command path.
  */
+import { emptyCaches, rebuildCaches } from "./caches";
+import { configTicks } from "./clock";
 import { type ApplyCtx, applyCommandNow } from "./commands";
 import { headNeedingNarration } from "./decisions";
 import { createDefLookup } from "./defs";
@@ -402,7 +402,8 @@ function haltAfterStep(state: WorldState): AdvanceHalt | null {
 /**
  * Run up to `ticks` steps. Returns immediately while halted; otherwise stops after the tick that
  * raises a hook or leaves a decision pending. W2 decision: `caches.diagnostics.lastEvents` gets
- * this call's ticker events (`isTickerEvent`: `notable`+ plus a few readable trace types; even an empty set when halted) (bounded by `config.events.tickerMaxEntries`) for the render ticker.
+ * this call's ticker events for the render ticker (`isTickerEvent`: `notable`+ plus a few
+ * readable trace types), the latest `config.events.tickerMaxEntries` of them; empty when halted.
  */
 export function advance(world: World, registry: KernelRegistry, ticks: number): AdvanceResult {
   if (!Number.isInteger(ticks) || ticks < 0) {

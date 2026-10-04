@@ -1,4 +1,3 @@
-import { registerCoreCommandHandlers } from "./command-handlers";
 /**
  * The kernel registry: the one way other workstreams plug systems, planners, command handlers,
  * the AgentView builder and cache builders into the kernel.
@@ -9,6 +8,7 @@ import { registerCoreCommandHandlers } from "./command-handlers";
  * `defaultRegistry`, which the `register*` free functions write to. Tests build isolated
  * registries with `createRegistry()` so nothing leaks between them.
  */
+import { registerCoreCommandHandlers } from "./command-handlers";
 import type { CommandHandler } from "./commands";
 import { coreSystems } from "./pipeline";
 import type { CommandKind } from "./types/commands";
