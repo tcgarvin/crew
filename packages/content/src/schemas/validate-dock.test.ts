@@ -1,8 +1,9 @@
-import type { DockDef } from "@crew/sim";
+import type { ContentBundle, DockDef, ScenarioDef } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { rawBundle } from "../loader";
+import type { ValidationIssue } from "./issues";
 import { validateBundle } from "./validate";
-import { dockWalkableMask } from "./validate-dock";
+import { checkQuayRow, checkScenarioBerths, dockWalkableMask } from "./validate-dock";
 
 type Raw = Record<string, Record<string, unknown>>;
 type MutableDock = { -readonly [K in keyof DockDef]: DockDef[K] };
@@ -195,6 +196,115 @@ describe("dock map validation", () => {
     expect(twice).toContainEqual(
       expect.stringContaining('port "port.crossroads_hub" already has "dock.crossroads_hub"'),
     );
+  });
+});
+
+describe("berth box against hull classes (D72)", () => {
+  it("leaves a deck whose class is bigger than the box out of the dock's landing checks", () => {
+    const messages = messagesAfter((_dock, raw) => {
+      const mk1 = raw.decks?.["deck.freighter_mk1"] as { hull: { sizeClass: string } };
+      const decks = raw.decks as Record<string, unknown>;
+      // No scenario sails it, so nothing needs it to berth anywhere.
+      decks["deck.big_copy"] = {
+        ...mk1,
+        id: "deck.big_copy",
+        hull: { ...mk1.hull, sizeClass: "L" },
+      };
+    });
+    expect(messages).toEqual([]);
+  });
+
+  it("rejects a scenario whose ship's class does not fit a dock's berth box", () => {
+    const bundle = {
+      decks: { "deck.big": { id: "deck.big", hull: { class: "x", sizeClass: "L" } } },
+      docks: {
+        "dock.small": { id: "dock.small", berth: { origin: { x: 0, y: 0 }, sizeClass: "M" } },
+        "dock.large": { id: "dock.large", berth: { origin: { x: 0, y: 0 }, sizeClass: "L" } },
+      },
+    } as unknown as ContentBundle;
+    const scenario = { id: "scenario.test", deckId: "deck.big" } as unknown as ScenarioDef;
+    const issues: ValidationIssue[] = [];
+    checkScenarioBerths(scenario, bundle, issues);
+    expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([
+      'scenarios.scenario.test.deckId: "deck.big" (class L) cannot berth at "dock.small" (an M box)',
+    ]);
+  });
+});
+
+describe("quay row (D72)", () => {
+  /**
+   * A 26 x 16 map with an S box (24 x 14) at (1,0) between two wall columns, the quay row (14)
+   * floor from edge to edge, and a wall row under it.
+   */
+  function quayDock(edit: (dock: MutableDock) => void = () => {}): DockDef {
+    const dock = {
+      id: "dock.test.quay",
+      portId: "port.test.quay",
+      name: "Quay test",
+      palette: { floor: "#333333", wall: "#111111", accent: "#ffaa00" },
+      width: 26,
+      height: 16,
+      rows: [
+        ...Array.from({ length: 14 }, () => `#${" ".repeat(24)}#`),
+        ".".repeat(26),
+        "#".repeat(26),
+      ],
+      legend: { ".": "floor", "#": "wall", " ": "void" },
+      berth: { origin: { x: 1, y: 0 }, sizeClass: "S" },
+      posts: [],
+      areas: [],
+      props: [],
+      foreground: [],
+      ambience: "Quiet.",
+    } as unknown as MutableDock;
+    edit(dock);
+    return dock;
+  }
+
+  function quayMessages(dock: DockDef): string[] {
+    const issues: ValidationIssue[] = [];
+    checkQuayRow(dock, issues);
+    return issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+  }
+
+  it("accepts floor across the box's width", () => {
+    expect(quayMessages(quayDock())).toEqual([]);
+  });
+
+  it("rejects a wall in the quay row, counting the rest of the gap", () => {
+    const dock = quayDock((d) => {
+      setTile(d, 1, 14, "#");
+      setTile(d, 24, 14, "#");
+    });
+    expect(quayMessages(dock)).toEqual([
+      "docks.dock.test.quay.berth.origin: quay row 14 under the berth box: (1,14) is wall, not walkable floor (and 1 more)",
+    ]);
+  });
+
+  it("rejects a blocking prop on the quay row", () => {
+    const dock = quayDock((d) => {
+      d.props = [
+        {
+          key: "bollard_1",
+          kind: "bollard",
+          rect: { x: 10, y: 14, w: 1, h: 1 },
+          rot: 0,
+          blocking: true,
+        },
+      ];
+    });
+    expect(quayMessages(dock)).toEqual([
+      'docks.dock.test.quay.berth.origin: quay row 14 under the berth box: (10,14) is under blocking prop "bollard_1", not walkable floor',
+    ]);
+  });
+
+  it("rejects a box whose quay row would be off the map", () => {
+    const dock = quayDock((d) => {
+      d.berth = { origin: { x: 1, y: 2 }, sizeClass: "S" };
+    });
+    expect(quayMessages(dock)).toEqual([
+      "docks.dock.test.quay.berth.origin: quay row 16 under the berth box: (1,16) is off the map, not walkable floor (and 23 more)",
+    ]);
   });
 });
 
