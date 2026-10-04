@@ -8,7 +8,6 @@
 import { loadBundle } from "@crew/content";
 import {
   type FallbackReason,
-  type ModelTransport,
   type NarratorRequest,
   type NarratorResponse,
   nullNarratorResponse,
@@ -88,15 +87,6 @@ export const nullNarrator: RunNarrator = async (req) => ({
 });
 
 /**
- * W9 decision: OpenRouter transport (owner). The transport that sends the key to OpenRouter is
- * not implemented yet (see the W9 report); until it is, a configured key still yields the null
- * fallback, marked `fallback: "notConfigured"` in the call log.
- */
-function transportFor(apiKey: string): ModelTransport | undefined {
-  return openRouterTransport({ apiKey });
-}
-
-/**
  * Without a key the null narrator answers, marked `fallback: "notConfigured"` so the route can
  * refuse it in `error` mode (D43) and the call log says why the template path was taken.
  */
@@ -107,11 +97,10 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
       error: "no OPENROUTER_API_KEY configured",
     };
   }
-  const transport = transportFor(ctx.openRouterApiKey);
   const run = await runNarratorWithTrace(req, {
     gameId: ctx.gameId,
     notes: ctx.notes,
-    ...(transport === undefined ? {} : { transport }),
+    transport: openRouterTransport({ apiKey: ctx.openRouterApiKey }),
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
   });
