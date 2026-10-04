@@ -3,8 +3,9 @@
 Status: plan, 2026-10-04. Design and rationale: `docs/design/ship-life.md` (section references
 below are to that file unless marked Dockside). Five slices, as §12. Each slice ends deployed,
 with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
-playtest, and a pause to take stock. Slice 1 is planned in full below; slices 2–5 are sequenced
-and will be refined after the slice before them lands. Each slice adds its own `D<n>` entries.
+playtest, and a pause to take stock. Slices 1 and 2 are planned in full below; slices 3–5 are
+sequenced and will be refined after the slice before them lands. Each slice adds its own
+`D<n>` entries. Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74).
 
 Slice 1 is built by one serial *contract gate* followed by parallel workstreams in separate
 worktrees. The gate changes every shared type and leaves the repo green; each workstream then owns
@@ -436,25 +437,597 @@ timings; re-run `crew pacing` and record the numbers for the D-entry.
 
 ## Slice 2: The watch and the helm
 
-Save schema 7 → 8 (watch bill, thoughts). Prompt change (`pnpm test:live`).
+Scope (§12.2): time in fractions of the ship's day (§9); `shifts` → `watches`, three sections and
+a watch bill, the bell; the helm as the duty station with handover, relief and vacancy gating;
+gangway watch in port; the officer of the watch on rounds and engineers' maintenance rounds;
+mandatory course plotting; piloting checks with a narrator `scheduleHazard`; thoughts and mood
+with the first defs; auto-slowdown; the beats-per-watch report; long hops at least one watch.
+Save schema 7 → 8 (migrated, not refused). Prompt v0.21 (`pnpm test:live` once). Fixes the three
+playtest complaints (idle at post, "idle beside the console", the engineer at the helm).
 
-1. Day-relative time (§9): `config.time.daySeconds`, `watchesPerDay`; every need rate, meal,
-   sleep and narrator cadence rewritten in day units and converted at load; `shifts` becomes
-   `watches`. Record the knob list in the D-entry.
-2. Watch bill in the scenario with the auto-generator; `onDuty` from sections; the bell event and
-   ticker line; `CrewDef.shift` retired.
-3. Helm as duty station: `relieveHelm`/`handover` at the `standby` position, relief for needs,
-   vacancy gating of departure/approach/docking, `helmUnattended`; gangway watch at the airlock
-   `gangway` zone when docked (`meetSpeaker` finds them).
-4. Officer of the watch: rounds as the idle activity; captain's chair as the fallback idle spot.
-5. Idle-on-duty maintenance rounds for engineers; `plotCourse` at the nav terminal gating
-   departure; piloting checks with `scheduleHazard` (budget and window rules as `scheduleFault`).
-6. Thoughts/mood: `thoughtDef` content, `Actor.thoughts`, mood in the digest; the first defs
-   (stood a long watch, double watch).
-7. Sleep lengthened (~0.2 day); long hops ≥ one watch; auto-slowdown on a config list of events.
-8. Digest: "watch: White has the helm (Jax)"; `crew pacing` rerun; beats-per-watch report (§9).
+Built as two serial gate commits by one agent, then six parallel workstreams, then a tuning
+commit by the lead. (Lead's note at adoption: the D75 gate fix and the equipment perf work this
+plan treated as concurrent have both landed on `ship-life-1`; nothing is off limits for that
+reason. The calls below that leave `maxFaultWindowSeconds` alone stand, to keep the gate small;
+`faultsRemaining` is fixed by W3, see call 12.)
 
-Checkpoint: a 10-minute 1× session shows a bell, a handover and the captain on rounds.
+### Calls made
+
+1. **Day-relative units are their own serial step, Gate A, before the contracts gate.** They
+   touch every tunable and every reader; done first, on an otherwise unchanged sim, the
+   conversion is unit-exact and `crew pacing --json` must report the same `simSeconds` and legs
+   to the tick before and after. Gate B then adds every new knob in day units from the start.
+   Retuning (sleep 0.2 day, `quietTooLong` once per watch, fatigue recovery) is one lead commit
+   at integration, after the beats report, never inside a stream.
+2. **Converted at read, not at load.** `ConfigDef` is embedded in every save and the Zod schema
+   is asserted against it, so a load-time transform would need two config types. Day-relative
+   fields are typed `Days` (alias beside `Seconds` in `core/types/common.ts`) and converted
+   where read by `core/clock.ts` helpers; `restore` keeps a save's own config and fills missing
+   keys from the bundle (`save.ts` `fillConfig`), so a schema-7 save's renamed knobs come from
+   the loaded defaults and its stale keys are ignored.
+3. **The knob list.** To `Days` (or per day): `needs.hungerPerDay`, `fatiguePerDayAwake`,
+   `fatiguePerDayWorking`, `fatigueRecoveryPerDayAsleep`, `comfortPerDay`,
+   `comfortRecoveryPerDayResting`, `socialPerDay`, `socialRecoveryPerDayChatting`, `mealDays`,
+   `sleepDays`; `work.skillGainPerDay`; `urgency.routineAgingDays` (still unread, renamed for
+   consistency); `commerce.jobOfferTtlDays`, `reofferDays`, `passage.ashoreDaysMin/Max`,
+   `passage.overdueDays`; `narrator.quietTooLongDays`, `budgetRefillDays`.
+   `narrator.maxFaultWindowSeconds` keeps its name this slice: `equipment/commands.ts` reads it
+   and is under edit; it is the one narrator cadence left in seconds, named in the D-entry.
+   Stays in seconds (physical motion, dockside feel, work at a machine, host real time):
+   `movement.*`, `doors.*`, `work.switchCooldown/claimLease/timeBucket/retryBackoff`,
+   `equipment.*`, `travel.*` (stage timers, recall, locals, talk, gate, card delivery),
+   `commerce.market.buySeconds`, `haulEstimateSeconds`, `narrator.approachHookLeadSeconds`,
+   `social.chatCooldownSeconds`, `host.*`, and every machine def (`wearPerSecond`,
+   `workSeconds`, `intervalSeconds`). `time` gains `daySeconds: 1200` and `watchesPerDay: 3`.
+4. **The watch bill is authored in the scenario; sections stand the watch whose index equals
+   theirs.** `watchBill: { sections: [{ key, members }], dayworkers }`, section `i` on watch
+   while `floor(tick / watchTicks) mod watchesPerDay === i`, no modulo over sections (a bill
+   with fewer sections than watches leaves watches with nobody on, which is what the tiny test
+   fixtures already mean). Authored content must have `sections.length === time.watchesPerDay`
+   (validator). Dayworkers are on duty during `watches.dayworkerOnWatches` (`[0, 1]`). A crew
+   member not in the bill (narrator-spawned) is a dayworker. `generateWatchBill` exists for a
+   scenario without a bill (fixtures): greedy, one piloting-qualified per section, engineers
+   spread, the rest by role; pure, tested, never used by the default scenario.
+5. **`Actor.schedule` becomes `{ section?: LocalKey }`; the bill is derived from actors.** No
+   second copy in state. `CrewDef.shift` is retired; the validator's "unknown shift" rule becomes
+   the scenario's bill rules. The default bill is the design's: Red = Noor, Mara, Priya; White =
+   Jax, Tomas; Blue = Dane; dayworkers Bettina, Sunniva, Oyelaran.
+6. **Who stands the helm is the sim's, not the planner's.** `helmRoleOf(state, config, actorId)`
+   in `systems/watch/helm.ts` gives `stander | oncoming | relief | none`; the view carries it as
+   `self.watch.helmRole` and the planner's helm rule reads only that. The stander of a section is
+   the member with piloting ≥ the helm's `operatorSkill.min` who is not captain or first officer,
+   highest piloting first; else an officer with ≥ min; else anyone in the section with ≥ 1 (the
+   unqualified fallback, visible to the narrator); else the nearest available crew with ≥ min
+   from any section (the officer pulled back to the bridge is this case when the officer is
+   nearest). `oncoming` is the next section's stander from bell − `handoverLeadSeconds`.
+   `relief` is any available off-watch crew with ≥ min while a relief post is open. Helm tasks
+   are exempt from the planner's off-duty rejection and from `deferTo` (otherwise Noor yields to
+   a visible idle Mara and the junior never stands under the captain's eye). The captain is
+   never a stander while a non-officer qualifies; `requiresOperator`/`operatorSkill` are read at
+   last.
+7. **One helm plan shape, no `relieveHelm` task type.** Every `staffStation` plan on a machine
+   that has a `standby` `use` position is `moveTo standby → work handover → moveTo seat → hold
+   staff`; the handover step counts `handoverSeconds` only while someone else holds the seat and
+   is done at once otherwise, and on completion records `watch.helm.relievedAt`, which ends the
+   sitter's hold. The watch problem's task has `workerSlots: 2` so the oncoming can claim beside
+   the off-going; relief for needs is a second `stationToStaff` problem with `post: "relief"`
+   (routine class, dedupe per post). A helm hold ends when relieved, or when its problem is no
+   longer open; the old "resolved and docked or in transit" rule goes, because the watch problem
+   is now open for the whole of underway.
+8. **Vacancy gates manoeuvres and nothing else** (owner ruling): `preparingDeparture`, the end of
+   `transit`, `approaching` and `docking` wait for a manned helm; transit flies on. After
+   `helmUnattendedSeconds` empty in transit, `helmUnattended` fires once per vacancy (narrative,
+   so it reaches the digest and the ticker; not in `hookOnEvents`: the narrator reads it at its
+   next call rather than being woken for it).
+9. **Gangway watch is a personal activity, and D70 delivery does not change.** While docked the
+   section's stander holds `standWatch` at the airlock `gangway` zone (routine class, so an
+   essential need interrupts it and the course plan's helm problem outranks it). Cards still come
+   up when the captain meets the speaker; the gangway stander is the dot at the ramp, nothing
+   more this slice.
+10. **Rounds are personal activities, not tasks.** `rounds` for the officer of the watch
+    (engineering → hold → mess → bridge standby, `roundsStopSeconds` at each) and for an idle
+    on-duty engineer (every machine in `engineering`, at its repair tile), voluntary class, with a
+    `rounds` backoff of `roundsEveryDays` after each; perception does the noticing (being in the
+    compartment writes the symptom facts), so no new perception code. The officer of the watch
+    idles at the captain's chair's `use` tile between rounds; it is not a hold.
+11. **Course plotting is travel's problem.** `setCourse` (and a voyage's next hop) clears
+    `travel.coursePlotted`; `courseToPlot { toPortId }` derives one `plotCourse` task at the
+    `navStation` machine, essential class, `requiredSkills` = the helm's `operatorSkill`,
+    `plotCourseSeconds` of work scaled by skill through the existing `workRate`; the commit sets
+    `coursePlotted`, and `advanceTravel` waits for it beside the departure gate. Seconds, not
+    days: it is work at a machine like a repair step.
+12. **Hazards live in `WorldState.hazards`, owned by travel.** Kinds `debrisField`,
+    `asteroidBelt`, `ionStorm` (code enum; display names in `render.ts`); difficulty tiers
+    `easy | hard | brutal` map to `hazards.difficulty` numbers. `scheduleHazard` samples
+    `fireAtTick` in its window on the `failures` stream like `scheduleFault` and the hazard fires
+    at the first `transit` tick at or after it. Outcomes: clean, scrape (one weighted fault from
+    a machine with a catalog, pushed onto `machine.scheduledFaults` to fire next tick: the one
+    fault path, D6), delay (`routeProgress` set back by `hazards.delaySeconds × nominalSpeed`);
+    unattended is scrape and delay. `navHazard` is narrative, not hooked. Hazards have their own
+    budget (`narrator.hazardBudget`, `budget.hazardsRemaining`) because `scheduleFault` never
+    decrements `faultsRemaining` today; W3 also fixes that one line in
+    `equipment/commands.ts` (lead's change at adoption) with a test. `budgetRefillDays` is read by nothing today; Gate B adds the refill.
+13. **Thoughts are a closed key set in the sim and a required content table.** `ThoughtKey =
+    "stoodLongWatch" | "doubleWatch" | "helmCleanPass" | "helmScrape"`; `ContentBundle.thoughts:
+    Record<ThoughtKey, ThoughtDef>` (every key required, so a missing def fails validation, and
+    the three hand-built sim bundles carry the table). Mood is recomputed in the needs phase from
+    live thoughts; the only effect this slice is work speed (`mood.lowBelow/highAbove`,
+    `lowWorkSpeed/highWorkSpeed`); invitations wait for slice 4.
+14. **Long hops: the three spur legs become 400 s** (hub–Tern's Rest, Kessler–Ossory, Green
+    Meridian–Vesper); the core triangle stays 25/45/70. Pay is band × distance, so spur freight
+    pays 3–4× more; the bands are left alone and the lead judges from the pacing report.
+15. **Auto-slowdown is the web host's, keyed by view tick.** `host.slowDownOnEvents` names event
+    types; App queues `{tick}` from the worker's `events` and drops to 1× when playback reaches
+    it, highlighting the log line. Cards already pause.
+16. **The beats report is `crew beats`**, a headless N-day loop of the pacing voyage with an
+    instant narrator, reusing `pacing.ts`'s registry and content; `crew pacing` stays as it is.
+17. **Schema 8 migrates.** No geometry moved; sections come from the scenario's bill by crew def
+    id, thoughts start empty, hazards empty, the budget gains its hazard line.
+18. **The helm's `standby` position is part of the hull contract** (the plan shape depends on
+    it): the `pilotStation` def must have a `use` position; the validator says so.
+19. **Skill at the helm:** `work.skillGainPerDay` (unread today) raises piloting during a helm
+    hold only, capped at 10. Nothing else gains skill this slice.
+20. **The prompt gets a sixth lever and a watch paragraph** (v0.21); "exactly five levers" text
+    becomes six; one live run at integration.
+
+### Gate A: day-relative units (one agent, serial, first commit)
+
+Mechanical and unit-exact at `daySeconds: 1200`. `crew pacing --json --scenario both` before and
+after must agree on every `simSeconds`, every leg and every hook count; the only text change in
+the report is its header. All four checks green.
+
+- `core/types/common.ts`: `export type Days = number` beside `Seconds`.
+- `core/types/content.ts`: `time.daySeconds`, `time.watchesPerDay`; the renames of call 3 with
+  doc comments stating the cadence each implies ("1.5 per day with seekThreshold 0.5 is two
+  meals a day"). `core/clock.ts`: `daysToSeconds(config, days)`, `dayTicks(config, days)`,
+  `perDayToPerSecond(config, rate)`, `watchSeconds(config)`, `watchTicks(config)`,
+  `watchIndexAt(config, tick)` (whole watches since tick 0) and `watchOfDay(config, tick)`;
+  `clock.test.ts` covers them.
+- Readers: `systems/needs/needs.ts` (rates), `systems/work/steps.ts` (`sleepDays`),
+  `systems/work/plans.ts` and `planner/candidates.ts` (`mealDays`), `core/pipeline.ts`
+  (`quietTooLongDays`), `systems/travel/hooks.ts` (`reofferDays`), `systems/commerce/**`
+  (`jobOfferTtlDays`, passage days). `maxFaultWindowSeconds` is untouched (call 3), so
+  `systems/equipment/commands.ts` and `packages/narrator/src/lookups.ts` need no change.
+- Config: `packages/content/data/config/default.json` values converted exactly (×1/1200 or
+  ×1200), `packages/content/src/schemas/config.ts`, `crew content schemas` regenerated.
+- Fixture configs, converted exactly: `core/fixtures/tiny-content.ts` `tinyConfig`,
+  `systems/travel/fixtures.ts` `fixtureConfig`, `systems/work/fixtures/crew-deck.ts`
+  `crewConfig` (a 600 s day: `daySeconds: 600`, `watchesPerDay: 2`, so its shift windows survive
+  Gate B unchanged).
+- Tests that name the old keys: `needs.test.ts`, `work/needs-activities.test.ts`,
+  `core/kernel.test.ts`, `core/pipeline.test.ts`, `planner/boundary.test.ts`,
+  `commerce/passage.test.ts`, `content/schemas.test.ts`, `narrator/translate.test.ts` and
+  `capabilities.test.ts` (only if they read the renamed fields); `apps/cli/src/pacing.ts`
+  header prints the quiet window in seconds from days.
+
+### Gate B: contracts (same agent, serial, second commit)
+
+Everything below lands as one commit with all four checks green. Stubs are fine where behaviour
+is a workstream's; types, schemas, generated schemas, the migration, the ticker lines and the
+minimum content to keep the bundle valid are not. Every stub below is a named function in a
+file its stream owns, called from the shared file, so no stream edits `candidates.ts`, `plans.ts`,
+`steps.ts`, `labels.ts`, `render.ts` or `travel.ts` except the one named as its owner.
+
+**Sim types.**
+
+- `core/types/actor.ts`: `Schedule = { section?: LocalKey }`; `Actor.thoughts: Thought[]` with
+  `Thought = { key: ThoughtKey; value: number; expiresAtTick: Tick; refId?: EntityId }`.
+- `core/types/content.ts`: `THOUGHT_KEYS` / `ThoughtKey`; `ThoughtDef { key; label; value;
+  durationDays; stacks: boolean }`; `ContentBundle.thoughts: Readonly<Record<ThoughtKey,
+  ThoughtDef>>` (required); `HAZARD_KINDS` / `HazardKind`; `CrewDef.shift` removed;
+  `ScenarioDef.watchBill?: WatchBillDef`; `ConfigDef`: `watches { dayworkerOnWatches: number[];
+  handoverLeadSeconds; handoverSeconds; reliefMaxDays; reliefNoShowSeconds; longWatchFactor;
+  helmUnattendedSeconds; roundsStopSeconds; roundsEveryDays; plotCourseSeconds }`, `mood {
+  lowBelow; highAbove; lowWorkSpeed; highWorkSpeed }`, `hazards { difficulty: { easy; hard;
+  brutal }; delaySeconds }`, `narrator.hazardBudget`, `host.slowDownOnEvents: string[]`;
+  `shifts` removed.
+- `core/types/state.ts`: `WorldState.watch: WatchState = { lastBellWatch: number; helm: {
+  unattendedSinceTick?: Tick; relievedAt?: { tick: Tick; byActorId: ActorId } } }` (owner:
+  watch); `WorldState.hazards: ScheduledHazard[]` with `{ id: HazardId; kind; difficulty;
+  fireAtTick; causeCommandId? }` (owner: travel; `nextId.hazard`); `SCHEMA_VERSION = 8` and
+  its history line. `core/types/decisions.ts`: `budget.hazardsRemaining`,
+  `NarratorState.budgetRefilledTick`. `core/types/travel.ts`: the `docked` state gains
+  `coursePlotted?: true` (set by the plot's commit, consumed by `beginDeparture`, never
+  carried: prep only begins once it is set).
+- `core/types/work.ts`: `ProblemOwner` + `"watch"`; `ProblemPayloads.stationToStaff = {
+  machineId; post: "watch" | "relief" }`, `courseToPlot = { toPortId }`; `TASK_TYPES` +
+  `"plotCourse"`; `PERSONAL_ACTIVITIES` + `"rounds"`, `"standWatch"`; `HoldKind` + `"gangway"`;
+  `WorkStageKey` + `"handover"`, `"plot"`, `"rounds"`; `PROBLEM_KIND_SET` in
+  `systems/work/derivation.ts` follows. `core/types/view.ts`: `SelfView.watch: { section?:
+  LocalKey; onWatch: boolean; dayworker: boolean; helmRole: HelmRole; officerOfTheWatch: boolean
+  }`, `SelfView.thoughts: readonly Thought[]`.
+- Events: new `core/types/events/watch.ts` with `bell { watchIndex; sectionKey? }` (notable),
+  `helmRelieved { machineId; byActorId; fromActorId? }` (notable), `helmUnattended { machineId;
+  seconds }` (narrative), `gangwayWatchSet { actorId }` (trace), `thoughtAdded { actorId; key }`
+  (trace); `events/travel.ts` gains `coursePlotted { toPortId; actorId }` (notable),
+  `hazardScheduled { hazardId; kind }` (trace), `navHazard { hazardId; kind; difficulty;
+  standerId?; skill; outcome: "clean" | "scrape" | "delay" | "unattended" }` (narrative).
+  `events/index.ts` merges the catalog.
+- Commands: `core/types/commands/travel.ts` `scheduleHazard { kind: HazardKind; difficulty:
+  number; windowTicks: [number, number] }`; `authority.ts`: `NARRATOR_COMMAND_KINDS` +
+  `scheduleHazard`, `scenario` too; `contracts.test.ts` follows.
+- `core/thoughts.ts` (stub, owner W3): `addThought(ctx, actor, key, refId?)` throwing on an
+  unknown key, `moodOf(actor)`, `moodWorkFactor(actor, config)` returning 1. `core/world.ts`:
+  `emptyState` gains `watch`, `hazards`, the budget line; `createWorld` resolves the bill
+  (`scenario.watchBill ?? generateWatchBill(...)`, stub in `systems/watch/bill.ts` returning
+  everyone a dayworker) and passes each spawned actor's section through `scenarioSpawn` (the
+  spawn payload's actor entry gains `section?`; `core/command-handlers.ts` writes
+  `schedule: { section }`). The `budgetRefillSystem` in `core/pipeline.ts` `coreSystems`
+  (finalize phase): every `budgetRefillDays`, reset the three budgets to config and stamp
+  `budgetRefilledTick`; `pipeline.test.ts` covers it.
+- `core/migrations.ts` `7:` (D79): `schedule.shiftKey` → `{ section }` from
+  `content.scenarios[raw.scenarioId]?.watchBill` by `defId` (absent bill or unknown def: a
+  dayworker); `thoughts: []`; `watch: { lastBellWatch: watchIndexAt(tick), helm: {} }`;
+  `hazards: []`; `nextId.hazard = 1`; `budget.hazardsRemaining = config.narrator.hazardBudget`,
+  `budgetRefilledTick = tick`; every open `stationToStaff` payload gains `post: "watch"`.
+  `save.test.ts`: a schema-7 envelope (`packages/narrator/fixtures/approach.json` is one)
+  migrates and the captain is in Red; `core/invariants.ts` `checkInvariants` adds thought
+  bounds (`value` finite, `expiresAtTick` an integer) and `hazards` ids below `nextId.hazard`.
+- `systems/watch/` (new; owner W1): `duty.ts` with `isOnDuty(schedule, tick, config)` (the Gate
+  A rule of call 4; `systems/needs/shifts.ts` deleted, `needs/index.ts` and every importer
+  switched: `work/steps.ts`, `view/agentView.ts`), `bill.ts` (stub generator, `watchBillOf(state)`
+  deriving sections from actors), `helm.ts` (stubs: `helmRoleOf` → `"none"`, `whoHasTheHelm` →
+  `undefined`, `helmManned` → the old `isStaffed` rule moved here verbatim so behaviour is
+  unchanged until W1), `watch.ts` (`watchSystem`, needs phase: rings `bell` when
+  `watchIndexAt(tick) !== state.watch.lastBellWatch`; nothing else), `index.ts` with
+  `registerWatch(registry)`; `apps/web/src/worker/registry.ts` and `apps/cli/src/pacing.ts`
+  register it after needs; `packages/sim/src/index.ts` exports `registerWatch`, `isOnDuty`,
+  `watchIndexAt`, `watchOfDay`, `THOUGHT_KEYS`, `HAZARD_KINDS`.
+- `systems/travel/`: `travel.ts` imports `helmManned` from `systems/watch/helm.ts` in place of
+  its own `isStaffed`/`bridgeConsole`, `updateStaffingProblem` writes `post: "watch"` and
+  `owner: "watch"`, the docked branch gains `if (!coursePlotted(ctx)) return;` before
+  `departureCleared` (stub in new `systems/travel/course.ts`, owner W2, returning true), and
+  `continueVoyageIfFree` deletes `coursePlotted` when it sets the next hop (every hop of a
+  voyage is plotted at its waypoint); `hazards.ts` (stub, owner W3): `hazardsSystem` no-op and the `scheduleHazard` handler with
+  full validation (kind in `HAZARD_KINDS`, difficulty an integer in [1, 10], window as
+  `scheduleFault`'s against `maxFaultWindowSeconds`, `budgetExhausted` when `hazardsRemaining`
+  is 0, `preconditionFailed` unless a course is planned or the ship is underway) and an apply
+  that appends to `state.hazards`, decrements the budget and emits `hazardScheduled`;
+  `travel/index.ts` registers both; `travel/tasks.ts` derivation reads `post` into the
+  `derivationKey` (`staff:watch`, `staff:relief`) and sets `workerSlots: 2` for `watch`,
+  `requiredSkills` from the machine's `operatorSkill` with `min: 1` (the floor; call 6); a
+  `courseToPlot` derivation stub in `course.ts` returning `[]`.
+- `systems/work/`: `plans.ts` `machineTaskPlan` → `helmPlan(ctx, actor, task)` (stub in
+  `systems/watch/helm.ts`, owner W1, returning today's two-step plan) and `plotCoursePlan` (stub
+  in `course.ts`, blocked); `buildPersonalPlan` cases `rounds` → `roundsPlan` and `standWatch` →
+  `gangwayPlan` (stubs in `systems/watch/rounds.ts` (W2) and `helm.ts` (W1), blocked);
+  `steps.ts` `runStep` cases: `work` stage `handover` → `runHandover` (W1, `helm.ts`), `plot` →
+  `runPlot` (W2, `course.ts`), `rounds` → counts ticks; `holdDone` case `gangway` →
+  `gangwayHoldDone` (W1) and the `staff` case → `helmHoldDone` (W1, today's rule verbatim);
+  `workRate` multiplies by `moodWorkFactor`; `labels.ts` gains the strings of the table below
+  (no stubs: text only); `work/invariants.ts` unchanged.
+- `planner/candidates.ts`: `taskCandidate` routes `staffStation` and `plotCourse` eligibility
+  through `helmTaskAllowed(view, task)` in new `planner/helm.ts` (W1; stub returns true and
+  keeps today's behaviour) which also owns the `deferTo`/off-duty exemption; `postCandidate`
+  becomes `dutyIdleCandidate(view, config)` in new `planner/rounds.ts` (W2; stub returns today's
+  post candidate); `enumerateCandidates` adds `gangwayCandidate(view, config)` from
+  `planner/helm.ts` (stub undefined). `planner/index.ts` exports nothing new.
+- `view/agentView.ts`: `self.watch` from `helmRoleOf`/`isOnDuty`/`watchBillOf` and
+  `self.thoughts: actor.thoughts`; `toAgentViewSnapshot` carries them.
+- `core/render.ts`: ticker lines (W1–W3 write none): `bell` → "Bell. White section has the
+  watch." (no section: "Bell."); `helmRelieved` → "Jax Okonkwo relieves Noor Haddad at the helm"
+  (no `fromActorId`: "Jax Okonkwo takes the helm"); `helmUnattended` → "Nobody at the helm";
+  `coursePlotted` → "Course plotted for Kessler Drift"; `navHazard` → "Debris field: Noor Haddad
+  took us through clean" / "…: scraped through, the coolant pump took it" / "…: lost 60 s working
+  round it" / "…: nobody at the helm; scraped through and lost 60 s"; headline: docked with a
+  plan and no plotted course → "Preparing to depart for X — waiting on a course";
+  `hasOpenProblem` "waiting for someone at the helm" unchanged. `TICKER_TRACE_TYPES` unchanged.
+- `docs/CONTRACTS.md` "How work is advertised": watch owns `stationToStaff`; travel owns
+  `courseToPlot` and `cargo*`.
+
+**Content and schemas (`packages/content`).**
+
+- `schemas/crew.ts` drops `shift`; `schemas/scenario.ts` adds `watchBill` (sections ≥ 1, keys
+  distinct, members distinct across sections and dayworkers); new `schemas/thought.ts`
+  (`ThoughtDef`, `key` an enum guarded by `AssertEqual` against `ThoughtKey` in
+  `primitives.ts`, `value` in [−1, 1], `durationDays` positive); `bundle.ts` `thoughts:
+  z.strictObject` over every key; `config.ts` the new blocks and no `shifts`; `validate.ts`:
+  `checkCrew` loses the shift rule, `checkScenario` gains L2 "every bill member is in
+  `scenario.crew`, no one twice"; the L3 rules are W5's. `crew content schemas` regenerated.
+- Data: `data/thoughts/stood-long-watch.json` (−0.15, 0.5 day), `double-watch.json` (−0.25,
+  1 day), `helm-clean-pass.json` (+0.1, 0.3 day), `helm-scrape.json` (−0.1, 0.5 day); the ten
+  crew files lose `shift`; `scenarios/default.json` gets the bill of call 5; `config/default.json`
+  gets `watches { dayworkerOnWatches: [0, 1], handoverLeadSeconds: 30, handoverSeconds: 5,
+  reliefMaxDays: 0.1, reliefNoShowSeconds: 45, longWatchFactor: 1.25, helmUnattendedSeconds: 20,
+  roundsStopSeconds: 4, roundsEveryDays: 0.08, plotCourseSeconds: 20 }`, `mood { lowBelow: -0.4,
+  highAbove: 0.4, lowWorkSpeed: 0.9, highWorkSpeed: 1.05 }`, `hazards { difficulty: { easy: 3,
+  hard: 5, brutal: 7 }, delaySeconds: 60 }`, `narrator.hazardBudget: 2`, `host.slowDownOnEvents:
+  ["navHazard", "faultOccurred", "helmUnattended", "driftingChanged"]`; `loader.ts` imports the
+  thoughts; `loader.test.ts` counts.
+- Hand-built sim bundles (`tiny-content.ts`, `travel/fixtures.ts`, `work/fixtures/crew-deck.ts`,
+  `equipment/fixtures/w5-content.ts`, `core/fixtures/berth-deck.ts` if it builds one) gain
+  `thoughts` (the four defs inline) and lose crew `shift`; their crews get `schedule.section`
+  through the fixtures' spawn path (`crewConfig`'s alpha/beta become sections 0 and 1 of a two-
+  watch day, so `planner.test.ts`, `work.test.ts` and `soak.test.ts` keep their meaning);
+  `example-world.ts` actors' `schedule` and `thoughts`; `frozen-migrations.ts` untouched.
+
+**Tests the gate must fix to stay green** (literals and renames only): `needs.test.ts`
+"shifts" describe → the duty rule in `systems/watch/duty.test.ts` (same four cases plus
+dayworkers); `save.test.ts` schema-7 refusal test stays, a 7 → 8 case is added;
+`contracts.test.ts` command lists; `schemas.test.ts` and `loader.test.ts` counts;
+`kernel.test.ts`/`pipeline.test.ts` if they build `emptyState` by hand; `apps/web/src/worker/
+integration.test.ts` registers nothing new (the registry does); narrator `digest.test.ts` is
+untouched (the digest reads no new field yet); fixtures under `packages/narrator/fixtures/` are
+schema-7 saves and load through the migration (regenerated at integration, never hand-edited).
+
+### Workstreams (parallel after Gate B)
+
+No two streams edit the same file. `docs/DECISIONS.md`, `packages/content/schema-json/*`,
+`packages/content/data/config/default.json`, `packages/narrator/fixtures/*` and the dock and deck
+READMEs are the lead's at integration. Each stream's report names the files it touched, the
+D-entry text it proposes, and the beats it saw in a headless run.
+
+**W1 — Sim: sections, the helm as duty station, handover, relief, gangway.**
+Owns `packages/sim/src/systems/watch/{duty,bill,helm,watch,index}.ts` and their tests and
+fixtures (`systems/watch/fixtures/bridge-deck.ts`: a small deck with a helm that has `seat` and
+`standby`, a nav terminal, an airlock `gangway` zone, four crew in two sections),
+`systems/travel/travel.ts`, `travel.test.ts`, `travel/tasks.ts`, `travel/index.ts`,
+`systems/work/plans.ts`, `steps.ts`, `labels.ts`, `planner/helm.ts` (+ test),
+`view/agentView.ts`, `core/types/view.ts` (for `SchematicView.zones()` only).
+- `bill.ts`: `generateWatchBill(crewDefs, helmSkillMin, watchesPerDay)` (greedy of call 4) and
+  `watchBillOf(state)`; tests: nine authored crew without a bill produce three sections each with
+  a qualified stander; two crew produce one section and a dayworker.
+- `duty.ts`: section on watch by index; dayworkers by `dayworkerOnWatches`; no section and not a
+  dayworker never happens (a dayworker is "no section"); tests at the bell boundary tick.
+- `watch.ts` (`watchSystem`, needs phase, every tick): the bell with the section key; the helm
+  bookkeeping: open the `watch` problem (moved from `travel.ts`) while a course is planned or the
+  ship is underway, resolve it at `docked` with no plan; raise the `relief` problem when the
+  seat-holder's hunger, fatigue, comfort or social passes `needEssentialAbove` and no relief is
+  open, resolve it when the stander is back in the seat or `reliefMaxDays` has passed;
+  `unattendedSinceTick` and `helmUnattended` once per vacancy in transit; `stoodLongWatch` when
+  a hold passes `longWatchFactor × watch`, `doubleWatch` at 2× (via `addThought`); the gangway
+  bookkeeping needs no state.
+- `helm.ts`: `helmRoleOf`, `whoHasTheHelm(state)` (the actor whose current step is a `staff`
+  hold on a helm task and who stands on the seat tile), `helmManned` (crew, not passenger,
+  `whoHasTheHelm !== undefined`), `helmPlan` (call 7), `runHandover`, `helmHoldDone` (relieved
+  since my hold began, or problem not open), `gangwayPlan` (moveTo the `gangway` zone's first
+  tile → hold `gangway`), `gangwayHoldDone` (ship not docked, or no longer the stander);
+  piloting gain during the hold (`skillGainPerDay`, capped at 10) in `helmHoldDone`'s caller.
+- `travel.ts`: `isStaffed`, `bridgeConsole`, `checkStaffing`, `updateStaffingProblem` removed;
+  `helmManned` gates `preparingDeparture` (as today), the `transit → approaching` transition,
+  the `approaching` timer and `docking`; `tasks.ts` `workerSlots` and skills as the gate set.
+- `planner/helm.ts`: `helmTaskAllowed`: `staffStation` on the `watch` post for `stander` and
+  `oncoming`, on the `relief` post for `relief`; `plotCourse` for anyone meeting its skills (W2
+  may narrow); both exempt from off-duty and `deferTo`; `gangwayCandidate`: docked, `stander`,
+  not already on the gangway, routine class, the zone tile from the schematic (needs
+  `SchematicView.zones()` — add it to `view.ts`/`agentView.ts`, W1's).
+- Labels: "at the helm" (hold on the seat), "relieving Noor Haddad at the helm" (handover step),
+  "going to the helm" (moveTo), "on the gangway", "doing rounds" and "plotting a course to
+  Kessler Drift" (W2's activities; W1 writes the strings from `problem.payload.toPortId`).
+- Tests (`watch.test.ts`, `helm.test.ts`, on the bridge fixture and on `crewWorld`): the bell
+  rings once per watch with the right section; Noor stands Red's helm with Mara aboard; Dane
+  stands Blue's; with Noor ashore, Mara stands it; an engineer with piloting 1 never claims the
+  watch while anyone ≥ 3 is available, and does when nobody is (label "at the helm", the
+  narrator-visible fallback); at bell − 30 s the oncoming walks to standby, the handover takes
+  5 s, `helmRelieved` fires, the off-going leaves the seat and the oncoming holds it; a hungry
+  stander raises `relief`, an off-watch pilot takes it, the stander eats and comes back, the
+  relief problem resolves; a stander past survival leaves without relief; `preparingDeparture`
+  and `docking` stall while unattended and `approaching` does not start; in transit the ship
+  flies on and `helmUnattended` fires after 20 s; docked, the stander stands the gangway and
+  leaves it for the helm when a course is set; `stoodLongWatch` and `doubleWatch` land; the
+  engineer-at-the-helm regression (Priya) is a named test.
+Done when the sim suite is green and `fullSim.test.ts` (W6 fixes its pins) shows a handover at
+sea on a 400 s leg.
+
+**W2 — Sim: rounds, the officer of the watch, course plotting.**
+Owns `systems/watch/rounds.ts` (+ test), `planner/rounds.ts` (+ test), `systems/travel/course.ts`
+(+ test) and `systems/travel/command-handlers.ts` (`setCourse` clears `coursePlotted`). The
+voyage's next-hop clear is already in `travel.ts` from the gate; W2 tests it, W1 owns the file.
+- `rounds.ts`: `roundsPlan(ctx, actor)`: officer route = first compartments tagged
+  `engineering`, `cargoHold`, `mess`, then the helm's `standby` tile, a `rounds` work step of
+  `roundsStopSeconds` at each stop (a `loungeTile`-style deterministic floor tile per room);
+  engineer route = every machine in the `engineering` compartment at its `repair` (else first)
+  interaction tile; on completion a `rounds` backoff of `roundsEveryDays`.
+- `planner/rounds.ts`: `dutyIdleCandidate`: on duty and nothing else → officer of the watch
+  (`self.watch.officerOfTheWatch`: captain or first officer in the on-watch section who is not
+  the stander) → `rounds` when not backing off, else `wander` to the captain's chair's `use`
+  tile (`amenities("chair")`); engineer → `rounds` when not backing off, else today's post;
+  others → today's post. Voluntary class throughout.
+- `course.ts`: `coursePlotted(ctx)` (true when no plan, or `travel.coursePlotted`), the
+  `courseToPlot` problem raised by a small `courseSystem` (equipment phase, before travel's state
+  machine) whenever a plan exists and the flag is unset, resolved when set; derivation to
+  `plotCourse` at the `navStation` machine (operate tile; `requiredSkills` = helm
+  `operatorSkill`; essential class; `estimatedWorkSeconds: plotCourseSeconds`); `plotCoursePlan`
+  (moveTo operate → work `plot`); `runPlot` counts ticks scaled by `workRate` and on completion
+  sets `coursePlotted`, resolves the problem and emits `coursePlotted`.
+- Tests: Mara on Red's watch walks engineering → hold → mess → bridge and ends at the chair,
+  then rounds again after the cadence; Priya on duty with no task does the machine round and
+  the ticker shows nothing (trace only); a course set raises `courseToPlot`, a qualified pilot
+  plots it in `plotCourseSeconds` scaled by skill, departure prep does not begin before, and a
+  voyage's next hop raises it again at the waypoint; the headline reads "waiting on a course".
+Done when the sim suite is green and a `crewWorld` run shows the officer's rounds label.
+
+**W3 — Sim: thoughts, mood, hazards and the budget.**
+Owns `core/thoughts.ts` (+ test), `systems/needs/mood.ts` (+ test), `systems/needs/index.ts`,
+`systems/needs/invariants.ts`, `systems/travel/hazards.ts` (+ test), `systems/travel/invariants.ts`,
+and `systems/equipment/commands.ts` for the `faultsRemaining` decrement only (+ a test).
+- `core/thoughts.ts`: `addThought` (a non-stacking key refreshes the existing thought's expiry;
+  a stacking one appends), `moodOf` = clamp(Σ value, −1, 1) over unexpired thoughts,
+  `moodWorkFactor`. `mood.ts` (`moodSystem`, needs phase): prune expired, write `actor.mood`.
+  Invariants: `mood` in [−1, 1] and equal to `moodOf`.
+- `hazards.ts`: `hazardsSystem` (equipment phase, after travel's state machine): fire every
+  hazard with `fireAtTick <= tick` while `stage === "transit"`; roll against
+  `whoHasTheHelm(state)`'s piloting: `p = clamp((skill − difficulty + 5) / 10, 0.05, 0.95)`,
+  `r = rng.float("failures")`: clean if `r < p`, else scrape if `r < p + (1 − p) / 2`, else
+  delay; unattended: scrape and delay; scrape pushes one weighted fault (from the machine with a
+  catalog chosen by `rng.weighted` over catalog sizes) onto `scheduledFaults` with `fireAtTick:
+  tick + 1`; delay sets `routeProgress` back by `delaySeconds × nominalSpeed` (floored at 0);
+  `navHazard` emitted with the stander and skill; `helmCleanPass`/`helmScrape` thoughts to the
+  stander; the hazard is removed. Invariants: `fireAtTick` an integer, kinds in the enum.
+- Tests: a scheduled hazard in port waits for transit; clean/scrape/delay by seeded rolls; an
+  unattended helm takes both; the fault lands through the equipment path next tick; the budget
+  decrements and refills after `budgetRefillDays`; the command rejects an unknown kind, an
+  oversize window and an exhausted budget.
+Done when the sim suite is green.
+
+**W4 — Narrator: the sixth lever, the watch in the digest, mood.**
+Owns `packages/narrator/**` and `packages/server/src/routes/narrator*.test.ts`.
+- `contract.ts`: `scheduleHazard` intent `{ kind, difficulty: "easy" | "hard" | "brutal",
+  window }` with `HAZARD_DIFFICULTIES`; `translate.ts`: `translateHazard` (kind in
+  `HAZARD_KINDS`, window from `faultWindowTicks`, budget `hazardsRemaining − tally.hazards`,
+  dropped with a reason unless a course is planned or the ship is underway); `capabilities.ts`:
+  "six levers", "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check
+  for whoever has the helm" with kinds, tiers, window words, the budget, and that the sim rolls
+  it and the narrator never decides the outcome; `digest.ts`: Ship section `watch: White section
+  has the watch; Jax Okonkwo has the helm (piloting 8); officer of the watch: none; next bell in
+  ~120s` (docked: `…; Noor Haddad on the gangway`), crew lines gain `[Red, on watch]` /
+  `[dayworker, off duty]` and `mood: low (stood a long watch, double watch)` from the top three
+  thoughts by |value|, the budget section its hazard line; `prompts/system.ts` v0.21: a watch
+  paragraph (three watches, who has the helm is in the digest, `helmUnattended` is the ship's
+  own failing and a reason, a hazard is the helm's stakes and is placed when the leg and the
+  person at the helm make it a story, never twice in a row, never while another fault is
+  unrepaired), "six levers"; `prompts/hooks.ts` quietTooLong may place a hazard on a long leg.
+- Tests: `translate.test.ts` hazard cases (window bounds, budget, not docked without a course,
+  unknown kind); `capabilities.test.ts` text; `digest.test.ts` watch and mood lines on a
+  fixture with a bill; `run.test.ts` and `kernel-integration.test.ts` on regenerated fixtures;
+  server tests on the new command kind.
+Done when the narrator and server suites are green; the lead runs `pnpm test:live` once.
+
+**W5 — Content: validator rules, long hops, hull contract.**
+Owns `packages/content/src/schemas/validate.ts`, `validate-hull.ts`, their tests,
+`packages/content/data/ports/*.json` and `README`s under `data/`.
+- L3 `watchBill`: `sections.length === config.time.watchesPerDay`; every section has a member
+  whose piloting ≥ the deck's `pilotStation` `operatorSkill.min` ("no qualified helm-stander in
+  section Blue"); a scenario without a bill is allowed (the generator) only when its crew ≤ 3
+  (fixtures), else an error naming the generator's output as the suggested bill.
+- Hull contract: the `pilotStation` def has a `use` position besides its `operate` one
+  (`standby`); the deck has an `airlock` zone tagged `gangway` with ≥ 1 tile; a `chair` placed
+  in the `bridge` compartment is required (the officer's idle tile).
+- Ports: the three spur legs to 400 s both ways (`crossroads-hub ↔ terns-rest`, `kessler-drift
+  ↔ ossory-station`, `green-meridian ↔ vesper-gate`); `loader.test.ts` route symmetry stays.
+- Tests: one failing synthetic case per rule; the authored bundle passes.
+Done when `crew content validate` is green and every rule has a failing test.
+
+**W6 — Web and CLI: auto-slowdown, the inspector, the clock, the beats report, test pins.**
+Owns `apps/web/**` (except `worker/registry.ts`, the gate's) and `apps/cli/**`.
+- `App.tsx`: a `slowdownRef` queue filled from `events` messages whose `type` is in
+  `bundle.config.host.slowDownOnEvents` (`{ tick, text }` via `describeEvent`); in the playback
+  `onStep`, when `viewTick >= head.tick` and `speed > 1`: `onSetSpeed(1)` and mark the matching
+  log entry (`log.ts` `LogEntry.highlight?: true`, `Log.tsx` styles it, `styles.css`); a toast
+  "Slowed to 1×: Debris field". `TopBar.tsx`: the clock reads `D1 W2 3:21` from
+  `watchOfDay`/`watchIndexAt` (tickRate and daySeconds from the bundle). `Inspector.tsx`: Mood
+  as a word (`actorWords.ts`: low < −0.4, high > 0.4, else steady) with the top three thoughts'
+  labels from `bundle.thoughts`; a "Watch" line (section, on/off watch, helm role when not
+  `none`). Tests: `log.test.ts` highlight, `playback.test.ts` unchanged, `Inspector.test.tsx`
+  and `actorWords.test.ts`.
+- `apps/cli/src/beats.ts` (+ `beats.test.ts`): `crew beats [--days 3] [--seed 1] [--scenario
+  plain|freight] [--json]`: the pacing voyage repeated until N days have elapsed, hooks answered
+  at once with no commands, decisions by their left side; report per watch (mean and spread):
+  bells, handovers (`helmRelieved`), meals (`ateMeal`), faults (`faultOccurred`), hazards
+  (`navHazard`), cards (`decisionPending`), conversations; per person the share of sim time by
+  label class (helm, gangway, rounds, hauling, repairing, asleep, eating, resting or chatting,
+  idle, walking) and the longest idle stretch; helm-unattended seconds; `pacing.ts` exports
+  `loadPacingContent` and `createPacingRegistry` for it; `index.ts` dispatches `beats`. Test: a
+  one-day run completes, reports three bells and at least one handover.
+- Test pins: `fullSim.test.ts` prep bound (the stander now walks from the gangway, two rooms
+  away: still under `prepareDepartureSeconds + 2` since the problem opens at plan time; if not,
+  the bound moves to the measured walk and the comment says why), the 400 s legs in its tick
+  budgets, "does not stall…" case; `integration.test.ts` registers the watch; `dockside.test.ts`
+  and `captain-ashore.test.ts` (the captain on rounds between asks); `pacing.test.ts`
+  hook-count expectations (fewer `quietTooLong` once the lead retunes; W6 leaves them exact for
+  the gate values and the lead moves them with the tuning commit).
+Done when the web and CLI suites are green, `crew beats --days 1` runs, and a browser run at 8×
+drops to 1× on the first fault.
+
+### Integration order
+
+1. **Gate A** on `ship-life-2`: the four checks; `crew pacing --json --scenario both` saved
+   before and diffed after (identical but the header).
+2. **Gate B**: the four checks; `crew content validate`; a browser smoke run (bells in the log,
+   everything else as before: the stubs keep today's behaviour).
+3. **W5** (content) first among the streams: its 400 s spur legs are what make a handover at
+   sea observable in every later check; the four checks; `crew content validate` must report
+   nothing (its hull rules already hold on the gate content).
+4. **W1**, then **W2**, then **W3** (sim): the four checks after each; `crew pacing` after W1
+   shows `helmRelieved` on the Kessler–Ossory leg.
+5. **W4** (narrator): regenerate `packages/narrator/fixtures/*` with `crew narrator fixtures`
+   first (they are schema-7 saves and must become schema-8 with a bill), then the four checks;
+   `pnpm test:live` once.
+6. **W6**: the four checks; `crew beats --days 3 --scenario both` and `crew pacing`, numbers
+   recorded for the D-entry.
+7. **Tuning commit (lead):** `needs.sleepDays` 0.2, `fatigueRecoveryPerDayAsleep` so a sleep
+   clears a day's fatigue (≈ `(1 − wakeBelow) / sleepDays`), `narrator.quietTooLongDays` 1/3
+   (once per watch), `pacing.test.ts` expectations moved; `crew beats` rerun and both reports
+   kept beside the D-entry.
+8. D-entries, `README.md` note ("three watches"), deploy via the `ops` agent, phone playtest:
+   a 10-minute 1× session shows a bell, a handover and the captain on rounds.
+
+### Risks and hidden coupling
+
+- **Hot files with one owner and gate stubs**: `planner/candidates.ts`, `systems/work/plans.ts`,
+  `steps.ts`, `labels.ts`, `core/render.ts`, `systems/travel/travel.ts`. The gate writes every
+  call site; W1 owns five of them; W2 and W3 reach them only through their own files
+  (`course.ts`, `rounds.ts`, `hazards.ts`, `core/thoughts.ts`). A stream that finds it needs a
+  line in another's file asks the lead, who adds it at integration.
+- **Concurrent edits elsewhere**: `systems/travel/departure-gate.ts` (D75) and
+  `systems/equipment/**`. `travel.ts` calls `departureCleared` unchanged; the scrape writes only
+  `machine.scheduledFaults` (the inbox `scheduleFault` already writes from outside the
+  equipment tick); `maxFaultWindowSeconds` keeps its name because `equipment/commands.ts` reads
+  it. If D75 lands after Gate B, the gate's `travel.ts` diff is a three-line merge.
+- **`deferTo` and the off-duty rule would silently defeat the bill**: a helm task with a skill
+  requirement makes Noor defer to a visible idle Mara, and an off-duty oncoming cannot claim
+  before the bell. Both exemptions live in `planner/helm.ts` and have named tests.
+- **The seat handover is a reservation race**: the oncoming's `moveTo seat` runs while the
+  off-going still occupies it; spatial's bounded wait on an occupied interaction position
+  (`positionTaken` → `occupiedPosition`) must outlast the one or two ticks the off-going needs
+  to go idle and step away. W1 measures it on the bridge fixture; if it fails, the handover step
+  itself vacates the seat (the off-going's hold ends and their next planner tick moves them).
+- **The watch problem now spans transit**, so a `staffStation` hold no longer ends on
+  "resolved and in transit"; anything that counted on the pilot leaving the helm in transit
+  (`fullSim.test.ts` L189 comments, the haul tests around L307) is W6's to re-pin.
+- **`crewConfig`'s alpha/beta windows are the fixture's whole duty model**; Gate A's 600 s day
+  with two watches and Gate B's two sections keep `planner.test.ts`, `work.test.ts` and
+  `soak.test.ts` meaning what they meant. `tinyConfig`'s single `alpha` on `[0, 300)` of 600 is
+  one section of a two-watch day (call 4: no modulo).
+- **Fixture bundles must carry `thoughts`** (required in `ContentBundle`): five hand-built
+  bundles; a missed one fails at `createWorld` with a clear message, not silently.
+- **Narrator fixtures are schema-7 kernel saves**; they load through the migration (a test
+  for the migration in itself) but must be regenerated before W4's tests pin their text.
+- **The pay band scales with distance**: 400 s spurs pay 3–4× the old spur runs; `pacing`
+  freight uses hub → Ossory, so the report's money column moves. Flagged for the lead, bands
+  untouched.
+- **Narrator call budget**: `quietTooLongDays` at 1/3 day cuts quiet calls by ~6× against
+  today's 60 s; `helmUnattended` and `navHazard` are narrative (they reset the quiet timer and
+  appear in the digest) but not hooked, so no new call sources; `pacing.test.ts` pins hook
+  counts and moves with the tuning commit, not before.
+- **Counts and literals pinned in tests**: crew 9 unchanged; `loader.test.ts` crew defs 10 and
+  now `thoughts` 4; `contracts.test.ts` command lists; `capabilities.test.ts` "five levers";
+  `digest.test.ts` the Ship section's line order; `index.test.ts` CLI usage string gains
+  `beats`.
+- **Save config shape**: a schema-7 save's embedded config keeps `shifts` and the per-second
+  keys; `fillConfig` adds the new keys from the bundle and the kernel never reads the old ones.
+  No migration touches the envelope's config, by design; the `configHash` warning fires once.
+- **Dayworkers sleep in the gap**: with `dayworkerOnWatches: [0, 1]` three people are off during
+  the third watch only; the beats report's longest-idle column is the tripwire for whether the
+  cook and medic need an earlier window before slice 3 gives them work.
+- **`faultsRemaining` is never decremented** (pre-existing: `scheduleFault`'s apply does not
+  touch it) and `budgetRefillDays` refills a budget that never drains for faults. Hazards do it
+  right; W3 makes the one-line fix for faults in `equipment/commands.ts` and the D-entry names it.
+- **`maintenance.intervalSeconds` is unread** (maintenance is condition-driven); engineers'
+  rounds do not change that, and a reader expecting rounds to service machines is wrong until
+  slice 5's diagnostics.
+
+### D-entries for slice 2 (D76 onward; D75 is the departure-gate fix)
+
+- **D76.** Time is counted in fractions of the ship's day: `time.daySeconds` and
+  `watchesPerDay` are the two knobs, every need rate, meal, sleep, offer, passage and narrator
+  cadence is authored in days and converted where read; physical motion, work at a machine,
+  dockside timings and host real time stay in seconds (the list); the spur legs are one watch
+  long; fast-forward drops to 1× on a config list of events, when the player sees them;
+  `crew beats` measures beats per watch and is the tuning instrument.
+- **D77.** Watches replace shifts: three sections on a watch bill in the scenario, the bell in
+  the ticker, dayworkers; the helm is the duty station (the sim designates the stander by the
+  bill and skill, the captain never stands while a hand qualifies; handover at the standby
+  position; relief for needs; vacancy gates manoeuvres and nothing else; `helmUnattended`);
+  gangway watch in port; the officer of the watch walks rounds and idles at the chair;
+  engineers do maintenance rounds; piloting is learned at the helm.
+- **D78.** Course plotting is part of departure (`courseToPlot` at the nav terminal, per hop);
+  piloting checks: narrator `scheduleHazard` is the sixth lever, kinds and tiers, fired in
+  transit, rolled by the sim against whoever has the helm, outcomes clean, scrape (through the
+  fault path), delay; its own budget, and the budget refill that D6 promised now runs.
+- **D79.** Thoughts and mood: a closed key set, content defs with values and durations, mood the
+  clamped sum, work speed the only effect yet; the first four thoughts; save schema 8 migrates
+  schema 7 (sections from the bill, empty thoughts and hazards).
 
 ## Slice 3: Mess call and dirt
 
@@ -497,8 +1070,9 @@ Checkpoint: adding a station is a JSON file.
 
 - **Slice 1 is the geometry move**; everything after builds on Mk2, so its playtest must confirm
   the layout reads on a phone before slice 2 adds motion to it.
-- **Day-relative units (slice 2) touch every tunable**; do the conversion in one commit with a
-  before/after `crew pacing` and the beats report, or tuning drifts silently.
+- **Day-relative units (slice 2) touch every tunable**; slice 2's Gate A does the conversion
+  alone, unit-exact, with a before/after `crew pacing`; retuning is a separate lead commit
+  after the beats report, or tuning drifts silently.
 - **Content volume** in slices 3–4 (items, activities, thoughts, topics) is where the validator's
   L2 cross-reference rules earn their keep; add rules with each new table.
 - **Narrator prompt churn**: slices 2 and 4 both change prompts; budget a live run each.
