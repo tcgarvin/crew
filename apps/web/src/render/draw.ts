@@ -33,6 +33,7 @@ import {
   drawSky,
 } from "./scenery";
 import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
+import { disc } from "./shapes";
 import { type StarLayer, drawStars } from "./stars";
 
 /**
@@ -351,9 +352,7 @@ function drawActorDots(
   for (const actor of frame.actors) {
     const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
     ctx.fillStyle = actorDotColor(actor);
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, cx, cy, radius);
     if (actor.passenger) {
       ctx.strokeStyle = PASSENGER_RIM_COLOR;
       ctx.lineWidth = 1.5;

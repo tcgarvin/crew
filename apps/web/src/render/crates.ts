@@ -5,6 +5,7 @@
  */
 import type { CargoClass, RenderItem, RenderItemKind } from "@crew/sim";
 import { TEXT_COLOR } from "./screen";
+import { segment } from "./shapes";
 
 /** Polish A (D28): crate colour per freight class; other kinds get one colour each. */
 export const CARGO_COLORS: Readonly<Record<CargoClass, string>> = {
@@ -81,10 +82,7 @@ export function drawCrate(
     ctx.strokeRect(x, y, size, size);
     if (size >= 9) {
       // A strap across the lid, so it reads as a crate rather than a machine tile.
-      ctx.beginPath();
-      ctx.moveTo(x, cy);
-      ctx.lineTo(x + size, cy);
-      ctx.stroke();
+      segment(ctx, x, cy, x + size, cy);
     }
   }
   if (selected) {
@@ -94,17 +92,17 @@ export function drawCrate(
   }
 }
 
-/**
- * D65: a hand truck (or, D68, a dock hand's trolley) beside the person pushing it: an upright
- * handle and a toe plate with the crates stacked on it, one colour each (two to a row, at most two
- * rows; a count tag says how many when there are more than one).
- */
 /** How far a loaded truck drawn at `size` (`drawLoadedTruck`) rises above its pusher's dot, px. */
 export function loadedTruckRise(size: number): number {
   // Handle top: base (footY + 0.45 size) less two crates (0.6 size each) and 4px.
   return size * 0.75 + 4;
 }
 
+/**
+ * D65: a hand truck (or, D68, a dock hand's trolley) beside the person pushing it: an upright
+ * handle and a toe plate with the crates stacked on it, one colour each (two to a row, at most two
+ * rows; a count tag says how many when there are more than one).
+ */
 export function drawLoadedTruck(
   ctx: CanvasRenderingContext2D,
   x: number,

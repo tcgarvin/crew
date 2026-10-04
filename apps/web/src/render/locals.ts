@@ -13,6 +13,7 @@ import type { RenderDockProp, RenderLocal } from "@crew/sim";
 import { BLACK, mixHex } from "./color";
 import { CARGO_COLORS, drawCrate, drawLoadedTruck, itemColor } from "./crates";
 import { type ViewTransform, carriedSize, dotRadius, toScreenPx } from "./screen";
+import { disc } from "./shapes";
 
 /**
  * Muted, mid-light hues, far from crew gold (`#f2c14e`) and the passenger's pale `#dfe9f3`, and
@@ -54,9 +55,7 @@ export function drawLocalDots(
     const [cx, cy] = toScreenPx(t, local.x, local.y, rotated, viewportWidth);
     const look = localLook(local.lookSeed);
     ctx.fillStyle = look.fill;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, cx, cy, radius);
     ctx.strokeStyle = look.rim;
     ctx.lineWidth = 1.5;
     ctx.stroke();
