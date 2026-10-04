@@ -121,6 +121,8 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       nominalSpeed: 1,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      // D80: no limp unless a test turns it on.
+      limpSpeedFraction: 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
       dockHandGiveUpSeconds: 30,
@@ -144,7 +146,8 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
         ashoreDaysMax: 3 / day,
         overdueDays: 10 / day,
       },
-      // D80: off unless a test turns it on.
+      // D80: off unless a test turns them on.
+      sparesReserve: 0,
       foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },

@@ -936,6 +936,13 @@ export interface ConfigDef {
      */
     readonly departureMinOutput: number;
     /**
+     * D80: share of `nominalSpeed` a ship keeps in transit while its engines are below it and
+     * no repair can bring them back with what is aboard (the parts or a tool are not there): the
+     * engineer coaxes the engine along, so a lost part strands the ship for a while, never for
+     * good. 0 drifts as before.
+     */
+    readonly limpSpeedFraction: number;
+    /**
      * D61: how long departure prep calls people on the dock to come aboard before the dock crew
      * bring up whoever is still there, so a departure is never held forever by someone who
      * cannot (or will not) walk back.
@@ -1011,6 +1018,12 @@ export interface ConfigDef {
      * (`reserveLow`, bought like a part). `lowBelowDays` 0 turns it off.
      */
     readonly foodReserve: { readonly lowBelowDays: Days; readonly restockToDays: Days };
+    /**
+     * D80: units of each `spare`-tagged item the ship keeps aboard. Docked at a port whose market
+     * sells one, a shortfall is bought (`reserveLow`, routine), so a fault far from port finds
+     * its part aboard. 0 keeps no reserve.
+     */
+    readonly sparesReserve: number;
     /** D47: the parts market. */
     readonly market: {
       /** Multipliers over a port's content price for the narrator's `stockMarket` price tiers. */

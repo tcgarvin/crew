@@ -13,7 +13,7 @@ import { createKernel } from "../../core/kernel";
 import { createRegistry } from "../../core/registry";
 import type { ConfigDef, ContentBundle } from "../../core/types/content";
 import type { SimEvent } from "../../core/types/events";
-import type { HookId } from "../../core/types/ids";
+import type { HookId, ItemDefId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerEquipmentSystems } from "../equipment/register";
@@ -36,12 +36,17 @@ import { foodDaysAboard, reserveShortfalls } from "./reserve";
 
 const PORT = TINY.port;
 const RATION_PRICE = 2;
+const SPARES = "item.test.spares" as ItemDefId;
+const SPARE_PRICE = 50;
 
 interface ReserveOptions {
   /** Rations the dock's market sells (no line at all when undefined). */
   readonly rationStock?: number;
   readonly lowBelowDays?: number;
   readonly restockToDays?: number;
+  /** Spares the dock's market sells (no line at all when undefined). */
+  readonly spareStock?: number;
+  readonly sparesReserve?: number;
 }
 
 function reserveConfig(options: ReserveOptions): ConfigDef {
@@ -50,6 +55,7 @@ function reserveConfig(options: ReserveOptions): ConfigDef {
     ...base,
     commerce: {
       ...base.commerce,
+      sparesReserve: options.sparesReserve ?? 0,
       foodReserve: {
         lowBelowDays: options.lowBelowDays ?? 4,
         restockToDays: options.restockToDays ?? 6,
@@ -70,10 +76,26 @@ function reserveContent(config: ConfigDef, options: ReserveOptions): ContentBund
       ...base.ports,
       [PORT]: {
         ...port,
-        market:
-          options.rationStock === undefined
+        market: [
+          ...(options.rationStock === undefined
             ? []
-            : [{ itemDefId: TINY.rations, count: options.rationStock, price: RATION_PRICE }],
+            : [{ itemDefId: TINY.rations, count: options.rationStock, price: RATION_PRICE }]),
+          ...(options.spareStock === undefined
+            ? []
+            : [{ itemDefId: SPARES, count: options.spareStock, price: SPARE_PRICE }]),
+        ],
+      },
+    },
+    items: {
+      ...base.items,
+      [SPARES]: {
+        id: SPARES,
+        name: "Spare Parts",
+        stacking: "stackable",
+        maxStack: 20,
+        tags: ["spare"],
+        toolKinds: [],
+        mass: 0.5,
       },
     },
     scenarios: { ...base.scenarios, [CREW.scenario2]: { ...scenario, startingMoney: 500 } },
@@ -208,5 +230,52 @@ describe("food reserve (D80): days of the crew's hunger aboard", () => {
     expect(rationStacks(world).reduce((a, b) => a + b, 0)).toBeGreaterThan(before);
     run(tw, 20);
     expect(reserveProblems(world).filter((p) => p.status === "open")).toEqual([]);
+  });
+});
+
+describe("spares reserve (D80): units of each spare kept aboard", () => {
+  function sparesAboard(world: World): number {
+    return Object.values(world.state.items)
+      .filter((i) => i.defId === SPARES && i.location.kind !== "inExternalStore")
+      .reduce((n, i) => n + (i.stacking === "stack" ? i.count : 1), 0);
+  }
+
+  it("wants the shortfall to the reserve of each spare the market here sells", () => {
+    const { world } = reserveWorld({ spareStock: 4, sparesReserve: 2 });
+    const ctx = { state: world.state, content: world.content, config: world.config.values };
+    expect(reserveShortfalls(ctx, PORT)).toEqual([{ itemDefId: SPARES, count: 2 }]);
+    const off = reserveWorld({ spareStock: 4, sparesReserve: 0 });
+    const offCtx = {
+      state: off.world.state,
+      content: off.world.content,
+      config: off.world.config.values,
+    };
+    expect(reserveShortfalls(offCtx, PORT)).toEqual([]);
+  });
+
+  it("the crew buy the reserve with nothing broken, and nothing more once it is aboard", () => {
+    const tw = reserveWorld({ spareStock: 4, sparesReserve: 2 });
+    const { world } = tw;
+    run(tw, 2);
+    expect(reserveProblems(world).filter((p) => p.status === "open")).toMatchObject([
+      { baseUrgency: "routineObligation", payload: { itemDefId: SPARES, count: 2 } },
+    ]);
+    const events = run(tw, TWO_MINUTES, (w) =>
+      reserveProblems(w).some((p) => p.status === "resolved"),
+    );
+    expect(events.find((e) => e.type === "partsBought")).toMatchObject({
+      payload: { itemDefId: SPARES, count: 2, cost: 2 * SPARE_PRICE },
+    });
+    expect(sparesAboard(world)).toBe(2);
+    run(tw, 200);
+    expect(reserveProblems(world).filter((p) => p.status === "open")).toEqual([]);
+    expect(sparesAboard(world)).toBe(2);
+    expect(world.state.money.balance).toBe(500 - 2 * SPARE_PRICE);
+  });
+
+  it("raises nothing where the market has no spares", () => {
+    const tw = reserveWorld({ spareStock: 0, sparesReserve: 2 });
+    run(tw, 20);
+    expect(reserveProblems(tw.world)).toEqual([]);
   });
 });

@@ -87,6 +87,7 @@
     "nominalSpeed": 1,
     "staffEstimateSeconds": 0,
     "departureMinOutput": 0.5,
+    "limpSpeedFraction": 0.2,
     "recallAboardSeconds": 60,
     "localShuffleSeconds": 8,
     "dockHandGiveUpSeconds": 30,
@@ -127,6 +128,7 @@
       "ashoreDaysMax": 0.15,
       "overdueDays": 0.1
     },
+    "sparesReserve": 2,
     "foodReserve": {
       "lowBelowDays": 2,
       "restockToDays": 5
@@ -152,6 +154,7 @@
     "budgetRefillDays": 0.25,
     "hookOnEvents": [
       "driftingChanged",
+      "shipLimping",
       "contractCompleted",
       "departureRiskAccepted",
       "departureHoldLifted",

@@ -1,4 +1,3 @@
-import { allocateId } from "../../core/ids";
 /**
  * D80: the stores the ship keeps aboard, bought at port like a part (D47) when they run low.
  *
@@ -9,11 +8,16 @@ import { allocateId } from "../../core/ids";
  * same `buyParts` task it derives for `partsNeeded` (`tasks.ts`). Ship-life slice 3's
  * `provisionsLow` has the same shape and replaces the food rule when the galley cooks.
  *
+ * Spares are reckoned in units: each `spare`-tagged item the market sells is kept at
+ * `commerce.sparesReserve` units aboard, so a fault far from port finds its part in the hold.
+ * A repair short of a part right now is `partsNeeded` (D47) and is bought on top of this.
+ *
  * Raised, revised and settled against truth every tick, and only while docked at a port whose
  * market has the item in stock: underway, or where nothing is for sale, the crew can do nothing
  * about it, so there is no problem to show. The purchase settles it at the counter
  * (`market.ts`); the next tick's count against what is aboard confirms it.
  */
+import { allocateId } from "../../core/ids";
 import { effectiveMarket } from "../../core/markets";
 import type { ItemDefId, PortDefId, ProblemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
@@ -85,13 +89,27 @@ function foodShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveSho
   return units > 0 ? [{ itemDefId: food.id, count: units }] : [];
 }
 
+/** Each `spare`-tagged item sold here that the ship holds fewer than the reserve of. */
+function spareShortfalls(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
+  const reserve = ctx.config.commerce.sparesReserve;
+  if (reserve <= 0) return [];
+  const aboard = unitsAboard(ctx.state);
+  const short: ReserveShortfall[] = [];
+  for (const defId of stock) {
+    if (ctx.content.items[defId]?.tags.includes("spare") !== true) continue;
+    const missing = reserve - (aboard.get(defId) ?? 0);
+    if (missing > 0) short.push({ itemDefId: defId, count: missing });
+  }
+  return short;
+}
+
 /**
  * D80: what the ship should buy at `portId` to keep its reserves, among what the market there has
  * in stock. Empty when nothing is low or nothing that would help is for sale.
  */
 export function reserveShortfalls(ctx: ReserveCtx, portId: PortDefId): ReserveShortfall[] {
   const stock = inStock(ctx, portId);
-  return [...foodShortfall(ctx, stock)];
+  return [...foodShortfall(ctx, stock), ...spareShortfalls(ctx, stock)];
 }
 
 const dedupeKeyOf = (itemDefId: ItemDefId): string => `reserveLow:${itemDefId}`;

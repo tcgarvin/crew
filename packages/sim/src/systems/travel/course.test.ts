@@ -96,9 +96,9 @@ describe("course plotting (D78)", () => {
       estimatedWorkSeconds: 20,
       workerSlots: 1,
     });
-    expect(shipHeadline(world.state, world.content, 1)).toBe(
-      "Preparing to depart for Far Dock — waiting on a course",
-    );
+    expect(
+      shipHeadline(world.state, world.content, { nominalSpeed: 1, limpSpeedFraction: 0 }),
+    ).toBe("Preparing to depart for Far Dock — waiting on a course");
   });
 
   it("Mara plots it in plotCourseSeconds scaled by her piloting, and departure prep waits for it", () => {

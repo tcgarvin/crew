@@ -106,7 +106,7 @@ function underway(
 }
 
 function headline(state: WorldState, content = tinyTestWorld().world.content): string {
-  return shipHeadline(state, content, 1);
+  return shipHeadline(state, content, { nominalSpeed: 1, limpSpeedFraction: 0 });
 }
 
 describe("shipHeadline", () => {

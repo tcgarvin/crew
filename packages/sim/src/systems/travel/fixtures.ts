@@ -63,6 +63,8 @@ export interface FixtureConfigOverrides {
   hookOnEvents?: readonly string[];
   maxCratesPerJob?: number;
   passage?: ConfigDef["commerce"]["passage"];
+  /** D80: `travel.limpSpeedFraction` (0, no limp, by default). */
+  limpSpeedFraction?: number;
 }
 
 export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef {
@@ -137,6 +139,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       nominalSpeed: 5,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      // D80: no limp unless a test turns it on.
+      limpSpeedFraction: overrides.limpSpeedFraction ?? 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
       dockHandGiveUpSeconds: 30,
@@ -162,7 +166,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         ashoreDaysMax: 3 / FIXTURE_DAY,
         overdueDays: 10 / FIXTURE_DAY,
       },
-      // D80: off unless a test turns it on.
+      // D80: off unless a test turns them on.
+      sparesReserve: 0,
       foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },

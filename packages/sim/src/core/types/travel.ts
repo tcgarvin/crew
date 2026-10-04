@@ -83,8 +83,18 @@ export type TravelState =
       /** Route distance covered in transit, same units as `PortDef.routes.distance`. Never resets. */
       routeProgress: number;
       routeDistance: number;
-      /** Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed). */
+      /**
+       * Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed), unless
+       * the ship is `limping`.
+       */
       drifting: boolean;
+      /**
+       * D80, `transit` only: the engines are below `travel.limpSpeedFraction` and no repair can
+       * bring them back with what is aboard, so the ship makes way at that fraction of
+       * `nominalSpeed` (`shipLimping` said so when it began). Absent otherwise; every later
+       * stage builds a fresh object without it.
+       */
+      limping?: true;
       stageStartedTick: Tick;
       /**
        * D61, `preparingDeparture` only: the tick prep first called someone on the dock aboard.

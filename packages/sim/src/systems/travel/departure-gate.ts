@@ -154,14 +154,25 @@ function departureBound(travel: TravelState): PortDefId | undefined {
   return travel.stage === "docked" ? travel.plannedDestinationId : travel.toPortId;
 }
 
-/** D71: why holding for `impairment` would never end, or `undefined` when its repair can finish. */
-function impairmentOutOfReach(ctx: GateCtx, impairment: Impairment): RepairOutOfReach | undefined {
-  const machine = ctx.state.machines[impairment.machineId];
+/**
+ * D71: why `machineId`'s impairment cannot be cleared by a repair the crew can do with what is
+ * aboard and what the market at `portId` sells now (`undefined`: no market, as under way), or
+ * `undefined` when it can, or when the machine is not impaired. The gate asks it of the port the
+ * ship is at; D80's limp asks it under way.
+ */
+export function impairmentOutOfReach(
+  ctx: GateCtx,
+  machineId: MachineId,
+  portId: PortDefId | undefined,
+): RepairOutOfReach | undefined {
+  const machine = ctx.state.machines[machineId];
   const def = machine === undefined ? undefined : ctx.content.machines[machine.defId];
   if (machine === undefined || def === undefined) return undefined;
+  const impairment = impairmentOf(ctx, machine, def);
+  if (impairment === undefined) return undefined;
   const faultKeys = heldForFaults(machine, def, impairment.reason);
   if (faultKeys.size === 0) return undefined;
-  return repairOutOfReach(ctx.state, ctx.content, machine, def, faultKeys, portHere(ctx));
+  return repairOutOfReach(ctx.state, ctx.content, machine, def, faultKeys, portId);
 }
 
 function worstOf(found: readonly Impairment[]): Impairment | undefined {
@@ -260,7 +271,7 @@ export function departureCleared(ctx: StepCtx): boolean {
   if (gateDecisionPending(ctx)) return false;
   const outOfReach = new Map<Impairment, RepairOutOfReach>();
   for (const impairment of found) {
-    const why = impairmentOutOfReach(ctx, impairment);
+    const why = impairmentOutOfReach(ctx, impairment.machineId, portHere(ctx));
     if (why !== undefined) outOfReach.set(impairment, why);
   }
   const inReach = worstOf(found.filter((i) => !outOfReach.has(i)));

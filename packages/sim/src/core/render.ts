@@ -320,6 +320,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Docked at ${n.port(event.payload.portId)}`;
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
+    case "shipLimping": {
+      const { machineId, faultKey, itemDefId, need, speedFraction } = event.payload;
+      const what = need === "tool" ? "No" : "Not enough";
+      return `${what} ${n.itemDef(itemDefId)} aboard to fix the ${n.machineLower(machineId)}'s ${n.faultName(machineId, faultKey)}: limping on at ${Math.round(speedFraction * 100)}% speed`;
+    }
     case "departureHeld":
       return `Holding for repairs to the ${n.machineLower(event.payload.machineId)}`;
     case "departureRiskAccepted":
@@ -727,7 +732,7 @@ function captainAshoreLine(state: ReadonlyWorldState): string | undefined {
 export function shipHeadline(
   state: ReadonlyWorldState,
   content: ContentBundle,
-  nominalSpeed: number,
+  speeds: Pick<ConfigDef["travel"], "nominalSpeed" | "limpSpeedFraction">,
 ): string {
   const travel = state.travel;
   if (travel.stage === "docked") {
@@ -785,9 +790,14 @@ export function shipHeadline(
     case "departing":
       return `Departing ${portName(content, travel.fromPortId)} for ${to}`;
     case "transit": {
-      const speed = nominalSpeed * engineFactor(state, content);
-      if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
       const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
+      if (travel.limping === true) {
+        // D80: the engine is down and nothing aboard can fix it; the engineer coaxes it along.
+        const crawl = speeds.nominalSpeed * speeds.limpSpeedFraction;
+        return `Limping on to ${to} on a crippled engine — ${formatEta(remaining / crawl)}`;
+      }
+      const speed = speeds.nominalSpeed * engineFactor(state, content);
+      if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
       const voyage = travel.voyageDestinationId;
       const leg =
         voyage === undefined || voyage === travel.toPortId
@@ -927,6 +937,6 @@ export function getRenderFrame(world: World): RenderFrame {
     ...(dock === undefined ? {} : { dock }),
     locals: renderLocals(state),
     dockProps: renderDockProps(state, content),
-    headline: shipHeadline(state, content, world.config.values.travel.nominalSpeed),
+    headline: shipHeadline(state, content, world.config.values.travel),
   };
 }

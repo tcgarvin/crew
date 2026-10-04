@@ -2436,6 +2436,11 @@
               "minimum": 0,
               "maximum": 1
             },
+            "limpSpeedFraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
             "recallAboardSeconds": {
               "type": "number",
               "exclusiveMinimum": 0
@@ -2470,6 +2475,7 @@
             "nominalSpeed",
             "staffEstimateSeconds",
             "departureMinOutput",
+            "limpSpeedFraction",
             "recallAboardSeconds",
             "localShuffleSeconds",
             "dockHandGiveUpSeconds",
@@ -2605,6 +2611,11 @@
               "required": ["ashoreDaysMin", "ashoreDaysMax", "overdueDays"],
               "additionalProperties": false
             },
+            "sparesReserve": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
             "foodReserve": {
               "type": "object",
               "properties": {
@@ -2669,6 +2680,7 @@
             "reofferDays",
             "maxCratesPerJob",
             "passage",
+            "sparesReserve",
             "foodReserve",
             "market"
           ],

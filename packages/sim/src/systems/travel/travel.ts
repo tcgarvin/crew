@@ -27,12 +27,13 @@ import type {
   VoyageFields,
 } from "../../core/types/travel";
 import { shipDeckId } from "../../core/world";
+import type { RepairOutOfReach } from "../equipment/supplies";
 import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
 import { helmManned } from "../watch/helm";
 import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
 import { coursePlotted } from "./course";
-import { departureCleared } from "./departure-gate";
+import { departureCleared, impairmentOutOfReach } from "./departure-gate";
 import { nextHop } from "./graph";
 import { dismissLocals, dressDockAlongside } from "./locals";
 import { stageDockIfDue, stagingAnswered } from "./staging";
@@ -60,6 +61,61 @@ function propulsionFactor(ctx: Pick<StepCtx, "state" | "content">): number {
   if (engines.length === 0) return 1;
   const sum = engines.reduce((acc, m) => acc + (m.actualMode === "on" ? m.output : 0), 0);
   return sum / engines.length;
+}
+
+/**
+ * D80: why the ship limps rather than drifts: below `travel.limpSpeedFraction`, every engine that
+ * is wanted on and below it is impaired by a repair nothing aboard can finish (no market under
+ * way). The first such reason, by machine id; `undefined` when a repair aboard can still bring
+ * an engine back (the crew are on it: the ship waits for them, as before), or the engines are
+ * fine, or off by choice.
+ */
+function limpReason(ctx: StepCtx, raw: number): RepairOutOfReach | undefined {
+  const fraction = ctx.config.travel.limpSpeedFraction;
+  if (raw >= fraction) return undefined;
+  const down = Object.values(ctx.state.machines)
+    .filter((m) => ctx.content.machines[m.defId]?.tags.includes("engine") === true)
+    .filter((m) => m.desiredMode === "on" && (m.actualMode !== "on" || m.output < fraction))
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  let first: RepairOutOfReach | undefined;
+  for (const engine of down) {
+    const why = impairmentOutOfReach(ctx, engine.id, undefined);
+    if (why === undefined) return undefined;
+    first ??= why;
+  }
+  return first;
+}
+
+/**
+ * D80: start or stop the limp for this tick (`shipLimping` when it begins) and return the
+ * propulsion factor transit moves at: the engines' own, or `limpSpeedFraction` while limping.
+ */
+function updateLimp(ctx: StepCtx, travel: InFlight, raw: number): number {
+  const why = limpReason(ctx, raw);
+  if (why === undefined) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete travel.limping;
+    return raw;
+  }
+  const fraction = ctx.config.travel.limpSpeedFraction;
+  if (travel.limping !== true) {
+    travel.limping = true;
+    ctx.emit({
+      type: "shipLimping",
+      subjectIds: [why.machineId],
+      causeIds: [],
+      source: "sim",
+      locationRef: { kind: "machine", machineId: why.machineId },
+      payload: {
+        machineId: why.machineId,
+        faultKey: why.faultKey,
+        itemDefId: why.itemDefId,
+        need: why.need,
+        speedFraction: fraction,
+      },
+    });
+  }
+  return Math.max(raw, fraction);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -399,8 +455,8 @@ function advanceTravel(ctx: StepCtx): void {
   if (manoeuvre && !helmManned(ctx.state, ctx.content)) return; // stalled
 
   if (travel.stage === "transit") {
-    const factor = propulsionFactor(ctx);
-    const drifting = factor <= 0;
+    const raw = propulsionFactor(ctx);
+    const drifting = raw <= 0;
     if (drifting !== travel.drifting) {
       travel.drifting = drifting;
       ctx.emit({
@@ -411,6 +467,7 @@ function advanceTravel(ctx: StepCtx): void {
         payload: { drifting },
       });
     }
+    const factor = updateLimp(ctx, travel, raw);
     const secondsElapsed = ctx.elapsedTicks / ctx.config.time.tickRate;
     travel.routeProgress = Math.min(
       travel.routeDistance,

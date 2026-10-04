@@ -19,6 +19,20 @@ export interface TravelEventPayloads {
   departed: { readonly fromPortId: PortDefId; readonly toPortId: PortDefId };
   arrived: { readonly portId: PortDefId };
   driftingChanged: { readonly drifting: boolean };
+  /**
+   * D80: in transit the engines are below `travel.limpSpeedFraction` and no repair can bring them
+   * back with what is aboard: `machineId`'s `faultKey` repair is short of `itemDefId` (a `tool`
+   * nothing aboard provides, or `part`s), so the ship limps on at `speedFraction` of nominal.
+   * Raised the tick the limp begins; it ends unannounced when the engine is repaired (with
+   * `driftingChanged`) or the leg ends.
+   */
+  shipLimping: {
+    readonly machineId: MachineId;
+    readonly faultKey: LocalKey;
+    readonly itemDefId: ItemDefId;
+    readonly need: "tool" | "part";
+    readonly speedFraction: number;
+  };
   /** D36: the captain chose to wait for repairs to `machineId` before departing. */
   departureHeld: { readonly machineId: MachineId };
   /** D36: the captain chose to depart with `machineId` impaired. */
@@ -107,6 +121,7 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   departed: "narrative",
   arrived: "narrative",
   driftingChanged: "narrative",
+  shipLimping: "narrative",
   departureHeld: "narrative",
   departureRiskAccepted: "narrative",
   departureHoldLifted: "narrative",

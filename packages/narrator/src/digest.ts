@@ -191,7 +191,13 @@ function travelLine(state: State, content: ContentBundle): string {
     return `travel: docked at ${portName(content, t.portId)} (${t.portId})${course}`;
   }
   const progress = t.routeDistance > 0 ? t.routeProgress / t.routeDistance : 0;
-  const drifting = t.drifting ? ", DRIFTING (propulsion lost)" : "";
+  // D80: a limp is the engine down with no repair possible aboard; the ship crawls on.
+  const drifting =
+    t.limping === true
+      ? ", LIMPING (propulsion lost, no repair possible aboard; crawling on at a fraction of speed)"
+      : t.drifting
+        ? ", DRIFTING (propulsion lost)"
+        : "";
   return `travel: ${t.stage}, under way ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ${pct(progress)} of route${drifting}${bound}`;
 }
 

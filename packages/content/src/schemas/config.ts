@@ -85,6 +85,7 @@ export const configDefSchema = z.strictObject({
     nominalSpeed: positive,
     staffEstimateSeconds: nonNegative,
     departureMinOutput: unitInterval,
+    limpSpeedFraction: unitInterval,
     recallAboardSeconds: positive,
     localShuffleSeconds: positive,
     dockHandGiveUpSeconds: positive,
@@ -114,6 +115,7 @@ export const configDefSchema = z.strictObject({
       .refine((p) => p.ashoreDaysMin <= p.ashoreDaysMax, {
         message: "ashoreDaysMin must be <= ashoreDaysMax",
       }),
+    sparesReserve: nonNegativeInt,
     foodReserve: z
       .strictObject({ lowBelowDays: nonNegative, restockToDays: nonNegative })
       .refine((r) => r.lowBelowDays <= r.restockToDays, {
