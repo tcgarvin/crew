@@ -70,6 +70,7 @@ interface Stub {
   readonly at?: TileCoord;
   readonly backoff?: Record<string, number>;
   readonly machines?: readonly MachinePlacementView[];
+  readonly onDock?: boolean;
 }
 
 function stubView(stub: Stub): AgentView {
@@ -99,6 +100,7 @@ function stubView(stub: Stub): AgentView {
     thoughts: [],
     lastPlannedTick: 0,
     ...(stub.backoff === undefined ? {} : { backoff: stub.backoff }),
+    ...(stub.onDock === true ? { onDock: true as const } : {}),
   };
   return {
     tick: 100,
@@ -132,6 +134,13 @@ describe("dutyIdleCandidate (D77)", () => {
       urgency: "voluntaryActivity",
       estimateTicks: 40,
       choice: { kind: "personal", activity: "rounds" },
+    });
+  });
+
+  it("walks no round from the dock: the officer out on the quay is sent to the chair first (D77 addendum)", () => {
+    expect(dutyIdleCandidate(stubView({ officer: true, onDock: true }), config)).toMatchObject({
+      ref: "chair",
+      choice: { kind: "personal", activity: "wander", tile: { x: 8, y: 0 } },
     });
   });
 

@@ -9,8 +9,8 @@
  *   a relief and a fallback are off watch) and `deferTo` (Noor stands Red's helm with Mara idle
  *   beside her: the junior stands under the captain's eye). The course plot is anyone's who has
  *   its skill, on the same terms.
- * - Gangway watch: in port with no helm watch, the stander (never an officer) stands at the
- *   deck's `gangway` zone, routine class.
+ * - Gangway watch: in port with no helm watch, the sim's gangway stander (`watch.gangway`: the
+ *   section's non-officer, never an officer) stands at the deck's `gangway` zone, routine class.
  *
  * Owner: W1 of ship life slice 2.
  */
@@ -48,28 +48,19 @@ export function helmTaskExempt(_view: AgentView, task: TaskView): boolean {
   return isHelmTask(task);
 }
 
-/** A helm watch is wanted: the `watch` post is open (a course planned, or underway). */
-function helmWatchOpen(view: AgentView): boolean {
-  return view
-    .knownProblems()
-    .some((p) => p.kind === "stationToStaff" && p.payload.post === "watch");
-}
-
 /**
- * Gangway watch while docked with no helm watch, for the section's stander who is not an
- * officer (the captain goes ashore to look for work, D70), routine class. Not offered while
- * already standing it, so the hold is simply kept.
+ * Gangway watch for the one the sim names its stander (`watch.gangway`: docked with no helm
+ * watch, the section's non-officer, never the captain who goes ashore to look for work, D70),
+ * routine class. Not offered while already standing it, so the hold is simply kept.
  */
 export function gangwayCandidate(
   view: AgentView,
   _config: PlannerConfig,
 ): Candidate | Rejection | undefined {
   const self = view.self;
-  if (self.watch.helmRole !== "stander") return undefined;
-  if (self.roleTags.some((role) => role === "captain" || role === "firstOfficer")) return undefined;
+  if (self.watch.gangway !== true) return undefined;
   const activity = self.activity;
   if (activity.kind === "personal" && activity.activity === "standWatch") return undefined;
-  if (helmWatchOpen(view)) return undefined;
   const tile = view.schematic.deck.zones.find((zone) => zone.tags.includes("gangway"))?.tiles[0];
   if (tile === undefined) return undefined;
   if (backingOff(view, "standWatch")) return { ref: "standWatch", reason: "backoff" };

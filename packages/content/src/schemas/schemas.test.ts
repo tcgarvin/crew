@@ -272,6 +272,7 @@ const config = {
     mealDays: 0.0125,
     sleepDays: 0.05,
     wakeBelow: 0.1,
+    bedtimeAbove: 0.3,
     initialRange: {
       hunger: { min: 0.2, max: 0.6 },
       fatigue: { min: 0.1, max: 0.5 },

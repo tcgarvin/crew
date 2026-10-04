@@ -109,13 +109,15 @@ function engineeringMachineTiles(view: AgentView): TileCoord[] {
 }
 
 /**
- * A round, unless backing off or there is nowhere to go. Its estimate is the walk to the first
- * stop (the sim builds the route; the time at the stops is the same for every round).
+ * A round, unless backing off, out on the dock (rounds are walked aboard: the chair or the post
+ * brings them back first) or there is nowhere to go. Its estimate is the walk to the first stop
+ * (the sim builds the route; the time at the stops is the same for every round).
  */
 function roundsCandidate(
   view: AgentView,
   firstStop: TileCoord | undefined,
 ): Candidate | Rejection | undefined {
+  if (view.self.onDock === true) return undefined;
   if (backingOff(view, ROUNDS) || firstStop === undefined) return undefined;
   const walk = view.estimateTravelTicks(firstStop);
   if (walk === null) return { ref: ROUNDS, reason: "unreachableTarget" };

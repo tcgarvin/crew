@@ -10,6 +10,7 @@ import type { TravelStage } from "../../core/types/travel";
 import { PORTS, advanceThroughHooks } from "../travel/fixtures";
 import {
   BETTINA,
+  BRIDGE,
   DANE,
   GANGWAY,
   JAX,
@@ -485,5 +486,129 @@ describe("the helm's stakes: hazards are rolled by whoever has it (D77, D78)", (
     const [hazard] = ofType(runFor(fixture, 1), "navHazard");
     expect(hazard?.payload.outcome).toBe("unattended");
     expect(hazard?.payload.standerId).toBeUndefined();
+  });
+});
+
+describe("the bell and the relief (D77 addendum, slice-2 QA)", () => {
+  const reliefOpen = (w: World) =>
+    Object.values(w.state.work.problems).some(
+      (p) => p.kind === "stationToStaff" && p.payload.post === "relief" && p.status === "open",
+    );
+
+  it("raises no relief within the handover lead plus the no-show time of the bell: the oncoming relieves, once", () => {
+    const fixture = slowWorld(400);
+    const { world } = fixture;
+    setCourse(fixture);
+    runUntil(fixture, 20, (w) => stage(w) === "transit" && holder(w) === NOOR);
+    const watch = watchTicks(world.config.values);
+    // Hungry 74 s before the bell: inside lead (30 s) + no-show (45 s).
+    runUntil(fixture, 100, (w) => w.state.tick >= watch - secondsOf(w, 74));
+    const noor = world.state.actors[NOOR];
+    if (noor === undefined) throw new Error("no Noor");
+    noor.needs.hunger = 0.75;
+    runFor(fixture, 1);
+    expect(reliefOpen(world)).toBe(false);
+    const events = runUntil(fixture, 100, (w) => holder(w) === JAX);
+    expect(reliefOpen(world)).toBe(false);
+    expect(ofType(events, "helmRelieved").map((e) => e.payload)).toEqual([
+      expect.objectContaining({ byActorId: JAX, fromActorId: NOOR }),
+    ]);
+  });
+
+  it("still raises a relief a moment earlier than that", () => {
+    const fixture = slowWorld(400);
+    const { world } = fixture;
+    setCourse(fixture);
+    runUntil(fixture, 20, (w) => stage(w) === "transit" && holder(w) === NOOR);
+    const watch = watchTicks(world.config.values);
+    runUntil(fixture, 100, (w) => w.state.tick >= watch - secondsOf(w, 80));
+    const noor = world.state.actors[NOOR];
+    if (noor === undefined) throw new Error("no Noor");
+    noor.needs.hunger = 0.75;
+    runFor(fixture, 1);
+    expect(reliefOpen(world)).toBe(true);
+  });
+
+  it("a relief in the seat who becomes the stander keeps it with no 'takes the helm', and the relief post closes", () => {
+    const fixture = slowWorld(400);
+    const { world } = fixture;
+    setUnavailable(world, [MARA, DANE]);
+    setCourse(fixture);
+    runUntil(fixture, 20, (w) => stage(w) === "transit" && holder(w) === NOOR);
+    const noor = world.state.actors[NOOR];
+    if (noor === undefined) throw new Error("no Noor");
+    noor.needs.hunger = 0.75;
+    const relieved = runUntil(fixture, 40, (w) => holder(w) === JAX);
+    expect(ofType(relieved, "helmRelieved").map((e) => e.payload)).toEqual([
+      expect.objectContaining({ byActorId: JAX, fromActorId: NOOR }),
+    ]);
+    // Noor goes ashore: Jax, holding on the relief post, is now the nearest qualified hand and
+    // so Red's stander; he changes posts in the seat.
+    setUnavailable(world, [NOOR], "offShip");
+    const after = runFor(fixture, 15);
+    expect(holder(world)).toBe(JAX);
+    expect(roleOf(world, JAX)).toBe("stander");
+    expect(ofType(after, "helmRelieved")).toEqual([]);
+    expect(reliefOpen(world)).toBe(false);
+  });
+});
+
+describe("one person walks up to an empty helm at a time (D77 addendum, slice-2 QA)", () => {
+  it("the fallback already on her way keeps the designation until she sits; the stander, free again, relieves her", () => {
+    const fixture = bridgeWorld();
+    const { world } = fixture;
+    runFor(fixture, 2);
+    // Noor ashore: Mara, at the far end of the ship, is the stander and sets off.
+    setUnavailable(world, [NOOR], "offShip");
+    placeOnBridgeDeck(world, MARA, { x: 1, y: 2 });
+    placeOnBridgeDeck(world, NOOR, { x: 10, y: 2 });
+    setPlottedCourse(fixture);
+    const events = runUntil(fixture, 10, (w) => labelOf(w, MARA) === "going to the helm");
+    expect(helmWatchOf(helmCtx(world))?.stander).toBe(MARA);
+    // Noor is back aboard, idle beside the helm: still Mara's walk, not Noor's as well.
+    setUnavailable(world, [NOOR], "available");
+    events.push(
+      ...runUntil(
+        fixture,
+        20,
+        (w) => holder(w) === MARA,
+        (w) => {
+          if (holder(w) === MARA) return;
+          expect(helmWatchOf(helmCtx(w))?.stander).toBe(MARA);
+          expect(roleOf(w, NOOR)).toBe("none");
+        },
+      ),
+    );
+    expect(helmClaimants(world, events)).toEqual([MARA]);
+    // Now the seat is held, the section's own stander relieves her: one handover.
+    events.push(...runUntil(fixture, 20, (w) => holder(w) === NOOR));
+    expect(ofType(events, "helmRelieved").map((e) => e.payload)).toEqual([
+      expect.objectContaining({ byActorId: MARA }),
+      expect.objectContaining({ byActorId: NOOR, fromActorId: MARA }),
+    ]);
+  });
+});
+
+describe("gangway watch by a section's non-officer (D77 addendum)", () => {
+  it("Blue's cook, unqualified for the helm, stands the gangway in port while the first officer has the watch, and leaves it when a course is set", () => {
+    const bill = {
+      sections: [
+        { key: "red", members: [BRIDGE.noor, BRIDGE.mara, BRIDGE.priya] },
+        { key: "white", members: [BRIDGE.jax] },
+        { key: "blue", members: [BRIDGE.dane, BRIDGE.bettina] },
+      ],
+      dayworkers: [],
+    };
+    const fixture = bridgeWorld({ bill });
+    const { world } = fixture;
+    runUntil(fixture, 300, (w) => w.state.tick >= 2 * watchTicks(w.config.values));
+    runUntil(fixture, 20, (w) => labelOf(w, BETTINA) === "on the gangway");
+    expect(tileOf(world, BETTINA)).toEqual(GANGWAY);
+    expect(roleOf(world, DANE)).toBe("stander");
+    expect(isOfficerOfTheWatch(helmCtx(world), DANE)).toBe(true);
+    expect(labelOf(world, DANE)).not.toBe("on the gangway");
+    setCourse(fixture);
+    runUntil(fixture, 20, (w) => holder(w) === DANE);
+    runUntil(fixture, 5, (w) => labelOf(w, BETTINA) !== "on the gangway");
   });
 });

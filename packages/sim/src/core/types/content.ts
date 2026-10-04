@@ -859,6 +859,13 @@ export interface ConfigDef {
     /** Wake when fatigue falls below this. */
     readonly wakeBelow: number;
     /**
+     * D77 addendum: bedtime. In one's sleep watch (the watch after one's own) anyone with
+     * fatigue above this turns in, so a day's tiredness is slept off in the same window every
+     * day; set so a full sleep's recovery cannot reach it again within the window (no second
+     * nap), and a day awake always passes it.
+     */
+    readonly bedtimeAbove: number;
+    /**
      * Integration 2 addition: initial need deficits for spawned crew are drawn uniformly from
      * these inclusive ranges on the `setup` stream, so the first minutes have motion.
      */

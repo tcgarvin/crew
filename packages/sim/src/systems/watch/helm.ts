@@ -17,11 +17,18 @@
  *   rather than a stander who is eating or asleep, and a vacancy pulls the officer of the watch
  *   back to the bridge. While someone has it nobody is re-designated for being busy: the
  *   off-going or a relief holds until the designated stander comes.
+ * - Once someone is on their way to an empty helm on its watch post, they stay designated until
+ *   they sit or drop it (D77 addendum, the slice-2 QA departure churn): a better-placed hand who
+ *   becomes free meanwhile is not sent as well, but relieves them once they hold it, so one
+ *   person walks up at a time and a departure sees one handover, not three.
  * - `oncoming`: the next section's stander, from `handoverLeadSeconds` before the bell. Once the
  *   oncoming has the helm, the off-going section has no stander.
  * - `relief`: any qualified, awake crew member aboard who is not on watch, while a `relief` post is
  *   open. A stander (or oncoming) with a need past `needEssentialAbove` is not called to a helm
  *   someone else holds (`none`) until it is seen to, so one relieved to eat goes and eats.
+ * - Gangway watch in port (`gangwayStanderOf`): the section on watch's non-officer, the helm's
+ *   stander when that is one, else its best pilot; it needs no piloting, so a section whose only
+ *   qualified hand is an officer still has someone at the ramp.
  *
  * Owner: W1 of ship life slice 2.
  */
@@ -291,16 +298,27 @@ export function helmWatchOf(ctx: HelmReadCtx): HelmWatch | undefined {
   const held = cover !== undefined;
   const watchIndex = watchIndexAt(ctx.config, ctx.tick);
   const ofDay = watchOfDay(ctx.config, ctx.tick);
-  const stander = standerOrder(ctx, helm, ofDay, false).find(
-    (a) => aboard(ctx, a) && (held || free(ctx, helm.id, a)),
-  )?.id;
+  const order = standerOrder(ctx, helm, ofDay, false);
+  const designated = order.find((a) => aboard(ctx, a) && (held || free(ctx, helm.id, a)))?.id;
   const nextBell = (watchIndex + 1) * watchTicks(ctx.config);
   const windowStart = nextBell - configTicks(ctx.config, ctx.config.watches.handoverLeadSeconds);
   const next = (ofDay + 1) % ctx.config.time.watchesPerDay;
   const oncoming =
     ctx.tick >= windowStart
-      ? standerOrder(ctx, helm, next, true).find((a) => aboard(ctx, a) && a.id !== stander)?.id
+      ? standerOrder(ctx, helm, next, true).find((a) => aboard(ctx, a) && a.id !== designated)?.id
       : undefined;
+  // Hysteresis at an empty helm: whoever is already walking up on the watch post keeps the
+  // designation (the best-ranked of them, if several) until they sit or drop it.
+  const walkingUp = held
+    ? undefined
+    : order.find(
+        (a) =>
+          a.id !== oncoming &&
+          aboard(ctx, a) &&
+          helmPostOf(ctx.state, helm.id, a) === "watch" &&
+          incoming(ctx.state, helm.id, a.id) !== undefined,
+      )?.id;
+  const stander = walkingUp ?? designated;
   const takenOver =
     oncoming !== undefined &&
     (holder === oncoming || (relievedAt?.byActorId === oncoming && relievedAt.tick >= windowStart));
@@ -339,6 +357,32 @@ export function helmRoleOf(ctx: HelmReadCtx, actorId: ActorId): HelmRole {
   const qualified = helm !== undefined && pilotingOf(actor) >= helmSkillMinOf(ctx.content, helm);
   const offWatch = !isOnWatch(actor.schedule, ctx.tick, ctx.config);
   return qualified && offWatch && aboard(ctx, actor) && !asleep(actor) ? "relief" : "none";
+}
+
+/**
+ * Who stands gangway watch at `ctx.tick`: docked with no helm watch wanted (its `watch` post
+ * closed), the section on watch's non-officer aboard and awake: the helm's stander when that is
+ * one, else the qualified by piloting, else anyone by piloting. Undefined otherwise, and for a
+ * section of officers only (the captain goes ashore, D70; the first officer has the watch).
+ */
+export function gangwayStanderOf(ctx: HelmReadCtx): ActorId | undefined {
+  if (ctx.state.travel.stage !== "docked") return undefined;
+  const helm = helmMachine(ctx.state, ctx.content);
+  if (helm === undefined || openPost(ctx.state, helm.id, "watch")) return undefined;
+  const ofDay = watchOfDay(ctx.config, ctx.tick);
+  const min = helmSkillMinOf(ctx.content, helm);
+  const hands = Object.values(ctx.state.actors)
+    .filter(
+      (a) => a.schedule.section?.index === ofDay && !isOfficer(a) && aboard(ctx, a) && !asleep(a),
+    )
+    .sort(
+      (a, b) =>
+        Number(pilotingOf(b) >= min) - Number(pilotingOf(a) >= min) ||
+        pilotingOf(b) - pilotingOf(a) ||
+        byId(a, b),
+    );
+  const stander = helmWatchOf(ctx)?.stander;
+  return hands.find((a) => a.id === stander)?.id ?? hands[0]?.id;
 }
 
 /**
@@ -424,12 +468,24 @@ export function helmPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const hold: ActivityStep = { kind: "hold", hold: "staff", sinceTick: ctx.tick };
   const holder = whoHasTheHelm(ctx.state, ctx.content);
   const standby = positionFor(ctx, actor, machineId, "use");
+  const seatTileNow = operateTiles(ctx, machineId)[0];
   const taken = (holder !== undefined && holder !== actor.id) || onTheirWay(ctx, actor, machineId);
-  const steps: ActivityStep[] =
-    taken && standby !== undefined
+  // Changing posts in the seat (a relief whose section has come on, D77 addendum): the one who
+  // last took the helm, still on its seat (held, or between the old task and this one), simply
+  // keeps it; no handover, and no "takes the helm" told for a helm that never changed hands.
+  const resuming =
+    holder === actor.id ||
+    (holder === undefined &&
+      ctx.state.watch.helm.relievedAt?.byActorId === actor.id &&
+      seatTileNow !== undefined &&
+      actor.location.kind === "onDeck" &&
+      Math.floor(actor.location.x) === seatTileNow.x &&
+      Math.floor(actor.location.y) === seatTileNow.y);
+  const steps: ActivityStep[] = resuming
+    ? [hold]
+    : taken && standby !== undefined
       ? [{ kind: "moveTo", target: standby, requested: false }, handover, toSeat, hold]
       : [toSeat, handover, hold];
-  const seatTileNow = operateTiles(ctx, machineId)[0];
   const off = seatTileNow === undefined ? undefined : stepOffTile(ctx, actor, seatTileNow);
   if (off !== undefined) steps.push({ kind: "moveTo", target: off, requested: false });
   return { ok: true, plan: { steps, stepIndex: 0 } };
@@ -553,8 +609,9 @@ export function gangwayPlan(ctx: StepCtx, actor: Actor): PlanResult {
 }
 
 /**
- * Does a `gangway` hold end? When the ship is no longer docked, or they are no longer the
- * stander. Its first tick says so in the trace (`gangwayWatchSet`).
+ * Does a `gangway` hold end? When they are no longer the gangway stander (the ship has left, the
+ * helm watch has opened, or the bell has gone). Its first tick says so in the trace
+ * (`gangwayWatchSet`).
  */
 export function gangwayHoldDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   if (step.sinceTick === ctx.tick) {
@@ -566,6 +623,5 @@ export function gangwayHoldDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">
       payload: { actorId: actor.id },
     });
   }
-  if (ctx.state.travel.stage !== "docked") return true;
-  return helmRoleOf(ctx, actor.id) !== "stander";
+  return gangwayStanderOf(ctx) !== actor.id;
 }

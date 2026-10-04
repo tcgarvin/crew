@@ -106,7 +106,7 @@ describe("loadBundle", () => {
     ]);
   });
 
-  it("stands the default scenario's watch in three sections, with three dayworkers (D77)", () => {
+  it("stands the default scenario's watch in three sections, Blue with a deckhand for the gangway, and two dayworkers (D77)", () => {
     const bundle = authoredBundle();
     const bill =
       bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios]
@@ -117,8 +117,9 @@ describe("loadBundle", () => {
       "crew.mara_osei",
       "crew.priya_kessler",
     ]);
-    expect(bill?.sections.flatMap((s) => s.members)).toHaveLength(6);
-    expect(bill?.dayworkers).toHaveLength(3);
+    expect(bill?.sections[2]?.members).toEqual(["crew.dane_whitcross", "crew.sunniva_park"]);
+    expect(bill?.sections.flatMap((s) => s.members)).toHaveLength(7);
+    expect(bill?.dayworkers).toEqual(["crew.bettina_solheim", "crew.oyelaran_abiodun"]);
   });
 
   it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (D73)", () => {

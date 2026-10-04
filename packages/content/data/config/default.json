@@ -33,6 +33,7 @@
     "mealDays": 0.0125,
     "sleepDays": 0.2,
     "wakeBelow": 0.15,
+    "bedtimeAbove": 0.3,
     "initialRange": {
       "hunger": {
         "min": 0.2,

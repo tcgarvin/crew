@@ -28,8 +28,9 @@ import {
  *   voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
  *
  * Duty (D77, the watch bill): off duty, routine and essential tasks are not candidates
- * (emergencies, containment and above, ignore duty, SD §11.4). Off-duty actors rest or socialize
- * when nothing else applies; on-duty actors only socialize/rest when the need is actually high.
+ * (emergencies, containment and above, ignore duty, SD §11.4), except cargo in port, which is all
+ * hands awake. Off-duty actors rest or socialize when nothing else applies; on-duty actors only
+ * socialize/rest when the need is actually high. Routine sleep is taken in one's sleep watch.
  */
 import type { DeepReadonly, TileCoord } from "../core/types/common";
 import type { MachineTag, ToolKind } from "../core/types/content";
@@ -266,7 +267,15 @@ function taskCandidate(
   const betterQualified = exempt ? undefined : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
-  if (!exempt && !view.self.onDuty && urgencyIndex(urgency) > urgencyIndex("containment"))
+  // D77 addendum: cargo in port is all hands awake, not the watch's: nobody off duty is turned
+  // away from a crate (the sleeping sleep on, since the hold is not interrupted for routine work).
+  const allHands = problem.kind === "cargoToLoad" || problem.kind === "cargoToUnload";
+  if (
+    !exempt &&
+    !allHands &&
+    !view.self.onDuty &&
+    urgencyIndex(urgency) > urgencyIndex("containment")
+  )
     return reject("offDuty");
   const travel = taskTravel(view, task, problem);
   if (typeof travel === "string") return reject(travel);
@@ -380,15 +389,16 @@ const betterBed = (a: BedChoice, b: BedChoice | undefined): boolean =>
  * A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is for
  * patients).
  *
- * D77: on duty, nobody turns in while tiredness is merely routine; they sleep when the watch (or
- * a dayworker's hours) ends, so a sleep a day settles into the same off-watch window ("Priya
- * sleeps after her watch"). Pressing fatigue still sends them, through relief at the helm.
+ * D77 (addendum): routine tiredness is slept off in one's sleep watch, the watch after one's own
+ * (`watch.sleepWatch`), and there anyone past bedtime (fatigue above `needs.bedtimeAbove`) turns
+ * in, so a sleep a day sits in the same window every day ("Priya sleeps after her watch") instead
+ * of drifting with the fatigue rate. Outside it only pressing fatigue sends them, through relief
+ * at the helm.
  */
 function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const fatigue = view.self.needs.fatigue;
-  const urgency = needUrgency(fatigue, config);
+  const urgency = sleepUrgency(view, config, fatigue);
   if (urgency === undefined) return undefined;
-  if (view.self.onDuty && urgency === "routineObligation") return undefined;
   const occupied = occupiedTiles(view);
   const mine = view.self.berth?.machineId;
   const assigned = new Set(view.assignedBeds());
@@ -418,6 +428,22 @@ function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rej
     activity: "sleep",
     targetId: best.bed,
   });
+}
+
+/**
+ * How pressing a sleep is: pressing tiredness (past `needEssentialAbove`) anywhere; routine
+ * tiredness, and bedtime (fatigue past `needs.bedtimeAbove`), only in the sleep watch; nothing
+ * otherwise.
+ */
+export function sleepUrgency(
+  view: Pick<AgentView, "self">,
+  config: PlannerConfig,
+  fatigue: number,
+): UrgencyClass | undefined {
+  const urgency = needUrgency(fatigue, config);
+  if (urgency !== undefined && urgency !== "routineObligation") return urgency;
+  if (view.self.watch.sleepWatch !== true) return undefined;
+  return fatigue > config.needs.bedtimeAbove ? "routineObligation" : undefined;
 }
 
 function leisureCandidate(

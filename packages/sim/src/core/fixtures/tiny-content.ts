@@ -81,6 +81,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       mealDays: 10 / day,
       sleepDays: 60 / day,
       wakeBelow: 0.1,
+      bedtimeAbove: 0.3,
       initialRange: {
         hunger: { min: 0, max: 0 },
         fatigue: { min: 0, max: 0 },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlannerConfig } from "../../core/types/pipeline";
-import { enumerateCandidates } from "../../planner/candidates";
+import { enumerateCandidates, sleepUrgency } from "../../planner/candidates";
 import { selectIntent } from "../../planner/select";
 import {
   JON,
@@ -79,23 +79,66 @@ describe("selectIntent", () => {
     });
   });
 
-  it("on watch, routine tiredness waits for the watch to end; pressing tiredness does not (D77)", () => {
+  it("routine tiredness is slept off in the sleep watch, from bedtime on; pressing tiredness anywhere (D77)", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
     withoutRounds(world);
-    const sleepUrgency = () =>
+    const sleepClass = () =>
       enumerateCandidates(kernel.getAgentView(world, MARA), plannerConfig(tw)).candidates.find(
         (c) => c.choice.kind === "personal" && c.choice.activity === "sleep",
       )?.urgency;
     actorOf(tw, MARA).needs.fatigue = 0.6;
     expect(kernel.getAgentView(world, MARA).self.onDuty).toBe(true);
-    expect(sleepUrgency()).toBeUndefined();
-    // Her section (`alpha`) stands [0, 300) s of the 600 s day; at 300 s she is off watch.
+    expect(kernel.getAgentView(world, MARA).self.watch.sleepWatch).toBeUndefined();
+    expect(sleepClass()).toBeUndefined();
+    // Her section (`alpha`) stands [0, 300) s of the 600 s day; the watch after is her sleep
+    // watch, where even bedtime tiredness (above `bedtimeAbove`, below the seek threshold) sends
+    // her to bed.
     world.state.tick = 300 * world.config.values.time.tickRate;
     expect(kernel.getAgentView(world, MARA).self.onDuty).toBe(false);
-    expect(sleepUrgency()).toBe("routineObligation");
+    expect(kernel.getAgentView(world, MARA).self.watch.sleepWatch).toBe(true);
+    expect(sleepClass()).toBe("routineObligation");
+    actorOf(tw, MARA).needs.fatigue = 0.35;
+    expect(sleepClass()).toBe("routineObligation");
+    actorOf(tw, MARA).needs.fatigue = 0.2;
+    expect(sleepClass()).toBeUndefined();
     world.state.tick = 0;
     actorOf(tw, MARA).needs.fatigue = 0.75;
-    expect(sleepUrgency()).toBe("essentialOperation");
+    expect(sleepClass()).toBe("essentialOperation");
+  });
+
+  it("outside the sleep watch, routine tiredness waits even off duty (D77 addendum)", () => {
+    const tw = crewWorld();
+    const config = plannerConfig(tw);
+    const view = (sleepWatch: boolean) =>
+      ({
+        self: { watch: sleepWatch ? { sleepWatch: true } : {} },
+      }) as unknown as Parameters<typeof sleepUrgency>[0];
+    expect(sleepUrgency(view(false), config, 0.6)).toBeUndefined();
+    expect(sleepUrgency(view(false), config, 0.75)).toBe("essentialOperation");
+    expect(sleepUrgency(view(true), config, 0.6)).toBe("routineObligation");
+    expect(sleepUrgency(view(true), config, 0.2)).toBeUndefined();
+  });
+
+  it("a sleeper is woken for an emergency, not for essential work or a meal (D77 addendum)", () => {
+    const tw = crewWorld();
+    const { world, kernel } = tw;
+    withoutRounds(world);
+    world.state.tick = 300 * world.config.values.time.tickRate;
+    actorOf(tw, MARA).needs.fatigue = 0.6;
+    run(tw, 25);
+    expect(world.state.actors[MARA]?.activity).toMatchObject({
+      kind: "personal",
+      activity: "sleep",
+    });
+    actorOf(tw, MARA).needs.hunger = 0.75;
+    expect(selectIntent(kernel.getAgentView(world, MARA), plannerConfig(tw))).toEqual({
+      kind: "continue",
+    });
+    actorOf(tw, MARA).needs.hunger = 0.95;
+    expect(selectIntent(kernel.getAgentView(world, MARA), plannerConfig(tw))).toMatchObject({
+      kind: "personal",
+      activity: "eat",
+    });
   });
 });

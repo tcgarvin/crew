@@ -10,11 +10,13 @@ export function registerWatch(registry: KernelRegistry): Unregister {
 }
 
 export { type WatchBill, type WatchBillSection, generateWatchBill, watchBillOf } from "./bill";
-export { isOnDuty, isOnWatch } from "./duty";
+export { isOnDuty, isOnWatch, isSleepWatch, sleepWatchOf } from "./duty";
 export {
+  gangwayStanderOf,
   helmMachine,
   helmManned,
   helmRoleOf,
+  helmWatchOf,
   isOfficerOfTheWatch,
   whoHasTheHelm,
 } from "./helm";

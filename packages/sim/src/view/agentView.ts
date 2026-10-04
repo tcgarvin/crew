@@ -19,6 +19,7 @@
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
  * of the following tick. Backoff and blockage `retryAfterTick`s compare against this tick.
  */
+import { isOnDock } from "../core/docks";
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
 import type { DeckDef, MachinePlacementDef } from "../core/types/content";
@@ -44,8 +45,8 @@ import {
   isStaticWalkable,
   rotateOffset,
 } from "../systems/spatial/geometry";
-import { isOnDuty, isOnWatch } from "../systems/watch/duty";
-import { helmRoleOf, isOfficerOfTheWatch } from "../systems/watch/helm";
+import { isOnDuty, isOnWatch, isSleepWatch } from "../systems/watch/duty";
+import { gangwayStanderOf, helmRoleOf, isOfficerOfTheWatch } from "../systems/watch/helm";
 
 type ReadonlyActor = DeepReadonly<Actor>;
 
@@ -163,6 +164,8 @@ function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["wa
     dayworker: section === undefined,
     helmRole: helmRoleOf(helm, actor.id),
     officerOfTheWatch: isOfficerOfTheWatch(helm, actor.id),
+    ...(isSleepWatch(actor.schedule, tick, config) ? { sleepWatch: true as const } : {}),
+    ...(gangwayStanderOf(helm) === actor.id ? { gangway: true as const } : {}),
   };
 }
 
@@ -195,6 +198,7 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     ...(actor.workBackoff === undefined ? {} : { backoff: actor.workBackoff }),
     ...(actor.passenger === true ? { passenger: true as const } : {}),
     ...(actor.disembarking === true ? { disembarking: true as const } : {}),
+    ...(isOnDock(world.content, state, location) ? { onDock: true as const } : {}),
     ...(berth === undefined ? {} : { berth }),
   };
 }
