@@ -10,7 +10,13 @@ import { dockAlongsideAt, dockAreaTiles, marketCounter } from "../../core/docks"
 import { affordableUnits } from "../../core/markets";
 import type { TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
-import type { CompletionPredicate, DeriveTasks, TaskSpec } from "../../core/types/work";
+import type { ItemId } from "../../core/types/ids";
+import type {
+  CompletionPredicate,
+  DerivationCtx,
+  DeriveTasks,
+  TaskSpec,
+} from "../../core/types/work";
 
 function firstDeck(content: ContentBundle) {
   const [deck] = Object.values(content.decks);
@@ -21,29 +27,42 @@ function firstDeck(content: ContentBundle) {
 // crate); `estimatedWorkSeconds` uses the W6-added `config.commerce.haulEstimateSeconds`
 // (a short, uniform placeholder — actual haul time is walking + pick/drop, not
 // modelled by the derivation table).
-const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
-  const deck = firstDeck(ctx.content);
-  const zone = deck?.zones.find((z) => z.key === problem.payload.stowageZoneKey);
-  const spec: TaskSpec = {
-    derivationKey: "load",
+function haulSpec(
+  problem: { readonly baseUrgency: TaskSpec["baseUrgency"] },
+  ctx: Pick<DerivationCtx, "config">,
+  derivationKey: "load" | "unload",
+  itemId: ItemId,
+  interactionTiles: TileCoord[],
+  completion: CompletionPredicate,
+): TaskSpec {
+  return {
+    derivationKey,
     type: "haul",
-    target: { kind: "item", itemId: problem.payload.itemId },
+    target: { kind: "item", itemId },
     baseUrgency: problem.baseUrgency,
     requiredSkills: [],
     requiredTools: [],
     consumables: [],
     workerSlots: 1,
-    interactionTiles: zone?.tiles ? [...zone.tiles] : [],
+    interactionTiles,
     dependencyIds: [],
-    progressRef: { kind: "itemCustody", itemId: problem.payload.itemId },
-    completion: {
-      kind: "itemInZone",
-      itemId: problem.payload.itemId,
-      zoneKey: problem.payload.stowageZoneKey,
-    },
+    progressRef: { kind: "itemCustody", itemId },
+    completion,
     estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds,
   };
-  return [spec];
+}
+
+const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
+  const { itemId, stowageZoneKey } = problem.payload;
+  const zone = firstDeck(ctx.content)?.zones.find((z) => z.key === stowageZoneKey);
+  const tiles = zone?.tiles ? [...zone.tiles] : [];
+  return [
+    haulSpec(problem, ctx, "load", itemId, tiles, {
+      kind: "itemInZone",
+      itemId,
+      zoneKey: stowageZoneKey,
+    }),
+  ];
 };
 
 /** `tiles` rotated to start at `start` (mod length), so parallel hauls spread over an area. */
@@ -60,27 +79,12 @@ function rotated<T>(tiles: readonly T[], start: number): T[] {
  */
 const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
   const { itemId, jobId, portId, storeKey } = problem.payload;
-  const spec = (interactionTiles: TileCoord[], completion: CompletionPredicate): TaskSpec => ({
-    derivationKey: "unload",
-    type: "haul",
-    target: { kind: "item", itemId },
-    baseUrgency: problem.baseUrgency,
-    requiredSkills: [],
-    requiredTools: [],
-    consumables: [],
-    workerSlots: 1,
-    interactionTiles,
-    dependencyIds: [],
-    progressRef: { kind: "itemCustody", itemId },
-    completion,
-    estimatedWorkSeconds: ctx.config.commerce.haulEstimateSeconds,
-  });
   const dock = dockAlongsideAt(ctx.content, ctx.state, portId);
   const bay = dock === undefined ? [] : dockAreaTiles(dock, "deliveryBay");
   if (dock !== undefined && bay.length > 0) {
     const index = Math.max(0, ctx.state.jobs[jobId]?.cargoItemIds.indexOf(itemId) ?? 0);
     return [
-      spec(rotated(bay, index), {
+      haulSpec(problem, ctx, "unload", itemId, rotated(bay, index), {
         kind: "itemInDockArea",
         itemId,
         dockId: dock.id,
@@ -89,7 +93,14 @@ const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
     ];
   }
   const tiles = firstDeck(ctx.content)?.docking.cargoTransferTiles ?? [];
-  return [spec([...tiles], { kind: "itemInStore", itemId, portId, storeKey })];
+  return [
+    haulSpec(problem, ctx, "unload", itemId, [...tiles], {
+      kind: "itemInStore",
+      itemId,
+      portId,
+      storeKey,
+    }),
+  ];
 };
 
 /**
