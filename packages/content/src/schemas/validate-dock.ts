@@ -11,44 +11,26 @@
  * with the sim's own builder.
  */
 import type { ContentBundle, DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
-import { type Path, type ValidationIssue, checkDuplicateLocalKeys, issue } from "./issues";
+import { SIDE_OFFSET, at, rectContains, rectTiles, tileKey } from "./geometry";
+import { type Path, type ValidationIssue, checkLocalKeyLists, checkRef, issue } from "./issues";
 
 /** Dockside §3.1: ship plus dock stays legible in the docked camera on a phone. */
-export const DOCK_MAX_WIDTH = 48;
-export const DOCK_MAX_HEIGHT = 36;
+const DOCK_MAX_WIDTH = 48;
+const DOCK_MAX_HEIGHT = 36;
 
-const NEIGHBOURS: readonly TileCoord[] = [
-  { x: 0, y: -1 },
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-];
-
-const SIDE_DELTA: Readonly<Record<"n" | "e" | "s" | "w", TileCoord>> = {
-  n: { x: 0, y: -1 },
-  e: { x: 1, y: 0 },
-  s: { x: 0, y: 1 },
-  w: { x: -1, y: 0 },
-};
+const NEIGHBOURS: readonly TileCoord[] = Object.values(SIDE_OFFSET);
 
 function dockPath(dock: DockDef): Path {
   return ["docks", dock.id];
 }
 
-function at(t: TileCoord): string {
-  return `(${t.x},${t.y})`;
-}
-
-function rectTiles(rect: DockRect): TileCoord[] {
-  const tiles: TileCoord[] = [];
-  for (let y = rect.y; y < rect.y + rect.h; y++) {
-    for (let x = rect.x; x < rect.x + rect.w; x++) tiles.push({ x, y });
-  }
-  return tiles;
-}
-
 function inMap(dock: DockDef, t: TileCoord): boolean {
   return t.x >= 0 && t.y >= 0 && t.x < dock.width && t.y < dock.height;
+}
+
+/** Row-major index of an on-map tile in a dock-sized mask. */
+function cell(dock: DockDef, t: TileCoord): number {
+  return t.y * dock.width + t.x;
 }
 
 function rectInMap(dock: DockDef, rect: DockRect): boolean {
@@ -71,28 +53,26 @@ export function dockWalkableMask(dock: DockDef): Uint8Array {
   const mask = new Uint8Array(dock.width * dock.height);
   for (let y = 0; y < dock.height; y++) {
     for (let x = 0; x < dock.width; x++) {
-      if (tileKind(dock, { x, y }) === "floor") mask[y * dock.width + x] = 1;
+      if (tileKind(dock, { x, y }) === "floor") mask[cell(dock, { x, y })] = 1;
     }
   }
   for (const prop of dock.props) {
     if (!prop.blocking) continue;
     for (const t of rectTiles(prop.rect)) {
-      if (inMap(dock, t)) mask[t.y * dock.width + t.x] = 0;
+      if (inMap(dock, t)) mask[cell(dock, t)] = 0;
     }
   }
   return mask;
 }
 
 function walkable(dock: DockDef, mask: Uint8Array, t: TileCoord): boolean {
-  return inMap(dock, t) && mask[t.y * dock.width + t.x] === 1;
+  return inMap(dock, t) && mask[cell(dock, t)] === 1;
 }
 
 /** Why a tile is not walkable, for messages: "wall", "off the map", "under blocking prop …". */
 function describeTile(dock: DockDef, t: TileCoord): string {
   if (!inMap(dock, t)) return "off the map";
-  const blocker = dock.props.find(
-    (p) => p.blocking && rectTiles(p.rect).some((r) => r.x === t.x && r.y === t.y),
-  );
+  const blocker = dock.props.find((p) => p.blocking && rectContains(p.rect, t));
   if (blocker !== undefined) return `under blocking prop "${blocker.key}"`;
   return tileKind(dock, t) ?? "an undeclared character";
 }
@@ -131,9 +111,7 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
   const dockByPort = new Map<string, string>();
   for (const dock of Object.values(bundle.docks ?? {})) {
     const path = dockPath(dock);
-    if (!(dock.portId in bundle.ports)) {
-      issues.push(issue("referential", [...path, "portId"], `unknown port "${dock.portId}"`));
-    }
+    checkRef(bundle.ports, dock.portId, "port", [...path, "portId"], issues);
     const other = dockByPort.get(dock.portId);
     if (other !== undefined) {
       issues.push(
@@ -141,22 +119,13 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
       );
     }
     dockByPort.set(dock.portId, dock.id);
-    checkDuplicateLocalKeys(
-      dock.posts.map((p) => p.key),
-      [...path, "posts"],
-      "post",
-      issues,
-    );
-    checkDuplicateLocalKeys(
-      dock.areas.map((a) => a.key),
-      [...path, "areas"],
-      "area",
-      issues,
-    );
-    checkDuplicateLocalKeys(
-      dock.props.map((p) => p.key),
-      [...path, "props"],
-      "prop",
+    checkLocalKeyLists(
+      path,
+      [
+        ["posts", "post", dock.posts.map((p) => p.key)],
+        ["areas", "area", dock.areas.map((a) => a.key)],
+        ["props", "prop", dock.props.map((p) => p.key)],
+      ],
       issues,
     );
     checkComposition(dock, issues);
@@ -173,11 +142,6 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
   }
 }
 
-/** The dock map for a port, if it has one. */
-export function dockOfPort(bundle: ContentBundle, portId: string): DockDef | undefined {
-  return Object.values(bundle.docks ?? {}).find((d) => d.portId === portId);
-}
-
 /** L2: a castSeed `post` names a post on that port's dock map (Dockside §5.2). */
 export function checkCastSeedPosts(
   port: PortDef,
@@ -187,7 +151,7 @@ export function checkCastSeedPosts(
   port.castSeed.forEach((seed, i) => {
     if (seed.post === undefined) return;
     const path: Path = ["ports", port.id, "castSeed", i, "post"];
-    const dock = dockOfPort(bundle, port.id);
+    const dock = Object.values(bundle.docks ?? {}).find((d) => d.portId === port.id);
     if (dock === undefined) {
       issues.push(
         issue(
@@ -261,42 +225,41 @@ function checkGrid(dock: DockDef, issues: ValidationIssue[]): boolean {
   return usable;
 }
 
+/**
+ * Claims each tile of `rect` for `key` in `owners`, in order, stopping at the first tile that
+ * `problemAt` rejects or that another key already holds. Returns that problem, if any.
+ */
+function claimRect(
+  rect: DockRect,
+  key: string,
+  label: string,
+  owners: Map<string, string>,
+  problemAt: (t: TileCoord) => string | undefined,
+): string | undefined {
+  for (const t of rectTiles(rect)) {
+    const problem = problemAt(t);
+    if (problem !== undefined) return problem;
+    const other = owners.get(tileKey(t));
+    if (other !== undefined) return `${label} "${key}" overlaps "${other}" at ${at(t)}`;
+    owners.set(tileKey(t), key);
+  }
+  return undefined;
+}
+
 /** Props, areas and foreground rects lie on the map; props sit on floor and do not overlap. */
 function checkPlacements(dock: DockDef, issues: ValidationIssue[]): void {
   const path = dockPath(dock);
   const propAt = new Map<string, string>();
   dock.props.forEach((prop, i) => {
-    if (!rectInMap(dock, prop.rect)) {
-      issues.push(
-        issue("physical", [...path, "props", i], `prop "${prop.key}" reaches off the map`),
-      );
-      return;
-    }
-    for (const t of rectTiles(prop.rect)) {
-      const kind = tileKind(dock, t);
-      if (kind !== "floor") {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "props", i],
-            `prop "${prop.key}" covers ${at(t)}, which is ${kind ?? "undeclared"}, not floor`,
-          ),
-        );
-        return;
-      }
-      const other = propAt.get(`${t.x},${t.y}`);
-      if (other !== undefined) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "props", i],
-            `prop "${prop.key}" overlaps "${other}" at ${at(t)}`,
-          ),
-        );
-        return;
-      }
-      propAt.set(`${t.x},${t.y}`, prop.key);
-    }
+    const problem = rectInMap(dock, prop.rect)
+      ? claimRect(prop.rect, prop.key, "prop", propAt, (t) => {
+          const kind = tileKind(dock, t);
+          return kind === "floor"
+            ? undefined
+            : `prop "${prop.key}" covers ${at(t)}, which is ${kind ?? "undeclared"}, not floor`;
+        })
+      : `prop "${prop.key}" reaches off the map`;
+    if (problem !== undefined) issues.push(issue("physical", [...path, "props", i], problem));
   });
   dock.areas.forEach((area, i) => {
     if (!rectInMap(dock, area.rect)) {
@@ -317,50 +280,28 @@ function checkPostsAndAreas(dock: DockDef, mask: Uint8Array, issues: ValidationI
   const path = dockPath(dock);
   const areaAt = new Map<string, string>();
   dock.areas.forEach((area, i) => {
-    for (const t of rectTiles(area.rect)) {
-      if (!walkable(dock, mask, t)) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "areas", i],
-            `area "${area.key}" tile ${at(t)} is ${describeTile(dock, t)}, not walkable floor`,
-          ),
-        );
-        return;
-      }
-      const other = areaAt.get(`${t.x},${t.y}`);
-      if (other !== undefined) {
-        issues.push(
-          issue(
-            "physical",
-            [...path, "areas", i],
-            `area "${area.key}" overlaps "${other}" at ${at(t)}`,
-          ),
-        );
-        return;
-      }
-      areaAt.set(`${t.x},${t.y}`, area.key);
-    }
+    const problem = claimRect(area.rect, area.key, "area", areaAt, (t) =>
+      walkable(dock, mask, t)
+        ? undefined
+        : `area "${area.key}" tile ${at(t)} is ${describeTile(dock, t)}, not walkable floor`,
+    );
+    if (problem !== undefined) issues.push(issue("physical", [...path, "areas", i], problem));
   });
   dock.posts.forEach((post, i) => {
+    const postPath: Path = [...path, "posts", i, "tile"];
+    const where = `post "${post.key}" at ${at(post.tile)}`;
     if (!walkable(dock, mask, post.tile)) {
       issues.push(
         issue(
           "physical",
-          [...path, "posts", i, "tile"],
-          `post "${post.key}" at ${at(post.tile)} is ${describeTile(dock, post.tile)}, not walkable floor`,
+          postPath,
+          `${where} is ${describeTile(dock, post.tile)}, not walkable floor`,
         ),
       );
     }
-    const area = areaAt.get(`${post.tile.x},${post.tile.y}`);
+    const area = areaAt.get(tileKey(post.tile));
     if (area !== undefined) {
-      issues.push(
-        issue(
-          "physical",
-          [...path, "posts", i, "tile"],
-          `post "${post.key}" at ${at(post.tile)} stands inside area "${area}"`,
-        ),
-      );
+      issues.push(issue("physical", postPath, `${where} stands inside area "${area}"`));
     }
   });
 }
@@ -388,11 +329,11 @@ function checkBerth(dock: DockDef, deck: DeckDef, issues: ValidationIssue[]): bo
     );
     return false;
   }
-  const under = new Set(shipFloor(deck).map((t) => `${t.x + sx},${t.y + sy}`));
+  const under = new Set(shipFloor(deck).map((t) => tileKey({ x: t.x + sx, y: t.y + sy })));
   for (let y = 0; y < dock.height; y++) {
     for (let x = 0; x < dock.width; x++) {
       const berth = tileKind(dock, { x, y }) === "berth";
-      if (berth !== under.has(`${x},${y}`)) {
+      if (berth !== under.has(tileKey({ x, y }))) {
         const message = berth
           ? `berth at ${at({ x, y })} is not under "${deck.id}" docked at ${at(dock.shipAt)}`
           : `${at({ x, y })} is under "${deck.id}" docked at ${at(dock.shipAt)} but is not berth`;
@@ -404,19 +345,17 @@ function checkBerth(dock: DockDef, deck: DeckDef, issues: ValidationIssue[]): bo
   return true;
 }
 
-interface Landing {
-  readonly rampKey: string;
-  readonly tile: TileCoord;
-}
-
-/** Dock-frame tile just outside each ramp door of the deck. */
-function landingsOf(dock: DockDef, deck: DeckDef): Landing[] {
+/** Dock-frame tile just outside each ramp door of the deck, docked at `shipAt`. */
+export function dockRampLandings(
+  dock: DockDef,
+  deck: DeckDef,
+): { readonly key: string; readonly tile: TileCoord }[] {
   return deck.doors
     .filter((door) => door.kind === "ramp")
     .map((door) => {
-      const d = SIDE_DELTA[door.edge.side];
+      const d = SIDE_OFFSET[door.edge.side];
       return {
-        rampKey: door.key,
+        key: door.key,
         tile: { x: door.edge.x + d.x + dock.shipAt.x, y: door.edge.y + d.y + dock.shipAt.y },
       };
     });
@@ -425,14 +364,14 @@ function landingsOf(dock: DockDef, deck: DeckDef): Landing[] {
 function reachableFrom(dock: DockDef, mask: Uint8Array, start: TileCoord): Uint8Array {
   const seen = new Uint8Array(dock.width * dock.height);
   if (!walkable(dock, mask, start)) return seen;
-  seen[start.y * dock.width + start.x] = 1;
+  seen[cell(dock, start)] = 1;
   const queue: TileCoord[] = [start];
   for (let head = 0; head < queue.length; head++) {
     const t = queue[head] as TileCoord;
     for (const d of NEIGHBOURS) {
       const n = { x: t.x + d.x, y: t.y + d.y };
-      if (!walkable(dock, mask, n) || seen[n.y * dock.width + n.x] === 1) continue;
-      seen[n.y * dock.width + n.x] = 1;
+      if (!walkable(dock, mask, n) || seen[cell(dock, n)] === 1) continue;
+      seen[cell(dock, n)] = 1;
       queue.push(n);
     }
   }
@@ -447,8 +386,8 @@ function checkLandings(
   issues: ValidationIssue[],
 ): void {
   const path = dockPath(dock);
-  for (const landing of landingsOf(dock, deck)) {
-    const where = `ramp "${landing.rampKey}" of "${deck.id}" lands at ${at(landing.tile)}`;
+  for (const landing of dockRampLandings(dock, deck)) {
+    const where = `ramp "${landing.key}" of "${deck.id}" lands at ${at(landing.tile)}`;
     if (!walkable(dock, mask, landing.tile)) {
       issues.push(
         issue(
@@ -459,16 +398,14 @@ function checkLandings(
       );
       continue;
     }
-    const inArea = dock.areas.find((a) =>
-      rectTiles(a.rect).some((t) => t.x === landing.tile.x && t.y === landing.tile.y),
-    );
+    const inArea = dock.areas.find((a) => rectContains(a.rect, landing.tile));
     if (inArea !== undefined) {
       issues.push(issue("physical", [...path, "areas"], `${where}, inside area "${inArea.key}"`));
     }
     const seen = reachableFrom(dock, mask, landing.tile);
-    const reached = (t: TileCoord) => inMap(dock, t) && seen[t.y * dock.width + t.x] === 1;
+    const unreached = (t: TileCoord) => walkable(dock, mask, t) && seen[cell(dock, t)] !== 1;
     dock.posts.forEach((post, i) => {
-      if (walkable(dock, mask, post.tile) && !reached(post.tile)) {
+      if (unreached(post.tile)) {
         issues.push(
           issue(
             "physical",
@@ -479,7 +416,7 @@ function checkLandings(
       }
     });
     dock.areas.forEach((area, i) => {
-      const cut = rectTiles(area.rect).find((t) => walkable(dock, mask, t) && !reached(t));
+      const cut = rectTiles(area.rect).find(unreached);
       if (cut !== undefined) {
         issues.push(
           issue(

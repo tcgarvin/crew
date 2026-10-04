@@ -230,7 +230,7 @@ export function rawBundle(): Record<string, unknown> {
   return { ...withoutHash, hash: hashOf(withoutHash) };
 }
 
-/** Loads, validates (L1-L3) and returns the content bundle. Throws on any `NotImplementedError`. */
+/** Loads, validates (L1-L3) and returns the content bundle. */
 export function loadBundle(): ValidationResult {
   return validateBundle(rawBundle());
 }
