@@ -8,7 +8,7 @@ import type { ActorId, ContentBundle, NarratorHook, PortDefId, SaveEnvelope } fr
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { approachRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
-import { payFor, routeDistance } from "./lookups";
+import { pathBetween, payFor, routeDistance } from "./lookups";
 import { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 import { content } from "./test-support";
 
@@ -163,7 +163,9 @@ describe("null narrator offers work (D40)", () => {
     expect(routeDistance(bundle, TERNS, DRIFT)).toBeUndefined();
     const line = job.cargo[0];
     if (line === undefined) throw new Error("no cargo");
-    const { min, max } = payFor(bundle.config, "hazardous", 115, line.count, "standard");
+    const distance = pathBetween(bundle, TERNS, DRIFT)?.distance;
+    if (distance === undefined) throw new Error("no path");
+    const { min, max } = payFor(bundle.config, "hazardous", distance, line.count, "standard");
     expect(job.pay).toBeGreaterThanOrEqual(min);
     expect(job.pay).toBeLessThanOrEqual(max);
   });

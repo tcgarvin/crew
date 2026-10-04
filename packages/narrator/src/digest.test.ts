@@ -24,10 +24,28 @@ import {
   passengerOverdueRequest,
   quietTooLongRequest,
 } from "./fixtures";
+import { pathBetween, portName } from "./lookups";
 import { EMPTY_NOTES } from "./notes";
 import { content } from "./test-support";
 
 const HUB_PORT = "port.crossroads_hub";
+
+/**
+ * "2 hops, 425s transit" and the waypoints by name, from content: the leg lengths are tuning
+ * (D76 made the spur legs a watch long), so tests derive them rather than pin them.
+ */
+function pathWords(from: string, to: string): { hops: string; via: string } {
+  const path = pathBetween(content(), from, to);
+  if (path === undefined) throw new Error(`no path ${from} -> ${to}`);
+  const via = path.path
+    .slice(1, -1)
+    .map((id) => portName(content(), id))
+    .join(", ");
+  return {
+    hops: `${path.hops} ${path.hops === 1 ? "hop" : "hops"}, ${path.distance}s transit`,
+    via,
+  };
+}
 
 function manyEvents(n: number): SimEvent[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -287,7 +305,7 @@ describe("buildDigest", () => {
     const mara = content().crew["crew.mara_osei" as keyof ReturnType<typeof content>["crew"]];
     const first = crewLines?.[0] ?? "";
     expect(first).toMatch(
-      /^- Mara Osei \[captain\]: this is the captain, the player; never a speaker\. .+; needs: .+; good at: .+/,
+      /^- Mara Osei \[captain\] \[Red, o(n|ff) watch\]: this is the captain, the player; never a speaker\. .+; needs: .+; mood: .+; good at: .+/,
     );
     expect(first).toContain(`voice: ${mara?.voice}`);
     expect(first).not.toContain("captain, the player; never a speaker. voice:");
@@ -462,7 +480,7 @@ describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
     snapshot.state.travel = { ...t, voyageDestinationId: OSSORY };
     const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
     expect(text).toContain(
-      "travel: approaching, under way Crossroads Hub -> Kessler Drift (port.kessler_drift), 100% of route, bound for Ossory Station (port.ossory_station); 1 hop, 120s transit still to go from there",
+      `travel: approaching, under way Crossroads Hub -> Kessler Drift (port.kessler_drift), 100% of route, bound for Ossory Station (port.ossory_station); ${pathWords(DRIFT, OSSORY).hops} still to go from there`,
     );
   });
 
@@ -477,11 +495,11 @@ describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
     };
     const stopping = buildDigest(snapshot, [], EMPTY_NOTES, content(), undefined).text;
     expect(stopping).toContain(
-      "travel: stopping at Kessler Drift (port.kessler_drift) on the way to Ossory Station (port.ossory_station); 1 hop, 120s transit still to go; next leg to Ossory Station; the ship continues on her own once nothing holds her here",
+      `travel: stopping at Kessler Drift (port.kessler_drift) on the way to Ossory Station (port.ossory_station); ${pathWords(DRIFT, OSSORY).hops} still to go; next leg to Ossory Station; the ship continues on her own once nothing holds her here`,
     );
     snapshot.state.travel = { stage: "docked", portId: HUB, voyageDestinationId: OSSORY };
     expect(buildDigest(snapshot, [], EMPTY_NOTES, content(), undefined).text).toContain(
-      "on the way to Ossory Station (port.ossory_station); 2 hops, 145s transit still to go;",
+      `on the way to Ossory Station (port.ossory_station); ${pathWords(HUB, OSSORY).hops} still to go;`,
     );
     // At the destination the voyage is over: no "on the way" wording even if the field lingers.
     snapshot.state.travel = { stage: "docked", portId: OSSORY, voyageDestinationId: OSSORY };
@@ -495,8 +513,9 @@ describe("buildDigest: voyages (passengers-and-galaxy §2.3)", () => {
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     for (const job of Object.values(snapshot.state.jobs)) job.toPortId = OSSORY;
     const { text } = buildDigest(snapshot, [], EMPTY_NOTES, content(), req.hook);
+    const far = pathWords(HUB, OSSORY);
     expect(text).toContain(
-      "Crossroads Hub -> Ossory Station (2 hops, 145s transit via Kessler Drift), 4x General Cargo Crate",
+      `Crossroads Hub -> Ossory Station (${far.hops} via ${far.via}), 4x General Cargo Crate`,
     );
     const near = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook).text;
     expect(near).toContain("Crossroads Hub -> Green Meridian, 4x General Cargo Crate");
@@ -525,8 +544,9 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
 
   it("says the job is a round-trip passage on the Jobs line, with the leg and the luggage", () => {
     const req = passengerAboardRequest(content());
+    const far = pathWords(HUB_PORT, "port.ossory_station");
     expect(digestOf(req)).toContain(
-      "Crossroads Hub -> Ossory Station (2 hops, 145s transit via Kessler Drift), round-trip passage (leg out), no luggage",
+      `Crossroads Hub -> Ossory Station (${far.hops} via ${far.via}), round-trip passage (leg out), no luggage`,
     );
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     const job = Object.values(snapshot.state.jobs)[0];

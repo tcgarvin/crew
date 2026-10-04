@@ -116,8 +116,13 @@ describe("translateIntents: far ports (passengers-and-galaxy §2.3)", () => {
     expect(draft.toPortId).toBe(OSSORY);
     expect(routeDistance(content(), HUB, OSSORY)).toBeUndefined();
     const path = pathBetween(content(), HUB, OSSORY);
-    expect(path).toMatchObject({ hops: 2, distance: 145 });
-    const expected = payFor(req.snapshot.config, "hazardous", 145, 3, "standard");
+    if (path === undefined) throw new Error("no path");
+    expect(path.hops).toBe(2);
+    expect(path.distance).toBe(
+      (routeDistance(content(), HUB, "port.kessler_drift") ?? 0) +
+        (routeDistance(content(), "port.kessler_drift", OSSORY) ?? 0),
+    );
+    const expected = payFor(req.snapshot.config, "hazardous", path.distance, 3, "standard");
     expect(draft.pay).toBe(expected.pay);
     // Direct-route pricing would be a different (lower) number.
     expect(draft.pay).not.toBe(payFor(req.snapshot.config, "hazardous", 25, 3, "standard").pay);
@@ -1026,5 +1031,157 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     const ended = translateIntents(plan([putOff]), ctxOf({ ...req, snapshot }));
     expect(ended.commands).toEqual([]);
     expect(ended.dropped[0]?.reason).toContain("endPassage needs a passenger");
+  });
+});
+
+describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
+  const hazard = {
+    kind: "scheduleHazard",
+    hazard: "debrisField",
+    difficulty: "hard",
+    window: "soon",
+  };
+
+  /** In transit with `secondsLeft` of the leg to run at nominal speed. */
+  function inTransit(secondsLeft: number): NarratorRequest {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const travel = snapshot.state.travel;
+    if (travel.stage === "docked") throw new Error("fixture: expected the ship under way");
+    const speed = snapshot.config.travel.nominalSpeed;
+    snapshot.state.travel = {
+      ...travel,
+      routeDistance: 400,
+      routeProgress: 400 - secondsLeft * speed,
+    };
+    return { ...req, snapshot };
+  }
+
+  function withBudget(req: NarratorRequest, hazardsRemaining: number): NarratorRequest {
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.narrator.budget = { ...snapshot.state.narrator.budget, hazardsRemaining };
+    return { ...req, snapshot };
+  }
+
+  it("translates the tier to config's difficulty and the window to the fault windows' ticks", () => {
+    const req = withBudget(inTransit(200), 2);
+    const result = translateIntents(plan([hazard]), ctxOf(req));
+    expect(result.dropped).toEqual([]);
+    const [command] = result.commands;
+    expect(command?.kind).toBe("scheduleHazard");
+    if (command?.kind !== "scheduleHazard") return;
+    const config = req.snapshot.config;
+    expect(command.source).toBe("narrator");
+    expect(command.payload.kind).toBe("debrisField");
+    expect(command.payload.difficulty).toBe(config.hazards.difficulty.hard);
+    const [earliest, latest] = command.payload.windowTicks;
+    const third = (config.narrator.maxFaultWindowSeconds / 3) * config.time.tickRate;
+    expect(earliest).toBe(0);
+    expect(latest).toBe(Math.round(third));
+    expect(latest - earliest).toBeLessThanOrEqual(
+      config.narrator.maxFaultWindowSeconds * config.time.tickRate,
+    );
+  });
+
+  it("maps every tier and kind", () => {
+    const config = quietTooLongRequest(content()).snapshot.config;
+    for (const difficulty of ["easy", "hard", "brutal"] as const) {
+      for (const kind of ["debrisField", "asteroidBelt", "ionStorm"]) {
+        const req = withBudget(inTransit(200), 2);
+        const result = translateIntents(
+          plan([{ ...hazard, hazard: kind, difficulty }]),
+          ctxOf(req),
+        );
+        const [command] = result.commands;
+        if (command?.kind !== "scheduleHazard") throw new Error(`no hazard for ${kind}`);
+        expect(command.payload).toMatchObject({
+          kind,
+          difficulty: config.hazards.difficulty[difficulty],
+        });
+      }
+    }
+  });
+
+  it("drops a window that opens after this leg's transit ends, and keeps soon", () => {
+    const req = withBudget(inTransit(10), 2);
+    const later = translateIntents(plan([{ ...hazard, window: "later" }]), ctxOf(req));
+    expect(later.commands).toEqual([]);
+    expect(later.dropped[0]?.reason).toBe(
+      "scheduleHazard: window later opens after this leg's transit ends (~10s left); use soon, or place it on the next leg",
+    );
+    const soon = translateIntents(plan([hazard]), ctxOf(req));
+    expect(soon.commands.map((c) => c.kind)).toEqual(["scheduleHazard"]);
+  });
+
+  it("drops one while docked with no course, and accepts one once a course is set", () => {
+    const bare = withBudget(docked(approachRequest(content())), 2);
+    const none = translateIntents(plan([{ ...hazard, window: "muchLater" }]), ctxOf(bare));
+    expect(none.commands).toEqual([]);
+    expect(none.dropped[0]?.reason).toBe(
+      "scheduleHazard: the ship is docked with no course set; a hazard needs a leg to lie on",
+    );
+    const snapshot = structuredClone(bare.snapshot) as SaveEnvelope;
+    snapshot.state.travel = {
+      stage: "docked",
+      portId: "port.kessler_drift" as PortDefId,
+      plannedDestinationId: "port.ossory_station" as PortDefId,
+    };
+    const set = translateIntents(plan([{ ...hazard, window: "muchLater" }]), {
+      ...ctxOf(bare),
+      snapshot,
+    });
+    expect(set.dropped).toEqual([]);
+    expect(set.commands.map((c) => c.kind)).toEqual(["scheduleHazard"]);
+  });
+
+  it("drops one on approach: this leg's transit is over", () => {
+    const req = withBudget(approachRequest(content()), 2);
+    expect(req.snapshot.state.travel.stage).toBe("approaching");
+    const result = translateIntents(plan([hazard]), ctxOf(req));
+    expect(result.dropped.map((d) => d.reason)).toEqual([
+      "scheduleHazard: the ship is approaching: this leg's transit is over; place it on the next leg once a course is set",
+    ]);
+  });
+
+  it("spends the hazard budget and lets one hazard wait at a time", () => {
+    const empty = translateIntents(plan([hazard]), ctxOf(withBudget(inTransit(200), 0)));
+    expect(empty.dropped.map((d) => d.reason)).toEqual(["scheduleHazard: hazard budget exhausted"]);
+
+    const two = translateIntents(
+      plan([hazard, { ...hazard, hazard: "ionStorm" }]),
+      ctxOf(withBudget(inTransit(200), 2)),
+    );
+    expect(two.commands.map((c) => c.kind)).toEqual(["scheduleHazard"]);
+    expect(two.dropped.map((d) => d.reason)).toEqual([
+      "scheduleHazard: a hazard is already waiting on the ship's path; let it fire first",
+    ]);
+
+    const req = withBudget(inTransit(200), 2);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.hazards = [
+      {
+        id: "hz1" as never,
+        kind: "asteroidBelt",
+        difficulty: 5,
+        fireAtTick: snapshot.state.tick + 100,
+      },
+    ];
+    const waiting = translateIntents(plan([hazard]), { ...ctxOf(req), snapshot });
+    expect(waiting.commands).toEqual([]);
+    expect(waiting.dropped[0]?.reason).toContain("a hazard is already waiting");
+  });
+
+  it("drops an unknown hazard kind or tier at the schema", () => {
+    const req = withBudget(inTransit(200), 2);
+    const result = translateIntents(
+      plan([
+        { ...hazard, hazard: "blackHole" },
+        { ...hazard, difficulty: "deadly" },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.commands).toEqual([]);
+    expect(result.dropped.map((d) => d.kind)).toEqual(["scheduleHazard", "scheduleHazard"]);
+    for (const drop of result.dropped) expect(drop.reason).toContain("scheduleHazard: invalid");
   });
 });

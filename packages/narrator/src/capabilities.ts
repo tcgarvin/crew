@@ -1,5 +1,5 @@
 /**
- * The capability list (D11): exactly what the five narrator commands can do in this game,
+ * The capability list (D11): exactly what the six narrator levers can do in this game,
  * generated from content, config and the ship's machines so the prompt never promises what the
  * sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
@@ -11,12 +11,14 @@ import {
   type ConfigDef,
   type ContentBundle,
   type FaultEffect,
+  HAZARD_KINDS,
   JOB_URGENCIES,
   MARKET_PRICE_TIERS,
   type MarketPriceTier,
   basePriceFor,
   effectiveMarket,
 } from "@crew/sim";
+import { HAZARD_DIFFICULTIES } from "./contract";
 import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
@@ -28,6 +30,7 @@ import {
   pathBetween,
   portHereOrNext,
 } from "./lookups";
+import { HAZARD_NAMES } from "./watch-digest";
 
 function effectText(effect: FaultEffect): string {
   switch (effect.kind) {
@@ -96,6 +99,20 @@ function reachLine(content: ContentBundle, hereId: string, portId: string): stri
   return `${legs}, ${seconds(path.distance)} transit in all${stops}`;
 }
 
+/** D78: the sixth lever, with its kinds, tiers and windows from config. */
+function hazardLever(config: ConfigDef): string[] {
+  const windows = faultWindowSeconds(config);
+  const tiers = HAZARD_DIFFICULTIES.map((t) => `${t} (${config.hazards.difficulty[t]})`).join(", ");
+  return [
+    "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check for whoever has the helm",
+    `- hazard: ${HAZARD_KINDS.map((k) => `${k} (${HAZARD_NAMES[k]})`).join(", ")}. All three are the same check; pick the one that fits the leg and the story.`,
+    `- difficulty: ${tiers}: the piloting it is rolled against, on the 1-10 scale of "good at: piloting" under Crew. A pilot at or above it usually comes through clean; well below it, usually not.`,
+    `- window: soon (${seconds(windows.soon[0])}-${seconds(windows.soon[1])}), later (${seconds(windows.later[0])}-${seconds(windows.later[1])}), muchLater (${seconds(windows.muchLater[0])}-${seconds(windows.muchLater[1])}) from now. It goes off at the first moment the ship is in transit at or after that, so one placed while docked with a course set waits for that leg's transit.`,
+    "- Only while a course is set or the ship is under way, and only on a leg with transit left: dropped while docked with no course, on approach or docking, or when the window opens after this leg's transit ends. One hazard waits at a time. Uses one hazard from the budget in the digest.",
+    `- The sim rolls it against whoever has the helm when it goes off, never you: clean (nothing happens), a scrape (one of the ship's machines takes a fault, which the crew must find and repair like any other), or a delay (about ${seconds(config.hazards.delaySeconds)} lost on the leg). With nobody at the helm it is a scrape and a delay both. The next digest shows who was at the helm and how it went.`,
+  ];
+}
+
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
   const ports = Object.values(content.ports).sort((a, b) => a.id.localeCompare(b.id));
   const here = portHereOrNext(state);
@@ -114,7 +131,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly five levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly six levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
   lines.push(
     "The ids below (ports, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -212,5 +229,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; you never buy, deliver, repair or pay. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
+  lines.push("");
+  lines.push(...hazardLever(config));
   return lines.join("\n");
 }
