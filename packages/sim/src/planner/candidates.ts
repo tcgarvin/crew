@@ -360,13 +360,36 @@ function occupiedTiles(view: AgentView): TileCoord[] {
   return out;
 }
 
+interface BedChoice {
+  readonly bed: MachineId;
+  readonly ticks: number;
+  readonly own: boolean;
+  readonly quarters: boolean;
+}
+
+/** Own berth first, then a bunk in the quarters, then the nearest. */
+const betterBed = (a: BedChoice, b: BedChoice | undefined): boolean =>
+  b === undefined ||
+  (a.own !== b.own ? a.own : a.quarters !== b.quarters ? a.quarters : a.ticks < b.ticks);
+
+/**
+ * D74: sleep in one's own berth (`self.berth`) unless it is believed occupied, unreachable or
+ * backing off; otherwise in the unassigned pool, a quarters bunk before a nearer bed elsewhere.
+ * A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is for
+ * patients).
+ */
 function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const fatigue = view.self.needs.fatigue;
   const urgency = needUrgency(fatigue, config);
   if (urgency === undefined) return undefined;
   const occupied = occupiedTiles(view);
-  let best: { bed: MachineId; ticks: number; quarters: boolean } | undefined;
+  const mine = view.self.berth?.machineId;
+  const assigned = new Set(view.assignedBeds());
+  let best: BedChoice | undefined;
   for (const bed of view.schematic.amenities("bed")) {
+    if (bed.tags.includes("medBed")) continue;
+    const own = bed.machineId === mine;
+    if (!own && assigned.has(bed.machineId)) continue;
     const berth = (
       bed.interactionTiles.find((t) => t.purposes.includes("use")) ?? bed.interactionTiles[0]
     )?.tile;
@@ -374,13 +397,13 @@ function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rej
     if (occupied.some((t) => sameTile(t, berth))) continue;
     const ticks = view.estimateTravelTicks(berth);
     if (ticks === null) continue;
-    // A bunk in the quarters beats a nearer bed elsewhere (the medbay bed is not for napping).
-    const quarters = inCompartmentTagged(view, berth, "quarters");
-    const better =
-      best === undefined ||
-      (quarters && !best.quarters) ||
-      (quarters === best.quarters && ticks < best.ticks);
-    if (better) best = { bed: bed.machineId, ticks, quarters };
+    const choice = {
+      bed: bed.machineId,
+      ticks,
+      own,
+      quarters: inCompartmentTagged(view, berth, "quarters"),
+    };
+    if (betterBed(choice, best)) best = choice;
   }
   if (best === undefined) return { ref: "sleep", reason: "noFreeBed" };
   return personal(`sleep:${best.bed}`, urgency, best.ticks, view.tick, {

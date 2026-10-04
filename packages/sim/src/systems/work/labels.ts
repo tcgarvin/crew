@@ -7,8 +7,8 @@
  * "coming aboard" (D61), "picking up <item>", "hauling <item>",
  * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "fetching the hand truck",
  * "loading <item>", "hauling <n> crates", "unloading <item>", "returning the hand truck",
- * "parking the hand truck" (D65), "eating", "asleep", "resting", "chatting", "inspecting <machine>",
- * "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>", and the captain
+ * "parking the hand truck" (D65), "eating", "asleep", "asleep in the <cabin>" (D74), "resting",
+ * "chatting", "inspecting <machine>", "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>", and the captain
  * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
  * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
@@ -190,7 +190,7 @@ function personalStepLabel(
     case "parkTruck":
       return "moving crates";
     case "hold":
-      return HOLD_LABEL[step.hold];
+      return step.hold === "sleep" ? sleepLabel(ctx, actor) : HOLD_LABEL[step.hold];
     case "awaitWord":
       return "looking for work";
     case "talk":
@@ -198,6 +198,25 @@ function personalStepLabel(
     case "deliverCard":
       return "talking";
   }
+}
+
+/**
+ * D74: "asleep in the captain's cabin" when the bed is in a `cabin`-tagged compartment, else
+ * "asleep". Content gives people no pronouns, so the cabin is named rather than "her cabin".
+ */
+function sleepLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
+  const location = actor.location;
+  if (location.kind !== "onDeck") return HOLD_LABEL.sleep;
+  const geometry = ctx.caches.nav.decks[location.deckId];
+  const compartmentId =
+    geometry === undefined ? undefined : compartmentAt(geometry, location.x, location.y);
+  const compartment =
+    compartmentId === undefined ? undefined : ctx.state.compartments[compartmentId];
+  const def = ctx.content.decks[location.deckId]?.compartments.find(
+    (c) => c.key === compartment?.key,
+  );
+  if (def === undefined || !def.tags.includes("cabin")) return HOLD_LABEL.sleep;
+  return `${HOLD_LABEL.sleep} in the ${def.name.toLowerCase()}`;
 }
 
 /**

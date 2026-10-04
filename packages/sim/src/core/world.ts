@@ -1,7 +1,9 @@
 /**
  * World creation and `advance` (SD §19.1). `createWorld` builds an empty `WorldState`,
- * instantiates the scenario deck, then spawns crew, stores and faults through the command path.
+ * instantiates the scenario deck, then spawns crew, stores and faults through the command path,
+ * then assigns berths and sets personal belongings down in lockers (D74).
  */
+import { assignBerths, stowPersonalItems } from "./berths";
 import { emptyCaches, rebuildCaches } from "./caches";
 import { configTicks } from "./clock";
 import { type ApplyCtx, applyCommandNow } from "./commands";
@@ -338,6 +340,9 @@ export function createWorld(
   for (const command of scenarioSetupCommands(scenario, deck, content, state)) {
     applyCommandNow(registry, ctx, command);
   }
+  // D74: berths by rank from tick 0, and each crew member's belongings in their locker.
+  assignBerths(state, deck, content);
+  stowPersonalItems(state, deck, content);
   seedInitialNeeds(state, values.needs.initialRange, rng);
   // D66: the dock a game starts alongside has its regulars at their posts from tick 0.
   if (state.deck.dock !== undefined) {
