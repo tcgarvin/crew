@@ -48,6 +48,19 @@ export const HULL_CLASS_BOX: Readonly<
   L: { w: 40, h: 24 },
 };
 
+/** D72: the dock-frame rectangle of `dock`'s berth box. */
+export function berthBox(dock: Pick<DockDef, "berth">): DockRect {
+  const box = HULL_CLASS_BOX[dock.berth.sizeClass];
+  return { x: dock.berth.origin.x, y: dock.berth.origin.y, w: box.w, h: box.h };
+}
+
+/** D72: whether a hull of class `hull` fits a berth box of class `berth` (S < M < L). */
+export function hullFitsBerth(hull: HullSizeClass, berth: HullSizeClass): boolean {
+  const own = HULL_CLASS_BOX[hull];
+  const box = HULL_CLASS_BOX[berth];
+  return own.w <= box.w && own.h <= box.h;
+}
+
 /**
  * D72: the dock tile under deck tile (0,0) when `deck` lies in `dock`'s berth box: flush to the
  * box's south edge and centred across it. Mirrors sim `berthPlacement` without its throws (the

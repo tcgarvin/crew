@@ -2,21 +2,33 @@
  * Dock map validation (Dockside §3.1). L2: the port exists and has one dock, keys are unique, the
  * map has the posts and areas physical port work needs, a planet has a sky, and castSeed posts
  * name real posts. L3: the map's geometry against every deck in the bundle: the berth box (D72)
- * lies on the map and is all void, each deck fits the box, its ramps (with the deck placed in the
- * box, `shipAtInBerth`) land on walkable floor, posts and areas are walkable and reachable from
- * every landing, and the map fits the size cap. The rest of the hull contract is the validator
- * stream's (ship life plan W1).
+ * lies on the map and is all void; the quay row under it is walkable floor across its width
+ * (`checkQuayRow`, not yet called: see `checkDockPhysical`); for each deck whose class fits the
+ * box, its ramps (the deck placed in the box, `shipAtInBerth`) land on walkable floor outside the
+ * areas and reach every post and area; posts and areas are walkable; the map fits the size cap.
+ * A scenario's ship fits every dock's box (`checkScenarioBerths`). The deck's side of the
+ * contract is `validate-hull.ts`.
  *
  * Walkable dock floor is a `floor` tile under no blocking prop. The sim's nav graft applies the
  * same rule (`dockFloorMask` in `@crew/sim`, which this package may only import as types); a CLI
  * test checks the two agree on every authored dock, and `crew content validate` grafts each dock
  * with the sim's own builder.
  */
-import type { ContentBundle, DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
+import type {
+  ContentBundle,
+  DeckDef,
+  DockDef,
+  DockRect,
+  PortDef,
+  ScenarioDef,
+  TileCoord,
+} from "@crew/sim";
 import {
   HULL_CLASS_BOX,
   SIDE_OFFSET,
   at,
+  berthBox,
+  hullFitsBerth,
   rectContains,
   rectTiles,
   shipAtInBerth,
@@ -320,14 +332,13 @@ function checkPostsAndAreas(dock: DockDef, mask: Uint8Array, issues: ValidationI
 function checkBerthBox(dock: DockDef, issues: ValidationIssue[]): boolean {
   const path: Path = [...dockPath(dock), "berth", "origin"];
   const { origin, sizeClass } = dock.berth;
-  const box = HULL_CLASS_BOX[sizeClass];
-  const rect: DockRect = { x: origin.x, y: origin.y, w: box.w, h: box.h };
+  const rect = berthBox(dock);
   if (!rectInMap(dock, rect)) {
     issues.push(
       issue(
         "physical",
         path,
-        `the ${sizeClass} berth box (${box.w} x ${box.h}) at ${at(origin)} does not fit on the ${dock.width} x ${dock.height} map`,
+        `the ${sizeClass} berth box (${rect.w} x ${rect.h}) at ${at(origin)} does not fit on the ${dock.width} x ${dock.height} map`,
       ),
     );
     return false;
@@ -341,20 +352,38 @@ function checkBerthBox(dock: DockDef, issues: ValidationIssue[]): boolean {
   return true;
 }
 
-/** D72: the deck fits its own size class, and that class fits the dock's berth box. */
-function checkDeckFitsBerth(dock: DockDef, deck: DeckDef, issues: ValidationIssue[]): boolean {
+/**
+ * L3 (D72): the quay row, just south of the berth box, is walkable floor across the box's whole
+ * width, so a ramp anywhere along a hull of the box's class lands on the quay. Expects a usable
+ * grid and a box on the map (`checkDockPhysical` checks both first); a quay row off the map is
+ * reported as off the map.
+ */
+export function checkQuayRow(dock: DockDef, issues: ValidationIssue[]): void {
+  const mask = dockWalkableMask(dock);
+  const rect = berthBox(dock);
+  const y = rect.y + rect.h;
+  const gaps = rectTiles({ x: rect.x, y, w: rect.w, h: 1 }).filter((t) => !walkable(dock, mask, t));
+  const [first] = gaps;
+  if (first === undefined) return;
+  const more = gaps.length > 1 ? ` (and ${gaps.length - 1} more)` : "";
+  issues.push(
+    issue(
+      "physical",
+      [...dockPath(dock), "berth", "origin"],
+      `quay row ${y} under the berth box: ${at(first)} is ${describeTile(dock, first)}, not walkable floor${more}`,
+    ),
+  );
+}
+
+/**
+ * Whether `deck` can lie in `dock`'s box. A deck over its own class box is the hull contract's to
+ * report; a class bigger than the box cannot berth here, which `checkScenarioBerths` makes an error
+ * for any scenario's ship.
+ */
+function deckBerthsAt(dock: DockDef, deck: DeckDef): boolean {
   const own = HULL_CLASS_BOX[deck.hull.sizeClass];
-  const box = HULL_CLASS_BOX[dock.berth.sizeClass];
-  const problem =
-    deck.width > own.w || deck.height > own.h
-      ? `"${deck.id}" (${deck.width} x ${deck.height}) exceeds its ${deck.hull.sizeClass} box (${own.w} x ${own.h})`
-      : own.w > box.w || own.h > box.h
-        ? `a ${dock.berth.sizeClass} berth cannot take "${deck.id}" (class ${deck.hull.sizeClass})`
-        : undefined;
-  if (problem !== undefined) {
-    issues.push(issue("physical", [...dockPath(dock), "berth", "sizeClass"], problem));
-  }
-  return problem === undefined;
+  const withinOwnClass = deck.width <= own.w && deck.height <= own.h;
+  return withinOwnClass && hullFitsBerth(deck.hull.sizeClass, dock.berth.sizeClass);
 }
 
 /** Dock-frame tile just outside each ramp door of the deck, lying in the dock's berth box. */
@@ -454,7 +483,29 @@ export function checkDockPhysical(
   const mask = dockWalkableMask(dock);
   checkPostsAndAreas(dock, mask, issues);
   if (!checkBerthBox(dock, issues)) return;
+  // `checkQuayRow` joins here once the six maps are re-authored for the M box (ship life plan
+  // W4): Kessler Drift, Vesper Gate and Tern's Rest put the box against the map edge today.
   for (const deck of Object.values(bundle.decks)) {
-    if (checkDeckFitsBerth(dock, deck, issues)) checkLandings(dock, deck, mask, issues);
+    if (deckBerthsAt(dock, deck)) checkLandings(dock, deck, mask, issues);
+  }
+}
+
+/** L3 (D72): a scenario's ship can berth at every dock, its class fitting each berth box. */
+export function checkScenarioBerths(
+  scenario: ScenarioDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const deck = bundle.decks[scenario.deckId];
+  if (deck === undefined) return; // L2 reports an unknown deck
+  for (const dock of Object.values(bundle.docks ?? {})) {
+    if (hullFitsBerth(deck.hull.sizeClass, dock.berth.sizeClass)) continue;
+    issues.push(
+      issue(
+        "physical",
+        ["scenarios", scenario.id, "deckId"],
+        `"${deck.id}" (class ${deck.hull.sizeClass}) cannot berth at "${dock.id}" (an ${dock.berth.sizeClass} box)`,
+      ),
+    );
   }
 }

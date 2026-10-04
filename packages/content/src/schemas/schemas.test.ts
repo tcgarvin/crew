@@ -17,47 +17,74 @@ import {
 } from "./index";
 import type { ValidationIssue } from "./issues";
 
+const door = (key: string, x: number, y: number, side: string, kind = "interior") => ({
+  key,
+  edge: { x, y, side },
+  kind,
+  manualOperationSupported: true,
+  initialState: "closed",
+});
+
+/** A single-tile machine on the top row, used from the tile south of it (rotation 270). */
+const placed = (key: string, machineDefId: string, x: number) => ({
+  key,
+  machineDefId,
+  origin: { x, y: 0 },
+  rotation: 270,
+});
+
+/**
+ * The smallest deck that meets the hull contract (D72): bridge on the east edge, both ramps south,
+ * every required room, station, zone and spawn point, and beds for the one crew member plus one.
+ */
 const deck = {
   id: "deck.test.main",
   name: "Test deck",
-  width: 3,
-  height: 1,
-  tiles: ["aab"],
+  width: 8,
+  height: 3,
+  tiles: ["EEGGQQBB", "EEGGQQBB", "HHHHHAAB"],
   compartments: [
-    { key: "hold", symbol: "a", name: "Hold", tags: ["cargoHold"] },
-    { key: "bridge", symbol: "b", name: "Bridge", tags: [] },
+    { key: "hold", symbol: "H", name: "Hold", tags: ["cargoHold"] },
+    { key: "engineering", symbol: "E", name: "Engineering", tags: ["engineering"] },
+    { key: "galley", symbol: "G", name: "Galley", tags: ["galley", "mess"] },
+    { key: "quarters", symbol: "Q", name: "Quarters", tags: ["quarters"] },
+    { key: "bridge", symbol: "B", name: "Bridge", tags: ["bridge"] },
+    { key: "airlock", symbol: "A", name: "Airlock", tags: ["airlock"] },
   ],
   doors: [
-    {
-      key: "d1",
-      edge: { x: 1, y: 0, side: "e" },
-      kind: "interior",
-      manualOperationSupported: true,
-      initialState: "closed",
-    },
-    {
-      key: "ramp",
-      edge: { x: 0, y: 0, side: "w" },
-      kind: "ramp",
-      manualOperationSupported: true,
-      initialState: "closed",
-    },
+    door("d1", 1, 0, "e"),
+    door("d2", 3, 1, "e"),
+    door("d3", 5, 1, "e"),
+    door("d4", 0, 1, "s"),
+    door("d5", 4, 2, "e"),
+    door("ramp", 1, 2, "s", "ramp"),
+    door("personnel_ramp", 5, 2, "s", "ramp"),
   ],
   openings: [],
   walls: [],
   machines: [
-    { key: "pump1", machineDefId: "machine.test.pump", origin: { x: 2, y: 0 }, rotation: 0 },
+    placed("engine1", "machine.test.engine", 0),
+    placed("pump1", "machine.test.pump", 1),
+    placed("stove1", "machine.test.stove", 2),
+    placed("table1", "machine.test.table", 3),
+    placed("bunk1", "machine.test.bunk", 4),
+    placed("bunk2", "machine.test.bunk", 5),
+    placed("helm1", "machine.test.helm", 6),
+    placed("nav1", "machine.test.nav", 7),
   ],
   powerDomains: [{ key: "main", name: "Main bus" }],
-  zones: [{ key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 0, y: 0 }] }],
+  zones: [{ key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 2, y: 2 }] }],
   docking: {
     cargoRampDoorKey: "ramp",
-    personnelRampDoorKey: "ramp",
-    cargoTransferTiles: [{ x: 0, y: 0 }],
-    personnelTransferTiles: [{ x: 0, y: 0 }],
+    personnelRampDoorKey: "personnel_ramp",
+    cargoTransferTiles: [{ x: 1, y: 2 }],
+    personnelTransferTiles: [{ x: 5, y: 2 }],
   },
   hull: { class: "test_hull", sizeClass: "S" },
-  spawnPoints: [{ key: "s1", tile: { x: 1, y: 0 }, tags: ["crew"] }],
+  spawnPoints: [
+    { key: "s1", tile: { x: 3, y: 2 }, tags: ["crew"] },
+    { key: "p1", tile: { x: 6, y: 2 }, tags: ["passenger"] },
+  ],
 };
 
 const machine = {
@@ -96,6 +123,23 @@ const machine = {
   ],
   components: [],
 };
+
+/** The pump's shape with one tag and no faults: the stations and furniture the deck needs. */
+const inertMachine = (name: string, tag: string) => ({
+  ...machine,
+  id: `machine.test.${name}`,
+  name,
+  tags: [tag],
+  faults: [],
+});
+const furniture = [
+  inertMachine("engine", "engine"),
+  inertMachine("stove", "stove"),
+  inertMachine("table", "messTable"),
+  inertMachine("bunk", "bed"),
+  inertMachine("helm", "pilotStation"),
+  inertMachine("nav", "navStation"),
+];
 
 const item = {
   id: "item.test.wrench",
@@ -406,7 +450,7 @@ const physicalIssues = (input: unknown) => issuesAt(validatePhysical, input);
 describe("bundle validation", () => {
   const bundle = {
     decks: { [deck.id]: deck },
-    machines: { [machine.id]: machine },
+    machines: Object.fromEntries([machine, ...furniture].map((m) => [m.id, m])),
     items: { [item.id]: item },
     crew: { [crew.id]: crew },
     traits: { [trait.id]: trait },
@@ -478,6 +522,21 @@ describe("bundle validation", () => {
         },
       });
       expect(negative.ok).toBe(false);
+    });
+
+    it("rejects a zone whose machineKey names no placement on its deck (D72)", () => {
+      const locker = {
+        key: "locker_1",
+        name: "Locker",
+        tags: ["locker"],
+        tiles: [{ x: 4, y: 1 }],
+        machineKey: "bunk9",
+      };
+      const badDeck = { ...deck, zones: [...deck.zones, locker] };
+      const issues = referenceIssues({ ...bundle, decks: { [badDeck.id]: badDeck } });
+      expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([
+        'decks.deck.test.main.zones.1.machineKey: zone "locker_1" names unknown machine placement "bunk9"',
+      ]);
     });
 
     it("rejects a dangling item reference in a crew starting inventory", () => {
@@ -595,11 +654,30 @@ describe("bundle validation", () => {
         ...deck,
         machines: [
           ...deck.machines,
-          { key: "pump2", machineDefId: "machine.test.pump", origin: { x: 2, y: 0 }, rotation: 0 },
+          { key: "pump2", machineDefId: "machine.test.pump", origin: { x: 1, y: 0 }, rotation: 0 },
         ],
       };
       const issues = physicalIssues({ ...bundle, decks: { [badDeck.id]: badDeck } });
       expect(issues.some((i) => i.message.includes("overlaps"))).toBe(true);
+    });
+
+    it("holds every deck to the hull contract (D72)", () => {
+      const westward = {
+        ...deck,
+        tiles: ["BBEEGGQQ", "BBEEGGQQ", "BHHHHHAA"],
+      };
+      const issues = physicalIssues({ ...bundle, decks: { [westward.id]: westward } });
+      expect(issues.map((i) => i.message)).toContain(
+        "the bridge does not reach the east hull edge (x = 7); the bow is east",
+      );
+    });
+
+    it("gives each of a scenario's crew a crew spawn point", () => {
+      const crowded = { ...scenario, crew: ["crew.test.mara", "crew.test.mara"] };
+      const issues = physicalIssues({ ...bundle, scenarios: { [scenario.id]: crowded } });
+      expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([
+        'scenarios.scenario.test.default.crew: 2 crew but "deck.test.main" has 1 crew spawn points',
+      ]);
     });
 
     it("rejects a spawn point off the floor", () => {
