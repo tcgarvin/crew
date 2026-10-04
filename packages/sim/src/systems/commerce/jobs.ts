@@ -206,24 +206,25 @@ type Cause = Pick<EventDraft, "causeIds" | "source">;
 const SYSTEM_CAUSE: Cause = { causeIds: [], source: "system" };
 
 /**
- * Create one freight item of `job` at `location` (owner: commerce), with no work attached. The
- * "kernel spawn path": allocate-and-insert directly, the same pattern `scenarioSpawn`'s `apply()`
- * uses. Staging an offer (D63) stops here; `spawnCargoItem` also opens the load work.
+ * Create one item at `location`, a freight item of a job when `freight` names it (owner:
+ * commerce), with no work attached. The "kernel spawn path": allocate-and-insert directly, the
+ * same pattern `scenarioSpawn`'s `apply()` uses. Staging an offer (D63) stops here;
+ * `spawnCargoItem` also opens the load work, and `spawnAtBoundary` spawns store items this way.
  */
-function spawnFreightItem(
+export function spawnItem(
   ctx: ApplyCtx,
-  job: Pick<Job, "id">,
   def: { readonly id: ItemDefId },
   count: number,
   stacking: "unique" | "stackable",
   location: PhysicalLocation,
   cause: Cause,
+  freight: Pick<Item, "jobId">,
 ): ItemId {
   const id = allocateId(ctx.state, "item");
   const item: Item =
     stacking === "unique"
-      ? { id, defId: def.id, stacking: "unique", location, condition: 1, jobId: job.id }
-      : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, jobId: job.id };
+      ? { id, defId: def.id, stacking: "unique", location, condition: 1, ...freight }
+      : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, ...freight };
   ctx.state.items[id] = item;
   ctx.caches.dirty.inventory = true;
   ctx.emit({
@@ -292,7 +293,7 @@ export function spawnCargoItem(
   /** Event attribution; defaults to the unattributed system cause `acceptJob` has always used. */
   cause: Cause = SYSTEM_CAUSE,
 ): ItemId {
-  const id = spawnFreightItem(ctx, job, def, count, stacking, location, cause);
+  const id = spawnItem(ctx, def, count, stacking, location, cause, { jobId: job.id });
   raiseLoadProblem(ctx, job, id, stowageZoneKey);
   return id;
 }
@@ -365,7 +366,7 @@ export function stageOfferedFreight(ctx: ApplyCtx, job: Job, cause: Cause = SYST
     const def = ctx.defs.item(line.itemDefId);
     for (let i = 0; i < line.count; i++) {
       const location = locations[ids.length] as PhysicalLocation;
-      ids.push(spawnFreightItem(ctx, job, def, 1, def.stacking, location, cause));
+      ids.push(spawnItem(ctx, def, 1, def.stacking, location, cause, { jobId: job.id }));
     }
   }
   job.cargoItemIds = ids;

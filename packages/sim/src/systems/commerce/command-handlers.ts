@@ -22,8 +22,7 @@ import { ensureMarket } from "../../core/markets";
 import type { BoundaryLocation, CommandOfKind } from "../../core/types/commands";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { CrewDef, ItemDef } from "../../core/types/content";
-import type { EntityId, ItemId, JobId, TempRef } from "../../core/types/ids";
-import type { Item } from "../../core/types/ship";
+import type { EntityId, JobId, TempRef } from "../../core/types/ids";
 import type { CargoLine, Job } from "../../core/types/travel";
 import { jobBlockingAcceptance } from "../travel/in-hand";
 import { portStoreLocation } from "../travel/travel";
@@ -40,6 +39,7 @@ import {
   issuerLabel,
   normaliseIssuer,
   spawnCargoItem,
+  spawnItem,
   surfaceOfferCard,
 } from "./jobs";
 import { PASSENGER_CREW_DEF_ID, endPassageEarly, spawnPassenger } from "./passage";
@@ -505,12 +505,9 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
           // which spawns the same way for the deterministic job source's manifests).
           // D63: on the origin's staging area when its dock is alongside, else in its store.
           const locations = freightSpawnLocations(ctx, job.fromPortId, spawn.count);
-          const ids: ItemId[] = [];
-          for (const location of locations) {
-            ids.push(
-              spawnCargoItem(ctx, job, def, 1, def.stacking, location, stowageZoneKey, cause),
-            );
-          }
+          const ids = locations.map((location) =>
+            spawnCargoItem(ctx, job, def, 1, def.stacking, location, stowageZoneKey, cause),
+          );
           job.cargoItemIds.push(...ids);
           const [firstId] = ids;
           if (firstId === undefined) {
@@ -518,33 +515,7 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
           }
           id = firstId;
         } else {
-          const newId = allocateId(state, "item");
-          const item: Item =
-            def.stacking === "unique"
-              ? {
-                  id: newId,
-                  defId: def.id,
-                  stacking: "unique",
-                  location: physicalLocation,
-                  condition: 1,
-                }
-              : {
-                  id: newId,
-                  defId: def.id,
-                  stacking: "stack",
-                  location: physicalLocation,
-                  count: spawn.count,
-                  reserved: 0,
-                };
-          state.items[newId] = item;
-          ctx.caches.dirty.inventory = true;
-          ctx.emit({
-            ...cause,
-            type: "entitySpawned",
-            subjectIds: [newId],
-            payload: { entityId: newId, defId: def.id },
-          });
-          id = newId;
+          id = spawnItem(ctx, def, spawn.count, def.stacking, physicalLocation, cause, {});
         }
         tempRefs[spawn.tempRef] = id;
       } else {
