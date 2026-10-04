@@ -37,19 +37,14 @@ import type {
   World,
 } from "@crew/sim";
 import {
-  checkInvariants,
   commerceViolations,
-  createKernel,
   getRenderFrame,
   isInDockArea,
   isOnDock,
-  spatialViolations,
   travelViolations,
-  workViolations,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { loadWebContent } from "./content";
-import { createFullRegistry } from "./registry";
+import { assertInvariants, captainOf, newGame } from "./testGame";
 
 const HUB = "port.crossroads_hub" as PortDefId;
 const HUB_DOCK = "dock.crossroads_hub";
@@ -124,16 +119,7 @@ function drive(
   for (let i = 0; i < ticks; i++) {
     const result = kernel.advance(world, 1);
     events.push(...result.events);
-    const violations = [
-      ...checkInvariants(world.state),
-      ...spatialViolations(world),
-      ...workViolations(world),
-      ...travelViolations(world),
-      ...commerceViolations(world),
-    ];
-    if (violations.length > 0) {
-      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-    }
+    assertInvariants(world);
     if (result.halt.kind === "hook") {
       const hook = world.state.narrator.pendingHook;
       if (hook === undefined) throw new Error("hook halt without a pending hook");
@@ -203,9 +189,7 @@ const loadingOpen = (world: World) =>
 
 describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => {
   it("starts a new game with the Hub's dock alongside and its ramps down", () => {
-    const { bundle, config, scenarioId } = loadWebContent();
-    const kernel = createKernel(createFullRegistry());
-    const world = kernel.createWorld(scenarioId, 20261003, bundle, config);
+    const { world } = newGame(20261003);
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: HUB });
     const frame = getRenderFrame(world);
     expect(frame.dock?.dockId).toBe(HUB_DOCK);
@@ -223,9 +207,7 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
   });
 
   it("restores a schema-3 save docked mid-loading, loads, casts off and docks at the next port", () => {
-    const { bundle, config, scenarioId } = loadWebContent();
-    const kernel = createKernel(createFullRegistry());
-    const world = kernel.createWorld(scenarioId, 20260930, bundle, config);
+    const { bundle, kernel, world } = newGame(20260930);
     drive(kernel, world, 20 * 120, loadingOpen);
     expect(loadingOpen(world)).toBe(true);
 
@@ -284,9 +266,7 @@ interface CrateLog {
 
 describe("port work is physical on real content (D63)", { timeout: 20_000 }, () => {
   it("runs Hub → Kessler freight: staged on offer, carried aboard, delivered to the bay, paid once", () => {
-    const { bundle, config, scenarioId } = loadWebContent();
-    const kernel = createKernel(createFullRegistry());
-    const world = kernel.createWorld(scenarioId, 20261003, bundle, config);
+    const { bundle, kernel, world } = newGame(20261003);
     const send = (command: Omit<Command, "id">) => {
       n += 1;
       const result = kernel.enqueueCommand(world, {
@@ -394,16 +374,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
           if (carrier?.origin.kind === "receiver") receiverTookDelivery = true;
         }
       }
-      const violations = [
-        ...checkInvariants(world.state),
-        ...spatialViolations(world),
-        ...workViolations(world),
-        ...travelViolations(world),
-        ...commerceViolations(world),
-      ];
-      if (violations.length > 0) {
-        throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-      }
+      assertInvariants(world);
       const delivered = world.state.jobs[job.id]?.status === "paid";
       for (const [itemId, log] of crates) {
         const location = world.state.items[itemId]?.location;
@@ -541,9 +512,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
 
 describe("the captain ashore on real content (D70)", { timeout: 30_000 }, () => {
   it("runs Hub → Kessler with the offer made in person on the dock: loaded, delivered, paid once", () => {
-    const { bundle, config, scenarioId } = loadWebContent();
-    const kernel = createKernel(createFullRegistry());
-    const world = kernel.createWorld(scenarioId, 20261003, bundle, config);
+    const { bundle, kernel, world } = newGame(20261003);
     const send = (command: Omit<Command, "id">) => {
       n += 1;
       const result = kernel.enqueueCommand(world, {
@@ -553,8 +522,7 @@ describe("the captain ashore on real content (D70)", { timeout: 30_000 }, () => 
       if (result.status !== "accepted")
         throw new Error(`${command.kind}: ${JSON.stringify(result)}`);
     };
-    const captain = Object.values(world.state.actors).find((a) => a.roleTags.includes("captain"));
-    if (captain === undefined) throw new Error("no captain");
+    const captain = captainOf(world);
     const band = world.config.values.commerce.priceBands.general;
     const events: SimEvent[] = [];
     const asks: { portId: string; tick: number; captainOnDock: boolean }[] = [];
@@ -563,16 +531,7 @@ describe("the captain ashore on real content (D70)", { timeout: 30_000 }, () => 
     for (let i = 0; i < 20 * 900; i++) {
       const result = kernel.advance(world, 1);
       events.push(...result.events);
-      const violations = [
-        ...checkInvariants(world.state),
-        ...spatialViolations(world),
-        ...workViolations(world),
-        ...travelViolations(world),
-        ...commerceViolations(world),
-      ];
-      if (violations.length > 0) {
-        throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-      }
+      assertInvariants(world);
       const where = world.state.actors[captain.id]?.location;
       const onDock = where !== undefined && isOnDock(bundle, world.state, where);
       for (const e of result.events) {

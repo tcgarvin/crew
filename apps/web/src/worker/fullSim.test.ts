@@ -18,19 +18,9 @@ import type {
   SimEvent,
   World,
 } from "@crew/sim";
-import {
-  actionLabel,
-  checkInvariants,
-  commerceViolations,
-  createKernel,
-  isOnDock,
-  spatialViolations,
-  travelViolations,
-  workViolations,
-} from "@crew/sim";
+import { actionLabel, checkInvariants, isOnDock } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { loadWebContent } from "./content";
-import { createFullRegistry } from "./registry";
+import { assertInvariants, newGame } from "./testGame";
 
 const TICK_RATE = 20;
 const FIVE_MINUTES = TICK_RATE * 300;
@@ -101,9 +91,7 @@ interface RunLog {
 }
 
 function runFullSim(seed: number, ticks: number, policy: Policy): { world: World; log: RunLog } {
-  const { bundle, config, scenarioId } = loadWebContent();
-  const kernel = createKernel(createFullRegistry());
-  const world = kernel.createWorld(scenarioId, seed, bundle, config);
+  const { kernel, world } = newGame(seed);
   const log: RunLog = {
     events: [],
     labels: new Map(),
@@ -164,16 +152,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
         jobId: problem.payload.jobId,
       });
     }
-    const violations = [
-      ...checkInvariants(world.state),
-      ...spatialViolations(world),
-      ...workViolations(world),
-      ...travelViolations(world),
-      ...commerceViolations(world),
-    ];
-    if (violations.length > 0) {
-      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-    }
+    assertInvariants(world);
     for (const actor of Object.values(world.state.actors)) {
       if (!actor.crew) continue;
       const set = log.labels.get(actor.id) ?? new Set<string>();

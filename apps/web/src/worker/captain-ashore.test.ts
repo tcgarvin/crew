@@ -11,7 +11,6 @@
  * package may not depend on `@crew/content`.
  */
 import type {
-  Actor,
   ActorId,
   Command,
   CommandId,
@@ -22,20 +21,9 @@ import type {
   SimEvent,
   World,
 } from "@crew/sim";
-import {
-  checkInvariants,
-  commerceViolations,
-  createKernel,
-  decisionShownTick,
-  getRenderFrame,
-  isOnDock,
-  spatialViolations,
-  travelViolations,
-  workViolations,
-} from "@crew/sim";
+import { decisionShownTick, getRenderFrame, isOnDock } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { loadWebContent } from "./content";
-import { createFullRegistry } from "./registry";
+import { assertInvariants, captainOf, newGame } from "./testGame";
 
 const HUB = "port.crossroads_hub" as PortDefId;
 const KESSLER = "port.kessler_drift" as PortDefId;
@@ -46,13 +34,6 @@ type Answer = (world: World, hook: NarratorHook) => Omit<Command, "id">[];
 
 let n = 0;
 
-function newGame(seed = SEED) {
-  const { bundle, config, scenarioId } = loadWebContent();
-  const kernel = createKernel(createFullRegistry());
-  const world = kernel.createWorld(scenarioId, seed, bundle, config);
-  return { kernel, world };
-}
-
 function send(kernel: Kernel, world: World, command: Omit<Command, "id">): void {
   n += 1;
   const result = kernel.enqueueCommand(world, {
@@ -60,12 +41,6 @@ function send(kernel: Kernel, world: World, command: Omit<Command, "id">): void 
     id: `cmd:ashore:${n}` as CommandId,
   } as Command);
   if (result.status !== "accepted") throw new Error(`${command.kind}: ${JSON.stringify(result)}`);
-}
-
-function captainOf(world: World): Actor {
-  const captain = Object.values(world.state.actors).find((a) => a.roleTags.includes("captain"));
-  if (captain === undefined) throw new Error("no captain");
-  return captain;
 }
 
 /** A narrator `offerJob` from `issuer` at the hub, Hub → Kessler, two crates, surfaced. */
@@ -123,16 +98,7 @@ function drive(
   for (let i = 0; i < ticks; i++) {
     const result = kernel.advance(world, 1);
     run.events.push(...result.events);
-    const violations = [
-      ...checkInvariants(world.state),
-      ...spatialViolations(world),
-      ...workViolations(world),
-      ...travelViolations(world),
-      ...commerceViolations(world),
-    ];
-    if (violations.length > 0) {
-      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-    }
+    assertInvariants(world);
     for (const e of result.events) {
       if (e.type !== "decisionPending") continue;
       const captain = captainOf(world);
@@ -180,7 +146,7 @@ const near = (a: { x: number; y: number }, b: { x: number; y: number }, reach: n
 
 describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   it("walks down the ramp and asks the narrator the tick they step onto the dock, once", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const captain = captainOf(world);
     expect(isOnDock(world.content, world.state, captain.location)).toBe(false);
     const run = drive(kernel, world, 20 * 120, answerNothing, (w) => {
@@ -206,7 +172,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("says so in the headline while ashore", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     let seen = "";
     drive(kernel, world, 20 * 60, answerNothing, (w) => {
       const line = getRenderFrame(w).headline;
@@ -219,7 +185,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("sends the first officer when the captain is asleep (D8)", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const captain = captainOf(world);
     captain.activity = {
       kind: "personal",
@@ -240,7 +206,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("walks over to a local who has work, talks, and the card comes up there", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const hal = localNamed(world, "Hal Petrosyan");
     expect(hal).toBeDefined();
     const run = drive(
@@ -282,7 +248,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("goes out through the gate to someone in the port, and the card comes up on the way back", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     expect(localNamed(world, "Ilse Brandt")).toBeUndefined();
     let wasOut = false;
     const run = drive(
@@ -307,7 +273,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("with the captain aboard, a docked offer's issuer walks to the foot of the ramp", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     // The docking's ask is spent on nothing, and the captain is back aboard.
     drive(kernel, world, 20 * 120, answerNothing, (w) => {
       const c = captainOf(w);
@@ -336,7 +302,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("with the captain aboard, a local with work walks over from their post, then goes back", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     drive(kernel, world, 20 * 120, answerNothing, (w) => {
       const c = captainOf(w);
       return (
@@ -365,7 +331,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("never offers work in flight: no card comes up away from the dock", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const run = drive(
       kernel,
       world,
@@ -389,7 +355,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("survives a save and restore mid-walk, and the card still comes up in person", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const answer = offerAtHubFrom({ name: "Hal Petrosyan", role: "queue clerk" });
     drive(kernel, world, 20 * 180, answer, (w) => {
       const a = captainOf(w).activity;
@@ -404,7 +370,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("sends the first officer on if the captain is taken out mid-walk, and the card still comes", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const answer = offerAtHubFrom({ name: "Hal Petrosyan", role: "queue clerk" });
     drive(kernel, world, 20 * 180, answer, (w) => {
       const a = captainOf(w).activity;
@@ -421,7 +387,7 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
   });
 
   it("brings the card up anyway when nobody can go to meet the speaker", () => {
-    const { kernel, world } = newGame();
+    const { kernel, world } = newGame(SEED);
     const answer = offerAtHubFrom({ name: "Hal Petrosyan", role: "queue clerk" });
     drive(kernel, world, 20 * 180, answer, (w) => w.state.decisions.held.length > 0);
     for (const actor of Object.values(world.state.actors)) actor.availability = "incapacitated";
