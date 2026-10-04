@@ -6,11 +6,16 @@
  * the stand-in.
  *
  * - Far: the station's outer structure, or the planet's disc, growing ahead and receding astern.
+ *
+ * Ahead is +x (D72, `orientation.ts`); the scene's berth offset (positive astern) becomes deck x
+ * through `dockSlide`, as the dock map's does.
  * - Berth (behind the hull): the station bay's floor, or the planet's fields and landing pad.
  * - Foreground (over the deck): bay walls and gantries, or clouds and dust, translucent where they
  *   cross the deck so the crew stay legible.
  */
+import { dockSlide } from "./dock";
 import type { Bounds } from "./hull";
+import { aftOf, endsAlongShip, foreOf, spanAlongShip } from "./orientation";
 import { type Scene, smooth } from "./scene";
 import { disc } from "./shapes";
 import { wrap } from "./stars";
@@ -27,8 +32,8 @@ export interface SceneryFrame {
 
 /** How much the far scenery moves per unit of berth offset astern: it is far away. */
 const FAR_PARALLAX = 0.08;
-/** Where an arriving port first shows, as a fraction of the deck length (negative: off the nose). */
-const FAR_START = -0.12;
+/** How far off the nose an arriving port first shows, as a fraction of the deck length. */
+const FAR_AHEAD = 0.12;
 /** The station bay beyond each end of the ship, in deck lengths. */
 const BAY_FORE = 0.35;
 const BAY_AFT = 0.35;
@@ -58,7 +63,8 @@ export function drawSky(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryF
   rect(ctx, view.minX, view.minY, view.maxX, view.maxY);
   if (scene.sky <= 0) return;
   // Lighter ahead, toward where the ship is going.
-  const gradient = ctx.createLinearGradient(view.minX, 0, view.maxX, 0);
+  const ends = endsAlongShip(view.minX, view.maxX);
+  const gradient = ctx.createLinearGradient(ends.bow, 0, ends.stern, 0);
   gradient.addColorStop(0, scene.palette.sky);
   gradient.addColorStop(1, scene.palette.skyLow);
   ctx.globalAlpha = scene.sky;
@@ -124,8 +130,8 @@ function drawPlanet(
  * toward the middle of the view; departing, it falls astern with the berth (at a parallax).
  */
 function farCentreX(scene: Pick<Scene, "portOffset" | "portScale">, width: number): number {
-  if (scene.portOffset >= 0) return width / 2 + scene.portOffset * width * FAR_PARALLAX;
-  return width * (FAR_START + (0.5 - FAR_START) * scene.portScale);
+  if (scene.portOffset >= 0) return width / 2 + aftOf(scene.portOffset * width * FAR_PARALLAX);
+  return width / 2 + foreOf(width * (0.5 + FAR_AHEAD) * (1 - scene.portScale));
 }
 
 /** The station structure or planet disc: a point ahead that grows, or a shrinking one astern. */
@@ -141,16 +147,19 @@ export function drawFarScenery(ctx: CanvasRenderingContext2D, scene: Scene, f: S
   }
 }
 
+/** Where the berth's stand-in (bay or pad) is along the ship: deck x of its stern-side edge. */
+function berthX(scene: Scene, f: SceneryFrame): number {
+  return dockSlide(scene, f.width);
+}
+
 /** Bay extent along the ship, tile units, at the scene's berth offset. */
 function bayExtent(scene: Scene, f: SceneryFrame): { x0: number; x1: number } {
-  const offset = scene.portOffset * f.width;
-  return { x0: offset - BAY_FORE * f.width, x1: offset + f.width * (1 + BAY_AFT) };
+  return spanAlongShip(berthX(scene, f), f.width, BAY_FORE * f.width, BAY_AFT * f.width);
 }
 
 function drawBayFloor(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
   const { palette } = scene;
   const { x0, x1 } = bayExtent(scene, f);
-  const offset = scene.portOffset * f.width;
   ctx.fillStyle = palette.ground;
   rect(ctx, x0, -WALL_GAP, x1, f.height + WALL_GAP);
   ctx.strokeStyle = palette.groundAccent;
@@ -161,12 +170,14 @@ function drawBayFloor(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFra
     ctx.lineTo(x, f.height + WALL_GAP);
   }
   ctx.stroke();
-  // The berth: hazard markings framing where the ship sits, the quay edge on the ramp side.
+  // The berth: hazard markings framing where the ship sits, room for the nose fore and the bells
+  // aft.
+  const frame = spanAlongShip(berthX(scene, f), f.width, 4.5, 2.1);
   ctx.strokeStyle = palette.marking;
   ctx.globalAlpha *= 0.7;
   ctx.lineWidth = Math.max(2 * f.px, 0.12);
   ctx.setLineDash([0.6, 0.4]);
-  ctx.strokeRect(offset - 4.5, -0.75, f.width + 6.6, f.height + 1.5);
+  ctx.strokeRect(frame.x0, -0.75, frame.x1 - frame.x0, f.height + 1.5);
   ctx.setLineDash([]);
 }
 
@@ -185,10 +196,9 @@ function inGroundFrame(
   f: SceneryFrame,
   draw: () => void,
 ): void {
-  const offset = scene.portOffset * f.width;
   const scale = groundScale(scene.altitude);
   ctx.save();
-  ctx.translate(f.width / 2 + offset * scale, f.height / 2);
+  ctx.translate(f.width / 2 + berthX(scene, f) * scale, f.height / 2);
   ctx.scale(scale, scale);
   ctx.translate(-f.width / 2, -f.height / 2);
   draw();
@@ -224,12 +234,13 @@ function drawGround(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame
   ctx.globalAlpha *= visible;
   drawFields(ctx, scene, f);
   // The pad slides in under the ship at full size, so it visibly arrives and stops.
-  const offset = scene.portOffset * f.width;
+  const pad = spanAlongShip(berthX(scene, f), f.width, 2.2, 2.6);
   ctx.fillStyle = palette.pad;
-  rect(ctx, offset - 2.2, -1.6, offset + f.width + 2.6, f.height + 1.6);
+  rect(ctx, pad.x0, -1.6, pad.x1, f.height + 1.6);
+  const line = spanAlongShip(berthX(scene, f), f.width, 1.6, 2.0);
   ctx.strokeStyle = palette.marking;
   ctx.lineWidth = 0.18;
-  ctx.strokeRect(offset - 1.6, -1.0, f.width + 3.6, f.height + 2.0);
+  ctx.strokeRect(line.x0, -1.0, line.x1 - line.x0, f.height + 2.0);
 }
 
 /** Cloud tops far below a pier that runs out into open sky; they scale with height like fields. */
@@ -248,7 +259,8 @@ function drawCloudSea(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFra
     for (let period = -1; period <= 1; period++) {
       for (const cloud of CLOUD_SEA) {
         const ry = cloud.radius * f.height;
-        const x = (cloud.x + period) * f.width * 1.6;
+        // The bank reaches furthest astern: the side in view while an arriving dock is still ahead.
+        const x = f.width / 2 + aftOf((cloud.x + period) * f.width * 1.6 - f.width / 2);
         const y = (cloud.y - 0.2) * f.height * 1.4;
         puff(ctx, x, y, ry * 2.2, ry, scene.palette.cloudRgb, 0.5 * cloud.opacity);
       }
@@ -380,7 +392,9 @@ function drawClouds(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame
   const viewHeight = view.maxY - view.minY;
   for (const cloud of CLOUD_PUFFS) {
     const ry = cloud.radius * viewHeight * 0.6;
-    const x = view.minX - ry * 2 + wrap(cloud.x * period + scene.cloudScroll * f.width, period);
+    // The bank streams aft past the ship as it flies on.
+    const along = cloud.x * period + aftOf(scene.cloudScroll * f.width);
+    const x = view.minX - ry * 2 + wrap(along, period);
     const y = view.minY + cloud.y * viewHeight;
     const alpha = CLOUD_ALPHA * scene.cloudBand * cloud.opacity;
     puff(ctx, x, y, ry * 2.4, ry, scene.palette.cloudRgb, alpha);

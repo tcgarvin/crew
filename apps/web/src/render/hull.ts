@@ -1,11 +1,12 @@
 /**
- * Dockside §2.5 (D58): the ship's silhouette and engine plume, built from the deck's bounds, so the
- * deck reads as a ship. A tapered nose fore (west) beyond the bridge, engine bells aft (east)
- * beyond engineering. No content change: an optional `hull` block on `DeckDef` can come with a
- * second ship. Geometry is in deck tile units; callers draw it under a tile-space transform.
+ * Dockside §2.5 (D58): the ship's silhouette and engine plume, built from the deck's bounds alone,
+ * so the deck reads as a ship. D72: the bow is always the high-x end (`orientation.ts`), so a
+ * tapered nose sits fore of the deck and the engine bells aft of it whatever the compartments are
+ * called. Geometry is in deck tile units; callers draw it under a tile-space transform.
  */
 import type { RenderFrame, RenderMachineState } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
+import { aftOf, endsAlongShip, foreOf } from "./orientation";
 
 export interface Point {
   readonly x: number;
@@ -32,6 +33,8 @@ export interface HullGeometry {
   /** Body plus nose, clockwise from the top-left corner of the body. */
   readonly outline: readonly Point[];
   readonly bells: readonly Bell[];
+  /** The bridge windows: a polyline just aft of the nose's leading edges. */
+  readonly windows: readonly Point[];
   /** Everything the hull covers, nose to bell mouths (not the plume). */
   readonly bounds: Bounds;
 }
@@ -41,55 +44,55 @@ export const HULL_RIM = 0.35;
 const BELL_LENGTH = 1.8;
 /** Plume length at full output, tiles beyond the bell mouth. */
 const PLUME_MAX_TILES = 11;
+/** Where the nose's shoulders meet the body, as a fraction of the deck's height from each side. */
+const NOSE_SHOULDER = 0.15;
+/** How far the bridge windows sit aft of the nose's leading edges, tiles. */
+const WINDOW_INSET = 0.45;
 
-type HullLayout = Pick<DeckLayout, "width" | "height" | "compartmentBoxes" | "compartmentTags">;
-
-/** The tile box of the first compartment tagged `tag`, or the whole deck if none is. */
-function boxOf(layout: HullLayout, tag: string): Bounds {
-  for (const [key, tags] of Object.entries(layout.compartmentTags)) {
-    const box = layout.compartmentBoxes[key];
-    if (box !== undefined && tags.includes(tag)) return box;
-  }
-  return { minX: 0, minY: 0, maxX: layout.width, maxY: layout.height };
-}
+type HullLayout = Pick<DeckLayout, "width" | "height">;
 
 export function hullGeometry(layout: HullLayout): HullGeometry {
   const w = layout.width;
   const h = layout.height;
-  const left = -HULL_RIM;
-  const right = w + HULL_RIM;
   const top = -HULL_RIM;
   const bottom = h + HULL_RIM;
+  const { bow, stern } = endsAlongShip(-HULL_RIM, w + HULL_RIM);
   const nose = Math.min(5, Math.max(2, h * 0.2));
-  const tip = left - nose;
-  // The nose tapers to a blunt tip at mid-height, its shoulders level with the bridge.
-  const bridge = boxOf(layout, "bridge");
-  const shoulder = Math.max(0.08, Math.min(0.3, bridge.minY / h + 0.1));
+  const tip = bow + foreOf(nose);
+  const cheek = bow + foreOf(nose * 0.85);
+  const shoulder = bow + foreOf(nose * 0.45);
+  // The nose tapers to a blunt tip at mid-height.
   const outline: Point[] = [
-    { x: left, y: top },
-    { x: right, y: top },
-    { x: right, y: bottom },
-    { x: left, y: bottom },
-    { x: left - nose * 0.45, y: h * (1 - shoulder) },
-    { x: left - nose * 0.85, y: h * 0.66 },
-    { x: tip, y: h * 0.56 },
+    { x: stern, y: top },
+    { x: bow, y: top },
+    { x: shoulder, y: h * NOSE_SHOULDER },
+    { x: cheek, y: h * 0.34 },
     { x: tip, y: h * 0.44 },
-    { x: left - nose * 0.85, y: h * 0.34 },
-    { x: left - nose * 0.45, y: h * shoulder },
+    { x: tip, y: h * 0.56 },
+    { x: cheek, y: h * 0.66 },
+    { x: shoulder, y: h * (1 - NOSE_SHOULDER) },
+    { x: bow, y: bottom },
+    { x: stern, y: bottom },
   ];
-  const engineering = boxOf(layout, "engineering");
-  const span = engineering.maxY - engineering.minY;
+  const windows: Point[] = [
+    { x: cheek + aftOf(WINDOW_INSET), y: h * 0.34 + WINDOW_INSET * 0.6 },
+    { x: tip + aftOf(WINDOW_INSET), y: h * 0.44 + WINDOW_INSET * 0.3 },
+    { x: tip + aftOf(WINDOW_INSET), y: h * 0.56 - WINDOW_INSET * 0.3 },
+    { x: cheek + aftOf(WINDOW_INSET), y: h * 0.66 - WINDOW_INSET * 0.6 },
+  ];
   const bells: Bell[] = [0.3, 0.7].map((at) => ({
-    y: engineering.minY + span * at,
-    throatX: right,
-    mouthX: right + BELL_LENGTH,
-    throatHalf: span * 0.08,
-    mouthHalf: span * 0.13,
+    y: h * at,
+    throatX: stern,
+    mouthX: stern + aftOf(BELL_LENGTH),
+    throatHalf: h * 0.08,
+    mouthHalf: h * 0.13,
   }));
+  const mouth = stern + aftOf(BELL_LENGTH);
   return {
     outline,
     bells,
-    bounds: { minX: tip, minY: top, maxX: right + BELL_LENGTH, maxY: bottom },
+    windows,
+    bounds: { minX: Math.min(tip, mouth), minY: top, maxX: Math.max(tip, mouth), maxY: bottom },
   };
 }
 
@@ -157,25 +160,17 @@ export function drawPlume(
     const wobble = 1 + 0.06 * flicker * (i % 2 === 0 ? 1 : -0.8);
     const length = PLUME_MAX_TILES * strength * wobble;
     const half = bell.mouthHalf * (0.55 + 0.35 * strength);
-    const gradient = ctx.createLinearGradient(bell.mouthX, 0, bell.mouthX + length, 0);
+    const end = bell.mouthX + aftOf(length);
+    const control = bell.mouthX + aftOf(length * 0.35);
+    const gradient = ctx.createLinearGradient(bell.mouthX, 0, end, 0);
     gradient.addColorStop(0, `rgba(235, 245, 255, ${0.9 * Math.min(1, strength * 1.6)})`);
     gradient.addColorStop(0.25, `rgba(120, 190, 255, ${0.7 * strength})`);
     gradient.addColorStop(1, "rgba(60, 110, 255, 0)");
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.moveTo(bell.mouthX, bell.y - half);
-    ctx.quadraticCurveTo(
-      bell.mouthX + length * 0.35,
-      bell.y - half * 0.9,
-      bell.mouthX + length,
-      bell.y,
-    );
-    ctx.quadraticCurveTo(
-      bell.mouthX + length * 0.35,
-      bell.y + half * 0.9,
-      bell.mouthX,
-      bell.y + half,
-    );
+    ctx.quadraticCurveTo(control, bell.y - half * 0.9, end, bell.y);
+    ctx.quadraticCurveTo(control, bell.y + half * 0.9, bell.mouthX, bell.y + half);
     ctx.closePath();
     ctx.fill();
   }
@@ -197,26 +192,12 @@ export function drawHull(ctx: CanvasRenderingContext2D, hull: HullGeometry, px: 
   ctx.fill();
   ctx.stroke();
   // Bridge windows along the nose's leading edges.
-  const [, , , , lowShoulder, lowCheek, lowTip, highTip, highCheek, highShoulder] = hull.outline;
-  if (
-    lowShoulder !== undefined &&
-    lowCheek !== undefined &&
-    lowTip !== undefined &&
-    highTip !== undefined &&
-    highCheek !== undefined &&
-    highShoulder !== undefined
-  ) {
-    const inset = 0.45;
-    ctx.strokeStyle = WINDOW;
-    ctx.lineWidth = Math.max(2 * px, 0.18);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(highCheek.x + inset, highCheek.y + inset * 0.6);
-    ctx.lineTo(highTip.x + inset, highTip.y + inset * 0.3);
-    ctx.lineTo(lowTip.x + inset, lowTip.y - inset * 0.3);
-    ctx.lineTo(lowCheek.x + inset, lowCheek.y - inset * 0.6);
-    ctx.stroke();
-    ctx.lineCap = "butt";
-  }
+  ctx.strokeStyle = WINDOW;
+  ctx.lineWidth = Math.max(2 * px, 0.18);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  hull.windows.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.stroke();
+  ctx.lineCap = "butt";
   ctx.lineJoin = "miter";
 }

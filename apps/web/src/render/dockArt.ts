@@ -27,6 +27,7 @@ import { BLACK, WHITE, hash01, mixHex, rgba } from "./color";
 import { type PropLook, drawProp } from "./dockProps";
 import {
   type DockShape,
+  type FloorEdge,
   type FloorPattern,
   type TileRun,
   dockShape,
@@ -49,6 +50,11 @@ export interface DockPaint {
   readonly px: number;
   /** The visible area, deck tile units. */
   readonly view: Bounds;
+  /**
+   * The docked ship's deck rectangle in dock tiles (D72: its place in the berth box, which may
+   * be larger), so the clamps grip the hull rather than the box's corners.
+   */
+  readonly ship: Bounds;
   /**
    * 0..1: how far a station bay's darkness fills the view beyond the map (the scene's
    * `cameraT`, so it closes in as the camera settles on the dock and opens as it leaves).
@@ -253,6 +259,29 @@ const CLAMP_SETBACK = 1.1;
 const CLAMP_ARM = 1.2;
 
 /**
+ * The stretch of a quay edge that runs along the ship's side, as distances along the edge from
+ * (x1, y1), or `undefined` where the edge does not touch the ship (the margin round a ship
+ * smaller than the box, D72).
+ */
+function alongShip(edge: FloorEdge, ship: Bounds): { from: number; to: number } | undefined {
+  const horizontal = edge.ny !== 0;
+  const line = horizontal ? edge.y1 : edge.x1;
+  const side = horizontal
+    ? edge.ny > 0
+      ? ship.maxY
+      : ship.minY
+    : edge.nx > 0
+      ? ship.maxX
+      : ship.minX;
+  if (Math.abs(line - side) > 1e-6) return undefined;
+  const [start, end] = horizontal ? [edge.x1, edge.x2] : [edge.y1, edge.y2];
+  const [lo, hi] = horizontal ? [ship.minX, ship.maxX] : [ship.minY, ship.maxY];
+  const from = Math.max(start, lo) - start;
+  const to = Math.min(end, hi) - start;
+  return to > from ? { from, to } : undefined;
+}
+
+/**
  * Station clamps on the quay, one near each end of the ship (clear of the ramps in the middle):
  * arms that lie along the edge when retracted and swing out to grip the hull as `engaged` goes to
  * 1 (dockside §2.4: "clamps" at the end of docking, "clamps release" at the start of undocking).
@@ -262,20 +291,20 @@ function drawClamps(
   ctx: CanvasRenderingContext2D,
   dock: DockDef,
   shape: DockShape,
-  setting: PortSetting,
-  engaged: number,
-  px: number,
+  paint: Pick<DockPaint, "setting" | "clamps" | "ship" | "px">,
 ) {
-  if (setting !== "station") return;
+  if (paint.setting !== "station") return;
+  const { clamps: engaged, px } = paint;
   const arm = mixHex(dock.palette.wall, "#9aa6b2", 0.5);
   for (const edge of shape.quay) {
+    const span = alongShip(edge, paint.ship);
+    if (span === undefined || span.to - span.from < CLAMP_INSET * 4) continue;
     const length = Math.hypot(edge.x2 - edge.x1, edge.y2 - edge.y1);
-    if (length < CLAMP_INSET * 4) continue;
     const ux = (edge.x2 - edge.x1) / length;
     const uy = (edge.y2 - edge.y1) / length;
     for (const [s, toward] of [
-      [CLAMP_INSET, 1],
-      [length - CLAMP_INSET, -1],
+      [span.from + CLAMP_INSET, 1],
+      [span.to - CLAMP_INSET, -1],
     ] as const) {
       const bx = edge.x1 + ux * s + edge.nx * CLAMP_SETBACK;
       const by = edge.y1 + uy * s + edge.ny * CLAMP_SETBACK;
@@ -553,7 +582,7 @@ export function drawDock(ctx: CanvasRenderingContext2D, dock: DockDef, paint: Do
   drawWalls(ctx, dock, shape, px);
   drawAreas(ctx, dock, px);
   drawQuayEdge(ctx, dock, shape, px);
-  drawClamps(ctx, dock, shape, paint.setting, paint.clamps, px);
+  drawClamps(ctx, dock, shape, paint);
   for (const post of dock.posts) {
     drawPostFloor(ctx, dock, post, px, post.key === paint.selectedPostKey);
   }

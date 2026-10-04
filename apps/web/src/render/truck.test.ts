@@ -83,7 +83,7 @@ describe("drawing the hand truck (D65)", () => {
 
   it("draws at most four crates however many ride on it, rotated or not", () => {
     const canvas = mockCanvas();
-    drawCarriedItems(canvas.ctx, view, frame(6), true, 400);
+    drawCarriedItems(canvas.ctx, view, frame(6), true, 700);
     expect(canvas.calls.get("fillRect")).toBe(5);
   });
 });

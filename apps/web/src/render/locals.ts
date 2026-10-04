@@ -47,12 +47,12 @@ export function drawLocalDots(
   t: ViewTransform,
   locals: readonly RenderLocal[],
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
   selectedId?: string,
 ): void {
   const radius = dotRadius(t);
   for (const local of locals) {
-    const [cx, cy] = toScreenPx(t, local.x, local.y, rotated, viewportWidth);
+    const [cx, cy] = toScreenPx(t, local.x, local.y, rotated, viewportHeight);
     const look = localLook(local.lookSeed);
     ctx.fillStyle = look.fill;
     disc(ctx, cx, cy, radius);
@@ -78,13 +78,13 @@ export function drawLocalTrolleys(
   t: ViewTransform,
   locals: readonly RenderLocal[],
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
 ): void {
   const dot = dotRadius(t);
   const small = carriedSize(t);
   for (const local of locals) {
     if (local.carrying <= 0) continue;
-    const [ax, ay] = toScreenPx(t, local.x, local.y, rotated, viewportWidth);
+    const [ax, ay] = toScreenPx(t, local.x, local.y, rotated, viewportHeight);
     const colors = Array.from({ length: local.carrying }, () => CARGO_COLORS.general);
     drawLoadedTruck(ctx, ax + dot + small / 2, ay, small, colors);
   }
@@ -143,7 +143,7 @@ export function drawDockProps(
   t: ViewTransform,
   props: readonly RenderDockProp[],
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
   selectedKey?: string,
 ): void {
   props.forEach((prop, index) => {
@@ -151,11 +151,11 @@ export function drawDockProps(
     const size = Math.max(6, t.scale * (units.length === 1 ? 0.5 : 0.36));
     const color = dockPropColor(prop);
     for (const [dx, dy] of units) {
-      const [cx, cy] = toScreenPx(t, prop.x + dx, prop.y + dy, rotated, viewportWidth);
+      const [cx, cy] = toScreenPx(t, prop.x + dx, prop.y + dy, rotated, viewportHeight);
       drawCrate(ctx, cx, cy, size, color, false);
     }
     if (selectedKey === dockPropKey(prop, index)) {
-      const [cx, cy] = toScreenPx(t, prop.x, prop.y, rotated, viewportWidth);
+      const [cx, cy] = toScreenPx(t, prop.x, prop.y, rotated, viewportHeight);
       const side = Math.max(12, t.scale * 0.95);
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;

@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
-import { berthInView, clampEngagement, dockInView } from "./dock";
+import { berthInView, clampEngagement, dockInView, shipInDock } from "./dock";
 import { drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
 import { dockShape, dockSurface } from "./dockShape";
@@ -181,9 +181,10 @@ describe("every authored dock draws", () => {
 describe("dock layers on their own", () => {
   for (const dock of allDocks) {
     it(`${dock.id}: map and foreground draw, and skip entirely when faded out`, () => {
-      const { shipAt } = berthInView(dock, layout);
+      const berth = berthInView(dock, layout);
       const paint = {
-        origin: { x: -shipAt.x, y: -shipAt.y },
+        origin: { x: -berth.shipAt.x, y: -berth.shipAt.y },
+        ship: shipInDock(berth, layout),
         alpha: 1,
         clamps: 1,
         px: 0.05,
@@ -281,9 +282,10 @@ describe("dock layers on their own", () => {
         rect: { x: i * 3, y: 0, w: i % 2 === 0 ? 3 : 1, h: i % 2 === 0 ? 1 : 6 },
       })),
     };
-    const { shipAt } = berthInView(dock, layout);
+    const berth = berthInView(dock, layout);
     const paint = {
-      origin: { x: -shipAt.x, y: -shipAt.y },
+      origin: { x: -berth.shipAt.x, y: -berth.shipAt.y },
+      ship: shipInDock(berth, layout),
       alpha: 1,
       clamps: 0.5,
       px: 0.05,
@@ -337,5 +339,67 @@ describe("dockShape", () => {
     }
     // Every map has a quay edge the ramps come down onto.
     for (const dock of allDocks) expect(dockShape(dock).quay.length, dock.id).toBeGreaterThan(0);
+  });
+
+  /** A 40×26 map with an M box at (2,2) and 4 rows of quay, `ring` round the box's other sides. */
+  function ringedDock(ring: "." | "#" | " "): DockDef {
+    const base = allDocks[0];
+    if (base === undefined) throw new Error("no docks");
+    const box = HULL_SIZE_BOX.M;
+    const rows = Array.from({ length: 26 }, (_, y) =>
+      Array.from({ length: 40 }, (_, x) => {
+        const inBox = x >= 2 && x < 2 + box.w && y >= 2 && y < 2 + box.h;
+        if (inBox) return " ";
+        return y >= 2 + box.h ? "." : ring;
+      }).join(""),
+    );
+    return {
+      ...base,
+      width: 40,
+      height: 26,
+      rows,
+      legend: { ".": "floor", "#": "wall", " ": "void" },
+      berth: { origin: { x: 2, y: 2 }, sizeClass: "M" },
+    };
+  }
+
+  it("reads the berth box as a pad when ground surrounds it, open otherwise (D72)", () => {
+    // The quay along the south edge is always floor: only the other three sides decide.
+    expect(dockShape(ringedDock(".")).berthStyle).toBe("pad");
+    expect(dockShape(ringedDock("#")).berthStyle).toBe("open");
+    expect(dockShape(ringedDock(" ")).berthStyle).toBe("open");
+  });
+
+  it("draws the pad over the whole box, round a ship smaller than it", () => {
+    const dock = ringedDock(".");
+    const shape = dockShape(dock);
+    const fills: number[][] = [];
+    const { ctx } = mockCanvas();
+    const recording = new Proxy(ctx, {
+      get(target, prop) {
+        if (prop === "fillRect") return (...args: number[]) => fills.push(args);
+        const value = Reflect.get(target, prop);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const berth = berthInView(dock, layout);
+    drawDock(recording, dock, {
+      origin: { x: 0, y: 0 },
+      ship: shipInDock(berth, layout),
+      alpha: 1,
+      clamps: 1,
+      px: 0.05,
+      view: { minX: -10, minY: -10, maxX: 60, maxY: 40 },
+      enclosure: 0,
+      setting: "planet",
+    });
+    const { minX, minY, maxX, maxY } = shape.berth;
+    const apron = fills.find(
+      ([x, y, w, h]) =>
+        x === minX && y === minY && Math.abs((w ?? 0) - (maxX - minX)) < 0.1 && (h ?? 0) > 1,
+    );
+    expect(apron?.[3]).toBeCloseTo(maxY - minY, 0);
+    // Mk1 is smaller than the M box, so the pad shows round it.
+    expect(layout.width).toBeLessThan(maxX - minX);
   });
 });

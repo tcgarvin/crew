@@ -216,7 +216,7 @@ export function DeckCanvas({
         px,
         py,
         rotatedRef.current,
-        sizeRef.current.width,
+        sizeRef.current.height,
       );
       // Hit what is on screen: people and crates on the dock where the sliding dock put them.
       const shown = withDockSlide(frame, slide);

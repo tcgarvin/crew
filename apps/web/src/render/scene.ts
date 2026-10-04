@@ -4,8 +4,9 @@
  * right on a reload, under playback interpolation and at every speed. Stars are the exception:
  * they carry no meaning, so the canvas scrolls them from its own accumulator at `starSpeed`.
  *
- * Distances along the ship are in deck lengths, positive aft (east, +x in deck coordinates): the
- * ship never moves on screen, so the world flows fore to aft past it and arrival never reverses.
+ * Distances along the ship are in deck lengths, positive aft (D72: west, −x in deck coordinates;
+ * the conversion is `orientation.ts` `aftOf`): the ship never moves on screen, so the world flows
+ * fore to aft past it and arrival never reverses.
  */
 import type { DockDef, PortDef, PortDefId, PortSetting, RenderTravel } from "@crew/sim";
 import { mixHex } from "./color";

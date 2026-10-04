@@ -278,7 +278,7 @@ describe("local labels", () => {
       ],
     } as unknown as RenderFrame;
     const { ctx, calls } = mockCanvas();
-    drawActorLabels(ctx, { scale: 20, offsetX: 0, offsetY: 0 }, frame, false, 800);
+    drawActorLabels(ctx, { scale: 20, offsetX: 0, offsetY: 0 }, frame, false, 800, 600);
     expect(calls.get("fillText")).toBe(2);
   });
 });
@@ -300,7 +300,7 @@ describe("a dock hand's trolley", () => {
 
   it("shows at most four crates, rotated or not", () => {
     const canvas = mockCanvas();
-    drawLocalTrolleys(canvas.ctx, t, [local({ id: "o1", carrying: 6 })], true, 400);
+    drawLocalTrolleys(canvas.ctx, t, [local({ id: "o1", carrying: 6 })], true, 700);
     expect(canvas.calls.get("fillRect")).toBe(5);
   });
 });
