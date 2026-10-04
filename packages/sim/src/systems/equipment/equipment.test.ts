@@ -112,6 +112,28 @@ describe("scheduleFault", () => {
     expect(byDef(world, W5.engine).scheduledFaults).toEqual([]);
   });
 
+  it("spends the narrator's fault budget, and is rejected once it is spent (D78)", () => {
+    const { kernel, world } = w5TestWorld();
+    const engine = byDef(world, W5.engine);
+    const schedule = (faultKey: string) =>
+      kernel.enqueueCommand(
+        world,
+        cmd({
+          source: "scenario",
+          kind: "scheduleFault",
+          payload: { machineId: engine.id, faultKey, windowTicks: [50, 60] },
+        }),
+      );
+    const full = world.config.values.narrator.faultBudget;
+    expect(world.state.narrator.budget.faultsRemaining).toBe(full);
+    expect(schedule("wornBearing").status).toBe("accepted");
+    kernel.advance(world, 1);
+    expect(world.state.narrator.budget.faultsRemaining).toBe(full - 1);
+    world.state.narrator.budget.faultsRemaining = 0;
+    const refused = schedule("wornBearing");
+    expect(refused.status === "rejected" && refused.rejection.code).toBe("budgetExhausted");
+  });
+
   it("is rejected for an unknown fault key", () => {
     const { kernel, world } = w5TestWorld();
     const engine = byDef(world, W5.engine);
