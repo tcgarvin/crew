@@ -63,6 +63,7 @@ import { releaseReservations } from "../spatial/reservations";
 import { backoffRef, currentHold, currentStep, isOutThroughGate } from "./activity";
 import { claimTask, completeTask, isCompletionMet, releaseActorClaim, renewClaim } from "./claims";
 import { claimantsOf, isTerminal } from "./derivation";
+import { emitSim } from "./events";
 import { directSight, writeFact } from "./facts";
 import { labelFor } from "./labels";
 import { awaitsFamiliarityBrief } from "./perception";
@@ -320,13 +321,7 @@ function refreshPresentation(ctx: StepCtx, actor: Actor): void {
       current.targetId !== next.targetId
     ) {
       activity.action = next;
-      ctx.emit({
-        type: "actionStarted",
-        subjectIds: [actor.id],
-        causeIds: [],
-        source: "sim",
-        payload: { action: next.kind },
-      });
+      emitSim(ctx, "actionStarted", [actor.id], { action: next.kind });
     }
     if (step.kind === "work" && step.stage === "eat" && step.ticksNeeded > 0) {
       activity.action.progress = Math.min(1, step.ticksDone / step.ticksNeeded);
@@ -423,7 +418,7 @@ function tellCrew(ctx: StepCtx, teller: Actor, item: Item): void {
 
 function leaveHold(ctx: StepCtx, actor: Actor): void {
   if (currentHold(actor.activity) === "sleep") {
-    ctx.emit({ type: "wokeUp", subjectIds: [actor.id], causeIds: [], source: "sim", payload: {} });
+    emitSim(ctx, "wokeUp", [actor.id], {});
   }
 }
 
@@ -456,13 +451,7 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
 function failActivity(ctx: StepCtx, actor: Actor, reason: BlockageReason): void {
   const activity = actor.activity;
   if (activity.kind === "idle") return;
-  ctx.emit({
-    type: "actionFailed",
-    subjectIds: [actor.id],
-    causeIds: [],
-    source: "sim",
-    payload: { action: activity.action.kind, reason },
-  });
+  emitSim(ctx, "actionFailed", [actor.id], { action: activity.action.kind, reason });
   setBackoff(ctx, actor, activityRef(activity));
   if (activity.kind === "task") {
     const task = ctx.state.work.tasks[activity.taskId];
@@ -472,13 +461,7 @@ function failActivity(ctx: StepCtx, actor: Actor, reason: BlockageReason): void 
 }
 
 function blockTask(ctx: StepCtx, actor: Actor, task: Task, reason: BlockageReason): void {
-  ctx.emit({
-    type: "taskBlocked",
-    subjectIds: [actor.id, task.id],
-    causeIds: [],
-    source: "sim",
-    payload: { taskId: task.id, reason },
-  });
+  emitSim(ctx, "taskBlocked", [actor.id, task.id], { taskId: task.id, reason });
   if (TASK_LEVEL.has(reason)) {
     task.blockage = { reason, sinceTick: ctx.tick, retryAfterTick: ctx.tick + backoffTicks(ctx) };
   }
@@ -705,13 +688,7 @@ function runConsume(ctx: StepCtx, actor: Actor, step: StepOf<"consume">): StepRe
   if (item.stacking === "stack" && item.count > 1) item.count -= 1;
   else delete ctx.state.items[item.id];
   touchInventory(ctx);
-  ctx.emit({
-    type: "ateMeal",
-    subjectIds: [actor.id, item.id],
-    causeIds: [],
-    source: "sim",
-    payload: { nutrition },
-  });
+  emitSim(ctx, "ateMeal", [actor.id, item.id], { nutrition });
   return "done";
 }
 
@@ -790,12 +767,10 @@ function noteGoingToSee(ctx: StepCtx, actor: Actor): void {
   const decisionId = meetingAhead(actor);
   const held = decisionId === undefined ? undefined : heldCard(ctx.state, decisionId);
   if (held === undefined) return;
-  ctx.emit({
-    type: "wentToSee",
-    subjectIds: [actor.id],
-    causeIds: [],
-    source: "sim",
-    payload: { actorId: actor.id, name: actor.name, withName: held.speaker },
+  emitSim(ctx, "wentToSee", [actor.id], {
+    actorId: actor.id,
+    name: actor.name,
+    withName: held.speaker,
   });
 }
 
@@ -924,12 +899,10 @@ function runAwaitWord(ctx: StepCtx, actor: Actor, step: StepOf<"awaitWord">): St
  */
 function runTalk(ctx: StepCtx, actor: Actor, step: StepOf<"talk">): StepResult {
   if (step.ticksDone === 0) {
-    ctx.emit({
-      type: "talkingWith",
-      subjectIds: [actor.id, step.localId],
-      causeIds: [],
-      source: "sim",
-      payload: { actorId: actor.id, name: actor.name, withName: step.withName },
+    emitSim(ctx, "talkingWith", [actor.id, step.localId], {
+      actorId: actor.id,
+      name: actor.name,
+      withName: step.withName,
     });
   }
   step.ticksDone += 1;
@@ -1006,26 +979,14 @@ function enterStep(ctx: StepCtx, actor: Actor): void {
   if (step?.kind !== "hold") return;
   (step as StepOf<"hold">).sinceTick = ctx.tick;
   if (step.hold === "sleep") {
-    ctx.emit({
-      type: "fellAsleep",
-      subjectIds: [actor.id],
-      causeIds: [],
-      source: "sim",
-      payload: {},
-    });
+    emitSim(ctx, "fellAsleep", [actor.id], {});
   }
 }
 
 function completedStepEvent(ctx: StepCtx, actor: Actor): void {
   const activity = actor.activity;
   if (activity.kind === "idle" || activity.action.kind === "walk") return;
-  ctx.emit({
-    type: "actionCompleted",
-    subjectIds: [actor.id],
-    causeIds: [],
-    source: "sim",
-    payload: { action: activity.action.kind },
-  });
+  emitSim(ctx, "actionCompleted", [actor.id], { action: activity.action.kind });
 }
 
 function advanceActivity(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
@@ -1140,13 +1101,7 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
   };
   activity.action = actionFor(ctx, activity, first);
   actor.activity = activity;
-  ctx.emit({
-    type: "taskSelected",
-    subjectIds: [actor.id, task.id],
-    causeIds: [],
-    source: "sim",
-    payload: { taskId: task.id, urgency: intent.urgency },
-  });
+  emitSim(ctx, "taskSelected", [actor.id, task.id], { taskId: task.id, urgency: intent.urgency });
 }
 
 function samePersonal(activity: Activity, intent: Extract<Intent, { kind: "personal" }>): boolean {
@@ -1188,12 +1143,9 @@ function startPersonal(
   activity.action = actionFor(ctx, activity, first);
   actor.activity = activity;
   enterStep(ctx, actor);
-  ctx.emit({
-    type: "personalActivityStarted",
-    subjectIds: [actor.id],
-    causeIds: [],
-    source: "sim",
-    payload: { activity: intent.activity, urgency: intent.urgency },
+  emitSim(ctx, "personalActivityStarted", [actor.id], {
+    activity: intent.activity,
+    urgency: intent.urgency,
   });
 }
 
@@ -1269,13 +1221,7 @@ export function expireClaims(ctx: StepCtx): void {
     if (ctx.tick <= claim.expiresAtTick) continue;
     const task = ctx.state.work.tasks[claim.taskId];
     const owner = ctx.state.actors[claim.ownerActorId];
-    ctx.emit({
-      type: "claimExpired",
-      subjectIds: [claim.ownerActorId, claim.taskId],
-      causeIds: [],
-      source: "sim",
-      payload: { taskId: claim.taskId },
-    });
+    emitSim(ctx, "claimExpired", [claim.ownerActorId, claim.taskId], { taskId: claim.taskId });
     const activity = owner?.activity;
     if (
       owner !== undefined &&

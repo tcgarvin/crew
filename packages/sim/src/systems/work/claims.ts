@@ -16,6 +16,7 @@ import type { TaskReleaseReason } from "../../core/types/events";
 import type { ActorId, ClaimId, ItemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Task } from "../../core/types/work";
+import { emitSim } from "./events";
 
 export function claimTask(ctx: StepCtx, actor: Actor, task: Task): ClaimId {
   const id = allocateId(ctx.state, "claim");
@@ -31,13 +32,7 @@ export function claimTask(ctx: StepCtx, actor: Actor, task: Task): ClaimId {
   task.status = "claimed";
   // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
   delete task.blockage;
-  ctx.emit({
-    type: "taskClaimed",
-    subjectIds: [actor.id, task.id],
-    causeIds: [],
-    source: "sim",
-    payload: { taskId: task.id, claimId: id },
-  });
+  emitSim(ctx, "taskClaimed", [actor.id, task.id], { taskId: task.id, claimId: id });
   return id;
 }
 
@@ -67,13 +62,7 @@ export function releaseActorClaim(
   for (const claim of Object.values(ctx.state.work.claims)) {
     if (claim.taskId !== task.id || claim.ownerActorId !== actorId) continue;
     dropClaim(ctx, task, claim.id);
-    ctx.emit({
-      type: "taskReleased",
-      subjectIds: [actorId, task.id],
-      causeIds: [],
-      source: "sim",
-      payload: { taskId: task.id, reason },
-    });
+    emitSim(ctx, "taskReleased", [actorId, task.id], { taskId: task.id, reason });
   }
 }
 
@@ -156,22 +145,13 @@ export function completeTask(ctx: StepCtx, task: Task): void {
   task.status = "completed";
   task.claimState = { kind: "unclaimed" };
   const haul = custodyHaul(task.completion);
-  ctx.emit({
-    type: "taskCompleted",
-    subjectIds: [task.id, task.problemId, ...workers],
-    causeIds: [],
-    source: "sim",
-    payload: { taskId: task.id, ...(haul === undefined ? {} : { haul }) },
+  emitSim(ctx, "taskCompleted", [task.id, task.problemId, ...workers], {
+    taskId: task.id,
+    ...(haul === undefined ? {} : { haul }),
   });
   const problem = ctx.state.work.problems[task.problemId];
   if (haul !== undefined && problem !== undefined && problem.status === "open") {
     problem.status = "resolved";
-    ctx.emit({
-      type: "problemResolved",
-      subjectIds: [problem.id],
-      causeIds: [],
-      source: "sim",
-      payload: { problemId: problem.id, kind: problem.kind },
-    });
+    emitSim(ctx, "problemResolved", [problem.id], { problemId: problem.id, kind: problem.kind });
   }
 }

@@ -13,6 +13,7 @@ import type { Actor } from "../../core/types/actor";
 import type { ConfigDef } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { isAsleep } from "./activity";
+import { emitSim } from "./events";
 
 export const AMBIENT_EVERY_TICKS = 20;
 
@@ -67,13 +68,7 @@ export const ambientChatSystem: System = {
         const [a, b] = flip ? [second, first] : [first, second];
         const template = ctx.rng.pick("social", social.templateLines);
         const line = template.replaceAll("{a}", a.name).replaceAll("{b}", b.name);
-        ctx.emit({
-          type: "conversation",
-          subjectIds: [a.id, b.id],
-          causeIds: [],
-          source: "sim",
-          payload: { line },
-        });
+        emitSim(ctx, "conversation", [a.id, b.id], { line });
         a.lastConversationTick = ctx.tick;
         b.lastConversationTick = ctx.tick;
         talked.add(a.id);

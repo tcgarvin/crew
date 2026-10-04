@@ -36,6 +36,10 @@ export const tileOf = (location: { x: number; y: number }): TileCoord => ({
   y: Math.floor(location.y),
 });
 
+/** Within arm's reach: the same tile or one of its eight neighbours. */
+export const near = (a: TileCoord, b: TileCoord): boolean =>
+  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
+
 /** The actor's belief about where an item is, ignoring beliefs marked absent. */
 export function believedLocation(actor: Actor, itemId: ItemId): PhysicalLocation | undefined {
   const fact = actor.knowledge[`${itemId}/itemLocation`];

@@ -30,8 +30,8 @@ import type { ActivityPlan, ActivityStep, HaulBatch, HaulLeg, Task } from "../..
 import { backoffRef, isBackingOff } from "./activity";
 import { completeTask, isCompletionMet, releaseActorClaim } from "./claims";
 import { isTerminal } from "./derivation";
-import { directSight, writeFact } from "./facts";
-import { believedLocation, isCarriedBy, tileOf } from "./plans";
+import { seeItem } from "./facts";
+import { believedLocation, isCarriedBy, near, tileOf } from "./plans";
 
 type TaskActivity = Extract<Actor["activity"], { kind: "task" }>;
 
@@ -44,9 +44,6 @@ export function truckCapacity(ctx: Pick<StepCtx, "content">, item: Item | undefi
 }
 
 const units = (item: Item): number => (item.stacking === "stack" ? item.count : 1);
-
-const near = (a: TileCoord, b: TileCoord): boolean =>
-  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
 
 const sameTile = (a: TileCoord, b: TileCoord): boolean => a.x === b.x && a.y === b.y;
 
@@ -243,13 +240,7 @@ export function buildTruckPlan(ctx: StepCtx, actor: Actor, lead: Task): TruckPla
 // ---------------------------------------------------------------------------------------------
 
 function seeWhere(ctx: StepCtx, actor: Actor, item: Item): void {
-  writeFact(
-    actor,
-    item.id,
-    "itemLocation",
-    { location: item.location },
-    directSight(actor, ctx.tick),
-  );
+  seeItem(actor, item.id, item.location, ctx.tick);
 }
 
 /** Settle one held task the trip is letting go of: completed if its crate made it, else released. */

@@ -4,8 +4,8 @@
  * discovers a discrepancy.
  */
 import type { Actor, FactType, FactValues, KnownFact } from "../../core/types/actor";
-import type { Tick } from "../../core/types/common";
-import type { ActorId, EntityId, MachineId } from "../../core/types/ids";
+import type { PhysicalLocation, Tick } from "../../core/types/common";
+import type { ActorId, EntityId, ItemId, MachineId } from "../../core/types/ids";
 
 export interface FactSource {
   readonly tick: Tick;
@@ -36,4 +36,14 @@ export function writeFact<T extends FactType>(
 
 export function directSight(actor: Actor, tick: Tick): FactSource {
   return { tick, sourceId: actor.id, evidence: "direct", certainty: "confirmed" };
+}
+
+/** The actor sees for themselves that `itemId` is at `location`. */
+export function seeItem(
+  actor: Actor,
+  itemId: ItemId,
+  location: PhysicalLocation,
+  tick: Tick,
+): void {
+  writeFact(actor, itemId, "itemLocation", { location }, directSight(actor, tick));
 }
