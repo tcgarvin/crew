@@ -15,11 +15,10 @@
  * a port without a dock map.
  */
 import { dockAlongsideAt, dockPost } from "./docks";
-import type { DeepReadonly } from "./types/common";
-import type { Tick } from "./types/common";
+import type { DeepReadonly, Tick } from "./types/common";
 import type { Decision, HeldCard } from "./types/decisions";
 import type { Local } from "./types/dockside";
-import type { CardDeliveryReason, EventDraft } from "./types/events";
+import type { CardDeliveryReason } from "./types/events";
 import type { DecisionId, PortDefId } from "./types/ids";
 import type { ReadonlyWorldState, StepCtx } from "./types/pipeline";
 
@@ -144,14 +143,13 @@ export function deliverHeldCard(
   const stale = staleReason(ctx.state, decision);
   if (stale !== undefined) {
     if (decision !== undefined && decision.status === "pending") decision.status = "dropped";
-    const dropped: EventDraft = {
+    ctx.emit({
       type: "decisionDropped",
       subjectIds: [decisionId],
       causeIds: [],
       source: "sim",
       payload: { decisionId, reason: stale },
-    };
-    ctx.emit(dropped);
+    });
     return;
   }
   decisions.queue.push(decisionId);
