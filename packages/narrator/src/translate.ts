@@ -205,7 +205,7 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   const config = snapshot.config;
   const here = offerPortNow(snapshot.state);
   if (here === undefined) {
-    return no("offerJob: the ship is not docked; offers are made in person at the dock");
+    return no("the ship is not docked; offers are made in person at the dock");
   }
   // D16/D50/D52: one job at a time. The kernel rejects `acceptContract` while a job is in hand,
   // so an offer made now could only be declined; drop it here with the job it would collide
@@ -213,47 +213,44 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   // destination, a passenger walking off) does not drop an offer made on the docked tick.
   const inHand = jobBlockingAcceptance(snapshot.state);
   if (inHand !== undefined) {
-    return no(
-      `offerJob: a job is already in hand: ${inHand.id} to ${portName(content, inHand.toPortId)}`,
-    );
+    return no(`a job is already in hand: ${inHand.id} to ${portName(content, inHand.toPortId)}`);
   }
   const fromPort = knownPort(content, intent.fromPort);
-  if (!fromPort.ok) return no(`offerJob: fromPort: ${fromPort.reason}`);
+  if (!fromPort.ok) return no(`fromPort: ${fromPort.reason}`);
   const toPort = knownPort(content, intent.toPort);
-  if (!toPort.ok) return no(`offerJob: toPort: ${toPort.reason}`);
+  if (!toPort.ok) return no(`toPort: ${toPort.reason}`);
   if (intent.fromPort !== here) {
     return no(
-      `offerJob: fromPort must be ${here} (${portName(content, here)}), the port the ship is docked at`,
+      `fromPort must be ${here} (${portName(content, here)}), the port the ship is docked at`,
     );
   }
-  if (intent.toPort === intent.fromPort) return no("offerJob: toPort equals fromPort");
+  if (intent.toPort === intent.fromPort) return no("toPort equals fromPort");
   // Passengers-and-galaxy §2.3: any reachable port; a far one becomes a voyage when accepted,
   // and the kernel prices it over the same path distance.
   const path = pathBetween(content, intent.fromPort, intent.toPort);
-  if (path === undefined)
-    return no(`offerJob: no route from ${intent.fromPort} to ${intent.toPort}`);
+  if (path === undefined) return no(`no route from ${intent.fromPort} to ${intent.toPort}`);
   const distance = path.distance;
   // §4.1: roundTrip is a passenger's shape; freight has no return leg.
   if (intent.roundTrip && !intent.passenger) {
-    return no("offerJob: roundTrip needs passenger (freight has no return)");
+    return no("roundTrip needs passenger (freight has no return)");
   }
   // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (D70: the card comes
   // up when the captain meets them).
   const surface = intent.passenger || intent.surface;
   if (surface && env.hook?.kind === "policyDecision") {
-    return no("offerJob: cannot surface a new card while a policy decision is pending");
+    return no("cannot surface a new card while a policy decision is pending");
   }
   if (surface && env.tally.cardUsed) {
     // A quiet offer never reaches the captain (nothing surfaces a board offer later), so a
     // passenger offer cannot fall back to the board the way freight can.
     return no(
       intent.passenger
-        ? "offerJob: a passenger offer must be surfaced and this call's card is taken"
-        : "offerJob: only one card per call",
+        ? "a passenger offer must be surfaced and this call's card is taken"
+        : "only one card per call",
     );
   }
   const cargo = offerCargo(env, intent);
-  if (!cargo.ok) return no(`offerJob: cargoItem: ${cargo.reason}`);
+  if (!cargo.ok) return no(`cargoItem: ${cargo.reason}`);
   const name = clipChars(intent.issuerName, ISSUER_MAX_CHARS);
   const role = clipChars(intent.issuerRole, ISSUER_MAX_CHARS).toLowerCase();
   const org = clipChars(intent.issuerOrg, ISSUER_MAX_CHARS);
@@ -268,7 +265,7 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (org !== "") texts.push(["issuerOrg", org]);
   for (const [field, text] of texts) {
     const problem = textProblem(text, env.secrets);
-    if (problem !== undefined) return no(`offerJob: ${field}: ${problem}`);
+    if (problem !== undefined) return no(`${field}: ${problem}`);
   }
   // §3.4: a passage is priced by the passenger band over path distance (doubled for a round
   // trip), luggage adding nothing; freight by its class band per unit.
@@ -325,17 +322,17 @@ function translateSpawn(env: Env, intent: Intent<"spawnAtBoundary">): Outcome<Na
   const { snapshot, content } = env;
   const config = snapshot.config;
   const budget = snapshot.state.narrator.budget.spawnsRemaining - env.tally.spawns;
-  if (budget <= 0) return no("spawnAtBoundary: spawn budget exhausted");
+  if (budget <= 0) return no("spawn budget exhausted");
   const known = knownPort(content, intent.port);
-  if (!known.ok) return no(`spawnAtBoundary: port: ${known.reason}`);
+  if (!known.ok) return no(`port: ${known.reason}`);
   const port = known.value;
   if (!port.externalStores.some((s) => s.key === intent.store)) {
     return no(
-      `spawnAtBoundary: port ${intent.port} has no store "${intent.store}"; use one listed under What you can do`,
+      `port ${intent.port} has no store "${intent.store}"; use one listed under What you can do`,
     );
   }
   const cargo = cargoItem(content, intent.cargoItem);
-  if (!cargo.ok) return no(`spawnAtBoundary: cargoItem: ${cargo.reason}`);
+  if (!cargo.ok) return no(`cargoItem: ${cargo.reason}`);
   const item = cargo.value;
   const wanted = SPAWN_QUANTITY_UNITS[intent.quantity];
   const count =
@@ -358,26 +355,26 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
   const config = snapshot.config;
   const machine = snapshot.state.machines[intent.machine as MachineId];
   if (machine === undefined) {
-    return no(`scheduleFault: machine: ${unknownId("machine", intent.machine)}`);
+    return no(`machine: ${unknownId("machine", intent.machine)}`);
   }
   const def = content.machines[machine.defId];
   if (def === undefined || !def.faults.some((f) => f.key === intent.faultKey)) {
     return no(
-      `scheduleFault: machine ${intent.machine} has no fault "${intent.faultKey}"; use a faultKey listed under it in What you can do`,
+      `machine ${intent.machine} has no fault "${intent.faultKey}"; use a faultKey listed under it in What you can do`,
     );
   }
   if (
     machine.faults.some((f) => f.faultKey === intent.faultKey) ||
     machine.scheduledFaults.some((f) => f.faultKey === intent.faultKey)
   ) {
-    return no(`scheduleFault: ${intent.machine} already has or awaits "${intent.faultKey}"`);
+    return no(`${intent.machine} already has or awaits "${intent.faultKey}"`);
   }
   const budget = snapshot.state.narrator.budget.faultsRemaining - env.tally.faults;
-  if (budget <= 0) return no("scheduleFault: fault budget exhausted");
+  if (budget <= 0) return no("fault budget exhausted");
   const windowTicks = faultWindowTicks(config, intent.window);
   const maxWindow = configTicks(config, config.narrator.maxFaultWindowSeconds);
   if (windowTicks[1] - windowTicks[0] > maxWindow || windowTicks[0] < 0) {
-    return no("scheduleFault: window outside config bounds");
+    return no("window outside config bounds");
   }
   env.tally.faults += 1;
   return ok({
@@ -535,29 +532,29 @@ function closedLabel(env: Env, title: string): string {
 
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
   if (env.hook?.kind === "policyDecision") {
-    return no("surfaceDecision: a policy decision is pending; dress it with `card` instead");
+    return no("a policy decision is pending; dress it with `card` instead");
   }
-  if (env.tally.cardUsed) return no("surfaceDecision: only one card per call");
+  if (env.tally.cardUsed) return no("only one card per call");
   const beat = beatThread(env, intent);
-  if (!beat.ok) return no(`surfaceDecision: ${beat.reason}`);
+  if (!beat.ok) return beat;
   const closing = closingThread(env, intent);
-  if (!closing.ok) return no(`surfaceDecision: ${closing.reason}`);
+  if (!closing.ok) return closing;
   const title = clipChars(intent.title, TITLE_MAX_CHARS);
   const situation = clipWords(intent.situation, CARD_SITUATION_MAX_WORDS);
   const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
-  if (problem !== undefined) return no(`surfaceDecision: ${problem}`);
+  if (problem !== undefined) return no(problem);
   const speaker = speakerName(env, intent.speaker);
-  if (!speaker.ok) return no(`surfaceDecision: ${speaker.reason}`);
+  if (!speaker.ok) return speaker;
   const left = translateSide(env, intent.left, "left");
-  if (!left.ok) return no(`surfaceDecision: ${left.reason}`);
+  if (!left.ok) return left;
   const right = translateSide(env, intent.right, "right");
-  if (!right.ok) return no(`surfaceDecision: ${right.reason}`);
+  if (!right.ok) return right;
   const leftAftermath = aftermathText(env, intent.leftAftermath, "leftAftermath");
-  if (!leftAftermath.ok) return no(`surfaceDecision: ${leftAftermath.reason}`);
+  if (!leftAftermath.ok) return leftAftermath;
   const rightAftermath = aftermathText(env, intent.rightAftermath, "rightAftermath");
-  if (!rightAftermath.ok) return no(`surfaceDecision: ${rightAftermath.reason}`);
+  if (!rightAftermath.ok) return rightAftermath;
   if (left.value.label.toLowerCase() === right.value.label.toLowerCase()) {
-    return no("surfaceDecision: both sides have the same label");
+    return no("both sides have the same label");
   }
   env.tally.cardUsed = true;
   env.tally.beatCardThread = beat.value;
@@ -602,10 +599,9 @@ function translateStock(env: Env, intent: Intent<"stockMarket">): Outcome<Narrat
   const { snapshot, content } = env;
   const config = snapshot.config;
   const known = knownPort(content, intent.port);
-  if (!known.ok) return no(`stockMarket: port: ${known.reason}`);
+  if (!known.ok) return no(`port: ${known.reason}`);
   const item = content.items[intent.cargoItem as ItemDefId];
-  if (item === undefined)
-    return no(`stockMarket: cargoItem: ${unknownId("item", intent.cargoItem)}`);
+  if (item === undefined) return no(`cargoItem: ${unknownId("item", intent.cargoItem)}`);
   const max = config.commerce.market.maxStockPerCommand;
   const count = Math.max(0, Math.min(max, Number.parseInt(intent.count, 10)));
   const base = basePriceFor(content, config, known.value.id, item.id);
@@ -616,7 +612,13 @@ function translateStock(env: Env, intent: Intent<"stockMarket">): Outcome<Narrat
   });
 }
 
+/** Every reason a translation gives is prefixed with the intent's kind. */
 function translateOne(env: Env, intent: NarratorIntent): Outcome<NarratorDraft> {
+  const outcome = translateByKind(env, intent);
+  return outcome.ok ? outcome : no(`${intent.kind}: ${outcome.reason}`);
+}
+
+function translateByKind(env: Env, intent: NarratorIntent): Outcome<NarratorDraft> {
   switch (intent.kind) {
     case "offerJob":
       return translateOfferJob(env, intent);
