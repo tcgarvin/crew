@@ -17,7 +17,7 @@ import type {
   ToWorker,
 } from "@crew/sim";
 import { decisionShownTick } from "@crew/sim";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
 import {
@@ -61,6 +61,7 @@ import {
   appendTicker,
   visibleLog,
 } from "./ui/log";
+import { portraitCssVars } from "./ui/portraitLayout";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
@@ -68,6 +69,9 @@ import { loadWebContent } from "./worker/content";
 const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
 const SERVER_OPEN_GRACE_MS = 3_000;
+
+/** D72: the portrait chrome heights, which the stylesheet reads from these properties. */
+const APP_STYLE = portraitCssVars() as CSSProperties;
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -183,10 +187,14 @@ export function App() {
     connection.send({ type: "command", requestId, command });
   }, []);
 
-  /** What the pause button does, also used when the narrator error panel pauses the game. */
+  /**
+   * What the pause button does, also used when the narrator error panel pauses the game. The
+   * playback freezes too, or the run-ahead already buffered would keep playing after the pause.
+   */
   const applyPause = useCallback((next: boolean) => {
     setPausedState(next);
     pausedRef.current = next;
+    playbackRef.current.setPaused(next);
     connectionRef.current?.setUserPaused(next);
     connectionRef.current?.send({ type: next ? "pause" : "resume" });
   }, []);
@@ -432,6 +440,7 @@ export function App() {
     setPausedState(false);
     pausedRef.current = false;
     playbackRef.current.setSpeed(next);
+    playbackRef.current.setPaused(false);
     connectionRef.current?.setUserPaused(false);
     connectionRef.current?.send({ type: "setSpeed", speed: next });
     connectionRef.current?.send({ type: "resume" });
@@ -578,7 +587,7 @@ export function App() {
   );
 
   return (
-    <div className="app">
+    <div className="app" style={APP_STYLE}>
       <TopBar
         speed={speed}
         paused={paused}

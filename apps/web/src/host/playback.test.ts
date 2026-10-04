@@ -172,6 +172,59 @@ describe("FramePlayback", () => {
   });
 });
 
+describe("FramePlayback paused", () => {
+  /** A playback a quarter of the way through ticks 0..20, with run-ahead buffered to tick 200. */
+  function midway(): FramePlayback {
+    const playback = new FramePlayback(20);
+    for (let tick = 0; tick <= 200; tick += 20) playback.push(frame(tick, tick, 0));
+    playback.advance(250);
+    return playback;
+  }
+
+  it("holds the picture it was showing however much buffered run-ahead remains", () => {
+    const playback = midway();
+    const before = playback.advance(0);
+    playback.setPaused(true);
+    const held = playback.advance(5000);
+    expect(held?.viewTick).toBe(before?.viewTick);
+    expect(held && firstActor(held.frame).x).toBeCloseTo(5);
+    expect(playback.advance(5000)).toBe(held);
+    expect(playback.bufferedFrameCount).toBe(11);
+  });
+
+  it("resumes from the same view tick, not from where the wall clock got to", () => {
+    const playback = midway();
+    playback.setPaused(true);
+    playback.advance(10_000);
+    playback.setPaused(false);
+    const resumed = playback.advance(250);
+    if (!resumed) throw new Error("expected a playback step");
+    expect(resumed.viewTick).toBe(10);
+    expect(firstActor(resumed.frame).x).toBeCloseTo(10);
+  });
+
+  it("keeps frames that arrive while paused for after the pause", () => {
+    const playback = new FramePlayback(20);
+    playback.push(frame(0, 0, 0));
+    playback.setPaused(true);
+    expect(playback.advance(100)?.viewTick).toBe(0);
+    playback.push(frame(20, 20, 0));
+    expect(playback.advance(1000)?.viewTick).toBe(0);
+    playback.setPaused(false);
+    expect(playback.advance(500)?.viewTick).toBe(10);
+  });
+
+  it("plays at the new speed once resumed when the speed changed during the pause", () => {
+    const playback = midway();
+    playback.setPaused(true);
+    playback.setSpeed(4);
+    expect(playback.advance(1000)?.viewTick).toBe(5);
+    playback.setPaused(false);
+    // 250 ms at 4x is one more sim-second: tick 5 -> 25.
+    expect(playback.advance(250)?.viewTick).toBe(25);
+  });
+});
+
 describe("interpolateFrame and the dock's locals (D66)", () => {
   function withLocals(base: RenderFrame, locals: { id: string; x: number; facing: number }[]) {
     return {

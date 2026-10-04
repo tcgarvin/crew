@@ -148,9 +148,20 @@ body {
  * One feed, newest on top: event lines and the cards the captain was shown. It scrolls; nothing
  * in it fades out.
  */
-.log {
+.log-panel {
   flex: 0 0 auto;
   width: clamp(220px, 30vw, 340px);
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--panel-border);
+}
+
+.log {
+  flex: 1;
+  min-height: 0;
   list-style: none;
   margin: 0;
   padding: 8px;
@@ -159,8 +170,11 @@ body {
   gap: 6px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--panel);
-  border-left: 1px solid var(--panel-border);
+}
+
+/* Portrait only (D72): opens the compact log out. */
+.log-toggle {
+  display: none;
 }
 
 .log-item {
@@ -253,16 +267,86 @@ body {
   color: var(--text-dim);
 }
 
+/*
+ * D72: portrait gives the canvas most of the height. The top bar is one row and the headline a
+ * fixed two lines (so the canvas never resizes as the headline wraps), and the log is a compact
+ * strip the player can open out. Heights come from `portraitLayout.ts` through the custom
+ * properties set on `.app`, which is what the camera's legibility test models.
+ */
 @media (orientation: portrait) {
+  .top-bar {
+    height: var(--portrait-top-bar);
+    flex-wrap: nowrap;
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .top-bar-group {
+    gap: 4px;
+  }
+  .speed-button {
+    padding: 3px 5px;
+    min-width: 28px;
+  }
+  .new-game-button {
+    padding: 3px 6px;
+    margin-left: 2px;
+    white-space: nowrap;
+  }
+  .headline {
+    height: var(--portrait-headline);
+    padding: 4px 12px;
+    font-size: 14px;
+    line-height: 18px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .travel-bar {
+    height: var(--portrait-travel-bar);
+  }
   .main-area {
     flex-direction: column;
   }
-  .log {
+  .log-panel {
     width: auto;
-    height: clamp(110px, 28vh, 220px);
-    padding: 6px 8px;
+    height: clamp(
+      var(--portrait-log-min),
+      calc(100vh - var(--portrait-log-reserve)),
+      var(--portrait-log-max)
+    );
+    height: clamp(
+      var(--portrait-log-min),
+      calc(100dvh - var(--portrait-log-reserve)),
+      var(--portrait-log-max)
+    );
     border-left: none;
     border-top: 1px solid var(--panel-border);
+  }
+  .log-panel-expanded {
+    height: clamp(
+      var(--portrait-log-expanded-min),
+      var(--portrait-log-expanded),
+      var(--portrait-log-expanded-max)
+    );
+  }
+  .log {
+    padding: 4px 44px 4px 8px;
+  }
+  .log-toggle {
+    display: block;
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    width: 32px;
+    height: 26px;
+    padding: 0;
+    background: #1b2430;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
   }
 }
 

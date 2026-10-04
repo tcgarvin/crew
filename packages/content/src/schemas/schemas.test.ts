@@ -620,6 +620,15 @@ describe("bundle validation", () => {
       expect(issues.some((i) => i.message.includes("item.does.not_exist"))).toBe(true);
     });
 
+    it("rejects a generated given name that is a crew member's first name", () => {
+      const clash = { ...people, givenNames: ["Ysolde", "Mara"] };
+      const issues = referenceIssues({ ...bundle, people: clash });
+      expect(issues.map((i) => [i.path, i.message])).toEqual([
+        [["people", "givenNames", 1], `given name "Mara" is the first name of crew "${crew.id}"`],
+      ]);
+      expect(referenceIssues(bundle)).toEqual([]);
+    });
+
     it("rejects a unique item with maxStack other than 1", () => {
       const badItem = { ...item, maxStack: 2 };
       const issues = referenceIssues({ ...bundle, items: { [badItem.id]: badItem } });

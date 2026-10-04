@@ -49,6 +49,14 @@ export function shouldRotate(
   return viewportHeight > viewportWidth && layout.width > layout.height;
 }
 
+/** Screen padding around the framed bounds, CSS pixels. */
+export const FIT_PADDING_PX = 12;
+/**
+ * D72: a portrait phone keeps every pixel of its width for the ship: the flight margin and the
+ * dock map's own edges frame the picture, so the padding is a hairline.
+ */
+export const PORTRAIT_FIT_PADDING_PX = 4;
+
 /**
  * Fit `bounds` (tile units) into a CSS-pixel viewport, centred, with padding. When `rotated`, the
  * fit is computed against the viewport's dimensions swapped (the deck is drawn in its own
@@ -59,7 +67,7 @@ export function computeFitTransform(
   viewportHeight: number,
   bounds: Bounds,
   rotated: boolean,
-  padding = 12,
+  padding = rotated ? PORTRAIT_FIT_PADDING_PX : FIT_PADDING_PX,
 ): ViewTransform {
   const fitW = rotated ? viewportHeight : viewportWidth;
   const fitH = rotated ? viewportWidth : viewportHeight;
@@ -160,7 +168,7 @@ function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: Deck
  * real screen space so text always reads upright (task item 5). Machine labels sit at machine
  * centres, so corner plates keep the two apart.
  */
-function drawCompartmentLabels(
+export function drawCompartmentLabels(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
@@ -172,6 +180,7 @@ function drawCompartmentLabels(
   ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
+  const roomAt = tileRooms(layout);
   for (const [key, name] of Object.entries(layout.compartmentNames)) {
     const box = layout.compartmentBoxes[key];
     if (box === undefined) continue;
@@ -185,11 +194,38 @@ function drawCompartmentLabels(
     if (label === "") continue;
     const w = ctx.measureText(label).width + 8;
     const h = fontPx + 4;
+    // D72: the plate stays inside its own room. In a room shorter than the plate on screen, or
+    // one whose bounding-box corner lies in a neighbour, it would cover the neighbour's label.
+    const corners = [
+      [x + 3, y + 3],
+      [x + 2 + w, y + 3],
+      [x + 3, y + 2 + h],
+      [x + 2 + w, y + 2 + h],
+    ] as const;
+    const inRoom = corners.every(([cx, cy]) => {
+      const at = screenToWorld(t, cx, cy, rotated, viewportHeight);
+      return roomAt.get(`${Math.floor(at.x)},${Math.floor(at.y)}`) === key;
+    });
+    if (!inRoom) continue;
     ctx.fillStyle = ROOM_PLATE_BG;
     ctx.fillRect(x + 3, y + 3, w, h);
     ctx.fillStyle = roomStyle(layout.compartmentTags[key]).label;
     ctx.fillText(label, x + 7, y + 3 + h / 2);
   }
+}
+
+const tileRoomCache = new WeakMap<DeckLayout, ReadonlyMap<string, string>>();
+
+/** The compartment of each deck tile, by "x,y". */
+function tileRooms(layout: DeckLayout): ReadonlyMap<string, string> {
+  const cached = tileRoomCache.get(layout);
+  if (cached !== undefined) return cached;
+  const rooms = new Map<string, string>();
+  for (const tile of layout.tiles) {
+    if (tile.compartmentKey !== undefined) rooms.set(`${tile.x},${tile.y}`, tile.compartmentKey);
+  }
+  tileRoomCache.set(layout, rooms);
+  return rooms;
 }
 
 /** Truncate with an ellipsis to fit `maxPx`; "" if not even two characters fit. */
@@ -620,6 +656,9 @@ export function drawActorLabels(
 
   for (const { entry, at } of sorted) {
     const [dotX, cy] = at;
+    // D72: a label names a dot the player can see. While the dock slides in, its people are still
+    // off the canvas, and a label clamped onto the edge would float there on its own.
+    if (dotX < 0 || dotX > viewportWidth || cy < 0 || cy > viewportHeight) continue;
     const labelW = ctx.measureText(entry.text).width + 8;
     // Kept on screen: the docked camera puts people on the dock's far edges.
     const cx = Math.max(labelW / 2 + 2, Math.min(viewportWidth - labelW / 2 - 2, dotX));
@@ -629,6 +668,8 @@ export function drawActorLabels(
         labelY = p.y - (fontPx + 4);
       }
     }
+    // Nor off the top, where a crowd near the bow stacks its labels.
+    labelY = Math.max(fontPx / 2 + 2, labelY);
     placed.push({ x: cx, y: labelY, w: labelW });
 
     ctx.fillStyle = LABEL_BG;
