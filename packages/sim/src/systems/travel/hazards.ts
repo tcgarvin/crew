@@ -1,6 +1,9 @@
 /**
  * Navigation hazards (D78): the narrator's `scheduleHazard` places one on the leg, and it fires
  * at the first `transit` tick at or after its `fireAtTick`, rolled against whoever has the helm.
+ * A hazard lies on that leg only: if transit ends before it falls due, or the course is given up
+ * in port, it is dropped (`navHazardMissed`, notable: a fact for the narrator, no ticker line),
+ * never carried to the next leg. It can only be placed while the leg still has transit ahead.
  *
  * The roll: the stander's piloting against the hazard's difficulty,
  * `p = clamp((skill - difficulty + 5) / 10, 0.05, 0.95)` and one `failures` draw `r`: clean if
@@ -77,6 +80,12 @@ export const scheduleHazard: CommandHandler<"scheduleHazard", null> = {
         "scheduleHazard: docked with no course planned; a hazard needs a leg to lie on",
       );
     }
+    if (travel.stage === "approaching" || travel.stage === "docking") {
+      return reject(
+        "preconditionFailed",
+        `scheduleHazard: the leg's transit is over (${travel.stage}); a hazard needs a leg to lie on`,
+      );
+    }
     return ok(null);
   },
   apply(ctx, command) {
@@ -115,11 +124,29 @@ export function hazardOutcome(p: number, r: number): Exclude<HazardOutcome, "una
   return "delay";
 }
 
-/** Fires every due hazard while the ship is in transit (phase `equipment`, after travel). */
+/**
+ * Has the leg the waiting hazards lie on ended without them? Its transit is over (`approaching`,
+ * `docking`), or the ship is in port with no course to fly (given up before the leg began).
+ */
+function legGone(travel: StepCtx["state"]["travel"]): boolean {
+  if (travel.stage === "docked") return travel.plannedDestinationId === undefined;
+  return travel.stage === "approaching" || travel.stage === "docking";
+}
+
+/**
+ * Fires every due hazard while the ship is in transit, and drops the ones the leg left unfired
+ * (`navHazardMissed`) once it is gone (phase `equipment`, after travel, so the tick transit ends
+ * is the tick they go).
+ */
 export const hazardsSystem: System = {
   name: "travel.hazards",
   phase: "equipment",
   run(ctx) {
+    if (ctx.state.hazards.length === 0) return;
+    if (legGone(ctx.state.travel)) {
+      missAll(ctx);
+      return;
+    }
     if (ctx.state.travel.stage !== "transit") return;
     if (!ctx.state.hazards.some((hazard) => hazard.fireAtTick <= ctx.tick)) return;
     const due = ctx.state.hazards.filter((hazard) => hazard.fireAtTick <= ctx.tick);
@@ -127,6 +154,26 @@ export const hazardsSystem: System = {
     for (const hazard of due) fireHazard(ctx, hazard);
   },
 };
+
+/** Drops every waiting hazard with the leg it lay on, each with a `navHazardMissed`. */
+function missAll(ctx: StepCtx): void {
+  const travel = ctx.state.travel;
+  const leg =
+    travel.stage === "docked"
+      ? { fromPortId: travel.portId }
+      : { fromPortId: travel.fromPortId, toPortId: travel.toPortId };
+  const missed = ctx.state.hazards;
+  ctx.state.hazards = [];
+  for (const hazard of missed) {
+    ctx.emit({
+      type: "navHazardMissed",
+      subjectIds: [],
+      causeIds: hazard.causeCommandId === undefined ? [] : [hazard.causeCommandId],
+      source: "sim",
+      payload: { hazardId: hazard.id, kind: hazard.kind, difficulty: hazard.difficulty, ...leg },
+    });
+  }
+}
 
 function fireHazard(ctx: StepCtx, hazard: ScheduledHazard): void {
   const standerId = whoHasTheHelm(ctx.state, ctx.content);

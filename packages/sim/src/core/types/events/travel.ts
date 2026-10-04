@@ -88,6 +88,18 @@ export interface TravelEventPayloads {
     readonly scrapedMachineId?: MachineId;
     readonly lostSeconds: number;
   };
+  /**
+   * D78: hazard `hazardId` never fired and is dropped with its leg, `fromPortId` → `toPortId`:
+   * transit ended before it fell due, or (absent `toPortId`) the course was given up in port
+   * before the leg began. A hazard lies on the leg it was placed on and never carries to another.
+   */
+  navHazardMissed: {
+    readonly hazardId: HazardId;
+    readonly kind: HazardKind;
+    readonly difficulty: number;
+    readonly fromPortId: PortDefId;
+    readonly toPortId?: PortDefId;
+  };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -109,4 +121,6 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   hazardScheduled: "trace",
   // The helm's stakes: in the digest and the ticker, but not hooked (D78).
   navHazard: "narrative",
+  // A fact for the narrator's digest that its hazard came to nothing; no story, no ticker line.
+  navHazardMissed: "notable",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

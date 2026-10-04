@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { configTicks } from "../../core/clock";
 import { cmd } from "../../core/fixtures/test-world";
+import { isTickerEvent } from "../../core/render";
 import { createRngApi, seedStream } from "../../core/rng";
 import type { Actor } from "../../core/types/actor";
 import type { HazardKind } from "../../core/types/content";
@@ -38,10 +40,10 @@ const codeOf = (result: ReturnType<typeof schedule>) =>
   result.status === "rejected" ? result.rejection.code : result.status;
 
 /** A planned course: `setCourse` while docked (applied at the next tick). */
-function planCourse(test: Test) {
+function planCourse(test: Test, to: (typeof PORTS)[keyof typeof PORTS] = PORTS.b) {
   test.kernel.enqueueCommand(
     test.world,
-    cmd({ source: "scenario", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
+    cmd({ source: "scenario", kind: "setCourse", payload: { destinationPortId: to } }),
   );
   test.kernel.advance(test.world, 1);
 }
@@ -380,6 +382,83 @@ describe("hazardsSystem (D78)", () => {
   });
 });
 
+describe("a hazard lies on its own leg only (D78)", () => {
+  it("is dropped the tick transit ends before it falls due, and never fires on a later leg", () => {
+    const test = freightTestWorld();
+    planCourse(test);
+    const maxWindow = configTicks(
+      test.world.config.values,
+      test.world.config.values.narrator.maxFaultWindowSeconds,
+    );
+    const command = cmd({
+      source: "scenario",
+      kind: "scheduleHazard",
+      payload: { kind: "ionStorm", difficulty: 7, windowTicks: [maxWindow, maxWindow] },
+    });
+    expect(test.kernel.enqueueCommand(test.world, command).status).toBe("accepted");
+    const all: SimEvent[] = [...step(test)];
+    const fireAtTick = test.world.state.hazards[0]?.fireAtTick ?? Number.NaN;
+    const stage = () => test.world.state.travel.stage;
+    for (let i = 0; i < 2_000 && stage() !== "approaching"; i++) {
+      const events = step(test);
+      all.push(...events);
+      expect(travelViolations(test.world)).toEqual([]);
+      const missed = events.filter((e) => e.type === "navHazardMissed");
+      // Nothing is dropped while the leg still has transit ahead.
+      expect(missed).toHaveLength(stage() === "approaching" ? 1 : 0);
+    }
+    expect(stage()).toBe("approaching");
+    expect(test.world.state.tick).toBeLessThan(fireAtTick);
+    expect(test.world.state.hazards).toEqual([]);
+    const missed = all.find((e) => e.type === "navHazardMissed");
+    expect(missed?.payload).toEqual({
+      hazardId: "h1",
+      kind: "ionStorm",
+      difficulty: 7,
+      fromPortId: PORTS.a,
+      toPortId: PORTS.b,
+    });
+    expect(missed?.causeIds).toEqual([command.id]);
+    expect(missed?.significance).toBe("notable");
+    expect(missed !== undefined && isTickerEvent(missed)).toBe(false);
+    // Back and forth on later legs, past the tick it would have fired: nothing does.
+    let next: (typeof PORTS)[keyof typeof PORTS] = PORTS.a;
+    for (let leg = 0; leg < 20 && test.world.state.tick <= fireAtTick; leg++) {
+      advanceToStage(test.kernel, test.world, "docked");
+      planCourse(test, next);
+      next = next === PORTS.a ? PORTS.b : PORTS.a;
+      for (let i = 0; i < 2_000 && test.world.state.travel.stage !== "approaching"; i++) {
+        all.push(...step(test));
+      }
+    }
+    expect(test.world.state.tick).toBeGreaterThan(fireAtTick);
+    expect(all.some((e) => e.type === "navHazard")).toBe(false);
+  });
+
+  it("is dropped with the course when it is given up in port before the leg begins", () => {
+    const test = freightTestWorld();
+    const tick = test.world.state.tick;
+    test.world.state.hazards = [
+      { id: "h1" as never, kind: "asteroidBelt", difficulty: 3, fireAtTick: tick + 50 },
+    ];
+    const missed = step(test).find((e) => e.type === "navHazardMissed");
+    expect(missed?.payload).toEqual({
+      hazardId: "h1",
+      kind: "asteroidBelt",
+      difficulty: 3,
+      fromPortId: PORTS.a,
+    });
+    expect(test.world.state.hazards).toEqual([]);
+  });
+
+  it("cannot be placed once the leg's transit is over", () => {
+    const test = freightTestWorld();
+    planCourse(test);
+    advanceToStage(test.kernel, test.world, "approaching");
+    expect(codeOf(schedule(test, debris))).toBe("preconditionFailed");
+  });
+});
+
 describe("hazard invariants (D78)", () => {
   it("flag an unknown kind, an off-scale difficulty, a fractional tick and one overdue in transit", () => {
     const test = freightTestWorld();
@@ -396,6 +475,19 @@ describe("hazard invariants (D78)", () => {
       "hazard h2 difficulty 11 is not an integer in [1, 10]",
       `hazard h3 fireAtTick ${tick + 0.5} is not a whole tick`,
       `hazard h4 was due at tick ${tick} and has not fired in transit`,
+    ]);
+  });
+
+  it("flag a hazard that outlived its leg's transit", () => {
+    const test = freightTestWorld();
+    planCourse(test);
+    advanceToStage(test.kernel, test.world, "approaching");
+    const tick = test.world.state.tick;
+    test.world.state.hazards = [
+      { id: "h1" as never, kind: "ionStorm", difficulty: 3, fireAtTick: tick + 9 },
+    ];
+    expect(travelViolations(test.world)).toEqual([
+      "1 hazards outlived their leg's transit (stage approaching)",
     ]);
   });
 });

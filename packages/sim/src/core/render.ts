@@ -149,6 +149,8 @@ const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
   "decisionPending",
   "commandRejected",
   "invariantViolated",
+  // D78: the narrator's bookkeeping (its hazard came to nothing); the player saw nothing happen.
+  "navHazardMissed",
 ]);
 
 /** Should `event` reach the ticker at all? (`describeEvent` may still drop it with `null`.) */

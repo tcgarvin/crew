@@ -3,7 +3,8 @@
  * exactly the dock content has for the port the ship is at, from the start of `docking` to the
  * end of `undocking`, and none otherwise (in flight, or at a port without a dock map). While the
  * ramps are not both shut, nobody is on a dock that is not there. D78: waiting hazards are well
- * formed and none is overdue in transit. Pure over state and content.
+ * formed, none is overdue in transit and none outlives its leg's transit. Pure over state and
+ * content.
  */
 import { dockForPort, expectedDock, isDockPoint } from "../../core/docks";
 import { HAZARD_KINDS } from "../../core/types/content";
@@ -31,11 +32,16 @@ export function travelViolations(world: Pick<World, "state" | "content">): strin
 
 /**
  * D78: every waiting hazard has a known kind, a difficulty on the 1-10 scale and a whole-tick
- * fire time; and none is overdue in transit, where `hazardsSystem` fires them the tick they fall
- * due. (Ids below `nextId.hazard` are core's, `checkInvariants`.)
+ * fire time; none is overdue in transit, where `hazardsSystem` fires them the tick they fall
+ * due; and none outlives the transit of its leg (dropped the tick it ends). (Ids below
+ * `nextId.hazard` are core's, `checkInvariants`.)
  */
 function hazardViolations({ state }: Pick<World, "state">): string[] {
   const out: string[] = [];
+  const stage = state.travel.stage;
+  if ((stage === "approaching" || stage === "docking") && state.hazards.length > 0) {
+    out.push(`${state.hazards.length} hazards outlived their leg's transit (stage ${stage})`);
+  }
   for (const hazard of state.hazards) {
     const where = `hazard ${hazard.id}`;
     if (!(HAZARD_KINDS as readonly string[]).includes(hazard.kind)) {
