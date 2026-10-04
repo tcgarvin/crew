@@ -2,7 +2,7 @@
  * Scenario/fixture setup commands (SD §19.2: "scenario setup can spawn entities and faults before
  * execution"). Source `scenario` only; never reachable by the narrator or player.
  */
-import type { Needs } from "../actor";
+import type { Needs, WatchSection } from "../actor";
 import type { PhysicalLocation } from "../common";
 import type { ActorId, CrewDefId, ItemDefId, LocalKey, MachineId, TempRef } from "../ids";
 
@@ -12,6 +12,8 @@ export type ScenarioSpawn =
       readonly tempRef: TempRef;
       readonly crewDefId: CrewDefId;
       readonly location: PhysicalLocation;
+      /** D77: their watch section from the scenario's bill; absent for a dayworker. */
+      readonly section?: WatchSection;
     }
   | {
       readonly kind: "item";

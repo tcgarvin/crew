@@ -66,6 +66,12 @@ export type TravelState =
       portId: PortDefId;
       /** Set by `setCourse`; departure prep begins when cleared to go. */
       plannedDestinationId?: PortDefId;
+      /**
+       * D78: the course to `plannedDestinationId` is plotted (the nav terminal's `plotCourse`
+       * commit). Departure prep waits for it; `setCourse` and a voyage's next hop clear it, and
+       * the `preparingDeparture` object is built without it, so it never carries.
+       */
+      coursePlotted?: true;
     } & DepartureGateFlags &
       VoyageFields)
   | ({

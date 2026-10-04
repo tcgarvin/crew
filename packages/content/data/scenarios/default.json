@@ -53,5 +53,13 @@
       "zoneKey": "cargo_stow"
     }
   ],
-  "initialFaults": []
+  "initialFaults": [],
+  "watchBill": {
+    "sections": [
+      { "key": "red", "members": ["crew.noor_haddad", "crew.mara_osei", "crew.priya_kessler"] },
+      { "key": "white", "members": ["crew.jax_okonkwo", "crew.tomas_ruiz"] },
+      { "key": "blue", "members": ["crew.dane_whitcross"] }
+    ],
+    "dayworkers": ["crew.bettina_solheim", "crew.sunniva_park", "crew.oyelaran_abiodun"]
+  }
 }

@@ -20,6 +20,7 @@ import {
   traitDefIdSchema,
 } from "./primitives";
 import { scenarioDefSchema } from "./scenario";
+import { thoughtDefSchema } from "./thought";
 
 export const contentBundleSchema = z.strictObject({
   decks: z.record(deckDefIdSchema, deckDefSchema),
@@ -33,6 +34,13 @@ export const contentBundleSchema = z.strictObject({
   people: peopleTableDefSchema,
   /** Dockside §3: required for authored content (it may be empty); optional in the sim type. */
   docks: z.record(dockDefIdSchema, dockDefSchema),
+  /** D79: every thought key, each with its def (a missing one fails here). */
+  thoughts: z.strictObject({
+    stoodLongWatch: thoughtDefSchema,
+    doubleWatch: thoughtDefSchema,
+    helmCleanPass: thoughtDefSchema,
+    helmScrape: thoughtDefSchema,
+  }),
   config: configDefSchema,
   /** Cache-busting fingerprint of the canonical bundle, filled in by `loader.ts` (D4/D13). */
   hash: z.string(),

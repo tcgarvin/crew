@@ -91,6 +91,8 @@ function stubView(hunger: number, items: KnownItemView[]): AgentView {
     activity: { kind: "idle" },
     inventory: [],
     onDuty: true,
+    watch: { onWatch: false, dayworker: true, helmRole: "none", officerOfTheWatch: false },
+    thoughts: [],
     lastPlannedTick: 0,
   };
   return {

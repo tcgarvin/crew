@@ -7,6 +7,12 @@
  * exactly (ramp door, engine, two crew spawn points) without touching a fixture other
  * workstreams share.
  */
+import {
+  FIXTURE_HAZARDS,
+  FIXTURE_MOOD,
+  FIXTURE_THOUGHTS,
+  fixtureWatches,
+} from "../../core/fixtures/ship-life";
 import { createKernel } from "../../core/kernel";
 import { type KernelRegistry, createRegistry } from "../../core/registry";
 import type { ConfigDef, ContentBundle } from "../../core/types/content";
@@ -172,6 +178,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       faultBudget: 2,
       budgetRefillDays: 600 / FIXTURE_DAY,
       hookOnEvents: overrides.hookOnEvents ?? [],
+      hazardBudget: 2,
     },
     host: {
       runAheadCapSeconds: 60,
@@ -180,8 +187,12 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       localSaveEverySeconds: 30,
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
+      slowDownOnEvents: [],
     },
-    shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 600]] }] },
+    // D77: everyone is a dayworker on every watch: always on duty, as before watches.
+    watches: fixtureWatches([0, 1, 2]),
+    mood: FIXTURE_MOOD,
+    hazards: FIXTURE_HAZARDS,
     social: {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
@@ -304,7 +315,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: ["captain"],
         skills: { piloting: 6 },
         startingInventory: [],
-        shift: "alpha",
         bio: "Runs the boat.",
         voice: "Plain and brief.",
       },
@@ -314,7 +324,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: ["firstOfficer", "engineer"],
         skills: { piloting: 4 },
         startingInventory: [],
-        shift: "alpha",
         bio: "Backs up the captain.",
         voice: "Plain and brief.",
       },
@@ -324,7 +333,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: [],
         skills: {},
         startingInventory: [],
-        shift: "alpha",
         bio: "A paying passenger.",
         voice: "Whoever they turn out to be.",
       },
@@ -420,8 +428,10 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         startingMoney: 100,
         startingItems: [],
         initialFaults: [],
+        watchBill: { sections: [], dayworkers: [FIX.captain, FIX.firstOfficer] },
       },
     },
+    thoughts: FIXTURE_THOUGHTS,
     config,
     hash: "fixture-content-v1",
   };

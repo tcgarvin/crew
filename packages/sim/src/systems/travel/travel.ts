@@ -19,7 +19,6 @@ import type { PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
 import type { DeckDefId, DoorId, MachineId, PortDefId, ProblemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipeline";
-import type { Machine } from "../../core/types/ship";
 import type {
   DepartureGateFlags,
   DockStaging,
@@ -31,13 +30,14 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
 import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
+import { helmMachine, helmManned } from "../watch/helm";
 import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
+import { coursePlotted } from "./course";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
 import { dismissLocals, dressDockAlongside } from "./locals";
 import { stageDockIfDue, stagingAnswered } from "./staging";
 import { portStoreLocation } from "./stores";
-import { operateTiles } from "./tasks";
 
 export { portStoreLocation } from "./stores";
 
@@ -103,43 +103,14 @@ function rampsClosed(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return doorIds.every((id) => ctx.state.doors[id]?.physicalState === "closed");
 }
 
-/** A `pilotStation`-tagged machine whose def requires an operator: V1's "bridge console". */
-function bridgeConsole(ctx: Pick<StepCtx, "state" | "content">): Machine | undefined {
-  return Object.values(ctx.state.machines).find((m) => {
-    const def = ctx.content.machines[m.defId];
-    return def?.tags.includes("pilotStation") && def.operation.requiresOperator === true;
-  });
-}
-
-/**
- * V1 staffing check (thin, per PLAN §6 item 1): any crew actor within 1 tile of one of the
- * console's `operate` interaction positions. W4 will replace this with a real claimed
- * `stationToStaff` task.
- */
-function isStaffed(
-  ctx: Pick<StepCtx, "state" | "content">,
-  console_: Machine | undefined,
-): boolean {
-  if (console_ === undefined) return true;
-  const positions = operateTiles(ctx, console_.id);
-  if (positions.length === 0) return true;
-  const deckId = theDeckId(ctx);
-  return Object.values(ctx.state.actors).some((actor) => {
-    const location = actor.location;
-    // Passengers §3.2: a passenger standing by the console is not staffing it.
-    if (!actor.crew || actor.passenger === true) return false;
-    if (location.kind !== "onDeck" || location.deckId !== deckId) return false;
-    return positions.some(
-      (p) => Math.abs(location.x - (p.x + 0.5)) <= 1 && Math.abs(location.y - (p.y + 0.5)) <= 1,
-    );
-  });
-}
-
 // ---------------------------------------------------------------------------------------------
 // stationToStaff problem bookkeeping
 // ---------------------------------------------------------------------------------------------
 
-/** Open (or revise) `stationToStaff` while unstaffed; resolve it once staffed. Owner: travel. */
+/**
+ * Open (or revise) the helm's `watch` post while unstaffed; resolve it once staffed. Owner: the
+ * watch (D77); kept here until W1 moves the bookkeeping to `systems/watch/watch.ts`.
+ */
 function updateStaffingProblem(ctx: StepCtx, machineId: MachineId, staffed: boolean): void {
   const dedupeKey = `stationToStaff:${machineId}`;
   const existing = Object.values(ctx.state.work.problems).find(
@@ -154,8 +125,8 @@ function updateStaffingProblem(ctx: StepCtx, machineId: MachineId, staffed: bool
   ctx.state.work.problems[id] = {
     id,
     kind: "stationToStaff",
-    payload: { machineId },
-    owner: "travel",
+    payload: { machineId, post: "watch" },
+    owner: "watch",
     visibility: "public",
     dedupeKey,
     status: "open",
@@ -168,9 +139,9 @@ function updateStaffingProblem(ctx: StepCtx, machineId: MachineId, staffed: bool
 
 /** Is the bridge staffed (or does it need nobody)? Keeps its `stationToStaff` problem in step. */
 function checkStaffing(ctx: StepCtx): boolean {
-  const console_ = bridgeConsole(ctx);
-  const staffed = isStaffed(ctx, console_);
-  if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
+  const helm = helmMachine(ctx.state, ctx.content);
+  const staffed = helmManned(ctx.state, ctx.content);
+  if (helm !== undefined) updateStaffingProblem(ctx, helm.id, staffed);
   return staffed;
 }
 
@@ -412,6 +383,9 @@ function continueVoyageIfFree(ctx: StepCtx): void {
   }
   if (voyageHeldAtWaypoint(ctx)) return;
   travel.plannedDestinationId = hop;
+  // D78: every hop of a voyage is plotted at its waypoint.
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete travel.coursePlotted;
 }
 
 function advanceTravel(ctx: StepCtx): void {
@@ -440,17 +414,19 @@ function advanceTravel(ctx: StepCtx): void {
       // Passengers §3.3: while the ship waits for a passenger ashore (or walking off) the station
       // is not wanted yet: an open problem here would have the pilot arrive, "resolve" it, wander
       // off and be sent back for the whole stay. It is treated as settled until they are aboard.
-      const console_ = bridgeConsole(ctx);
-      if (console_ !== undefined) {
+      const helm = helmMachine(ctx.state, ctx.content);
+      if (helm !== undefined) {
         const waiting = waitingForPassenger(ctx.state) !== undefined;
         updateStaffingProblem(
           ctx,
-          console_.id,
-          waiting || (isStaffed(ctx, console_) && !hasOpenCargoWork(ctx)),
+          helm.id,
+          waiting || (helmManned(ctx.state, ctx.content) && !hasOpenCargoWork(ctx)),
         );
       }
     }
     if (planned === undefined || departureWaits(ctx)) return;
+    // D78: prep begins only once the course is plotted (`course.ts`).
+    if (!coursePlotted(ctx)) return;
     // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
     if (departureCleared(ctx)) beginDeparture(ctx, planned);
     return;

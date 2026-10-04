@@ -924,6 +924,23 @@ describe("fixtures and kernel authority (N6)", () => {
     }
   });
 
+  it("migrates a stored schema-7 snapshot to 8 with the scenario's watch bill (D77)", () => {
+    const stored = JSON.parse(
+      readFileSync(new URL("../fixtures/approach.json", import.meta.url), "utf8"),
+    ) as NarratorRequest;
+    expect(stored.snapshot.schemaVersion).toBe(7);
+    const restored = createKernel(createRegistry()).restore(stored.snapshot, content());
+    const actors = Object.values(restored.state.actors);
+    const captain = actors.find((a) => a.roleTags.includes("captain"));
+    expect(captain?.schedule).toEqual({ section: { key: "red", index: 0 } });
+    expect(actors.find((a) => a.defId === "crew.dane_whitcross")?.schedule.section?.key).toBe(
+      "blue",
+    );
+    expect(actors.find((a) => a.defId === "crew.bettina_solheim")?.schedule).toEqual({});
+    expect(actors.every((a) => a.thoughts.length === 0)).toBe(true);
+    expect(restored.state.hazards).toEqual([]);
+  });
+
   it("reads a stored snapshot whose config predates the day units (D76) with the loaded values", async () => {
     // Stored before D76: `commerce.passage.overdueSeconds`, no `overdueDays`. The digest's
     // OVERDUE line needs the window, so a missing key would throw rather than render.

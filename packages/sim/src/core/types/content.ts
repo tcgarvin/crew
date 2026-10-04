@@ -134,6 +134,26 @@ export type RecipeActionKind = (typeof RECIPE_ACTIONS)[number];
 /** How a symptom can be noticed (SD §13.2). */
 export type SymptomChannel = "visual" | "audible" | "sensor";
 
+/**
+ * D79: the thoughts the sim can give someone, a closed set because each is raised by sim code
+ * (a long watch, a clean pass at the helm). Content gives each its label, value and duration
+ * (`ContentBundle.thoughts`, every key required).
+ */
+export const THOUGHT_KEYS = [
+  "stoodLongWatch",
+  "doubleWatch",
+  "helmCleanPass",
+  "helmScrape",
+] as const;
+export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
+
+/**
+ * D78: kinds of navigation hazard the narrator's `scheduleHazard` may place on a leg. The kernel
+ * rolls them all the same way; display names live in `core/render.ts`.
+ */
+export const HAZARD_KINDS = ["debrisField", "asteroidBelt", "ionStorm"] as const;
+export type HazardKind = (typeof HAZARD_KINDS)[number];
+
 // ---------------------------------------------------------------------------------------------
 // Deck
 // ---------------------------------------------------------------------------------------------
@@ -579,8 +599,6 @@ export interface CrewDef {
   readonly skills: SkillLevels;
   readonly traits?: readonly TraitDefId[];
   readonly startingInventory: readonly ItemCount[];
-  /** Key into `config.shifts.shifts`. */
-  readonly shift: LocalKey;
   /** One line of flavour for the inspector and narrator digest. */
   readonly bio: string;
   /**
@@ -608,6 +626,25 @@ export interface TraitDef {
   readonly modifiers: Readonly<Partial<Record<TraitModifierKey, number>>>;
   /** Traits that cannot co-occur with this one during sampling. */
   readonly excludes: readonly TraitDefId[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Thoughts (D79)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * D79: what a thought is worth. Mood is the clamped sum of a person's live thoughts' values; a
+ * thought lasts `durationDays` from when it was had. A non-stacking thought had again refreshes
+ * the one already held; a stacking one is held once per occasion.
+ */
+export interface ThoughtDef {
+  readonly key: ThoughtKey;
+  /** Lower-case phrase for the inspector and digest: "stood a long watch". */
+  readonly label: string;
+  /** Contribution to mood, in [-1, 1]. */
+  readonly value: number;
+  readonly durationDays: Days;
+  readonly stacks: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -695,6 +732,24 @@ export interface JobTemplateDef {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * D77: who stands which watch. Section `i` has the watch while `watchOfDay(tick) === i`, so the
+ * order of `sections` is the order the watches come round; a section beyond
+ * `config.time.watchesPerDay` never stands one (content validation requires exactly that many).
+ * Dayworkers keep `config.watches.dayworkerOnWatches`. Crew in the scenario but in neither list
+ * (and anyone who joins later) are dayworkers.
+ */
+export interface WatchBillDef {
+  readonly sections: readonly WatchSectionDef[];
+  readonly dayworkers: readonly CrewDefId[];
+}
+
+export interface WatchSectionDef {
+  /** "red", "white", "blue": the ticker capitalises it ("White section has the watch"). */
+  readonly key: LocalKey;
+  readonly members: readonly CrewDefId[];
+}
+
+/**
  * A starting setup for `createWorld`. W0 decision: scenarios are content (a bundle table), so the
  * default game and headless test fixtures share one path.
  */
@@ -714,6 +769,11 @@ export interface ScenarioDef {
     readonly placementKey: LocalKey;
     readonly faultKey: LocalKey;
   }[];
+  /**
+   * D77: the watch bill. Absent in small test fixtures, where `createWorld` generates one
+   * (`core/watch-bill.ts`); content validation decides when authored content may omit it.
+   */
+  readonly watchBill?: WatchBillDef;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -968,8 +1028,8 @@ export interface ConfigDef {
      */
     readonly maxFaultWindowSeconds: Seconds;
     /**
-     * Narrator budget (review §D.3), refilled to these values every `budgetRefillDays` (D76;
-     * not read yet: the refill lands with slice 2's contracts).
+     * Narrator budget (review §D.3), refilled to these values (and `hazardBudget`) every
+     * `budgetRefillDays` (D76; `core/pipeline.ts` runs the refill since D78).
      */
     readonly spawnBudget: number;
     readonly faultBudget: number;
@@ -980,6 +1040,11 @@ export interface ConfigDef {
      * `notableEvent` hook the following tick. Empty = never.
      */
     readonly hookOnEvents: readonly string[];
+    /**
+     * D78: narrator-caused navigation hazards before the budget refills (`scheduleHazard`), a
+     * budget of their own beside spawns and faults.
+     */
+    readonly hazardBudget: number;
   };
   readonly host: {
     /** D14: max sim-seconds the worker may run ahead of the viewer. */
@@ -990,17 +1055,53 @@ export interface ConfigDef {
     readonly localSaveEverySeconds: Seconds;
     readonly remoteSaveEverySeconds: Seconds;
     readonly frameEveryTicks: number;
-  };
-  readonly shifts: {
     /**
-     * W0 decision: shifts are cyclic work windows over a fixed cycle; outside a window the actor
-     * is off duty (still eligible for emergencies, SD §11.4).
+     * D76: `SimEvent["type"]` names (plain strings, as `narrator.hookOnEvents`) that drop the web
+     * host's fast-forward back to 1× when playback reaches them.
      */
-    readonly cycleSeconds: Seconds;
-    readonly shifts: readonly {
-      readonly key: LocalKey;
-      readonly workWindows: readonly (readonly [Seconds, Seconds])[];
-    }[];
+    readonly slowDownOnEvents: readonly string[];
+  };
+  /**
+   * D77: watches replace shifts. Which section is on watch comes from the scenario's bill against
+   * `time.watchesPerDay`; these are the rhythm's tunables.
+   */
+  readonly watches: {
+    /** Watches of the day (0-based, each `< time.watchesPerDay`) on which dayworkers are on duty. */
+    readonly dayworkerOnWatches: readonly number[];
+    /** How long before the bell the oncoming helm-stander makes for the helm. */
+    readonly handoverLeadSeconds: Seconds;
+    /** The handover at the helm's standby position, both present. */
+    readonly handoverSeconds: Seconds;
+    /** Longest a relief stands in for a stander away for a need before the relief post closes. */
+    readonly reliefMaxDays: Days;
+    /** How long a stander past a survival need waits for relief before leaving anyway. */
+    readonly reliefNoShowSeconds: Seconds;
+    /** A hold this many watches long earns `stoodLongWatch` (twice it, `doubleWatch`). */
+    readonly longWatchFactor: number;
+    /** An empty helm in transit this long raises `helmUnattended` (once per vacancy). */
+    readonly helmUnattendedSeconds: Seconds;
+    /** Time at each stop of a round. */
+    readonly roundsStopSeconds: Seconds;
+    /** The pause after a round before the next. */
+    readonly roundsEveryDays: Days;
+    /** Work to plot a course at the nav terminal, before the skill rate (work at a machine). */
+    readonly plotCourseSeconds: Seconds;
+  };
+  /** D79: mood (the clamped sum of live thoughts) and its bounded effects. */
+  readonly mood: {
+    /** Mood below this is low: work at `lowWorkSpeed`. */
+    readonly lowBelow: number;
+    /** Mood above this is high: work at `highWorkSpeed`. */
+    readonly highAbove: number;
+    readonly lowWorkSpeed: number;
+    readonly highWorkSpeed: number;
+  };
+  /** D78: navigation hazards (the narrator's `scheduleHazard`). */
+  readonly hazards: {
+    /** The narrator's difficulty tiers as piloting-check difficulties (1-10). */
+    readonly difficulty: { readonly easy: number; readonly hard: number; readonly brutal: number };
+    /** A `delay` outcome sets the leg back this long at `travel.nominalSpeed`. */
+    readonly delaySeconds: Seconds;
   };
   /** W4a addition: ambient chat (PLAN §6 W4a item 5). */
   readonly social: {
@@ -1072,6 +1173,8 @@ export interface ContentBundle {
    * not carry any; a port without one keeps the transfer-tile behaviour.
    */
   readonly docks?: Readonly<Record<DockDefId, DockDef>>;
+  /** D79: every thought's def; required, so a missing one fails validation (and `createWorld`). */
+  readonly thoughts: Readonly<Record<ThoughtKey, ThoughtDef>>;
   readonly config: ConfigDef;
   readonly hash: string;
 }

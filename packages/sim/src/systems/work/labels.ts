@@ -8,7 +8,9 @@
  * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "fetching the hand truck",
  * "loading <item>", "hauling <n> crates", "unloading <item>", "returning the hand truck",
  * "parking the hand truck" (D65), "eating", "asleep", "asleep in the <cabin>" (D74), "resting",
- * "chatting", "inspecting <machine>", "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>", and the captain
+ * "chatting", "inspecting <machine>", "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>",
+ * the watch (D77): "going to the helm", "relieving <name> at the helm" (or "taking the helm"),
+ * "on the gangway", "doing rounds", and "plotting a course to <port>" (D78); and the captain
  * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
  * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
@@ -19,8 +21,9 @@ import type { DeepReadonly, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
 import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/types/ids";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
-import type { ActivityStep, StepTarget, Task } from "../../core/types/work";
+import type { ActivityStep, HoldKind, StepTarget, Task } from "../../core/types/work";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
+import { whoHasTheHelm } from "../watch/helm";
 import { currentStep } from "./activity";
 
 export interface LabelCtx {
@@ -107,6 +110,29 @@ const RECIPE_VERB: Readonly<Record<string, string>> = {
   repair: "fixing",
 };
 
+/** Is `task` a watch at the helm (a `staffStation` on a `pilotStation` machine)? */
+function isHelmTask(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): boolean {
+  if (task?.type !== "staffStation" || task.target.kind !== "machine") return false;
+  const machine = ctx.state.machines[task.target.machineId];
+  const tags = machine === undefined ? [] : (ctx.content.machines[machine.defId]?.tags ?? []);
+  return tags.includes("pilotStation");
+}
+
+/** D77: the handover step: "relieving Noor Haddad at the helm", or "taking the helm" if empty. */
+function handoverLabel(ctx: LabelCtx): string {
+  const holder = whoHasTheHelm(ctx.state, ctx.content);
+  const name = holder === undefined ? undefined : ctx.state.actors[holder]?.name;
+  return name === undefined ? "taking the helm" : `relieving ${name} at the helm`;
+}
+
+/** D78: "plotting a course to Kessler Drift", from the task's `courseToPlot` problem. */
+function plotLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
+  const problem = task === undefined ? undefined : ctx.state.work.problems[task.problemId];
+  if (problem?.kind !== "courseToPlot") return "plotting a course";
+  const port = ctx.content.ports[problem.payload.toPortId]?.name ?? problem.payload.toPortId;
+  return `plotting a course to ${port}`;
+}
+
 function taskStepLabel(
   ctx: LabelCtx,
   actor: DeepReadonly<Actor>,
@@ -124,7 +150,7 @@ function taskStepLabel(
   }
   switch (step.kind) {
     case "moveTo":
-      return placeLabel(ctx, actor, step.target);
+      return isHelmTask(ctx, task) ? "going to the helm" : placeLabel(ctx, actor, step.target);
     case "pickUp":
       return `picking up ${itemName(ctx, step.itemId)}`;
     case "putDown":
@@ -143,6 +169,9 @@ function taskStepLabel(
       return "parking the hand truck";
     case "work": {
       if (step.stage === "buy") return `buying ${marketItemName(ctx, task)}`;
+      if (step.stage === "handover") return handoverLabel(ctx);
+      if (step.stage === "plot") return plotLabel(ctx, task);
+      if (step.stage === "rounds") return "doing rounds";
       if (task === undefined || task.target.kind !== "machine") return "working";
       const verb = RECIPE_VERB[task.derivationKey] ?? RECIPE_VERB[task.type] ?? "working on";
       return `${verb} ${machineName(ctx, task.target.machineId)}`;
@@ -163,7 +192,13 @@ function taskStepLabel(
   }
 }
 
-const HOLD_LABEL = { sleep: "asleep", rest: "resting", socialize: "chatting", staff: "on station" };
+const HOLD_LABEL: Readonly<Record<HoldKind, string>> = {
+  sleep: "asleep",
+  rest: "resting",
+  socialize: "chatting",
+  staff: "on station",
+  gangway: "on the gangway",
+};
 
 function personalStepLabel(
   ctx: LabelCtx,
@@ -178,6 +213,7 @@ function personalStepLabel(
     case "putDown":
       return `putting down ${itemName(ctx, step.itemId)}`;
     case "work":
+      return step.stage === "rounds" ? "doing rounds" : "eating";
     case "consume":
       return "eating";
     case "buy":
@@ -258,6 +294,8 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   if (activity.activity === "lookForWork" || activity.activity === "meetSpeaker") {
     return shoreLabel(ctx, actor, activity.plan?.steps.slice(activity.plan.stepIndex) ?? [], step);
   }
+  // D77: a round reads as one activity, its walks between stops included.
+  if (activity.activity === "rounds") return "doing rounds";
   return personalStepLabel(ctx, actor, step);
 }
 

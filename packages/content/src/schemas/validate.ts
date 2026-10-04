@@ -7,7 +7,8 @@
  *   loader before defs are keyed; see `loader.ts`); each namespace matches its table; local keys
  *   unique within their def; a zone's `machineKey` names a placement on its deck; scenario
  *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
- *   bands `min <= max`; config numbers finite.
+ *   bands `min <= max`; config numbers finite. D77: every watch-bill member is in the scenario's
+ *   crew, and dayworkers' watches exist in the day; D79: each thought sits under its own key.
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
@@ -272,9 +273,6 @@ function checkCrew(crew: CrewDef, bundle: ContentBundle, issues: ValidationIssue
       issues,
     );
   });
-  if (!bundle.config.shifts.shifts.some((s) => s.key === crew.shift)) {
-    issues.push(issue("referential", [...path, "shift"], `unknown shift "${crew.shift}"`));
-  }
 }
 
 function checkTrait(trait: TraitDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -393,6 +391,52 @@ function checkScenario(
       );
     }
   });
+  checkWatchBillCrew(scenario, path, issues);
+}
+
+/** D77: every watch-bill member is one of the scenario's crew (L1 has ruled out duplicates). */
+function checkWatchBillCrew(scenario: ScenarioDef, path: Path, issues: ValidationIssue[]): void {
+  const bill = scenario.watchBill;
+  if (bill === undefined) return;
+  const crew = new Set<string>(scenario.crew);
+  const check = (id: string, memberPath: Path) => {
+    if (!crew.has(id)) {
+      issues.push(
+        issue("referential", memberPath, `"${id}" is in the watch bill but not the crew`),
+      );
+    }
+  };
+  bill.sections.forEach((section, i) => {
+    section.members.forEach((id, j) => {
+      check(id, [...path, "watchBill", "sections", i, "members", j]);
+    });
+  });
+  bill.dayworkers.forEach((id, j) => check(id, [...path, "watchBill", "dayworkers", j]));
+}
+
+/** D77: dayworkers' watches are watches of the day, each listed once. */
+function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const watches = bundle.config.time.watchesPerDay;
+  const seen = new Set<number>();
+  bundle.config.watches.dayworkerOnWatches.forEach((watch, i) => {
+    const path: Path = ["config", "watches", "dayworkerOnWatches", i];
+    if (watch >= watches) {
+      issues.push(issue("referential", path, `watch ${watch} is not one of the ${watches} a day`));
+    }
+    if (seen.has(watch)) issues.push(issue("referential", path, `watch ${watch} is listed twice`));
+    seen.add(watch);
+  });
+}
+
+/** D79: each thought def sits under its own key. */
+function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  for (const [key, def] of Object.entries(bundle.thoughts)) {
+    if (def.key !== key) {
+      issues.push(
+        issue("referential", ["thoughts", key, "key"], `thought "${def.key}" is under "${key}"`),
+      );
+    }
+  }
 }
 
 function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -447,6 +491,8 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   for (const scenario of Object.values(bundle.scenarios)) checkScenario(scenario, bundle, issues);
   checkPriceBands(bundle, issues);
   checkPeople(bundle, issues);
+  checkDayworkerWatches(bundle, issues);
+  checkThoughtKeys(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;

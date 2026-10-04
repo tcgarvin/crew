@@ -164,6 +164,30 @@ function acknowledge(
   expect(ack.status).toBe("accepted");
 }
 
+describe("narrator budget refill (D78)", () => {
+  it("refills spawns, faults and hazards to config every budgetRefillDays, from the last refill", () => {
+    const { world, kernel } = tinyTestWorld();
+    const config = world.config.values;
+    const every = config.narrator.budgetRefillDays * config.time.daySeconds * config.time.tickRate;
+    expect(world.state.narrator.budgetRefilledTick).toBe(0);
+    world.state.narrator.budget = { spawnsRemaining: 0, faultsRemaining: 0, hazardsRemaining: 0 };
+    kernel.advance(world, every - 1);
+    expect(world.state.narrator.budget).toEqual({
+      spawnsRemaining: 0,
+      faultsRemaining: 0,
+      hazardsRemaining: 0,
+    });
+    kernel.advance(world, 1);
+    expect(world.state.tick).toBe(every);
+    expect(world.state.narrator.budget).toEqual({
+      spawnsRemaining: config.narrator.spawnBudget,
+      faultsRemaining: config.narrator.faultBudget,
+      hazardsRemaining: config.narrator.hazardBudget,
+    });
+    expect(world.state.narrator.budgetRefilledTick).toBe(every);
+  });
+});
+
 describe("quiet-too-long timer", () => {
   it("raises exactly once, halts advance, and pauses until acknowledged", () => {
     // 1 s at 20 ticks/s: fires once 20 ticks have passed without a narrative event.

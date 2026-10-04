@@ -341,17 +341,20 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
     );
     expect(run.cards.length).toBeGreaterThan(0);
     expect(run.cards.every((c) => c.docked)).toBe(true);
-    // At the destination the captain goes ashore while the crew unload, and the headline says
-    // so over the crate count until they are back.
+    // At the destination the command actor goes ashore while the crew unload, and the headline
+    // says so over the crate count until they are back. D77: on this seed the captain is asleep
+    // when the ship docks (her section's watch has ended), so it is the first officer (D8).
     let seen = "";
     drive(kernel, world, 20 * 120, answerNothing, (w) => {
       const line = getRenderFrame(w).headline;
       if (line.includes("is ashore looking for work")) seen = line;
       return seen !== "";
     });
-    expect(seen).toBe(
-      `Docked at Kessler Drift — ${captainOf(world).name} is ashore looking for work`,
+    const ashore = Object.values(world.state.actors).find(
+      (a) => a.activity.kind === "personal" && a.activity.activity === "lookForWork",
     );
+    expect(ashore?.roleTags.some((r) => r === "captain" || r === "firstOfficer")).toBe(true);
+    expect(seen).toBe(`Docked at Kessler Drift — ${ashore?.name} is ashore looking for work`);
   });
 
   it("survives a save and restore mid-walk, and the card still comes up in person", () => {

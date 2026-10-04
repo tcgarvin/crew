@@ -2,7 +2,6 @@
 import type { ConfigDef } from "@crew/sim";
 import { z } from "zod";
 import {
-  localKeySchema,
   nonNegative,
   nonNegativeInt,
   positive,
@@ -131,6 +130,7 @@ export const configDefSchema = z.strictObject({
     faultBudget: z.number().int().min(0),
     budgetRefillDays: positive,
     hookOnEvents: z.array(z.string().min(1)),
+    hazardBudget: z.number().int().min(0),
   }),
   host: z.strictObject({
     runAheadCapSeconds: nonNegative,
@@ -139,17 +139,35 @@ export const configDefSchema = z.strictObject({
     localSaveEverySeconds: positive,
     remoteSaveEverySeconds: positive,
     frameEveryTicks: positiveInt,
+    slowDownOnEvents: z.array(z.string().min(1)),
   }),
-  shifts: z.strictObject({
-    cycleSeconds: positive,
-    shifts: z
-      .array(
-        z.strictObject({
-          key: localKeySchema,
-          workWindows: z.array(z.tuple([nonNegative, nonNegative])),
-        }),
-      )
-      .min(1),
+  watches: z.strictObject({
+    dayworkerOnWatches: z.array(nonNegativeInt),
+    handoverLeadSeconds: nonNegative,
+    handoverSeconds: nonNegative,
+    reliefMaxDays: positive,
+    reliefNoShowSeconds: nonNegative,
+    longWatchFactor: z.number().min(1),
+    helmUnattendedSeconds: nonNegative,
+    roundsStopSeconds: nonNegative,
+    roundsEveryDays: nonNegative,
+    plotCourseSeconds: nonNegative,
+  }),
+  mood: z
+    .strictObject({
+      lowBelow: z.number().min(-1).max(1),
+      highAbove: z.number().min(-1).max(1),
+      lowWorkSpeed: positive,
+      highWorkSpeed: positive,
+    })
+    .refine((m) => m.lowBelow < m.highAbove, { message: "lowBelow must be < highAbove" }),
+  hazards: z.strictObject({
+    difficulty: z.strictObject({
+      easy: z.number().int().min(1).max(10),
+      hard: z.number().int().min(1).max(10),
+      brutal: z.number().int().min(1).max(10),
+    }),
+    delaySeconds: nonNegative,
   }),
   social: z.strictObject({
     chatRadiusTiles: positive,

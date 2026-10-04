@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "helmCleanPass",
+  "label": "brought the ship through clean",
+  "value": 0.1,
+  "durationDays": 0.3,
+  "stacks": true
+}

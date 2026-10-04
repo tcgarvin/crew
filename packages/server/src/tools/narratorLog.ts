@@ -389,6 +389,7 @@ function snapshotOf(request: unknown): SaveEnvelope {
   if (schemaVersion === SCHEMA_VERSION) return { ...saved, config };
   const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), schemaVersion, {
     content,
+    config,
   });
   return { ...saved, schemaVersion: SCHEMA_VERSION, state, config } as SaveEnvelope;
 }

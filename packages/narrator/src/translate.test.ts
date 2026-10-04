@@ -643,7 +643,11 @@ describe("translateIntents: drops with reasons", () => {
   it("drops faults and spawns past the budget", () => {
     const req = quietTooLongRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
-    snapshot.state.narrator.budget = { spawnsRemaining: 0, faultsRemaining: 1 };
+    snapshot.state.narrator.budget = {
+      spawnsRemaining: 0,
+      faultsRemaining: 1,
+      hazardsRemaining: 0,
+    };
     const machines = Object.values(snapshot.state.machines);
     const gen = machines.find((m) => m.defId === "machine.generator")?.id;
     const engine = machines.find((m) => m.defId === "machine.engine")?.id;

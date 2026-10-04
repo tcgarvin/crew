@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { JON, MARA, crewConfig, crewWorld, place } from "../work/fixtures/crew-deck";
+import { JON, MARA, crewWorld, place } from "../work/fixtures/crew-deck";
 import { eventsOf, run } from "../work/fixtures/run";
 import { fatigueCapacity } from "./needs";
-import { isOnDuty } from "./shifts";
 
 describe("needs", () => {
   it("rise at the configured per-day rates, converted to per second, while awake and idle", () => {
@@ -54,17 +53,5 @@ describe("needs", () => {
       tw.world.config.values.movement.fatigueSpeedFloor,
     );
     expect(mara.capacities.manipulation).toBe(mara.capacities.movement);
-  });
-});
-
-describe("shifts", () => {
-  it("derives on/off duty from the tick and the cycle", () => {
-    const config = crewConfig();
-    const tickAt = (seconds: number) => seconds * config.time.tickRate;
-    expect(isOnDuty({ shiftKey: "alpha" }, tickAt(10), config)).toBe(true);
-    expect(isOnDuty({ shiftKey: "alpha" }, tickAt(310), config)).toBe(false);
-    expect(isOnDuty({ shiftKey: "beta" }, tickAt(310), config)).toBe(true);
-    expect(isOnDuty({ shiftKey: "alpha" }, tickAt(610), config)).toBe(true);
-    expect(isOnDuty({ shiftKey: "nobody" }, tickAt(310), config)).toBe(true);
   });
 });

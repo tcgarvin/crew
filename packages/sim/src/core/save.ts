@@ -143,10 +143,11 @@ export function restore(
       `Save was made with content ${envelope.contentHash}, but content ${content.hash} is loaded; restored against the loaded content`,
     );
   }
+  const { values, filled } = fillConfig(envelope.config, content.config);
   const migrated = migrateState(
     deepCopy(envelope.state),
     envelope.schemaVersion,
-    { content },
+    { content, config: values },
     options.migrations ?? migrations,
   );
   if (typeof migrated !== "object" || migrated === null) {
@@ -159,7 +160,6 @@ export function restore(
       `Save state is invalid:\n  ${violations.slice(0, 20).join("\n  ")}`,
     );
   }
-  const { values, filled } = fillConfig(envelope.config, content.config);
   if (filled.length > 0) {
     warnings.push(
       `Save's config predates ${filled.join(", ")}; restored with the loaded content's values`,

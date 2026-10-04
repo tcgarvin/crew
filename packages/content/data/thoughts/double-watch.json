@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "doubleWatch",
+  "label": "double watch",
+  "value": -0.25,
+  "durationDays": 1,
+  "stacks": false
+}

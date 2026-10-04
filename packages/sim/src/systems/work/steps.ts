@@ -10,8 +10,8 @@
  * - Eating takes one unit off the believed stack at pickup (split into a carried unit of 1) and
  *   consumes it at the end of `mealDays`: the stack on the floor drops by exactly one. Hunger
  *   falls by the item's `nutrition` (food without one fully satisfies).
- * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor's shift has
- *   started and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
+ * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
+ *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
  *   fully met while on duty; off duty they last until the planner finds something more urgent.
  * - Staffing holds until the station's problem is resolved *and* the ship is docked or in
  *   transit (the stages where travel does not check staffing), so the pilot does not walk off
@@ -25,6 +25,7 @@ import { configTicks, dayTicks } from "../../core/clock";
 import { deliverHeldCard, heldCard } from "../../core/delivery";
 import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
+import { moodWorkFactor } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { ActorId, ItemId, PortDefId, TaskId } from "../../core/types/ids";
@@ -34,10 +35,12 @@ import type { ActivityStep, BlockageReason, StepTarget, Task } from "../../core/
 import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
-import { isOnDuty } from "../needs/shifts";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
+import { runPlot } from "../travel/course";
+import { isOnDuty } from "../watch/duty";
+import { gangwayHoldDone, helmHoldDone, runHandover } from "../watch/helm";
 import { backoffRef, currentStep, isOutThroughGate } from "./activity";
 import { setBackoff } from "./backoff";
 import { isCompletionMet } from "./claims";
@@ -325,7 +328,11 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
 // Recipes
 // ---------------------------------------------------------------------------------------------
 
-function workRate(ctx: StepCtx, actor: Actor, task: Task): number {
+/**
+ * How fast `actor` works `task`: manipulation, trait `workSpeed`, levels above the task's first
+ * skill requirement, and (D79) mood. Exported for timed work outside recipes (D78's plot).
+ */
+export function workRate(ctx: StepCtx, actor: Actor, task: Task): number {
   const requirement = task.requiredSkills[0];
   const levelsAbove =
     requirement === undefined
@@ -334,7 +341,8 @@ function workRate(ctx: StepCtx, actor: Actor, task: Task): number {
   let trait = 1;
   for (const traitId of actor.traits) trait *= ctx.defs.trait(traitId).modifiers.workSpeed ?? 1;
   const skill = 1 + ctx.config.work.workSpeedPerSkillLevel * levelsAbove;
-  return Math.max(0, actor.capacities.manipulation) * trait * skill;
+  const mood = moodWorkFactor(actor, ctx.config);
+  return Math.max(0, actor.capacities.manipulation) * trait * skill * mood;
 }
 
 function hasTools(ctx: StepCtx, actor: Actor, task: Task): boolean {
@@ -531,14 +539,29 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
       return onDuty && actor.needs.comfort <= 0;
     case "socialize":
       return onDuty && actor.needs.social <= 0;
-    case "staff": {
-      const activity = actor.activity;
-      const task = activity.kind === "task" ? ctx.state.work.tasks[activity.taskId] : undefined;
-      const resolved =
-        task === undefined || ctx.state.work.problems[task.problemId]?.status !== "open";
-      const stage = ctx.state.travel.stage;
-      return resolved && (stage === "docked" || stage === "transit");
-    }
+    case "staff":
+      return helmHoldDone(ctx, actor, step);
+    case "gangway":
+      return gangwayHoldDone(ctx, actor, step);
+  }
+}
+
+/**
+ * A `work` step by stage: recipes are equipment's, the helm's handover the watch's (D77), the
+ * plot travel's (D78); the rest are personal timers.
+ */
+function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work">): StepResult {
+  switch (step.stage) {
+    case "recipe":
+      return runRecipe(ctx, deps, actor);
+    case "handover":
+      return runHandover(ctx, actor, step);
+    case "plot":
+      return runPlot(ctx, actor, step);
+    case "eat":
+    case "buy":
+    case "rounds":
+      return countTick(step) ? "done" : "wait";
   }
 }
 
@@ -554,8 +577,7 @@ export function runStep(
     case "pickUp":
       return runPickUp(ctx, actor, step);
     case "work":
-      if (step.stage === "recipe") return runRecipe(ctx, deps, actor);
-      return countTick(step) ? "done" : "wait";
+      return runWork(ctx, deps, actor, step);
     case "consume":
       return runConsume(ctx, actor, step);
     case "putDown":

@@ -67,6 +67,7 @@ import {
   registerPlannerDefaults,
   registerSpatial,
   registerTravel,
+  registerWatch,
   registerWork,
   shortestPath,
   travelTaskDerivations,
@@ -186,6 +187,7 @@ export function createPacingRegistry(): KernelRegistry {
   registerTravel(registry);
   registerCommerce(registry);
   registerNeeds(registry);
+  registerWatch(registry);
   registerWork(registry, {
     derivations: {
       ...equipmentTaskDerivation,

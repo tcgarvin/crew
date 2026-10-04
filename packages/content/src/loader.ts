@@ -85,6 +85,12 @@ import dockVesperGate from "../data/docks/vesper-gate.json";
 
 import scenarioDefault from "../data/scenarios/default.json";
 
+// Thoughts (D79)
+import thoughtDoubleWatch from "../data/thoughts/double-watch.json";
+import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
+import thoughtHelmScrape from "../data/thoughts/helm-scrape.json";
+import thoughtStoodLongWatch from "../data/thoughts/stood-long-watch.json";
+
 // People (D25)
 import peopleNameTable from "../data/people/name-table.json";
 
@@ -170,6 +176,12 @@ const DOCKS = [
   dockTernsRest,
 ];
 const SCENARIOS = [scenarioDefault];
+const THOUGHTS = [
+  thoughtStoodLongWatch,
+  thoughtDoubleWatch,
+  thoughtHelmCleanPass,
+  thoughtHelmScrape,
+];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */
 function stripSchemaKey(value: unknown): unknown {
@@ -185,6 +197,16 @@ function keyById<T extends { id: string }>(defs: readonly unknown[]): Record<str
   for (const raw of defs) {
     const def = stripSchemaKey(raw) as T;
     out[def.id] = def;
+  }
+  return out;
+}
+
+/** D79: thought defs are keyed by their `key` (a closed sim vocabulary), not a namespaced id. */
+function keyByKey<T extends { key: string }>(defs: readonly unknown[]): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const raw of defs) {
+    const def = stripSchemaKey(raw) as T;
+    out[def.key] = def;
   }
   return out;
 }
@@ -241,6 +263,7 @@ export function rawBundle(): Record<string, unknown> {
     scenarios: keyById(SCENARIOS),
     people: stripSchemaKey(peopleNameTable),
     docks: keyById(DOCKS),
+    thoughts: keyByKey(THOUGHTS),
     config: stripSchemaKey(configDefault),
   };
   return { ...withoutHash, hash: hashOf(withoutHash) };

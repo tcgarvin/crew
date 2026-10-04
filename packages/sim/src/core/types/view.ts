@@ -8,7 +8,7 @@
  *
  * The render frame is truth (D7: the player's map shows truth) but only what the canvas needs.
  */
-import type { Capacities, FactType, KnownFact, Needs } from "./actor";
+import type { Capacities, FactType, KnownFact, Needs, Thought } from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
 import type {
   CargoClass,
@@ -51,6 +51,25 @@ export interface InventoryEntry {
   readonly count: number;
 }
 
+/**
+ * D77: who stands the helm, as the sim decides it (`systems/watch/helm.ts` `helmRoleOf`): this
+ * section's `stander`, the next section's `oncoming` stander near the bell, a `relief` while a
+ * relief post is open, or `none`. The planner's helm rule reads only this.
+ */
+export type HelmRole = "stander" | "oncoming" | "relief" | "none";
+
+/** D77: the actor's place in the watch, from the bill and the tick. */
+export interface WatchView {
+  /** Their section's key; absent for a dayworker. */
+  readonly section?: LocalKey;
+  /** Their section has the watch now (always false for a dayworker). */
+  readonly onWatch: boolean;
+  readonly dayworker: boolean;
+  readonly helmRole: HelmRole;
+  /** Captain or first officer in the section on watch, and not its helm-stander. */
+  readonly officerOfTheWatch: boolean;
+}
+
 /** The actor's own state: they always know their body, needs and what they carry. */
 export interface SelfView {
   readonly id: ActorId;
@@ -67,8 +86,12 @@ export interface SelfView {
   readonly compartmentId?: CompartmentId;
   readonly activity: DeepReadonly<Activity>;
   readonly inventory: readonly InventoryEntry[];
-  /** From the shift schedule at the current tick. */
+  /** D77: on duty now: their section has the watch, or a dayworker in working hours. */
   readonly onDuty: boolean;
+  /** D77: their place in the watch. */
+  readonly watch: WatchView;
+  /** D79: what is on their mind (`Actor.thoughts`); mood is their clamped sum. */
+  readonly thoughts: readonly DeepReadonly<Thought>[];
   readonly lastPlannedTick: Tick;
   /** W4a addition: the actor's own retry backoff (`Actor.workBackoff`); refs → retry tick. */
   readonly backoff?: Readonly<Record<string, Tick>>;

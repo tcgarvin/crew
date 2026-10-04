@@ -11,8 +11,8 @@
  *
  * 1. The *owning system* detects a condition and creates or revises a `Problem` row in
  *    `state.work.problems`. Equipment creates `machineSymptom` / `machineFault` /
- *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload` /
- *    `stationToStaff`. Before creating, it looks up an open problem with the same `dedupeKey`
+ *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload`,
+ *    travel `courseToPlot` (D78); the watch creates `stationToStaff` (D77). Before creating, it looks up an open problem with the same `dedupeKey`
  *    and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for one fault).
  * 2. The *work system* (W4) derives tasks from problems through the `TaskDerivationTable`: one
  *    rule per `ProblemKind`, each returning `TaskSpec`s. Each owning system exports the rules for
@@ -79,8 +79,11 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
 // Problems
 // ---------------------------------------------------------------------------------------------
 
-/** Which system created a problem and is responsible for resolving it. */
-export type ProblemOwner = "equipment" | "travel" | "commerce";
+/**
+ * Which system created a problem and is responsible for resolving it. D77: the watch owns
+ * `stationToStaff` (the helm's watch and relief posts).
+ */
+export type ProblemOwner = "equipment" | "travel" | "commerce" | "watch";
 
 /**
  * Who can see a problem in their AgentView.
@@ -109,8 +112,13 @@ export interface ProblemPayloads {
     portId: PortDefId;
     storeKey: LocalKey;
   };
-  /** A station must be crewed for the current travel stage (e.g. pilot for undock → dock). */
-  stationToStaff: { machineId: MachineId };
+  /**
+   * A station must be crewed (D77: the helm). `watch` is the section's post, open while a course
+   * is planned or the ship is underway; `relief` stands in for a stander away for a need.
+   */
+  stationToStaff: { machineId: MachineId; post: "watch" | "relief" };
+  /** D78: a course to `toPortId` must be plotted at the nav terminal before departure. */
+  courseToPlot: { toPortId: PortDefId };
   /**
    * D47: a diagnosed fault's remaining repair steps consume `count` more of `itemDefId` than the
    * ship has aboard. Owner: equipment (it watches the shortfall); commerce derives the `buyParts`
@@ -153,6 +161,8 @@ export const TASK_TYPES = [
   "haul",
   "staffStation",
   "buyParts",
+  /** D78: plot the planned course at the `navStation` machine (`courseToPlot`). */
+  "plotCourse",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -362,6 +372,10 @@ export const PERSONAL_ACTIVITIES = [
   "comeAboard",
   "lookForWork",
   "meetSpeaker",
+  /** D77: the officer of the watch's rounds, and an idle on-duty engineer's machine round. */
+  "rounds",
+  /** D77: the section's helm-stander on gangway watch while docked. */
+  "standWatch",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -380,10 +394,16 @@ export type WorkStageKey =
   /** A recipe stage owned by equipment (W5): progress lives on the fault/machine. */
   | "recipe"
   /** D47: time at a port market's counter before the `buy` commit step. */
-  | "buy";
+  | "buy"
+  /** D77: taking over the helm at its standby position (counts only while someone holds the seat). */
+  | "handover"
+  /** D78: plotting a course at the nav terminal. */
+  | "plot"
+  /** D77: a stop on a round. */
+  | "rounds";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
-export type HoldKind = "sleep" | "staff" | "rest" | "socialize";
+export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway";
 
 /**
  * W4a addition: one step of an activity's bounded plan (SD §14.3). The work system builds the

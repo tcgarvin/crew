@@ -22,6 +22,7 @@ import type {
   ScenarioDefId,
   SkillId,
   SkillLevels,
+  ThoughtKey,
   TileCoord,
   TileEdge,
   ToolKind,
@@ -159,6 +160,13 @@ export const recipeActionSchema = z.enum([
 ]);
 /** D72: hull size classes (sim `HULL_SIZE_CLASSES`). */
 export const hullSizeClassSchema = z.enum(["S", "M", "L"]);
+/** D79: the thoughts the sim raises (sim `THOUGHT_KEYS`). */
+export const thoughtKeySchema = z.enum([
+  "stoodLongWatch",
+  "doubleWatch",
+  "helmCleanPass",
+  "helmScrape",
+]);
 export const traitModifierSchema = z.enum([
   "hungerRate",
   "fatigueRate",
@@ -195,4 +203,5 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof recipeActionSchema>, RecipeActionKind>,
   AssertEqual<z.infer<typeof traitModifierSchema>, TraitModifierKey>,
   AssertEqual<z.infer<typeof hullSizeClassSchema>, HullSizeClass>,
-] = [true, true, true, true, true, true, true, true, true, true];
+  AssertEqual<z.infer<typeof thoughtKeySchema>, ThoughtKey>,
+] = [true, true, true, true, true, true, true, true, true, true, true];

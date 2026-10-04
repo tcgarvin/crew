@@ -21,7 +21,7 @@ import { findCrewDef, findItemDef } from "./defs";
 import { cardSpeaker, queueOrHold } from "./delivery";
 import { allocateId } from "./ids";
 import type { KernelRegistry } from "./registry";
-import type { Actor, Needs } from "./types/actor";
+import type { Actor, Needs, WatchSection } from "./types/actor";
 import type {
   Command,
   CommandKind,
@@ -140,6 +140,14 @@ function validateSpawn(
     if (findCrewDef(ctx.content, ctx.state, spawn.crewDefId) === undefined) {
       return `unknown crew def "${spawn.crewDefId}"`;
     }
+    const section = spawn.section;
+    if (section !== undefined) {
+      const watches = ctx.config.time.watchesPerDay;
+      if (section.key.length === 0) return "section key must not be empty";
+      if (!Number.isInteger(section.index) || section.index < 0 || section.index >= watches) {
+        return `section "${section.key}" index ${section.index} is outside the ${watches} watches of the day`;
+      }
+    }
   } else {
     const def = findItemDef(ctx.content, ctx.state, spawn.itemDefId);
     if (def === undefined) return `unknown item def "${spawn.itemDefId}"`;
@@ -157,8 +165,16 @@ function validateSpawn(
  * (a waiting NPC passenger). Absent `CrewDef.traits` spawn as no traits: procedural sampling needs
  * a trait-count knob that `ConfigDef` does not have yet. Exported for `spawnAtBoundary` (commerce),
  * the other command kind that can spawn an actor at a boundary.
+ *
+ * D77: `section` is their watch section from the scenario's bill; without one they are a
+ * dayworker (as is anyone spawned after world creation).
  */
-export function newActor(id: ActorId, def: CrewDef, location: PhysicalLocation): Actor {
+export function newActor(
+  id: ActorId,
+  def: CrewDef,
+  location: PhysicalLocation,
+  section?: WatchSection,
+): Actor {
   return {
     id,
     defId: def.id,
@@ -172,7 +188,8 @@ export function newActor(id: ActorId, def: CrewDef, location: PhysicalLocation):
     skills: { ...def.skills },
     traits: [...(def.traits ?? [])],
     mood: 0,
-    schedule: { shiftKey: def.shift },
+    thoughts: [],
+    schedule: section === undefined ? {} : { section: { ...section } },
     activity: { kind: "idle" },
     lastPlannedTick: 0,
     knowledge: {},
@@ -210,7 +227,7 @@ const scenarioSpawn: CommandHandler<"scenarioSpawn", null> = {
       let defId: string;
       if (spawn.kind === "actor") {
         const id = allocateId(state, "actor");
-        state.actors[id] = newActor(id, ctx.defs.crew(spawn.crewDefId), location);
+        state.actors[id] = newActor(id, ctx.defs.crew(spawn.crewDefId), location, spawn.section);
         entityId = id;
         defId = spawn.crewDefId;
       } else {

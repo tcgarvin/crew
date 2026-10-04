@@ -1120,10 +1120,6 @@
               "additionalProperties": false
             }
           },
-          "shift": {
-            "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
-          },
           "bio": {
             "type": "string"
           },
@@ -1132,16 +1128,7 @@
             "minLength": 1
           }
         },
-        "required": [
-          "id",
-          "name",
-          "roleTags",
-          "skills",
-          "startingInventory",
-          "shift",
-          "bio",
-          "voice"
-        ],
+        "required": ["id", "name", "roleTags", "skills", "startingInventory", "bio", "voice"],
         "additionalProperties": false
       }
     },
@@ -1459,6 +1446,42 @@
               "required": ["placementKey", "faultKey"],
               "additionalProperties": false
             }
+          },
+          "watchBill": {
+            "type": "object",
+            "properties": {
+              "sections": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                      }
+                    }
+                  },
+                  "required": ["key", "members"],
+                  "additionalProperties": false
+                }
+              },
+              "dayworkers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                }
+              }
+            },
+            "required": ["sections", "dayworkers"],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1886,6 +1909,121 @@
         ],
         "additionalProperties": false
       }
+    },
+    "thoughts": {
+      "type": "object",
+      "properties": {
+        "stoodLongWatch": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "doubleWatch": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "helmCleanPass": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "helmScrape": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"],
+      "additionalProperties": false
     },
     "config": {
       "type": "object",
@@ -2560,6 +2698,11 @@
                 "type": "string",
                 "minLength": 1
               }
+            },
+            "hazardBudget": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -2570,7 +2713,8 @@
             "spawnBudget",
             "faultBudget",
             "budgetRefillDays",
-            "hookOnEvents"
+            "hookOnEvents",
+            "hazardBudget"
           ],
           "additionalProperties": false
         },
@@ -2601,6 +2745,13 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "slowDownOnEvents": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "required": [
@@ -2609,53 +2760,129 @@
             "snapshotEverySeconds",
             "localSaveEverySeconds",
             "remoteSaveEverySeconds",
-            "frameEveryTicks"
+            "frameEveryTicks",
+            "slowDownOnEvents"
           ],
           "additionalProperties": false
         },
-        "shifts": {
+        "watches": {
           "type": "object",
           "properties": {
-            "cycleSeconds": {
+            "dayworkerOnWatches": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "handoverLeadSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "handoverSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "reliefMaxDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
-            "shifts": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
-                  },
-                  "workWindows": {
-                    "type": "array",
-                    "items": {
-                      "type": "array",
-                      "prefixItems": [
-                        {
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        {
-                          "type": "number",
-                          "minimum": 0
-                        }
-                      ],
-                      "items": false,
-                      "minItems": 2,
-                      "maxItems": 2
-                    }
-                  }
-                },
-                "required": ["key", "workWindows"],
-                "additionalProperties": false
-              }
+            "reliefNoShowSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "longWatchFactor": {
+              "type": "number",
+              "minimum": 1
+            },
+            "helmUnattendedSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "roundsStopSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "roundsEveryDays": {
+              "type": "number",
+              "minimum": 0
+            },
+            "plotCourseSeconds": {
+              "type": "number",
+              "minimum": 0
             }
           },
-          "required": ["cycleSeconds", "shifts"],
+          "required": [
+            "dayworkerOnWatches",
+            "handoverLeadSeconds",
+            "handoverSeconds",
+            "reliefMaxDays",
+            "reliefNoShowSeconds",
+            "longWatchFactor",
+            "helmUnattendedSeconds",
+            "roundsStopSeconds",
+            "roundsEveryDays",
+            "plotCourseSeconds"
+          ],
+          "additionalProperties": false
+        },
+        "mood": {
+          "type": "object",
+          "properties": {
+            "lowBelow": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "highAbove": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "lowWorkSpeed": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "highWorkSpeed": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": ["lowBelow", "highAbove", "lowWorkSpeed", "highWorkSpeed"],
+          "additionalProperties": false
+        },
+        "hazards": {
+          "type": "object",
+          "properties": {
+            "difficulty": {
+              "type": "object",
+              "properties": {
+                "easy": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "hard": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "brutal": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                }
+              },
+              "required": ["easy", "hard", "brutal"],
+              "additionalProperties": false
+            },
+            "delaySeconds": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["difficulty", "delaySeconds"],
           "additionalProperties": false
         },
         "social": {
@@ -2712,7 +2939,9 @@
         "commerce",
         "narrator",
         "host",
-        "shifts",
+        "watches",
+        "mood",
+        "hazards",
         "social",
         "events"
       ],
@@ -2732,6 +2961,7 @@
     "scenarios",
     "people",
     "docks",
+    "thoughts",
     "config",
     "hash"
   ],

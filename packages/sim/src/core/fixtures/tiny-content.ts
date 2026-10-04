@@ -14,6 +14,7 @@ import type {
   ScenarioDefId,
 } from "../types/ids";
 import type { EffectiveConfig } from "../types/kernel";
+import { FIXTURE_HAZARDS, FIXTURE_MOOD, FIXTURE_THOUGHTS, fixtureWatches } from "./ship-life";
 
 export const TINY = {
   deck: "deck.tiny.main" as DeckDefId,
@@ -29,8 +30,12 @@ export const TINY = {
   scenario: "scenario.tiny" as ScenarioDefId,
 } as const;
 
-/** The fixture's default ship's day (D76). */
-export const TINY_DAY = 1200;
+/**
+ * The fixture's default ship's day (D76): 600 s of two watches, so the scenario's one section
+ * (`alpha`) stands `[0, 300)` of every 600 s, the duty window the tests were written against
+ * (D77), and dayworkers keep the same hours.
+ */
+export const TINY_DAY = 600;
 
 export interface TinyConfigOptions {
   /** A fixture convenience in seconds, stored as `narrator.quietTooLongDays`. */
@@ -47,7 +52,7 @@ export interface TinyConfigOptions {
 export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
   const day = options.daySeconds ?? TINY_DAY;
   return {
-    time: { tickRate: 20, daySeconds: day, watchesPerDay: options.watchesPerDay ?? 3 },
+    time: { tickRate: 20, daySeconds: day, watchesPerDay: options.watchesPerDay ?? 2 },
     movement: {
       walkSpeed: 2,
       passDelaySeconds: 0.5,
@@ -157,6 +162,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       faultBudget: 2,
       budgetRefillDays: 600 / day,
       hookOnEvents: [],
+      hazardBudget: 2,
     },
     host: {
       runAheadCapSeconds: 60,
@@ -165,8 +171,11 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       localSaveEverySeconds: 30,
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
+      slowDownOnEvents: [],
     },
-    shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+    watches: fixtureWatches([0]),
+    mood: FIXTURE_MOOD,
+    hazards: FIXTURE_HAZARDS,
     social: {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
@@ -296,7 +305,6 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         roleTags: ["captain"],
         skills: { piloting: 6 },
         startingInventory: [{ itemDefId: TINY.rations, count: 3 }],
-        shift: "alpha",
         bio: "Keeps the ship flying.",
         voice: "Plain and brief.",
       },
@@ -353,8 +361,10 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         startingMoney: 500,
         startingItems: [{ itemDefId: TINY.wrench, count: 1, zoneKey: "stores" }],
         initialFaults: [],
+        watchBill: { sections: [{ key: "alpha", members: [TINY.mara] }], dayworkers: [] },
       },
     },
+    thoughts: FIXTURE_THOUGHTS,
     config,
     hash: "tiny-content-v1",
   };

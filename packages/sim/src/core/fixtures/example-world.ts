@@ -12,6 +12,7 @@ import type {
   DecisionId,
   DeckDefId,
   DoorId,
+  HazardId,
   HookId,
   ItemDefId,
   ItemId,
@@ -75,6 +76,7 @@ export function exampleWorldState(): WorldState {
       transaction: 2,
       event: 57,
       local: 1,
+      hazard: 2,
     },
     actors: {
       [a1]: {
@@ -101,7 +103,8 @@ export function exampleWorldState(): WorldState {
         skills: { piloting: 6, cargo: 2 },
         traits: ["trait.steady" as TraitDefId],
         mood: 0.1,
-        schedule: { shiftKey: "alpha" },
+        thoughts: [{ key: "helmCleanPass", value: 0.1, expiresAtTick: 7600 }],
+        schedule: { section: { key: "red", index: 0 } },
         activity: {
           kind: "task",
           taskId: t1,
@@ -156,7 +159,8 @@ export function exampleWorldState(): WorldState {
         skills: { engineering: 7, electrical: 4 },
         traits: [],
         mood: -0.2,
-        schedule: { shiftKey: "beta" },
+        thoughts: [],
+        schedule: {},
         activity: {
           kind: "personal",
           activity: "sleep",
@@ -317,6 +321,16 @@ export function exampleWorldState(): WorldState {
       plannerRotation: 1,
     },
     travel: { stage: "docked", portId: port, plannedDestinationId: port2 },
+    watch: { lastBellWatch: 0, helm: {} },
+    hazards: [
+      {
+        id: "h1" as HazardId,
+        kind: "debrisField",
+        difficulty: 5,
+        fireAtTick: 900,
+        causeCommandId: "cmd:narrator:7:0" as CommandId,
+      },
+    ],
     jobs: {
       [j1]: {
         id: j1,
@@ -382,7 +396,8 @@ export function exampleWorldState(): WorldState {
         tick: 400,
       },
       lastNarrativeTick: 250,
-      budget: { spawnsRemaining: 3, faultsRemaining: 1 },
+      budget: { spawnsRemaining: 3, faultsRemaining: 1, hazardsRemaining: 1 },
+      budgetRefilledTick: 0,
       recentHookIds: [],
     },
     commands: {

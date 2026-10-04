@@ -29,10 +29,14 @@ export const SIM_VERSION = "0.1.0";
 
 /**
  * What a migration may read besides the save: the content it is being restored against (D61:
- * which dock map belongs to the port a save is docked at; D65: which item is the hand truck).
+ * which dock map belongs to the port a save is docked at; D65: which item is the hand truck;
+ * D77: the scenario's watch bill), and the config the restored world will run with (the save's
+ * own, missing keys filled from that content: `fillConfig`), for D77's watch arithmetic and
+ * D78's hazard budget.
  */
 export interface MigrationContext {
-  readonly content: Pick<ContentBundle, "decks" | "docks" | "items">;
+  readonly content: Pick<ContentBundle, "decks" | "docks" | "items" | "scenarios">;
+  readonly config: ConfigDef;
 }
 
 /**

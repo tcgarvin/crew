@@ -15,7 +15,7 @@ import { tinyConfig } from "./fixtures/tiny-content";
 import type { ConfigDef } from "./types/content";
 
 function withTime(time: Partial<ConfigDef["time"]>): ConfigDef {
-  const config = tinyConfig();
+  const config = tinyConfig({ daySeconds: 1200, watchesPerDay: 3 });
   return { ...config, time: { ...config.time, ...time } };
 }
 
@@ -45,8 +45,8 @@ describe("clock", () => {
   });
 
   describe("ship's day (D76)", () => {
-    // tinyConfig: 1200 s day, three watches, 20 ticks per second.
-    const config = tinyConfig();
+    // A 1200 s day of three watches (the default bundle's), 20 ticks per second.
+    const config = tinyConfig({ daySeconds: 1200, watchesPerDay: 3 });
 
     it("converts days to seconds and to ticks by the ceiling rule", () => {
       expect(daysToSeconds(config, 0.05)).toBe(60);

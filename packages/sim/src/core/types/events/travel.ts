@@ -1,7 +1,9 @@
 /** Travel events (W6). */
+import type { HazardKind } from "../content";
 import type {
   ActorId,
   DockDefId,
+  HazardId,
   ItemDefId,
   ItemId,
   LocalId,
@@ -66,6 +68,26 @@ export interface TravelEventPayloads {
   };
   /** D66: the staging plan's one line for the log as the dock comes alongside. */
   dockAmbience: { readonly portId: PortDefId; readonly line: string };
+  /** D78: `actorId` plotted the course to `toPortId` at the nav terminal. */
+  coursePlotted: { readonly toPortId: PortDefId; readonly actorId: ActorId };
+  /** D78: a `scheduleHazard` placed hazard `hazardId` on the leg. */
+  hazardScheduled: { readonly hazardId: HazardId; readonly kind: HazardKind };
+  /**
+   * D78: a navigation hazard fired in transit and the helm rolled against it: `standerId` (absent:
+   * nobody at the helm) at piloting `skill` against `difficulty`. `unattended` is a scrape and a
+   * delay both. `scrapedMachineId` is the machine a scrape put a fault on (absent: no scrape, or
+   * no machine with a fault catalog to take it); `lostSeconds` is the delay (0 without one).
+   */
+  navHazard: {
+    readonly hazardId: HazardId;
+    readonly kind: HazardKind;
+    readonly difficulty: number;
+    readonly standerId?: ActorId;
+    readonly skill: number;
+    readonly outcome: "clean" | "scrape" | "delay" | "unattended";
+    readonly scrapedMachineId?: MachineId;
+    readonly lostSeconds: number;
+  };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -83,4 +105,8 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   dockDressed: "trace",
   // The staging call sets the stage and never moves the plot (D57): shown, never narrative.
   dockAmbience: "notable",
+  coursePlotted: "notable",
+  hazardScheduled: "trace",
+  // The helm's stakes: in the digest and the ticker, but not hooked (D78).
+  navHazard: "narrative",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

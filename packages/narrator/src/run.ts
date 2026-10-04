@@ -333,6 +333,7 @@ function currentSnapshot(snapshot: SaveEnvelope, content: ContentBundle): SaveEn
   if (snapshot.schemaVersion === SCHEMA_VERSION) return { ...snapshot, config };
   const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), snapshot.schemaVersion, {
     content,
+    config,
   }) as SaveEnvelope["state"];
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, state, config };
 }

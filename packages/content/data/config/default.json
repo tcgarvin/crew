@@ -153,7 +153,8 @@
       "departureHoldLifted",
       "departureRepairOutOfReach",
       "passengerReturned"
-    ]
+    ],
+    "hazardBudget": 2
   },
   "host": {
     "runAheadCapSeconds": 60,
@@ -161,24 +162,30 @@
     "snapshotEverySeconds": 1,
     "localSaveEverySeconds": 10,
     "remoteSaveEverySeconds": 60,
-    "frameEveryTicks": 2
+    "frameEveryTicks": 2,
+    "slowDownOnEvents": ["navHazard", "faultOccurred", "helmUnattended", "driftingChanged"]
   },
-  "shifts": {
-    "cycleSeconds": 1200,
-    "shifts": [
-      {
-        "key": "alpha",
-        "workWindows": [[0, 600]]
-      },
-      {
-        "key": "beta",
-        "workWindows": [[600, 1200]]
-      },
-      {
-        "key": "gamma",
-        "workWindows": [[300, 900]]
-      }
-    ]
+  "watches": {
+    "dayworkerOnWatches": [0, 1],
+    "handoverLeadSeconds": 30,
+    "handoverSeconds": 5,
+    "reliefMaxDays": 0.1,
+    "reliefNoShowSeconds": 45,
+    "longWatchFactor": 1.25,
+    "helmUnattendedSeconds": 20,
+    "roundsStopSeconds": 4,
+    "roundsEveryDays": 0.08,
+    "plotCourseSeconds": 20
+  },
+  "mood": {
+    "lowBelow": -0.4,
+    "highAbove": 0.4,
+    "lowWorkSpeed": 0.9,
+    "highWorkSpeed": 1.05
+  },
+  "hazards": {
+    "difficulty": { "easy": 3, "hard": 5, "brutal": 7 },
+    "delaySeconds": 60
   },
   "social": {
     "chatRadiusTiles": 2,

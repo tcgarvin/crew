@@ -25,6 +25,7 @@ export {
 } from "./systems/travel/index";
 export { travelViolations } from "./systems/travel/invariants";
 export { registerNeeds } from "./systems/needs/index";
+export { isOnDuty, registerWatch } from "./systems/watch/index";
 export { equipmentStages, registerWork } from "./systems/work/index";
 export { workViolations } from "./systems/work/invariants";
 export { registerPlannerDefaults } from "./planner/index";

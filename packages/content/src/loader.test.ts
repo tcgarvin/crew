@@ -88,15 +88,37 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits and the default scenario", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario and 4 thoughts", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
       scenarios: Record<string, unknown>;
+      thoughts: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
+    expect(Object.keys(bundle.thoughts).sort()).toEqual([
+      "doubleWatch",
+      "helmCleanPass",
+      "helmScrape",
+      "stoodLongWatch",
+    ]);
+  });
+
+  it("stands the default scenario's watch in three sections, with three dayworkers (D77)", () => {
+    const bundle = authoredBundle();
+    const bill =
+      bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios]
+        ?.watchBill;
+    expect(bill?.sections.map((s) => s.key)).toEqual(["red", "white", "blue"]);
+    expect(bill?.sections[0]?.members).toEqual([
+      "crew.noor_haddad",
+      "crew.mara_osei",
+      "crew.priya_kessler",
+    ]);
+    expect(bill?.sections.flatMap((s) => s.members)).toHaveLength(6);
+    expect(bill?.dayworkers).toHaveLength(3);
   });
 
   it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (D73)", () => {

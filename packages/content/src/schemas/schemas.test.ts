@@ -157,7 +157,6 @@ const crew = {
   roleTags: ["captain"],
   skills: { piloting: 5 },
   startingInventory: [],
-  shift: "alpha",
   bio: "Test captain.",
   voice: "Plain and brief.",
 };
@@ -217,6 +216,20 @@ const scenario = {
   startingMoney: 1000,
   startingItems: [{ itemDefId: "item.test.wrench", count: 1, zoneKey: "stow" }],
   initialFaults: [],
+};
+
+const thought = (key: string, value: number, stacks: boolean) => ({
+  key,
+  label: key,
+  value,
+  durationDays: 0.5,
+  stacks,
+});
+const thoughts = {
+  stoodLongWatch: thought("stoodLongWatch", -0.15, false),
+  doubleWatch: thought("doubleWatch", -0.25, false),
+  helmCleanPass: thought("helmCleanPass", 0.1, true),
+  helmScrape: thought("helmScrape", -0.1, true),
 };
 
 const band = { min: 1, max: 3 };
@@ -327,6 +340,7 @@ const config = {
     faultBudget: 2,
     budgetRefillDays: 0.5,
     hookOnEvents: [],
+    hazardBudget: 2,
   },
   host: {
     runAheadCapSeconds: 60,
@@ -335,8 +349,22 @@ const config = {
     localSaveEverySeconds: 10,
     remoteSaveEverySeconds: 60,
     frameEveryTicks: 2,
+    slowDownOnEvents: [],
   },
-  shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+  watches: {
+    dayworkerOnWatches: [0, 1],
+    handoverLeadSeconds: 30,
+    handoverSeconds: 5,
+    reliefMaxDays: 0.1,
+    reliefNoShowSeconds: 45,
+    longWatchFactor: 1.25,
+    helmUnattendedSeconds: 20,
+    roundsStopSeconds: 4,
+    roundsEveryDays: 0.08,
+    plotCourseSeconds: 20,
+  },
+  mood: { lowBelow: -0.4, highAbove: 0.4, lowWorkSpeed: 0.9, highWorkSpeed: 1.05 },
+  hazards: { difficulty: { easy: 3, hard: 5, brutal: 7 }, delaySeconds: 60 },
   social: { chatRadiusTiles: 2, chatCooldownSeconds: 45, templateLines: ["{a} joked"] },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
 };
@@ -458,6 +486,7 @@ describe("bundle validation", () => {
     scenarios: { [scenario.id]: scenario },
     people,
     docks: {},
+    thoughts,
     config,
     hash: "test",
   };
@@ -465,6 +494,20 @@ describe("bundle validation", () => {
   it("L1 accepts a structurally valid bundle", () => {
     expect(contentBundleSchema.safeParse(bundle).success).toBe(true);
     expect(validateStructure(bundle).ok).toBe(true);
+  });
+
+  it("L1 requires every thought def, and a bill with distinct sections and members (D77, D79)", () => {
+    const { helmScrape: _missing, ...three } = thoughts;
+    expect(validateStructure({ ...bundle, thoughts: three }).ok).toBe(false);
+    const bill = (sections: unknown, dayworkers: unknown) => ({
+      ...bundle,
+      scenarios: { [scenario.id]: { ...scenario, watchBill: { sections, dayworkers } } },
+    });
+    const red = { key: "red", members: ["crew.test.mara"] };
+    expect(validateStructure(bill([red], [])).ok).toBe(true);
+    expect(validateStructure(bill([], [])).ok).toBe(false);
+    expect(validateStructure(bill([red, { key: "red", members: [] }], [])).ok).toBe(false);
+    expect(validateStructure(bill([red], ["crew.test.mara"])).ok).toBe(false);
   });
 
   it("L1 reports issues with paths", () => {
@@ -491,6 +534,35 @@ describe("bundle validation", () => {
       expect(
         issues.some((i) => i.level === "referential" && i.message.includes("item.test.other")),
       ).toBe(true);
+    });
+
+    it("rejects a watch-bill member who is not in the scenario's crew (D77)", () => {
+      const billed = {
+        ...scenario,
+        watchBill: {
+          sections: [{ key: "red", members: ["crew.test.mara"] }],
+          dayworkers: ["crew.test.stranger"],
+        },
+      };
+      const issues = referenceIssues({ ...bundle, scenarios: { [scenario.id]: billed } });
+      expect(
+        issues.some((i) => i.message.includes("crew.test.stranger") && i.message.includes("bill")),
+      ).toBe(true);
+      const ok = { ...billed, watchBill: { ...billed.watchBill, dayworkers: [] } };
+      expect(referenceIssues({ ...bundle, scenarios: { [scenario.id]: ok } })).toEqual([]);
+    });
+
+    it("rejects a dayworker watch outside the day, or listed twice (D77)", () => {
+      const bad = { ...config, watches: { ...config.watches, dayworkerOnWatches: [1, 3, 1] } };
+      const issues = referenceIssues({ ...bundle, config: bad });
+      expect(issues.some((i) => i.message.includes("watch 3 is not one of the 3"))).toBe(true);
+      expect(issues.some((i) => i.message.includes("watch 1 is listed twice"))).toBe(true);
+    });
+
+    it("rejects a thought filed under another thought's key (D79)", () => {
+      const swapped = { ...thoughts, doubleWatch: thoughts.stoodLongWatch };
+      const issues = referenceIssues({ ...bundle, thoughts: swapped });
+      expect(issues.some((i) => i.path.join(".") === "thoughts.doubleWatch.key")).toBe(true);
     });
 
     it("rejects an id outside its table's namespace", () => {

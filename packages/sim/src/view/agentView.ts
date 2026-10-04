@@ -5,8 +5,8 @@
  * call that received it (it closes over live state).
  *
  * What the actor sees:
- * - `self`: body, needs, skills, carried items (truth: they know their own hands), shift status,
- *   retry backoff;
+ * - `self`: body, needs, skills, carried items (truth: they know their own hands), duty and their
+ *   place in the watch (D77), thoughts (D79), retry backoff;
  * - facts: their latest-belief table;
  * - problems: open problems that are `public`, or `discovered` ones they hold a `problem` fact for;
  * - tasks: live tasks of those problems. Claims are public in V1 (W4a decision, see
@@ -37,7 +37,6 @@ import type {
   SelfView,
   TaskView,
 } from "../core/types/view";
-import { isOnDuty } from "../systems/needs/shifts";
 import { estimateTravelTicks } from "../systems/spatial/estimates";
 import {
   compartmentAt,
@@ -45,6 +44,8 @@ import {
   isStaticWalkable,
   rotateOffset,
 } from "../systems/spatial/geometry";
+import { isOnDuty, isOnWatch } from "../systems/watch/duty";
+import { helmRoleOf, isOfficerOfTheWatch } from "../systems/watch/helm";
 
 type ReadonlyActor = DeepReadonly<Actor>;
 
@@ -151,6 +152,20 @@ function interactionsByMachine(
   return byMachine;
 }
 
+/** D77: the actor's place in the watch at the planning tick. */
+function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["watch"] {
+  const { state } = world;
+  const config = world.config.values;
+  const section = actor.schedule.section;
+  return {
+    ...(section === undefined ? {} : { section: section.key }),
+    onWatch: isOnWatch(actor.schedule, tick, config),
+    dayworker: section === undefined,
+    helmRole: helmRoleOf(state, config, actor.id),
+    officerOfTheWatch: isOfficerOfTheWatch(state, config, actor.id, tick),
+  };
+}
+
 function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
   const { state } = world;
   const config = world.config.values;
@@ -174,6 +189,8 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     activity: actor.activity,
     inventory: inventoryOf(state, actor.id),
     onDuty: isOnDuty(actor.schedule, state.tick + 1, config),
+    watch: watchOf(world, actor, state.tick + 1),
+    thoughts: actor.thoughts,
     lastPlannedTick: actor.lastPlannedTick,
     ...(actor.workBackoff === undefined ? {} : { backoff: actor.workBackoff }),
     ...(actor.passenger === true ? { passenger: true as const } : {}),

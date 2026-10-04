@@ -31,6 +31,7 @@ import type { TraitModifierKey } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { currentHold } from "../work/activity";
 import { berthsSystem } from "./berths";
+import { moodSystem } from "./mood";
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
@@ -130,7 +131,12 @@ export const needsSystem: System = {
 
 /** Needs, then the berth rule (D74), both in phase 5. */
 export function registerNeeds(registry: KernelRegistry): Unregister {
-  const unregister = [registry.registerSystem(needsSystem), registry.registerSystem(berthsSystem)];
+  const unregister = [
+    registry.registerSystem(needsSystem),
+    // D79: mood from live thoughts, after the needs it sits beside.
+    registry.registerSystem(moodSystem),
+    registry.registerSystem(berthsSystem),
+  ];
   return () => {
     for (const undo of unregister) undo();
   };

@@ -10,7 +10,7 @@ import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation } from "./types/common";
-import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
+import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
@@ -31,7 +31,7 @@ import type {
   RenderTravel,
   TickerEntry,
 } from "./types/view";
-import type { ActionKind } from "./types/work";
+import type { ActionKind, ProblemKind } from "./types/work";
 
 const ACTION_VERBS: Readonly<Record<ActionKind, string>> = {
   walk: "walking",
@@ -171,6 +171,39 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
   approaching: "On approach",
   docking: "Docking",
 };
+
+/** D78: how each navigation hazard kind reads in the ticker. */
+const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
+  debrisField: "Debris field",
+  asteroidBelt: "Asteroid belt",
+  ionStorm: "Ion storm",
+};
+
+/** D77: "white" → "White", for "Bell. White section has the watch." */
+function sectionName(key: string): string {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** D78: the ticker line for a navigation hazard's outcome. */
+function navHazardLine(event: Extract<SimEvent, { type: "navHazard" }>, n: Names): string {
+  const { kind, outcome, standerId, scrapedMachineId, lostSeconds } = event.payload;
+  const head = HAZARD_NAMES[kind];
+  const scraped =
+    scrapedMachineId === undefined
+      ? "scraped through"
+      : `scraped through, the ${n.machineLower(scrapedMachineId)} took it`;
+  const lost = `lost ${Math.round(lostSeconds)} s`;
+  switch (outcome) {
+    case "clean":
+      return `${head}: ${n.actor(standerId ?? "") ?? "the helm"} took us through clean`;
+    case "scrape":
+      return `${head}: ${scraped}`;
+    case "delay":
+      return `${head}: ${lost} working round it`;
+    case "unattended":
+      return `${head}: nobody at the helm; scraped through and ${lost}`;
+  }
+}
 
 /** Passengers §3.5: how a passage's ending reads in the ticker, by `PassageEndReason`. */
 const PASSAGE_END_LINES: Readonly<
@@ -353,6 +386,22 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "decisionResolved":
       return null;
+    case "bell": {
+      const key = event.payload.sectionKey;
+      return key === undefined ? "Bell." : `Bell. ${sectionName(key)} section has the watch.`;
+    }
+    case "helmRelieved": {
+      const by = n.actor(event.payload.byActorId) ?? "Someone";
+      const fromId = event.payload.fromActorId;
+      const from = fromId === undefined ? undefined : (n.actor(fromId) ?? "someone");
+      return from === undefined ? `${by} takes the helm` : `${by} relieves ${from} at the helm`;
+    }
+    case "helmUnattended":
+      return "Nobody at the helm";
+    case "coursePlotted":
+      return `Course plotted for ${n.port(event.payload.toPortId)}`;
+    case "navHazard":
+      return navHazardLine(event, n);
     default:
       return undefined;
   }
@@ -598,7 +647,7 @@ function loadingLine(count: FreightCount): string {
   return `loading cargo (${count.done} of ${count.total} ${crates(count.total)} aboard)`;
 }
 
-function hasOpenProblem(state: ReadonlyWorldState, kind: "stationToStaff"): boolean {
+function hasOpenProblem(state: ReadonlyWorldState, kind: ProblemKind): boolean {
   return Object.values(state.work.problems).some((p) => p.kind === kind && p.status === "open");
 }
 
@@ -691,8 +740,12 @@ export function shipHeadline(
     }
     if (travel.plannedDestinationId !== undefined) {
       const to = portName(content, travel.plannedDestinationId);
-      return travel.holdForRepairs === true
-        ? `${here} — holding for repairs before departing for ${to}`
+      if (travel.holdForRepairs === true) {
+        return `${here} — holding for repairs before departing for ${to}`;
+      }
+      // D78: the course is travel's open `courseToPlot` until someone plots it.
+      return hasOpenProblem(state, "courseToPlot")
+        ? `Preparing to depart for ${to} — waiting on a course`
         : `Preparing to depart for ${to}`;
     }
     // Offers are the card's story to tell, not the headline's (D34): the headline only says what

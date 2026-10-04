@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { exampleWorldState } from "./fixtures/example-world";
 import { checkInvariants, jsonSafetyViolations } from "./invariants";
-import type { ItemId, TaskId } from "./types/ids";
+import type { ActorId, HazardId, ItemId, TaskId } from "./types/ids";
 
 describe("checkInvariants", () => {
   it("passes the W0 example world", () => {
@@ -68,5 +68,22 @@ describe("checkInvariants", () => {
     expect(violations).toContain("money.balance is 1.5");
     expect(violations).toContain("decisions.queue names missing decision x9");
     expect(violations).toContain("work.tasks has a dependency cycle through t1");
+  });
+
+  it("flags bad thoughts, a bad section and an unallocated hazard (D77-D79)", () => {
+    const state = exampleWorldState();
+    const actor = state.actors["a1" as ActorId];
+    if (actor === undefined) throw new Error("fixture changed");
+    actor.thoughts = [{ key: "doubleWatch", value: Number.POSITIVE_INFINITY, expiresAtTick: 1.5 }];
+    actor.schedule = { section: { key: "red", index: -1 } };
+    const hazard = state.hazards[0];
+    if (hazard === undefined) throw new Error("fixture changed");
+    state.hazards.push({ ...hazard }, { ...hazard, id: "h7" as HazardId });
+    const violations = checkInvariants(state);
+    expect(violations).toContain("actors.a1.thoughts[0].value is Infinity");
+    expect(violations).toContain("actors.a1.thoughts[0].expiresAtTick is 1.5");
+    expect(violations).toContain('actors.a1.schedule.section is {"key":"red","index":-1}');
+    expect(violations).toContain("hazards[1] repeats id h1");
+    expect(violations).toContain("hazards[2] has unallocated id h7");
   });
 });
