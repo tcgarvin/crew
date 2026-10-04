@@ -17,9 +17,8 @@
  *   rooms, stations, zones and spawn points every deck needs, lockers serving beds; a scenario's
  *   crew each get a crew spawn point. Dock maps (`validate-dock.ts`): rows against the legend,
  *   the berth box on the map and void, each deck's ramp landings on floor, posts and areas on
- *   floor and reachable from both landings, the size cap; a scenario's ship fits every berth box.
- *   Two rules wait for slice 1's content (see `validatePhysical`): beds for crew + 1
- *   (`checkScenarioBeds`) and the quay row (`checkQuayRow`).
+ *   floor and reachable from both landings, the quay row under the box walkable, the size cap; a
+ *   scenario's ship fits every berth box and has beds for its crew + 1 (`checkScenarioBeds`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -52,7 +51,7 @@ import {
   checkDockReferences,
   checkScenarioBerths,
 } from "./validate-dock";
-import { checkHullContract, checkScenarioCrewSpawns } from "./validate-hull";
+import { checkHullContract, checkScenarioBeds, checkScenarioCrewSpawns } from "./validate-hull";
 
 export type { ValidationIssue, ValidationLevel };
 
@@ -799,8 +798,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     const deck = bundle.decks[scenario.deckId];
     if (deck === undefined) continue; // reported by L2
     checkScenarioCrewSpawns(scenario, deck, issues);
-    // `checkScenarioBeds` (crew + 1 beds) joins here once Freighter Mk2 is the default deck (ship
-    // life plan W3): Mk1's eight bunks for eight crew fail it, and every suite loads the bundle.
+    checkScenarioBeds(scenario, deck, bundle.machines, issues);
   }
   checkRecipeToolsSatisfiable(bundle, issues);
   checkScenarioCarriesRecipeTools(bundle, issues);

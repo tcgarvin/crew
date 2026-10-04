@@ -11,6 +11,40 @@ Green Meridian, field pad 2 (dock.green_meridian)
 planet dock for Green Meridian (port.green_meridian)
 40 x 29 tiles; M berth box 36 x 20 at (2,1)
 
+Freighter Mk2 (deck.freighter_mk2) docked at (2,1)
+
+   0         1         2         3
+   0123456789012345678901234567890123456789
+ 0  ......................................
+ 1  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 2  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 3  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 4  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 5  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 6  .EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB.
+ 7  .EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.
+ 8  .EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.
+ 9  .EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN.
+10  .EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN.
+11  .EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN.
+12  .EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN.
+13  .EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN.
+14  .EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN.
+15  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+16  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+17  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+18  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+19  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+20  .EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA.
+21 ...............v....................v...
+22 %%.....dddd......ssss.................%%
+23 .......dddd......ssss...................
+24 .......dddd......ssss....%..2...4.......
+25 .........1.............................3
+26 ......#######%%.........................
+27 .%%...#######%%.........................
+28 ......#######...........................
+
 Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
@@ -56,6 +90,10 @@ Posts (4):
   2  coop_stall: marketStall, the growers' co-op stall, at (28,24) facing n
   3  pad_gate: gate, the lane up to the Greenhouse Lounge, at (39,25) facing w
   4  pad_bench: bench, the bench under the awning, at (32,24) facing n; regular: Tilde Haugen
+
+Ramp landings (deck.freighter_mk2):
+  personnel_ramp: (36,21)
+  cargo_ramp: (15,21)
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (33,21)

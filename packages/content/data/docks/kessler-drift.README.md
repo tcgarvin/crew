@@ -11,6 +11,38 @@ Kessler Drift, ore berth 3 (dock.kessler_drift)
 station dock for Kessler Drift (port.kessler_drift)
 40 x 27 tiles; M berth box 36 x 20 at (2,1)
 
+Freighter Mk2 (deck.freighter_mk2) docked at (2,1)
+
+   0         1         2         3
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 2   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 3   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 4   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 5   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 6   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 7   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 8   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 9   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+10   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+11   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+12   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+13   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+14   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+15   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+16   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+17   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+18   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+19   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+20   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+21 ##.............v....................v.##
+22 ##.%.%%...............................##
+23 ###%...ddd......ssss.%%%%%%%%%%%%....2##
+24 ####...ddd......ssss..................##
+25 #####.....4.................1.%...3.####
+26 ########################################
+
 Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
@@ -54,6 +86,10 @@ Posts (4):
   2  shift_board: kiosk, the shift board, at (37,23) facing w; regular: Greta Lindholm
   3  canteen_hatch: gate, the hatch to the canteen ring, at (34,25) facing n
   4  ore_store: warehouseDoor, the ore-store lock, at (10,25) facing n
+
+Ramp landings (deck.freighter_mk2):
+  personnel_ramp: (36,21)
+  cargo_ramp: (15,21)
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (33,21)

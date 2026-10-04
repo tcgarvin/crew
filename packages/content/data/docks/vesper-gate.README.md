@@ -11,6 +11,39 @@ Vesper Gate, quiet berth (dock.vesper_gate)
 station dock for Vesper Gate (port.vesper_gate)
 40 x 28 tiles; M berth box 36 x 20 at (2,1)
 
+Freighter Mk2 (deck.freighter_mk2) docked at (2,1)
+
+   0         1         2         3
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 2   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 3   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 4   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 5   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 6   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 7   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 8   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 9   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+10   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+11   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+12   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+13   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+14   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+15   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+16   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+17   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+18   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+19   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+20   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+21 #..............v....................v..#
+22 #.............................1........#
+23 #................sss..................%#
+24 #.........ddd....sss..................%#
+25 #.........ddd..................5.......#
+26 #.........................%%........%..#
+27 ###########.4.#########.3.#######.2.####
+
 Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
@@ -56,6 +89,10 @@ Posts (5):
   3  apothecary: marketStall, the apothecary stall, at (24,27) facing n
   4  gate_stores: warehouseDoor, the Gate Stores hatch, at (12,27) facing n
   5  chapel_bench: bench, the bench by the chapel doors, at (31,25) facing n
+
+Ramp landings (deck.freighter_mk2):
+  personnel_ramp: (36,21)
+  cargo_ramp: (15,21)
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (33,21)

@@ -11,6 +11,39 @@ Tern's Rest, the long pier (dock.terns_rest)
 planet dock for Tern's Rest (port.terns_rest)
 44 x 28 tiles; M berth box 36 x 20 at (6,0)
 
+Freighter Mk2 (deck.freighter_mk2) docked at (6,0)
+
+   0         1         2         3         4
+   01234567890123456789012345678901234567890123
+ 0       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 1       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 2       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 3       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 4       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 5       EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 6       EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 7       EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 8       EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+ 9       EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+10       EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+11       EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+12       EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+13       EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+14       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+15       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+16       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+17       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+18       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+19       EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+20 ...................v....................v...
+21 .....5....%...............:...........1...%.
+22 %%......        ssss....ddd.
+23 ........        ssss.2..ddd.
+24 4.......        ....####...%
+25 ........
+26 ....3...
+27 %.####..
+
 Freighter Mk1 (deck.freighter_mk1) docked at (8,2)
 
    0         1         2         3         4
@@ -56,6 +89,10 @@ Posts (5):
   3  trading_post: marketStall, Harrow's trading-post counter, at (4,26) facing n; regular: Nell Harrow
   4  common_room: gate, the steps up to the relay common room, at (0,24) facing e
   5  pier_bench: bench, the bench at the end of the pier, at (5,21) facing n
+
+Ramp landings (deck.freighter_mk2):
+  personnel_ramp: (40,20)
+  cargo_ramp: (19,20)
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (37,20)

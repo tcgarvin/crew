@@ -11,6 +11,40 @@ Crossroads Hub, Bay 14 (dock.crossroads_hub)
 station dock for Crossroads Hub (port.crossroads_hub)
 40 x 29 tiles; M berth box 36 x 20 at (2,1)
 
+Freighter Mk2 (deck.freighter_mk2) docked at (2,1)
+
+   0         1         2         3
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 2   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 3   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 4   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 5   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 6   EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB
+ 7   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 8   EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 9   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+10   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+11   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+12   EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN
+13   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+14   EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN
+15   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+16   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+17   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+18   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+19   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+20   EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
+21 %..............v....................v..%
+22 ....%%%.................................
+23 ....%%%...........ssss.........1.....%%.
+24 ..........dddd....ssss...............%%.
+25 .2........dddd....ssss...%%.............
+26 ....%%....dddd..........................
+27 %.......#...4..............#....5..3....
+28 ########################################
+
 Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
@@ -57,6 +91,10 @@ Posts (5):
   3  lounge_gate: gate, the transit lounge gate, at (35,27) facing n
   4  dispatch: warehouseDoor, the Co-op dispatch window, at (12,27) facing n
   5  bench: bench, the bench by the lounge gate, at (32,27) facing n
+
+Ramp landings (deck.freighter_mk2):
+  personnel_ramp: (36,21)
+  cargo_ramp: (15,21)
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (33,21)
