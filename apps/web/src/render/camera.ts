@@ -4,7 +4,7 @@
  * `sceneAt` derives from stage progress during `docking` and `undocking`, so the framing is a pure
  * function of the frame like the rest of the port-bound scenery.
  */
-import type { DockDef } from "@crew/sim";
+import type { BerthedDock } from "@crew/sim";
 import { dockRectOnDeck } from "./dock";
 import type { Bounds, HullGeometry } from "./hull";
 
@@ -34,10 +34,10 @@ export function flightBounds(hull: Pick<HullGeometry, "bounds">): Bounds {
 /** Dockside §2.7: docked, it fits the ship and the dock map. Without a map, the flight framing. */
 export function dockedBounds(
   hull: Pick<HullGeometry, "bounds">,
-  dock: Pick<DockDef, "shipAt" | "width" | "height"> | undefined,
+  berth: BerthedDock | undefined,
 ): Bounds {
-  if (dock === undefined) return flightBounds(hull);
-  return grow(union(hull.bounds, dockRectOnDeck(dock)), DOCKED_MARGIN_TILES);
+  if (berth === undefined) return flightBounds(hull);
+  return grow(union(hull.bounds, dockRectOnDeck(berth)), DOCKED_MARGIN_TILES);
 }
 
 /**
@@ -47,11 +47,11 @@ export function dockedBounds(
  */
 export function cameraBounds(
   hull: Pick<HullGeometry, "bounds">,
-  dock: Pick<DockDef, "shipAt" | "width" | "height"> | undefined,
+  berth: BerthedDock | undefined,
   cameraT: number,
 ): Bounds {
   const from = flightBounds(hull);
-  const to = dockedBounds(hull, dock);
+  const to = dockedBounds(hull, berth);
   const t = Math.min(1, Math.max(0, cameraT));
   const at = (a: number, b: number) => a + (b - a) * t;
   return {

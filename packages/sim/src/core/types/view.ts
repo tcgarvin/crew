@@ -76,6 +76,8 @@ export interface SelfView {
   readonly passenger?: true;
   /** Passengers §3.5: walking off the ship; the planner keeps out of the way. */
   readonly disembarking?: true;
+  /** D74: the bed assigned to this actor (`WorldState.berths`); absent while unberthed. */
+  readonly berth?: { readonly machineId: MachineId };
 }
 
 /**
@@ -162,6 +164,12 @@ export interface AgentView {
   knownProblems(): readonly ProblemView[];
   knownTasks(): readonly TaskView[];
   roster(): readonly RosterEntry[];
+  /**
+   * D74: every bed assigned to someone (`WorldState.berths`), this actor's included, ashore or
+   * aboard. Who sleeps where is common knowledge aboard, like the roster. The planner never
+   * sleeps in one of these but its own (`self.berth`).
+   */
+  assignedBeds(): readonly MachineId[];
   /** W4a addition: items the actor holds a location belief about (plus what it carries). */
   knownItems(): readonly KnownItemView[];
   /**
@@ -312,9 +320,9 @@ export interface RenderTravel {
 
 /**
  * D61: the dock alongside, from the start of `docking` to the end of `undocking`. The map itself
- * is content (`ContentBundle.docks[dockId]`, a `DockDef`): its tile (x, y) is deck tile
- * (x − shipAt.x, y − shipAt.y), so the renderer draws it at `−shipAt` in deck coordinates plus
- * the scenery's berth offset. Actors and items standing on it are in the frame's ordinary lists
+ * is content (`ContentBundle.docks[dockId]`, a `DockDef`): with the deck at `shipAt` in its berth
+ * box (`berthPlacement`, D72), its tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y), so the
+ * renderer draws it at `−shipAt` in deck coordinates plus the scenery's berth offset. Actors and items standing on it are in the frame's ordinary lists
  * with `onDock` set.
  */
 export interface RenderDock {

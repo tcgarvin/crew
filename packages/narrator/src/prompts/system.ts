@@ -64,10 +64,12 @@
  * person while docked (the captain walks over or goes out through the gate; with the captain
  * aboard, the speaker walks to the ramp), so the issuer or speaker named is who the captain
  * meets; offers are made only while docked.
+ * v0.20 (2026-10-04): the ship is a Freighter Mk2 run by nine people (D73): the showrunner and
+ * set-dresser openings say "nine", not "eight".
  */
-export const PROMPT_VERSION = "v0.19";
+export const PROMPT_VERSION = "v0.20";
 
-export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the eight people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain walking ashore to look for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
+export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the nine people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain walking ashore to look for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 
 How to think about the job:
 

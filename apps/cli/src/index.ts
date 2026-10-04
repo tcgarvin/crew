@@ -121,8 +121,8 @@ export function docksDir(): string {
 }
 
 /**
- * Renders a dock with the ship composited and writes `<stem>.README.md` next to its JSON (or
- * into `outDir`). Needs exactly one deck in the bundle, since maps are authored against one ship.
+ * Renders a dock with every deck in the bundle composited in its berth box (one map per deck) and
+ * writes `<stem>.README.md` next to its JSON (or into `outDir`).
  */
 export function runContentRenderDock(dockId: string | undefined, outDir?: string): CliResult {
   if (dockId === undefined) {
@@ -138,10 +138,6 @@ export function runContentRenderDock(dockId: string | undefined, outDir?: string
     return fail(`content render-dock: unknown dock "${dockId}"`);
   }
   const decks = Object.values(bundle.decks);
-  const deck = decks[0];
-  if (deck === undefined || decks.length !== 1) {
-    return fail(`content render-dock: needs exactly one deck to dock, found ${decks.length}`);
-  }
   const port = bundle.ports[dock.portId];
   if (port === undefined) {
     return fail(`content render-dock: dock "${dockId}" names unknown port "${dock.portId}"`);
@@ -151,7 +147,7 @@ export function runContentRenderDock(dockId: string | undefined, outDir?: string
   if (!existsSync(source)) {
     return fail(`content render-dock: expected "${dock.id}" in ${source}`);
   }
-  const readme = renderDockReadme(dock, deck, port, `${stem}.json`);
+  const readme = renderDockReadme(dock, decks, port, `${stem}.json`);
   const dir = outDir ?? docksDir();
   mkdirSync(dir, { recursive: true });
   const target = path.join(dir, `${stem}.README.md`);

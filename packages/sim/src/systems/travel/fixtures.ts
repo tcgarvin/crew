@@ -226,6 +226,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
           cargoTransferTiles: [{ x: 0, y: 1 }],
           personnelTransferTiles: [{ x: 0, y: 1 }],
         },
+        hull: { class: "test_hull", sizeClass: "S" },
         spawnPoints: [
           { key: "bunk1", tile: { x: 1, y: 1 }, tags: ["crew"] },
           { key: "bunk2", tile: { x: 2, y: 1 }, tags: ["crew"] },

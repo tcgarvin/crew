@@ -101,6 +101,7 @@ export function deck12Content(config: ConfigDef = tinyConfig()): ContentBundle {
           cargoTransferTiles: [{ x: 0, y: 0 }],
           personnelTransferTiles: [{ x: 0, y: 0 }],
         },
+        hull: { class: "test_hull", sizeClass: "S" },
         spawnPoints: [
           { key: "hallWest", tile: { x: 0, y: 5 }, tags: ["crew"] },
           { key: "hallWest2", tile: { x: 0, y: 6 }, tags: ["crew"] },

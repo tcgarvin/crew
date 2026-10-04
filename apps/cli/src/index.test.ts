@@ -1,8 +1,25 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { dockWalkableMask, loadBundle } from "@crew/content";
-import { type DockDefId, dockFloorMask } from "@crew/sim";
+import {
+  HULL_CLASS_BOX,
+  dockRampLandings,
+  dockWalkableMask,
+  loadBundle,
+  shipAtInBerth,
+  validatePhysical,
+} from "@crew/content";
+import {
+  type ContentBundle,
+  type DeckDef,
+  type DeckDefId,
+  type DockDefId,
+  type DoorPlacementDef,
+  HULL_SIZE_BOX,
+  berthPlacement,
+  checkDockFitsDeck,
+  dockFloorMask,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {
   crew,
@@ -97,9 +114,9 @@ describe("crew content render-dock", () => {
       const result = runContentRenderDock("dock.crossroads_hub", dir);
       expect(result.exitCode).toBe(0);
       const readme = readFileSync(path.join(dir, "crossroads-hub.README.md"), "utf8");
-      expect(readme).toContain("Freighter Mk1 (deck.freighter_mk1) docked at (3,1)");
+      expect(readme).toContain("Freighter Mk1 (deck.freighter_mk1) docked at (4,3)");
       expect(readme).toContain("regular: Hal Petrosyan");
-      expect(readme).toContain("personnel_ramp: (5,19)");
+      expect(readme).toContain("personnel_ramp: (33,21)");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -112,15 +129,14 @@ describe("crew content render-dock", () => {
 
   it("has an up-to-date README next to every authored dock", () => {
     const bundle = authoredBundle();
-    const deck = Object.values(bundle.decks)[0];
-    if (deck === undefined) throw new Error("no deck");
+    const decks = Object.values(bundle.decks);
     for (const dock of Object.values(bundle.docks ?? {})) {
       const port = bundle.ports[dock.portId];
       if (port === undefined) throw new Error(`no port ${dock.portId}`);
       const stem = dockFileStem(dock.id);
       const committed = readFileSync(path.join(docksDir(), `${stem}.README.md`), "utf8");
       expect(committed, `${stem}.README.md is stale: crew content render-dock ${dock.id}`).toBe(
-        renderDockReadme(dock, deck, port, `${stem}.json`),
+        renderDockReadme(dock, decks, port, `${stem}.json`),
       );
     }
   });
@@ -135,6 +151,18 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
     }
   });
 
+  it("place every deck in every berth box alike (D72)", () => {
+    expect(HULL_CLASS_BOX).toEqual(HULL_SIZE_BOX);
+    const bundle = authoredBundle();
+    for (const dock of Object.values(bundle.docks ?? {})) {
+      for (const deck of Object.values(bundle.decks)) {
+        expect(shipAtInBerth(dock, deck), `${dock.id} ${deck.id}`).toEqual(
+          berthPlacement(dock, deck),
+        );
+      }
+    }
+  });
+
   it("grafts every authored dock onto the deck", () => {
     expect(dockGraftIssues(authoredBundle())).toEqual([]);
   });
@@ -143,10 +171,130 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
     const bundle = authoredBundle();
     const hub = bundle.docks?.["dock.crossroads_hub" as DockDefId];
     if (hub === undefined) throw new Error("no hub dock");
-    // Floor under the whole ship: the graft overlaps the deck.
-    const flooded = { ...hub, legend: { ...hub.legend, B: "floor" as const } };
-    expect(dockGraftIssues({ ...bundle, docks: { [hub.id]: flooded } })).toEqual([
-      expect.stringContaining("overlaps deck"),
-    ]);
+    // Floor over the whole berth box: the graft overlaps the deck.
+    const box = HULL_SIZE_BOX[hub.berth.sizeClass];
+    const { origin } = hub.berth;
+    const flooded = {
+      ...hub,
+      rows: hub.rows.map((row, y) =>
+        y < origin.y || y >= origin.y + box.h
+          ? row
+          : row.slice(0, origin.x) + ".".repeat(box.w) + row.slice(origin.x + box.w),
+      ),
+    };
+    // The graft is checked against every deck, so each one reports the overlap.
+    const issues = dockGraftIssues({ ...bundle, docks: { [hub.id]: flooded } });
+    expect(issues).toHaveLength(Object.keys(bundle.decks).length);
+    for (const deckId of Object.keys(bundle.decks)) {
+      expect(issues).toContainEqual(
+        expect.stringMatching(new RegExp(`on ${deckId}: .*overlaps deck`)),
+      );
+    }
+  });
+});
+
+function rampDoor(key: string, x: number): DoorPlacementDef {
+  return {
+    key,
+    edge: { x, y: 19, side: "s" },
+    kind: "ramp",
+    manualOperationSupported: true,
+    initialState: "closed",
+  };
+}
+
+/**
+ * Freighter Mk2's footprint with nothing inside (ship life §8): 36 x 20, the cargo ramp at
+ * (13,19) and the personnel ramp at (34,19), both on the south hull, each with its transfer tile
+ * just inside. Lets the dock maps be checked against the M box's full-size ship before that deck
+ * is authored.
+ */
+const mk2Footprint: DeckDef = {
+  id: "deck.mk2_footprint" as DeckDefId,
+  name: "Freighter Mk2 footprint (test stub)",
+  width: 36,
+  height: 20,
+  tiles: Array.from({ length: 20 }, () => "H".repeat(36)),
+  compartments: [{ key: "hold", symbol: "H", name: "Hold", tags: ["cargoHold"] }],
+  doors: [rampDoor("cargo_ramp", 13), rampDoor("personnel_ramp", 34)],
+  openings: [],
+  walls: [],
+  machines: [],
+  powerDomains: [],
+  zones: [],
+  docking: {
+    cargoRampDoorKey: "cargo_ramp",
+    personnelRampDoorKey: "personnel_ramp",
+    cargoTransferTiles: [{ x: 13, y: 18 }],
+    personnelTransferTiles: [{ x: 34, y: 18 }],
+  },
+  spawnPoints: [],
+  hull: { class: "light_freighter", sizeClass: "M" },
+};
+
+describe("dock maps take both M-class footprints (D72)", () => {
+  const authored = authoredBundle();
+  const withMk2: ContentBundle = {
+    ...authored,
+    decks: { ...authored.decks, [mk2Footprint.id]: mk2Footprint },
+  };
+  const docks = Object.values(authored.docks ?? {});
+
+  it("has the Mk1 deck and the Mk2 stub to check against", () => {
+    expect(Object.keys(withMk2.decks)).toEqual(
+      expect.arrayContaining(["deck.freighter_mk1", mk2Footprint.id]),
+    );
+    expect(docks.length).toBe(6);
+  });
+
+  it("lays every map out round an M box: 2-tile side margins, a quay below, under 44 x 30", () => {
+    for (const dock of docks) {
+      const box = HULL_CLASS_BOX[dock.berth.sizeClass];
+      const { origin } = dock.berth;
+      expect(dock.berth.sizeClass, dock.id).toBe("M");
+      expect(origin.x, dock.id).toBeGreaterThanOrEqual(2);
+      expect(dock.width - (origin.x + box.w), dock.id).toBeGreaterThanOrEqual(2);
+      expect(dock.width, dock.id).toBeLessThanOrEqual(44);
+      expect(dock.height, dock.id).toBeLessThanOrEqual(30);
+      expect(dock.height - (origin.y + box.h), dock.id).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it("puts walkable floor along the whole quay row, so any ramp in the box lands", () => {
+    for (const dock of docks) {
+      const box = HULL_CLASS_BOX[dock.berth.sizeClass];
+      const { origin } = dock.berth;
+      const mask = dockWalkableMask(dock);
+      const quayY = origin.y + box.h;
+      for (let x = origin.x; x < origin.x + box.w; x++) {
+        expect(mask[quayY * dock.width + x], `${dock.id} (${x},${quayY})`).toBe(1);
+      }
+    }
+  });
+
+  it("lands the Mk2 stub's ramps at box x + 13 and box x + 34 on the quay row", () => {
+    for (const dock of docks) {
+      const { origin } = dock.berth;
+      expect(dockRampLandings(dock, mk2Footprint), dock.id).toEqual([
+        { key: "cargo_ramp", tile: { x: origin.x + 13, y: origin.y + 20 } },
+        { key: "personnel_ramp", tile: { x: origin.x + 34, y: origin.y + 20 } },
+      ]);
+    }
+  });
+
+  it("grafts every map onto both decks in the sim", () => {
+    for (const dock of docks) {
+      for (const deck of Object.values(withMk2.decks)) {
+        expect(
+          () => checkDockFitsDeck(withMk2, deck.id, dock.id),
+          `${dock.id} ${deck.id}`,
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it("passes the dock checks with both decks docked: landings, posts and areas reached", () => {
+    const dockIssues = validatePhysical(withMk2).filter((i) => i.path[0] === "docks");
+    expect(dockIssues).toEqual([]);
   });
 });

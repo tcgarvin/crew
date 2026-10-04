@@ -16,7 +16,7 @@ import type {
 } from "@crew/sim";
 import { drawBadge, drawCrate, drawLoadedTruck, itemColor, loadedTruckRise } from "./crates";
 import type { DeckLayout } from "./deckLayout";
-import { dockOrigin, dockSlide, withDockSlide } from "./dock";
+import { berthInView, dockOrigin, dockSlide, shipInDock, withDockSlide } from "./dock";
 import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
@@ -37,8 +37,9 @@ import { disc } from "./shapes";
 import { type StarLayer, drawStars } from "./stars";
 
 /**
- * Whether the deck's drawing should be rotated 90° to fill a portrait viewport (task item 5:
- * the deck is landscape 32×18; phones are portrait). Desktop (landscape viewport) never rotates.
+ * Whether the deck's drawing should be turned a quarter (counter-clockwise, bow up) to fill a
+ * portrait viewport (task item 5: the deck is landscape 32×18; phones are portrait). Desktop
+ * (landscape viewport) never rotates.
  */
 export function shouldRotate(
   viewportWidth: number,
@@ -48,17 +49,25 @@ export function shouldRotate(
   return viewportHeight > viewportWidth && layout.width > layout.height;
 }
 
+/** Screen padding around the framed bounds, CSS pixels. */
+export const FIT_PADDING_PX = 12;
+/**
+ * D72: a portrait phone keeps every pixel of its width for the ship: the flight margin and the
+ * dock map's own edges frame the picture, so the padding is a hairline.
+ */
+export const PORTRAIT_FIT_PADDING_PX = 4;
+
 /**
  * Fit `bounds` (tile units) into a CSS-pixel viewport, centred, with padding. When `rotated`, the
  * fit is computed against the viewport's dimensions swapped (the deck is drawn in its own
- * landscape space, then the whole canvas is rotated 90° — see `drawFrame`).
+ * landscape space, then the whole canvas is turned a quarter — see `drawFrame`).
  */
 export function computeFitTransform(
   viewportWidth: number,
   viewportHeight: number,
   bounds: Bounds,
   rotated: boolean,
-  padding = 12,
+  padding = rotated ? PORTRAIT_FIT_PADDING_PX : FIT_PADDING_PX,
 ): ViewTransform {
   const fitW = rotated ? viewportHeight : viewportWidth;
   const fitH = rotated ? viewportWidth : viewportHeight;
@@ -159,35 +168,64 @@ function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: Deck
  * real screen space so text always reads upright (task item 5). Machine labels sit at machine
  * centres, so corner plates keep the two apart.
  */
-function drawCompartmentLabels(
+export function drawCompartmentLabels(
   ctx: CanvasRenderingContext2D,
   t: ViewTransform,
   layout: DeckLayout,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
 ): void {
   if (t.scale <= 8) return;
   const fontPx = Math.max(10, Math.min(14, t.scale * 0.42));
   ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
+  const roomAt = tileRooms(layout);
   for (const [key, name] of Object.entries(layout.compartmentNames)) {
     const box = layout.compartmentBoxes[key];
     if (box === undefined) continue;
-    // Under rotation the screen's top-left of a room is its fit-space bottom-left corner.
+    // Under the counter-clockwise turn the screen's top-left of a room is its fit-space
+    // top-right corner (bow-most, upper side).
     const [x, y] = rotated
-      ? toScreenPx(t, box.minX, box.maxY, true, viewportWidth)
-      : toScreenPx(t, box.minX, box.minY, false, viewportWidth);
+      ? toScreenPx(t, box.maxX, box.minY, true, viewportHeight)
+      : toScreenPx(t, box.minX, box.minY, false, viewportHeight);
     const roomWidthPx = (rotated ? box.maxY - box.minY : box.maxX - box.minX) * t.scale;
     const label = fitText(ctx, name.toUpperCase(), roomWidthPx - 10);
     if (label === "") continue;
     const w = ctx.measureText(label).width + 8;
     const h = fontPx + 4;
+    // D72: the plate stays inside its own room. In a room shorter than the plate on screen, or
+    // one whose bounding-box corner lies in a neighbour, it would cover the neighbour's label.
+    const corners = [
+      [x + 3, y + 3],
+      [x + 2 + w, y + 3],
+      [x + 3, y + 2 + h],
+      [x + 2 + w, y + 2 + h],
+    ] as const;
+    const inRoom = corners.every(([cx, cy]) => {
+      const at = screenToWorld(t, cx, cy, rotated, viewportHeight);
+      return roomAt.get(`${Math.floor(at.x)},${Math.floor(at.y)}`) === key;
+    });
+    if (!inRoom) continue;
     ctx.fillStyle = ROOM_PLATE_BG;
     ctx.fillRect(x + 3, y + 3, w, h);
     ctx.fillStyle = roomStyle(layout.compartmentTags[key]).label;
     ctx.fillText(label, x + 7, y + 3 + h / 2);
   }
+}
+
+const tileRoomCache = new WeakMap<DeckLayout, ReadonlyMap<string, string>>();
+
+/** The compartment of each deck tile, by "x,y". */
+function tileRooms(layout: DeckLayout): ReadonlyMap<string, string> {
+  const cached = tileRoomCache.get(layout);
+  if (cached !== undefined) return cached;
+  const rooms = new Map<string, string>();
+  for (const tile of layout.tiles) {
+    if (tile.compartmentKey !== undefined) rooms.set(`${tile.x},${tile.y}`, tile.compartmentKey);
+  }
+  tileRoomCache.set(layout, rooms);
+  return rooms;
 }
 
 /** Truncate with an ellipsis to fit `maxPx`; "" if not even two characters fit. */
@@ -299,7 +337,7 @@ function drawMachineLabels(
   t: ViewTransform,
   layout: DeckLayout,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
 ): void {
   if (t.scale <= 14) return;
   const fontPx = Math.max(9, Math.min(13, t.scale * 0.3));
@@ -310,7 +348,7 @@ function drawMachineLabels(
   // would overlap one already drawn.
   const placed: { x: number; y: number; w: number }[] = [];
   for (const placement of layout.machines) {
-    const [cx, cy] = toScreenPx(t, placement.center.x, placement.center.y, rotated, viewportWidth);
+    const [cx, cy] = toScreenPx(t, placement.center.x, placement.center.y, rotated, viewportHeight);
     const w = ctx.measureText(placement.name).width + 6;
     if (placed.some((p) => Math.abs(p.x - cx) < (p.w + w) / 2 && Math.abs(p.y - cy) < fontPx + 2)) {
       continue;
@@ -345,12 +383,12 @@ function drawActorDots(
   t: ViewTransform,
   frame: RenderFrame,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
   selectedId?: string,
 ): void {
   const radius = dotRadius(t);
   for (const actor of frame.actors) {
-    const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
+    const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportHeight);
     ctx.fillStyle = actorDotColor(actor);
     disc(ctx, cx, cy, radius);
     if (actor.passenger) {
@@ -437,11 +475,11 @@ export function drawDeckItems(
   layout: DeckLayout,
   frame: RenderFrame,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
   selectedId?: string,
 ): void {
   for (const pile of deckPiles(frame, layout.deckId)) {
-    const [cx, cy] = toScreenPx(t, pile.x, pile.y, rotated, viewportWidth);
+    const [cx, cy] = toScreenPx(t, pile.x, pile.y, rotated, viewportHeight);
     const size = Math.max(pile.top.kind === "crate" ? 10 : 6, t.scale * pile.size);
     // Ship's stores are drawn dimmer than freight so the cargo reads first.
     ctx.globalAlpha = pile.top.kind === "crate" ? 1 : 0.75;
@@ -483,7 +521,7 @@ export function drawCarriedItems(
   t: ViewTransform,
   frame: RenderFrame,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
 ): void {
   const actorsById = new Map(frame.actors.map((a) => [a.id, a] as const));
   const dot = dotRadius(t);
@@ -494,7 +532,7 @@ export function drawCarriedItems(
     if (item.kind !== "crate" && item.kind !== "tool") continue;
     const actor = actorsById.get(item.location.actorId);
     if (actor === undefined) continue;
-    const [ax, ay] = toScreenPx(t, actor.x, actor.y, rotated, viewportWidth);
+    const [ax, ay] = toScreenPx(t, actor.x, actor.y, rotated, viewportHeight);
     const x = ax + dot + small / 2;
     const y = ay - small * 0.35;
     const load = loads.get(item.id);
@@ -597,19 +635,30 @@ export function drawActorLabels(
   frame: RenderFrame,
   rotated: boolean,
   viewportWidth: number,
+  viewportHeight: number,
 ): void {
   const radius = dotRadius(t);
   const fontPx = Math.max(MIN_LABEL_FONT_PX, t.scale * 0.32);
   ctx.font = `${fontPx}px system-ui, sans-serif`;
   ctx.textBaseline = "middle";
 
-  const sorted = personLabels(frame).sort((a, b) => a.x - b.x);
+  // Bottom of the screen first, so a crowded label stacks upward over the labels below it
+  // rather than pushing one of them up past its own dot; the same whichever way the deck turns.
+  const sorted = personLabels(frame)
+    .map((entry) => ({
+      entry,
+      at: toScreenPx(t, entry.x, entry.y, rotated, viewportHeight),
+    }))
+    .sort((a, b) => b.at[1] - a.at[1] || a.at[0] - b.at[0]);
   const placed: { x: number; y: number; w: number }[] = [];
   // A label sits radius + 6 above the dot's centre; a truck's handle rises higher (D68 check).
   const truckLift = Math.max(0, loadedTruckRise(carriedSize(t)) + fontPx / 2 + 4 - radius - 6);
 
-  for (const entry of sorted) {
-    const [dotX, cy] = toScreenPx(t, entry.x, entry.y, rotated, viewportWidth);
+  for (const { entry, at } of sorted) {
+    const [dotX, cy] = at;
+    // D72: a label names a dot the player can see. While the dock slides in, its people are still
+    // off the canvas, and a label clamped onto the edge would float there on its own.
+    if (dotX < 0 || dotX > viewportWidth || cy < 0 || cy > viewportHeight) continue;
     const labelW = ctx.measureText(entry.text).width + 8;
     // Kept on screen: the docked camera puts people on the dock's far edges.
     const cx = Math.max(labelW / 2 + 2, Math.min(viewportWidth - labelW / 2 - 2, dotX));
@@ -619,6 +668,8 @@ export function drawActorLabels(
         labelY = p.y - (fontPx + 4);
       }
     }
+    // Nor off the top, where a crowd near the bow stacks its labels.
+    labelY = Math.max(fontPx / 2 + 2, labelY);
     placed.push({ x: cx, y: labelY, w: labelW });
 
     ctx.fillStyle = LABEL_BG;
@@ -721,12 +772,12 @@ export function drawFrame(
 
   ctx.save();
   if (rotated) {
-    // Draw the deck in its own landscape ("fit") space, then rotate the whole thing 90°
-    // clockwise to fill the portrait canvas (task item 5). See `toScreenPx` for the matching
-    // inverse used to place upright text afterwards, and `screenToWorld` for the matching
-    // inverse used for tap-to-select.
-    ctx.translate(viewportWidth, 0);
-    ctx.rotate(Math.PI / 2);
+    // Draw the deck in its own landscape ("fit") space, then turn the whole thing a quarter
+    // counter-clockwise to fill the portrait canvas (task item 5), so the bow points up (D72,
+    // `orientation.ts`). See `toScreenPx` for the matching mapping used to place upright text
+    // afterwards, and `screenToWorld` for its inverse used for tap-to-select.
+    ctx.translate(0, viewportHeight);
+    ctx.rotate(-Math.PI / 2);
   }
   inTileSpace(ctx, t, () => drawSky(ctx, scene, sceneryFrame));
   drawStars(
@@ -737,11 +788,13 @@ export function drawFrame(
     scene.starSpeed,
     scene.starAlpha,
   );
+  const berth = dock === undefined ? undefined : berthInView(dock, layout);
   const dockPaint: DockPaint | undefined =
-    dock === undefined
+    berth === undefined
       ? undefined
       : {
-          origin: dockOrigin(dock, scene, layout.width),
+          origin: dockOrigin(berth, scene, layout.width),
+          ship: shipInDock(berth, layout),
           alpha: scene.portAlpha,
           clamps: scenery.clamps,
           setting: scene.setting,
@@ -782,23 +835,23 @@ export function drawFrame(
   // Everything with text (and the dots and crates that text and badges sit on) is drawn after
   // `ctx.restore()`, in real screen space, so labels stay upright under rotation (task item 5).
   // They sit above the foreground too, so bay walls and clouds never hide the crew.
-  drawCompartmentLabels(ctx, t, layout, rotated, viewportWidth);
-  drawMachineLabels(ctx, t, layout, rotated, viewportWidth);
+  drawCompartmentLabels(ctx, t, layout, rotated, viewportHeight);
+  drawMachineLabels(ctx, t, layout, rotated, viewportHeight);
   drawDockProps(
     ctx,
     t,
     shown.dockProps,
     rotated,
-    viewportWidth,
+    viewportHeight,
     selectedIdOf(selected, "dockProp"),
   );
-  drawDeckItems(ctx, t, layout, shown, rotated, viewportWidth, selectedIdOf(selected, "item"));
-  drawLocalDots(ctx, t, shown.locals, rotated, viewportWidth, selectedIdOf(selected, "local"));
-  drawActorDots(ctx, t, shown, rotated, viewportWidth, selectedIdOf(selected, "actor"));
-  drawActorLabels(ctx, t, shown, rotated, viewportWidth);
+  drawDeckItems(ctx, t, layout, shown, rotated, viewportHeight, selectedIdOf(selected, "item"));
+  drawLocalDots(ctx, t, shown.locals, rotated, viewportHeight, selectedIdOf(selected, "local"));
+  drawActorDots(ctx, t, shown, rotated, viewportHeight, selectedIdOf(selected, "actor"));
+  drawActorLabels(ctx, t, shown, rotated, viewportWidth, viewportHeight);
   // After the labels: a label plate sits just above the dot and would hide the load.
-  drawCarriedItems(ctx, t, shown, rotated, viewportWidth);
-  drawLocalTrolleys(ctx, t, shown.locals, rotated, viewportWidth);
+  drawCarriedItems(ctx, t, shown, rotated, viewportHeight);
+  drawLocalTrolleys(ctx, t, shown.locals, rotated, viewportHeight);
 }
 
 /**
@@ -810,8 +863,8 @@ export function screenToWorld(
   screenX: number,
   screenY: number,
   rotated: boolean,
-  viewportWidth: number,
+  viewportHeight: number,
 ): { readonly x: number; readonly y: number } {
-  const [lx, ly] = rotated ? [screenY, viewportWidth - screenX] : [screenX, screenY];
+  const [lx, ly] = rotated ? [viewportHeight - screenY, screenX] : [screenX, screenY];
   return { x: (lx - t.offsetX) / t.scale, y: (ly - t.offsetY) / t.scale };
 }

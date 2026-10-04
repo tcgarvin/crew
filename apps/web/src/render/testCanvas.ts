@@ -9,6 +9,8 @@ export interface MockCanvas {
   readonly ctx: CanvasRenderingContext2D;
   /** Calls per method name. */
   readonly calls: ReadonlyMap<string, number>;
+  /** Every `fillText`, in order: what was written and where. */
+  readonly texts: readonly { readonly text: string; readonly x: number; readonly y: number }[];
 }
 
 function checkArgs(method: string, args: readonly unknown[]): void {
@@ -30,6 +32,7 @@ function checkArgs(method: string, args: readonly unknown[]): void {
 export function mockCanvas(): MockCanvas {
   const calls = new Map<string, number>();
   const count = (method: string) => calls.set(method, (calls.get(method) ?? 0) + 1);
+  const texts: { text: string; x: number; y: number }[] = [];
   const gradient = {
     addColorStop(offset: number, color: string) {
       checkArgs("addColorStop", [offset]);
@@ -57,6 +60,9 @@ export function mockCanvas(): MockCanvas {
       return (...args: unknown[]) => {
         checkArgs(prop, args);
         count(prop);
+        if (prop === "fillText") {
+          texts.push({ text: String(args[0]), x: Number(args[1]), y: Number(args[2]) });
+        }
       };
     },
     set(_target, prop, value: unknown) {
@@ -71,5 +77,5 @@ export function mockCanvas(): MockCanvas {
       return true;
     },
   };
-  return { ctx: new Proxy({}, handler) as CanvasRenderingContext2D, calls };
+  return { ctx: new Proxy({}, handler) as CanvasRenderingContext2D, calls, texts };
 }

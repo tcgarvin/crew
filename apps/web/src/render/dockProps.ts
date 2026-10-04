@@ -7,6 +7,7 @@
  */
 import type { DockPaletteDef, DockPropDef, DockPropKind, DockRect, PortSetting } from "@crew/sim";
 import { BLACK, WHITE, hash01, hashKey, mixHex, rgba } from "./color";
+import { foreOf } from "./orientation";
 import { disc, segment } from "./shapes";
 
 export interface PropLook {
@@ -130,14 +131,17 @@ const drawCrane: PropDrawer = (ctx, prop, look) => {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
   const turret = Math.min(r.w, r.h) * 0.3;
-  // The jib swings out over the quay at a fixed angle (fore and toward the berth), with a
-  // counterweight behind the turret and the hook hanging at its tip.
-  const angle = -Math.PI * (0.62 + (prop.rot / 360) * 0.5);
+  // The jib swings out over the quay at a fixed angle (fore, +x, and north toward the berth),
+  // with a counterweight behind the turret and the hook hanging at its tip. `swing` is the angle
+  // up from the fore direction; a rotated prop leans further fore.
+  const swing = Math.PI * (0.38 - (prop.rot / 360) * 0.5);
+  const ux = foreOf(Math.cos(swing));
+  const uy = -Math.sin(swing);
   const reach = Math.max(r.w, r.h) * 1.6;
-  const tipX = cx + Math.cos(angle) * reach;
-  const tipY = cy + Math.sin(angle) * reach;
-  const tailX = cx - Math.cos(angle) * turret * 1.8;
-  const tailY = cy - Math.sin(angle) * turret * 1.8;
+  const tipX = cx + ux * reach;
+  const tipY = cy + uy * reach;
+  const tailX = cx - ux * turret * 1.8;
+  const tailY = cy - uy * turret * 1.8;
   ctx.lineCap = "round";
   ctx.strokeStyle = rgba(BLACK, 0.3);
   ctx.lineWidth = 0.32;
@@ -149,11 +153,11 @@ const drawCrane: PropDrawer = (ctx, prop, look) => {
   ctx.strokeStyle = rgba(BLACK, 0.45);
   ctx.lineWidth = hairline(look, 0.03);
   ctx.beginPath();
-  const nx = -Math.sin(angle) * 0.1;
-  const ny = Math.cos(angle) * 0.1;
+  const nx = -uy * 0.1;
+  const ny = ux * 0.1;
   for (let s = 0, i = 0; s < reach; s += 0.25, i++) {
-    const x = cx + Math.cos(angle) * s;
-    const y = cy + Math.sin(angle) * s;
+    const x = cx + ux * s;
+    const y = cy + uy * s;
     const side = i % 2 === 0 ? 1 : -1;
     if (s === 0) ctx.moveTo(x + nx * side, y + ny * side);
     else ctx.lineTo(x + nx * side, y + ny * side);

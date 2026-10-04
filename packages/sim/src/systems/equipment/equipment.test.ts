@@ -36,6 +36,28 @@ describe("heat, derating and hysteresis", () => {
 
     expect(checkInvariants(world.state)).toEqual([]);
   });
+
+  it("cools at the reduced rate in the same tick the pump overheats and stops", () => {
+    // The coolant index is built once per equipment pass; it must read the pump's live mode, so
+    // a pump ticked (and stopped) earlier in the pass counts as off for the engine after it.
+    const { kernel, world } = w5TestWorld();
+    kernel.advance(world, 20);
+    const pump = byDef(world, W5.pump);
+    const engine = byDef(world, W5.engine);
+    const order = Object.keys(world.state.machines);
+    expect(order.indexOf(pump.id)).toBeLessThan(order.indexOf(engine.id));
+    expect(pump.actualMode).toBe("on");
+    expect(engine.actualMode).toBe("on");
+
+    pump.temperature = 1; // at the failure point: equipment stops it during its own tick
+    engine.temperature = 0.3;
+    kernel.advance(world, 1);
+
+    expect(byDef(world, W5.pump).actualMode).toBe("off");
+    // With the pump counted as running the engine would cool (rise 0.02/s < cool 0.03/s); at the
+    // reduced coolant fraction it warms instead.
+    expect(byDef(world, W5.engine).temperature).toBeGreaterThan(0.3);
+  });
 });
 
 describe("hazard and fault draws", () => {

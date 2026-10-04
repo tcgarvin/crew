@@ -32,6 +32,7 @@ const deck: DeckDef = {
     cargoTransferTiles: [],
     personnelTransferTiles: [],
   },
+  hull: { class: "test_hull", sizeClass: "S" },
   spawnPoints: [],
 };
 
@@ -109,6 +110,7 @@ function stubView(hunger: number, items: KnownItemView[]): AgentView {
     knownProblems: () => [],
     knownTasks: () => [],
     roster: () => [],
+    assignedBeds: () => [],
     knownItems: () => items,
     estimateTravelTicks: (to) => Math.abs(to.x) * 10,
   };

@@ -1,17 +1,39 @@
 /**
  * Dock map validation (Dockside §3.1). L2: the port exists and has one dock, keys are unique, the
  * map has the posts and areas physical port work needs, a planet has a sky, and castSeed posts
- * name real posts. L3: the map's geometry against every deck in the bundle (one ship class
- * today): the berth is exactly the ship's floor at `shipAt`, each ramp lands on walkable floor,
- * posts and areas are walkable and reachable from every landing, and the map fits the size cap.
+ * name real posts. L3: the map's geometry against every deck in the bundle: the berth box (D72)
+ * lies on the map and is all void; the quay row under it is walkable floor across its width
+ * (`checkQuayRow`); for each deck whose class fits the
+ * box, its ramps (the deck placed in the box, `shipAtInBerth`) land on walkable floor outside the
+ * areas and reach every post and area; posts and areas are walkable; the map fits the size cap.
+ * A scenario's ship fits every dock's box (`checkScenarioBerths`). The deck's side of the
+ * contract is `validate-hull.ts`.
  *
  * Walkable dock floor is a `floor` tile under no blocking prop. The sim's nav graft applies the
  * same rule (`dockFloorMask` in `@crew/sim`, which this package may only import as types); a CLI
  * test checks the two agree on every authored dock, and `crew content validate` grafts each dock
  * with the sim's own builder.
  */
-import type { ContentBundle, DeckDef, DockDef, DockRect, PortDef, TileCoord } from "@crew/sim";
-import { SIDE_OFFSET, at, rectContains, rectTiles, tileKey } from "./geometry";
+import type {
+  ContentBundle,
+  DeckDef,
+  DockDef,
+  DockRect,
+  PortDef,
+  ScenarioDef,
+  TileCoord,
+} from "@crew/sim";
+import {
+  HULL_CLASS_BOX,
+  SIDE_OFFSET,
+  at,
+  berthBox,
+  hullFitsBerth,
+  rectContains,
+  rectTiles,
+  shipAtInBerth,
+  tileKey,
+} from "./geometry";
 import { type Path, type ValidationIssue, checkLocalKeyLists, checkRef, issue } from "./issues";
 
 /** Dockside §3.1: ship plus dock stays legible in the docked camera on a phone. */
@@ -306,57 +328,77 @@ function checkPostsAndAreas(dock: DockDef, mask: Uint8Array, issues: ValidationI
   });
 }
 
-/** Deck floor tiles (deck frame). */
-function shipFloor(deck: DeckDef): TileCoord[] {
-  const tiles: TileCoord[] = [];
-  deck.tiles.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) if (row[x] !== " ") tiles.push({ x, y });
-  });
-  return tiles;
-}
-
-/** The ship lies on the map, and the berth tiles are exactly its floor. */
-function checkBerth(dock: DockDef, deck: DeckDef, issues: ValidationIssue[]): boolean {
-  const path: Path = [...dockPath(dock), "shipAt"];
-  const { x: sx, y: sy } = dock.shipAt;
-  if (sx < 0 || sy < 0 || sx + deck.width > dock.width || sy + deck.height > dock.height) {
+/** D72: the berth box lies on the map and every tile of it is authored `void`. */
+function checkBerthBox(dock: DockDef, issues: ValidationIssue[]): boolean {
+  const path: Path = [...dockPath(dock), "berth", "origin"];
+  const { origin, sizeClass } = dock.berth;
+  const rect = berthBox(dock);
+  if (!rectInMap(dock, rect)) {
     issues.push(
       issue(
         "physical",
         path,
-        `"${deck.id}" (${deck.width} x ${deck.height}) at ${at(dock.shipAt)} does not fit on the ${dock.width} x ${dock.height} map`,
+        `the ${sizeClass} berth box (${rect.w} x ${rect.h}) at ${at(origin)} does not fit on the ${dock.width} x ${dock.height} map`,
       ),
     );
     return false;
   }
-  const under = new Set(shipFloor(deck).map((t) => tileKey({ x: t.x + sx, y: t.y + sy })));
-  for (let y = 0; y < dock.height; y++) {
-    for (let x = 0; x < dock.width; x++) {
-      const berth = tileKind(dock, { x, y }) === "berth";
-      if (berth !== under.has(tileKey({ x, y }))) {
-        const message = berth
-          ? `berth at ${at({ x, y })} is not under "${deck.id}" docked at ${at(dock.shipAt)}`
-          : `${at({ x, y })} is under "${deck.id}" docked at ${at(dock.shipAt)} but is not berth`;
-        issues.push(issue("physical", path, message));
-        return false;
-      }
-    }
+  const solid = rectTiles(rect).find((t) => tileKind(dock, t) !== "void");
+  if (solid !== undefined) {
+    const kind = tileKind(dock, solid) ?? "undeclared";
+    issues.push(issue("physical", path, `berth box tile ${at(solid)} is ${kind}, not void`));
+    return false;
   }
   return true;
 }
 
-/** Dock-frame tile just outside each ramp door of the deck, docked at `shipAt`. */
+/**
+ * L3 (D72): the quay row, just south of the berth box, is walkable floor across the box's whole
+ * width, so a ramp anywhere along a hull of the box's class lands on the quay. Expects a usable
+ * grid and a box on the map (`checkDockPhysical` checks both first); a quay row off the map is
+ * reported as off the map.
+ */
+export function checkQuayRow(dock: DockDef, issues: ValidationIssue[]): void {
+  const mask = dockWalkableMask(dock);
+  const rect = berthBox(dock);
+  const y = rect.y + rect.h;
+  const gaps = rectTiles({ x: rect.x, y, w: rect.w, h: 1 }).filter((t) => !walkable(dock, mask, t));
+  const [first] = gaps;
+  if (first === undefined) return;
+  const more = gaps.length > 1 ? ` (and ${gaps.length - 1} more)` : "";
+  issues.push(
+    issue(
+      "physical",
+      [...dockPath(dock), "berth", "origin"],
+      `quay row ${y} under the berth box: ${at(first)} is ${describeTile(dock, first)}, not walkable floor${more}`,
+    ),
+  );
+}
+
+/**
+ * Whether `deck` can lie in `dock`'s box. A deck over its own class box is the hull contract's to
+ * report; a class bigger than the box cannot berth here, which `checkScenarioBerths` makes an error
+ * for any scenario's ship.
+ */
+function deckBerthsAt(dock: DockDef, deck: DeckDef): boolean {
+  const own = HULL_CLASS_BOX[deck.hull.sizeClass];
+  const withinOwnClass = deck.width <= own.w && deck.height <= own.h;
+  return withinOwnClass && hullFitsBerth(deck.hull.sizeClass, dock.berth.sizeClass);
+}
+
+/** Dock-frame tile just outside each ramp door of the deck, lying in the dock's berth box. */
 export function dockRampLandings(
   dock: DockDef,
   deck: DeckDef,
 ): { readonly key: string; readonly tile: TileCoord }[] {
+  const shipAt = shipAtInBerth(dock, deck);
   return deck.doors
     .filter((door) => door.kind === "ramp")
     .map((door) => {
       const d = SIDE_OFFSET[door.edge.side];
       return {
         key: door.key,
-        tile: { x: door.edge.x + d.x + dock.shipAt.x, y: door.edge.y + d.y + dock.shipAt.y },
+        tile: { x: door.edge.x + d.x + shipAt.x, y: door.edge.y + d.y + shipAt.y },
       };
     });
 }
@@ -392,7 +434,7 @@ function checkLandings(
       issues.push(
         issue(
           "physical",
-          [...path, "shipAt"],
+          [...path, "berth"],
           `${where}, which is ${describeTile(dock, landing.tile)}`,
         ),
       );
@@ -440,7 +482,29 @@ export function checkDockPhysical(
   checkPlacements(dock, issues);
   const mask = dockWalkableMask(dock);
   checkPostsAndAreas(dock, mask, issues);
+  if (!checkBerthBox(dock, issues)) return;
+  checkQuayRow(dock, issues);
   for (const deck of Object.values(bundle.decks)) {
-    if (checkBerth(dock, deck, issues)) checkLandings(dock, deck, mask, issues);
+    if (deckBerthsAt(dock, deck)) checkLandings(dock, deck, mask, issues);
+  }
+}
+
+/** L3 (D72): a scenario's ship can berth at every dock, its class fitting each berth box. */
+export function checkScenarioBerths(
+  scenario: ScenarioDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const deck = bundle.decks[scenario.deckId];
+  if (deck === undefined) return; // L2 reports an unknown deck
+  for (const dock of Object.values(bundle.docks ?? {})) {
+    if (hullFitsBerth(deck.hull.sizeClass, dock.berth.sizeClass)) continue;
+    issues.push(
+      issue(
+        "physical",
+        ["scenarios", scenario.id, "deckId"],
+        `"${deck.id}" (class ${deck.hull.sizeClass}) cannot berth at "${dock.id}" (an ${dock.berth.sizeClass} box)`,
+      ),
+    );
   }
 }

@@ -2,8 +2,10 @@ import {
   DOCK_FOREGROUND_KINDS,
   DOCK_POST_KINDS,
   DOCK_PROP_KINDS,
+  type DeckDefId,
   type DockDef,
   type DockPropDef,
+  HULL_SIZE_BOX,
   type LocalKey,
   type PortDefId,
   type PortSetting,
@@ -15,7 +17,7 @@ import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
-import { clampEngagement, dockInView } from "./dock";
+import { berthInView, clampEngagement, dockInView, shipInDock } from "./dock";
 import { drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
 import { dockShape, dockSurface } from "./dockShape";
@@ -31,6 +33,10 @@ if (scenario === undefined) throw new Error("no scenario");
 const deck = bundle.decks[scenario.deckId];
 if (deck === undefined) throw new Error("no deck");
 const layout = buildDeckLayout(deck, bundle);
+// Mk1 is the deck smaller than the M berth box (Mk2, the scenario's, fills it).
+const mk1 = bundle.decks["deck.freighter_mk1" as DeckDefId];
+if (mk1 === undefined) throw new Error("no Mk1 deck");
+const mk1Layout = buildDeckLayout(mk1, bundle);
 const hull = hullGeometry(layout);
 const stars = buildStarField();
 const docks = bundle.docks ?? {};
@@ -61,7 +67,8 @@ function travel(state: TravelStage, progress: number, from: string, to: string):
 
 /** A frame with somebody at every post, a crate in each area and the ramps down. */
 function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
-  const at = (x: number, y: number) => ({ x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 });
+  const { shipAt } = berthInView(dock, layout);
+  const at = (x: number, y: number) => ({ x: x - shipAt.x + 0.5, y: y - shipAt.y + 0.5 });
   return {
     tick: 0 as RenderFrame["tick"],
     actors: dock.posts.map((post, i) => ({
@@ -120,7 +127,7 @@ function render(
   const transform = computeFitTransform(
     width,
     height,
-    cameraBounds(hull, shown, scene.cameraT),
+    cameraBounds(hull, shown === undefined ? undefined : berthInView(shown, layout), scene.cameraT),
     rotated,
   );
   drawFrame(
@@ -179,8 +186,10 @@ describe("every authored dock draws", () => {
 describe("dock layers on their own", () => {
   for (const dock of allDocks) {
     it(`${dock.id}: map and foreground draw, and skip entirely when faded out`, () => {
+      const berth = berthInView(dock, layout);
       const paint = {
-        origin: { x: -dock.shipAt.x, y: -dock.shipAt.y },
+        origin: { x: -berth.shipAt.x, y: -berth.shipAt.y },
+        ship: shipInDock(berth, layout),
         alpha: 1,
         clamps: 1,
         px: 0.05,
@@ -278,8 +287,10 @@ describe("dock layers on their own", () => {
         rect: { x: i * 3, y: 0, w: i % 2 === 0 ? 3 : 1, h: i % 2 === 0 ? 1 : 6 },
       })),
     };
+    const berth = berthInView(dock, layout);
     const paint = {
-      origin: { x: -dock.shipAt.x, y: -dock.shipAt.y },
+      origin: { x: -berth.shipAt.x, y: -berth.shipAt.y },
+      ship: shipInDock(berth, layout),
       alpha: 1,
       clamps: 0.5,
       px: 0.05,
@@ -296,14 +307,15 @@ describe("dock layers on their own", () => {
 });
 
 describe("dockShape", () => {
-  it("finds the berth as the ship's footprint in every map", () => {
+  it("finds the berth as the map's berth box in every map (D72)", () => {
     for (const dock of allDocks) {
       const { berth } = dockShape(dock);
+      const { origin, sizeClass } = dock.berth;
       expect(berth, dock.id).toEqual({
-        minX: dock.shipAt.x,
-        minY: dock.shipAt.y,
-        maxX: dock.shipAt.x + layout.width,
-        maxY: dock.shipAt.y + layout.height,
+        minX: origin.x,
+        minY: origin.y,
+        maxX: origin.x + HULL_SIZE_BOX[sizeClass].w,
+        maxY: origin.y + HULL_SIZE_BOX[sizeClass].h,
       });
     }
   });
@@ -315,12 +327,13 @@ describe("dockShape", () => {
       const shape = dockShape(dock);
       return { ...shape, ...dockSurface(shape, settingOf(dock)) };
     };
-    // A farming world's pad set into the field; a pier out into open sky.
+    // A farming world's pad set into the field.
     expect(byPort("port.green_meridian")).toMatchObject({
       berthStyle: "pad",
       floorPattern: "slabs",
       overSky: false,
     });
+    // A pier out into open sky.
     expect(byPort("port.terns_rest")).toMatchObject({
       berthStyle: "open",
       floorPattern: "planks",
@@ -331,5 +344,67 @@ describe("dockShape", () => {
     }
     // Every map has a quay edge the ramps come down onto.
     for (const dock of allDocks) expect(dockShape(dock).quay.length, dock.id).toBeGreaterThan(0);
+  });
+
+  /** A 40×26 map with an M box at (2,2) and 4 rows of quay, `ring` round the box's other sides. */
+  function ringedDock(ring: "." | "#" | " "): DockDef {
+    const base = allDocks[0];
+    if (base === undefined) throw new Error("no docks");
+    const box = HULL_SIZE_BOX.M;
+    const rows = Array.from({ length: 26 }, (_, y) =>
+      Array.from({ length: 40 }, (_, x) => {
+        const inBox = x >= 2 && x < 2 + box.w && y >= 2 && y < 2 + box.h;
+        if (inBox) return " ";
+        return y >= 2 + box.h ? "." : ring;
+      }).join(""),
+    );
+    return {
+      ...base,
+      width: 40,
+      height: 26,
+      rows,
+      legend: { ".": "floor", "#": "wall", " ": "void" },
+      berth: { origin: { x: 2, y: 2 }, sizeClass: "M" },
+    };
+  }
+
+  it("reads the berth box as a pad when ground surrounds it, open otherwise (D72)", () => {
+    // The quay along the south edge is always floor: only the other three sides decide.
+    expect(dockShape(ringedDock(".")).berthStyle).toBe("pad");
+    expect(dockShape(ringedDock("#")).berthStyle).toBe("open");
+    expect(dockShape(ringedDock(" ")).berthStyle).toBe("open");
+  });
+
+  it("draws the pad over the whole box, round a ship smaller than it", () => {
+    const dock = ringedDock(".");
+    const shape = dockShape(dock);
+    const fills: number[][] = [];
+    const { ctx } = mockCanvas();
+    const recording = new Proxy(ctx, {
+      get(target, prop) {
+        if (prop === "fillRect") return (...args: number[]) => fills.push(args);
+        const value = Reflect.get(target, prop);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const berth = berthInView(dock, mk1Layout);
+    drawDock(recording, dock, {
+      origin: { x: 0, y: 0 },
+      ship: shipInDock(berth, mk1Layout),
+      alpha: 1,
+      clamps: 1,
+      px: 0.05,
+      view: { minX: -10, minY: -10, maxX: 60, maxY: 40 },
+      enclosure: 0,
+      setting: "planet",
+    });
+    const { minX, minY, maxX, maxY } = shape.berth;
+    const apron = fills.find(
+      ([x, y, w, h]) =>
+        x === minX && y === minY && Math.abs((w ?? 0) - (maxX - minX)) < 0.1 && (h ?? 0) > 1,
+    );
+    expect(apron?.[3]).toBeCloseTo(maxY - minY, 0);
+    // Mk1 is smaller than the M box, so the pad shows round it.
+    expect(mk1Layout.width).toBeLessThan(maxX - minX);
   });
 });

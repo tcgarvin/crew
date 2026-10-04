@@ -264,6 +264,7 @@ export function exampleWorldState(): WorldState {
         jobId: j1,
       },
     },
+    berths: {},
     work: {
       problems: {
         [p1]: {

@@ -12,7 +12,8 @@
  * - tasks: live tasks of those problems. Claims are public in V1 (W4a decision, see
  *   `systems/work/claims.ts`): `knownClaimantId` is another actor holding a claim;
  * - items: `itemLocation` beliefs joined with the item's static definition;
- * - schematic + roster: static layout and who is aboard with trained skills.
+ * - schematic + roster: static layout and who is aboard with trained skills;
+ * - berths (D74): the actor's own bed (`self.berth`) and every assigned bed (`assignedBeds`).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
@@ -20,9 +21,10 @@
  */
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
-import type { ActorId, EntityId, ItemId, ProblemId } from "../core/types/ids";
+import type { DeckDef, MachinePlacementDef } from "../core/types/content";
+import type { ActorId, EntityId, ItemId, MachineId, ProblemId } from "../core/types/ids";
 import type { World } from "../core/types/kernel";
-import type { DeckGeometry } from "../core/types/nav";
+import type { DeckGeometry, NavInteractionPosition } from "../core/types/nav";
 import type { ReadonlyWorldState } from "../core/types/pipeline";
 import type {
   AgentView,
@@ -68,6 +70,87 @@ function inventoryOf(state: ReadonlyWorldState, actorId: ActorId): InventoryEntr
   return out;
 }
 
+/**
+ * D74: the machine of the actor's berth (`state.berths`), on the deck the view is built for.
+ * Throws if the key names no machine there, which the needs invariants rule out.
+ */
+function berthOf(
+  state: World["state"],
+  actorId: ReadonlyActor["id"],
+  deckId: DeckGeometry["deckId"],
+): SelfView["berth"] {
+  const key = state.berths[actorId];
+  if (key === undefined) return undefined;
+  return { machineId: bedMachine(state, key, deckId) };
+}
+
+function bedMachine(
+  state: World["state"],
+  key: World["state"]["berths"][ActorId],
+  deckId: DeckGeometry["deckId"],
+): MachineId {
+  const machine = Object.values(state.machines).find(
+    (m) => m.deckId === deckId && m.placementKey === key,
+  );
+  if (machine === undefined) throw new Error(`Berth "${key}" is no machine on ${deckId}`);
+  return machine.id;
+}
+
+/**
+ * D74: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`): one pass
+ * over the machines rather than one per berth, with `bedMachine`'s first match and its error.
+ */
+function assignedBeds(state: World["state"], deckId: DeckGeometry["deckId"]): MachineId[] {
+  const byKey = new Map<string, MachineId>();
+  for (const machine of Object.values(state.machines)) {
+    if (machine.deckId !== deckId || byKey.has(machine.placementKey)) continue;
+    byKey.set(machine.placementKey, machine.id);
+  }
+  return Object.values(state.berths).map((key) => {
+    const machineId = byKey.get(key);
+    if (machineId === undefined) throw new Error(`Berth "${key}" is no machine on ${deckId}`);
+    return machineId;
+  });
+}
+
+/** Placements by key per deck def; content is immutable, so never stale (first key wins). */
+const placementsByDeck = new WeakMap<DeckDef, ReadonlyMap<string, MachinePlacementDef>>();
+
+function placementsByKey(deck: DeckDef): ReadonlyMap<string, MachinePlacementDef> {
+  const cached = placementsByDeck.get(deck);
+  if (cached !== undefined) return cached;
+  const byKey = new Map<string, MachinePlacementDef>();
+  for (const placement of deck.machines) {
+    if (!byKey.has(placement.key)) byKey.set(placement.key, placement);
+  }
+  placementsByDeck.set(deck, byKey);
+  return byKey;
+}
+
+/**
+ * Interaction positions by machine, in geometry order, per built geometry. A geometry's positions
+ * are fixed when it is built and a rebuild makes a new object, so the entry cannot go stale.
+ */
+const interactionsByGeometry = new WeakMap<
+  DeckGeometry,
+  ReadonlyMap<MachineId, readonly NavInteractionPosition[]>
+>();
+
+function interactionsByMachine(
+  geometry: DeckGeometry,
+): ReadonlyMap<MachineId, readonly NavInteractionPosition[]> {
+  const cached = interactionsByGeometry.get(geometry);
+  if (cached !== undefined) return cached;
+  const byMachine = new Map<MachineId, NavInteractionPosition[]>();
+  for (const position of geometry.interactionPositions) {
+    const list = byMachine.get(position.machineId);
+    if (list === undefined) byMachine.set(position.machineId, [position]);
+    else list.push(position);
+  }
+  interactionsByGeometry.set(geometry, byMachine);
+  return byMachine;
+}
+
 function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
   const { state } = world;
   const config = world.config.values;
@@ -75,6 +158,7 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
   const onDeck = location.kind === "onDeck";
   const tile = onDeck ? tileOf(location) : undefined;
   const compartmentId = onDeck ? compartmentAt(geometry, location.x, location.y) : undefined;
+  const berth = berthOf(state, actor.id, geometry.deckId);
   return {
     id: actor.id,
     name: actor.name,
@@ -94,6 +178,7 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     ...(actor.workBackoff === undefined ? {} : { backoff: actor.workBackoff }),
     ...(actor.passenger === true ? { passenger: true as const } : {}),
     ...(actor.disembarking === true ? { disembarking: true as const } : {}),
+    ...(berth === undefined ? {} : { berth }),
   };
 }
 
@@ -105,10 +190,12 @@ function buildSchematic(world: World, geometry: DeckGeometry): SchematicView {
   const allMachines = (): MachinePlacementView[] => {
     if (machines !== undefined) return machines;
     machines = [];
+    const placements = placementsByKey(deck);
+    const interactions = interactionsByMachine(geometry);
     for (const machine of Object.values(state.machines)) {
       if (machine.deckId !== geometry.deckId) continue;
       const def = content.machines[machine.defId];
-      const placement = deck.machines.find((p) => p.key === machine.placementKey);
+      const placement = placements.get(machine.placementKey);
       if (def === undefined || placement === undefined) continue;
       machines.push({
         machineId: machine.id,
@@ -118,9 +205,10 @@ function buildSchematic(world: World, geometry: DeckGeometry): SchematicView {
           const r = rotateOffset(offset, placement.rotation);
           return { x: placement.origin.x + r.x, y: placement.origin.y + r.y };
         }),
-        interactionTiles: geometry.interactionPositions
-          .filter((p) => p.machineId === machine.id)
-          .map((p) => ({ tile: p.tile, purposes: p.purposes })),
+        interactionTiles: (interactions.get(machine.id) ?? []).map((p) => ({
+          tile: p.tile,
+          purposes: p.purposes,
+        })),
       });
     }
     return machines;
@@ -262,6 +350,7 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
       [...problemsKnown()].map((id) => state.work.problems[id]).filter((p) => p !== undefined),
     knownTasks: () => knownTasks(state, actor, problemsKnown()),
     roster: () => roster(state),
+    assignedBeds: () => assignedBeds(state, geometry.deckId),
     knownItems: () => knownItems(world, actor),
     estimateTravelTicks: (to: TileCoord, from?: TileCoord) => {
       const start = from ?? self.tile;

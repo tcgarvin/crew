@@ -4,17 +4,20 @@
  * share one implementation. `systems/spatial` grafts the walkable floor this module defines onto
  * the deck's nav grid (`geometry.ts`, `dock.ts`).
  *
- * Frames: a dock map has its own tile frame; the ship's deck tile (0,0) sits on dock tile
- * `shipAt`, so dock tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y). Everything in state
- * is in the deck frame.
+ * Frames: a dock map has its own tile frame. The ship lies in the map's berth box (D72), at the
+ * place `berthPlacement` derives from the box and the deck: the ship's deck tile (0,0) sits on
+ * dock tile `shipAt`, so dock tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y). A
+ * `BerthedDock` carries a map with that place; everything in state is in the deck frame.
  */
 import type { EdgeSide, PhysicalLocation, TileCoord } from "./types/common";
-import type {
-  ContentBundle,
-  DockAreaKind,
-  DockDef,
-  DockPostDef,
-  DockPostKind,
+import {
+  type ContentBundle,
+  type DeckDef,
+  type DockAreaKind,
+  type DockDef,
+  type DockPostDef,
+  type DockPostKind,
+  HULL_SIZE_BOX,
 } from "./types/content";
 import type { PortDefId } from "./types/ids";
 import type { DockPresence } from "./types/ship";
@@ -22,6 +25,61 @@ import type { TravelState } from "./types/travel";
 
 /** The slice of state that says which dock, if any, is alongside. */
 type DockHost = { readonly deck: { readonly dock?: DockPresence } };
+
+/** The content a dock's frame needs: the maps, and the decks whose footprint places the ship. */
+type DockContent = Pick<ContentBundle, "docks" | "decks">;
+
+/** D72: a dock map with the ship's place in it, derived from the berth box and the deck. */
+export interface BerthedDock {
+  readonly dock: DockDef;
+  /** Dock tile under deck tile (0,0). */
+  readonly shipAt: TileCoord;
+}
+
+/** What placing a ship in a berth reads from its deck: the footprint and its size class. */
+export type BerthingDeck = Pick<DeckDef, "id" | "width" | "height" | "hull">;
+
+/**
+ * D72: where `deck` lies in `dock`'s berth box (the dock tile under deck tile (0,0)): flush to
+ * the box's south edge, the quay side, and centred across it (a remainder tile goes east). Throws
+ * if the deck is larger than its own size class, or its class larger than the box's, which
+ * content validation rules out for authored content.
+ */
+export function berthPlacement(dock: Pick<DockDef, "id" | "berth">, deck: BerthingDeck): TileCoord {
+  const own = HULL_SIZE_BOX[deck.hull.sizeClass];
+  if (deck.width > own.w || deck.height > own.h) {
+    throw new Error(
+      `Deck "${deck.id}" (${deck.width} x ${deck.height}) exceeds its ${deck.hull.sizeClass} box (${own.w} x ${own.h})`,
+    );
+  }
+  const box = HULL_SIZE_BOX[dock.berth.sizeClass];
+  if (own.w > box.w || own.h > box.h) {
+    throw new Error(
+      `Dock "${dock.id}": a ${dock.berth.sizeClass} berth cannot take "${deck.id}" (class ${deck.hull.sizeClass})`,
+    );
+  }
+  const { origin } = dock.berth;
+  return {
+    x: origin.x + Math.floor((box.w - deck.width) / 2),
+    y: origin.y + box.h - deck.height,
+  };
+}
+
+const berthed = new WeakMap<DockDef, WeakMap<BerthingDeck, BerthedDock>>();
+
+/** `dock` with `deck` in its berth. Memoized per pair (defs are immutable). */
+export function berthDock(dock: DockDef, deck: BerthingDeck): BerthedDock {
+  let byDeck = berthed.get(dock);
+  if (byDeck === undefined) {
+    byDeck = new WeakMap();
+    berthed.set(dock, byDeck);
+  }
+  const cached = byDeck.get(deck);
+  if (cached !== undefined) return cached;
+  const value: BerthedDock = { dock, shipAt: berthPlacement(dock, deck) };
+  byDeck.set(deck, value);
+  return value;
+}
 
 const floorMasks = new WeakMap<DockDef, Uint8Array>();
 
@@ -71,18 +129,18 @@ export function isDockFloor(dock: DockDef, x: number, y: number): boolean {
   return dockFloorMask(dock)[y * dock.width + x] === 1;
 }
 
-/** Is deck-frame tile `tile` walkable floor of `dock`? */
-export function isDockFloorAt(dock: DockDef, tile: TileCoord): boolean {
-  return isDockFloor(dock, tile.x + dock.shipAt.x, tile.y + dock.shipAt.y);
+/** Is deck-frame tile `tile` walkable floor of the berthed dock? */
+export function isDockFloorAt(berth: BerthedDock, tile: TileCoord): boolean {
+  return isDockFloor(berth.dock, tile.x + berth.shipAt.x, tile.y + berth.shipAt.y);
 }
 
 /** Dock-frame tile → deck-frame tile. */
-export function dockToDeck(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
+export function dockToDeck(layout: Pick<BerthedDock, "shipAt">, tile: TileCoord): TileCoord {
   return { x: tile.x - layout.shipAt.x, y: tile.y - layout.shipAt.y };
 }
 
 /** Deck-frame tile → dock-frame tile. */
-export function deckToDock(layout: Pick<DockDef, "shipAt">, tile: TileCoord): TileCoord {
+export function deckToDock(layout: Pick<BerthedDock, "shipAt">, tile: TileCoord): TileCoord {
   return { x: tile.x + layout.shipAt.x, y: tile.y + layout.shipAt.y };
 }
 
@@ -133,14 +191,9 @@ export function expectedDock(
 }
 
 /** Is deck-frame point (x, y) on the floor of the dock alongside? False with no dock attached. */
-export function isDockPoint(
-  content: Pick<ContentBundle, "docks">,
-  state: DockHost,
-  x: number,
-  y: number,
-): boolean {
-  const dock = dockAlongside(content, state);
-  return dock !== undefined && isDockFloorAt(dock, { x: Math.floor(x), y: Math.floor(y) });
+export function isDockPoint(content: DockContent, state: DockHost, x: number, y: number): boolean {
+  const berth = dockAlongside(content, state);
+  return berth !== undefined && isDockFloorAt(berth, { x: Math.floor(x), y: Math.floor(y) });
 }
 
 /**
@@ -149,7 +202,7 @@ export function isDockPoint(
  * With the graft (D59), `onDeck` alone no longer means aboard.
  */
 export function isOnDock(
-  content: Pick<ContentBundle, "docks">,
+  content: DockContent,
   state: DockHost,
   location: PhysicalLocation,
 ): boolean {
@@ -163,48 +216,50 @@ export function isOnDock(
 // Posts and areas (D63): where port work happens on the dock, in the deck frame
 // ---------------------------------------------------------------------------------------------
 
-/** The dock alongside right now (`state.deck.dock`), if any. Throws if content lost its map. */
-export function dockAlongside(
-  content: Pick<ContentBundle, "docks">,
-  state: DockHost,
-): DockDef | undefined {
+/**
+ * The dock alongside right now (`state.deck.dock`), if any, with the ship's deck in its berth.
+ * Throws if content lost the map or the deck.
+ */
+export function dockAlongside(content: DockContent, state: DockHost): BerthedDock | undefined {
   const presence = state.deck.dock;
   if (presence === undefined) return undefined;
   const dock = content.docks?.[presence.dockId];
   if (dock === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
-  return dock;
+  const deck = content.decks[presence.deckId];
+  if (deck === undefined) throw new Error(`No deck "${presence.deckId}" in content`);
+  return berthDock(dock, deck);
 }
 
 /** The dock alongside if it is `portId`'s, else undefined (no dock, or another port's). */
 export function dockAlongsideAt(
-  content: Pick<ContentBundle, "docks">,
+  content: DockContent,
   state: DockHost,
   portId: PortDefId,
-): DockDef | undefined {
-  const dock = dockAlongside(content, state);
-  return dock?.portId === portId ? dock : undefined;
+): BerthedDock | undefined {
+  const berth = dockAlongside(content, state);
+  return berth?.dock.portId === portId ? berth : undefined;
 }
 
 /**
  * Every tile of the dock's first area of `kind`, deck frame, row by row. Empty when the map has
  * none (content validation requires one staging area and one delivery bay per authored dock).
  */
-export function dockAreaTiles(dock: DockDef, kind: DockAreaKind): TileCoord[] {
-  const area = dock.areas.find((a) => a.kind === kind);
+export function dockAreaTiles(berth: BerthedDock, kind: DockAreaKind): TileCoord[] {
+  const area = berth.dock.areas.find((a) => a.kind === kind);
   if (area === undefined) return [];
   const tiles: TileCoord[] = [];
   const { x, y, w, h } = area.rect;
   for (let dy = 0; dy < h; dy++) {
-    for (let dx = 0; dx < w; dx++) tiles.push(dockToDeck(dock, { x: x + dx, y: y + dy }));
+    for (let dx = 0; dx < w; dx++) tiles.push(dockToDeck(berth, { x: x + dx, y: y + dy }));
   }
   return tiles;
 }
 
 /** Is deck-frame point (x, y) inside the dock's first area of `kind`? */
-function inDockArea(dock: DockDef, kind: DockAreaKind, x: number, y: number): boolean {
-  const area = dock.areas.find((a) => a.kind === kind);
+function inDockArea(berth: BerthedDock, kind: DockAreaKind, x: number, y: number): boolean {
+  const area = berth.dock.areas.find((a) => a.kind === kind);
   if (area === undefined) return false;
-  const tile = deckToDock(dock, { x: Math.floor(x), y: Math.floor(y) });
+  const tile = deckToDock(berth, { x: Math.floor(x), y: Math.floor(y) });
   const { rect } = area;
   return (
     tile.x >= rect.x && tile.x < rect.x + rect.w && tile.y >= rect.y && tile.y < rect.y + rect.h
@@ -216,7 +271,7 @@ function inDockArea(dock: DockDef, kind: DockAreaKind, x: number, y: number): bo
  * delivery bay's custody check (D63) and the narrator's "On the dock" lines read it.
  */
 export function isInDockArea(
-  content: Pick<ContentBundle, "docks">,
+  content: DockContent,
   state: DockHost,
   location: PhysicalLocation,
   kind: DockAreaKind,
@@ -224,8 +279,8 @@ export function isInDockArea(
   if (location.kind !== "onDeck") return false;
   const presence = state.deck.dock;
   if (presence === undefined || location.deckId !== presence.deckId) return false;
-  const dock = dockAlongside(content, state);
-  return dock !== undefined && inDockArea(dock, kind, location.x, location.y);
+  const berth = dockAlongside(content, state);
+  return berth !== undefined && inDockArea(berth, kind, location.x, location.y);
 }
 
 /** The dock's first post of `kind`, if it has one (a dock may have no market stall). */
@@ -246,26 +301,26 @@ export const EDGE_STEP: Readonly<Record<EdgeSide, TileCoord>> = {
  * counter's customer side), or the post's own tile if that one is not walkable. Keeps the post
  * tile itself free for whoever works there (locals, phase 3).
  */
-export function postServiceTile(dock: DockDef, post: DockPostDef): TileCoord {
+export function postServiceTile(berth: BerthedDock, post: DockPostDef): TileCoord {
   const step = EDGE_STEP[post.facing];
   const front = { x: post.tile.x + step.x, y: post.tile.y + step.y };
-  return dockToDeck(dock, isDockFloor(dock, front.x, front.y) ? front : post.tile);
+  return dockToDeck(berth, isDockFloor(berth.dock, front.x, front.y) ? front : post.tile);
 }
 
 /** A post's own tile, deck frame (the gate: where someone walks out of the simulated world). */
-export function postTile(dock: DockDef, post: DockPostDef): TileCoord {
-  return dockToDeck(dock, post.tile);
+export function postTile(berth: Pick<BerthedDock, "shipAt">, post: DockPostDef): TileCoord {
+  return dockToDeck(berth, post.tile);
 }
 
 /** The gate tile of the dock alongside at `portId`, deck frame, if that dock has a gate. */
 export function gateTileAt(
-  content: Pick<ContentBundle, "docks">,
+  content: DockContent,
   state: DockHost,
   portId: PortDefId,
 ): TileCoord | undefined {
-  const dock = dockAlongsideAt(content, state, portId);
-  const gate = dock === undefined ? undefined : dockPost(dock, "gate");
-  return dock === undefined || gate === undefined ? undefined : postTile(dock, gate);
+  const berth = dockAlongsideAt(content, state, portId);
+  const gate = berth === undefined ? undefined : dockPost(berth.dock, "gate");
+  return berth === undefined || gate === undefined ? undefined : postTile(berth, gate);
 }
 
 /**
@@ -283,14 +338,14 @@ type MarketCounter =
   | { readonly kind: "transferTile" };
 
 export function marketCounter(
-  content: Pick<ContentBundle, "docks">,
+  content: DockContent,
   state: DockHost,
   portId: PortDefId,
 ): MarketCounter {
-  const dock = dockAlongsideAt(content, state, portId);
-  if (dock === undefined) return { kind: "transferTile" };
-  const stall = dockPost(dock, "marketStall");
-  if (stall !== undefined) return { kind: "stall", tile: postServiceTile(dock, stall) };
+  const berth = dockAlongsideAt(content, state, portId);
+  if (berth === undefined) return { kind: "transferTile" };
+  const stall = dockPost(berth.dock, "marketStall");
+  if (stall !== undefined) return { kind: "stall", tile: postServiceTile(berth, stall) };
   const gate = gateTileAt(content, state, portId);
   return gate === undefined ? { kind: "transferTile" } : { kind: "gate", tile: gate };
 }

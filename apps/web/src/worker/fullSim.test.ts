@@ -188,7 +188,10 @@ const count = (log: RunLog, type: SimEvent["type"]) =>
  * crates jumped aboard at the ramp; the crew's-day case runs until the ship has left its second
  * port (the pilot only gets up from the helm once it is under way again). D65: with the hand
  * truck the second call is shorter and the ship is at a third port by seven minutes, the pilot
- * back at the helm before anything else came up; by eight it has left that one too.
+ * back at the helm before anything else came up; by eight it has left that one too. D73: on
+ * Freighter Mk2 with nine crew this seed draws an engine controller fault on the first leg, so the
+ * ship drifts for about two minutes and reaches the third port at about 7.6 minutes; both dock
+ * dressings (Green Meridian, Kessler Drift) still fall inside the eight.
  */
 const EIGHT_MINUTES = TICK_RATE * 480;
 
@@ -256,7 +259,7 @@ describe(
       expect(count(log, "faultRepaired")).toBeGreaterThanOrEqual(1);
 
       // The crew's day: everyone does at least three different things.
-      expect(log.labels.size).toBe(8);
+      expect(log.labels.size).toBe(9);
       for (const [actorId, labels] of log.labels) {
         expect(labels.size, `${actorId}: ${[...labels].join(" | ")}`).toBeGreaterThanOrEqual(3);
       }

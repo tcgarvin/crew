@@ -28,6 +28,7 @@ import type {
   VoyageFields,
 } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
+import { shipDeckId } from "../../core/world";
 import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
 import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
@@ -66,11 +67,12 @@ function propulsionFactor(ctx: Pick<StepCtx, "state" | "content">): number {
 // Ramps and staffing (departure/docking preconditions)
 // ---------------------------------------------------------------------------------------------
 
-/** V1 is single-ship/single-deck (common.ts W0 decision); the one deck the ship uses. */
-export function theDeckId(ctx: Pick<StepCtx, "content">): DeckDefId {
-  const [deck] = Object.values(ctx.content.decks);
-  if (deck === undefined) throw new Error("travel: content bundle has no deck");
-  return deck.id;
+/**
+ * V1 is single-ship/single-deck (common.ts W0 decision); the one deck the ship uses: the world's
+ * (`shipDeckId`), not the bundle's first, which may hold other footprints.
+ */
+export function theDeckId(ctx: Pick<StepCtx, "state">): DeckDefId {
+  return shipDeckId(ctx.state);
 }
 
 function rampDoorIds(ctx: Pick<StepCtx, "state" | "content">): DoorId[] {

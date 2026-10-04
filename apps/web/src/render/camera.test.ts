@@ -1,9 +1,10 @@
-import type { DockDef, PortDefId, RenderTravel, TravelStage } from "@crew/sim";
+import type { BerthedDock, PortDefId, RenderTravel, TravelStage } from "@crew/sim";
 import { describe, expect, it } from "vitest";
+import { portraitCanvasSize } from "../ui/portraitLayout";
 import { loadWebContent } from "../worker/content";
 import { DOCKED_MARGIN_TILES, cameraBounds, dockedBounds, flightBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
-import { dockInView, dockRectOnDeck } from "./dock";
+import { berthInView, dockInView, dockRectOnDeck } from "./dock";
 import { computeFitTransform, shouldRotate } from "./draw";
 import type { Bounds } from "./hull";
 import { hullGeometry } from "./hull";
@@ -17,7 +18,8 @@ if (deck === undefined) throw new Error("no deck");
 const layout = buildDeckLayout(deck, bundle);
 const hull = hullGeometry(layout);
 const docks = bundle.docks ?? {};
-const allDocks: DockDef[] = Object.values(docks);
+/** Every authored dock with the scenario deck in its berth box (D72). */
+const allDocks: BerthedDock[] = Object.values(docks).map((dock) => berthInView(dock, layout));
 const MOTION = { reducedMotion: false };
 
 function travel(state: TravelStage, progress: number, from: string, to: string): RenderTravel {
@@ -33,7 +35,8 @@ function travel(state: TravelStage, progress: number, from: string, to: string):
 /** What the canvas frames for this travel moment, as `DeckCanvas` computes it. */
 function framed(t: RenderTravel): Bounds {
   const dock = dockInView({ travel: t }, docks);
-  return cameraBounds(hull, dock, sceneAt(t, bundle.ports, MOTION).cameraT);
+  const berth = dock === undefined ? undefined : berthInView(dock, layout);
+  return cameraBounds(hull, berth, sceneAt(t, bundle.ports, MOTION).cameraT);
 }
 
 function expectClose(a: Bounds, b: Bounds, eps = 1e-9): void {
@@ -57,17 +60,18 @@ describe("camera framing at both ends", () => {
     for (const dock of allDocks) {
       expect(cameraBounds(hull, dock, 0)).toEqual(flightBounds(hull));
     }
-    const port = allDocks[0]?.portId ?? "";
+    const port = allDocks[0]?.dock.portId ?? "";
     expectClose(framed(travel("transit", 0.5, "x", port)), flightBounds(hull));
   });
 
   it("fits ship plus the whole dock map when docked, for every authored dock", () => {
     expect(allDocks.length).toBe(6);
     for (const dock of allDocks) {
-      const docked = framed(travel("docked", 0, dock.portId, dock.portId));
+      const { portId, id } = dock.dock;
+      const docked = framed(travel("docked", 0, portId, portId));
       expect(docked).toEqual(dockedBounds(hull, dock));
-      expect(contains(docked, hull.bounds), dock.id).toBe(true);
-      expect(contains(docked, dockRectOnDeck(dock)), dock.id).toBe(true);
+      expect(contains(docked, hull.bounds), id).toBe(true);
+      expect(contains(docked, dockRectOnDeck(dock)), id).toBe(true);
       // Tight: nothing beyond the map and hull but the margin.
       const map = dockRectOnDeck(dock);
       expect(docked.minY).toBeCloseTo(Math.min(map.minY, hull.bounds.minY) - DOCKED_MARGIN_TILES);
@@ -78,22 +82,46 @@ describe("camera framing at both ends", () => {
   it("keeps the flight framing when the port has no dock map (the stand-in berth)", () => {
     expect(dockedBounds(hull, undefined)).toEqual(flightBounds(hull));
   });
+});
 
-  it("stays legible on a 390×700 portrait phone at the biggest dock", () => {
-    const biggest = allDocks.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
-    for (const dock of [biggest, ...allDocks]) {
-      const rotated = shouldRotate(390, 700, layout);
-      expect(rotated).toBe(true);
-      const t = computeFitTransform(390, 700, dockedBounds(hull, dock), rotated);
-      // Dots are at least 8 px across and labels 11 px whatever the scale; at 12 px a tile the
-      // compartment labels still show (they need more than 8).
-      expect(t.scale, dock.id).toBeGreaterThan(12);
+describe("legibility on a 390×700 portrait phone (D72)", () => {
+  // The canvas the app lays out under its portrait chrome (top bar, headline, travel bar, compact
+  // log), not the whole window. Dots are at least 8 px across and labels 11 px whatever the scale;
+  // at 12 px a tile the compartment labels show and the ship reads.
+  const [width, height] = [390, 700];
+  const rotated = shouldRotate(width, height, layout);
+
+  it("turns the deck and leaves the canvas most of the height", () => {
+    expect(rotated).toBe(true);
+    const docked = portraitCanvasSize(width, height, { travelBar: false, logExpanded: false });
+    expect(docked.width).toBe(390);
+    expect(docked.height).toBeGreaterThan(560);
+  });
+
+  it("frames ship and dock map at more than 12 px a tile at every dock", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: false, logExpanded: false });
+    for (const dock of allDocks) {
+      const t = computeFitTransform(canvas.width, canvas.height, dockedBounds(hull, dock), rotated);
+      expect(t.scale, dock.dock.id).toBeGreaterThan(12);
     }
+  });
+
+  it("frames the ship in flight at more than 12 px a tile", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: true, logExpanded: false });
+    const t = computeFitTransform(canvas.width, canvas.height, flightBounds(hull), rotated);
+    expect(t.scale).toBeGreaterThan(12);
+  });
+
+  it("still shows the whole ship, smaller, with the log opened out", () => {
+    const canvas = portraitCanvasSize(width, height, { travelBar: true, logExpanded: true });
+    const t = computeFitTransform(canvas.width, canvas.height, flightBounds(hull), rotated);
+    expect(t.scale).toBeGreaterThan(9);
+    expect(t.scale).toBeLessThan(12);
   });
 });
 
 describe("camera continuity", () => {
-  const ports = allDocks.map((d) => d.portId);
+  const ports = allDocks.map((d) => d.dock.portId);
 
   for (const port of ports) {
     const other = ports.find((p) => p !== port) ?? port;

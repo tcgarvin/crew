@@ -2,7 +2,7 @@
   "$schema": "../../schema-json/machine.schema.json",
   "id": "machine.galley_stove",
   "name": "Galley Stove",
-  "tags": ["galley"],
+  "tags": ["stove"],
   "footprint": [
     {
       "x": 0,

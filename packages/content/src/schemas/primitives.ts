@@ -10,6 +10,7 @@ import type {
   CrewDefId,
   DeckDefId,
   DockDefId,
+  HullSizeClass,
   ItemDefId,
   ItemTag,
   MachineDefId,
@@ -109,6 +110,7 @@ export const itemTagSchema = z.enum([
   "cargo",
   "medical",
   "container",
+  "personal",
 ]);
 export const toolKindSchema = z.enum([
   "wrench",
@@ -120,9 +122,19 @@ export const toolKindSchema = z.enum([
 export const cargoClassSchema = z.enum(["general", "fragile", "perishable", "hazardous"]);
 export const machineTagSchema = z.enum([
   "bed",
-  "galley",
+  "medBed",
+  "stove",
   "messTable",
   "pilotStation",
+  "navStation",
+  "opsStation",
+  "chair",
+  "desk",
+  "gamesTable",
+  "vidScreen",
+  "exerciseRig",
+  "workbench",
+  "console",
   "engine",
   "generator",
   "battery",
@@ -145,6 +157,8 @@ export const recipeActionSchema = z.enum([
   "installComponent",
   "test",
 ]);
+/** D72: hull size classes (sim `HULL_SIZE_CLASSES`). */
+export const hullSizeClassSchema = z.enum(["S", "M", "L"]);
 export const traitModifierSchema = z.enum([
   "hungerRate",
   "fatigueRate",
@@ -180,4 +194,5 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof powerPrioritySchema>, PowerPriority>,
   AssertEqual<z.infer<typeof recipeActionSchema>, RecipeActionKind>,
   AssertEqual<z.infer<typeof traitModifierSchema>, TraitModifierKey>,
-] = [true, true, true, true, true, true, true, true, true];
+  AssertEqual<z.infer<typeof hullSizeClassSchema>, HullSizeClass>,
+] = [true, true, true, true, true, true, true, true, true, true];

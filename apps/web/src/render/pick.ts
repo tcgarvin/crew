@@ -6,6 +6,7 @@
  */
 import type { DockDef, RenderFrame } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
+import { berthInView } from "./dock";
 import { dockTargetAt } from "./dockHit";
 import { type DrawSelection, deckPiles } from "./draw";
 import { dockPropKey } from "./locals";
@@ -97,5 +98,7 @@ export function pickAt(
   if (prop !== undefined) return { kind: "dockProp", id: prop.key };
   const machine = machineAt(shown, layout, x, y);
   if (machine !== undefined) return machine;
-  return dock === undefined ? undefined : dockTargetAt(dock, layout, x - slide, y);
+  return dock === undefined
+    ? undefined
+    : dockTargetAt(berthInView(dock, layout), layout, x - slide, y);
 }

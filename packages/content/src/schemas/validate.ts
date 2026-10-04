@@ -5,16 +5,20 @@
  * - **L2 referential**: every definition ID resolves across the bundle; record keys equal their
  *   value's `id`; no ID collisions; `gen.` namespace only for generated content (checked by the
  *   loader before defs are keyed; see `loader.ts`); each namespace matches its table; local keys
- *   unique within their def; scenario placement/fault keys exist; `unique` items have
- *   `maxStack: 1`; port routes symmetric; price bands `min <= max`; config numbers finite.
+ *   unique within their def; a zone's `machineKey` names a placement on its deck; scenario
+ *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
+ *   bands `min <= max`; config numbers finite.
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
  *   some item def, and carried from the start by every scenario whose deck has the machine
- *   (D71). Dock maps (`validate-dock.ts`): rows against the legend, the berth against
- *   each deck's footprint, ramp landings on floor, posts and areas on floor and reachable from
- *   both landings, the size cap.
+ *   (D71). The hull contract (`validate-hull.ts`, D72): size class, bow east, ramps south, the
+ *   rooms, stations, zones and spawn points every deck needs, lockers serving beds; a scenario's
+ *   crew each get a crew spawn point. Dock maps (`validate-dock.ts`): rows against the legend,
+ *   the berth box on the map and void, each deck's ramp landings on floor, posts and areas on
+ *   floor and reachable from both landings, the quay row under the box walkable, the size cap; a
+ *   scenario's ship fits every berth box and has beds for its crew + 1 (`checkScenarioBeds`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -41,7 +45,13 @@ import {
   checkRef,
   issue,
 } from "./issues";
-import { checkCastSeedPosts, checkDockPhysical, checkDockReferences } from "./validate-dock";
+import {
+  checkCastSeedPosts,
+  checkDockPhysical,
+  checkDockReferences,
+  checkScenarioBerths,
+} from "./validate-dock";
+import { checkHullContract, checkScenarioBeds, checkScenarioCrewSpawns } from "./validate-hull";
 
 export type { ValidationIssue, ValidationLevel };
 
@@ -148,6 +158,20 @@ function checkDeck(deck: DeckDef, bundle: ContentBundle, issues: ValidationIssue
       issues,
     );
     checkPowerDomain(placement.powerDomain, [...placementPath, "powerDomain"]);
+  });
+
+  // Ship life plan call 8: a zone serves a placement on its own deck (a locker, its bed).
+  const placementKeys = new Set(deck.machines.map((m) => m.key));
+  deck.zones.forEach((zone, i) => {
+    if (zone.machineKey !== undefined && !placementKeys.has(zone.machineKey)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "zones", i, "machineKey"],
+          `zone "${zone.key}" names unknown machine placement "${zone.machineKey}"`,
+        ),
+      );
+    }
   });
 
   const doorKeys = new Set(deck.doors.map((d) => d.key));
@@ -385,10 +409,29 @@ function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void
   }
 }
 
-/** D25: every port with job templates has people to offer them, and every entry is a port. */
+/**
+ * D25: every port with job templates has people to offer them, and every entry is a port. No
+ * given name is a crew member's first name: labels and log lines call people by first name, so a
+ * dock local named like a crew member reads as them.
+ */
 function checkPeople(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const people = bundle.people;
   if (people === undefined) return;
+  const crewByFirstName = new Map(
+    Object.values(bundle.crew).map((crew) => [crew.name.split(" ")[0] ?? crew.name, crew.id]),
+  );
+  people.givenNames.forEach((given, i) => {
+    const crewId = crewByFirstName.get(given);
+    if (crewId !== undefined) {
+      issues.push(
+        issue(
+          "referential",
+          ["people", "givenNames", i],
+          `given name "${given}" is the first name of crew "${crewId}"`,
+        ),
+      );
+    }
+  });
   for (const portId of Object.keys(people.ports)) {
     checkRef(bundle.ports, portId, "port", ["people", "ports", portId], issues);
   }
@@ -766,8 +809,16 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     checkDeckMachines(deck, bundle, index, issues);
     checkDeckConnectivity(deck, index, issues);
     checkDeckZonesAndSpawns(deck, index, issues);
+    checkHullContract(deck, bundle.machines, issues);
   }
   for (const dock of Object.values(bundle.docks ?? {})) checkDockPhysical(dock, bundle, issues);
+  for (const scenario of Object.values(bundle.scenarios)) {
+    checkScenarioBerths(scenario, bundle, issues);
+    const deck = bundle.decks[scenario.deckId];
+    if (deck === undefined) continue; // reported by L2
+    checkScenarioCrewSpawns(scenario, deck, issues);
+    checkScenarioBeds(scenario, deck, bundle.machines, issues);
+  }
   checkRecipeToolsSatisfiable(bundle, issues);
   checkScenarioCarriesRecipeTools(bundle, issues);
 

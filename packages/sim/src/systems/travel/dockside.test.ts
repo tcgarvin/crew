@@ -5,6 +5,7 @@
  * frame projects the dock and who is on it, and a schema-3 save gets its dock on load.
  */
 import { describe, expect, it } from "vitest";
+import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY } from "../../core/fixtures/tiny-content";
 import { checkInvariants } from "../../core/invariants";
@@ -367,7 +368,7 @@ describe("save migration 3 → 4 (D61)", () => {
     run(test, 10);
     const old = asSchema3(test);
     const revision = old.state.deck.geometryRevision;
-    const restored = test.kernel.restore(old, test.world.content);
+    const restored = restoreThroughSchema6(old, test.world.content, test.registry);
     expect(restored.state.schemaVersion).toBe(SCHEMA_VERSION);
     expect(restored.state.deck.dock).toEqual({
       dockId: HOME_DOCK.id,
@@ -388,10 +389,10 @@ describe("save migration 3 → 4 (D61)", () => {
     const test = docksideWorld();
     setCourse(test, TINY.port2);
     run(test, 2_000, (w) => w.state.travel.stage === "transit");
-    const inFlight = test.kernel.restore(asSchema3(test), test.world.content);
+    const inFlight = restoreThroughSchema6(asSchema3(test), test.world.content, test.registry);
     expect(inFlight.state.deck.dock).toBeUndefined();
     run(test, 2_000, (w) => w.state.travel.stage === "docking");
-    const docking = test.kernel.restore(asSchema3(test), test.world.content);
+    const docking = restoreThroughSchema6(asSchema3(test), test.world.content, test.registry);
     expect(docking.state.deck.dock?.dockId).toBe(FAR_DOCK.id);
     // Mid-docking the ramps stay up: only arriving lowers them.
     expect(ramps(docking).every((r) => r.requestedState === "closed")).toBe(true);

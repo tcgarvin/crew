@@ -11,11 +11,13 @@
  *
  * Asked at most once per voyage (passengers-and-galaxy §2.3; once per docking with no voyage):
  * not while `departureRiskAccepted` is set for the impairment set that is live now
- * (`impairmentKey`), nor while a gate decision is already queued. A new fault or a repair
- * changes the key, drops the answer and asks again. The decision is queued through
- * `queuePolicyDecision` (D37: the kernel narrates it before showing it); the chosen side's
- * command (`holdDepartureForRepairs` / `acceptDepartureRisk`, `command-handlers.ts`) sets the
- * travel flag the gate reads next tick.
+ * (`impairmentKey`), nor while a gate decision is already queued. The set is keyed on each
+ * impaired machine and its faults, not on why it counts as impaired this tick (D75), so a new
+ * fault or a repair changes the key, drops the answer and asks again, while a machine hovering at
+ * its temperature limit (blocked one tick, low on output the next) does not. The decision is
+ * queued through `queuePolicyDecision` (D37: the kernel narrates it before showing it); the
+ * chosen side's command (`holdDepartureForRepairs` / `acceptDepartureRisk`,
+ * `command-handlers.ts`) sets the travel flag the gate reads next tick.
  *
  * D71: the gate never waits on a repair that cannot finish. An impairment is *out of reach* when
  * one of the machine's diagnosed faults that keeps it impaired is short of a tool or parts that
@@ -53,6 +55,8 @@ interface Impairment {
   readonly machineName: string;
   readonly reason: ImpairmentReason;
   readonly output: number;
+  /** Every fault on the machine, whatever its effect: what `impairmentKey` remembers (D75). */
+  readonly faultKeys: readonly LocalKey[];
 }
 
 const SEVERITY: Readonly<Record<ImpairmentReason, number>> = {
@@ -71,7 +75,12 @@ function effectKind(def: MachineDef, fault: Machine["faults"][number]) {
 }
 
 function impairmentOf(ctx: GateCtx, machine: Machine, def: MachineDef): Impairment | undefined {
-  const base = { machineId: machine.id, machineName: def.name, output: machine.output };
+  const base = {
+    machineId: machine.id,
+    machineName: def.name,
+    output: machine.output,
+    faultKeys: machine.faults.map((fault) => fault.faultKey),
+  };
   if (isMachineBlocked(machine, def, ctx.config.equipment)) return { ...base, reason: "blocked" };
   const disablingFault = machine.faults.some((fault) => {
     const kind = effectKind(def, fault);
@@ -100,12 +109,16 @@ function impairments(ctx: GateCtx): Impairment[] {
 }
 
 /**
- * The impaired set as one string (`machineId:reason`, sorted, comma-joined; "" when nothing is
- * impaired). "Leave anyway" is remembered against this, so a new fault or a repair re-asks.
+ * The impaired set as one string (`machineId:faultKey+faultKey`, faults sorted, machines sorted,
+ * comma-joined; "" when nothing is impaired). "Leave anyway" is remembered against this, so a new
+ * fault or a repair re-asks. D75: it names every fault on the machine, not the momentary reason
+ * nor `heldForFaults` (which depends on the reason): an overheat fault at its temperature limit
+ * flips the reason between `blocked` and `lowOutput` or `faultDerated` every few ticks, and a key
+ * that followed it dropped the answer and raised the card again each time.
  */
 export function impairmentKey(ctx: GateCtx): string {
   return impairments(ctx)
-    .map((i) => `${i.machineId}:${i.reason}`)
+    .map((i) => `${i.machineId}:${[...i.faultKeys].sort().join("+")}`)
     .sort()
     .join(",");
 }

@@ -1153,3 +1153,103 @@ D47's "the narrator stocks the part while the ship holds": a hold no longer wait
 nothing here sells; the hook tells the narrator, who can stock the next port. Not changed: an
 engine or generator impaired by integrity alone, with no fault left to repair (only a completed
 repair restores integrity, D35), still holds for ever if held for; no tour has produced one.
+
+## 2026-10-04 — Ship life, slice 1: Freighter Mk2 and the hull contract
+
+Design: `docs/design/ship-life.md` (owner rulings §13); plan: `docs/design/ship-life-plan.md`.
+Built by a contract gate and six parallel workstreams, integrated by the team lead; the plan's
+"Calls made" are adopted as written except where noted below.
+
+**D72. The hull contract: bow east, quay south, ships berth in size-class boxes.** The owner
+ruled bow east. Orientation is an invariant, not a parameter: the validator (L3, every deck)
+requires that the deck fits its `hull.sizeClass` box (S 24×14, M 36×20, L 40×24), that a
+`bridge` compartment touches the east edge (x = width−1), that both ramp doors face `s` from the
+bottom row with their transfer tiles on or beside them, and that it has the rooms, stations,
+zones and spawns ship life needs (bridge; quarters or a cabin; mess; galley; engineering; cargo
+hold; airlock; exactly one `pilotStation` and one `navStation`; an engine, a mess table and a
+stove; cargo stowage; crew and passenger spawns; every `locker` zone serving one bed by
+`machineKey`). Per scenario: a crew spawn point per crew member, beds (never the medbay's
+`medBed`) for crew + 1, and a ship whose class fits every dock's box. `hull` carries no ramp
+slots: the ramp doors already say where the ramps are. Dock maps no longer draw the ship:
+`berth: { origin, sizeClass }` replaces `shipAt` and the `berth` tile kind; the box must be on
+the map and all `void`, the quay row under it walkable floor across its full width, and every
+deck whose class fits the box must land both ramps on floor that reaches every post and area.
+The ship's place is derived by one rule, `berthPlacement` (flush south, centred, an odd spare
+column east), mirrored in content's `shipAtInBerth` because content may import only sim types;
+a CLI test holds the two equal for every dock and deck. The six maps were re-authored with
+2-tile side margins and at most 29 rows, so the docked phone camera stays above 12 px a tile;
+posts follow the bow (gate, kiosk and benches by the personnel ramp, warehouse and bays by the
+cargo ramp) except at Tern's Rest, where the long walk to the far end of the pier is the point.
+Post keys did not change. In code, direction lives only in the renderer: `render/orientation.ts`
+holds `FORE = +1`; the hull is drawn from the deck bounds alone (nose +x, bells −x), the scene's
+"positive astern" offsets convert through it, stars stream toward −x, and the phone portrait turn
+is now counter-clockwise so the bow still points up and the quay is on the right. The sim has no
+direction. Three sim helpers that took the bundle's first deck now use `shipDeckId(state)`.
+
+**D73. Freighter Mk2 is the default ship; Mk1 is mirrored and kept; Noor Haddad joins.** Mk2 is
+ship life §8's 36×20 grid and door list with every room furnished: the bridge (helm with a
+`standby` position below it, nav and ops terminals, captain's chair, two reserved bare tiles for
+later stations), captain's, first officer's and two-berth passenger cabins, an eight-bunk
+bunkroom, lounge, mess with two four-seat tables, galley, stores, gym, infirmary, airlock and
+hold. The new furniture is inert content (ops terminal, chair, desk, games table, vid screen,
+exercise rig, workbench, engineering console); the four terminals draw 0.2 kW of domestic power.
+Placements moved from the plan where the plan blocked a door's inside tile or the helm's standby
+(bunks in columns 14, 15, 17, 18; pantry up a row; ops terminal at (34,5)). `bridge_console` is
+renamed `helm` now rather than in slice 2, the galley stove is tagged `stove`, and the medbay bed
+`medBed`, no longer a place to sleep. Mk1 was mirrored by `scripts/mirror-deck.mts`, keeps no
+scenario, and stays loadable so the berth box is exercised with two footprints; its spawns were
+moved off interaction tiles. The ninth crew member is Noor Haddad, a relief pilot with piloting
+3, on beta shift, so each shift has a qualified pilot until slice 2's watches replace shifts.
+The narrator prompt says nine crew.
+
+**D74. Berths by rank as a standing rule; lockers belong to beds; old saves are refused.**
+`assignBerths` runs at world creation and every tick in the needs stage: captain's cabin, first
+officer's cabin, passenger cabin, bunkroom, else any free bed outside the passenger cabin, else
+unberthed (slice 4 gives that a thought). Rank first, then actor id. The dead, anyone removed
+from the ship and a passenger left behind free theirs; someone briefly ashore keeps theirs. A
+locker is the zone whose `machineKey` names the bed; each crew member's `personal` starting
+items (the harmonica, the old photograph) start there with `ownerId`. People sleep in their own
+berth or a bed nobody is assigned, never in another's (the planner reads
+`AgentView.assignedBeds()`; the sleep plan refuses one as a second guard); no hot-bunking yet.
+A sleeper in a cabin is labelled by the cabin ("asleep in the captain's cabin"), since content
+has no pronouns. Save schema 7: a schema-6 save is refused with `SaveCompatibilityError` and the
+host starts a new game, rather than migrating every tile-bearing field across a mirrored deck
+and reshaped dock maps (PLAN §3 allows this before there are players); older migration tests
+stop at schema 6.
+
+**D75. The departure gate remembers its answer per machine and fault, not per reason.** Found
+by the slice-1 test work on the Ossory passengers run: a generator with `electrical_short` (heat
+rise 0.045/s against cooling 0.02/s) hovers at its temperature limit, blocked at it and low on
+output just under it, so its reason flipped every couple of ticks. The remembered "leave anyway"
+was keyed `machineId:reason` (D49, D71), so each flip dropped the answer and raised the card
+again: 712 gate cards between ticks 4580 and 6186, which in play is a policy hook and a narrator
+call every couple of ticks. The key (`impairmentKey`) is now each impaired machine with every
+fault on it (`machineId:faultA+faultB`), which only a repair or a new fault changes; D71's "a new
+fault or a repair asks again" holds, and a machine that stops being impaired still drops out.
+Chosen over keying on the faults that keep the machine impaired (`heldForFaults`): that set
+counts an overheat fault only while the machine is blocked or low on output, so a machine with
+a derating and an overheat fault at its limit would flip it the same way. A new overheat fault
+on a machine already impaired for another reason now asks again, as a new fault should. No save
+carries the old key format: it ships with schema 7, which refuses older saves (D74).
+
+The same pass made the kernel about twice as fast per tick on Mk2's 33 machines with identical
+event logs and end states (a per-pass coolant index in equipment, a leaner A*, cached placement
+lookups, and invariant paths built only on a violation). `crew pacing` on Mk2 against Mk1 at the
+gate: plain 450.6 sim-s against 459.7, freight 536.5 against 532.9, the same narrator calls, the
+1x stall 5.5 s against 8.1 s (the captain's longer walk ashore builds lead).
+
+*D72 addendum (portrait layout), from the slice-1 browser QA.* The camera's legibility test fitted
+the whole 390×700 window while the app gave the canvas only 390×382, so docked Mk2 drew at 8.3
+px a tile with room labels dropping out. On a portrait screen the canvas now gets most of the
+height: a one-row 36 px top bar, a headline fixed at two lines (so the canvas never resizes as
+it wraps), and a compact log strip under the canvas, `clamp(44px, 100dvh − 660px, 160px)`, which a
+toggle opens to the old 28vh at the cost of zoom. The fit pads 4 px instead of 12 when the deck
+is turned. The sizes live in `apps/web/src/ui/portraitLayout.ts` and reach the stylesheet as
+custom properties, so the test checks the canvas the app really lays out: at 390×700 every dock
+frames above 12 px a tile (Hub 12.95) and flight at 12.6; landscape is unchanged. A person's
+label is drawn only while their dot is on the canvas (no labels floating ahead of an arriving
+dock), and a room's plate only when it fits inside that room on screen. The same pass fixed
+pause, which stopped the worker but not playback (seconds of buffered movement kept playing):
+`FramePlayback.setPaused` freezes the view on its last frame. "Noor" left the locals' name table
+(replaced in its slot by "Ines"), and validation now rejects a generated given name equal to a
+crew member's first name.

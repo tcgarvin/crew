@@ -15,10 +15,10 @@
  */
 import type { ApplyCtx } from "../../core/commands";
 import { queueOrHold } from "../../core/delivery";
-import { dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
+import { type BerthedDock, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
-import type { CargoClass, DockDef, ExternalStoreDef, PortDef } from "../../core/types/content";
+import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
 import type {
   DecisionId,
@@ -32,6 +32,7 @@ import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
+import { shipDeckId } from "../../core/world";
 import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
@@ -194,9 +195,9 @@ function warehouseStoreKey(port: PortDef): ExternalStoreDef["key"] {
   );
 }
 
-/** V1's single ship deck (see `travel.ts` `theDeckId`); a `cargoStowage`-tagged zone on it. */
-export function cargoStowageZoneKey(ctx: Pick<StepCtx, "content">): string | undefined {
-  const [deck] = Object.values(ctx.content.decks);
+/** A `cargoStowage`-tagged zone on the ship's deck (`shipDeckId`). */
+export function cargoStowageZoneKey(ctx: Pick<StepCtx, "content" | "state">): string | undefined {
+  const deck = ctx.content.decks[shipDeckId(ctx.state)];
   return deck?.zones.find((z) => z.tags.includes("cargoStowage"))?.key;
 }
 
@@ -302,8 +303,11 @@ export function spawnCargoItem(
  * D63: the staging area's tiles with the free ones first (no item lying there), so several
  * crates spread out before any two share a tile.
  */
-export function stagingTilesFreeFirst(ctx: Pick<StepCtx, "state">, dock: DockDef): TileCoord[] {
-  const tiles = dockAreaTiles(dock, "freightStaging");
+export function stagingTilesFreeFirst(
+  ctx: Pick<StepCtx, "state">,
+  berth: BerthedDock,
+): TileCoord[] {
+  const tiles = dockAreaTiles(berth, "freightStaging");
   const taken = new Set<string>();
   for (const item of Object.values(ctx.state.items)) {
     if (item.location.kind !== "onDeck") continue;
@@ -322,10 +326,10 @@ export function freightSpawnLocations(
   fromPortId: PortDefId,
   count: number,
 ): PhysicalLocation[] {
-  const dock = dockAlongsideAt(ctx.content, ctx.state, fromPortId);
+  const berth = dockAlongsideAt(ctx.content, ctx.state, fromPortId);
   const presence = ctx.state.deck.dock;
-  const tiles = dock === undefined ? [] : stagingTilesFreeFirst(ctx, dock);
-  if (dock === undefined || presence === undefined || tiles.length === 0) {
+  const tiles = berth === undefined ? [] : stagingTilesFreeFirst(ctx, berth);
+  if (berth === undefined || presence === undefined || tiles.length === 0) {
     const store = portStoreLocation(ctx.defs.port(fromPortId));
     return Array.from({ length: count }, () => store);
   }
@@ -343,13 +347,15 @@ export function freightSpawnLocations(
 export function offerStagingDock(
   ctx: Pick<StepCtx, "state" | "content">,
   job: Readonly<Job>,
-): DockDef | undefined {
+): BerthedDock | undefined {
   if (job.status !== "offered") return undefined;
   const stage = ctx.state.travel.stage;
   if (stage !== "docking" && stage !== "docked") return undefined;
-  const dock = dockAlongsideAt(ctx.content, ctx.state, job.fromPortId);
+  const berth = dockAlongsideAt(ctx.content, ctx.state, job.fromPortId);
   // A hand-built dock with no staging area stages nothing; acceptance then uses the store.
-  return dock !== undefined && dockAreaTiles(dock, "freightStaging").length > 0 ? dock : undefined;
+  return berth !== undefined && dockAreaTiles(berth, "freightStaging").length > 0
+    ? berth
+    : undefined;
 }
 
 /**
@@ -478,7 +484,7 @@ type CustodyState = Pick<ReadonlyWorldState, "items" | "deck">;
  */
 function inPortCustody(
   state: CustodyState,
-  content: Pick<StepCtx["content"], "docks">,
+  content: Pick<StepCtx["content"], "docks" | "decks">,
   itemId: ItemId,
   portId: PortDefId,
 ): boolean {
@@ -497,7 +503,7 @@ function inPortCustody(
  */
 export function deliveryComplete(
   state: CustodyState,
-  content: Pick<StepCtx["content"], "docks">,
+  content: Pick<StepCtx["content"], "docks" | "decks">,
   job: Pick<Job, "cargoItemIds" | "toPortId">,
 ): boolean {
   if (job.cargoItemIds.length === 0) return false;
@@ -511,7 +517,7 @@ export function deliveryComplete(
  */
 export function jobFulfilled(
   state: CustodyState,
-  content: Pick<StepCtx["content"], "docks">,
+  content: Pick<StepCtx["content"], "docks" | "decks">,
   job: Pick<Job, "cargoItemIds" | "toPortId" | "passage">,
 ): boolean {
   if (job.passage === undefined) return deliveryComplete(state, content, job);

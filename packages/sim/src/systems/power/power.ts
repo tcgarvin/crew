@@ -14,7 +14,7 @@
  * `power.role` is `"none"`, is not touched by this system at all: no allocation, no mode change.
  */
 import type { KernelRegistry } from "../../core/registry";
-import type { PowerPriority } from "../../core/types/content";
+import type { DeckDef, PowerPriority } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
 import type { DeckDefId, LocalKey, MachineId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
@@ -27,11 +27,28 @@ interface DomainGroup {
   battery: Machine | undefined;
 }
 
+/**
+ * Each placement's power domain by placement key, per deck def. Content is immutable, so the
+ * entry is never stale and a fresh process rebuilds it on first use (as `berthDock` does); a
+ * repeated key keeps its first placement, as a linear search would.
+ */
+const domainsByDeck = new WeakMap<DeckDef, ReadonlyMap<string, LocalKey | undefined>>();
+
+function placementDomains(deck: DeckDef): ReadonlyMap<string, LocalKey | undefined> {
+  const cached = domainsByDeck.get(deck);
+  if (cached !== undefined) return cached;
+  const domains = new Map<string, LocalKey | undefined>();
+  for (const placement of deck.machines) {
+    if (!domains.has(placement.key)) domains.set(placement.key, placement.powerDomain);
+  }
+  domainsByDeck.set(deck, domains);
+  return domains;
+}
+
 /** The power domain a machine's placement names, or `undefined` if it is not on any bus. */
 export function domainKeyOf(ctx: StepCtx, machine: Machine): LocalKey | undefined {
   const deck = ctx.content.decks[machine.deckId as DeckDefId];
-  const placement = deck?.machines.find((p) => p.key === machine.placementKey);
-  return placement?.powerDomain;
+  return deck === undefined ? undefined : placementDomains(deck).get(machine.placementKey);
 }
 
 function groupByDomain(ctx: StepCtx): Map<LocalKey, DomainGroup> {

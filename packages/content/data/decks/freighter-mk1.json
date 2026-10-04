@@ -5,24 +5,24 @@
   "width": 32,
   "height": 18,
   "tiles": [
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "BBBBQQQQQQQQQQGGGGGGNNNNEEEEEEEE",
-    "CCCCCCCCCCCCCCCCCCCCCCCCEEEEEEEE",
-    "CCCCCCCCCCCCCCCCCCCCCCCCEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE",
-    "AAAAHHHHHHHHHHHHHHHHHHHHEEEEEEEE"
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB",
+    "EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC",
+    "EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA",
+    "EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA"
   ],
   "compartments": [
     {
@@ -78,7 +78,7 @@
     {
       "key": "bridge_corridor",
       "edge": {
-        "x": 2,
+        "x": 29,
         "y": 8,
         "side": "n"
       },
@@ -89,7 +89,7 @@
     {
       "key": "personnel_ramp",
       "edge": {
-        "x": 2,
+        "x": 29,
         "y": 17,
         "side": "s"
       },
@@ -101,7 +101,7 @@
     {
       "key": "airlock_corridor",
       "edge": {
-        "x": 2,
+        "x": 29,
         "y": 10,
         "side": "n"
       },
@@ -112,7 +112,7 @@
     {
       "key": "quarters_corridor",
       "edge": {
-        "x": 8,
+        "x": 23,
         "y": 8,
         "side": "n"
       },
@@ -123,7 +123,7 @@
     {
       "key": "galley_corridor",
       "edge": {
-        "x": 16,
+        "x": 15,
         "y": 8,
         "side": "n"
       },
@@ -134,7 +134,7 @@
     {
       "key": "infirmary_corridor",
       "edge": {
-        "x": 21,
+        "x": 10,
         "y": 8,
         "side": "n"
       },
@@ -145,7 +145,7 @@
     {
       "key": "cargo_corridor",
       "edge": {
-        "x": 12,
+        "x": 19,
         "y": 10,
         "side": "n"
       },
@@ -156,9 +156,9 @@
     {
       "key": "engineering_corridor",
       "edge": {
-        "x": 24,
+        "x": 7,
         "y": 8,
-        "side": "w"
+        "side": "e"
       },
       "kind": "interior",
       "powerDomain": "main",
@@ -168,9 +168,9 @@
     {
       "key": "engineering_cargo",
       "edge": {
-        "x": 24,
+        "x": 7,
         "y": 13,
-        "side": "w"
+        "side": "e"
       },
       "kind": "interior",
       "powerDomain": "main",
@@ -180,7 +180,7 @@
     {
       "key": "cargo_ramp",
       "edge": {
-        "x": 13,
+        "x": 18,
         "y": 17,
         "side": "s"
       },
@@ -194,10 +194,10 @@
   "walls": [],
   "machines": [
     {
-      "key": "bridge_console_1",
-      "machineDefId": "machine.bridge_console",
+      "key": "helm_1",
+      "machineDefId": "machine.helm",
       "origin": {
-        "x": 1,
+        "x": 30,
         "y": 3
       },
       "rotation": 0,
@@ -207,57 +207,57 @@
       "key": "engine_1",
       "machineDefId": "machine.engine",
       "origin": {
-        "x": 25,
+        "x": 6,
         "y": 2
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "coolant_pump_1",
       "machineDefId": "machine.coolant_pump",
       "origin": {
-        "x": 25,
+        "x": 6,
         "y": 5
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "generator_1",
       "machineDefId": "machine.generator",
       "origin": {
-        "x": 25,
+        "x": 6,
         "y": 7
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "battery_bank_1",
       "machineDefId": "machine.battery_bank",
       "origin": {
-        "x": 25,
+        "x": 6,
         "y": 10
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "life_support_1",
       "machineDefId": "machine.life_support",
       "origin": {
-        "x": 25,
+        "x": 6,
         "y": 13
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "galley_stove_1",
       "machineDefId": "machine.galley_stove",
       "origin": {
-        "x": 15,
+        "x": 16,
         "y": 2
       },
       "rotation": 0,
@@ -267,26 +267,26 @@
       "key": "medbay_bed_1",
       "machineDefId": "machine.medbay_bed",
       "origin": {
-        "x": 21,
+        "x": 10,
         "y": 2
       },
-      "rotation": 0
+      "rotation": 180
     },
     {
       "key": "cargo_crane_1",
       "machineDefId": "machine.cargo_crane",
       "origin": {
-        "x": 12,
+        "x": 19,
         "y": 15
       },
-      "rotation": 0,
+      "rotation": 180,
       "powerDomain": "main"
     },
     {
       "key": "bunk_1",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 5,
+        "x": 26,
         "y": 1
       },
       "rotation": 0
@@ -295,7 +295,7 @@
       "key": "bunk_2",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 6,
+        "x": 25,
         "y": 1
       },
       "rotation": 0
@@ -304,7 +304,7 @@
       "key": "bunk_3",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 7,
+        "x": 24,
         "y": 1
       },
       "rotation": 0
@@ -313,7 +313,7 @@
       "key": "bunk_4",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 8,
+        "x": 23,
         "y": 1
       },
       "rotation": 0
@@ -322,7 +322,7 @@
       "key": "bunk_5",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 5,
+        "x": 26,
         "y": 5
       },
       "rotation": 0
@@ -331,7 +331,7 @@
       "key": "bunk_6",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 6,
+        "x": 25,
         "y": 5
       },
       "rotation": 0
@@ -340,7 +340,7 @@
       "key": "bunk_7",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 7,
+        "x": 24,
         "y": 5
       },
       "rotation": 0
@@ -349,7 +349,26 @@
       "key": "bunk_8",
       "machineDefId": "machine.bunk",
       "origin": {
-        "x": 8,
+        "x": 23,
+        "y": 5
+      },
+      "rotation": 0
+    },
+    {
+      "key": "nav_terminal_1",
+      "machineDefId": "machine.nav_terminal",
+      "origin": {
+        "x": 31,
+        "y": 1
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "mess_table_1",
+      "machineDefId": "machine.mess_table",
+      "origin": {
+        "x": 13,
         "y": 5
       },
       "rotation": 0
@@ -368,43 +387,23 @@
       "tags": ["cargoStowage"],
       "tiles": [
         {
-          "x": 8,
+          "x": 23,
           "y": 12
         },
         {
-          "x": 9,
+          "x": 22,
           "y": 12
         },
         {
-          "x": 10,
+          "x": 21,
           "y": 12
         },
         {
-          "x": 11,
+          "x": 20,
           "y": 12
         },
         {
-          "x": 12,
-          "y": 12
-        },
-        {
-          "x": 13,
-          "y": 12
-        },
-        {
-          "x": 14,
-          "y": 12
-        },
-        {
-          "x": 15,
-          "y": 12
-        },
-        {
-          "x": 16,
-          "y": 12
-        },
-        {
-          "x": 17,
+          "x": 19,
           "y": 12
         },
         {
@@ -412,43 +411,43 @@
           "y": 12
         },
         {
-          "x": 8,
-          "y": 13
-        },
-        {
-          "x": 9,
-          "y": 13
-        },
-        {
-          "x": 10,
-          "y": 13
-        },
-        {
-          "x": 11,
-          "y": 13
-        },
-        {
-          "x": 12,
-          "y": 13
-        },
-        {
-          "x": 13,
-          "y": 13
-        },
-        {
-          "x": 14,
-          "y": 13
-        },
-        {
-          "x": 15,
-          "y": 13
+          "x": 17,
+          "y": 12
         },
         {
           "x": 16,
+          "y": 12
+        },
+        {
+          "x": 15,
+          "y": 12
+        },
+        {
+          "x": 14,
+          "y": 12
+        },
+        {
+          "x": 13,
+          "y": 12
+        },
+        {
+          "x": 23,
           "y": 13
         },
         {
-          "x": 17,
+          "x": 22,
+          "y": 13
+        },
+        {
+          "x": 21,
+          "y": 13
+        },
+        {
+          "x": 20,
+          "y": 13
+        },
+        {
+          "x": 19,
           "y": 13
         },
         {
@@ -456,43 +455,43 @@
           "y": 13
         },
         {
-          "x": 8,
-          "y": 14
-        },
-        {
-          "x": 9,
-          "y": 14
-        },
-        {
-          "x": 10,
-          "y": 14
-        },
-        {
-          "x": 11,
-          "y": 14
-        },
-        {
-          "x": 12,
-          "y": 14
-        },
-        {
-          "x": 13,
-          "y": 14
-        },
-        {
-          "x": 14,
-          "y": 14
-        },
-        {
-          "x": 15,
-          "y": 14
+          "x": 17,
+          "y": 13
         },
         {
           "x": 16,
+          "y": 13
+        },
+        {
+          "x": 15,
+          "y": 13
+        },
+        {
+          "x": 14,
+          "y": 13
+        },
+        {
+          "x": 13,
+          "y": 13
+        },
+        {
+          "x": 23,
           "y": 14
         },
         {
-          "x": 17,
+          "x": 22,
+          "y": 14
+        },
+        {
+          "x": 21,
+          "y": 14
+        },
+        {
+          "x": 20,
+          "y": 14
+        },
+        {
+          "x": 19,
           "y": 14
         },
         {
@@ -500,43 +499,43 @@
           "y": 14
         },
         {
-          "x": 8,
-          "y": 15
-        },
-        {
-          "x": 9,
-          "y": 15
-        },
-        {
-          "x": 10,
-          "y": 15
-        },
-        {
-          "x": 11,
-          "y": 15
-        },
-        {
-          "x": 12,
-          "y": 15
-        },
-        {
-          "x": 13,
-          "y": 15
-        },
-        {
-          "x": 14,
-          "y": 15
-        },
-        {
-          "x": 15,
-          "y": 15
+          "x": 17,
+          "y": 14
         },
         {
           "x": 16,
+          "y": 14
+        },
+        {
+          "x": 15,
+          "y": 14
+        },
+        {
+          "x": 14,
+          "y": 14
+        },
+        {
+          "x": 13,
+          "y": 14
+        },
+        {
+          "x": 23,
           "y": 15
         },
         {
-          "x": 17,
+          "x": 22,
+          "y": 15
+        },
+        {
+          "x": 21,
+          "y": 15
+        },
+        {
+          "x": 20,
+          "y": 15
+        },
+        {
+          "x": 19,
           "y": 15
         },
         {
@@ -544,39 +543,47 @@
           "y": 15
         },
         {
-          "x": 8,
-          "y": 16
-        },
-        {
-          "x": 9,
-          "y": 16
-        },
-        {
-          "x": 10,
-          "y": 16
-        },
-        {
-          "x": 11,
-          "y": 16
-        },
-        {
-          "x": 12,
-          "y": 16
-        },
-        {
-          "x": 13,
-          "y": 16
-        },
-        {
-          "x": 14,
-          "y": 16
-        },
-        {
-          "x": 15,
-          "y": 16
+          "x": 17,
+          "y": 15
         },
         {
           "x": 16,
+          "y": 15
+        },
+        {
+          "x": 15,
+          "y": 15
+        },
+        {
+          "x": 14,
+          "y": 15
+        },
+        {
+          "x": 13,
+          "y": 15
+        },
+        {
+          "x": 23,
+          "y": 16
+        },
+        {
+          "x": 22,
+          "y": 16
+        },
+        {
+          "x": 21,
+          "y": 16
+        },
+        {
+          "x": 20,
+          "y": 16
+        },
+        {
+          "x": 19,
+          "y": 16
+        },
+        {
+          "x": 18,
           "y": 16
         },
         {
@@ -584,7 +591,19 @@
           "y": 16
         },
         {
-          "x": 18,
+          "x": 16,
+          "y": 16
+        },
+        {
+          "x": 15,
+          "y": 16
+        },
+        {
+          "x": 14,
+          "y": 16
+        },
+        {
+          "x": 13,
           "y": 16
         }
       ]
@@ -595,11 +614,7 @@
       "tags": ["muster"],
       "tiles": [
         {
-          "x": 14,
-          "y": 8
-        },
-        {
-          "x": 15,
+          "x": 17,
           "y": 8
         },
         {
@@ -607,7 +622,11 @@
           "y": 8
         },
         {
-          "x": 17,
+          "x": 15,
+          "y": 8
+        },
+        {
+          "x": 14,
           "y": 8
         }
       ]
@@ -618,19 +637,19 @@
       "tags": ["galleyCounter"],
       "tiles": [
         {
-          "x": 14,
+          "x": 17,
           "y": 2
         },
         {
-          "x": 15,
+          "x": 16,
           "y": 2
         },
         {
-          "x": 14,
+          "x": 17,
           "y": 3
         },
         {
-          "x": 15,
+          "x": 16,
           "y": 3
         }
       ]
@@ -641,13 +660,13 @@
     "personnelRampDoorKey": "personnel_ramp",
     "cargoTransferTiles": [
       {
-        "x": 13,
+        "x": 18,
         "y": 16
       }
     ],
     "personnelTransferTiles": [
       {
-        "x": 2,
+        "x": 29,
         "y": 16
       }
     ]
@@ -656,7 +675,7 @@
     {
       "key": "spawn_captain",
       "tile": {
-        "x": 2,
+        "x": 28,
         "y": 3
       },
       "tags": ["crew"]
@@ -664,7 +683,7 @@
     {
       "key": "spawn_first_officer",
       "tile": {
-        "x": 1,
+        "x": 30,
         "y": 2
       },
       "tags": ["crew"]
@@ -672,7 +691,7 @@
     {
       "key": "spawn_engineer",
       "tile": {
-        "x": 26,
+        "x": 4,
         "y": 5
       },
       "tags": ["crew"]
@@ -680,7 +699,7 @@
     {
       "key": "spawn_second_engineer",
       "tile": {
-        "x": 28,
+        "x": 3,
         "y": 7
       },
       "tags": ["crew"]
@@ -688,7 +707,7 @@
     {
       "key": "spawn_pilot",
       "tile": {
-        "x": 2,
+        "x": 29,
         "y": 1
       },
       "tags": ["crew"]
@@ -704,15 +723,15 @@
     {
       "key": "spawn_medic",
       "tile": {
-        "x": 22,
-        "y": 2
+        "x": 9,
+        "y": 4
       },
       "tags": ["crew"]
     },
     {
       "key": "spawn_cargo_hand",
       "tile": {
-        "x": 12,
+        "x": 19,
         "y": 14
       },
       "tags": ["crew"]
@@ -720,7 +739,7 @@
     {
       "key": "spawn_passenger_1",
       "tile": {
-        "x": 2,
+        "x": 29,
         "y": 16
       },
       "tags": ["passenger"]
@@ -728,10 +747,14 @@
     {
       "key": "spawn_cargo_1",
       "tile": {
-        "x": 13,
+        "x": 18,
         "y": 16
       },
       "tags": ["cargo"]
     }
-  ]
+  ],
+  "hull": {
+    "class": "light_freighter",
+    "sizeClass": "M"
+  }
 }

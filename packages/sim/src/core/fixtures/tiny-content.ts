@@ -189,6 +189,7 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
           cargoTransferTiles: [{ x: 0, y: 0 }],
           personnelTransferTiles: [{ x: 0, y: 0 }],
         },
+        hull: { class: "test_hull", sizeClass: "S" },
         spawnPoints: [{ key: "bunk", tile: { x: 1, y: 1 }, tags: ["crew"] }],
       },
     },

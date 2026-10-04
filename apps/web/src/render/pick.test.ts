@@ -13,7 +13,7 @@ import type {
 import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
 import { buildDeckLayout } from "./deckLayout";
-import { withDockSlide } from "./dock";
+import { berthInView, withDockSlide } from "./dock";
 import { dockPropKey } from "./locals";
 import { pickAt } from "./pick";
 
@@ -30,7 +30,8 @@ if (kiosk === undefined) throw new Error("hub has a queue kiosk");
 
 /** Deck-frame centre of a dock tile. */
 function onDeck(x: number, y: number) {
-  return { x: x - dock.shipAt.x + 0.5, y: y - dock.shipAt.y + 0.5 };
+  const { shipAt } = berthInView(dock, layout);
+  return { x: x - shipAt.x + 0.5, y: y - shipAt.y + 0.5 };
 }
 
 const atKiosk = onDeck(kiosk.tile.x, kiosk.tile.y);

@@ -2,8 +2,10 @@
  * Dockside §2.2 (D58): the star field. Stars carry no meaning, so their positions come from a
  * fixed hash and they scroll from a client-side accumulator (`StarScroll`) at the scene's
  * `starSpeed`; a reload re-scatters nothing that matters. Drawn in the deck's own ("fit") pixel
- * space, so they stream fore to aft (+x) and the portrait rotation carries them with the deck.
+ * space, so they stream fore to aft (toward −x, D72 `orientation.ts`) and the portrait rotation
+ * carries them with the deck.
  */
+import { aftOf, spanAlongShip } from "./orientation";
 
 /** One star in a square tile of the field, position in [0, 1). */
 export interface Star {
@@ -112,20 +114,21 @@ export function drawStars(
   const tilesX = Math.ceil(area.width / STAR_TILE_PX) + 1;
   const tilesY = Math.ceil(area.height / STAR_TILE_PX) + 1;
   for (const layer of layers) {
-    const shift = wrap(scrollPx * layer.parallax, STAR_TILE_PX);
+    // The field moves aft as the scroll grows; wrapped into one tile so the tile loop is the same.
+    const shift = wrap(aftOf(scrollPx * layer.parallax), STAR_TILE_PX);
     const streak = STREAK_PX * starSpeed * layer.parallax;
     for (const star of layer.stars) {
       ctx.globalAlpha = starAlpha * star.brightness;
       const baseX = area.x + star.x * STAR_TILE_PX + shift;
       const baseY = area.y + star.y * STAR_TILE_PX;
       for (let tx = -1; tx < tilesX; tx++) {
-        const x = baseX + tx * STAR_TILE_PX;
-        if (x < area.x - streak - 4 || x > area.x + area.width + 4) continue;
+        // The streak trails behind the star, on its fore side: the star itself leads, moving aft.
+        const trail = spanAlongShip(baseX + tx * STAR_TILE_PX, star.size, streak, 0);
+        if (trail.x1 < area.x - 4 || trail.x0 > area.x + area.width + 4) continue;
         for (let ty = 0; ty < tilesY; ty++) {
           const y = baseY + ty * STAR_TILE_PX;
           if (y > area.y + area.height) break;
-          // The streak trails behind the star (fore, -x): the star itself leads, moving aft.
-          ctx.fillRect(x - streak, y, star.size + streak, star.size);
+          ctx.fillRect(trail.x0, y, trail.x1 - trail.x0, star.size);
         }
       }
     }

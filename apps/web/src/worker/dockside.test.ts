@@ -38,12 +38,16 @@ import type {
 } from "@crew/sim";
 import {
   commerceViolations,
+  dockAlongside,
   getRenderFrame,
   isInDockArea,
   isOnDock,
+  migrations,
+  restore,
   travelViolations,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
+import { createFullRegistry } from "./registry";
 import { assertInvariants, captainOf, newGame } from "./testGame";
 
 const HUB = "port.crossroads_hub" as PortDefId;
@@ -56,13 +60,11 @@ function localsByName(world: World): Map<string, { postKey: string; x: number; y
 
 /** D66: is this local standing at (or beside, when it was taken) that post on the dock? */
 function nearPost(world: World, local: { x: number; y: number }, postKey: string): boolean {
-  const dock = Object.values(world.content.docks ?? {}).find(
-    (d) => d.id === world.state.deck.dock?.dockId,
-  );
-  const post = dock?.posts.find((p) => p.key === postKey);
-  if (dock === undefined || post === undefined) return false;
-  const px = post.tile.x - dock.shipAt.x + 0.5;
-  const py = post.tile.y - dock.shipAt.y + 0.5;
+  const berth = dockAlongside(world.content, world.state);
+  const post = berth?.dock.posts.find((p) => p.key === postKey);
+  if (berth === undefined || post === undefined) return false;
+  const px = post.tile.x - berth.shipAt.x + 0.5;
+  const py = post.tile.y - berth.shipAt.y + 0.5;
   return Math.abs(local.x - px) <= 2 && Math.abs(local.y - py) <= 2;
 }
 
@@ -216,7 +218,11 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
       (i) => i.jobId !== undefined && i.location.kind === "inExternalStore",
     );
     expect(inStore.length).toBeGreaterThan(0);
-    const restored = kernel.restore(old, bundle);
+    // D74: the game refuses every save older than schema 7; the frozen 3 → 6 migrations are run
+    // here with that refusal passed through.
+    const restored = restore(old, bundle, createFullRegistry(), {
+      migrations: { ...migrations, 6: (raw: unknown) => raw },
+    });
     expect(restored.state.deck.dock?.dockId).toBe(HUB_DOCK);
     // D66: migrated with an empty dockside; its first tick dresses the dock alongside.
     expect(restored.state.dockside.locals).toEqual({});

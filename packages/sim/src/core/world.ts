@@ -1,7 +1,9 @@
 /**
  * World creation and `advance` (SD §19.1). `createWorld` builds an empty `WorldState`,
- * instantiates the scenario deck, then spawns crew, stores and faults through the command path.
+ * instantiates the scenario deck, then spawns crew, stores and faults through the command path,
+ * then assigns berths and sets personal belongings down in lockers (D74).
  */
+import { assignBerths, stowPersonalItems } from "./berths";
 import { emptyCaches, rebuildCaches } from "./caches";
 import { configTicks } from "./clock";
 import { type ApplyCtx, applyCommandNow } from "./commands";
@@ -23,6 +25,7 @@ import type { SimEvent } from "./types/events";
 import type {
   CommandId,
   CompartmentId,
+  DeckDefId,
   LocalKey,
   MachineId,
   PortDefId,
@@ -49,6 +52,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     machines: {},
     power: { domains: {} },
     items: {},
+    berths: {},
     work: { problems: {}, tasks: {}, claims: {}, plannerRotation: 0 },
     travel: { stage: "docked", portId: scenario.startPortId },
     jobs: {},
@@ -64,6 +68,20 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     commands: { queue: [], recentIds: [], nextSeq: 1 },
     defs: { dynamic: { items: {}, crew: {} } },
   };
+}
+
+/**
+ * The ship's deck: the one deck instantiated in state (`state.deck.tiles` has a key per deck
+ * `createWorld` built). The bundle may hold several decks (other footprints); the scenario's is
+ * the only one in the world. Throws on none or several, which world creation rules out.
+ */
+export function shipDeckId(state: { readonly deck: Pick<WorldState["deck"], "tiles"> }): DeckDefId {
+  const ids = Object.keys(state.deck.tiles) as DeckDefId[];
+  const [only] = ids;
+  if (only === undefined || ids.length !== 1) {
+    throw new Error(`Expected exactly one ship deck in state, found ${ids.length}`);
+  }
+  return only;
 }
 
 /**
@@ -322,6 +340,9 @@ export function createWorld(
   for (const command of scenarioSetupCommands(scenario, deck, content, state)) {
     applyCommandNow(registry, ctx, command);
   }
+  // D74: berths by rank from tick 0, and each crew member's belongings in their locker.
+  assignBerths(state, deck, content);
+  stowPersonalItems(state, deck, content);
   seedInitialNeeds(state, values.needs.initialRange, rng);
   // D66: the dock a game starts alongside has its regulars at their posts from tick 0.
   if (state.deck.dock !== undefined) {

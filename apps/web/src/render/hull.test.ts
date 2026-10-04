@@ -5,15 +5,7 @@ import { engineOutput, hullGeometry } from "./hull";
 
 const DECK = "deck.test" as DeckDefId;
 
-const layout = {
-  width: 32,
-  height: 18,
-  compartmentTags: { bridge: ["bridge"], engineering: ["engineering"] },
-  compartmentBoxes: {
-    bridge: { minX: 0, minY: 0, maxX: 4, maxY: 8 },
-    engineering: { minX: 24, minY: 0, maxX: 32, maxY: 18 },
-  },
-};
+const layout = { width: 32, height: 18 };
 
 function machine(key: string, tags: LayoutMachine["tags"]): LayoutMachine {
   return {
@@ -31,14 +23,17 @@ function rendered(key: string, state: RenderMachineState): RenderMachine {
 }
 
 describe("hullGeometry", () => {
-  it("puts a nose fore of the deck and engine bells aft, never over the deck", () => {
+  it("puts the nose fore of the deck (+x) and engine bells aft (-x), never over the deck", () => {
     const hull = hullGeometry(layout);
-    expect(hull.bounds.minX).toBeLessThan(-1);
     expect(hull.bounds.maxX).toBeGreaterThan(layout.width + 1);
+    expect(hull.bounds.minX).toBeLessThan(-1);
+    // The nose's tip is the hull's bow-most point.
+    expect(Math.max(...hull.outline.map((p) => p.x))).toBe(hull.bounds.maxX);
     expect(hull.bells.length).toBeGreaterThan(0);
     for (const bell of hull.bells) {
-      expect(bell.throatX).toBeGreaterThanOrEqual(layout.width);
-      expect(bell.mouthX).toBeGreaterThan(bell.throatX);
+      expect(bell.throatX).toBeLessThanOrEqual(0);
+      expect(bell.mouthX).toBeLessThan(bell.throatX);
+      expect(bell.mouthX).toBe(hull.bounds.minX);
       expect(bell.mouthHalf).toBeGreaterThan(bell.throatHalf);
       expect(bell.y).toBeGreaterThan(0);
       expect(bell.y).toBeLessThan(layout.height);
@@ -48,6 +43,24 @@ describe("hullGeometry", () => {
       const inside = p.x > 0 && p.x < layout.width && p.y > 0 && p.y < layout.height;
       expect(inside).toBe(false);
     }
+  });
+
+  it("puts the bridge windows inside the nose, beyond the deck's bow wall", () => {
+    const hull = hullGeometry(layout);
+    expect(hull.windows.length).toBeGreaterThan(1);
+    for (const p of hull.windows) {
+      expect(p.x).toBeGreaterThan(layout.width);
+      expect(p.x).toBeLessThan(hull.bounds.maxX);
+    }
+  });
+
+  it("reads nothing but the deck's size: the same rectangle gives the same hull", () => {
+    const tagged = {
+      ...layout,
+      compartmentTags: { bridge: ["bridge"] },
+      compartmentBoxes: { bridge: { minX: 0, minY: 0, maxX: 4, maxY: 8 } },
+    };
+    expect(hullGeometry(tagged)).toEqual(hullGeometry(layout));
   });
 });
 

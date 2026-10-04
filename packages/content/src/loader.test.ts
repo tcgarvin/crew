@@ -55,9 +55,9 @@ describe("loadBundle", () => {
   it("gives every crew member a voice of their own (D38)", () => {
     const bundle = authoredBundle();
     const voices = Object.values(bundle.crew).map((c) => c.voice);
-    expect(voices).toHaveLength(9);
+    expect(voices).toHaveLength(10);
     for (const voice of voices) expect(voice.trim().split(/\s+/).length).toBeLessThan(60);
-    expect(new Set(voices).size).toBe(9);
+    expect(new Set(voices).size).toBe(10);
   });
 
   it("ships a generic passenger template with no skills, role tags or inventory", () => {
@@ -88,15 +88,77 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 8 crew plus the passenger template, 10 traits and the default scenario", () => {
+  it("has 9 crew plus the passenger template, 10 traits and the default scenario", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
       scenarios: Record<string, unknown>;
     };
-    expect(Object.keys(bundle.crew)).toHaveLength(9);
+    expect(Object.keys(bundle.crew)).toHaveLength(10);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
+  });
+
+  it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (D73)", () => {
+    const bundle = authoredBundle();
+    const scenario =
+      bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios];
+    expect(scenario?.deckId).toBe("deck.freighter_mk2");
+    expect(scenario?.crew).toHaveLength(9);
+    expect(scenario?.crew[0]).toBe("crew.mara_osei");
+    expect(scenario?.crew).toContain("crew.noor_haddad");
+  });
+
+  it("keeps Mk1 loadable as a second footprint beside Mk2 (D73)", () => {
+    const bundle = authoredBundle();
+    expect(Object.keys(bundle.decks).sort()).toEqual(["deck.freighter_mk1", "deck.freighter_mk2"]);
+  });
+
+  it("gives Mk2 a bed for every crew member and a spare, and every bunk a locker (D73)", () => {
+    const bundle = authoredBundle();
+    const deck = bundle.decks["deck.freighter_mk2" as keyof typeof bundle.decks];
+    if (deck === undefined) throw new Error("no Mk2");
+    const beds = deck.machines.filter((m) => bundle.machines[m.machineDefId]?.tags.includes("bed"));
+    expect(beds).toHaveLength(12);
+    const lockerOwners = deck.zones
+      .filter((z) => z.tags.includes("locker"))
+      .map((z) => z.machineKey);
+    expect(lockerOwners.sort()).toEqual(beds.map((b) => b.key).sort());
+  });
+
+  it("puts no crew spawn point of either deck on a machine or its interaction tile (D73)", () => {
+    const bundle = authoredBundle();
+    for (const deck of Object.values(bundle.decks)) {
+      const taken = new Set<string>();
+      for (const placement of deck.machines) {
+        const def = bundle.machines[placement.machineDefId];
+        if (def === undefined) throw new Error(`unknown machine ${placement.machineDefId}`);
+        const turn = (o: { x: number; y: number }) =>
+          placement.rotation === 0
+            ? o
+            : placement.rotation === 180
+              ? { x: -o.x, y: -o.y }
+              : placement.rotation === 90
+                ? { x: -o.y, y: o.x }
+                : { x: o.y, y: -o.x };
+        const offsets = [...def.footprint, ...def.interactionPositions.map((p) => p.offset)];
+        for (const offset of offsets) {
+          const t = turn(offset);
+          taken.add(`${placement.origin.x + t.x},${placement.origin.y + t.y}`);
+        }
+      }
+      const crewSpawns = deck.spawnPoints.filter((p) => p.tags.includes("crew"));
+      for (const point of crewSpawns) {
+        expect(taken.has(`${point.tile.x},${point.tile.y}`), `${deck.id} ${point.key}`).toBe(false);
+      }
+    }
+  });
+
+  it("tags the harmonica and the old photograph as personal belongings", () => {
+    const bundle = authoredBundle();
+    for (const id of ["item.harmonica", "item.old_photograph"]) {
+      expect(bundle.items[id as keyof typeof bundle.items]?.tags).toContain("personal");
+    }
   });
 });
 

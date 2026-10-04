@@ -23,7 +23,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["tool", "consumable", "food", "spare", "cargo", "medical", "container"]
+        "enum": ["tool", "consumable", "food", "spare", "cargo", "medical", "container", "personal"]
       }
     },
     "toolKinds": {

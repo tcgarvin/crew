@@ -181,6 +181,8 @@ export interface UniqueItem extends ItemBase {
   condition: number;
   /** Actor holding an exclusive reservation for pickup (e.g. the one tool kit). */
   reservedBy?: ActorId;
+  /** D74: whose belonging this is (a `personal` item). Absent = nobody's in particular. */
+  ownerId?: ActorId;
 }
 
 export interface StackItem extends ItemBase {

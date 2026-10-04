@@ -8,44 +8,49 @@
     "wall": "#17151c",
     "accent": "#c9a86a"
   },
-  "width": 36,
-  "height": 25,
+  "width": 40,
+  "height": 28,
   "rows": [
-    "####################################",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "  BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB  ",
-    "#..................................#",
-    "#..................................#",
-    "#..................................#",
-    "#..................................#",
-    "#..................................#",
-    "#####...########...#######...#######"
+    "########################################",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "#......................................#",
+    "#......................................#",
+    "#......................................#",
+    "#......................................#",
+    "#......................................#",
+    "#......................................#",
+    "###########...#########...#######...####"
   ],
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 2,
-    "y": 1
+  "berth": {
+    "origin": {
+      "x": 2,
+      "y": 1
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -53,8 +58,8 @@
       "kind": "kiosk",
       "name": "the dock keeper's lectern",
       "tile": {
-        "x": 9,
-        "y": 20
+        "x": 30,
+        "y": 22
       },
       "facing": "n"
     },
@@ -63,8 +68,8 @@
       "kind": "gate",
       "name": "the chapel doors",
       "tile": {
-        "x": 17,
-        "y": 24
+        "x": 34,
+        "y": 27
       },
       "facing": "n"
     },
@@ -73,8 +78,8 @@
       "kind": "marketStall",
       "name": "the apothecary stall",
       "tile": {
-        "x": 6,
-        "y": 24
+        "x": 24,
+        "y": 27
       },
       "facing": "n"
     },
@@ -83,8 +88,8 @@
       "kind": "warehouseDoor",
       "name": "the Gate Stores hatch",
       "tile": {
-        "x": 27,
-        "y": 24
+        "x": 12,
+        "y": 27
       },
       "facing": "n"
     },
@@ -93,8 +98,8 @@
       "kind": "bench",
       "name": "the bench by the chapel doors",
       "tile": {
-        "x": 13,
-        "y": 23
+        "x": 31,
+        "y": 25
       },
       "facing": "n"
     }
@@ -104,8 +109,8 @@
       "key": "staging",
       "kind": "freightStaging",
       "rect": {
-        "x": 20,
-        "y": 21,
+        "x": 17,
+        "y": 23,
         "w": 3,
         "h": 2
       }
@@ -114,8 +119,8 @@
       "key": "delivery",
       "kind": "deliveryBay",
       "rect": {
-        "x": 30,
-        "y": 21,
+        "x": 10,
+        "y": 24,
         "w": 3,
         "h": 2
       }
@@ -126,8 +131,8 @@
       "key": "candles_chapel",
       "kind": "lamp",
       "rect": {
-        "x": 19,
-        "y": 23,
+        "x": 36,
+        "y": 26,
         "w": 1,
         "h": 1
       },
@@ -138,8 +143,8 @@
       "key": "memorial_planters",
       "kind": "planter",
       "rect": {
-        "x": 1,
-        "y": 21,
+        "x": 38,
+        "y": 23,
         "w": 1,
         "h": 2
       },
@@ -150,8 +155,8 @@
       "key": "med_crates",
       "kind": "crates",
       "rect": {
-        "x": 33,
-        "y": 19,
+        "x": 26,
+        "y": 26,
         "w": 2,
         "h": 1
       },
@@ -165,7 +170,7 @@
       "rect": {
         "x": 0,
         "y": 0,
-        "w": 36,
+        "w": 40,
         "h": 1
       }
     },
@@ -173,8 +178,8 @@
       "kind": "terminalEdge",
       "rect": {
         "x": 0,
-        "y": 24,
-        "w": 36,
+        "y": 27,
+        "w": 40,
         "h": 1
       }
     }

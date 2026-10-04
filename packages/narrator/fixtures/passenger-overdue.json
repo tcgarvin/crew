@@ -9,10 +9,10 @@
     "tick": 9430
   },
   "snapshot": {
-    "schemaVersion": 6,
+    "schemaVersion": 7,
     "simVersion": "0.1.0",
-    "contentHash": "3aad0af79e160231",
-    "configHash": "3aad0af79e160231",
+    "contentHash": "9ca94c7aa56944bb",
+    "configHash": "9ca94c7aa56944bb",
     "savedAtTick": 9430,
     "config": {
       "time": {
@@ -164,6 +164,7 @@
           "contractCompleted",
           "departureRiskAccepted",
           "departureHoldLifted",
+          "departureRepairOutOfReach",
           "passengerReturned"
         ]
       },
@@ -212,24 +213,24 @@
       }
     },
     "state": {
-      "schemaVersion": 6,
+      "schemaVersion": 7,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 29,
       "tick": 9430,
       "rng": {
-        "setup": [2984924728, 2431851168, 381768267, 1069204439],
-        "failures": [810186448, 3974150066, 697000389, 1141189366],
+        "setup": [4230596768, 1685654044, 1869376924, 1069204443],
+        "failures": [682787655, 4067609378, 1721548947, 1141189382],
         "perception": [3791142992, 4269426098, 1564997300, 2411552688],
         "social": [2995647493, 3415600381, 2033674554, 2086814347],
         "commerce": [2286767076, 1009815394, 165056437, 1549769749],
         "narrator": [2663688086, 1766195951, 2510589834, 1466252469]
       },
       "nextId": {
-        "actor": 10,
-        "machine": 18,
-        "item": 12,
-        "door": 11,
-        "compartment": 9,
+        "actor": 11,
+        "machine": 34,
+        "item": 13,
+        "door": 20,
+        "compartment": 17,
         "task": 1,
         "problem": 1,
         "job": 2,
@@ -248,9 +249,9 @@
           "roleTags": ["captain"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 2.5,
-            "y": 3.5
+            "deckId": "deck.freighter_mk2",
+            "x": 31.5,
+            "y": 4.5
           },
           "movement": {
             "kind": "stationary"
@@ -296,8 +297,8 @@
           "roleTags": ["firstOfficer"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 1.5,
+            "deckId": "deck.freighter_mk2",
+            "x": 30.5,
             "y": 2.5
           },
           "movement": {
@@ -344,9 +345,9 @@
           "roleTags": ["engineer"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 26.5,
-            "y": 5.5
+            "deckId": "deck.freighter_mk2",
+            "x": 3.5,
+            "y": 4.5
           },
           "movement": {
             "kind": "stationary"
@@ -392,9 +393,9 @@
           "roleTags": ["engineer", "deckhand"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 28.5,
-            "y": 7.5
+            "deckId": "deck.freighter_mk2",
+            "x": 3.5,
+            "y": 9.5
           },
           "movement": {
             "kind": "stationary"
@@ -440,8 +441,8 @@
           "roleTags": ["pilot"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 2.5,
+            "deckId": "deck.freighter_mk2",
+            "x": 33.5,
             "y": 1.5
           },
           "movement": {
@@ -488,9 +489,9 @@
           "roleTags": ["cook"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 15.5,
-            "y": 3.5
+            "deckId": "deck.freighter_mk2",
+            "x": 20.5,
+            "y": 10.5
           },
           "movement": {
             "kind": "stationary"
@@ -536,9 +537,9 @@
           "roleTags": ["medic"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 22.5,
-            "y": 2.5
+            "deckId": "deck.freighter_mk2",
+            "x": 33.5,
+            "y": 11.5
           },
           "movement": {
             "kind": "stationary"
@@ -584,9 +585,9 @@
           "roleTags": ["deckhand"],
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
+            "deckId": "deck.freighter_mk2",
             "x": 12.5,
-            "y": 14.5
+            "y": 16.5
           },
           "movement": {
             "kind": "stationary"
@@ -627,6 +628,54 @@
         },
         "a9": {
           "id": "a9",
+          "defId": "crew.noor_haddad",
+          "name": "Noor Haddad",
+          "roleTags": ["pilot"],
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 13.5,
+            "y": 3.5
+          },
+          "movement": {
+            "kind": "stationary"
+          },
+          "facing": 0,
+          "needs": {
+            "hunger": 0.14,
+            "fatigue": 0.73,
+            "comfort": 0.1,
+            "social": 0.56
+          },
+          "capacities": {
+            "movement": 1,
+            "manipulation": 1,
+            "consciousness": 1
+          },
+          "skills": {
+            "piloting": 3,
+            "cargo": 2,
+            "engineering": 1,
+            "electrical": 1,
+            "medical": 1,
+            "cooking": 1
+          },
+          "traits": [],
+          "mood": 0,
+          "schedule": {
+            "shiftKey": "beta"
+          },
+          "activity": {
+            "kind": "idle"
+          },
+          "lastPlannedTick": 0,
+          "knowledge": {},
+          "navigationKnowledgeRevision": 0,
+          "availability": "available",
+          "crew": true
+        },
+        "a10": {
+          "id": "a10",
           "defId": "crew.passenger",
           "name": "Halla Thorne",
           "roleTags": [],
@@ -670,59 +719,99 @@
       "compartments": {
         "c1": {
           "id": "c1",
-          "deckId": "deck.freighter_mk1",
+          "deckId": "deck.freighter_mk2",
           "key": "bridge"
         },
         "c2": {
           "id": "c2",
-          "deckId": "deck.freighter_mk1",
-          "key": "quarters"
+          "deckId": "deck.freighter_mk2",
+          "key": "captains_cabin"
         },
         "c3": {
           "id": "c3",
-          "deckId": "deck.freighter_mk1",
-          "key": "galley"
+          "deckId": "deck.freighter_mk2",
+          "key": "officers_cabin"
         },
         "c4": {
           "id": "c4",
-          "deckId": "deck.freighter_mk1",
-          "key": "infirmary"
+          "deckId": "deck.freighter_mk2",
+          "key": "passenger_cabin"
         },
         "c5": {
           "id": "c5",
-          "deckId": "deck.freighter_mk1",
-          "key": "engineering"
+          "deckId": "deck.freighter_mk2",
+          "key": "quarters"
         },
         "c6": {
           "id": "c6",
-          "deckId": "deck.freighter_mk1",
-          "key": "corridor"
+          "deckId": "deck.freighter_mk2",
+          "key": "lounge"
         },
         "c7": {
           "id": "c7",
-          "deckId": "deck.freighter_mk1",
-          "key": "cargoHold"
+          "deckId": "deck.freighter_mk2",
+          "key": "engineering"
         },
         "c8": {
           "id": "c8",
-          "deckId": "deck.freighter_mk1",
+          "deckId": "deck.freighter_mk2",
+          "key": "corridor"
+        },
+        "c9": {
+          "id": "c9",
+          "deckId": "deck.freighter_mk2",
+          "key": "cross_passage"
+        },
+        "c10": {
+          "id": "c10",
+          "deckId": "deck.freighter_mk2",
+          "key": "infirmary"
+        },
+        "c11": {
+          "id": "c11",
+          "deckId": "deck.freighter_mk2",
           "key": "airlock"
+        },
+        "c12": {
+          "id": "c12",
+          "deckId": "deck.freighter_mk2",
+          "key": "mess"
+        },
+        "c13": {
+          "id": "c13",
+          "deckId": "deck.freighter_mk2",
+          "key": "galley"
+        },
+        "c14": {
+          "id": "c14",
+          "deckId": "deck.freighter_mk2",
+          "key": "stores"
+        },
+        "c15": {
+          "id": "c15",
+          "deckId": "deck.freighter_mk2",
+          "key": "gym"
+        },
+        "c16": {
+          "id": "c16",
+          "deckId": "deck.freighter_mk2",
+          "key": "cargoHold"
         }
       },
       "deck": {
         "tiles": {
-          "deck.freighter_mk1": {}
+          "deck.freighter_mk2": {}
         },
         "geometryRevision": 0,
         "dock": {
           "dockId": "dock.ossory_station",
-          "deckId": "deck.freighter_mk1"
+          "deckId": "deck.freighter_mk2"
         }
       },
       "doors": {
         "d1": {
           "id": "d1",
-          "deckId": "deck.freighter_mk1",
+          "deckId": "deck.freighter_mk2",
           "placementKey": "bridge_corridor",
           "kind": "interior",
           "physicalState": "closed",
@@ -736,11 +825,11 @@
         },
         "d2": {
           "id": "d2",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "personnel_ramp",
-          "kind": "ramp",
-          "physicalState": "open",
-          "requestedState": "open",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "captains_cabin_corridor",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
           "transitionProgress": 0,
           "integrity": 1,
           "sealQuality": 1,
@@ -750,8 +839,8 @@
         },
         "d3": {
           "id": "d3",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "airlock_corridor",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "officers_cabin_corridor",
           "kind": "interior",
           "physicalState": "closed",
           "requestedState": "closed",
@@ -764,11 +853,11 @@
         },
         "d4": {
           "id": "d4",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "quarters_corridor",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "passenger_cabin_corridor",
           "kind": "interior",
-          "physicalState": "open",
-          "requestedState": "open",
+          "physicalState": "closed",
+          "requestedState": "closed",
           "transitionProgress": 0,
           "integrity": 1,
           "sealQuality": 1,
@@ -778,8 +867,8 @@
         },
         "d5": {
           "id": "d5",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "galley_corridor",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "quarters_corridor",
           "kind": "interior",
           "physicalState": "open",
           "requestedState": "open",
@@ -792,11 +881,11 @@
         },
         "d6": {
           "id": "d6",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "infirmary_corridor",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "lounge_corridor",
           "kind": "interior",
-          "physicalState": "closed",
-          "requestedState": "closed",
+          "physicalState": "open",
+          "requestedState": "open",
           "transitionProgress": 0,
           "integrity": 1,
           "sealQuality": 1,
@@ -806,8 +895,8 @@
         },
         "d7": {
           "id": "d7",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "cargo_corridor",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "engineering_corridor",
           "kind": "interior",
           "physicalState": "open",
           "requestedState": "open",
@@ -820,21 +909,7 @@
         },
         "d8": {
           "id": "d8",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "engineering_corridor",
-          "kind": "interior",
-          "physicalState": "open",
-          "requestedState": "open",
-          "transitionProgress": 0,
-          "integrity": 1,
-          "sealQuality": 1,
-          "actuatorFault": false,
-          "manualOperationSupported": true,
-          "occupants": []
-        },
-        "d9": {
-          "id": "d9",
-          "deckId": "deck.freighter_mk1",
+          "deckId": "deck.freighter_mk2",
           "placementKey": "engineering_cargo",
           "kind": "interior",
           "physicalState": "closed",
@@ -846,9 +921,149 @@
           "manualOperationSupported": true,
           "occupants": []
         },
+        "d9": {
+          "id": "d9",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "cargo_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
         "d10": {
           "id": "d10",
-          "deckId": "deck.freighter_mk1",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "galley_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d11": {
+          "id": "d11",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "mess_corridor",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d12": {
+          "id": "d12",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "mess_cross_passage",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d13": {
+          "id": "d13",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "stores_galley",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d14": {
+          "id": "d14",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "stores_cargo",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d15": {
+          "id": "d15",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "gym_cross_passage",
+          "kind": "interior",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d16": {
+          "id": "d16",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "infirmary_corridor",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d17": {
+          "id": "d17",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "airlock_cross_passage",
+          "kind": "interior",
+          "physicalState": "closed",
+          "requestedState": "closed",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d18": {
+          "id": "d18",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "personnel_ramp",
+          "kind": "ramp",
+          "physicalState": "open",
+          "requestedState": "open",
+          "transitionProgress": 0,
+          "integrity": 1,
+          "sealQuality": 1,
+          "actuatorFault": false,
+          "manualOperationSupported": true,
+          "occupants": []
+        },
+        "d19": {
+          "id": "d19",
+          "deckId": "deck.freighter_mk2",
           "placementKey": "cargo_ramp",
           "kind": "ramp",
           "physicalState": "open",
@@ -864,9 +1079,9 @@
       "machines": {
         "m1": {
           "id": "m1",
-          "defId": "machine.bridge_console",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bridge_console_1",
+          "defId": "machine.helm",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "helm_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -888,9 +1103,9 @@
         },
         "m2": {
           "id": "m2",
-          "defId": "machine.engine",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "engine_1",
+          "defId": "machine.nav_terminal",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "nav_terminal_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -912,9 +1127,9 @@
         },
         "m3": {
           "id": "m3",
-          "defId": "machine.coolant_pump",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "coolant_pump_1",
+          "defId": "machine.ops_terminal",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "ops_terminal_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -936,9 +1151,9 @@
         },
         "m4": {
           "id": "m4",
-          "defId": "machine.generator",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "generator_1",
+          "defId": "machine.captains_chair",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "captains_chair_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -960,9 +1175,9 @@
         },
         "m5": {
           "id": "m5",
-          "defId": "machine.battery_bank",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "battery_bank_1",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "captain_bunk",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -979,15 +1194,14 @@
           "lastMaintainedTick": 0,
           "maintenanceProgress": 0,
           "roleState": {
-            "role": "battery",
-            "storedKj": 36000
+            "role": "none"
           }
         },
         "m6": {
           "id": "m6",
-          "defId": "machine.life_support",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "life_support_1",
+          "defId": "machine.desk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "captain_desk",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1009,9 +1223,9 @@
         },
         "m7": {
           "id": "m7",
-          "defId": "machine.galley_stove",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "galley_stove_1",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "first_officer_bunk",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1033,9 +1247,9 @@
         },
         "m8": {
           "id": "m8",
-          "defId": "machine.medbay_bed",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "medbay_bed_1",
+          "defId": "machine.desk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "first_officer_desk",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1057,9 +1271,9 @@
         },
         "m9": {
           "id": "m9",
-          "defId": "machine.cargo_crane",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "cargo_crane_1",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "passenger_bunk_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1082,8 +1296,8 @@
         "m10": {
           "id": "m10",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_1",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "passenger_bunk_2",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1106,8 +1320,8 @@
         "m11": {
           "id": "m11",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_2",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_1",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1130,8 +1344,8 @@
         "m12": {
           "id": "m12",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_3",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_2",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1154,8 +1368,8 @@
         "m13": {
           "id": "m13",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_4",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_3",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1178,8 +1392,8 @@
         "m14": {
           "id": "m14",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_5",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_4",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1202,8 +1416,8 @@
         "m15": {
           "id": "m15",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_6",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_5",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1226,8 +1440,8 @@
         "m16": {
           "id": "m16",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_7",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_6",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1250,8 +1464,8 @@
         "m17": {
           "id": "m17",
           "defId": "machine.bunk",
-          "deckId": "deck.freighter_mk1",
-          "placementKey": "bunk_8",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_7",
           "integrity": 1,
           "condition": 1,
           "desiredMode": "on",
@@ -1264,6 +1478,391 @@
           "failure": {
             "accumulatedHazard": 0,
             "threshold": 1.7902228445519002
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m18": {
+          "id": "m18",
+          "defId": "machine.bunk",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "bunk_8",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.47746177964098474
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m19": {
+          "id": "m19",
+          "defId": "machine.games_table",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "games_table_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.0510429595963746
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m20": {
+          "id": "m20",
+          "defId": "machine.vid_screen",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "vid_screen_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.14425525178409088
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m21": {
+          "id": "m21",
+          "defId": "machine.engine",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "engine_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.5286073105722338
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m22": {
+          "id": "m22",
+          "defId": "machine.coolant_pump",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "coolant_pump_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.4359067766981968
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m23": {
+          "id": "m23",
+          "defId": "machine.generator",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "generator_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.6520403581615661
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m24": {
+          "id": "m24",
+          "defId": "machine.battery_bank",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "battery_bank_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.9842119460110841
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "battery",
+            "storedKj": 36000
+          }
+        },
+        "m25": {
+          "id": "m25",
+          "defId": "machine.life_support",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "life_support_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.018533133341376358
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m26": {
+          "id": "m26",
+          "defId": "machine.engineering_console",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "engineering_console_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.5393775737345563
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m27": {
+          "id": "m27",
+          "defId": "machine.workbench",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "workbench_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.06174033991652632
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m28": {
+          "id": "m28",
+          "defId": "machine.medbay_bed",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "medbay_bed_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.2910808523127559
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m29": {
+          "id": "m29",
+          "defId": "machine.mess_table",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "mess_table_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.8529349512185731
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m30": {
+          "id": "m30",
+          "defId": "machine.mess_table",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "mess_table_2",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.3909876561691
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m31": {
+          "id": "m31",
+          "defId": "machine.galley_stove",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "galley_stove_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.8909389437565982
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m32": {
+          "id": "m32",
+          "defId": "machine.exercise_rig",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "exercise_rig_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 1.072971907541245
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
+        },
+        "m33": {
+          "id": "m33",
+          "defId": "machine.cargo_crane",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "cargo_crane_1",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.8661554064453806
           },
           "lastMaintainedTick": 0,
           "maintenanceProgress": 0,
@@ -1289,10 +1888,13 @@
           "defId": "item.old_photograph",
           "stacking": "unique",
           "location": {
-            "kind": "carriedBy",
-            "actorId": "a1"
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 25.5,
+            "y": 1.5
           },
-          "condition": 1
+          "condition": 1,
+          "ownerId": "a1"
         },
         "i2": {
           "id": "i2",
@@ -1309,10 +1911,13 @@
           "defId": "item.harmonica",
           "stacking": "unique",
           "location": {
-            "kind": "carriedBy",
-            "actorId": "a6"
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 18.5,
+            "y": 0.5
           },
-          "condition": 1
+          "condition": 1,
+          "ownerId": "a6"
         },
         "i4": {
           "id": "i4",
@@ -1320,9 +1925,9 @@
           "stacking": "unique",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 8.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
           },
           "condition": 1
         },
@@ -1332,36 +1937,35 @@
           "stacking": "unique",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 9.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 8.5,
+            "y": 10.5
           },
           "condition": 1
         },
         "i6": {
           "id": "i6",
+          "defId": "item.welder_torch",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
+          },
+          "condition": 1
+        },
+        "i7": {
+          "id": "i7",
           "defId": "item.spare_parts_stack",
           "stacking": "stack",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 8.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
           },
           "count": 10,
-          "reserved": 0
-        },
-        "i7": {
-          "id": "i7",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 8.5,
-            "y": 12.5
-          },
-          "count": 20,
           "reserved": 0
         },
         "i8": {
@@ -1370,51 +1974,75 @@
           "stacking": "stack",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 9.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
           },
           "count": 20,
           "reserved": 0
         },
         "i9": {
           "id": "i9",
-          "defId": "item.coolant_canister",
+          "defId": "item.ration_pack",
           "stacking": "stack",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
+            "deckId": "deck.freighter_mk2",
             "x": 8.5,
-            "y": 12.5
+            "y": 10.5
           },
-          "count": 4,
+          "count": 20,
           "reserved": 0
         },
         "i10": {
           "id": "i10",
-          "defId": "item.med_kit",
+          "defId": "item.coolant_canister",
           "stacking": "stack",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 8.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
           },
-          "count": 3,
+          "count": 4,
           "reserved": 0
         },
         "i11": {
           "id": "i11",
+          "defId": "item.med_kit",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
+          },
+          "count": 3,
+          "reserved": 0
+        },
+        "i12": {
+          "id": "i12",
           "defId": "item.hand_truck",
           "stacking": "unique",
           "location": {
             "kind": "onDeck",
-            "deckId": "deck.freighter_mk1",
-            "x": 8.5,
-            "y": 12.5
+            "deckId": "deck.freighter_mk2",
+            "x": 7.5,
+            "y": 10.5
           },
           "condition": 1
         }
+      },
+      "berths": {
+        "a1": "captain_bunk",
+        "a2": "first_officer_bunk",
+        "a3": "bunk_1",
+        "a4": "bunk_2",
+        "a5": "bunk_3",
+        "a6": "bunk_4",
+        "a7": "bunk_5",
+        "a8": "bunk_6",
+        "a9": "bunk_7"
       },
       "work": {
         "problems": {},
@@ -1458,7 +2086,7 @@
           "expiresAtTick": 14900,
           "cargoItemIds": [],
           "passage": {
-            "actorId": "a9",
+            "actorId": "a10",
             "roundTrip": true,
             "leg": "ashore",
             "ashoreSinceTick": 7000,
@@ -1580,9 +2208,9 @@
             },
             "postKey": "yard_gate",
             "location": {
-              "deckId": "deck.freighter_mk1",
-              "x": 22.5,
-              "y": 25.5
+              "deckId": "deck.freighter_mk2",
+              "x": 11.5,
+              "y": 26.5
             },
             "facing": -1.5707963267948966,
             "movement": {
@@ -1591,8 +2219,8 @@
             "behaviour": {
               "kind": "atPost",
               "home": {
-                "x": 22,
-                "y": 25
+                "x": 11,
+                "y": 26
               },
               "nextShuffleTick": 9431
             },
@@ -1608,9 +2236,9 @@
             },
             "postKey": "claims_office",
             "location": {
-              "deckId": "deck.freighter_mk1",
-              "x": 7.5,
-              "y": 25.5
+              "deckId": "deck.freighter_mk2",
+              "x": 27.5,
+              "y": 26.5
             },
             "facing": -1.5707963267948966,
             "movement": {
@@ -1619,8 +2247,8 @@
             "behaviour": {
               "kind": "atPost",
               "home": {
-                "x": 7,
-                "y": 25
+                "x": 27,
+                "y": 26
               },
               "nextShuffleTick": 9431
             },
@@ -1639,7 +2267,7 @@
               "key": "commerce.passengerOverdue",
               "params": {
                 "jobId": "j1",
-                "actorId": "a9",
+                "actorId": "a10",
                 "name": "Halla Thorne",
                 "port": "port.ossory_station",
                 "speaker": "Dane Whitcross"
@@ -1729,13 +2357,13 @@
       "tick": 7000,
       "seq": 0,
       "type": "passengerAshore",
-      "subjectIds": ["a9", "j1"],
+      "subjectIds": ["a10", "j1"],
       "causeIds": [],
       "source": "sim",
       "significance": "notable",
       "payload": {
         "jobId": "j1",
-        "actorId": "a9",
+        "actorId": "a10",
         "name": "Halla Thorne",
         "portId": "port.ossory_station"
       }

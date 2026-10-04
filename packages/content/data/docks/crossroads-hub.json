@@ -8,47 +8,50 @@
     "wall": "#1d222c",
     "accent": "#f2a93b"
   },
-  "width": 38,
-  "height": 28,
+  "width": 40,
+  "height": 29,
   "rows": [
-    "######################################",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "   BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB   ",
-    "......................................",
-    "......................................",
-    "......................................",
-    "......................................",
-    "......................................",
-    "......................................",
-    "......................................",
-    "...............#...............#......",
-    "######################################"
+    "########################################",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "                                        ",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........#..................#............",
+    "########################################"
   ],
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 3,
-    "y": 1
+  "berth": {
+    "origin": {
+      "x": 2,
+      "y": 1
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -56,8 +59,8 @@
       "kind": "kiosk",
       "name": "the queue-board kiosk",
       "tile": {
-        "x": 10,
-        "y": 21
+        "x": 31,
+        "y": 23
       },
       "facing": "n"
     },
@@ -67,7 +70,7 @@
       "name": "the night-market stall",
       "tile": {
         "x": 1,
-        "y": 24
+        "y": 25
       },
       "facing": "e"
     },
@@ -76,8 +79,8 @@
       "kind": "gate",
       "name": "the transit lounge gate",
       "tile": {
-        "x": 6,
-        "y": 26
+        "x": 35,
+        "y": 27
       },
       "facing": "n"
     },
@@ -86,8 +89,8 @@
       "kind": "warehouseDoor",
       "name": "the Co-op dispatch window",
       "tile": {
-        "x": 24,
-        "y": 26
+        "x": 12,
+        "y": 27
       },
       "facing": "n"
     },
@@ -96,8 +99,8 @@
       "kind": "bench",
       "name": "the bench by the lounge gate",
       "tile": {
-        "x": 10,
-        "y": 26
+        "x": 32,
+        "y": 27
       },
       "facing": "n"
     }
@@ -107,8 +110,8 @@
       "key": "staging",
       "kind": "freightStaging",
       "rect": {
-        "x": 19,
-        "y": 22,
+        "x": 18,
+        "y": 23,
         "w": 4,
         "h": 3
       }
@@ -117,8 +120,8 @@
       "key": "delivery",
       "kind": "deliveryBay",
       "rect": {
-        "x": 26,
-        "y": 22,
+        "x": 10,
+        "y": 24,
         "w": 4,
         "h": 3
       }
@@ -129,8 +132,8 @@
       "key": "crates_aft",
       "kind": "crates",
       "rect": {
-        "x": 32,
-        "y": 21,
+        "x": 4,
+        "y": 22,
         "w": 3,
         "h": 2
       },
@@ -141,8 +144,8 @@
       "key": "crates_corner",
       "kind": "crates",
       "rect": {
-        "x": 35,
-        "y": 24,
+        "x": 37,
+        "y": 23,
         "w": 2,
         "h": 2
       },
@@ -153,8 +156,8 @@
       "key": "container_aft",
       "kind": "container",
       "rect": {
-        "x": 33,
-        "y": 25,
+        "x": 4,
+        "y": 26,
         "w": 2,
         "h": 1
       },
@@ -165,8 +168,8 @@
       "key": "drums",
       "kind": "barrels",
       "rect": {
-        "x": 13,
-        "y": 24,
+        "x": 25,
+        "y": 25,
         "w": 2,
         "h": 1
       },
@@ -177,8 +180,8 @@
       "key": "bollard_fore",
       "kind": "bollard",
       "rect": {
-        "x": 0,
-        "y": 19,
+        "x": 39,
+        "y": 21,
         "w": 1,
         "h": 1
       },
@@ -189,8 +192,8 @@
       "key": "bollard_aft",
       "kind": "bollard",
       "rect": {
-        "x": 37,
-        "y": 19,
+        "x": 0,
+        "y": 21,
         "w": 1,
         "h": 1
       },
@@ -202,7 +205,7 @@
       "kind": "lamp",
       "rect": {
         "x": 0,
-        "y": 26,
+        "y": 27,
         "w": 1,
         "h": 1
       },
@@ -216,7 +219,7 @@
       "rect": {
         "x": 0,
         "y": 0,
-        "w": 38,
+        "w": 40,
         "h": 1
       }
     },
@@ -226,7 +229,7 @@
         "x": 12,
         "y": 0,
         "w": 1,
-        "h": 19
+        "h": 21
       }
     },
     {
@@ -235,15 +238,15 @@
         "x": 28,
         "y": 0,
         "w": 1,
-        "h": 19
+        "h": 21
       }
     },
     {
       "kind": "terminalEdge",
       "rect": {
         "x": 0,
-        "y": 27,
-        "w": 38,
+        "y": 28,
+        "w": 40,
         "h": 1
       }
     }

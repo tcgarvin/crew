@@ -638,7 +638,7 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
       portId: PORTS.c,
       voyageDestinationId: PORTS.d,
       departureRiskAccepted: true,
-      acceptedImpairmentKey: `${theEngine(world).id}:fault`,
+      acceptedImpairmentKey: `${theEngine(world).id}:wornBearing`,
     });
 
     // Through the waypoint without a second card, still faulty.
@@ -652,7 +652,7 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     expectGateAsked(kernel, world);
   });
 
-  it("asks again at a waypoint when the impaired set has changed since 'leave anyway'", () => {
+  it("asks again at a waypoint when a new fault joins the impaired machine since 'leave anyway'", () => {
     const { world, kernel } = freightTestWorld();
     addFault(world, "wornBearing");
     setCourseTo(kernel, world, PORTS.d);
@@ -660,11 +660,16 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     resolveGate(kernel, world, "right");
     advanceUntil(kernel, world, dockedAt(PORTS.c));
 
-    // The same fault now derates output: a different impairment, so the engineer speaks again.
+    // The same fault now derating output is not news (D75): the answer stands.
     theEngine(world).output = 0.5;
+    kernel.advance(world, 1);
+    expect(world.state.travel.departureRiskAccepted).toBe(true);
+    expect(world.state.decisions.queue).toEqual([]);
+
+    // A second fault on the already impaired engine is: the engineer speaks again.
+    addFault(world, "hotPanel");
     expectGateAsked(kernel, world, 20);
     expect(pendingGate(world)?.prompt.params.reason).toBe("faultDerated");
-    expect(world.state.travel).toMatchObject({ stage: "docked", portId: PORTS.c });
   });
 
   it("a repair on the way clears the answer, so a new fault later asks again; a healthy ship never does", () => {
@@ -709,6 +714,23 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     });
   });
 
+  it("a repair that leaves the machine impaired still asks again", () => {
+    const { world, kernel } = freightTestWorld();
+    addFault(world, "wornBearing");
+    addFault(world, "hotPanel");
+    theEngine(world).temperature = 1; // blocked, and stays so: no equipment system runs here
+    setCourseTo(kernel, world, PORTS.d);
+    expectGateAsked(kernel, world);
+    expect(pendingGate(world)?.prompt.params.reason).toBe("blocked");
+    resolveGate(kernel, world, "right");
+    advanceUntil(kernel, world, dockedAt(PORTS.c));
+    expect(world.state.decisions.queue).toEqual([]);
+
+    theEngine(world).faults = theEngine(world).faults.filter((f) => f.faultKey !== "hotPanel");
+    expectGateAsked(kernel, world, 20);
+    expect(pendingGate(world)?.prompt.params.reason).toBe("blocked");
+  });
+
   it("honours a pre-voyage save's 'leave anyway' that carries no impairment key", () => {
     const { world, kernel } = freightTestWorld();
     addFault(world, "wornBearing");
@@ -723,4 +745,82 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     expect(world.state.decisions.queue).toEqual([]);
     expect(world.state.travel.stage).toBe("transit");
   });
+});
+
+// ---------------------------------------------------------------------------------------------
+// D75: an engine hovering at its temperature limit is asked about once
+// ---------------------------------------------------------------------------------------------
+
+describe("departure gate at the temperature limit (D75)", () => {
+  /**
+   * Stand-in for the equipment system (not registered here): an overheat fault holds the engine
+   * at its limit, so it is blocked one tick (temperature 1, off) and just under it the next
+   * (cooling, output a trickle), the reason flipping between `blocked` and the next one down.
+   */
+  function hoverAtTemperatureLimit(world: GateWorld["world"], registry: GateWorld["registry"]) {
+    registry.registerSystem({
+      name: "hoverAtTemperatureLimit",
+      phase: "topology",
+      run: (ctx) => {
+        const engine = theEngine(world);
+        const atLimit = ctx.tick % 2 === 0;
+        engine.temperature = atLimit ? 1 : 0.99;
+        engine.output = atLimit ? 0 : 0.05;
+      },
+    });
+  }
+
+  /** Advance `ticks`, acknowledging every hook and answering every gate card "leave anyway". */
+  function runAnsweringLeave(
+    kernel: GateWorld["kernel"],
+    world: GateWorld["world"],
+    ticks: number,
+  ) {
+    let remaining = ticks;
+    while (remaining > 0) {
+      const result = kernel.advance(world, remaining);
+      remaining -= result.ticksAdvanced;
+      if (result.halt.kind === "hook") {
+        acknowledgeHook(kernel, world, world.state.narrator.pendingHook?.id as HookId);
+      } else if (result.halt.kind === "decision") {
+        resolveGate(kernel, world, "right");
+      }
+    }
+  }
+
+  function gateCards(world: GateWorld["world"]) {
+    return Object.values(world.state.decisions.records).filter(
+      (d) => d.prompt.key === "travel.departureGate",
+    );
+  }
+
+  for (const [label, faults] of [
+    ["an overheat fault alone (blocked / lowOutput)", ["hotPanel"]],
+    ["a derating and an overheat fault (blocked / faultDerated)", ["wornBearing", "hotPanel"]],
+  ] as const) {
+    it(`asks once for ${label} while the departure is stalled, however the reason flips`, () => {
+      const { world, kernel, registry } = freightTestWorld();
+      for (const fault of faults) addFault(world, fault);
+      hoverAtTemperatureLimit(world, registry);
+      setCourseTo(kernel, world, PORTS.b);
+      expectGateAsked(kernel, world);
+      resolveGate(kernel, world, "right");
+      // Loading still open, so departure prep stalls just after the gate, which runs every tick.
+      const loading = openProblem(world, {
+        kind: "cargoToLoad",
+        payload: { jobId: "job:x", itemId: "item:x", portId: PORTS.a, storeKey: "warehouse" },
+      });
+
+      runAnsweringLeave(kernel, world, 2000);
+      expect(gateCards(world)).toHaveLength(1);
+      expect(world.state.travel.stage).toBe("preparingDeparture");
+      expect(world.state.travel.departureRiskAccepted).toBe(true);
+
+      // The window really did stall at the gate; once loading is done the ship leaves.
+      resolveProblem(world, loading);
+      runAnsweringLeave(kernel, world, 100);
+      expect(world.state.travel.stage).toBe("transit");
+      expect(gateCards(world)).toHaveLength(1);
+    });
+  }
 });

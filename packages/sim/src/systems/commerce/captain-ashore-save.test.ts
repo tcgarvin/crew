@@ -5,7 +5,7 @@
  * as expired, since offers are now only made in person at the dock.
  */
 import { describe, expect, it } from "vitest";
-import { migrateState } from "../../core/save";
+import { migrateState, migrations } from "../../core/save";
 import type { WorldState } from "../../core/types/state";
 import { PORTS, freightTestWorld } from "../travel/fixtures";
 
@@ -38,7 +38,7 @@ describe("save migration 5 → 6 (D70)", () => {
       context: { portId: PORTS.a },
       tick: 400,
     };
-    const migrated = migrateState(raw, 5, { content: {} as never }) as WorldState;
+    const migrated = migrateState(raw, 5, { content: {} as never }, migrations, 6) as WorldState;
     expect(migrated.schemaVersion).toBe(6);
     expect(migrated.decisions.held).toEqual([]);
     expect(
@@ -67,7 +67,13 @@ describe("save migration 5 → 6 (D70)", () => {
       surfaceWhenDocked: true,
     });
     raw.jobs = { j1: job("j1", "offered"), j2: job("j2", "declined") };
-    const migrated = migrateState(raw, 5, { content: {} as never }) as unknown as Raw;
+    const migrated = migrateState(
+      raw,
+      5,
+      { content: {} as never },
+      migrations,
+      6,
+    ) as unknown as Raw;
     expect(migrated.jobs.j1).toEqual({
       id: "j1",
       status: "expired",

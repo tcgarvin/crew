@@ -6,6 +6,7 @@ import { emptyCaches, rebuildCaches } from "./caches";
 import { checkInvariants } from "./invariants";
 import { migrations } from "./migrations";
 import type { KernelRegistry } from "./registry";
+import { SaveCompatibilityError } from "./save-error";
 import type { ContentBundle } from "./types/content";
 import type { RestoredWorld, World } from "./types/kernel";
 import {
@@ -23,12 +24,7 @@ import { SCHEMA_VERSION, type WorldState } from "./types/state";
  */
 export { migrations } from "./migrations";
 
-export class SaveCompatibilityError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SaveCompatibilityError";
-  }
-}
+export { SaveCompatibilityError } from "./save-error";
 
 function deepCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;

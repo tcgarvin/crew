@@ -4,7 +4,8 @@
  * (phase 3, D68). All of it comes from the frame on screen and the content's dock map.
  */
 import type { RenderFrame } from "@crew/sim";
-import { type DockTable, dockInView } from "../render/dock";
+import type { DeckLayout } from "../render/deckLayout";
+import { type DockTable, berthInView, dockInView } from "../render/dock";
 import type { DockTarget } from "../render/dockHit";
 import { dockPropKey } from "../render/locals";
 import type { InspectorData } from "./Inspector";
@@ -24,21 +25,25 @@ export type DockSelection =
 export function dockInspection(
   frame: RenderFrame,
   docks: DockTable,
+  layout: Pick<DeckLayout, "deckId" | "width" | "height" | "hull">,
   target: DockSelection,
 ): InspectorData | undefined {
   const dock = dockInView(frame, docks);
   if (dock === undefined) return undefined;
+  const berth = berthInView(dock, layout);
   switch (target.kind) {
     case "post":
     case "dock":
       return { kind: "place", place: inspectPlace(dock, target) };
     case "local": {
       const local = frame.locals.find((l) => l.id === target.id);
-      return local === undefined ? undefined : { kind: "local", local: inspectLocal(dock, local) };
+      return local === undefined ? undefined : { kind: "local", local: inspectLocal(berth, local) };
     }
     case "dockProp": {
       const prop = frame.dockProps.find((p, i) => dockPropKey(p, i) === target.id);
-      return prop === undefined ? undefined : { kind: "place", place: inspectDockProp(dock, prop) };
+      return prop === undefined
+        ? undefined
+        : { kind: "place", place: inspectDockProp(berth, prop) };
     }
   }
 }

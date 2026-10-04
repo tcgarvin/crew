@@ -9,47 +9,50 @@
     "accent": "#7fb069",
     "sky": "#cdd98c"
   },
-  "width": 38,
-  "height": 28,
+  "width": 40,
+  "height": 29,
   "rows": [
-    "                                      ",
-    " .................................... ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " ..BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.. ",
-    " .................................... ",
-    " .................................... ",
-    " .................................... ",
-    " .................................... ",
-    " .................................... ",
-    " .........................#######.... ",
-    " .........................#######.... ",
-    "                                      "
+    " ...................................... ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    " .                                    . ",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "........................................",
+    "......#######...........................",
+    "......#######...........................",
+    "......#######..........................."
   ],
   "legend": {
     ".": "floor",
     "#": "wall",
-    " ": "void",
-    "B": "berth"
+    " ": "void"
   },
-  "shipAt": {
-    "x": 3,
-    "y": 2
+  "berth": {
+    "origin": {
+      "x": 2,
+      "y": 1
+    },
+    "sizeClass": "M"
   },
   "posts": [
     {
@@ -57,8 +60,8 @@
       "kind": "warehouseDoor",
       "name": "the produce shed doors",
       "tile": {
-        "x": 28,
-        "y": 24
+        "x": 9,
+        "y": 25
       },
       "facing": "n"
     },
@@ -67,7 +70,7 @@
       "kind": "marketStall",
       "name": "the growers' co-op stall",
       "tile": {
-        "x": 8,
+        "x": 28,
         "y": 24
       },
       "facing": "n"
@@ -77,17 +80,17 @@
       "kind": "gate",
       "name": "the lane up to the Greenhouse Lounge",
       "tile": {
-        "x": 1,
-        "y": 26
+        "x": 39,
+        "y": 25
       },
-      "facing": "e"
+      "facing": "w"
     },
     {
       "key": "pad_bench",
       "kind": "bench",
       "name": "the bench under the awning",
       "tile": {
-        "x": 12,
+        "x": 32,
         "y": 24
       },
       "facing": "n"
@@ -98,7 +101,7 @@
       "key": "staging",
       "kind": "freightStaging",
       "rect": {
-        "x": 19,
+        "x": 17,
         "y": 22,
         "w": 4,
         "h": 3
@@ -108,8 +111,8 @@
       "key": "delivery",
       "kind": "deliveryBay",
       "rect": {
-        "x": 30,
-        "y": 21,
+        "x": 7,
+        "y": 22,
         "w": 4,
         "h": 3
       }
@@ -117,35 +120,23 @@
   ],
   "props": [
     {
-      "key": "planter_fore",
-      "kind": "planter",
-      "rect": {
-        "x": 1,
-        "y": 2,
-        "w": 1,
-        "h": 3
-      },
-      "rot": 0,
-      "blocking": true
-    },
-    {
-      "key": "planter_aft",
-      "kind": "planter",
-      "rect": {
-        "x": 36,
-        "y": 2,
-        "w": 1,
-        "h": 3
-      },
-      "rot": 0,
-      "blocking": true
-    },
-    {
       "key": "planters_pad",
       "kind": "planter",
       "rect": {
-        "x": 1,
-        "y": 21,
+        "x": 0,
+        "y": 22,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "planters_bow",
+      "kind": "planter",
+      "rect": {
+        "x": 38,
+        "y": 22,
         "w": 2,
         "h": 1
       },
@@ -156,8 +147,8 @@
       "key": "produce_crates",
       "kind": "crates",
       "rect": {
-        "x": 23,
-        "y": 25,
+        "x": 13,
+        "y": 26,
         "w": 2,
         "h": 2
       },
@@ -168,8 +159,8 @@
       "key": "water_drums",
       "kind": "barrels",
       "rect": {
-        "x": 34,
-        "y": 25,
+        "x": 1,
+        "y": 27,
         "w": 2,
         "h": 1
       },
@@ -180,7 +171,7 @@
       "key": "pad_lamp",
       "kind": "lamp",
       "rect": {
-        "x": 17,
+        "x": 25,
         "y": 24,
         "w": 1,
         "h": 1
@@ -193,9 +184,9 @@
     {
       "kind": "awning",
       "rect": {
-        "x": 6,
+        "x": 27,
         "y": 23,
-        "w": 8,
+        "w": 7,
         "h": 2
       }
     }

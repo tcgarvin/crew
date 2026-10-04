@@ -576,7 +576,7 @@ describe("translateIntents: drops with reasons", () => {
       store: "warehouse",
       cargoItem: "item.crate_general",
       quantity: "one",
-      location: { kind: "onDeck", deckId: "deck.freighter_mk1", x: 3, y: 3 },
+      location: { kind: "onDeck", deckId: "deck.freighter_mk2", x: 3, y: 3 },
     };
     const noChapel = { ...onDeck, store: "chapel" } as Record<string, unknown>;
     // biome-ignore lint/performance/noDelete: building a test intent without the key.

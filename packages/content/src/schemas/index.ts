@@ -27,6 +27,7 @@ export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
 export * from "./validate";
+export { HULL_CLASS_BOX, shipAtInBerth } from "./geometry";
 export { dockRampLandings, dockWalkableMask } from "./validate-dock";
 
 /** Every def schema by name; the JSON Schema export and tests iterate this. */

@@ -8,11 +8,12 @@
  *
  * Dockside spike (docs/design/dockside-spike.md): while a dock is alongside (`state.deck.dock`),
  * its floor is grafted into the deck's grid in the deck's own frame (deck tile = dock tile −
- * shipAt), as floor in no compartment. Dock floor is a region of its own for implicit walls, so
- * the hull walls it off from the ship everywhere except across the ramp doors. The grid then has
- * a non-zero origin and larger bounds; every index goes through `indexAt`/`tileAtIndex`.
+ * shipAt, the ship's place in the berth box: `berthPlacement`, D72), as floor in no compartment.
+ * Dock floor is a region of its own for implicit walls, so the hull walls it off from the ship
+ * everywhere except across the ramp doors. The grid then has a non-zero origin and larger
+ * bounds; every index goes through `indexAt`/`tileAtIndex`.
  */
-import { dockFloorMask } from "../../core/docks";
+import { type BerthedDock, berthDock, dockFloorMask } from "../../core/docks";
 import type { CacheBuilder } from "../../core/registry";
 import type { EdgeSide, TileCoord, TileEdge } from "../../core/types/common";
 import type { ContentBundle, DeckDef, DockDef, MachineDef } from "../../core/types/content";
@@ -171,18 +172,18 @@ interface GeometryInputs {
   readonly doorIdByKey: ReadonlyMap<string, DoorId>;
   /** Machine instance by placement key. */
   readonly machineIdByKey: ReadonlyMap<string, MachineId>;
-  /** The dock to graft onto this deck, if one is alongside. */
-  readonly dock?: DockDef;
+  /** The dock to graft onto this deck (with the deck in its berth), if one is alongside. */
+  readonly dock?: BerthedDock;
 }
 
 /** Deck-frame tiles of a dock's walkable floor. Throws on a malformed map. */
-function dockFloorTiles(dock: DockDef): TileCoord[] {
+function dockFloorTiles({ dock, shipAt }: BerthedDock): TileCoord[] {
   const mask = dockFloorMask(dock);
   const tiles: TileCoord[] = [];
   for (let y = 0; y < dock.height; y++) {
     for (let x = 0; x < dock.width; x++) {
       if (mask[y * dock.width + x] === 1) {
-        tiles.push({ x: x - dock.shipAt.x, y: y - dock.shipAt.y });
+        tiles.push({ x: x - shipAt.x, y: y - shipAt.y });
       }
     }
   }
@@ -190,12 +191,15 @@ function dockFloorTiles(dock: DockDef): TileCoord[] {
 }
 
 /** Bounds of the deck plus, if docked, the dock map (both in deck coordinates). */
-function gridBounds(deck: DeckDef, dock: DockDef | undefined): Grid {
-  if (dock === undefined) return { originX: 0, originY: 0, width: deck.width, height: deck.height };
-  const originX = Math.min(0, -dock.shipAt.x);
-  const originY = Math.min(0, -dock.shipAt.y);
-  const endX = Math.max(deck.width, dock.width - dock.shipAt.x);
-  const endY = Math.max(deck.height, dock.height - dock.shipAt.y);
+function gridBounds(deck: DeckDef, berth: BerthedDock | undefined): Grid {
+  if (berth === undefined) {
+    return { originX: 0, originY: 0, width: deck.width, height: deck.height };
+  }
+  const { dock, shipAt } = berth;
+  const originX = Math.min(0, -shipAt.x);
+  const originY = Math.min(0, -shipAt.y);
+  const endX = Math.max(deck.width, dock.width - shipAt.x);
+  const endY = Math.max(deck.height, dock.height - shipAt.y);
   return { originX, originY, width: endX - originX, height: endY - originY };
 }
 
@@ -238,7 +242,7 @@ function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
       const i = at(tile.x, tile.y);
       if (floor[i] === 1) {
         throw new Error(
-          `Dock "${dock.id}": floor at deck (${tile.x},${tile.y}) overlaps deck "${deck.id}"`,
+          `Dock "${dock.dock.id}": floor at deck (${tile.x},${tile.y}) overlaps deck "${deck.id}"`,
         );
       }
       floor[i] = 1;
@@ -352,7 +356,7 @@ function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
 }
 
 /** Where each ramp lands on the dock; throws if a ramp would open onto anything but dock floor. */
-function dockGraft(geometry: DeckGeometry, dock: DockDef): NavDockGraft {
+function dockGraft(geometry: DeckGeometry, { dock, shipAt }: BerthedDock): NavDockGraft {
   const landings = new Map<DoorId, TileCoord>();
   for (const nav of geometry.doors.values()) {
     if (nav.placement.kind !== "ramp") continue;
@@ -364,7 +368,7 @@ function dockGraft(geometry: DeckGeometry, dock: DockDef): NavDockGraft {
     }
     landings.set(nav.id, outside);
   }
-  return { dockId: dock.id, offset: { x: -dock.shipAt.x, y: -dock.shipAt.y }, landings };
+  return { dockId: dock.id, offset: { x: -shipAt.x, y: -shipAt.y }, landings };
 }
 
 /** Copy dynamic state into the geometry: obstructions from `state.deck.tiles`, and open ramps. */
@@ -428,13 +432,13 @@ export function syncRampPassability(
 function dockLayoutFor(
   content: ContentBundle,
   state: ReadonlyWorldState,
-  deckId: DeckDefId,
-): DockDef | undefined {
+  deck: DeckDef,
+): BerthedDock | undefined {
   const presence = state.deck.dock;
-  if (presence === undefined || presence.deckId !== deckId) return undefined;
+  if (presence === undefined || presence.deckId !== deck.id) return undefined;
   const layout = content.docks?.[presence.dockId];
   if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
-  return layout;
+  return berthDock(layout, deck);
 }
 
 /**
@@ -450,7 +454,7 @@ export function checkDockGraft(
   if (deck === undefined) throw new Error(`No deck "${presence.deckId}" to dock against`);
   const layout = content.docks?.[presence.dockId];
   if (layout === undefined) throw new Error(`No dock layout "${presence.dockId}" in content`);
-  buildDeckGeometry({ ...geometryInputs(deck, content, state), dock: layout });
+  buildDeckGeometry({ ...geometryInputs(deck, content, state), dock: berthDock(layout, deck) });
 }
 
 /**
@@ -471,7 +475,7 @@ export function checkDockFitsDeck(
     new Map(keys.map((k) => [k.key, k.key as unknown as I]));
   buildDeckGeometry({
     deck,
-    dock,
+    dock: berthDock(dock, deck),
     machineDefs: (id) => content.machines[id],
     compartmentIdByKey: byKey<CompartmentId>(deck.compartments),
     doorIdByKey: byKey<DoorId>(deck.doors),
@@ -495,7 +499,7 @@ function geometryInputs(
     }
     return map;
   };
-  const dock = dockLayoutFor(content, state, deck.id);
+  const dock = dockLayoutFor(content, state, deck);
   return {
     deck,
     ...(dock === undefined ? {} : { dock }),

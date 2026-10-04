@@ -3,7 +3,8 @@
  * untrusted JSON and must tolerate missing or odd fields: anything it does not recognise is left
  * for the invariants to judge.
  */
-import { dockAreaTiles } from "./docks";
+import { berthDock, dockAreaTiles } from "./docks";
+import { SaveCompatibilityError } from "./save-error";
 import type { TileCoord } from "./types/common";
 import type { DeckDefId, DockDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
@@ -105,9 +106,10 @@ function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationContext):
   if (!isRecord(presence) || typeof presence.deckId !== "string") return raw;
   const dock =
     typeof presence.dockId === "string" ? content.docks?.[presence.dockId as DockDefId] : undefined;
-  if (dock === undefined) return raw;
+  const deck = content.decks[presence.deckId as DeckDefId];
+  if (dock === undefined || deck === undefined) return raw;
   const portId = dock.portId;
-  const tiles = dockAreaTiles(dock, "freightStaging");
+  const tiles = dockAreaTiles(berthDock(dock, deck), "freightStaging");
   if (tiles.length > 0 && isRecord(raw.jobs) && isRecord(raw.items)) {
     let next = 0;
     const moved = new Map<string, Record<string, unknown>>();
@@ -280,10 +282,21 @@ export function captainAshore(raw: unknown): unknown {
   return raw;
 }
 
+/**
+ * 6 → 7 (D72, D74): refused. Freighter Mk1 was mirrored bow-east and every dock map changed
+ * shape, so every tile-bearing field of an older save (locations, paths, plan steps, facts,
+ * claims) is in a frame that no longer exists; migrating them all is the change the compiler
+ * cannot check (D59). Saves predate players (PLAN §3); the host starts a new game.
+ */
+function refuseBeforeShipLife(): never {
+  throw new SaveCompatibilityError("save predates ship life (schema 6); start a new game");
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
   3: migrateToDockside,
   4: addDockside,
   5: captainAshore,
+  6: refuseBeforeShipLife,
 };

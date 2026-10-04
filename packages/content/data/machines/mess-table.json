@@ -1,0 +1,72 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.mess_table",
+  "name": "Mess Table",
+  "tags": ["messTable"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    },
+    {
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "seat_1",
+      "offset": {
+        "x": 0,
+        "y": -1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "seat_2",
+      "offset": {
+        "x": 1,
+        "y": -1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "seat_3",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "seat_4",
+      "offset": {
+        "x": 1,
+        "y": 1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "none"
+  },
+  "heat": {
+    "risePerSecond": 0,
+    "coolPerSecond": 0,
+    "derateAbove": 1
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0,
+    "heatFactor": 0,
+    "wearPerSecond": 0
+  },
+  "faults": [],
+  "components": []
+}

@@ -77,6 +77,14 @@ describe("serialize / restore", () => {
     );
   });
 
+  it("refuses a schema-6 save rather than migrating its pre-ship-life geometry (D74)", () => {
+    const { world, registry } = tinyTestWorld();
+    const envelope = serialize(world);
+    const old = { ...envelope, schemaVersion: 6, state: { ...envelope.state, schemaVersion: 6 } };
+    expect(() => restore(old, world.content, registry)).toThrow(SaveCompatibilityError);
+    expect(() => restore(old, world.content, registry)).toThrow(/predates ship life/);
+  });
+
   it("restores a save made with other content, with a warning", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);
