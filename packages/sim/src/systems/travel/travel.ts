@@ -260,7 +260,7 @@ function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
 }
 
 /** Open freight work (either direction) that must finish before the ship may leave. */
-export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return hasOpenFreightWork(ctx, ["cargoToLoad", "cargoToUnload"]);
 }
 
@@ -313,9 +313,18 @@ function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
   return held.length > 0 || queue.some((id) => records[id]?.status === "pending");
 }
 
-/** D70: a card is waiting to be delivered in person; departure waits for the meeting. */
-export function cardsAwaitingDelivery(ctx: Pick<StepCtx, "state">): boolean {
-  return ctx.state.decisions.held.length > 0;
+/**
+ * What keeps a ship with a course set docked: freight still moving through the open ramp
+ * (Integration 2), a passenger ashore or walking off (passengers §3.3: the ship never leaves them
+ * quietly, only through the overdue card or `endPassage`), or (D70) a card on its way to the
+ * captain in person. Departure prep begins the first tick none of them applies.
+ */
+export function departureWaits(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return (
+    hasOpenCargoWork(ctx) ||
+    waitingForPassenger(ctx.state) !== undefined ||
+    ctx.state.decisions.held.length > 0
+  );
 }
 
 /**
@@ -439,14 +448,9 @@ function advanceTravel(ctx: StepCtx): void {
         );
       }
     }
-    // Passengers §3.3: a planned voyage home waits docked for the passenger ashore.
-    if (planned !== undefined && waitingForPassenger(ctx.state) !== undefined) return;
-    // D70: nor while someone is on their way to the captain with word (a held card).
-    if (planned !== undefined && cardsAwaitingDelivery(ctx)) return;
+    if (planned === undefined || departureWaits(ctx)) return;
     // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
-    if (planned !== undefined && !hasOpenCargoWork(ctx) && departureCleared(ctx)) {
-      beginDeparture(ctx, planned);
-    }
+    if (departureCleared(ctx)) beginDeparture(ctx, planned);
     return;
   }
 
