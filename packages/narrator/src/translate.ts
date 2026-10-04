@@ -1,3 +1,4 @@
+import { NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
 /**
  * Intent → command translation (W0 `TranslateIntents`). Pure.
  *
@@ -66,7 +67,6 @@ import {
   portName,
 } from "./lookups";
 import { clipWords } from "./notes";
-import { NARRATOR_TEXT_KEYS, templateCard } from "./templates";
 
 const LABEL_MAX_CHARS = 48;
 const TITLE_MAX_CHARS = 60;

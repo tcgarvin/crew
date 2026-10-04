@@ -1,3 +1,4 @@
+import { templateCard } from "@crew/content";
 /**
  * D31: the server's record of which cards the captain has seen (`NarratorNotes.cardsShown`). The
  * model never writes it. Two sources feed it:
@@ -14,7 +15,6 @@ import type { DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
 import type { DecisionCardProse } from "./contract";
 import type { State } from "./lookups";
 import { type CardShown, NOTES_LIMITS, clipWords } from "./notes";
-import { templateCard } from "./templates";
 
 type ContentBundle = Parameters<typeof templateCard>[1];
 

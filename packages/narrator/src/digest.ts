@@ -1,3 +1,4 @@
+import { templateCard } from "@crew/content";
 /**
  * Digest projection (PLAN §3): a compact, LLM-readable view of the snapshot for one narrator
  * call. Pure and deterministic: the same inputs give the same text, byte for byte, so it can be
@@ -43,7 +44,6 @@ import {
   voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
-import { templateCard } from "./templates";
 
 /**
  * Policy prompt keys whose template text is the card the captain sees (D36 gate, the passengers

@@ -37,7 +37,7 @@ export {
   runNarrator,
   runNarratorWithTrace,
 } from "./run";
-export { NARRATOR_TEXT_KEYS, renderTextRef, templateCard } from "./templates";
+export { NARRATOR_TEXT_KEYS, renderTextRef, templateCard } from "@crew/content";
 export {
   type ModelFinish,
   type ModelRequest,
