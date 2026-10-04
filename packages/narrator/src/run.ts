@@ -19,14 +19,15 @@ import {
   migrateState,
 } from "@crew/sim";
 import { buildCapabilities } from "./capabilities";
-import type {
-  DroppedIntent,
-  FallbackReason,
-  NarratorPlan,
-  NarratorPlanSchema,
-  NarratorRequest,
-  NarratorResponse,
-  TranslationResult,
+import {
+  type DroppedIntent,
+  type FallbackReason,
+  type NarratorPlan,
+  type NarratorPlanSchema,
+  type NarratorRequest,
+  type NarratorResponse,
+  type TranslationResult,
+  buildNarratorPlanSchema,
 } from "./contract";
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
@@ -42,7 +43,7 @@ import {
   parseNotes,
 } from "./notes";
 import { nullNarratorResponse } from "./null";
-import { planJsonSchema, planSchemaFor } from "./plan";
+import { planJsonSchema } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
 import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
@@ -389,7 +390,7 @@ export async function runNarratorWithTrace(
   if (ctx.transport === undefined) {
     return fallback("notConfigured", "no model transport configured");
   }
-  const schema = planSchemaFor();
+  const schema = buildNarratorPlanSchema();
   let rawContent: string | undefined;
   try {
     const result = await callModel(ctx.transport, {

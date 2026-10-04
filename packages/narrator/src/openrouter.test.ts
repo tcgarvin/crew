@@ -6,9 +6,10 @@
 import type { CommandId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
+import { buildNarratorPlanSchema } from "./contract";
 import { approachRequest } from "./fixtures";
 import { openRouterTransport, schemaInstruction, systemContentParts } from "./openrouter";
-import { planJsonSchema, planSchemaFor } from "./plan";
+import { planJsonSchema } from "./plan";
 import { STATIC_RULES } from "./prompts/index";
 import { runNarrator } from "./run";
 import { content, emptyPlan } from "./test-support";
@@ -135,7 +136,7 @@ describe("OpenRouter plan schema (D53)", () => {
     const system = body.messages[0].content;
     expect(system.at(-1)).toEqual({
       type: "text",
-      text: schemaInstruction(planJsonSchema(planSchemaFor())),
+      text: schemaInstruction(planJsonSchema(buildNarratorPlanSchema())),
       cache_control: { type: "ephemeral" },
     });
   });
