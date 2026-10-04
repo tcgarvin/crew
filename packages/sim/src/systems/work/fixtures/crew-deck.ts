@@ -125,7 +125,9 @@ function extraCrew(base: CrewDef): Record<CrewDefId, CrewDef> {
 
 /** Tiny config with a second (off-duty-at-start) shift. */
 export function crewConfig(overrides: Partial<ConfigDef> = {}): ConfigDef {
-  const base = tinyConfig();
+  // D76: a 600 s day of two watches, matching the shift cycle, so the windows line up with
+  // watches when they replace shifts; the day knobs keep their durations in seconds.
+  const base = tinyConfig({ daySeconds: 600, watchesPerDay: 2 });
   return {
     ...base,
     shifts: {

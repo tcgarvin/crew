@@ -37,14 +37,14 @@ const deck: DeckDef = {
 };
 
 const config: PlannerConfig = {
-  time: { tickRate: 20 },
+  time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
   work: {
     reconsiderEveryTicks: 10,
     switchCooldownSeconds: 2,
     claimLeaseSeconds: 4,
     timeBucketSeconds: 1,
     retryBackoffSeconds: 5,
-    skillGainPerSecond: 0,
+    skillGainPerDay: 0,
     workSpeedPerSkillLevel: 0.1,
   },
   urgency: {
@@ -52,20 +52,20 @@ const config: PlannerConfig = {
     needSurvivalAbove: 0.9,
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
-    routineAgingSeconds: 90,
+    routineAgingDays: 0.075,
   },
   needs: {
-    hungerPerSecond: 0,
-    fatiguePerSecondAwake: 0,
-    fatiguePerSecondWorking: 0,
-    fatigueRecoveryPerSecondAsleep: 0,
-    comfortPerSecond: 0,
-    comfortRecoveryPerSecondResting: 0,
-    socialPerSecond: 0,
-    socialRecoveryPerSecondChatting: 0,
+    hungerPerDay: 0,
+    fatiguePerDayAwake: 0,
+    fatiguePerDayWorking: 0,
+    fatigueRecoveryPerDayAsleep: 0,
+    comfortPerDay: 0,
+    comfortRecoveryPerDayResting: 0,
+    socialPerDay: 0,
+    socialRecoveryPerDayChatting: 0,
     seekThreshold: 0.5,
-    mealSeconds: 10,
-    sleepMinSeconds: 60,
+    mealDays: 10 / 1200,
+    sleepDays: 0.05,
     wakeBelow: 0.1,
     initialRange: {
       hunger: { min: 0, max: 0 },

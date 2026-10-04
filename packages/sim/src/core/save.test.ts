@@ -85,6 +85,37 @@ describe("serialize / restore", () => {
     expect(() => restore(old, world.content, registry)).toThrow(/predates ship life/);
   });
 
+  it("restores a save whose config has the pre-D76 seconds names: new names from content, old ones unread", () => {
+    const { world, kernel, registry } = tinyTestWorld();
+    const envelope = serialize(world);
+    // A schema-7 save from before the day units: the same knobs under their seconds names.
+    const { mealDays: _meal, ...needs } = envelope.config.needs;
+    const { quietTooLongDays: _quiet, ...narrator } = envelope.config.narrator;
+    const { daySeconds: _day, watchesPerDay: _watches, ...time } = envelope.config.time;
+    const old = {
+      ...envelope,
+      config: {
+        ...envelope.config,
+        time,
+        needs: { ...needs, mealSeconds: 10 },
+        narrator: { ...narrator, quietTooLongSeconds: 600 },
+      },
+    } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const values = restored.config.values;
+    expect(values.needs.mealDays).toBe(world.content.config.needs.mealDays);
+    expect(values.narrator.quietTooLongDays).toBe(world.content.config.narrator.quietTooLongDays);
+    expect(values.time.daySeconds).toBe(world.content.config.time.daySeconds);
+    expect(values.time.watchesPerDay).toBe(world.content.config.time.watchesPerDay);
+    expect(restored.warnings.join("\n")).toMatch(
+      /config\.needs\.mealDays.*config\.narrator\.quietTooLongDays/s,
+    );
+    // The world runs on: the quiet timer reads the filled key, not the stale one.
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(world.state.tick + 20);
+  });
+
   it("restores a save made with other content, with a warning", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);

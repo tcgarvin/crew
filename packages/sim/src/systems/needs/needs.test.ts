@@ -5,7 +5,7 @@ import { fatigueCapacity } from "./needs";
 import { isOnDuty } from "./shifts";
 
 describe("needs", () => {
-  it("rise at the configured per-second rates while awake and idle", () => {
+  it("rise at the configured per-day rates, converted to per second, while awake and idle", () => {
     const tw = crewWorld();
     const { world } = tw;
     const jon = world.state.actors[JON];
@@ -15,10 +15,13 @@ describe("needs", () => {
     if (mara === undefined) throw new Error("no mara");
     run(tw, 20 * 10);
     const c = world.config.values.needs;
-    expect(mara.needs.hunger).toBeCloseTo(c.hungerPerSecond * 10, 6);
-    expect(mara.needs.fatigue).toBeCloseTo(c.fatiguePerSecondAwake * 10, 6);
-    expect(mara.needs.comfort).toBeCloseTo(c.comfortPerSecond * 10, 6);
-    expect(mara.needs.social).toBeCloseTo(c.socialPerSecond * 10, 6);
+    const tenSecondsInDays = 10 / world.config.values.time.daySeconds;
+    expect(mara.needs.hunger).toBeCloseTo(c.hungerPerDay * tenSecondsInDays, 6);
+    expect(mara.needs.fatigue).toBeCloseTo(c.fatiguePerDayAwake * tenSecondsInDays, 6);
+    expect(mara.needs.comfort).toBeCloseTo(c.comfortPerDay * tenSecondsInDays, 6);
+    expect(mara.needs.social).toBeCloseTo(c.socialPerDay * tenSecondsInDays, 6);
+    // The fixture's 600 s day: 0.6 per day is the 0.001 per second the test was written for.
+    expect(mara.needs.hunger).toBeCloseTo(0.01, 6);
   });
 
   it("emits a notable threshold event when a need goes critical", () => {

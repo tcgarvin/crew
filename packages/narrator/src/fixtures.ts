@@ -21,9 +21,9 @@ import {
   type WorldState,
   allocateId,
   clearDockside,
-  configTicks,
   createKernel,
   createRegistry,
+  dayTicks,
   dockAlongside,
   dockForPort,
   dressDock,
@@ -456,7 +456,7 @@ export function passengerOverdueRequest(content: ContentBundle, seed = 29): Narr
   const state = world.state;
   const config = world.config.values;
   const ashoreTick = 7_000;
-  const overdueTicks = configTicks(config, config.commerce.passage.overdueSeconds);
+  const overdueTicks = dayTicks(config, config.commerce.passage.overdueDays);
   const tick = ashoreTick + overdueTicks + 30;
   state.tick = tick;
   state.travel = {

@@ -297,7 +297,10 @@ function personal(
 function eatCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const urgency = needUrgency(view.self.needs.hunger, config);
   if (urgency === undefined) return undefined;
-  const mealTicks = Math.ceil(config.needs.mealSeconds * config.time.tickRate);
+  // `mealDays` in ticks, inline because the planner may not import `core/clock` (D76).
+  const mealTicks = Math.ceil(
+    config.needs.mealDays * config.time.daySeconds * config.time.tickRate,
+  );
   const food = view.knownItems().filter((i) => i.tags.includes("food") && !i.absent);
   const table = messTile(view);
   const toTable = (from?: TileCoord): number => {

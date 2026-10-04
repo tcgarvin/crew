@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   type CommandId,
   type DecisionId,
@@ -24,7 +25,7 @@ import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { HOOK_INSTRUCTIONS, STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
-import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator } from "./run";
+import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator, runNarratorWithTrace } from "./run";
 import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
 import { TransportError } from "./transport";
 
@@ -921,6 +922,23 @@ describe("fixtures and kernel authority (N6)", () => {
     ]) {
       expect(() => kernel.restore(req.snapshot, content())).not.toThrow();
     }
+  });
+
+  it("reads a stored snapshot whose config predates the day units (D76) with the loaded values", async () => {
+    // Stored before D76: `commerce.passage.overdueSeconds`, no `overdueDays`. The digest's
+    // OVERDUE line needs the window, so a missing key would throw rather than render.
+    const stored = JSON.parse(
+      readFileSync(new URL("../fixtures/passenger-overdue.json", import.meta.url), "utf8"),
+    ) as NarratorRequest;
+    const passage = stored.snapshot.config.commerce.passage as unknown as Record<string, unknown>;
+    expect(passage.overdueSeconds).toBeDefined();
+    expect(passage.overdueDays).toBeUndefined();
+    const run = await runNarratorWithTrace(stored, {
+      gameId: stored.gameId,
+      content: content(),
+      notes: EMPTY_NOTES,
+    });
+    expect(run.trace.digest).toContain("OVERDUE");
   });
 
   it("rejects a forbidden kind from the narrator regardless of prompt", () => {

@@ -29,9 +29,25 @@ export const TINY = {
   scenario: "scenario.tiny" as ScenarioDefId,
 } as const;
 
-export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): ConfigDef {
+/** The fixture's default ship's day (D76). */
+export const TINY_DAY = 1200;
+
+export interface TinyConfigOptions {
+  /** A fixture convenience in seconds, stored as `narrator.quietTooLongDays`. */
+  readonly quietTooLongSeconds?: number;
+  /** Ship's day length; the day knobs below keep their durations in seconds whatever it is. */
+  readonly daySeconds?: number;
+  readonly watchesPerDay?: number;
+}
+
+/**
+ * Day knobs are written as `seconds / day` and rates as `perSecond * day`, so the values the tests
+ * were written against stay visible and the conversion is exact for any `daySeconds`.
+ */
+export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
+  const day = options.daySeconds ?? TINY_DAY;
   return {
-    time: { tickRate: 20 },
+    time: { tickRate: 20, daySeconds: day, watchesPerDay: options.watchesPerDay ?? 3 },
     movement: {
       walkSpeed: 2,
       passDelaySeconds: 0.5,
@@ -48,17 +64,17 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       rampOpenSeconds: 2,
     },
     needs: {
-      hungerPerSecond: 0.001,
-      fatiguePerSecondAwake: 0.001,
-      fatiguePerSecondWorking: 0.002,
-      fatigueRecoveryPerSecondAsleep: 0.01,
-      comfortPerSecond: 0.001,
-      comfortRecoveryPerSecondResting: 0.01,
-      socialPerSecond: 0.001,
-      socialRecoveryPerSecondChatting: 0.01,
+      hungerPerDay: 0.001 * day,
+      fatiguePerDayAwake: 0.001 * day,
+      fatiguePerDayWorking: 0.002 * day,
+      fatigueRecoveryPerDayAsleep: 0.01 * day,
+      comfortPerDay: 0.001 * day,
+      comfortRecoveryPerDayResting: 0.01 * day,
+      socialPerDay: 0.001 * day,
+      socialRecoveryPerDayChatting: 0.01 * day,
       seekThreshold: 0.5,
-      mealSeconds: 10,
-      sleepMinSeconds: 60,
+      mealDays: 10 / day,
+      sleepDays: 60 / day,
       wakeBelow: 0.1,
       initialRange: {
         hunger: { min: 0, max: 0 },
@@ -73,7 +89,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       claimLeaseSeconds: 10,
       timeBucketSeconds: 5,
       retryBackoffSeconds: 5,
-      skillGainPerSecond: 0.001,
+      skillGainPerDay: 0.001 * day,
       workSpeedPerSkillLevel: 0.1,
     },
     urgency: {
@@ -81,7 +97,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       needSurvivalAbove: 0.9,
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
-      routineAgingSeconds: 60,
+      routineAgingDays: 60 / day,
     },
     equipment: {
       hazardScale: 1,
@@ -115,27 +131,31 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
         hazardous: { min: 3, max: 8 },
         passenger: { min: 2, max: 4 },
       },
-      jobOfferTtlSeconds: 120,
+      jobOfferTtlDays: 120 / day,
       dockingFee: 0,
       haulEstimateSeconds: 5,
-      passage: { ashoreSecondsMin: 3, ashoreSecondsMax: 3, overdueSeconds: 10 },
+      passage: {
+        ashoreDaysMin: 3 / day,
+        ashoreDaysMax: 3 / day,
+        overdueDays: 10 / day,
+      },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,
         defaultPrice: 100,
         buySeconds: 3,
       },
-      reofferSeconds: 60,
+      reofferDays: 60 / day,
       maxCratesPerJob: 6,
     },
     narrator: {
-      quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
+      quietTooLongDays: (options.quietTooLongSeconds ?? 600) / day,
       approachHookLeadSeconds: 5,
       maxSpawnsPerCommand: 3,
       maxFaultWindowSeconds: 60,
       spawnBudget: 3,
       faultBudget: 2,
-      budgetRefillSeconds: 600,
+      budgetRefillDays: 600 / day,
       hookOnEvents: [],
     },
     host: {

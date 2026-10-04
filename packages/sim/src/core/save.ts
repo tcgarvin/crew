@@ -7,7 +7,7 @@ import { checkInvariants } from "./invariants";
 import { migrations } from "./migrations";
 import type { KernelRegistry } from "./registry";
 import { SaveCompatibilityError } from "./save-error";
-import type { ContentBundle } from "./types/content";
+import type { ConfigDef, ContentBundle } from "./types/content";
 import type { RestoredWorld, World } from "./types/kernel";
 import {
   type MigrationContext,
@@ -83,7 +83,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * recursing into objects; `filled` collects the paths taken. A save keeps the config it was made
  * with (SD §20.1), but a key added since (D58's `doors.rampOpenSeconds`, D61's
  * `travel.recallAboardSeconds`) would otherwise read as `undefined` and turn timers into NaN.
- * Values the save does have always win.
+ * Values the save does have always win. A key renamed since (D76's day units:
+ * `needs.mealSeconds` → `needs.mealDays`) is a missing key here, so the new name takes the loaded
+ * value and the stale one is carried along unread.
  */
 function withMissingConfig<T>(saved: T, defaults: T, path: string, filled: string[]): T {
   if (!isPlainObject(saved) || !isPlainObject(defaults)) return saved;
@@ -98,6 +100,19 @@ function withMissingConfig<T>(saved: T, defaults: T, path: string, filled: strin
     }
   }
   return out as T;
+}
+
+/**
+ * A saved config (a save envelope's, or a narrator snapshot's) with every key it lacks filled
+ * from `defaults`, the loaded content's config, and the dotted paths that were filled.
+ */
+export function fillConfig(
+  saved: ConfigDef,
+  defaults: ConfigDef,
+): { readonly values: ConfigDef; readonly filled: readonly string[] } {
+  const filled: string[] = [];
+  const values = withMissingConfig(deepCopy(saved), defaults, "config", filled);
+  return { values, filled };
 }
 
 interface RestoreOptions {
@@ -144,8 +159,7 @@ export function restore(
       `Save state is invalid:\n  ${violations.slice(0, 20).join("\n  ")}`,
     );
   }
-  const filled: string[] = [];
-  const values = withMissingConfig(deepCopy(envelope.config), content.config, "config", filled);
+  const { values, filled } = fillConfig(envelope.config, content.config);
   if (filled.length > 0) {
     warnings.push(
       `Save's config predates ${filled.join(", ")}; restored with the loaded content's values`,

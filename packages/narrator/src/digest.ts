@@ -22,7 +22,7 @@ import {
   type Problem,
   type SimEvent,
   actionLabel,
-  configTicks,
+  dayTicks,
   describeEvent,
   effectiveMarket,
   marketBlock,
@@ -270,7 +270,7 @@ function partsShortfallNote(state: State, content: ContentBundle): string {
 /**
  * Passengers-and-galaxy §3.2: the "Aboard" line for a passenger: name, passenger, where to and
  * whether they come back, where they are on deck now; while ashore, where and when they are due
- * back (and overdue, once `ashoreSinceTick + overdueSeconds` has passed); while walking off,
+ * back (and overdue, once `ashoreSinceTick + overdueDays` has passed); while walking off,
  * "going down the ramp".
  */
 function aboardLine(
@@ -301,7 +301,7 @@ function aboardLine(
     const overdueAt =
       since === undefined
         ? undefined
-        : since + configTicks(config, config.commerce.passage.overdueSeconds);
+        : since + dayTicks(config, config.commerce.passage.overdueDays);
     const overdue =
       overdueAt !== undefined && state.tick >= overdueAt
         ? `; OVERDUE (expected by tick ${overdueAt})`

@@ -13,6 +13,7 @@ import {
   SCHEMA_VERSION,
   type SaveEnvelope,
   type SimEvent,
+  fillConfig,
   migrateState,
 } from "@crew/sim";
 import type {
@@ -370,17 +371,26 @@ async function notesSeenBy(
 function snapshotOf(request: unknown): SaveEnvelope {
   const snapshot = field(request, "snapshot");
   const schemaVersion = field(snapshot, "schemaVersion");
-  if (!isRecord(snapshot) || typeof schemaVersion !== "number" || !isRecord(snapshot.state)) {
+  if (
+    !isRecord(snapshot) ||
+    typeof schemaVersion !== "number" ||
+    !isRecord(snapshot.state) ||
+    !isRecord(snapshot.config)
+  ) {
     throw new NarratorLogError(
       "This call's request has no usable snapshot; cannot rebuild the digest.",
     );
   }
-  if (schemaVersion === SCHEMA_VERSION) return snapshot as unknown as SaveEnvelope;
-  // Same upgrade `runNarrator` applies, so an old request still renders through today's digest.
+  // Same upgrade `runNarrator` applies, so an old request still renders through today's digest:
+  // config keys added or renamed since (D76's day units) come from the loaded content.
+  const content = contentBundle();
+  const saved = snapshot as unknown as SaveEnvelope;
+  const config = fillConfig(saved.config, content.config).values;
+  if (schemaVersion === SCHEMA_VERSION) return { ...saved, config };
   const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), schemaVersion, {
-    content: contentBundle(),
+    content,
   });
-  return { ...snapshot, schemaVersion: SCHEMA_VERSION, state } as unknown as SaveEnvelope;
+  return { ...saved, schemaVersion: SCHEMA_VERSION, state, config } as SaveEnvelope;
 }
 
 function contentBundle() {

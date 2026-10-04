@@ -25,6 +25,13 @@ export type Tick = number;
 /** A duration authored in (fractional) sim-seconds. Only appears in content/config, never state. */
 export type Seconds = number;
 
+/**
+ * D76: a duration authored in (fractional) ship's days, `config.time.daySeconds` long. Only in
+ * config; converted where read by `core/clock.ts` (`daysToSeconds`, `dayTicks`), never at load,
+ * because the config is embedded in every save as authored.
+ */
+export type Days = number;
+
 // ---------------------------------------------------------------------------------------------
 // Space
 // ---------------------------------------------------------------------------------------------

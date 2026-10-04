@@ -44,7 +44,14 @@ export const FIX = {
   scenario: "scenario.freight" as ScenarioDefId,
 } as const;
 
+/**
+ * The fixture's ship's day (D76). Day knobs are written as `seconds / FIXTURE_DAY` so the values
+ * the tests were written against stay visible and the conversion stays exact.
+ */
+export const FIXTURE_DAY = 1200;
+
 export interface FixtureConfigOverrides {
+  /** A fixture convenience in seconds, stored as `narrator.quietTooLongDays`. */
   quietTooLongSeconds?: number;
   dockingFee?: number;
   hookOnEvents?: readonly string[];
@@ -54,7 +61,7 @@ export interface FixtureConfigOverrides {
 
 export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef {
   return {
-    time: { tickRate: 20 },
+    time: { tickRate: 20, daySeconds: FIXTURE_DAY, watchesPerDay: 3 },
     movement: {
       walkSpeed: 2,
       passDelaySeconds: 0.5,
@@ -71,17 +78,17 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       rampOpenSeconds: 2,
     },
     needs: {
-      hungerPerSecond: 0.001,
-      fatiguePerSecondAwake: 0.001,
-      fatiguePerSecondWorking: 0.002,
-      fatigueRecoveryPerSecondAsleep: 0.01,
-      comfortPerSecond: 0.001,
-      comfortRecoveryPerSecondResting: 0.01,
-      socialPerSecond: 0.001,
-      socialRecoveryPerSecondChatting: 0.01,
+      hungerPerDay: 0.001 * FIXTURE_DAY,
+      fatiguePerDayAwake: 0.001 * FIXTURE_DAY,
+      fatiguePerDayWorking: 0.002 * FIXTURE_DAY,
+      fatigueRecoveryPerDayAsleep: 0.01 * FIXTURE_DAY,
+      comfortPerDay: 0.001 * FIXTURE_DAY,
+      comfortRecoveryPerDayResting: 0.01 * FIXTURE_DAY,
+      socialPerDay: 0.001 * FIXTURE_DAY,
+      socialRecoveryPerDayChatting: 0.01 * FIXTURE_DAY,
       seekThreshold: 0.5,
-      mealSeconds: 10,
-      sleepMinSeconds: 60,
+      mealDays: 10 / FIXTURE_DAY,
+      sleepDays: 60 / FIXTURE_DAY,
       wakeBelow: 0.1,
       initialRange: {
         hunger: { min: 0, max: 0 },
@@ -96,7 +103,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       claimLeaseSeconds: 10,
       timeBucketSeconds: 5,
       retryBackoffSeconds: 5,
-      skillGainPerSecond: 0.001,
+      skillGainPerDay: 0.001 * FIXTURE_DAY,
       workSpeedPerSkillLevel: 0.1,
     },
     urgency: {
@@ -104,7 +111,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       needSurvivalAbove: 0.9,
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
-      routineAgingSeconds: 60,
+      routineAgingDays: 60 / FIXTURE_DAY,
     },
     equipment: {
       hazardScale: 1,
@@ -139,15 +146,15 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         hazardous: { min: 3, max: 8 },
         passenger: { min: 2, max: 4 },
       },
-      jobOfferTtlSeconds: 120,
+      jobOfferTtlDays: 120 / FIXTURE_DAY,
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
-      reofferSeconds: 60,
+      reofferDays: 60 / FIXTURE_DAY,
       maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
       passage: overrides.passage ?? {
-        ashoreSecondsMin: 3,
-        ashoreSecondsMax: 3,
-        overdueSeconds: 10,
+        ashoreDaysMin: 3 / FIXTURE_DAY,
+        ashoreDaysMax: 3 / FIXTURE_DAY,
+        overdueDays: 10 / FIXTURE_DAY,
       },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
@@ -157,13 +164,13 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       },
     },
     narrator: {
-      quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
+      quietTooLongDays: (overrides.quietTooLongSeconds ?? 600) / FIXTURE_DAY,
       approachHookLeadSeconds: 1,
       maxSpawnsPerCommand: 3,
       maxFaultWindowSeconds: 60,
       spawnBudget: 3,
       faultBudget: 2,
-      budgetRefillSeconds: 600,
+      budgetRefillDays: 600 / FIXTURE_DAY,
       hookOnEvents: overrides.hookOnEvents ?? [],
     },
     host: {

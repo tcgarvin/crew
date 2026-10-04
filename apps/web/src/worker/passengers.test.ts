@@ -70,12 +70,13 @@ function passageOffer(world: World): Omit<Command, "id"> {
 function runPassage(overdueChoice: "left" | "right"): { world: World; log: RunLog } {
   const { bundle, config, scenarioId } = loadWebContent();
   // Faster legs and a stay ashore that outlasts the overdue window; everything else authored.
+  const day = config.values.time.daySeconds;
   const values = {
     ...config.values,
     travel: { ...config.values.travel, nominalSpeed: 10 },
     commerce: {
       ...config.values.commerce,
-      passage: { ashoreSecondsMin: 120, ashoreSecondsMax: 120, overdueSeconds: 45 },
+      passage: { ashoreDaysMin: 120 / day, ashoreDaysMax: 120 / day, overdueDays: 45 / day },
     },
   };
   const kernel = createKernel(createFullRegistry());

@@ -4,7 +4,7 @@
  * finalises the tick's events (phase 8).
  */
 import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
-import { configTicks } from "./clock";
+import { dayTicks } from "./clock";
 import { applyDueCommands, pushCapped } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
@@ -171,7 +171,7 @@ function runPlannerStage(
  * `lastNarrativeTick` to the raise tick, so after `acknowledgeHook` the next hook needs another
  * full quiet window.
  *
- * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongSeconds`
+ * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongDays`
  * with no narrator contact at all, so every hook kind re-arms the timer (see `core/hooks.ts`),
  * and the timer runs last in the tick so that any other hook raised in the same tick
  * (`stageDock`, `captainAshore`, `notableEvent` in phase 4; `policyDecision` just before this
@@ -183,7 +183,7 @@ const quietTimerSystem: System = {
   run(ctx) {
     const narrator = ctx.state.narrator;
     if (narrator.pendingHook !== undefined) return;
-    const quietTicks = configTicks(ctx.config, ctx.config.narrator.quietTooLongSeconds);
+    const quietTicks = dayTicks(ctx.config, ctx.config.narrator.quietTooLongDays);
     if (ctx.tick - narrator.lastNarrativeTick < quietTicks) return;
     raiseHookIfIdle(ctx, "quietTooLong", { quietSinceTick: narrator.lastNarrativeTick });
   },

@@ -8,9 +8,9 @@
  *   `manipulation × trait workSpeed × (1 + workSpeedPerSkillLevel × levels above the task's
  *   first skill requirement)` ticks of recipe progress.
  * - Eating takes one unit off the believed stack at pickup (split into a carried unit of 1) and
- *   consumes it at the end of `mealSeconds`: the stack on the floor drops by exactly one. Hunger
+ *   consumes it at the end of `mealDays`: the stack on the floor drops by exactly one. Hunger
  *   falls by the item's `nutrition` (food without one fully satisfies).
- * - Sleep ends after `sleepMinSeconds` once fatigue ≤ `wakeBelow`, or once the actor's shift has
+ * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor's shift has
  *   started and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
  *   fully met while on duty; off duty they last until the planner finds something more urgent.
  * - Staffing holds until the station's problem is resolved *and* the ship is docked or in
@@ -21,7 +21,7 @@
  *   `positionTaken` → `occupiedPosition`, anything else → `unreachableTarget`.
  */
 import { rebuildItemIndexes } from "../../core/caches";
-import { configTicks } from "../../core/clock";
+import { configTicks, dayTicks } from "../../core/clock";
 import { deliverHeldCard, heldCard } from "../../core/delivery";
 import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
@@ -522,7 +522,7 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
   switch (step.hold) {
     case "sleep": {
-      const slept = ctx.tick - step.sinceTick >= configTicks(ctx.config, needs.sleepMinSeconds);
+      const slept = ctx.tick - step.sinceTick >= dayTicks(ctx.config, needs.sleepDays);
       const rested = actor.needs.fatigue <= needs.wakeBelow;
       const shiftCalls = onDuty && actor.needs.fatigue < needs.seekThreshold;
       return slept && (rested || shiftCalls);

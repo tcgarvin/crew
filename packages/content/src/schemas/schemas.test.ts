@@ -221,7 +221,7 @@ const scenario = {
 
 const band = { min: 1, max: 3 };
 const config = {
-  time: { tickRate: 20 },
+  time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
   movement: {
     walkSpeed: 2,
     passDelaySeconds: 0.3,
@@ -238,17 +238,17 @@ const config = {
     rampOpenSeconds: 2,
   },
   needs: {
-    hungerPerSecond: 0.001,
-    fatiguePerSecondAwake: 0.0008,
-    fatiguePerSecondWorking: 0.0012,
-    fatigueRecoveryPerSecondAsleep: 0.004,
-    comfortPerSecond: 0.0005,
-    comfortRecoveryPerSecondResting: 0.003,
-    socialPerSecond: 0.0005,
-    socialRecoveryPerSecondChatting: 0.01,
+    hungerPerDay: 1.2,
+    fatiguePerDayAwake: 0.96,
+    fatiguePerDayWorking: 1.44,
+    fatigueRecoveryPerDayAsleep: 4.8,
+    comfortPerDay: 0.6,
+    comfortRecoveryPerDayResting: 3.6,
+    socialPerDay: 0.6,
+    socialRecoveryPerDayChatting: 12,
     seekThreshold: 0.5,
-    mealSeconds: 15,
-    sleepMinSeconds: 60,
+    mealDays: 0.0125,
+    sleepDays: 0.05,
     wakeBelow: 0.1,
     initialRange: {
       hunger: { min: 0.2, max: 0.6 },
@@ -263,7 +263,7 @@ const config = {
     claimLeaseSeconds: 4,
     timeBucketSeconds: 1,
     retryBackoffSeconds: 5,
-    skillGainPerSecond: 0.0001,
+    skillGainPerDay: 0.12,
     workSpeedPerSkillLevel: 0.1,
   },
   urgency: {
@@ -271,7 +271,7 @@ const config = {
     needSurvivalAbove: 0.95,
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
-    routineAgingSeconds: 120,
+    routineAgingDays: 0.1,
   },
   equipment: {
     hazardScale: 1,
@@ -305,12 +305,12 @@ const config = {
       hazardous: band,
       passenger: band,
     },
-    jobOfferTtlSeconds: 300,
+    jobOfferTtlDays: 0.25,
     dockingFee: 0,
     haulEstimateSeconds: 5,
-    reofferSeconds: 60,
+    reofferDays: 0.05,
     maxCratesPerJob: 6,
-    passage: { ashoreSecondsMin: 60, ashoreSecondsMax: 180, overdueSeconds: 120 },
+    passage: { ashoreDaysMin: 0.05, ashoreDaysMax: 0.15, overdueDays: 0.1 },
     market: {
       priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
       maxStockPerCommand: 4,
@@ -319,13 +319,13 @@ const config = {
     },
   },
   narrator: {
-    quietTooLongSeconds: 180,
+    quietTooLongDays: 0.15,
     approachHookLeadSeconds: 10,
     maxSpawnsPerCommand: 4,
     maxFaultWindowSeconds: 120,
     spawnBudget: 4,
     faultBudget: 2,
-    budgetRefillSeconds: 600,
+    budgetRefillDays: 0.5,
     hookOnEvents: [],
   },
   host: {
@@ -373,7 +373,7 @@ const cases = [
     name: "config",
     schema: configDefSchema,
     valid: config,
-    invalid: { ...config, time: { tickRate: 0 } },
+    invalid: { ...config, time: { ...config.time, tickRate: 0 } },
   },
 ] as const;
 

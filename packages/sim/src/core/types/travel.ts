@@ -214,7 +214,7 @@ export interface Job {
   paymentTransactionId?: TransactionId;
   /**
    * Integration 2 addition: tick the offer was declined or expired. Drives the `captainAshore`
-   * re-ask cooldown (`config.commerce.reofferSeconds`, D40).
+   * re-ask cooldown (`config.commerce.reofferDays`, D40).
    */
   closedTick?: Tick;
   /** Command that created it (narrator audit). */

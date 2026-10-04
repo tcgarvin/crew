@@ -5,7 +5,7 @@
  *
  * Raising any hook is narrator contact, so it re-arms the quiet timer: `lastNarrativeTick` is
  * set to the raise tick and `quietTooLong` (`core/pipeline.ts`) needs another full
- * `narrator.quietTooLongSeconds` of silence after it (passengers-and-galaxy §2.2: a long leg gets
+ * `narrator.quietTooLongDays` of silence after it (passengers-and-galaxy §2.2: a long leg gets
  * one quiet check-in, never one ten seconds after another call).
  */
 import { allocateId } from "./ids";

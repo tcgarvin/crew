@@ -58,6 +58,7 @@ import {
   commerceTaskDerivations,
   createKernel,
   createRegistry,
+  daysToSeconds,
   equipmentStages,
   equipmentTaskDerivation,
   registerCommerce,
@@ -143,6 +144,7 @@ export interface PacingResult {
   readonly decisions: number;
   /** The ship is docked at the hub with no voyage set. */
   readonly completed: boolean;
+  /** `narrator.quietTooLongDays` in sim-seconds at the run's `daySeconds` (D76). */
   readonly quietTooLongSeconds: number;
   /** Calls per hour this voyage would spend if repeated back to back at this speed. */
   readonly callsPerHour: number;
@@ -546,7 +548,10 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
     legs,
     decisions,
     completed,
-    quietTooLongSeconds: world.config.values.narrator.quietTooLongSeconds,
+    quietTooLongSeconds: daysToSeconds(
+      world.config.values,
+      world.config.values.narrator.quietTooLongDays,
+    ),
     callsPerHour: wallSeconds > 0 ? (calls.length * 3600) / wallSeconds : 0,
   };
 }
@@ -702,7 +707,7 @@ export function formatPacingReport(results: readonly PacingResult[]): string {
     return sample === undefined ? [] : [{ scenario, rows, sample }];
   });
   return [
-    `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quietTooLongSeconds ${first.quietTooLongSeconds})`,
+    `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quiet window ${first.quietTooLongSeconds} s)`,
     ...groups.flatMap(scenarioSection),
     "",
     "## Narrator budget",

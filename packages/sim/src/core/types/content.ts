@@ -10,7 +10,7 @@
  * normalised units where 1.0 is the machine's failure temperature. The kernel converts seconds
  * to ticks with ceil.
  */
-import type { EdgeSide, Rotation, Seconds, TileCoord, TileEdge } from "./common";
+import type { Days, EdgeSide, Rotation, Seconds, TileCoord, TileEdge } from "./common";
 import type {
   CrewDefId,
   DeckDefId,
@@ -729,6 +729,14 @@ export interface ConfigDef {
   readonly time: {
     /** Ticks per sim-second. SD §5.1 default 20. */
     readonly tickRate: number;
+    /**
+     * D76: sim-seconds in one ship's day. Every `Days` knob and per-day rate is converted through
+     * this where it is read (`core/clock.ts`), so changing it rescales the routine while physical
+     * motion (walking, doors, docking stages) keeps its speed.
+     */
+    readonly daySeconds: Seconds;
+    /** D76: watches in one ship's day; a watch is `daySeconds / watchesPerDay`. */
+    readonly watchesPerDay: number;
   };
   readonly movement: {
     readonly walkSpeed: number;
@@ -754,22 +762,34 @@ export interface ConfigDef {
     readonly rampOpenSeconds: Seconds;
   };
   readonly needs: {
-    /**
+    /*
      * W0 decision: needs are deficits in [0, 1]; 0 = fully satisfied, 1 = critical.
-     * Rates are per sim-second before trait multipliers.
+     * D76: rates are deficit per ship's day before trait multipliers, converted to per second
+     * where read (`perDayToPerSecond`). A rate of 1 fills an empty need in one day; a recovery
+     * rate `r` clears a full deficit in `1 / r` of a day.
      */
-    readonly hungerPerSecond: number;
-    readonly fatiguePerSecondAwake: number;
-    readonly fatiguePerSecondWorking: number;
-    readonly fatigueRecoveryPerSecondAsleep: number;
-    readonly comfortPerSecond: number;
-    readonly comfortRecoveryPerSecondResting: number;
-    readonly socialPerSecond: number;
-    readonly socialRecoveryPerSecondChatting: number;
+    /** About 1 a day: a 0.25-nutrition ration offsets a quarter of it, so about four meals a day. */
+    readonly hungerPerDay: number;
+    /** About 2/3 a day awake and idle: rested to `seekThreshold` 0.5 in three quarters of a day. */
+    readonly fatiguePerDayAwake: number;
+    /** About 1 a day while on a task, half again the idle rate. */
+    readonly fatiguePerDayWorking: number;
+    /** About 10 a day asleep: from `seekThreshold` 0.5 to `wakeBelow` 0.15 in about 0.035 day. */
+    readonly fatigueRecoveryPerDayAsleep: number;
+    /** About 2/3 a day: from comfortable to `seekThreshold` 0.5 in three quarters of a day. */
+    readonly comfortPerDay: number;
+    /** About 20 a day resting: a full deficit is cleared in 0.05 day. */
+    readonly comfortRecoveryPerDayResting: number;
+    /** About 1/2 a day: from content to `seekThreshold` 0.5 in about a day, so a chat a day. */
+    readonly socialPerDay: number;
+    /** About 10 a day chatting: a full deficit is cleared in 0.1 day. */
+    readonly socialRecoveryPerDayChatting: number;
     /** Deficit above which a personal activity becomes a routine candidate. */
     readonly seekThreshold: number;
-    readonly mealSeconds: Seconds;
-    readonly sleepMinSeconds: Seconds;
+    /** D76: how long a meal takes, in days (0.0125 day is 15 s of a 1200 s day). */
+    readonly mealDays: Days;
+    /** D76: the shortest sleep, in days, before waking below `wakeBelow` ends it. */
+    readonly sleepDays: Days;
     /** Wake when fatigue falls below this. */
     readonly wakeBelow: number;
     /**
@@ -791,8 +811,11 @@ export interface ConfigDef {
     /** SD §15.3 step 5 quantisation bucket. */
     readonly timeBucketSeconds: Seconds;
     readonly retryBackoffSeconds: Seconds;
-    /** Skill gained per second of successful work, per level gap (SD §11.2: conservative). */
-    readonly skillGainPerSecond: number;
+    /**
+     * Skill gained per day of successful work, per level gap (SD §11.2: conservative). D76:
+     * 0.24 is a quarter of a level per day of practice. Unread until slice 2's helm practice.
+     */
+    readonly skillGainPerDay: number;
     /** Work speed multiplier per skill level above the requirement. */
     readonly workSpeedPerSkillLevel: number;
   };
@@ -804,8 +827,11 @@ export interface ConfigDef {
     /** Machine temperature at which its fault/symptom work moves to `containment`. */
     readonly heatContainmentAbove: number;
     readonly heatSurvivalAbove: number;
-    /** Seconds of age after which a routine obligation outranks younger ones in class. */
-    readonly routineAgingSeconds: Seconds;
+    /**
+     * Age in days after which a routine obligation outranks younger ones in class. Not read yet;
+     * renamed with the other day knobs (D76).
+     */
+    readonly routineAgingDays: Days;
   };
   readonly equipment: {
     /** Global hazard multiplier for tuning sweeps. */
@@ -881,7 +907,8 @@ export interface ConfigDef {
     readonly priceBands: Readonly<
       Record<CargoClass | "passenger", { readonly min: number; readonly max: number }>
     >;
-    readonly jobOfferTtlSeconds: Seconds;
+    /** D76: how long an offered job stays open, in days (0.5 is half a day). */
+    readonly jobOfferTtlDays: Days;
     /**
      * W6 addition: flat integer credits charged on arrival at a port (SD §17.3 "simple running
      * costs"), so money can go down even on an uneventful loop. 0 = no fee.
@@ -891,9 +918,9 @@ export interface ConfigDef {
     readonly haulEstimateSeconds: Seconds;
     /**
      * How long after a declined or expired offer at a port before the narrator is asked again
-     * there (the `captainAshore` hook, D40).
+     * there (the `captainAshore` hook, D40), in days (D76).
      */
-    readonly reofferSeconds: Seconds;
+    readonly reofferDays: Days;
     /**
      * Cap on total cargo units per job, clamped at offer time so a haul made of individually
      * spawned crates (one item per unit, see `jobs.ts` `acceptJob`) stays a short trip rather than
@@ -902,11 +929,14 @@ export interface ConfigDef {
     readonly maxCratesPerJob: number;
     /** Passengers-and-galaxy §3.3: how long a round-trip passenger stays ashore. */
     readonly passage: {
-      /** `returnsAtTick` is drawn uniformly in [min, max] seconds after going ashore. */
-      readonly ashoreSecondsMin: Seconds;
-      readonly ashoreSecondsMax: Seconds;
-      /** Not back this long after going ashore: the overdue card ("Wait for them" / "Leave"). */
-      readonly overdueSeconds: Seconds;
+      /** `returnsAtTick` is drawn uniformly in [min, max] days after going ashore (D76). */
+      readonly ashoreDaysMin: Days;
+      readonly ashoreDaysMax: Days;
+      /**
+       * Not back this many days after going ashore: the overdue card ("Wait for them" /
+       * "Leave").
+       */
+      readonly overdueDays: Days;
     };
     /** D47: the parts market. */
     readonly market: {
@@ -921,20 +951,29 @@ export interface ConfigDef {
     };
   };
   readonly narrator: {
-    /** Quiet-too-long hook fires after this many seconds without a narrative event. */
-    readonly quietTooLongSeconds: Seconds;
+    /**
+     * Quiet-too-long hook fires after this many days without a narrative event (D76; 0.05 day
+     * is a minute of a 1200 s day, about seven times a watch at most).
+     */
+    readonly quietTooLongDays: Days;
     /**
      * D66: the `stageDock` hook is raised this long (as a distance at `travel.nominalSpeed`)
      * before the end of the route; transit holds at the end until it is answered.
      */
     readonly approachHookLeadSeconds: Seconds;
     readonly maxSpawnsPerCommand: number;
-    /** Upper bound on `scheduleFault` window length. */
+    /**
+     * Upper bound on `scheduleFault` window length. D76: the one narrator cadence still in
+     * seconds this slice.
+     */
     readonly maxFaultWindowSeconds: Seconds;
-    /** Narrator budget (review §D.3), refilled to these values every `budgetRefillSeconds`. */
+    /**
+     * Narrator budget (review §D.3), refilled to these values every `budgetRefillDays` (D76;
+     * not read yet: the refill lands with slice 2's contracts).
+     */
     readonly spawnBudget: number;
     readonly faultBudget: number;
-    readonly budgetRefillSeconds: Seconds;
+    readonly budgetRefillDays: Days;
     /**
      * W6 addition: `SimEvent["type"]` names (kept as plain strings so `content.ts` need not
      * depend on `core/types/events`) whose `narrative`-significance occurrence raises the

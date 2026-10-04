@@ -17,7 +17,7 @@ const unitRange = z
   .refine((r) => r.min <= r.max, { message: "min must be <= max" });
 
 export const configDefSchema = z.strictObject({
-  time: z.strictObject({ tickRate: positiveInt }),
+  time: z.strictObject({ tickRate: positiveInt, daySeconds: positive, watchesPerDay: positiveInt }),
   movement: z.strictObject({
     walkSpeed: positive,
     passDelaySeconds: nonNegative,
@@ -34,17 +34,17 @@ export const configDefSchema = z.strictObject({
     rampOpenSeconds: positive,
   }),
   needs: z.strictObject({
-    hungerPerSecond: nonNegative,
-    fatiguePerSecondAwake: nonNegative,
-    fatiguePerSecondWorking: nonNegative,
-    fatigueRecoveryPerSecondAsleep: nonNegative,
-    comfortPerSecond: nonNegative,
-    comfortRecoveryPerSecondResting: nonNegative,
-    socialPerSecond: nonNegative,
-    socialRecoveryPerSecondChatting: nonNegative,
+    hungerPerDay: nonNegative,
+    fatiguePerDayAwake: nonNegative,
+    fatiguePerDayWorking: nonNegative,
+    fatigueRecoveryPerDayAsleep: nonNegative,
+    comfortPerDay: nonNegative,
+    comfortRecoveryPerDayResting: nonNegative,
+    socialPerDay: nonNegative,
+    socialRecoveryPerDayChatting: nonNegative,
     seekThreshold: unitInterval,
-    mealSeconds: positive,
-    sleepMinSeconds: positive,
+    mealDays: positive,
+    sleepDays: positive,
     wakeBelow: unitInterval,
     initialRange: z.strictObject({
       hunger: unitRange,
@@ -59,7 +59,7 @@ export const configDefSchema = z.strictObject({
     claimLeaseSeconds: positive,
     timeBucketSeconds: positive,
     retryBackoffSeconds: positive,
-    skillGainPerSecond: nonNegative,
+    skillGainPerDay: nonNegative,
     workSpeedPerSkillLevel: nonNegative,
   }),
   urgency: z.strictObject({
@@ -67,7 +67,7 @@ export const configDefSchema = z.strictObject({
     needSurvivalAbove: unitInterval,
     heatContainmentAbove: unitInterval,
     heatSurvivalAbove: unitInterval,
-    routineAgingSeconds: positive,
+    routineAgingDays: positive,
   }),
   equipment: z.strictObject({
     hazardScale: nonNegative,
@@ -101,19 +101,19 @@ export const configDefSchema = z.strictObject({
       hazardous: band,
       passenger: band,
     }),
-    jobOfferTtlSeconds: positive,
+    jobOfferTtlDays: positive,
     dockingFee: z.number().int().min(0),
     haulEstimateSeconds: nonNegative,
-    reofferSeconds: nonNegative,
+    reofferDays: nonNegative,
     maxCratesPerJob: positiveInt,
     passage: z
       .strictObject({
-        ashoreSecondsMin: nonNegative,
-        ashoreSecondsMax: nonNegative,
-        overdueSeconds: nonNegative,
+        ashoreDaysMin: nonNegative,
+        ashoreDaysMax: nonNegative,
+        overdueDays: nonNegative,
       })
-      .refine((p) => p.ashoreSecondsMin <= p.ashoreSecondsMax, {
-        message: "ashoreSecondsMin must be <= ashoreSecondsMax",
+      .refine((p) => p.ashoreDaysMin <= p.ashoreDaysMax, {
+        message: "ashoreDaysMin must be <= ashoreDaysMax",
       }),
     market: z.strictObject({
       priceTiers: z.strictObject({ cheap: positive, fair: positive, dear: positive }),
@@ -123,13 +123,13 @@ export const configDefSchema = z.strictObject({
     }),
   }),
   narrator: z.strictObject({
-    quietTooLongSeconds: positive,
+    quietTooLongDays: positive,
     approachHookLeadSeconds: positive,
     maxSpawnsPerCommand: positiveInt,
     maxFaultWindowSeconds: positive,
     spawnBudget: z.number().int().min(0),
     faultBudget: z.number().int().min(0),
-    budgetRefillSeconds: positive,
+    budgetRefillDays: positive,
     hookOnEvents: z.array(z.string().min(1)),
   }),
   host: z.strictObject({

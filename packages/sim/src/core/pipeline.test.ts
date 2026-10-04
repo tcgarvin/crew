@@ -219,7 +219,7 @@ describe("quiet-too-long timer", () => {
     expect(world.state.narrator.pendingHook?.context).toEqual({ quietSinceTick: 15 });
   });
 
-  it("does not fire within quietTooLongSeconds of another hook (captainAshore here)", () => {
+  it("does not fire within quietTooLongDays of another hook (captainAshore here)", () => {
     // Any hook raised is narrator contact: the quiet window restarts from its raise tick.
     const { world, kernel, registry } = tinyTestWorld({ quietTooLongSeconds: 1 });
     registry.registerSystem({

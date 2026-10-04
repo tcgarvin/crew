@@ -6,7 +6,7 @@ import { GALLEY_TILE, JON, MARA, crewWorld, itemAt, place } from "./fixtures/cre
 import { eventsOf, run } from "./fixtures/run";
 
 describe("eating", () => {
-  it("walks to the rations, eats for mealSeconds, hunger drops and the stack loses exactly one", () => {
+  it("walks to the rations, eats for mealDays, hunger drops and the stack loses exactly one", () => {
     const tw = crewWorld();
     const { world } = tw;
     const mara = world.state.actors[MARA];
@@ -33,7 +33,7 @@ describe("eating", () => {
     const labels = log.labels[MARA] ?? [];
     expect(labels).toContain("walking to galley");
     expect(labels).toContain("eating");
-    // Meal took at least mealSeconds.
+    // Meal took at least mealDays.
     const started = log.events.find(
       (e) => e.type === "actionStarted" && e.payload.action === "eat",
     );
@@ -104,7 +104,7 @@ describe("sleeping", () => {
     expect(rest.labels[MARA]).toEqual(["asleep"]);
   });
 
-  it("wakes after sleepMinSeconds once fatigue is below wakeBelow", () => {
+  it("wakes after sleepDays once fatigue is below wakeBelow", () => {
     const tw = crewWorld();
     const { world } = tw;
     const mara = world.state.actors[MARA];

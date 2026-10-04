@@ -19,6 +19,7 @@ import type { Item } from "../../core/types/ship";
 import { registerTravel } from "../travel";
 import {
   FIX,
+  FIXTURE_DAY,
   type FixtureConfigOverrides,
   type FixtureWorld,
   PORTS,
@@ -347,7 +348,13 @@ describe("passage lifecycle", () => {
     const run = offerAndAccept(
       150,
       { roundTrip: true },
-      { passage: { ashoreSecondsMin: 20, ashoreSecondsMax: 20, overdueSeconds: 5 } },
+      {
+        passage: {
+          ashoreDaysMin: 20 / FIXTURE_DAY,
+          ashoreDaysMax: 20 / FIXTURE_DAY,
+          overdueDays: 5 / FIXTURE_DAY,
+        },
+      },
     );
     const { world, kernel } = run;
     const arrived = runUntil(
@@ -859,7 +866,11 @@ describe("endPassage and the course", () => {
 
 describe("the overdue card and the return", () => {
   const LATE: FixtureConfigOverrides = {
-    passage: { ashoreSecondsMin: 20, ashoreSecondsMax: 20, overdueSeconds: 5 },
+    passage: {
+      ashoreDaysMin: 20 / FIXTURE_DAY,
+      ashoreDaysMax: 20 / FIXTURE_DAY,
+      overdueDays: 5 / FIXTURE_DAY,
+    },
   };
 
   /** Ashore at b, run to the tick before the overdue card is due. */

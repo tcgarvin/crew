@@ -9,7 +9,7 @@ import {
   type ProblemId,
   type SaveEnvelope,
   type SimEvent,
-  configTicks,
+  dayTicks,
   dockAlongside,
   dockAreaTiles,
   personnelRampFoot,
@@ -627,7 +627,7 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
     const dueAt = job?.passage?.returnsAtTick;
     if (since === undefined || dueAt === undefined) throw new Error("fixture: not ashore");
     const config = req.snapshot.config;
-    const overdueAt = since + configTicks(config, config.commerce.passage.overdueSeconds);
+    const overdueAt = since + dayTicks(config, config.commerce.passage.overdueDays);
     expect(overdue).toContain(
       `${ABOARD}; ashore at Ossory Station, back at about ${Math.round(dueAt / config.time.tickRate)}s (tick ${dueAt}); OVERDUE (expected by tick ${overdueAt}).`,
     );

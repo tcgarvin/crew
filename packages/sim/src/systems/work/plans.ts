@@ -6,7 +6,7 @@
  * Generic shape: acquire(item) = moveTo(believed spot) + pickUp → moveTo(target) → work/hold →
  * commit (consume, putDown).
  */
-import { configTicks } from "../../core/clock";
+import { configTicks, dayTicks } from "../../core/clock";
 import { marketCounter } from "../../core/docks";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -276,7 +276,7 @@ function eatPlan(
   itemId: ItemId | undefined,
   table: TileCoord | undefined,
 ): PlanResult {
-  const mealTicks = configTicks(ctx.config, ctx.config.needs.mealSeconds);
+  const mealTicks = dayTicks(ctx.config, ctx.config.needs.mealDays);
   const meal: ActivityStep[] = [
     ...(table === undefined
       ? []

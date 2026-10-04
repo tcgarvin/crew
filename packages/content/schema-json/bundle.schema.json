@@ -1897,9 +1897,18 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "daySeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "watchesPerDay": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
-          "required": ["tickRate"],
+          "required": ["tickRate", "daySeconds", "watchesPerDay"],
           "additionalProperties": false
         },
         "movement": {
@@ -1978,35 +1987,35 @@
         "needs": {
           "type": "object",
           "properties": {
-            "hungerPerSecond": {
+            "hungerPerDay": {
               "type": "number",
               "minimum": 0
             },
-            "fatiguePerSecondAwake": {
+            "fatiguePerDayAwake": {
               "type": "number",
               "minimum": 0
             },
-            "fatiguePerSecondWorking": {
+            "fatiguePerDayWorking": {
               "type": "number",
               "minimum": 0
             },
-            "fatigueRecoveryPerSecondAsleep": {
+            "fatigueRecoveryPerDayAsleep": {
               "type": "number",
               "minimum": 0
             },
-            "comfortPerSecond": {
+            "comfortPerDay": {
               "type": "number",
               "minimum": 0
             },
-            "comfortRecoveryPerSecondResting": {
+            "comfortRecoveryPerDayResting": {
               "type": "number",
               "minimum": 0
             },
-            "socialPerSecond": {
+            "socialPerDay": {
               "type": "number",
               "minimum": 0
             },
-            "socialRecoveryPerSecondChatting": {
+            "socialRecoveryPerDayChatting": {
               "type": "number",
               "minimum": 0
             },
@@ -2015,11 +2024,11 @@
               "minimum": 0,
               "maximum": 1
             },
-            "mealSeconds": {
+            "mealDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
-            "sleepMinSeconds": {
+            "sleepDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
@@ -2105,17 +2114,17 @@
             }
           },
           "required": [
-            "hungerPerSecond",
-            "fatiguePerSecondAwake",
-            "fatiguePerSecondWorking",
-            "fatigueRecoveryPerSecondAsleep",
-            "comfortPerSecond",
-            "comfortRecoveryPerSecondResting",
-            "socialPerSecond",
-            "socialRecoveryPerSecondChatting",
+            "hungerPerDay",
+            "fatiguePerDayAwake",
+            "fatiguePerDayWorking",
+            "fatigueRecoveryPerDayAsleep",
+            "comfortPerDay",
+            "comfortRecoveryPerDayResting",
+            "socialPerDay",
+            "socialRecoveryPerDayChatting",
             "seekThreshold",
-            "mealSeconds",
-            "sleepMinSeconds",
+            "mealDays",
+            "sleepDays",
             "wakeBelow",
             "initialRange"
           ],
@@ -2145,7 +2154,7 @@
               "type": "number",
               "exclusiveMinimum": 0
             },
-            "skillGainPerSecond": {
+            "skillGainPerDay": {
               "type": "number",
               "minimum": 0
             },
@@ -2160,7 +2169,7 @@
             "claimLeaseSeconds",
             "timeBucketSeconds",
             "retryBackoffSeconds",
-            "skillGainPerSecond",
+            "skillGainPerDay",
             "workSpeedPerSkillLevel"
           ],
           "additionalProperties": false
@@ -2188,7 +2197,7 @@
               "minimum": 0,
               "maximum": 1
             },
-            "routineAgingSeconds": {
+            "routineAgingDays": {
               "type": "number",
               "exclusiveMinimum": 0
             }
@@ -2198,7 +2207,7 @@
             "needSurvivalAbove",
             "heatContainmentAbove",
             "heatSurvivalAbove",
-            "routineAgingSeconds"
+            "routineAgingDays"
           ],
           "additionalProperties": false
         },
@@ -2417,7 +2426,7 @@
               "required": ["general", "fragile", "perishable", "hazardous", "passenger"],
               "additionalProperties": false
             },
-            "jobOfferTtlSeconds": {
+            "jobOfferTtlDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
@@ -2430,7 +2439,7 @@
               "type": "number",
               "minimum": 0
             },
-            "reofferSeconds": {
+            "reofferDays": {
               "type": "number",
               "minimum": 0
             },
@@ -2442,20 +2451,20 @@
             "passage": {
               "type": "object",
               "properties": {
-                "ashoreSecondsMin": {
+                "ashoreDaysMin": {
                   "type": "number",
                   "minimum": 0
                 },
-                "ashoreSecondsMax": {
+                "ashoreDaysMax": {
                   "type": "number",
                   "minimum": 0
                 },
-                "overdueSeconds": {
+                "overdueDays": {
                   "type": "number",
                   "minimum": 0
                 }
               },
-              "required": ["ashoreSecondsMin", "ashoreSecondsMax", "overdueSeconds"],
+              "required": ["ashoreDaysMin", "ashoreDaysMax", "overdueDays"],
               "additionalProperties": false
             },
             "market": {
@@ -2501,10 +2510,10 @@
           },
           "required": [
             "priceBands",
-            "jobOfferTtlSeconds",
+            "jobOfferTtlDays",
             "dockingFee",
             "haulEstimateSeconds",
-            "reofferSeconds",
+            "reofferDays",
             "maxCratesPerJob",
             "passage",
             "market"
@@ -2514,7 +2523,7 @@
         "narrator": {
           "type": "object",
           "properties": {
-            "quietTooLongSeconds": {
+            "quietTooLongDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
@@ -2541,7 +2550,7 @@
               "minimum": 0,
               "maximum": 9007199254740991
             },
-            "budgetRefillSeconds": {
+            "budgetRefillDays": {
               "type": "number",
               "exclusiveMinimum": 0
             },
@@ -2554,13 +2563,13 @@
             }
           },
           "required": [
-            "quietTooLongSeconds",
+            "quietTooLongDays",
             "approachHookLeadSeconds",
             "maxSpawnsPerCommand",
             "maxFaultWindowSeconds",
             "spawnBudget",
             "faultBudget",
-            "budgetRefillSeconds",
+            "budgetRefillDays",
             "hookOnEvents"
           ],
           "additionalProperties": false
