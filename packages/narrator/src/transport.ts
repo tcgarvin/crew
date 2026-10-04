@@ -1,11 +1,8 @@
 /**
- * The model transport `runNarrator` calls: one structured-output completion. Injected, so the
- * narrator package holds no provider SDK or endpoint and tests never touch the network.
- *
- * W9 decision: OpenRouter transport (owner). The concrete OpenRouter implementation
- * (chat completions, the plan schema in the prompt since D53) is not in this package yet; see the
- * W9 report. Until one is supplied, `runNarrator` answers with the null fallback
- * (`fallback: "notConfigured"`).
+ * The model transport `runNarrator` calls: one structured-output completion. Injected, so tests
+ * never touch the network. The OpenRouter implementation (W9; chat completions, the plan schema
+ * in the prompt since D53) is `./openrouter.ts`; without a transport, `runNarrator` answers with
+ * the null fallback (`fallback: "notConfigured"`).
  */
 import type { NarratorUsage } from "./contract";
 
