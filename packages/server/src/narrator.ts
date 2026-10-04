@@ -5,16 +5,15 @@
  * `CREW_NARRATOR_FALLBACK=error` mode (D43); tests inject their own through
  * `createApp({ runNarrator })`.
  */
-import { loadBundle } from "@crew/content";
 import {
   type FallbackReason,
   type NarratorRequest,
   type NarratorResponse,
+  defaultContent,
   nullNarratorResponse,
   openRouterTransport,
   runNarratorWithTrace,
 } from "@crew/narrator";
-import type { ContentBundle } from "@crew/sim";
 
 /** Context passed to a `RunNarrator`; carries secrets through without this package using them. */
 export interface NarratorCtx {
@@ -61,29 +60,14 @@ export function isRetryableFailure(failure: NarratorFailure): boolean {
 
 export type RunNarrator = (req: NarratorRequest, ctx: NarratorCtx) => Promise<NarratorOutcome>;
 
-let cachedBundle: ContentBundle | undefined;
-
-/** The validated content bundle, loaded once; the null narrator needs it for its offers (D40). */
-function content(): ContentBundle {
-  if (cachedBundle === undefined) {
-    const result = loadBundle();
-    if (!result.ok) {
-      throw new Error(
-        `narrator: content bundle failed validation (${result.issues.length} issues)`,
-      );
-    }
-    cachedBundle = result.bundle;
-  }
-  return cachedBundle;
-}
-
 /**
  * Deterministic offline narrator: a template card for policy decisions and, for
  * `captainAshore`, one templated job offer (D40: the narrator is the only source of
  * work, so the offline path must still hand out work).
  */
 export const nullNarrator: RunNarrator = async (req) => ({
-  response: nullNarratorResponse(req, { content: content() }),
+  // The null narrator needs the content bundle for its offers (D40).
+  response: nullNarratorResponse(req, { content: defaultContent() }),
 });
 
 /**
@@ -93,7 +77,10 @@ export const nullNarrator: RunNarrator = async (req) => ({
 export const defaultNarrator: RunNarrator = async (req, ctx) => {
   if (ctx.openRouterApiKey === undefined || ctx.openRouterApiKey === "") {
     return {
-      response: nullNarratorResponse(req, { content: content(), fallback: "notConfigured" }),
+      response: nullNarratorResponse(req, {
+        content: defaultContent(),
+        fallback: "notConfigured",
+      }),
       error: "no OPENROUTER_API_KEY configured",
     };
   }

@@ -33,6 +33,7 @@ export {
   type NarratorRun,
   type NarratorTrace,
   type RunNarratorCtx,
+  defaultContent,
   runNarrator,
   runNarratorWithTrace,
 } from "./run";
