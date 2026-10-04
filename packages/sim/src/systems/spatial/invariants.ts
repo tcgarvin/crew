@@ -8,7 +8,7 @@
 import type { World } from "../../core/types/kernel";
 import { dockGraftCurrent, doorBetween, isStaticFloor, rampPassable } from "./geometry";
 import { derivedPosition, isStandable } from "./movement";
-import { tileCapacity } from "./reservations";
+import { parseReservationKey, tileCapacity } from "./reservations";
 
 export function spatialViolations(world: World): string[] {
   const out: string[] = [];
@@ -64,11 +64,10 @@ export function spatialViolations(world: World): string[] {
     }
   }
   for (const [key, holders] of Object.entries(caches.nav.reservations)) {
-    const [deckId, coords] = key.split(":");
-    const geometry = caches.nav.decks[deckId as keyof typeof caches.nav.decks];
-    const [x, y] = (coords ?? "").split(",").map(Number);
-    if (geometry === undefined || x === undefined || y === undefined) continue;
-    if (holders.length > tileCapacity(geometry, { x, y })) {
+    const { deckId, tile } = parseReservationKey(key);
+    const geometry = caches.nav.decks[deckId];
+    if (geometry === undefined) continue;
+    if (holders.length > tileCapacity(geometry, tile)) {
       out.push(`reservation ${key} has ${holders.length} holders`);
     }
   }

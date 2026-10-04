@@ -35,7 +35,7 @@ import type { DeckGeometry } from "../../core/types/nav";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { deckGeometry, isDockTile, isWalkable } from "../spatial/geometry";
 import { indexAt } from "../spatial/grid";
-import { centre, overlapSpeedFactor, tileOf } from "../spatial/movement";
+import { centre, overlapSpeedFactor, tileOf, withinHalfTile } from "../spatial/movement";
 import { type PathPolicy, cachedPath, stepLength } from "../spatial/pathfind";
 import { takeCratesIntoStore, withdrawJobCrates } from "./dock-custody";
 
@@ -111,12 +111,7 @@ function bodies(ctx: Ctx): { id: string; x: number; y: number }[] {
 }
 
 function crowded(local: Local, others: readonly { id: string; x: number; y: number }[]): boolean {
-  return others.some((o) => {
-    if (o.id === local.id) return false;
-    const dx = o.x - local.location.x;
-    const dy = o.y - local.location.y;
-    return dx * dx + dy * dy < 0.25;
-  });
+  return others.some((o) => o.id !== local.id && withinHalfTile(local.location, o));
 }
 
 /** Walk one local up to `budget` tiles. A tile turned unwalkable ends the walk there. */

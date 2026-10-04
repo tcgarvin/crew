@@ -25,6 +25,7 @@ import {
   isDockTile,
   rebuildGeometries,
 } from "./geometry";
+import { parseReservationKey } from "./reservations";
 
 export { deckToDock, dockToDeck, isOnDock } from "../../core/docks";
 
@@ -129,9 +130,8 @@ export function detachDock(host: DockHost): void {
   }
   const reservations = host.caches.nav.reservations;
   for (const key of Object.keys(reservations)) {
-    const [, coords] = key.split(":");
-    const [x, y] = (coords ?? "").split(",").map(Number);
-    if (isDockTile(geometry, x ?? Number.NaN, y ?? Number.NaN)) delete reservations[key];
+    const { tile } = parseReservationKey(key);
+    if (isDockTile(geometry, tile.x, tile.y)) delete reservations[key];
   }
   // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
   delete host.state.deck.dock;
