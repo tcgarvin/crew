@@ -183,7 +183,6 @@ export function drawPlume(
 
 /** Silhouette, bells and a few nose windows. `px` is one CSS pixel in tile units. */
 export function drawHull(ctx: CanvasRenderingContext2D, hull: HullGeometry, px: number): void {
-  ctx.fillStyle = HULL_FILL;
   ctx.strokeStyle = HULL_EDGE;
   ctx.lineWidth = 1.5 * px;
   ctx.lineJoin = "round";

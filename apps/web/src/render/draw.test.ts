@@ -1,7 +1,8 @@
 import type { RenderFrame, RenderItem } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { DeckLayout } from "./deckLayout";
-import { type ViewTransform, actorDotColor, crewLabelText, deckPiles, drawDeckItems } from "./draw";
+import { actorDotColor, crewLabelText, deckPiles, drawDeckItems } from "./draw";
+import type { ViewTransform } from "./screen";
 import { mockCanvas } from "./testCanvas";
 
 describe("crewLabelText (D70)", () => {

@@ -1,3 +1,5 @@
+import type { HealthState } from "../health";
+
 const SPEEDS = [1, 2, 4, 8] as const;
 
 export interface TopBarProps {
@@ -9,7 +11,7 @@ export interface TopBarProps {
   readonly tickRate: number;
   readonly money: number;
   readonly runAheadBufferedSeconds: number;
-  readonly health: "checking" | "ok" | "error";
+  readonly health: HealthState;
   readonly onNewGame: () => void;
 }
 

@@ -33,6 +33,7 @@ import {
   dockSurface,
 } from "./dockShape";
 import { type Bounds, HULL_RIM } from "./hull";
+import { disc, segment, withClipRect } from "./shapes";
 
 /** What the dock layer needs besides the map. */
 export interface DockPaint {
@@ -216,27 +217,24 @@ function drawQuayEdge(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockS
     const y0 = Math.min(edge.y1, edge.y1 + edge.ny * band) + sy;
     const w = edge.nx !== 0 ? band : edge.x2 - edge.x1;
     const h = edge.ny !== 0 ? band : edge.y2 - edge.y1;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x0, y0, w, h);
-    ctx.clip();
-    ctx.fillStyle = rgba(dock.palette.accent, 0.85);
-    ctx.fillRect(x0, y0, w, h);
-    ctx.strokeStyle = rgba(BLACK, 0.75);
-    ctx.lineWidth = 0.13;
-    ctx.beginPath();
-    const length = Math.max(w, h);
-    for (let s = -band; s < length + band; s += 0.4) {
-      if (edge.ny !== 0) {
-        ctx.moveTo(x0 + s, y0 + h);
-        ctx.lineTo(x0 + s + band, y0);
-      } else {
-        ctx.moveTo(x0, y0 + s);
-        ctx.lineTo(x0 + w, y0 + s + band);
+    withClipRect(ctx, x0, y0, w, h, () => {
+      ctx.fillStyle = rgba(dock.palette.accent, 0.85);
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = rgba(BLACK, 0.75);
+      ctx.lineWidth = 0.13;
+      ctx.beginPath();
+      const length = Math.max(w, h);
+      for (let s = -band; s < length + band; s += 0.4) {
+        if (edge.ny !== 0) {
+          ctx.moveTo(x0 + s, y0 + h);
+          ctx.lineTo(x0 + s + band, y0);
+        } else {
+          ctx.moveTo(x0, y0 + s);
+          ctx.lineTo(x0 + w, y0 + s + band);
+        }
       }
-    }
-    ctx.stroke();
-    ctx.restore();
+      ctx.stroke();
+    });
   }
   ctx.strokeStyle = rgba(BLACK, 0.5);
   ctx.lineWidth = px;
@@ -289,10 +287,7 @@ function drawClamps(
       ctx.strokeStyle = arm;
       ctx.lineWidth = 0.22;
       ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.lineTo(bx + dx * CLAMP_ARM, by + dy * CLAMP_ARM);
-      ctx.stroke();
+      segment(ctx, bx, by, bx + dx * CLAMP_ARM, by + dy * CLAMP_ARM);
       ctx.lineCap = "butt";
       ctx.fillStyle = mixHex(dock.palette.wall, BLACK, 0.2);
       ctx.fillRect(bx - 0.22, by - 0.22, 0.44, 0.44);
@@ -323,19 +318,16 @@ function drawAreas(ctx: CanvasRenderingContext2D, dock: DockDef, px: number) {
     ctx.fillStyle = rgba(line, area.kind === "freightStaging" ? 0.1 : 0.06);
     ctx.fillRect(x0, y0, w, h);
     if (look.hatch) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x0, y0, w, h);
-      ctx.clip();
-      ctx.strokeStyle = rgba(line, 0.16);
-      ctx.lineWidth = 0.08;
-      ctx.beginPath();
-      for (let s = -h; s < w; s += 0.5) {
-        ctx.moveTo(x0 + s, y0 + h);
-        ctx.lineTo(x0 + s + h, y0);
-      }
-      ctx.stroke();
-      ctx.restore();
+      withClipRect(ctx, x0, y0, w, h, () => {
+        ctx.strokeStyle = rgba(line, 0.16);
+        ctx.lineWidth = 0.08;
+        ctx.beginPath();
+        for (let s = -h; s < w; s += 0.5) {
+          ctx.moveTo(x0 + s, y0 + h);
+          ctx.lineTo(x0 + s + h, y0);
+        }
+        ctx.stroke();
+      });
     }
     // A dark under-stroke keeps the paint legible on a pale pad or pier.
     ctx.strokeStyle = rgba(BLACK, 0.35);
@@ -412,9 +404,7 @@ function doorway(ctx: CanvasRenderingContext2D, dock: DockDef, px: number, half:
   ctx.stroke();
   ctx.fillStyle = mixHex(dock.palette.accent, WHITE, 0.4);
   for (const side of [-1, 1]) {
-    ctx.beginPath();
-    ctx.arc(side * (half + 0.18), 0.55, 0.07, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, side * (half + 0.18), 0.55, 0.07);
   }
 }
 
@@ -479,15 +469,12 @@ const POST_ART: Readonly<Record<DockPostKind, PostArt>> = {
     // A counter under a striped awning, a few goods on it.
     floor: (ctx, dock, px) => {
       const half = 0.8;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(-half, 0.18, half * 2, 0.62);
-      ctx.clip();
-      for (let i = 0, x = -half; x < half; x += 0.2, i++) {
-        ctx.fillStyle = i % 2 === 0 ? dock.palette.accent : "#efe6cf";
-        ctx.fillRect(x, 0.18, 0.2, 0.62);
-      }
-      ctx.restore();
+      withClipRect(ctx, -half, 0.18, half * 2, 0.62, () => {
+        for (let i = 0, x = -half; x < half; x += 0.2, i++) {
+          ctx.fillStyle = i % 2 === 0 ? dock.palette.accent : "#efe6cf";
+          ctx.fillRect(x, 0.18, 0.2, 0.62);
+        }
+      });
       ctx.fillStyle = mixHex(dock.palette.wall, "#7a5a3a", 0.5);
       ctx.fillRect(-0.62, 0.02, 1.24, 0.24);
       ctx.strokeStyle = rgba(BLACK, 0.6);
@@ -499,9 +486,7 @@ const POST_ART: Readonly<Record<DockPostKind, PostArt>> = {
         [0.24, "#7fb069"],
       ] as const) {
         ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x, 0.14, 0.07, 0, Math.PI * 2);
-        ctx.fill();
+        disc(ctx, x, 0.14, 0.07);
       }
     },
   },
@@ -641,10 +626,7 @@ const drawBayWall: ForegroundDrawer = (ctx, dock, piece, inward, px) => {
   }
   ctx.strokeStyle = rgba(dock.palette.accent, 0.85);
   ctx.lineWidth = Math.max(1.5 * px, 0.08);
-  ctx.beginPath();
-  ctx.moveTo(e.x1, e.y1);
-  ctx.lineTo(e.x2, e.y2);
-  ctx.stroke();
+  segment(ctx, e.x1, e.y1, e.x2, e.y2);
 };
 
 const drawGantry: ForegroundDrawer = (ctx, dock, piece, _inward, px) => {
@@ -676,9 +658,7 @@ const drawGantry: ForegroundDrawer = (ctx, dock, piece, _inward, px) => {
   ctx.fillStyle = "#e0453a";
   for (const s of [0.4, length - 0.4]) {
     const [x, y] = at(s, 0.5);
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(0.09, 2 * px), 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, x, y, Math.max(0.09, 2 * px));
   }
 };
 
@@ -698,26 +678,20 @@ const drawTerminalEdge: ForegroundDrawer = (ctx, dock, piece, inward, px) => {
   const e = innerEdge(r, inward);
   ctx.strokeStyle = mixHex(dock.palette.wall, WHITE, 0.35);
   ctx.lineWidth = Math.max(1.5 * px, 0.07);
-  ctx.beginPath();
-  ctx.moveTo(e.x1, e.y1);
-  ctx.lineTo(e.x2, e.y2);
-  ctx.stroke();
+  segment(ctx, e.x1, e.y1, e.x2, e.y2);
 };
 
 const drawAwning: ForegroundDrawer = (ctx, dock, piece, inward, px) => {
   const r = piece.rect;
   const along = r.w >= r.h;
   const stripe = 0.5;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(r.x, r.y, r.w, r.h);
-  ctx.clip();
-  for (let s = 0, i = 0; s < (along ? r.w : r.h); s += stripe, i++) {
-    ctx.fillStyle = i % 2 === 0 ? dock.palette.accent : "#efe6cf";
-    if (along) ctx.fillRect(r.x + s, r.y, stripe, r.h);
-    else ctx.fillRect(r.x, r.y + s, r.w, stripe);
-  }
-  ctx.restore();
+  withClipRect(ctx, r.x, r.y, r.w, r.h, () => {
+    for (let s = 0, i = 0; s < (along ? r.w : r.h); s += stripe, i++) {
+      ctx.fillStyle = i % 2 === 0 ? dock.palette.accent : "#efe6cf";
+      if (along) ctx.fillRect(r.x + s, r.y, stripe, r.h);
+      else ctx.fillRect(r.x, r.y + s, r.w, stripe);
+    }
+  });
   // Scalloped front edge.
   const e = innerEdge(r, inward);
   ctx.fillStyle = dock.palette.accent;
@@ -725,9 +699,7 @@ const drawAwning: ForegroundDrawer = (ctx, dock, piece, inward, px) => {
   for (let s = stripe / 2; s < len; s += stripe) {
     const x = e.x1 + ((e.x2 - e.x1) / len) * s;
     const y = e.y1 + ((e.y2 - e.y1) / len) * s;
-    ctx.beginPath();
-    ctx.arc(x, y, stripe / 2, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, x, y, stripe / 2);
   }
   ctx.strokeStyle = rgba(BLACK, 0.35);
   ctx.lineWidth = px;
@@ -834,14 +806,10 @@ export function drawDockForeground(
   for (const overShip of [false, true]) {
     ctx.save();
     ctx.beginPath();
-    if (overShip) {
-      ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
-      ctx.clip();
-    } else {
-      ctx.rect(view.minX, view.minY, view.maxX - view.minX, view.maxY - view.minY);
-      ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
-      ctx.clip("evenodd");
-    }
+    // Away from the ship: the view with the ship's rect cut out of it.
+    if (!overShip) ctx.rect(view.minX, view.minY, view.maxX - view.minX, view.maxY - view.minY);
+    ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
+    ctx.clip(overShip ? "nonzero" : "evenodd");
     ctx.translate(paint.origin.x, paint.origin.y);
     for (const piece of dock.foreground) {
       const alpha = FOREGROUND_ALPHA[piece.kind];

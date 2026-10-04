@@ -7,6 +7,7 @@
  */
 import type { DockPaletteDef, DockPropDef, DockPropKind, DockRect, PortSetting } from "@crew/sim";
 import { BLACK, WHITE, hash01, hashKey, mixHex, rgba } from "./color";
+import { disc, segment } from "./shapes";
 
 export interface PropLook {
   readonly palette: DockPaletteDef;
@@ -140,16 +141,10 @@ const drawCrane: PropDrawer = (ctx, prop, look) => {
   ctx.lineCap = "round";
   ctx.strokeStyle = rgba(BLACK, 0.3);
   ctx.lineWidth = 0.32;
-  ctx.beginPath();
-  ctx.moveTo(tailX + 0.12, tailY + 0.18);
-  ctx.lineTo(tipX + 0.12, tipY + 0.18);
-  ctx.stroke();
+  segment(ctx, tailX + 0.12, tailY + 0.18, tipX + 0.12, tipY + 0.18);
   ctx.strokeStyle = mixHex(look.palette.accent, steel, 0.35);
   ctx.lineWidth = 0.26;
-  ctx.beginPath();
-  ctx.moveTo(tailX, tailY);
-  ctx.lineTo(tipX, tipY);
-  ctx.stroke();
+  segment(ctx, tailX, tailY, tipX, tipY);
   // Truss lacing along the jib.
   ctx.strokeStyle = rgba(BLACK, 0.45);
   ctx.lineWidth = hairline(look, 0.03);
@@ -168,16 +163,12 @@ const drawCrane: PropDrawer = (ctx, prop, look) => {
   ctx.fillStyle = mixHex(look.palette.wall, BLACK, 0.35);
   ctx.fillRect(tailX - 0.22, tailY - 0.22, 0.44, 0.44);
   ctx.fillStyle = steel;
-  ctx.beginPath();
-  ctx.arc(cx, cy, turret, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, turret);
   ctx.strokeStyle = rgba(BLACK, 0.6);
   ctx.lineWidth = hairline(look);
   ctx.stroke();
   ctx.fillStyle = look.palette.accent;
-  ctx.beginPath();
-  ctx.arc(tipX, tipY, 0.11, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, tipX, tipY, 0.11);
 };
 
 const drawHullSection: PropDrawer = (ctx, prop, look) => {
@@ -247,9 +238,7 @@ const drawHullSection: PropDrawer = (ctx, prop, look) => {
     const s = (0.2 + 0.3 * i + hash01(seed, i, 9) * 0.1) * length;
     const x = lengthX ? x0 + s : x0 + w;
     const y = lengthX ? y0 + h : y0 + s;
-    ctx.beginPath();
-    ctx.arc(x, y, 0.22, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, x, y, 0.22);
   }
 };
 
@@ -269,9 +258,7 @@ const drawPlanter: PropDrawer = (ctx, prop, look) => {
     const y = r.y + 0.2 + hash01(seed, i, 2) * (r.h - 0.4);
     const radius = 0.13 + hash01(seed, i, 3) * 0.14;
     ctx.fillStyle = LEAF[i % LEAF.length] ?? LEAF[0];
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
+    disc(ctx, x, y, radius);
   }
 };
 
@@ -338,13 +325,9 @@ const drawBollard: PropDrawer = (ctx, prop, look) => {
   const radius = Math.min(r.w, r.h) * 0.3;
   const body = look.setting === "planet" ? mixHex("#6b4f35", look.palette.wall, 0.3) : "#3b4048";
   ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
-  ctx.beginPath();
-  ctx.arc(cx + 0.07, cy + 0.1, radius, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx + 0.07, cy + 0.1, radius);
   ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, radius);
   ctx.strokeStyle = look.palette.accent;
   ctx.lineWidth = Math.max(1.5 * look.px, 0.06);
   ctx.beginPath();
@@ -362,13 +345,9 @@ const drawLamp: PropDrawer = (ctx, prop, look) => {
   ctx.fillStyle = glow;
   ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
   ctx.fillStyle = mixHex(look.palette.wall, BLACK, 0.3);
-  ctx.beginPath();
-  ctx.arc(cx, cy, 0.17, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, 0.17);
   ctx.fillStyle = mixHex(look.palette.accent, WHITE, 0.6);
-  ctx.beginPath();
-  ctx.arc(cx, cy, 0.09, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, 0.09);
 };
 
 const DRUM_PAINT = ["#3e5a7a", "#7a3e2e", "#5e6b3a", "#6b6f75"] as const;
@@ -383,13 +362,9 @@ const drawBarrels: PropDrawer = (ctx, prop, look) => {
       const cx = x + 0.5 + (hash01(seed, x, y) - 0.5) * 0.08;
       const cy = y + 0.5 + (hash01(seed, y, x) - 0.5) * 0.08;
       ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
-      ctx.beginPath();
-      ctx.arc(cx + 0.07, cy + 0.1, 0.38, 0, Math.PI * 2);
-      ctx.fill();
+      disc(ctx, cx + 0.07, cy + 0.1, 0.38);
       ctx.fillStyle = base;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 0.38, 0, Math.PI * 2);
-      ctx.fill();
+      disc(ctx, cx, cy, 0.38);
       ctx.strokeStyle = rgba(mixHex(base, BLACK, 0.6), 0.9);
       ctx.lineWidth = hairline(look);
       ctx.stroke();
@@ -398,9 +373,7 @@ const drawBarrels: PropDrawer = (ctx, prop, look) => {
       ctx.arc(cx, cy, 0.26, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = rgba(BLACK, 0.5);
-      ctx.beginPath();
-      ctx.arc(cx + 0.13, cy - 0.1, 0.05, 0, Math.PI * 2);
-      ctx.fill();
+      disc(ctx, cx + 0.13, cy - 0.1, 0.05);
     }
   }
 };

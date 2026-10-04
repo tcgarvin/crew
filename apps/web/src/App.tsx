@@ -14,9 +14,11 @@ import type {
   SaveEnvelope,
   SimEvent,
   Tick,
+  ToWorker,
 } from "@crew/sim";
 import { decisionShownTick } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
 import {
   type NarratorFailure,
@@ -45,7 +47,7 @@ import { Inspector, type InspectorData } from "./ui/Inspector";
 import { Log } from "./ui/Log";
 import { NarratorErrorPanel } from "./ui/NarratorErrorPanel";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
-import { Toast } from "./ui/Toast";
+import { Toast, useToast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
@@ -62,13 +64,10 @@ import {
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { loadWebContent } from "./worker/content";
 
-type HealthState = "checking" | "ok" | "error";
-
 /** Wall-clock cadence of routine server saves (PLAN §3: "Neon every ~60 s"). */
 const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
 const SERVER_OPEN_GRACE_MS = 3_000;
-const TOAST_MS = 4_000;
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -152,8 +151,8 @@ export function App() {
   const [decision, setDecision] = useState<Decision>();
   const [decisionHidden, setDecisionHidden] = useState(false);
   const [prose, setProse] = useState<Readonly<Record<string, DecisionCardText>>>({});
-  const [health, setHealth] = useState<HealthState>("checking");
-  const [toast, setToast] = useState<string>();
+  const health = useApiHealth();
+  const [toast, showToast] = useToast();
   const [stale, setStale] = useState(false);
   /** D26: the card just answered, kept up with its aftermath caption until the timer closes it. */
   const [closingCard, setClosingCard] = useState<{
@@ -164,11 +163,24 @@ export function App() {
   const closingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(closingTimer.current), []);
 
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(undefined), TOAST_MS);
+  /** Send `message` (built around a fresh request id); the worker's reply to it goes to `onReply`. */
+  const request = useCallback(
+    (
+      connection: SimConnection,
+      message: (requestId: string) => ToWorker,
+      onReply: (reply: FromWorker) => void,
+    ) => {
+      const requestId = nextRequestId();
+      pendingRequests.current.set(requestId, onReply);
+      connection.send(message(requestId));
+    },
+    [],
+  );
+
+  const sendCommand = useCallback((connection: SimConnection, command: Command) => {
+    const requestId = nextRequestId();
+    if (command.source === "player") playerCommands.current.set(requestId, command.kind);
+    connection.send({ type: "command", requestId, command });
   }, []);
 
   /** What the pause button does, also used when the narrator error panel pauses the game. */
@@ -177,22 +189,6 @@ export function App() {
     pausedRef.current = next;
     connectionRef.current?.setUserPaused(next);
     connectionRef.current?.send({ type: next ? "pause" : "resume" });
-  }, []);
-
-  // -------------------------------------------------------------- API health dot
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/health")
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((body: { ok: boolean }) => {
-        if (!cancelled) setHealth(body.ok ? "ok" : "error");
-      })
-      .catch(() => {
-        if (!cancelled) setHealth("error");
-      });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // -------------------------------------------------------------- worker connection + playback
@@ -205,12 +201,14 @@ export function App() {
     /** Ask the worker for a save envelope (the current, possibly run-ahead, state). */
     function requestEnvelope(): Promise<SaveEnvelope> {
       return new Promise((resolve, reject) => {
-        const requestId = nextRequestId();
-        pendingRequests.current.set(requestId, (msg) => {
-          if (msg.type === "saveBlob") resolve(msg.envelope);
-          else reject(new Error(msg.type === "error" ? msg.message : `unexpected ${msg.type}`));
-        });
-        connection.send({ type: "requestSave", requestId });
+        request(
+          connection,
+          (requestId) => ({ type: "requestSave", requestId }),
+          (msg) => {
+            if (msg.type === "saveBlob") resolve(msg.envelope);
+            else reject(new Error(msg.type === "error" ? msg.message : `unexpected ${msg.type}`));
+          },
+        );
       });
     }
 
@@ -228,11 +226,7 @@ export function App() {
         });
     }
 
-    function send(command: Command): void {
-      const requestId = nextRequestId();
-      if (command.source === "player") playerCommands.current.set(requestId, command.kind);
-      connection.send({ type: "command", requestId, command });
-    }
+    const send = (command: Command): void => sendCommand(connection, command);
 
     /** One narrator call for a hook; every way it can fail is a `NarratorFailure` (D43). */
     async function attemptNarrator(hook: NarratorHook): Promise<NarratorOutcome> {
@@ -291,12 +285,10 @@ export function App() {
           ? stagingRetryAction(retry, failure)
           : nextRetryAction(retry, failure);
         console.warn(`[narrator] ${failure.reason}: ${failure.message}`, action);
-        if (action.type === "acknowledge") {
-          for (const command of hookAnswer(hook, tick, undefined)) send(command);
-          break;
-        }
         if (action.type === "floorSet") {
           console.warn(`[narrator] staging fallback ${action.reason}`, action.message);
+        }
+        if (action.type === "acknowledge" || action.type === "floorSet") {
           for (const command of hookAnswer(hook, tick, undefined)) send(command);
           break;
         }
@@ -432,7 +424,7 @@ export function App() {
       connection.dispose();
     };
     // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once, so they never change.
-  }, [scenarioId, saveEveryTicks, showToast, applyPause]);
+  }, [scenarioId, saveEveryTicks, showToast, applyPause, request, sendCommand]);
 
   // -------------------------------------------------------------- speed / pause
   const onSetSpeed = useCallback((next: number) => {
@@ -481,59 +473,49 @@ export function App() {
       setInspectorData({ kind: "loading" });
       const connection = connectionRef.current;
       if (!connection) return;
-      const viewTick = frame?.tick ?? runAhead.viewTick;
-      const requestId = nextRequestId();
+      const tick = frame?.tick ?? runAhead.viewTick;
       if (next.kind === "actor") {
         const label = frame?.actors.find((a) => a.id === next.id)?.actionLabel;
-        pendingRequests.current.set(requestId, (msg) => {
-          if (msg.type === "agentViewResult") {
-            setInspectorData({
-              kind: "actor",
-              view: msg.view as AgentViewSnapshot,
-              ...(label === undefined ? {} : { label }),
-            });
-          } else if (msg.type === "error") {
-            setInspectorData(undefined);
-          }
-        });
-        connection.send({
-          type: "requestAgentView",
-          requestId,
-          actorId: next.id as ActorId,
-          tick: viewTick,
-        });
-      } else if (next.kind === "item") {
-        pendingRequests.current.set(requestId, (msg) => {
-          if (msg.type === "snapshot") {
-            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout);
-            setInspectorData(item === undefined ? undefined : { kind: "item", item });
-          } else if (msg.type === "error") {
-            setInspectorData(undefined);
-          }
-        });
-        connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
-      } else {
-        pendingRequests.current.set(requestId, (msg) => {
-          if (msg.type === "snapshot") {
-            const machine = msg.state.machines[next.id as MachineId] as Machine | undefined;
-            const name = machine === undefined ? undefined : bundle.machines[machine.defId]?.name;
-            if (machine) {
+        const actorId = next.id as ActorId;
+        request(
+          connection,
+          (requestId) => ({ type: "requestAgentView", requestId, actorId, tick }),
+          (msg) => {
+            if (msg.type === "agentViewResult") {
               setInspectorData({
-                kind: "machine",
-                machine,
-                ...(name === undefined ? {} : { name }),
+                kind: "actor",
+                view: msg.view as AgentViewSnapshot,
+                ...(label === undefined ? {} : { label }),
               });
-            } else {
+            } else if (msg.type === "error") {
               setInspectorData(undefined);
             }
-          } else if (msg.type === "error") {
-            setInspectorData(undefined);
-          }
-        });
-        connection.send({ type: "requestSnapshotAt", requestId, tick: viewTick });
+          },
+        );
+        return;
       }
+      request(
+        connection,
+        (requestId) => ({ type: "requestSnapshotAt", requestId, tick }),
+        (msg) => {
+          if (msg.type === "error") setInspectorData(undefined);
+          if (msg.type !== "snapshot") return;
+          if (next.kind === "item") {
+            const item = inspectItem(msg.state, next.id as ItemId, bundle, layout);
+            setInspectorData(item === undefined ? undefined : { kind: "item", item });
+            return;
+          }
+          const machine = msg.state.machines[next.id as MachineId] as Machine | undefined;
+          if (machine === undefined) {
+            setInspectorData(undefined);
+            return;
+          }
+          const name = bundle.machines[machine.defId]?.name;
+          setInspectorData({ kind: "machine", machine, ...(name === undefined ? {} : { name }) });
+        },
+      );
     },
-    [frame, runAhead.viewTick, bundle, layout, docks],
+    [frame, runAhead.viewTick, bundle, layout, docks, request],
   );
 
   const onCloseInspector = useCallback(() => {
@@ -546,15 +528,12 @@ export function App() {
     (side: "left" | "right") => {
       const connection = connectionRef.current;
       if (!connection || !decision) return;
-      const command: Command = {
+      sendCommand(connection, {
         id: nextCommandId(),
         source: "player",
         kind: "resolveDecision",
         payload: { decisionId: decision.id, side },
-      };
-      const requestId = nextRequestId();
-      playerCommands.current.set(requestId, command.kind);
-      connection.send({ type: "command", requestId, command });
+      });
       // D26: keep the answered card up for a moment with a line on what happens next. The sim
       // resumes behind it straight away; only the card lingers.
       const narrated = prose[decision.id];
@@ -566,7 +545,7 @@ export function App() {
       setDecision(undefined);
       setDecisionHidden(false);
     },
-    [decision, prose, bundle],
+    [decision, prose, bundle, sendCommand],
   );
 
   const onNewGame = useCallback(() => {

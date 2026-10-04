@@ -18,11 +18,10 @@ import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { cameraBounds } from "./camera";
+import type { DeckLayout } from "./deckLayout";
 import { type DockTable, clampEngagement, dockInView, dockSlide, withDockSlide } from "./dock";
 import {
-  type DeckLayout,
   type DrawSelection,
-  type ViewTransform,
   computeFitTransform,
   drawFrame,
   screenToWorld,
@@ -31,6 +30,7 @@ import {
 import { engineOutput, hullGeometry } from "./hull";
 import { pickAt } from "./pick";
 import { sceneAt, withDockSky } from "./scene";
+import type { ViewTransform } from "./screen";
 import { StarScroll, buildStarField } from "./stars";
 
 export type Selection = DrawSelection;

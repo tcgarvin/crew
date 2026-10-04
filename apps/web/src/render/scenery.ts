@@ -12,6 +12,7 @@
  */
 import type { Bounds } from "./hull";
 import { type Scene, smooth } from "./scene";
+import { disc } from "./shapes";
 import { wrap } from "./stars";
 
 export interface SceneryFrame {
@@ -42,7 +43,7 @@ const DUST_ALPHA = 0.45;
 const FIELD_HAZE = 0.3;
 
 /** The planet's ground scale for an altitude: full size landed, a third at the top of the sky. */
-export function groundScale(altitude: number): number {
+function groundScale(altitude: number): number {
   return 1 / (1 + 2 * altitude);
 }
 
@@ -88,9 +89,7 @@ function drawStation(
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, r * 0.22);
   ctx.fillStyle = palette.structureLight;
   const light = Math.max(0.12, r * 0.025);
   for (let i = 0; i < 28; i++) {
@@ -113,9 +112,7 @@ function drawPlanet(
   gradient.addColorStop(0.55, palette.structure);
   gradient.addColorStop(1, "#14251a");
   ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, cx, cy, r);
   ctx.strokeStyle = `rgba(${palette.cloudRgb}, 0.35)`;
   ctx.lineWidth = Math.max(0.15, r * 0.03);
   ctx.stroke();
@@ -126,7 +123,7 @@ function drawPlanet(
  * Where the far scenery sits along the ship. Arriving, it grows from a point just off the nose
  * toward the middle of the view; departing, it falls astern with the berth (at a parallax).
  */
-export function farCentreX(scene: Pick<Scene, "portOffset" | "portScale">, width: number): number {
+function farCentreX(scene: Pick<Scene, "portOffset" | "portScale">, width: number): number {
   if (scene.portOffset >= 0) return width / 2 + scene.portOffset * width * FAR_PARALLAX;
   return width * (FAR_START + (0.5 - FAR_START) * scene.portScale);
 }
@@ -179,30 +176,45 @@ function groundVisible(scene: Scene): number {
 }
 
 /**
- * Fields: crop strips along the travel axis. They scale with height (far below looks small) and
- * slide with the berth at that scale. The caller sets the alpha.
+ * Run `draw` in the far-below ground's frame: scaled down with height about the deck's centre and
+ * slid with the berth at that scale.
  */
-function drawFields(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
-  const { palette } = scene;
+function inGroundFrame(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  f: SceneryFrame,
+  draw: () => void,
+): void {
   const offset = scene.portOffset * f.width;
   const scale = groundScale(scene.altitude);
   ctx.save();
   ctx.translate(f.width / 2 + offset * scale, f.height / 2);
   ctx.scale(scale, scale);
   ctx.translate(-f.width / 2, -f.height / 2);
-  const x0 = -2 * f.width;
-  const x1 = 3 * f.width;
-  const y0 = -3 * f.height;
-  const y1 = 4 * f.height;
-  ctx.fillStyle = palette.ground;
-  rect(ctx, x0, y0, x1, y1);
-  ctx.fillStyle = palette.groundAccent;
-  for (let y = y0, i = 0; y < y1; y += 3.2, i++) {
-    if (i % 3 === 0) continue;
-    const jog = (i * 7.3) % 11;
-    rect(ctx, x0 + jog, y, x1, y + 1.6);
-  }
+  draw();
   ctx.restore();
+}
+
+/**
+ * Fields: crop strips along the travel axis. They scale with height (far below looks small) and
+ * slide with the berth at that scale. The caller sets the alpha.
+ */
+function drawFields(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
+  const { palette } = scene;
+  inGroundFrame(ctx, scene, f, () => {
+    const x0 = -2 * f.width;
+    const x1 = 3 * f.width;
+    const y0 = -3 * f.height;
+    const y1 = 4 * f.height;
+    ctx.fillStyle = palette.ground;
+    rect(ctx, x0, y0, x1, y1);
+    ctx.fillStyle = palette.groundAccent;
+    for (let y = y0, i = 0; y < y1; y += 3.2, i++) {
+      if (i % 3 === 0) continue;
+      const jog = (i * 7.3) % 11;
+      rect(ctx, x0 + jog, y, x1, y + 1.6);
+    }
+  });
 }
 
 function drawGround(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
@@ -232,21 +244,16 @@ const CLOUD_SEA: readonly Puff[] = [
 ];
 
 function drawCloudSea(ctx: CanvasRenderingContext2D, scene: Scene, f: SceneryFrame): void {
-  const offset = scene.portOffset * f.width;
-  const scale = groundScale(scene.altitude);
-  ctx.save();
-  ctx.translate(f.width / 2 + offset * scale, f.height / 2);
-  ctx.scale(scale, scale);
-  ctx.translate(-f.width / 2, -f.height / 2);
-  for (let period = -1; period <= 1; period++) {
-    for (const cloud of CLOUD_SEA) {
-      const ry = cloud.radius * f.height;
-      const x = (cloud.x + period) * f.width * 1.6;
-      const y = (cloud.y - 0.2) * f.height * 1.4;
-      puff(ctx, x, y, ry * 2.2, ry, scene.palette.cloudRgb, 0.5 * cloud.opacity);
+  inGroundFrame(ctx, scene, f, () => {
+    for (let period = -1; period <= 1; period++) {
+      for (const cloud of CLOUD_SEA) {
+        const ry = cloud.radius * f.height;
+        const x = (cloud.x + period) * f.width * 1.6;
+        const y = (cloud.y - 0.2) * f.height * 1.4;
+        puff(ctx, x, y, ry * 2.2, ry, scene.palette.cloudRgb, 0.5 * cloud.opacity);
+      }
     }
-  }
-  ctx.restore();
+  });
 }
 
 /**
@@ -362,9 +369,7 @@ function puff(
   gradient.addColorStop(0.6, `rgba(${rgb}, ${alpha * 0.55})`);
   gradient.addColorStop(1, `rgba(${rgb}, 0)`);
   ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(0, 0, ry, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, 0, 0, ry);
   ctx.restore();
 }
 
