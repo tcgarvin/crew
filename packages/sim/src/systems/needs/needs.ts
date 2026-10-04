@@ -28,6 +28,7 @@ import type { Actor, NeedKey } from "../../core/types/actor";
 import type { TraitModifierKey } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { currentHold } from "../work/activity";
+import { berthsSystem } from "./berths";
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
@@ -125,6 +126,10 @@ export const needsSystem: System = {
   },
 };
 
+/** Needs, then the berth rule (D74), both in phase 5. */
 export function registerNeeds(registry: KernelRegistry): Unregister {
-  return registry.registerSystem(needsSystem);
+  const unregister = [registry.registerSystem(needsSystem), registry.registerSystem(berthsSystem)];
+  return () => {
+    for (const undo of unregister) undo();
+  };
 }

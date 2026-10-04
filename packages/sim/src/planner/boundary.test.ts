@@ -110,6 +110,7 @@ function stubView(hunger: number, items: KnownItemView[]): AgentView {
     knownProblems: () => [],
     knownTasks: () => [],
     roster: () => [],
+    assignedBeds: () => [],
     knownItems: () => items,
     estimateTravelTicks: (to) => Math.abs(to.x) * 10,
   };

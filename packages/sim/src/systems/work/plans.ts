@@ -293,6 +293,13 @@ function eatPlan(
   return planOf([...acquire, ...meal, { kind: "consume", itemId }]);
 }
 
+/** D74: is this bed someone else's berth? Nobody lies down in another's bed. */
+function berthOfAnother(ctx: StepCtx, actor: Actor, bed: MachineId): boolean {
+  const key = ctx.state.machines[bed]?.placementKey;
+  if (key === undefined) return false;
+  return Object.entries(ctx.state.berths).some(([id, held]) => held === key && id !== actor.id);
+}
+
 export function buildPersonalPlan(
   ctx: StepCtx,
   actor: Actor,
@@ -303,6 +310,7 @@ export function buildPersonalPlan(
       return eatPlan(ctx, actor, intent.itemId, intent.tile);
     case "sleep": {
       const bed = intent.targetId as MachineId | undefined;
+      if (bed !== undefined && berthOfAnother(ctx, actor, bed)) return blocked("occupiedPosition");
       const target = bed === undefined ? undefined : interactionTarget(ctx, actor, bed, "use");
       if (target === undefined) return blocked("unreachableTarget");
       return planOf([

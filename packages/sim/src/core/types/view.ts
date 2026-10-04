@@ -164,6 +164,12 @@ export interface AgentView {
   knownProblems(): readonly ProblemView[];
   knownTasks(): readonly TaskView[];
   roster(): readonly RosterEntry[];
+  /**
+   * D74: every bed assigned to someone (`WorldState.berths`), this actor's included, ashore or
+   * aboard. Who sleeps where is common knowledge aboard, like the roster. The planner never
+   * sleeps in one of these but its own (`self.berth`).
+   */
+  assignedBeds(): readonly MachineId[];
   /** W4a addition: items the actor holds a location belief about (plus what it carries). */
   knownItems(): readonly KnownItemView[];
   /**

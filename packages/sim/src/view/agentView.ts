@@ -12,7 +12,8 @@
  * - tasks: live tasks of those problems. Claims are public in V1 (W4a decision, see
  *   `systems/work/claims.ts`): `knownClaimantId` is another actor holding a claim;
  * - items: `itemLocation` beliefs joined with the item's static definition;
- * - schematic + roster: static layout and who is aboard with trained skills.
+ * - schematic + roster: static layout and who is aboard with trained skills;
+ * - berths (D74): the actor's own bed (`self.berth`) and every assigned bed (`assignedBeds`).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
@@ -20,7 +21,7 @@
  */
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
-import type { ActorId, EntityId, ItemId, ProblemId } from "../core/types/ids";
+import type { ActorId, EntityId, ItemId, MachineId, ProblemId } from "../core/types/ids";
 import type { World } from "../core/types/kernel";
 import type { DeckGeometry } from "../core/types/nav";
 import type { ReadonlyWorldState } from "../core/types/pipeline";
@@ -79,12 +80,24 @@ function berthOf(
 ): SelfView["berth"] {
   const key = state.berths[actorId];
   if (key === undefined) return undefined;
+  return { machineId: bedMachine(state, key, deckId) };
+}
+
+function bedMachine(
+  state: World["state"],
+  key: World["state"]["berths"][ActorId],
+  deckId: DeckGeometry["deckId"],
+): MachineId {
   const machine = Object.values(state.machines).find(
     (m) => m.deckId === deckId && m.placementKey === key,
   );
-  if (machine === undefined)
-    throw new Error(`Berth "${key}" of ${actorId} is no machine on ${deckId}`);
-  return { machineId: machine.id };
+  if (machine === undefined) throw new Error(`Berth "${key}" is no machine on ${deckId}`);
+  return machine.id;
+}
+
+/** D74: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`). */
+function assignedBeds(state: World["state"], deckId: DeckGeometry["deckId"]): MachineId[] {
+  return Object.values(state.berths).map((key) => bedMachine(state, key, deckId));
 }
 
 function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): SelfView {
@@ -283,6 +296,7 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
       [...problemsKnown()].map((id) => state.work.problems[id]).filter((p) => p !== undefined),
     knownTasks: () => knownTasks(state, actor, problemsKnown()),
     roster: () => roster(state),
+    assignedBeds: () => assignedBeds(state, geometry.deckId),
     knownItems: () => knownItems(world, actor),
     estimateTravelTicks: (to: TileCoord, from?: TileCoord) => {
       const start = from ?? self.tile;
