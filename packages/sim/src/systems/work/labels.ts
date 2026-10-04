@@ -242,14 +242,10 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   return personalStepLabel(ctx, actor, step);
 }
 
-/** The speaker of the held card a meeting still ahead in `rest` is for, if any. */
-function meetingWith(
-  ctx: LabelCtx,
-  rest: readonly DeepReadonly<ActivityStep>[],
-): string | undefined {
+/** Who a meeting still ahead in `rest` (its `deliverCard`) is with, if any. */
+function meetingWith(rest: readonly DeepReadonly<ActivityStep>[]): string | undefined {
   const deliver = rest.find((s) => s.kind === "deliverCard");
-  if (deliver?.kind !== "deliverCard") return undefined;
-  return ctx.state.decisions.held.find((h) => h.decisionId === deliver.decisionId)?.speaker;
+  return deliver?.kind === "deliverCard" ? deliver.withName : undefined;
 }
 
 /**
@@ -264,14 +260,14 @@ function shoreLabel(
   rest: readonly DeepReadonly<ActivityStep>[],
   step: DeepReadonly<ActivityStep>,
 ): string {
-  const seeing = meetingWith(ctx, rest);
+  const seeing = meetingWith(rest);
   switch (step.kind) {
     case "awaitWord":
       return "looking for work";
     case "talk":
       return `talking with ${step.withName}`;
     case "deliverCard":
-      return seeing === undefined ? "talking" : `talking with ${seeing}`;
+      return `talking with ${step.withName}`;
     case "throughGate":
       return seeing === undefined ? "looking round the port" : `ashore to see ${seeing}`;
     case "moveTo": {

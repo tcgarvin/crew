@@ -26,6 +26,8 @@ export interface NarratorCtx {
   readonly notes?: unknown;
   /** `CREW_NARRATOR_MODEL`; absent = the narrator's default. */
   readonly model?: string;
+  /** D70: the model timeout for this call (`CREW_STAGING_TIMEOUT_MS` for staging); absent = default. */
+  readonly timeoutMs?: number;
 }
 
 /**
@@ -111,6 +113,7 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     notes: ctx.notes,
     ...(transport === undefined ? {} : { transport }),
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
+    ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
   });
   return { response: run.response, ...(run.error === undefined ? {} : { error: run.error }) };
 };

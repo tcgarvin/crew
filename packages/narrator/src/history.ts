@@ -29,7 +29,7 @@ function fromRecord(
   if (record === undefined) return undefined;
   const text = templateCard(record, content);
   return {
-    tick: record.createdTick,
+    tick: record.deliveredTick ?? record.createdTick,
     decisionId,
     title: text.title,
     speaker: text.speaker ?? null,

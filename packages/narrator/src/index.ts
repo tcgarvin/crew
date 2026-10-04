@@ -29,6 +29,7 @@ export {
 export {
   DEFAULT_NARRATOR_MODEL,
   NARRATOR_TIMEOUT_MS,
+  STAGING_TIMEOUT_MS,
   type NarratorRun,
   type NarratorTrace,
   type RunNarratorCtx,

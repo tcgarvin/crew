@@ -671,6 +671,9 @@ export function shipHeadline(
   const travel = state.travel;
   if (travel.stage === "docked") {
     const here = `Docked at ${portName(content, travel.portId)}`;
+    // D70: the captain ashore is the moment to watch; the freight count comes back after.
+    const ashore = captainAshoreLine(state);
+    if (ashore !== undefined) return `${here} — ${ashore}`;
     const unloading = freightProgress(state, content, "cargoToUnload");
     if (unloading !== undefined) {
       return `${here} — unloading cargo (${unloading.done} of ${unloading.total} ${crates(unloading.total)} ashore)`;
@@ -691,8 +694,6 @@ export function shipHeadline(
         ? `${here} — holding for repairs before departing for ${to}`
         : `Preparing to depart for ${to}`;
     }
-    const ashore = captainAshoreLine(state);
-    if (ashore !== undefined) return `${here} — ${ashore}`;
     // Offers are the card's story to tell, not the headline's (D34): the headline only says what
     // the ship is doing.
     return `${here} — looking for work`;

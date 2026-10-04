@@ -15,6 +15,7 @@ import type {
   ActorId,
   Command,
   CommandId,
+  Decision,
   Kernel,
   NarratorHook,
   PortDefId,
@@ -25,6 +26,7 @@ import {
   checkInvariants,
   commerceViolations,
   createKernel,
+  decisionShownTick,
   getRenderFrame,
   isOnDock,
   spatialViolations,
@@ -262,6 +264,21 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
     if (halNow === undefined) throw new Error("Hal left");
     expect(near(card.captainAt, halNow.location, 2)).toBe(true);
     expect(ofType(run, "cardDelivered").map((e) => e.payload.reason)).toEqual(["met"]);
+    // The log does not announce the offer before the meeting: the card is its first word.
+    expect(ofType(run, "jobOffered")[0]?.significance).toBe("trace");
+    // While the card is up the captain is still with Hal, and the headline says so.
+    const frame = getRenderFrame(world);
+    expect(frame.headline).toBe(
+      "Docked at Crossroads Hub — Mara Osei is talking with Hal Petrosyan",
+    );
+    expect(frame.actors.find((a) => a.name === "Mara Osei")?.actionLabel).toBe(
+      "talking with Hal Petrosyan",
+    );
+    // The client shows (and logs) the card from the meeting, not from when it was held.
+    const decision = world.state.decisions.records[held.payload.decisionId];
+    expect(decision?.deliveredTick).toBe(card.tick);
+    expect(decisionShownTick(decision as Decision)).toBe(card.tick);
+    expect(decision?.createdTick).toBeLessThan(card.tick);
   });
 
   it("goes out through the gate to someone in the port, and the card comes up on the way back", () => {
@@ -358,6 +375,17 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
     );
     expect(run.cards.length).toBeGreaterThan(0);
     expect(run.cards.every((c) => c.docked)).toBe(true);
+    // At the destination the captain goes ashore while the crew unload, and the headline says
+    // so over the crate count until they are back.
+    let seen = "";
+    drive(kernel, world, 20 * 120, answerNothing, (w) => {
+      const line = getRenderFrame(w).headline;
+      if (line.includes("is ashore looking for work")) seen = line;
+      return seen !== "";
+    });
+    expect(seen).toBe(
+      `Docked at Kessler Drift — ${captainOf(world).name} is ashore looking for work`,
+    );
   });
 
   it("survives a save and restore mid-walk, and the card still comes up in person", () => {

@@ -113,6 +113,25 @@ describe("captainAshore on the narrator side (D70)", () => {
     expect(quiet?.kind === "offerJob" ? quiet.payload.surface : undefined).not.toBe(true);
   });
 
+  it("has the null narrator's work come from someone on the dock some of the time", () => {
+    const base = captainAshoreRequest(content());
+    const regulars = Object.values(base.snapshot.state.dockside.locals)
+      .filter((l) => l.origin.kind === "regular")
+      .map((l) => l.name);
+    expect(regulars.length).toBeGreaterThan(0);
+    const issuers = Array.from({ length: 12 }, (_, i) => {
+      const snapshot = structuredClone(base.snapshot) as SaveEnvelope;
+      snapshot.state.tick = 2_400 + i * 37;
+      const res = nullNarratorResponse({ ...base, snapshot }, { callId: "c", content: content() });
+      const offer = res.commands.find((c) => c.kind === "offerJob");
+      if (offer?.kind !== "offerJob") throw new Error("no offer");
+      const issuer = offer.payload.job.issuer;
+      return typeof issuer === "string" ? issuer : issuer.name;
+    });
+    expect(issuers.some((name) => regulars.includes(name))).toBe(true);
+    expect(issuers.some((name) => !regulars.includes(name))).toBe(true);
+  });
+
   it("forgets a held card that was dropped before it ever came up", () => {
     const req = withHeldCard();
     const state = req.snapshot.state;

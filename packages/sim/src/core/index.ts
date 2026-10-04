@@ -64,7 +64,13 @@ export {
   lookSeedOf,
   personnelRampFoot,
 } from "./locals";
-export { cardSpeaker, heldCard, isShipsPerson, localNamed } from "./delivery";
+export {
+  cardSpeaker,
+  decisionShownTick,
+  heldCard,
+  isShipsPerson,
+  localNamed,
+} from "./delivery";
 export { commandActor, isFitForCommand } from "./command-actor";
 export { isNobodysFreight } from "./freight";
 export { renderDockProps, renderLocals } from "./render";

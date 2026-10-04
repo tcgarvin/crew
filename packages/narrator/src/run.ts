@@ -56,6 +56,13 @@ export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
  * retry could not finish inside the budget, and the null fallback keeps the game going.
  */
 export const NARRATOR_TIMEOUT_MS = 25_000;
+/**
+ * D70: the staging call's own default timeout. Its output is small, and a staging attempt that
+ * runs long costs the player a held ship at the end of transit on every retry (D69's schedule is
+ * 2 s, 4 s, then the floor set), so it gives up sooner than a story call. The server's
+ * `CREW_STAGING_TIMEOUT_MS` overrides it.
+ */
+export const STAGING_TIMEOUT_MS = 10_000;
 /** A plan is a few hundred tokens; the rest is headroom for the model's reasoning. */
 export const NARRATOR_MAX_TOKENS = 4_000;
 
@@ -73,6 +80,7 @@ export interface RunNarratorCtx {
   /** Test/eval override; defaults to the validated bundle from `@crew/content`. */
   readonly content?: ContentBundle;
   readonly callId?: string;
+  /** Per-call model timeout; absent = `STAGING_TIMEOUT_MS` for `stageDock`, else `NARRATOR_TIMEOUT_MS`. */
   readonly timeoutMs?: number;
 }
 
@@ -339,7 +347,8 @@ export async function runNarratorWithTrace(
     cardsShown: applyDecisionEvents(stored.cardsShown, req.recentEvents, snapshot.state, content),
   };
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
-  const timeoutMs = ctx.timeoutMs ?? NARRATOR_TIMEOUT_MS;
+  const timeoutMs =
+    ctx.timeoutMs ?? (req.hook.kind === "stageDock" ? STAGING_TIMEOUT_MS : NARRATOR_TIMEOUT_MS);
   const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
   if (req.hook.kind === "stageDock") {
     // D67: the staging call has its own prompt, schema and translator, over the same digest.

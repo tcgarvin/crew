@@ -16,6 +16,7 @@ import {
   reject,
 } from "../../core/commands";
 import { findCrewDef, findItemDef } from "../../core/defs";
+import { heldCard } from "../../core/delivery";
 import { allocateId } from "../../core/ids";
 import { ensureMarket } from "../../core/markets";
 import type { BoundaryLocation, CommandOfKind, CommandRejection } from "../../core/types/commands";
@@ -140,18 +141,21 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         : {}),
     };
     ctx.state.jobs[jobId] = job;
+    // D63, D66: alongside the origin's dock, commerce's sweep this tick sends a dock hand out with
+    // the freight (or sets it out at once at a dock with no warehouse door); an offer made in
+    // flight is staged the same way when that dock comes alongside.
+    // D70: validated docked at the origin; the card is held until the captain meets the issuer.
+    const decisionId = surface ? surfaceOfferCard(ctx, job) : undefined;
+    const held = decisionId !== undefined && heldCard(ctx.state, decisionId) !== undefined;
     ctx.emit({
       type: "jobOffered",
       subjectIds: [jobId],
       causeIds: [command.id],
       source: command.source,
+      // D70: an offer whose card waits for the meeting is not in the log before it: the card is.
+      ...(held ? { significance: "trace" as const } : {}),
       payload: { jobId },
     });
-    // D63, D66: alongside the origin's dock, commerce's sweep this tick sends a dock hand out with
-    // the freight (or sets it out at once at a dock with no warehouse door); an offer made in
-    // flight is staged the same way when that dock comes alongside.
-    // D70: validated docked at the origin; the card is held until the captain meets the issuer.
-    if (surface) surfaceOfferCard(ctx, job);
     return NO_TEMP_REFS;
   },
 };

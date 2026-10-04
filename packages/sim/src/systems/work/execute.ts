@@ -992,8 +992,10 @@ function runStep(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: ActivityStep)
     case "talk":
       return runTalk(ctx, actor, step);
     case "deliverCard":
+      // The tick it comes up the captain is still with them (the world halts on the card).
+      if (heldCard(ctx.state, step.decisionId) === undefined) return "done";
       deliverHeldCard(ctx, step.decisionId, "met");
-      return "done";
+      return "wait";
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
   }

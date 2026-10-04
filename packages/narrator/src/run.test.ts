@@ -9,7 +9,7 @@ import {
   createKernel,
   createRegistry,
 } from "@crew/sim";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NarratorRequest } from "./contract";
 import {
   approachRequest,
@@ -24,7 +24,7 @@ import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { HOOK_INSTRUCTIONS, STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
-import { runNarrator } from "./run";
+import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator } from "./run";
 import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
 import { TransportError } from "./transport";
 
@@ -393,6 +393,17 @@ describe("runNarrator", () => {
       timeoutMs: 20,
     });
     expect(res.fallback).toBe("timeout");
+  });
+
+  it("gives the staging call its own, shorter default timeout (D70)", async () => {
+    const timeouts = vi.spyOn(AbortSignal, "timeout");
+    const transport = fakeTransport(okResult(JSON.stringify({ rationale: "bare", intents: [] })));
+    await runNarrator(stageDockRequest(content()), ctx(transport));
+    expect(timeouts).toHaveBeenLastCalledWith(STAGING_TIMEOUT_MS);
+    await runNarrator(quietTooLongRequest(content()), ctx(transport));
+    expect(timeouts).toHaveBeenLastCalledWith(NARRATOR_TIMEOUT_MS);
+    expect(STAGING_TIMEOUT_MS).toBeLessThan(NARRATOR_TIMEOUT_MS);
+    timeouts.mockRestore();
   });
 
   it("answers a policy decision with a template card on the null path", async () => {

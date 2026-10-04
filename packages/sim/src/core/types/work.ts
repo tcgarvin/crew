@@ -454,10 +454,12 @@ export type ActivityStep =
       ticksNeeded: number;
     }
   /**
-   * D70 commit point: the held card `decisionId` comes up now (`deliverHeldCard`). A card already
-   * delivered some other way (given up waiting, the dock leaving) makes this a no-op.
+   * D70 commit point: the held card `decisionId` comes up now (`deliverHeldCard`), and the step
+   * stays current for the tick it came up on, so the label still says who the captain is with
+   * while the card is on screen. A card already delivered some other way (given up waiting, the
+   * dock leaving) makes this a no-op.
    */
-  | { kind: "deliverCard"; decisionId: DecisionId }
+  | { kind: "deliverCard"; decisionId: DecisionId; withName: string }
   | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
 
 /**

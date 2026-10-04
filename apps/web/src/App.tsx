@@ -15,6 +15,7 @@ import type {
   SimEvent,
   Tick,
 } from "@crew/sim";
+import { decisionShownTick } from "@crew/sim";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type SimConnection, createSimConnection } from "./host/connection";
 import {
@@ -576,7 +577,8 @@ export function App() {
   const viewTick = frame?.tick ?? 0;
   // D14: the worker may be ahead of the viewer; show hook/decision UI once playback reaches it.
   const thinking = pendingHook !== undefined && viewTick >= pendingHook.tick;
-  const decisionDue = decision !== undefined && viewTick >= decision.createdTick;
+  // D70: a card held for delivery in person is due when it was delivered, not when it was made.
+  const decisionDue = decision !== undefined && viewTick >= decisionShownTick(decision);
   const card = useMemo(() => {
     if (decision === undefined) return undefined;
     return prose[decision.id] ?? templateCard(decision, bundle);

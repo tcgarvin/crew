@@ -160,7 +160,7 @@ export function meetingPlan(ctx: StepCtx, decisionId: DecisionId | undefined): S
         ticksDone: 0,
         ticksNeeded: configTicks(ctx.config, ctx.config.travel.talkSeconds),
       },
-      { kind: "deliverCard", decisionId },
+      { kind: "deliverCard", decisionId, withName: local.name },
       move(shore.top),
     ]);
   }
@@ -168,7 +168,7 @@ export function meetingPlan(ctx: StepCtx, decisionId: DecisionId | undefined): S
   return planOf([
     move(shore.gate),
     throughGate(ctx, shore, shore.gate),
-    { kind: "deliverCard", decisionId },
+    { kind: "deliverCard", decisionId, withName: held.speaker },
     move(shore.top),
   ]);
 }

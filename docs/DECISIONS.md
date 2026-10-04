@@ -1083,5 +1083,36 @@ in flight; the digest, translator, null narrator and history over a held card; t
 *Live:* the live `captainAshore` case now asserts an offer from the docked port or a stated reason,
 and logs whether the issuer is on the dock or beyond the gate. Not run: the OpenRouter key is at
 its weekly limit.
-*Not done:* the design's phone playtest; the captain's walk is fixed (the bridge to the ramp, about
-17 s), not tuned.
+*Merged with D69:* captainAshore is a story hook, so raising it settles a `pendingNotable` debt
+like any story call, and an owed `notableEvent` (travel raises it first in the tick) simply makes
+the ask retry the next tick; the walk waits on the dock meanwhile. D69's `finishActivity` setting
+down a task's supplies does not touch the personal shore activities.
+*Staging timeout:* a staging attempt now gives up after 10 s (`STAGING_TIMEOUT_MS` in the narrator,
+the default when a `stageDock` call is given no timeout; the server's `CREW_STAGING_TIMEOUT_MS`
+overrides it and the route passes it only for staging), not the story call's 25 s, which over
+D69's retry schedule could hold the ship at the end of transit for over a minute.
+*Browser verification* (dev servers on spare ports, null narrator, headless Playwright at 8x,
+1280×800 and 390×700, about seven minutes each, fourteen dockings over the Hub, Green Meridian and
+Kessler Drift): every docking asked once, on the tick the captain stepped off; eight cards came up
+on meeting a regular at their post (Hal Petrosyan, Anneke Vos, Osric Tan, Greta Lindholm, Bo
+Sandoval), six after the gate; once the captain was asleep and the first officer went; no card in
+flight, no card dropped, no error panel. Found and fixed, each with a test:
+- *The card came up ahead of the meeting.* The client showed a card once playback reached its
+  `createdTick`, the tick it was held, so with the worker running ahead the card covered a captain
+  still walking down the ramp. `Decision.deliveredTick` (set when a held card comes onto the queue)
+  is now when the card is due and when the log shows it (`decisionShownTick`).
+- *The label dropped the meeting while the card was up:* the walk back aboard began the tick the
+  card came up, so the headline read "looking for work" over the card. `deliverCard` now stays
+  current for that tick and names who the captain is with ("talking with Anneke Vos").
+- *The log announced the offer before the meeting* ("X has freight for Y" the moment it was held):
+  a held offer's `jobOffered` is trace; the card is its first word.
+- *At a destination the headline hid the captain ashore* behind the unloading count; the ashore
+  line now comes first while it lasts.
+- *Offline, every offer came from beyond the gate*, so the talk was never seen: the null narrator
+  now takes its issuer from someone standing on the dock (a regular, or someone staged there) half
+  the time.
+*Found, not changed:* a departure-gate "hold for repairs" at a port whose market sells no part for
+the fault parks the ship until the narrator acts (D64); the hourly story budget (30) runs out in
+about six minutes of 8x play because quiet check-ins come every 60 sim-seconds.
+*Not done:* the design's phone playtest by the owner; the captain's walk is fixed (the bridge to
+the ramp, about 17 s), not tuned.

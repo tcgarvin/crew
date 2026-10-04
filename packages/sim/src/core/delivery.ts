@@ -16,6 +16,7 @@
  */
 import { dockAlongsideAt, dockPost } from "./docks";
 import type { DeepReadonly } from "./types/common";
+import type { Tick } from "./types/common";
 import type { Decision, HeldCard } from "./types/decisions";
 import type { Local } from "./types/dockside";
 import type { CardDeliveryReason, EventDraft } from "./types/events";
@@ -93,6 +94,15 @@ export function queueOrHold(ctx: Ctx, decisionId: DecisionId, speaker: string | 
   });
 }
 
+/**
+ * The tick from which a card is on screen: when it was delivered, for a card held for delivery in
+ * person, else when it was created. The client shows the card (and logs it) once playback reaches
+ * this tick, so a card never comes up ahead of the meeting the viewer is still watching.
+ */
+export function decisionShownTick(decision: Pick<Decision, "createdTick" | "deliveredTick">): Tick {
+  return decision.deliveredTick ?? decision.createdTick;
+}
+
 /** The held card for `decisionId`, if it is still held. */
 export function heldCard(
   state: Pick<ReadonlyWorldState, "decisions">,
@@ -145,6 +155,7 @@ export function deliverHeldCard(
     return;
   }
   decisions.queue.push(decisionId);
+  if (decision !== undefined) decision.deliveredTick = ctx.tick;
   ctx.emit({
     type: "cardDelivered",
     subjectIds: [decisionId],

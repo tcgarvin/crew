@@ -52,6 +52,11 @@ export interface Decision {
   right: DecisionOption;
   status: DecisionStatus;
   createdTick: Tick;
+  /**
+   * D70: the tick a card held for delivery in person came onto the queue (the meeting); the
+   * card is shown from then, not from `createdTick`. Absent for a card queued when created.
+   */
+  deliveredTick?: Tick;
   resolvedTick?: Tick;
   chosen?: "left" | "right";
   /** The job this decision is about, if any (job offers are decisions, review §D.6.7). */

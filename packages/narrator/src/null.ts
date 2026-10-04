@@ -136,6 +136,23 @@ function drawPerson(
   };
 }
 
+type Person = ReturnType<typeof drawPerson>;
+
+/**
+ * D70: half the time the work comes from someone standing on the dock (a regular at their post,
+ * or someone the staging call placed), as the prompt asks the model to prefer, so the captain
+ * offline walks over and talks to them as well as going out through the gate. Their name and
+ * role; the drawn organisation and pitch stay.
+ */
+function withDockIssuer(rng: RngApi, snapshot: Snapshot, person: Person): Person {
+  const onDock = Object.values(snapshot.state.dockside.locals).filter(
+    (l) => l.origin.kind === "regular" || l.origin.kind === "staged",
+  );
+  if (onDock.length === 0 || !rng.chance("social", 0.5)) return person;
+  const local = rng.pick("social", onDock);
+  return { ...person, issuerName: local.name, issuerRole: local.role, issuerOrg: "" };
+}
+
 function offerIntent(
   rng: RngApi,
   snapshot: Snapshot,
@@ -158,7 +175,7 @@ function offerIntent(
   const urgency = rng.pick("social", JOB_URGENCIES);
   return {
     kind: "offerJob",
-    ...drawPerson(rng, content, portId, template, words),
+    ...withDockIssuer(rng, snapshot, drawPerson(rng, content, portId, template, words)),
     description,
     fromPort: portId,
     toPort: template.toPortId,

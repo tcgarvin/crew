@@ -1,3 +1,4 @@
+import { STAGING_TIMEOUT_MS } from "@crew/narrator";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SERVER_NARRATOR_MODEL, loadEnv } from "./env";
 
@@ -30,6 +31,15 @@ describe("loadEnv staging model (D67)", () => {
     const env = loadEnv({ CREW_NARRATOR_MODEL: "a/story", CREW_STAGING_MODEL: "b/cheap" });
     expect(env.stagingModel).toBe("b/cheap");
     expect(env.narratorModel).toBe("a/story");
+  });
+});
+
+describe("loadEnv staging timeout (D70)", () => {
+  it("defaults to the narrator's 10 s staging timeout and reads CREW_STAGING_TIMEOUT_MS", () => {
+    expect(loadEnv({}).stagingTimeoutMs).toBe(STAGING_TIMEOUT_MS);
+    expect(STAGING_TIMEOUT_MS).toBe(10_000);
+    expect(loadEnv({ CREW_STAGING_TIMEOUT_MS: "8000" }).stagingTimeoutMs).toBe(8000);
+    expect(() => loadEnv({ CREW_STAGING_TIMEOUT_MS: "soon" })).toThrow(/CREW_STAGING_TIMEOUT_MS/);
   });
 });
 
