@@ -1,0 +1,71 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.vid_screen",
+  "name": "Vid Screen",
+  "tags": ["vidScreen"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "north",
+      "offset": {
+        "x": 0,
+        "y": -1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "east",
+      "offset": {
+        "x": 1,
+        "y": 0
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "south",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    },
+    {
+      "key": "west",
+      "offset": {
+        "x": -1,
+        "y": 0
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 0.2,
+    "priority": "domestic",
+    "partialPower": "off"
+  },
+  "heat": {
+    "risePerSecond": 0,
+    "coolPerSecond": 0,
+    "derateAbove": 1
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0,
+    "heatFactor": 0,
+    "wearPerSecond": 0
+  },
+  "faults": [],
+  "components": []
+}

@@ -1,0 +1,1330 @@
+{
+  "$schema": "../../schema-json/deck.schema.json",
+  "id": "deck.freighter_mk2",
+  "name": "Freighter Mk2",
+  "width": 36,
+  "height": 20,
+  "tiles": [
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEELLLLLLLQQQQQQPPPFFFKKKBBBBBBBB",
+    "EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    "EEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    "EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHGGGGMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHSSSSMMMMMMXXNNNN",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA",
+    "EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA"
+  ],
+  "compartments": [
+    {
+      "key": "bridge",
+      "symbol": "B",
+      "name": "Bridge",
+      "tags": ["bridge"]
+    },
+    {
+      "key": "captains_cabin",
+      "symbol": "K",
+      "name": "Captain's Cabin",
+      "tags": ["cabin", "captainsCabin"]
+    },
+    {
+      "key": "officers_cabin",
+      "symbol": "F",
+      "name": "First Officer's Cabin",
+      "tags": ["cabin", "officersCabin"]
+    },
+    {
+      "key": "passenger_cabin",
+      "symbol": "P",
+      "name": "Passenger Cabin",
+      "tags": ["cabin", "passengerCabin"]
+    },
+    {
+      "key": "quarters",
+      "symbol": "Q",
+      "name": "Bunkroom",
+      "tags": ["quarters"]
+    },
+    {
+      "key": "lounge",
+      "symbol": "L",
+      "name": "Lounge",
+      "tags": ["lounge"]
+    },
+    {
+      "key": "engineering",
+      "symbol": "E",
+      "name": "Engineering",
+      "tags": ["engineering"]
+    },
+    {
+      "key": "corridor",
+      "symbol": "C",
+      "name": "Central Corridor",
+      "tags": ["corridor"]
+    },
+    {
+      "key": "cross_passage",
+      "symbol": "X",
+      "name": "Cross-Passage",
+      "tags": ["corridor"]
+    },
+    {
+      "key": "infirmary",
+      "symbol": "N",
+      "name": "Infirmary",
+      "tags": ["infirmary"]
+    },
+    {
+      "key": "airlock",
+      "symbol": "A",
+      "name": "Airlock",
+      "tags": ["airlock"]
+    },
+    {
+      "key": "mess",
+      "symbol": "M",
+      "name": "Mess",
+      "tags": ["mess"]
+    },
+    {
+      "key": "galley",
+      "symbol": "G",
+      "name": "Galley",
+      "tags": ["galley"]
+    },
+    {
+      "key": "stores",
+      "symbol": "S",
+      "name": "Stores",
+      "tags": ["stores"]
+    },
+    {
+      "key": "gym",
+      "symbol": "Y",
+      "name": "Gym",
+      "tags": ["gym"]
+    },
+    {
+      "key": "cargoHold",
+      "symbol": "H",
+      "name": "Cargo Hold",
+      "tags": ["cargoHold"]
+    }
+  ],
+  "doors": [
+    {
+      "key": "bridge_corridor",
+      "edge": {
+        "x": 32,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "captains_cabin_corridor",
+      "edge": {
+        "x": 26,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "officers_cabin_corridor",
+      "edge": {
+        "x": 23,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "passenger_cabin_corridor",
+      "edge": {
+        "x": 20,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "quarters_corridor",
+      "edge": {
+        "x": 16,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "lounge_corridor",
+      "edge": {
+        "x": 9,
+        "y": 6,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "engineering_corridor",
+      "edge": {
+        "x": 5,
+        "y": 6,
+        "side": "e"
+      },
+      "kind": "interior",
+      "powerDomain": "main",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "engineering_cargo",
+      "edge": {
+        "x": 5,
+        "y": 14,
+        "side": "e"
+      },
+      "kind": "interior",
+      "powerDomain": "main",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "cargo_corridor",
+      "edge": {
+        "x": 15,
+        "y": 8,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "galley_corridor",
+      "edge": {
+        "x": 22,
+        "y": 8,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "mess_corridor",
+      "edge": {
+        "x": 27,
+        "y": 8,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "mess_cross_passage",
+      "edge": {
+        "x": 29,
+        "y": 10,
+        "side": "e"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "stores_galley",
+      "edge": {
+        "x": 22,
+        "y": 12,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "stores_cargo",
+      "edge": {
+        "x": 19,
+        "y": 14,
+        "side": "e"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "gym_cross_passage",
+      "edge": {
+        "x": 29,
+        "y": 16,
+        "side": "e"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "open"
+    },
+    {
+      "key": "infirmary_corridor",
+      "edge": {
+        "x": 34,
+        "y": 8,
+        "side": "n"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "airlock_cross_passage",
+      "edge": {
+        "x": 32,
+        "y": 16,
+        "side": "w"
+      },
+      "kind": "interior",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "personnel_ramp",
+      "edge": {
+        "x": 34,
+        "y": 19,
+        "side": "s"
+      },
+      "kind": "ramp",
+      "powerDomain": "main",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    },
+    {
+      "key": "cargo_ramp",
+      "edge": {
+        "x": 13,
+        "y": 19,
+        "side": "s"
+      },
+      "kind": "ramp",
+      "powerDomain": "main",
+      "manualOperationSupported": true,
+      "initialState": "closed"
+    }
+  ],
+  "openings": [
+    {
+      "x": 30,
+      "y": 8,
+      "side": "n"
+    },
+    {
+      "x": 31,
+      "y": 8,
+      "side": "n"
+    },
+    {
+      "x": 23,
+      "y": 9,
+      "side": "e"
+    }
+  ],
+  "walls": [],
+  "machines": [
+    {
+      "key": "helm_1",
+      "machineDefId": "machine.helm",
+      "origin": {
+        "x": 34,
+        "y": 2
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "nav_terminal_1",
+      "machineDefId": "machine.nav_terminal",
+      "origin": {
+        "x": 34,
+        "y": 0
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "ops_terminal_1",
+      "machineDefId": "machine.ops_terminal",
+      "origin": {
+        "x": 34,
+        "y": 5
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "captains_chair_1",
+      "machineDefId": "machine.captains_chair",
+      "origin": {
+        "x": 32,
+        "y": 2
+      },
+      "rotation": 0
+    },
+    {
+      "key": "captain_bunk",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 26,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "captain_desk",
+      "machineDefId": "machine.desk",
+      "origin": {
+        "x": 26,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "first_officer_bunk",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 23,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "first_officer_desk",
+      "machineDefId": "machine.desk",
+      "origin": {
+        "x": 23,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "passenger_bunk_1",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 19,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "passenger_bunk_2",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 21,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_1",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 14,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_2",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 15,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_3",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 17,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_4",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 18,
+        "y": 1
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_5",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 14,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_6",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 15,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_7",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 17,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "bunk_8",
+      "machineDefId": "machine.bunk",
+      "origin": {
+        "x": 18,
+        "y": 4
+      },
+      "rotation": 0
+    },
+    {
+      "key": "games_table_1",
+      "machineDefId": "machine.games_table",
+      "origin": {
+        "x": 8,
+        "y": 2
+      },
+      "rotation": 0
+    },
+    {
+      "key": "vid_screen_1",
+      "machineDefId": "machine.vid_screen",
+      "origin": {
+        "x": 11,
+        "y": 1
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "engine_1",
+      "machineDefId": "machine.engine",
+      "origin": {
+        "x": 0,
+        "y": 1
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "coolant_pump_1",
+      "machineDefId": "machine.coolant_pump",
+      "origin": {
+        "x": 0,
+        "y": 4
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "generator_1",
+      "machineDefId": "machine.generator",
+      "origin": {
+        "x": 0,
+        "y": 7
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "battery_bank_1",
+      "machineDefId": "machine.battery_bank",
+      "origin": {
+        "x": 0,
+        "y": 10
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "life_support_1",
+      "machineDefId": "machine.life_support",
+      "origin": {
+        "x": 0,
+        "y": 13
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "engineering_console_1",
+      "machineDefId": "machine.engineering_console",
+      "origin": {
+        "x": 0,
+        "y": 16
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "workbench_1",
+      "machineDefId": "machine.workbench",
+      "origin": {
+        "x": 2,
+        "y": 19
+      },
+      "rotation": 0
+    },
+    {
+      "key": "medbay_bed_1",
+      "machineDefId": "machine.medbay_bed",
+      "origin": {
+        "x": 33,
+        "y": 9
+      },
+      "rotation": 0
+    },
+    {
+      "key": "mess_table_1",
+      "machineDefId": "machine.mess_table",
+      "origin": {
+        "x": 25,
+        "y": 9
+      },
+      "rotation": 0
+    },
+    {
+      "key": "mess_table_2",
+      "machineDefId": "machine.mess_table",
+      "origin": {
+        "x": 25,
+        "y": 12
+      },
+      "rotation": 0
+    },
+    {
+      "key": "galley_stove_1",
+      "machineDefId": "machine.galley_stove",
+      "origin": {
+        "x": 21,
+        "y": 8
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "exercise_rig_1",
+      "machineDefId": "machine.exercise_rig",
+      "origin": {
+        "x": 25,
+        "y": 15
+      },
+      "rotation": 0
+    },
+    {
+      "key": "cargo_crane_1",
+      "machineDefId": "machine.cargo_crane",
+      "origin": {
+        "x": 15,
+        "y": 18
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    }
+  ],
+  "powerDomains": [
+    {
+      "key": "main",
+      "name": "Main Bus"
+    }
+  ],
+  "zones": [
+    {
+      "key": "cargo_stow",
+      "name": "Cargo Stowage",
+      "tags": ["cargoStowage"],
+      "tiles": [
+        {
+          "x": 7,
+          "y": 10
+        },
+        {
+          "x": 8,
+          "y": 10
+        },
+        {
+          "x": 9,
+          "y": 10
+        },
+        {
+          "x": 10,
+          "y": 10
+        },
+        {
+          "x": 11,
+          "y": 10
+        },
+        {
+          "x": 12,
+          "y": 10
+        },
+        {
+          "x": 13,
+          "y": 10
+        },
+        {
+          "x": 14,
+          "y": 10
+        },
+        {
+          "x": 15,
+          "y": 10
+        },
+        {
+          "x": 16,
+          "y": 10
+        },
+        {
+          "x": 17,
+          "y": 10
+        },
+        {
+          "x": 7,
+          "y": 11
+        },
+        {
+          "x": 8,
+          "y": 11
+        },
+        {
+          "x": 9,
+          "y": 11
+        },
+        {
+          "x": 10,
+          "y": 11
+        },
+        {
+          "x": 11,
+          "y": 11
+        },
+        {
+          "x": 12,
+          "y": 11
+        },
+        {
+          "x": 13,
+          "y": 11
+        },
+        {
+          "x": 14,
+          "y": 11
+        },
+        {
+          "x": 15,
+          "y": 11
+        },
+        {
+          "x": 16,
+          "y": 11
+        },
+        {
+          "x": 17,
+          "y": 11
+        },
+        {
+          "x": 7,
+          "y": 12
+        },
+        {
+          "x": 8,
+          "y": 12
+        },
+        {
+          "x": 9,
+          "y": 12
+        },
+        {
+          "x": 10,
+          "y": 12
+        },
+        {
+          "x": 11,
+          "y": 12
+        },
+        {
+          "x": 12,
+          "y": 12
+        },
+        {
+          "x": 13,
+          "y": 12
+        },
+        {
+          "x": 14,
+          "y": 12
+        },
+        {
+          "x": 15,
+          "y": 12
+        },
+        {
+          "x": 16,
+          "y": 12
+        },
+        {
+          "x": 17,
+          "y": 12
+        },
+        {
+          "x": 7,
+          "y": 13
+        },
+        {
+          "x": 8,
+          "y": 13
+        },
+        {
+          "x": 9,
+          "y": 13
+        },
+        {
+          "x": 10,
+          "y": 13
+        },
+        {
+          "x": 11,
+          "y": 13
+        },
+        {
+          "x": 12,
+          "y": 13
+        },
+        {
+          "x": 13,
+          "y": 13
+        },
+        {
+          "x": 14,
+          "y": 13
+        },
+        {
+          "x": 15,
+          "y": 13
+        },
+        {
+          "x": 16,
+          "y": 13
+        },
+        {
+          "x": 17,
+          "y": 13
+        },
+        {
+          "x": 7,
+          "y": 14
+        },
+        {
+          "x": 8,
+          "y": 14
+        },
+        {
+          "x": 9,
+          "y": 14
+        },
+        {
+          "x": 10,
+          "y": 14
+        },
+        {
+          "x": 11,
+          "y": 14
+        },
+        {
+          "x": 12,
+          "y": 14
+        },
+        {
+          "x": 13,
+          "y": 14
+        },
+        {
+          "x": 14,
+          "y": 14
+        },
+        {
+          "x": 15,
+          "y": 14
+        },
+        {
+          "x": 16,
+          "y": 14
+        },
+        {
+          "x": 17,
+          "y": 14
+        }
+      ]
+    },
+    {
+      "key": "muster",
+      "name": "Muster Point",
+      "tags": ["muster"],
+      "tiles": [
+        {
+          "x": 25,
+          "y": 18
+        },
+        {
+          "x": 26,
+          "y": 18
+        },
+        {
+          "x": 27,
+          "y": 18
+        },
+        {
+          "x": 28,
+          "y": 18
+        }
+      ]
+    },
+    {
+      "key": "serving",
+      "name": "Serving Counter",
+      "tags": ["serving"],
+      "tiles": [
+        {
+          "x": 22,
+          "y": 9
+        },
+        {
+          "x": 23,
+          "y": 9
+        }
+      ]
+    },
+    {
+      "key": "pantry",
+      "name": "Pantry",
+      "tags": ["pantry"],
+      "tiles": [
+        {
+          "x": 20,
+          "y": 12
+        },
+        {
+          "x": 21,
+          "y": 12
+        },
+        {
+          "x": 20,
+          "y": 13
+        },
+        {
+          "x": 21,
+          "y": 13
+        }
+      ]
+    },
+    {
+      "key": "parts",
+      "name": "Parts Shelves",
+      "tags": ["parts"],
+      "tiles": [
+        {
+          "x": 22,
+          "y": 16
+        },
+        {
+          "x": 23,
+          "y": 16
+        },
+        {
+          "x": 22,
+          "y": 17
+        },
+        {
+          "x": 23,
+          "y": 17
+        }
+      ]
+    },
+    {
+      "key": "cleaning_locker",
+      "name": "Cleaning Locker",
+      "tags": ["cleaningLocker"],
+      "tiles": [
+        {
+          "x": 20,
+          "y": 18
+        }
+      ]
+    },
+    {
+      "key": "sparring_mat",
+      "name": "Sparring Mat",
+      "tags": ["sparringMat"],
+      "tiles": [
+        {
+          "x": 27,
+          "y": 15
+        },
+        {
+          "x": 28,
+          "y": 15
+        },
+        {
+          "x": 27,
+          "y": 16
+        },
+        {
+          "x": 28,
+          "y": 16
+        }
+      ]
+    },
+    {
+      "key": "book_shelf",
+      "name": "Book Shelf",
+      "tags": ["bookShelf"],
+      "tiles": [
+        {
+          "x": 6,
+          "y": 0
+        },
+        {
+          "x": 6,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "key": "viewport",
+      "name": "Viewport",
+      "tags": ["viewport"],
+      "tiles": [
+        {
+          "x": 9,
+          "y": 0
+        },
+        {
+          "x": 10,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "key": "med_locker",
+      "name": "Med Locker",
+      "tags": ["medLocker"],
+      "tiles": [
+        {
+          "x": 35,
+          "y": 9
+        }
+      ]
+    },
+    {
+      "key": "gangway",
+      "name": "Gangway Post",
+      "tags": ["gangway"],
+      "tiles": [
+        {
+          "x": 33,
+          "y": 17
+        }
+      ]
+    },
+    {
+      "key": "locker_bunk_1",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 14,
+          "y": 0
+        }
+      ],
+      "machineKey": "bunk_1"
+    },
+    {
+      "key": "locker_bunk_2",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 15,
+          "y": 0
+        }
+      ],
+      "machineKey": "bunk_2"
+    },
+    {
+      "key": "locker_bunk_3",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 17,
+          "y": 0
+        }
+      ],
+      "machineKey": "bunk_3"
+    },
+    {
+      "key": "locker_bunk_4",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 18,
+          "y": 0
+        }
+      ],
+      "machineKey": "bunk_4"
+    },
+    {
+      "key": "locker_bunk_5",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 14,
+          "y": 3
+        }
+      ],
+      "machineKey": "bunk_5"
+    },
+    {
+      "key": "locker_bunk_6",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 15,
+          "y": 3
+        }
+      ],
+      "machineKey": "bunk_6"
+    },
+    {
+      "key": "locker_bunk_7",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 17,
+          "y": 3
+        }
+      ],
+      "machineKey": "bunk_7"
+    },
+    {
+      "key": "locker_bunk_8",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 18,
+          "y": 3
+        }
+      ],
+      "machineKey": "bunk_8"
+    },
+    {
+      "key": "locker_captain",
+      "name": "Captain's Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 25,
+          "y": 1
+        }
+      ],
+      "machineKey": "captain_bunk"
+    },
+    {
+      "key": "locker_first_officer",
+      "name": "First Officer's Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 22,
+          "y": 1
+        }
+      ],
+      "machineKey": "first_officer_bunk"
+    },
+    {
+      "key": "locker_passenger_1",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 19,
+          "y": 0
+        }
+      ],
+      "machineKey": "passenger_bunk_1"
+    },
+    {
+      "key": "locker_passenger_2",
+      "name": "Locker",
+      "tags": ["locker"],
+      "tiles": [
+        {
+          "x": 21,
+          "y": 0
+        }
+      ],
+      "machineKey": "passenger_bunk_2"
+    }
+  ],
+  "docking": {
+    "cargoRampDoorKey": "cargo_ramp",
+    "personnelRampDoorKey": "personnel_ramp",
+    "cargoTransferTiles": [
+      {
+        "x": 13,
+        "y": 18
+      }
+    ],
+    "personnelTransferTiles": [
+      {
+        "x": 34,
+        "y": 18
+      }
+    ]
+  },
+  "spawnPoints": [
+    {
+      "key": "spawn_captain",
+      "tile": {
+        "x": 31,
+        "y": 4
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_first_officer",
+      "tile": {
+        "x": 30,
+        "y": 2
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_engineer",
+      "tile": {
+        "x": 3,
+        "y": 4
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_second_engineer",
+      "tile": {
+        "x": 3,
+        "y": 9
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_pilot",
+      "tile": {
+        "x": 33,
+        "y": 1
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_cook",
+      "tile": {
+        "x": 20,
+        "y": 10
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_medic",
+      "tile": {
+        "x": 33,
+        "y": 11
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_cargo_hand",
+      "tile": {
+        "x": 12,
+        "y": 16
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_relief_pilot",
+      "tile": {
+        "x": 13,
+        "y": 3
+      },
+      "tags": ["crew"]
+    },
+    {
+      "key": "spawn_passenger_1",
+      "tile": {
+        "x": 34,
+        "y": 18
+      },
+      "tags": ["passenger"]
+    },
+    {
+      "key": "spawn_cargo_1",
+      "tile": {
+        "x": 13,
+        "y": 18
+      },
+      "tags": ["cargo"]
+    }
+  ],
+  "hull": {
+    "class": "light_freighter",
+    "sizeClass": "M"
+  }
+}

@@ -21,7 +21,10 @@
     }
   ],
   "power": {
-    "role": "none"
+    "role": "consumer",
+    "drawKw": 0.2,
+    "priority": "domestic",
+    "partialPower": "off"
   },
   "heat": {
     "risePerSecond": 0,

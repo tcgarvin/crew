@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.exercise_rig",
+  "name": "Exercise Rig",
+  "tags": ["exerciseRig"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "station",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["use"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "none"
+  },
+  "heat": {
+    "risePerSecond": 0,
+    "coolPerSecond": 0,
+    "derateAbove": 1
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0,
+    "heatFactor": 0,
+    "wearPerSecond": 0
+  },
+  "faults": [],
+  "components": []
+}

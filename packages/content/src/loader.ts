@@ -9,19 +9,28 @@
 import { type ValidationResult, validateBundle } from "./schemas/validate";
 
 import deckFreighterMk1 from "../data/decks/freighter-mk1.json";
+import deckFreighterMk2 from "../data/decks/freighter-mk2.json";
 
 import machineBatteryBank from "../data/machines/battery-bank.json";
 import machineBunk from "../data/machines/bunk.json";
+import machineCaptainsChair from "../data/machines/captains-chair.json";
 import machineCargoCrane from "../data/machines/cargo-crane.json";
 import machineCoolantPump from "../data/machines/coolant-pump.json";
+import machineDesk from "../data/machines/desk.json";
 import machineEngine from "../data/machines/engine.json";
+import machineEngineeringConsole from "../data/machines/engineering-console.json";
+import machineExerciseRig from "../data/machines/exercise-rig.json";
 import machineGalleyStove from "../data/machines/galley-stove.json";
+import machineGamesTable from "../data/machines/games-table.json";
 import machineGenerator from "../data/machines/generator.json";
 import machineHelm from "../data/machines/helm.json";
 import machineLifeSupport from "../data/machines/life-support.json";
 import machineMedbayBed from "../data/machines/medbay-bed.json";
 import machineMessTable from "../data/machines/mess-table.json";
 import machineNavTerminal from "../data/machines/nav-terminal.json";
+import machineOpsTerminal from "../data/machines/ops-terminal.json";
+import machineVidScreen from "../data/machines/vid-screen.json";
+import machineWorkbench from "../data/machines/workbench.json";
 
 import itemCoolantCanister from "../data/items/coolant-canister.json";
 import itemCrateFragile from "../data/items/crate-fragile.json";
@@ -41,6 +50,7 @@ import crewBettinaSolheim from "../data/crew/bettina-solheim.json";
 import crewDaneWhitcross from "../data/crew/dane-whitcross.json";
 import crewJaxOkonkwo from "../data/crew/jax-okonkwo.json";
 import crewMaraOsei from "../data/crew/mara-osei.json";
+import crewNoorHaddad from "../data/crew/noor-haddad.json";
 import crewOyelaranAbiodun from "../data/crew/oyelaran-abiodun.json";
 import crewPassenger from "../data/crew/passenger.json";
 import crewPriyaKessler from "../data/crew/priya-kessler.json";
@@ -80,7 +90,8 @@ import peopleNameTable from "../data/people/name-table.json";
 
 import configDefault from "../data/config/default.json";
 
-const DECKS = [deckFreighterMk1];
+// The scenario names its deck; Mk1 stays as a second footprint the docks must also fit (D73).
+const DECKS = [deckFreighterMk2, deckFreighterMk1];
 const MACHINES = [
   machineEngine,
   machineCoolantPump,
@@ -94,6 +105,14 @@ const MACHINES = [
   machineHelm,
   machineNavTerminal,
   machineMessTable,
+  machineOpsTerminal,
+  machineCaptainsChair,
+  machineDesk,
+  machineGamesTable,
+  machineVidScreen,
+  machineExerciseRig,
+  machineWorkbench,
+  machineEngineeringConsole,
 ];
 const ITEMS = [
   itemToolkit,
@@ -119,6 +138,7 @@ const CREW = [
   crewBettinaSolheim,
   crewOyelaranAbiodun,
   crewSunnivaPark,
+  crewNoorHaddad,
   crewPassenger,
 ];
 const TRAITS = [
