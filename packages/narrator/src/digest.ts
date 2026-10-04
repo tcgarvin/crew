@@ -38,6 +38,7 @@ import {
   offerPortNow,
   pathBetween,
   placePhrase,
+  portHereOrNext,
   portName,
   voyageAhead,
 } from "./lookups";
@@ -525,8 +526,7 @@ function stagingSections(content: ContentBundle, hook: DeepReadonly<NarratorHook
  */
 function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: ContentBundle): Section {
   const state = snapshot.state;
-  const t = state.travel;
-  const portId = offerPortNow(state) ?? (t.stage === "docked" ? t.portId : t.toPortId);
+  const portId = portHereOrNext(state);
   const lines: string[] = [];
   const named = new Set<string>();
   const port = content.ports[portId];

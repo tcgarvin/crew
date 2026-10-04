@@ -134,10 +134,7 @@ export function pathBetween(
   return { path: found.path, hops: hopCount(found.path), distance: found.distance };
 }
 
-/**
- * The port the ship is at or heading for next: the docked port, or the far end of the leg in
- * progress. Undefined only when the travel state names no port at all (it always does).
- */
+/** The port the ship is at or heading for next: the docked port, or the far end of the leg. */
 export function portHereOrNext(state: State): PortDefId {
   const travel = state.travel;
   return travel.stage === "docked" ? travel.portId : travel.toPortId;
