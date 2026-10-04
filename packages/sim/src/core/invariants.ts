@@ -9,14 +9,24 @@ import type { ReadonlyWorldState } from "./types/pipeline";
 /** Walk a value and report anything that would not survive a JSON round-trip unchanged. */
 export function jsonSafetyViolations(value: unknown, path = "state"): string[] {
   const out: string[] = [];
-  const walk = (v: unknown, p: string): void => {
+  // The path to the current value as segments (an array index or an object key), joined only
+  // when there is something to report: formatting every node's path up front made this walk the
+  // main cost of tests that check invariants after every tick.
+  const segments: (number | string)[] = [];
+  const here = (): string => {
+    let p = path;
+    for (const segment of segments)
+      p += typeof segment === "number" ? `[${segment}]` : `.${segment}`;
+    return p;
+  };
+  const walk = (v: unknown): void => {
     switch (typeof v) {
       case "undefined":
-        out.push(`${p} is undefined`);
+        out.push(`${here()} is undefined`);
         return;
       case "number":
-        if (!Number.isFinite(v)) out.push(`${p} is ${v}`);
-        else if (Object.is(v, -0)) out.push(`${p} is -0`);
+        if (!Number.isFinite(v)) out.push(`${here()} is ${v}`);
+        else if (Object.is(v, -0)) out.push(`${here()} is -0`);
         return;
       case "string":
       case "boolean":
@@ -24,22 +34,32 @@ export function jsonSafetyViolations(value: unknown, path = "state"): string[] {
       case "object": {
         if (v === null) return;
         if (Array.isArray(v)) {
-          v.forEach((item, i) => walk(item, `${p}[${i}]`));
+          for (let i = 0; i < v.length; i++) {
+            if (!(i in v)) continue; // a hole, which `forEach` would skip too
+            segments.push(i);
+            walk(v[i]);
+            segments.pop();
+          }
           return;
         }
         const proto = Object.getPrototypeOf(v);
         if (proto !== Object.prototype && proto !== null) {
-          out.push(`${p} is a ${(v as object).constructor?.name ?? "non-plain object"}`);
+          out.push(`${here()} is a ${(v as object).constructor?.name ?? "non-plain object"}`);
           return;
         }
-        for (const [key, child] of Object.entries(v)) walk(child, `${p}.${key}`);
+        const record = v as Readonly<Record<string, unknown>>;
+        for (const key of Object.keys(record)) {
+          segments.push(key);
+          walk(record[key]);
+          segments.pop();
+        }
         return;
       }
       default:
-        out.push(`${p} is a ${typeof v}`);
+        out.push(`${here()} is a ${typeof v}`);
     }
   };
-  walk(value, path);
+  walk(value);
   return out;
 }
 
