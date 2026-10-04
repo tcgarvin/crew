@@ -50,7 +50,7 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
 import { repairShortfall, unitsAboard } from "./supplies";
-import { clamp } from "./util";
+import { clamp, machineEvent } from "./util";
 
 /** W5 decision: see module doc — pending `MachineDef` field for diagnosis. */
 export const DIAGNOSE_SECONDS = 20;
@@ -248,106 +248,120 @@ function fireScheduledFaults(ctx: StepCtx, machine: Machine, def: MachineDef): v
   for (const sf of due) applyFault(ctx, machine, def, sf.faultKey, sf.causeCommandId);
 }
 
-function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
-  const def = ctx.defs.machine(machine.defId);
-  fireScheduledFaults(ctx, machine, def);
-  ensureSymptomProblems(ctx, machine, def);
-  updatePartsNeeded(ctx, machine, def);
+/** What the machine's present faults do to it, combined. */
+interface FaultEffects {
+  readonly inoperable: boolean;
+  readonly outputFactor: number;
+  readonly extraHeatPerSecond: number;
+}
 
-  let inoperableFromFault = false;
-  let faultOutputFactor = 1;
-  let faultExtraHeat = 0;
+function faultEffects(machine: Machine, def: MachineDef): FaultEffects {
+  let inoperable = false;
+  let outputFactor = 1;
+  let extraHeatPerSecond = 0;
   for (const fault of machine.faults) {
-    const faultDef = def.faults.find((f) => f.key === fault.faultKey);
-    if (faultDef === undefined) continue;
-    if (faultDef.effect.kind === "inoperable") inoperableFromFault = true;
-    else if (faultDef.effect.kind === "derate") faultOutputFactor *= faultDef.effect.outputFactor;
-    else if (faultDef.effect.kind === "overheat")
-      faultExtraHeat += faultDef.effect.extraRisePerSecond;
+    const effect = def.faults.find((f) => f.key === fault.faultKey)?.effect;
+    if (effect?.kind === "inoperable") inoperable = true;
+    else if (effect?.kind === "derate") outputFactor *= effect.outputFactor;
+    else if (effect?.kind === "overheat") extraHeatPerSecond += effect.extraRisePerSecond;
   }
+  return { inoperable, outputFactor, extraHeatPerSecond };
+}
 
-  // Heat: rise while genuinely operating (power on and not inoperable), fall toward ambient
-  // otherwise, gated by coolant-pump availability (see module doc).
-  const poweredOn = machine.actualMode === "on";
-  const generatingHeat = poweredOn && !inoperableFromFault;
-  const modeFactor =
-    def.power.role === "consumer" && def.power.drawKw > 0
-      ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
-      : 1;
-  const riseRate = generatingHeat ? def.heat.risePerSecond * modeFactor + faultExtraHeat : 0;
+/** The share of its rated draw a consumer is allocated (1 for anything else). */
+function powerFraction(machine: Machine, def: MachineDef): number {
+  return def.power.role === "consumer" && def.power.drawKw > 0
+    ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
+    : 1;
+}
+
+/**
+ * Heat: rise while genuinely operating (power on and not inoperable), fall toward ambient
+ * otherwise, gated by coolant-pump availability (see module doc). Overheat costs integrity.
+ */
+function updateHeat(
+  ctx: StepCtx,
+  machine: Machine,
+  def: MachineDef,
+  faults: FaultEffects,
+  dtSeconds: number,
+): void {
+  const generatingHeat = machine.actualMode === "on" && !faults.inoperable;
+  const riseRate = generatingHeat
+    ? def.heat.risePerSecond * powerFraction(machine, def) + faults.extraHeatPerSecond
+    : 0;
   const coolRate =
     def.heat.coolPerSecond *
     (coolantAvailable(ctx, machine) ? 1 : COOLANT_OFFLINE_COOLING_FRACTION);
-  const newTemp = clamp(machine.temperature + (riseRate - coolRate) * dtSeconds, 0, 1.5);
-  machine.temperature = newTemp;
-
-  if (newTemp > 1) {
+  machine.temperature = clamp(machine.temperature + (riseRate - coolRate) * dtSeconds, 0, 1.5);
+  if (machine.temperature > 1) {
     machine.integrity = clamp(
       machine.integrity - ctx.config.equipment.overheatDamagePerSecond * dtSeconds,
       0,
       1,
     );
   }
+}
 
-  let heatFactor = 1;
-  if (newTemp >= 1) heatFactor = 0;
-  else if (newTemp > def.heat.derateAbove) heatFactor = (1 - newTemp) / (1 - def.heat.derateAbove);
+function heatOutputFactor(temperature: number, def: MachineDef): number {
+  if (temperature >= 1) return 0;
+  if (temperature > def.heat.derateAbove) return (1 - temperature) / (1 - def.heat.derateAbove);
+  return 1;
+}
 
+/** Power already set the baseline this tick; equipment may only push further toward off. */
+function updateMode(ctx: StepCtx, machine: Machine, def: MachineDef): void {
   // D35: integrity after this tick's overheat damage, so a machine that just crossed the
   // inoperable threshold stops now rather than next tick.
-  const integrityFactor = integrityOutputFactor(machine.integrity, ctx.config.equipment);
-  const integrityBlocked = isIntegrityBlocked(machine.integrity, ctx.config.equipment);
-
-  // Mode: power already set the baseline this tick; equipment may only push further toward off.
-  const blocked = inoperableFromFault || newTemp >= 1 || integrityBlocked;
+  const blocked = isMachineBlocked(machine, def, ctx.config.equipment);
   const wasMode = machine.actualMode;
   if (def.power.role === "consumer") {
     if (blocked) machine.actualMode = "off";
   } else {
     machine.actualMode = blocked ? "off" : machine.desiredMode;
   }
-  if (machine.actualMode !== wasMode) {
-    ctx.emit({
-      type: "machineModeChanged",
-      subjectIds: [machine.id],
-      causeIds: [],
-      source: "sim",
-      locationRef: { kind: "machine", machineId: machine.id },
-      payload: { machineId: machine.id, from: wasMode, to: machine.actualMode },
-    });
-  }
+  if (machine.actualMode === wasMode) return;
+  ctx.emit(
+    machineEvent("machineModeChanged", machine.id, {
+      machineId: machine.id,
+      from: wasMode,
+      to: machine.actualMode,
+    }),
+  );
+}
 
-  const finalOn = machine.actualMode === "on";
-  const powerFraction =
-    def.power.role === "consumer" && def.power.drawKw > 0
-      ? clamp(machine.powerAllocatedKw / def.power.drawKw, 0, 1)
-      : 1;
+function updateOutput(ctx: StepCtx, machine: Machine, def: MachineDef, faults: FaultEffects): void {
+  const factors = [
+    ["power", powerFraction(machine, def)],
+    ["heat", heatOutputFactor(machine.temperature, def)],
+    ["fault", faults.outputFactor],
+    ["integrity", integrityOutputFactor(machine.integrity, ctx.config.equipment)],
+  ] as const;
   const oldOutput = machine.output;
-  const newOutput = finalOn
-    ? clamp(powerFraction * heatFactor * faultOutputFactor * integrityFactor, 0, 1)
-    : 0;
+  const newOutput =
+    machine.actualMode === "on"
+      ? clamp(
+          factors.reduce((p, [, f]) => p * f, 1),
+          0,
+          1,
+        )
+      : 0;
   machine.output = newOutput;
-  if (oldOutput >= 1 && newOutput < 1) {
-    const cause = derateCause([
-      ["power", powerFraction],
-      ["heat", heatFactor],
-      ["fault", faultOutputFactor],
-      ["integrity", integrityFactor],
-    ]);
-    ctx.emit({
-      type: "machineDerated",
-      subjectIds: [machine.id],
-      causeIds: [],
-      source: "sim",
-      locationRef: { kind: "machine", machineId: machine.id },
-      payload: { machineId: machine.id, output: newOutput, cause },
-    });
-  }
+  if (oldOutput < 1 || newOutput >= 1) return;
+  ctx.emit(
+    machineEvent("machineDerated", machine.id, {
+      machineId: machine.id,
+      output: newOutput,
+      cause: derateCause(factors),
+    }),
+  );
+}
 
-  // Wear and hazard accumulate only while truly operating.
-  if (finalOn) {
+/** Wear and hazard accumulate only while truly operating; a crossed threshold draws a fault. */
+function updateHazard(ctx: StepCtx, machine: Machine, def: MachineDef, dtSeconds: number): void {
+  if (machine.actualMode === "on") {
     machine.condition = clamp(machine.condition - def.failure.wearPerSecond * dtSeconds, 0, 1);
-    const heatHazardFactor = 1 + (def.failure.heatFactor - 1) * clamp(newTemp, 0, 1);
+    const heatHazardFactor = 1 + (def.failure.heatFactor - 1) * clamp(machine.temperature, 0, 1);
     const wearFactor = 1 - machine.condition;
     const hazardRate =
       def.failure.baseHazardPerSecond *
@@ -356,40 +370,47 @@ function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
       (1 + wearFactor);
     machine.failure.accumulatedHazard += hazardRate * dtSeconds;
   }
-
-  if (machine.failure.accumulatedHazard >= machine.failure.threshold) {
-    const candidates = def.faults.filter(
-      (f) => !machine.faults.some((mf) => mf.faultKey === f.key),
+  if (machine.failure.accumulatedHazard < machine.failure.threshold) return;
+  const candidates = def.faults.filter((f) => !machine.faults.some((mf) => mf.faultKey === f.key));
+  if (candidates.length > 0) {
+    const chosen = ctx.rng.weighted(
+      "failures",
+      candidates.map((f) => ({ item: f, weight: f.weight })),
     );
-    if (candidates.length > 0) {
-      const chosen = ctx.rng.weighted(
-        "failures",
-        candidates.map((f) => ({ item: f, weight: f.weight })),
-      );
-      applyFault(ctx, machine, def, chosen.key);
-    }
-    machine.failure.accumulatedHazard = 0;
-    machine.failure.threshold = -Math.log(1 - ctx.rng.float("failures"));
+    applyFault(ctx, machine, def, chosen.key);
   }
+  machine.failure.accumulatedHazard = 0;
+  machine.failure.threshold = -Math.log(1 - ctx.rng.float("failures"));
+}
 
-  // Maintenance due.
-  if (def.maintenance !== undefined) {
-    const dedupeKey = `maintenanceDue:${machine.id}`;
-    if (machine.condition < ctx.config.equipment.maintenanceConditionBelow) {
-      const { event } = raiseProblem(ctx.state, ctx.tick, {
-        kind: "maintenanceDue",
-        payload: { machineId: machine.id },
-        dedupeKey,
-        visibility: "public",
-        baseUrgency: "routineObligation",
-        location: { kind: "machine", machineId: machine.id },
-      });
-      if (event !== undefined) ctx.emit(event);
-    } else {
-      const event = resolveProblem(ctx.state, dedupeKey);
-      if (event !== undefined) ctx.emit(event);
-    }
-  }
+function updateMaintenanceDue(ctx: StepCtx, machine: Machine, def: MachineDef): void {
+  if (def.maintenance === undefined) return;
+  const dedupeKey = `maintenanceDue:${machine.id}`;
+  const event =
+    machine.condition < ctx.config.equipment.maintenanceConditionBelow
+      ? raiseProblem(ctx.state, ctx.tick, {
+          kind: "maintenanceDue",
+          payload: { machineId: machine.id },
+          dedupeKey,
+          visibility: "public",
+          baseUrgency: "routineObligation",
+          location: { kind: "machine", machineId: machine.id },
+        }).event
+      : resolveProblem(ctx.state, dedupeKey);
+  if (event !== undefined) ctx.emit(event);
+}
+
+function tickMachine(ctx: StepCtx, machine: Machine, dtSeconds: number): void {
+  const def = ctx.defs.machine(machine.defId);
+  fireScheduledFaults(ctx, machine, def);
+  ensureSymptomProblems(ctx, machine, def);
+  updatePartsNeeded(ctx, machine, def);
+  const faults = faultEffects(machine, def);
+  updateHeat(ctx, machine, def, faults, dtSeconds);
+  updateMode(ctx, machine, def);
+  updateOutput(ctx, machine, def, faults);
+  updateHazard(ctx, machine, def, dtSeconds);
+  updateMaintenanceDue(ctx, machine, def);
 }
 
 export const equipmentSystem: System = {

@@ -28,6 +28,7 @@ import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { isAsleep } from "./activity";
+import { emitSim } from "./events";
 import { directSight, writeFact } from "./facts";
 import { tileOf } from "./plans";
 
@@ -121,12 +122,9 @@ function seeMachinesAndProblems(ctx: StepCtx, actor: Actor, here: CompartmentId)
       sight,
     );
     if (isNew) {
-      ctx.emit({
-        type: "problemObserved",
-        subjectIds: [actor.id, problem.id],
-        causeIds: [],
-        source: "sim",
-        payload: { problemId: problem.id, kind: problem.kind },
+      emitSim(ctx, "problemObserved", [actor.id, problem.id], {
+        problemId: problem.id,
+        kind: problem.kind,
       });
     }
   }

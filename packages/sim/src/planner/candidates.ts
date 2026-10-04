@@ -73,6 +73,9 @@ const backingOff = (view: AgentView, ref: string): boolean => {
 
 const sameTile = (a: TileCoord, b: TileCoord): boolean => a.x === b.x && a.y === b.y;
 
+const inMyHands = (view: AgentView, item: KnownItemView): boolean =>
+  item.location.kind === "carriedBy" && item.location.actorId === view.self.id;
+
 // ---------------------------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------------------------
@@ -130,7 +133,7 @@ export function taskUrgency(
 function heldTools(view: AgentView): Set<ToolKind> {
   const out = new Set<ToolKind>();
   for (const item of view.knownItems()) {
-    if (item.location.kind === "carriedBy" && item.location.actorId === view.self.id) {
+    if (inMyHands(view, item)) {
       for (const kind of item.toolKinds) out.add(kind);
     }
   }
@@ -175,7 +178,7 @@ function taskTravel(view: AgentView, task: TaskView, problem: ProblemView): numb
     if (task.target.kind !== "item") return "unreachableTarget";
     const itemId = task.target.itemId;
     const known = view.knownItems().find((i) => i.itemId === itemId && !i.absent);
-    const carried = known?.location.kind === "carriedBy" && known.location.actorId === view.self.id;
+    const carried = known !== undefined && inMyHands(view, known);
     const from =
       (known === undefined ? undefined : pickupTile(view, known)) ??
       (problem.location.kind === "tile"
@@ -302,9 +305,7 @@ function eatCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejec
     return view.estimateTravelTicks(table, from) ?? 0;
   };
   const atTable = table === undefined ? {} : { tile: table };
-  const inHand = food.find(
-    (i) => i.location.kind === "carriedBy" && i.location.actorId === view.self.id,
-  );
+  const inHand = food.find((i) => inMyHands(view, i));
   if (inHand !== undefined) {
     return personal("eat", urgency, toTable() + mealTicks, view.tick, {
       kind: "personal",

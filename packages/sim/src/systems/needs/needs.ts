@@ -67,26 +67,19 @@ function needRates(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
 }
 
 function emitCrossings(ctx: StepCtx, actor: Actor, key: NeedKey, before: number, after: number) {
-  const critical = ctx.config.urgency.needSurvivalAbove;
+  const survival = ctx.config.urgency.needSurvivalAbove;
   const seek = ctx.config.needs.seekThreshold;
-  if (before <= critical && after > critical) {
-    ctx.emit({
-      type: "needThresholdCrossed",
-      subjectIds: [actor.id],
-      causeIds: [],
-      source: "sim",
-      significance: "notable",
-      payload: { need: key, value: after, rising: true },
-    });
-  } else if (before <= seek !== after <= seek) {
-    ctx.emit({
-      type: "needThresholdCrossed",
-      subjectIds: [actor.id],
-      causeIds: [],
-      source: "sim",
-      payload: { need: key, value: after, rising: after > before },
-    });
-  }
+  const critical = before <= survival && after > survival;
+  if (!critical && before <= seek === after <= seek) return;
+  ctx.emit({
+    type: "needThresholdCrossed",
+    subjectIds: [actor.id],
+    causeIds: [],
+    source: "sim",
+    ...(critical ? { significance: "notable" as const } : {}),
+    // A critical crossing is always rising (`before` ≤ survival < `after`).
+    payload: { need: key, value: after, rising: after > before },
+  });
 }
 
 /** Bounded capacity curve for severe fatigue (see module doc). */

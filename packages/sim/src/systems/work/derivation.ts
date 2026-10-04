@@ -35,6 +35,7 @@ import type {
   TaskSpec,
 } from "../../core/types/work";
 import { completeTask, releaseClaimsForTask } from "./claims";
+import { emitSim } from "./events";
 
 const PROBLEM_KIND_SET = {
   machineSymptom: true,
@@ -125,12 +126,10 @@ function createTask(ctx: StepCtx, problem: Problem, spec: TaskSpec): void {
     claimState: { kind: "unclaimed" },
   };
   ctx.state.work.tasks[id] = task;
-  ctx.emit({
-    type: "taskCreated",
-    subjectIds: [id, problem.id],
-    causeIds: [],
-    source: "sim",
-    payload: { taskId: id, type: task.type, problemId: problem.id },
+  emitSim(ctx, "taskCreated", [id, problem.id], {
+    taskId: id,
+    type: task.type,
+    problemId: problem.id,
   });
 }
 

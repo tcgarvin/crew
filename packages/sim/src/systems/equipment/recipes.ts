@@ -32,7 +32,7 @@ import type { WorldState } from "../../core/types/state";
 import type { Task } from "../../core/types/work";
 import { DIAGNOSE_SECONDS, REPAIR_CONDITION_RESTORE } from "./equipment";
 import { raiseProblem, resolveProblem } from "./problems";
-import { clamp } from "./util";
+import { clamp, machineEvent } from "./util";
 
 export interface RecipeCtx {
   readonly state: WorldState;
@@ -70,19 +70,6 @@ function consumeItems(state: WorldState, actorId: ActorId, consumes: readonly It
   }
 }
 
-function currentProgress(state: WorldState, task: Task): number {
-  if (task.progressRef.kind === "fault") {
-    const fault = state.machines[task.progressRef.machineId]?.faults.find(
-      (f) => f.faultKey === (task.progressRef as { faultKey: string }).faultKey,
-    );
-    return fault?.repairStepProgress ?? 0;
-  }
-  if (task.progressRef.kind === "maintenance") {
-    return state.machines[task.progressRef.machineId]?.maintenanceProgress ?? 0;
-  }
-  return 0;
-}
-
 function advanceInspect(ctx: RecipeCtx, task: Task, ticks: number): RecipeOutcome {
   if (task.progressRef.kind !== "fault") return { status: "notFound" };
   const { machineId, faultKey } = task.progressRef;
@@ -98,16 +85,7 @@ function advanceInspect(ctx: RecipeCtx, task: Task, ticks: number): RecipeOutcom
   fault.diagnosed = true;
   fault.repairStepIndex = 0;
   fault.repairStepProgress = 0;
-  const events: EventDraft[] = [
-    {
-      type: "faultDiagnosed",
-      subjectIds: [machineId],
-      causeIds: [],
-      source: "sim",
-      locationRef: { kind: "machine", machineId },
-      payload: { machineId, faultKey },
-    },
-  ];
+  const events: EventDraft[] = [machineEvent("faultDiagnosed", machineId, { machineId, faultKey })];
   const resolvedSymptom = resolveProblem(ctx.state, `machineSymptom:${machineId}:${faultKey}`);
   if (resolvedSymptom !== undefined) events.push(resolvedSymptom);
   const { event: raised } = raiseProblem(ctx.state, ctx.tick, {
@@ -166,14 +144,7 @@ function advanceRepair(ctx: RecipeCtx, task: Task, actorId: ActorId, ticks: numb
         0,
         1,
       );
-      events.push({
-        type: "faultRepaired",
-        subjectIds: [machineId],
-        causeIds: [],
-        source: "sim",
-        locationRef: { kind: "machine", machineId },
-        payload: { machineId, faultKey },
-      });
+      events.push(machineEvent("faultRepaired", machineId, { machineId, faultKey }));
       const resolved = resolveProblem(ctx.state, `machineFault:${machineId}:${faultKey}`);
       if (resolved !== undefined) events.push(resolved);
       return { status: "recipeComplete", events };
@@ -205,26 +176,10 @@ function advanceMaintain(ctx: RecipeCtx, task: Task, ticks: number): RecipeOutco
   machine.maintenanceProgress = 0;
   machine.condition = clamp(machine.condition + def.maintenance.conditionRestored, 0, 1);
   machine.lastMaintainedTick = ctx.tick;
-  const events: EventDraft[] = [
-    {
-      type: "maintenanceCompleted",
-      subjectIds: [machineId],
-      causeIds: [],
-      source: "sim",
-      locationRef: { kind: "machine", machineId },
-      payload: { machineId },
-    },
-  ];
+  const events: EventDraft[] = [machineEvent("maintenanceCompleted", machineId, { machineId })];
   const resolved = resolveProblem(ctx.state, `maintenanceDue:${machineId}`);
   if (resolved !== undefined) events.push(resolved);
   return { status: "recipeComplete", events };
-}
-
-/** Look up the task and current stage without mutating anything (a worker starting or resuming). */
-export function beginStage(ctx: RecipeCtx, taskId: TaskId, _actorId: ActorId): RecipeOutcome {
-  const task = ctx.state.work.tasks[taskId];
-  if (task === undefined) return { status: "notFound" };
-  return { status: "inProgress", progress: currentProgress(ctx.state, task) };
 }
 
 /** Advance the task's current stage by `ticks` of work from `actorId`. */
@@ -240,9 +195,4 @@ export function advanceStage(
   if (task.derivationKey === "repair") return advanceRepair(ctx, task, actorId, ticks);
   if (task.derivationKey === "maintain") return advanceMaintain(ctx, task, ticks);
   return { status: "notFound" };
-}
-
-/** Force the current stage to completion now (e.g. a discrete `Action` completion event). */
-export function completeStage(ctx: RecipeCtx, taskId: TaskId, actorId: ActorId): RecipeOutcome {
-  return advanceStage(ctx, taskId, actorId, Number.MAX_SAFE_INTEGER);
 }
