@@ -8,9 +8,10 @@
  *
  * Dockside spike (docs/design/dockside-spike.md): while a dock is alongside (`state.deck.dock`),
  * its floor is grafted into the deck's grid in the deck's own frame (deck tile = dock tile −
- * shipAt, the ship's place in the berth box: `berthPlacement`, D72), as floor in no compartment. Dock floor is a region of its own for implicit walls, so
- * the hull walls it off from the ship everywhere except across the ramp doors. The grid then has
- * a non-zero origin and larger bounds; every index goes through `indexAt`/`tileAtIndex`.
+ * shipAt, the ship's place in the berth box: `berthPlacement`, D72), as floor in no compartment.
+ * Dock floor is a region of its own for implicit walls, so the hull walls it off from the ship
+ * everywhere except across the ramp doors. The grid then has a non-zero origin and larger
+ * bounds; every index goes through `indexAt`/`tileAtIndex`.
  */
 import { type BerthedDock, berthDock, dockFloorMask } from "../../core/docks";
 import type { CacheBuilder } from "../../core/registry";

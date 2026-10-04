@@ -36,16 +36,16 @@ export interface BerthedDock {
   readonly shipAt: TileCoord;
 }
 
+/** What placing a ship in a berth reads from its deck: the footprint and its size class. */
+export type BerthingDeck = Pick<DeckDef, "id" | "width" | "height" | "hull">;
+
 /**
  * D72: where `deck` lies in `dock`'s berth box (the dock tile under deck tile (0,0)): flush to
  * the box's south edge, the quay side, and centred across it (a remainder tile goes east). Throws
  * if the deck is larger than its own size class, or its class larger than the box's, which
  * content validation rules out for authored content.
  */
-export function berthPlacement(
-  dock: Pick<DockDef, "id" | "berth">,
-  deck: Pick<DeckDef, "id" | "width" | "height" | "hull">,
-): TileCoord {
+export function berthPlacement(dock: Pick<DockDef, "id" | "berth">, deck: BerthingDeck): TileCoord {
   const own = HULL_SIZE_BOX[deck.hull.sizeClass];
   if (deck.width > own.w || deck.height > own.h) {
     throw new Error(
@@ -65,10 +65,10 @@ export function berthPlacement(
   };
 }
 
-const berthed = new WeakMap<DockDef, WeakMap<DeckDef, BerthedDock>>();
+const berthed = new WeakMap<DockDef, WeakMap<BerthingDeck, BerthedDock>>();
 
 /** `dock` with `deck` in its berth. Memoized per pair (defs are immutable). */
-export function berthDock(dock: DockDef, deck: DeckDef): BerthedDock {
+export function berthDock(dock: DockDef, deck: BerthingDeck): BerthedDock {
   let byDeck = berthed.get(dock);
   if (byDeck === undefined) {
     byDeck = new WeakMap();
