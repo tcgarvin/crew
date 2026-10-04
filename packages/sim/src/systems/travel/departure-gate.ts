@@ -65,11 +65,16 @@ const SEVERITY: Readonly<Record<ImpairmentReason, number>> = {
 /** What the gate reads: truth, content and the thresholds in config. */
 type GateCtx = Pick<StepCtx, "state" | "content" | "config">;
 
+/** The kind of effect a fault on this machine has, per its def. */
+function effectKind(def: MachineDef, fault: Machine["faults"][number]) {
+  return def.faults.find((d) => d.key === fault.faultKey)?.effect.kind;
+}
+
 function impairmentOf(ctx: GateCtx, machine: Machine, def: MachineDef): Impairment | undefined {
   const base = { machineId: machine.id, machineName: def.name, output: machine.output };
   if (isMachineBlocked(machine, def, ctx.config.equipment)) return { ...base, reason: "blocked" };
   const disablingFault = machine.faults.some((fault) => {
-    const kind = def.faults.find((d) => d.key === fault.faultKey)?.effect.kind;
+    const kind = effectKind(def, fault);
     return kind === "derate" || kind === "inoperable";
   });
   if (disablingFault) {
@@ -115,7 +120,7 @@ function heldForFaults(machine: Machine, def: MachineDef, reason: ImpairmentReas
   const overheatCounts = reason === "blocked" || reason === "lowOutput";
   const keys = new Set<LocalKey>();
   for (const fault of machine.faults) {
-    const kind = def.faults.find((d) => d.key === fault.faultKey)?.effect.kind;
+    const kind = effectKind(def, fault);
     if (kind === "derate" || kind === "inoperable" || (kind === "overheat" && overheatCounts)) {
       keys.add(fault.faultKey);
     }
