@@ -31,13 +31,15 @@ let waitUntilProbe: Promise<WaitUntilFn | undefined> | undefined;
 export async function runAfterResponse(work: () => Promise<void>): Promise<void> {
   waitUntilProbe ??= probeWaitUntil();
   const waitUntil = await waitUntilProbe;
+  // Started once: if `waitUntil` refuses it, the same run is awaited inline rather than repeated.
+  const pending = work().catch(() => {});
   if (waitUntil) {
     try {
-      waitUntil(work());
+      waitUntil(pending);
       return;
     } catch {
       // `waitUntil` throws outside a Vercel request context; fall through to inline execution.
     }
   }
-  await work().catch(() => {});
+  await pending;
 }
