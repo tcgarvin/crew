@@ -9,7 +9,7 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 ```
 Ossory Station, breaker's slip 9 (dock.ossory_station)
 station dock for Ossory Station (port.ossory_station)
-40 x 30 tiles; M berth box 36 x 20 at (2,1)
+40 x 29 tiles; M berth box 36 x 20 at (2,1)
 
 Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
@@ -37,14 +37,13 @@ Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 19   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 20   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 21 ......................v..........v......
-22 .......................%%...........%%%%
-23 %%%%.......%%%%%%......%%...........%%%%
-24 %%%%.......%%%%%%..................2%%%%
-25 %%%%.................ssss...dddd....%%%%
-26 .....................ssss...dddd....%%%%
-27 %%..............................%%%.....
-28 %%.3.......1...5..........4.....%%%.....
-29 ########################################
+22 %%%%....%%..........................%%%%
+23 %%%%....%%.......ssss..%%%%%%.......%%%%
+24 %%%%2......dddd..ssss..%%%%%%.......%%%%
+25 %%%%.......dddd.........................
+26 %%%%.%%%.................%%.............
+27 .....%%%.....4...........%%..1..5...3...
+28 ########################################
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -53,33 +52,33 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
 
 Posts (5):
-  1  claims_office: kiosk, the claims office window, at (11,28) facing n; regular: Ezra Pell
-  2  salvage_market: marketStall, the salvage market container, at (35,24) facing w
-  3  registry_stairs: gate, the stairs up to the registry, at (3,28) facing n
-  4  yard_gate: warehouseDoor, the breaker's yard gate, at (26,28) facing n; regular: Vida Orlov
-  5  breakers_bench: bench, the breakers' bench, at (15,28) facing n
+  1  claims_office: kiosk, the claims office window, at (29,27) facing n; regular: Ezra Pell
+  2  salvage_market: marketStall, the salvage market container, at (4,24) facing e
+  3  registry_stairs: gate, the stairs up to the registry, at (36,27) facing n
+  4  yard_gate: warehouseDoor, the breaker's yard gate, at (13,27) facing n; regular: Vida Orlov
+  5  breakers_bench: bench, the breakers' bench, at (32,27) facing n
 
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (33,21)
   cargo_ramp: (22,21)
 
 Areas (2):
-  staging: freightStaging (21,25) 4 x 2
-  delivery: deliveryBay (28,25) 4 x 2
+  staging: freightStaging (17,23) 4 x 2
+  delivery: deliveryBay (11,24) 4 x 2
 
 Props (6):
-  hull_fore: hullSection (0,23) 4 x 3 rot=90, blocking
-  hull_mid: hullSection (11,23) 6 x 2 rot=0, blocking
-  crane: crane (23,22) 2 x 2 rot=0, blocking
-  market_box: container (36,22) 4 x 5 rot=90, blocking
-  plate_stack: crates (32,27) 3 x 2 rot=0, blocking
-  scrap_drums: barrels (0,27) 2 x 2 rot=0, blocking
+  hull_fore: hullSection (36,22) 4 x 3 rot=90, blocking
+  hull_mid: hullSection (23,23) 6 x 2 rot=0, blocking
+  crane: crane (8,22) 2 x 2 rot=0, blocking
+  market_box: container (0,22) 4 x 5 rot=90, blocking
+  plate_stack: crates (5,26) 3 x 2 rot=0, blocking
+  scrap_drums: barrels (25,26) 2 x 2 rot=0, blocking
 
 Foreground (4):
   bayWall (0,0) 40 x 1
   gantry (10,0) 1 x 21
   gantry (30,0) 1 x 21
-  terminalEdge (0,29) 40 x 1
+  terminalEdge (0,28) 40 x 1
 
 Palette: floor #4d4a45, wall #2a2522, accent #e0602f
 ```

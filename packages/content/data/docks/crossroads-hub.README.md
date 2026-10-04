@@ -9,42 +9,41 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 ```
 Crossroads Hub, Bay 14 (dock.crossroads_hub)
 station dock for Crossroads Hub (port.crossroads_hub)
-38 x 30 tiles; M berth box 36 x 20 at (1,1)
+40 x 29 tiles; M berth box 36 x 20 at (2,1)
 
-Freighter Mk1 (deck.freighter_mk1) docked at (3,3)
+Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
-   01234567890123456789012345678901234567
- 0 ######################################
- 1  ====================================
- 2  ====================================
- 3  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 4  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 5  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 6  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 7  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 8  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 9  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-10  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-11  ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-12  ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-13  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-14  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-15  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-16  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-17  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-18  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-19  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-20  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-21 %....................v..........v....%
-22 ......................................
-23 ..........1.....................%%%...
-24 ...................ssss...dddd..%%%...
-25 ...................ssss...dddd........
-26 .2...........%%....ssss...dddd.....%%.
-27 .................................%%%%.
-28 %.....3...5....#........4......#......
-29 ######################################
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   ====================================
+ 2   ====================================
+ 3   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 4   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 5   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 6   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 7   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 8   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 9   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+10   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+11   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+12   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+13   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+14   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+15   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+16   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+17   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+18   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+19   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+20   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+21 %.....................v..........v.....%
+22 ....%%%.................................
+23 ....%%%...........ssss.........1.....%%.
+24 ..........dddd....ssss...............%%.
+25 .2........dddd....ssss...%%.............
+26 ....%%....dddd..........................
+27 %.......#...4..............#....5..3....
+28 ########################################
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -53,34 +52,34 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
 
 Posts (5):
-  1  queue_kiosk: kiosk, the queue-board kiosk, at (10,23) facing n; regular: Hal Petrosyan
-  2  night_stall: marketStall, the night-market stall, at (1,26) facing e; regular: Anneke Vos
-  3  lounge_gate: gate, the transit lounge gate, at (6,28) facing n
-  4  dispatch: warehouseDoor, the Co-op dispatch window, at (24,28) facing n
-  5  bench: bench, the bench by the lounge gate, at (10,28) facing n
+  1  queue_kiosk: kiosk, the queue-board kiosk, at (31,23) facing n; regular: Hal Petrosyan
+  2  night_stall: marketStall, the night-market stall, at (1,25) facing e; regular: Anneke Vos
+  3  lounge_gate: gate, the transit lounge gate, at (35,27) facing n
+  4  dispatch: warehouseDoor, the Co-op dispatch window, at (12,27) facing n
+  5  bench: bench, the bench by the lounge gate, at (32,27) facing n
 
 Ramp landings (deck.freighter_mk1):
-  personnel_ramp: (32,21)
-  cargo_ramp: (21,21)
+  personnel_ramp: (33,21)
+  cargo_ramp: (22,21)
 
 Areas (2):
-  staging: freightStaging (19,24) 4 x 3
-  delivery: deliveryBay (26,24) 4 x 3
+  staging: freightStaging (18,23) 4 x 3
+  delivery: deliveryBay (10,24) 4 x 3
 
 Props (7):
-  crates_aft: crates (32,23) 3 x 2 rot=0, blocking
-  crates_corner: crates (35,26) 2 x 2 rot=90, blocking
-  container_aft: container (33,27) 2 x 1 rot=0, blocking
-  drums: barrels (13,26) 2 x 1 rot=0, blocking
-  bollard_fore: bollard (0,21) 1 x 1 rot=0, blocking
-  bollard_aft: bollard (37,21) 1 x 1 rot=0, blocking
-  lamp_stall: lamp (0,28) 1 x 1 rot=0, blocking
+  crates_aft: crates (4,22) 3 x 2 rot=0, blocking
+  crates_corner: crates (37,23) 2 x 2 rot=90, blocking
+  container_aft: container (4,26) 2 x 1 rot=0, blocking
+  drums: barrels (25,25) 2 x 1 rot=0, blocking
+  bollard_fore: bollard (39,21) 1 x 1 rot=0, blocking
+  bollard_aft: bollard (0,21) 1 x 1 rot=0, blocking
+  lamp_stall: lamp (0,27) 1 x 1 rot=0, blocking
 
 Foreground (4):
-  bayWall (0,0) 38 x 1
+  bayWall (0,0) 40 x 1
   gantry (12,0) 1 x 21
   gantry (28,0) 1 x 21
-  terminalEdge (0,29) 38 x 1
+  terminalEdge (0,28) 40 x 1
 
 Palette: floor #3a4150, wall #1d222c, accent #f2a93b
 ```
