@@ -34,6 +34,7 @@ import type { MachineDef } from "../../core/types/content";
 import type { LocalKey, MachineId, PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
+import type { TravelState } from "../../core/types/travel";
 import { isMachineBlocked } from "../equipment/equipment";
 import { type RepairOutOfReach, repairOutOfReach } from "../equipment/supplies";
 import { commandActor } from "./roster";
@@ -130,6 +131,11 @@ function portHere(ctx: Pick<StepCtx, "state">): PortDefId | undefined {
   return undefined;
 }
 
+/** Where the planned departure is bound: the course set while docked, or the leg under way. */
+function departureBound(travel: TravelState): PortDefId | undefined {
+  return travel.stage === "docked" ? travel.plannedDestinationId : travel.toPortId;
+}
+
 /** D71: why holding for `impairment` would never end, or `undefined` when its repair can finish. */
 function impairmentOutOfReach(ctx: GateCtx, impairment: Impairment): RepairOutOfReach | undefined {
   const machine = ctx.state.machines[impairment.machineId];
@@ -219,7 +225,7 @@ export function departureCleared(ctx: StepCtx): boolean {
     if (travel.holdForRepairs === true) {
       // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
       delete travel.holdForRepairs;
-      const toPortId = travel.stage === "docked" ? travel.plannedDestinationId : travel.toPortId;
+      const toPortId = departureBound(travel);
       if (toPortId !== undefined) {
         ctx.emit({
           type: "departureHoldLifted",
@@ -260,7 +266,7 @@ function leaveWithRepairsOutOfReach(
 ): void {
   const travel = ctx.state.travel;
   const portId = portHere(ctx);
-  const toPortId = travel.stage === "docked" ? travel.plannedDestinationId : travel.toPortId;
+  const toPortId = departureBound(travel);
   const heldForRepairs = travel.holdForRepairs === true;
   // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
   delete travel.holdForRepairs;

@@ -82,6 +82,9 @@ export function stagingAnswered(
 // The stageDock command
 // ---------------------------------------------------------------------------------------------
 
+/** What the plan is checked against: content and the world as it stands. */
+type PlanEnv = { readonly content: StepCtx["content"]; readonly state: ReadonlyWorldState };
+
 /** No control characters, no template braces, not blank, at most `max` characters. */
 function textProblem(value: unknown, what: string, max: number): string | undefined {
   if (typeof value !== "string") return `${what} must be text`;
@@ -94,11 +97,13 @@ function textProblem(value: unknown, what: string, max: number): string | undefi
   return undefined;
 }
 
-function personProblem(
-  who: StagedPersonSpec,
-  ctx: { readonly content: StepCtx["content"]; readonly state: ReadonlyWorldState },
-  portId: string,
-): string | undefined {
+function postProblem(dock: DockDef, postKey: unknown): string | undefined {
+  return dock.posts.some((p) => p.key === postKey)
+    ? undefined
+    : `"${String(postKey)}" is not a post on ${dock.name}`;
+}
+
+function personProblem(who: StagedPersonSpec, ctx: PlanEnv, portId: string): string | undefined {
   if (typeof who !== "object" || who === null) return "a placement needs a person";
   const name = textProblem(who.name, "a name", STAGING_LIMITS.nameChars);
   if (name !== undefined) return name;
@@ -129,23 +134,17 @@ function personProblem(
 function placementProblem(
   placement: StagedPlacement,
   dock: DockDef,
-  ctx: { readonly content: StepCtx["content"]; readonly state: ReadonlyWorldState },
+  ctx: PlanEnv,
 ): string | undefined {
   if (typeof placement !== "object" || placement === null) return "a placement must be an object";
-  const who = personProblem(placement.who, ctx, dock.portId);
-  if (who !== undefined) return who;
-  if (!dock.posts.some((p) => p.key === placement.postKey)) {
-    return `"${String(placement.postKey)}" is not a post on ${dock.name}`;
-  }
+  const problem =
+    personProblem(placement.who, ctx, dock.portId) ?? postProblem(dock, placement.postKey);
+  if (problem !== undefined) return problem;
   if (placement.label === undefined) return undefined;
   return textProblem(placement.label, "a label", STAGING_LIMITS.labelChars);
 }
 
-function propProblem(
-  prop: StagedProp,
-  dock: DockDef,
-  ctx: { readonly content: StepCtx["content"]; readonly state: ReadonlyWorldState },
-): string | undefined {
+function propProblem(prop: StagedProp, dock: DockDef, ctx: PlanEnv): string | undefined {
   if (typeof prop !== "object" || prop === null) return "a prop must be an object";
   if (findItemDef(ctx.content, ctx.state, prop.itemDefId as ItemDefId) === undefined) {
     return `"${String(prop.itemDefId)}" is not in the item catalogue`;
@@ -155,11 +154,7 @@ function propProblem(
   }
   const at = prop.at;
   if (at?.kind === "staging") return undefined;
-  if (at?.kind === "post") {
-    return dock.posts.some((p) => p.key === at.postKey)
-      ? undefined
-      : `"${String(at.postKey)}" is not a post on ${dock.name}`;
-  }
+  if (at?.kind === "post") return postProblem(dock, at.postKey);
   return "a prop goes on the staging area or by a post";
 }
 

@@ -39,19 +39,21 @@ type Ctx = StepCtx;
 
 const COME_ABOARD_REF = backoffRef.personal("comeAboard");
 
+/** Where this actor's walk ends, if they are walking. */
+function walkEnd(actor: Actor): TileCoord | undefined {
+  const movement = actor.movement;
+  return movement.kind === "moving" ? movement.path[movement.path.length - 1] : undefined;
+}
+
 /** Is this actor walking a route that ends on the dock? */
 function headedAshore(ctx: Ctx, actor: Actor): boolean {
-  const movement = actor.movement;
-  if (movement.kind !== "moving") return false;
-  const end = movement.path[movement.path.length - 1];
+  const end = walkEnd(actor);
   return end !== undefined && isDockPoint(ctx.content, ctx.state, end.x, end.y);
 }
 
 /** Is this actor walking a route that ends aboard? */
 function headedAboard(ctx: Ctx, actor: Actor): boolean {
-  const movement = actor.movement;
-  if (movement.kind !== "moving") return false;
-  const end = movement.path[movement.path.length - 1];
+  const end = walkEnd(actor);
   return end !== undefined && !isDockPoint(ctx.content, ctx.state, end.x, end.y);
 }
 
