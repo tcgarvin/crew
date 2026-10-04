@@ -3,7 +3,7 @@
  * map has the posts and areas physical port work needs, a planet has a sky, and castSeed posts
  * name real posts. L3: the map's geometry against every deck in the bundle: the berth box (D72)
  * lies on the map and is all void; the quay row under it is walkable floor across its width
- * (`checkQuayRow`, not yet called: see `checkDockPhysical`); for each deck whose class fits the
+ * (`checkQuayRow`); for each deck whose class fits the
  * box, its ramps (the deck placed in the box, `shipAtInBerth`) land on walkable floor outside the
  * areas and reach every post and area; posts and areas are walkable; the map fits the size cap.
  * A scenario's ship fits every dock's box (`checkScenarioBerths`). The deck's side of the
@@ -483,8 +483,7 @@ export function checkDockPhysical(
   const mask = dockWalkableMask(dock);
   checkPostsAndAreas(dock, mask, issues);
   if (!checkBerthBox(dock, issues)) return;
-  // `checkQuayRow` joins here once the six maps are re-authored for the M box (ship life plan
-  // W4): Kessler Drift, Vesper Gate and Tern's Rest put the box against the map edge today.
+  checkQuayRow(dock, issues);
   for (const deck of Object.values(bundle.decks)) {
     if (deckBerthsAt(dock, deck)) checkLandings(dock, deck, mask, issues);
   }

@@ -10,9 +10,9 @@ type MutableDock = { -readonly [K in keyof DockDef]: DockDef[K] };
 
 const HUB = "dock.crossroads_hub";
 const HUB_PORT = "port.crossroads_hub";
-/** Freighter Mk1 in the Hub's berth box (box (1,1), ship at (3,3)): its ramps land here. */
-const PERSONNEL_LANDING = { x: 32, y: 21 };
-const CARGO_LANDING = { x: 21, y: 21 };
+/** Freighter Mk1 in the Hub's berth box (box (2,1), ship at (4,3)): its ramps land here. */
+const PERSONNEL_LANDING = { x: 33, y: 21 };
+const CARGO_LANDING = { x: 22, y: 21 };
 
 function hubDock(raw: Raw): MutableDock {
   return raw.docks?.[HUB] as MutableDock;
@@ -44,7 +44,7 @@ describe("dock map validation", () => {
     );
     expect(messages).toContainEqual(
       expect.stringContaining(
-        'ramp "personnel_ramp" of "deck.freighter_mk1" lands at (32,21), which is wall',
+        'ramp "personnel_ramp" of "deck.freighter_mk1" lands at (33,21), which is wall',
       ),
     );
   });
@@ -69,19 +69,19 @@ describe("dock map validation", () => {
 
   it("rejects a post that the landings cannot reach", () => {
     const messages = messagesAfter((dock) => {
-      // Wall the lounge gate (6,28) into its corner of the quay.
+      // Wall the lounge gate (35,27) into its corner of the quay.
       for (const [x, y] of [
-        [5, 27],
-        [6, 27],
-        [7, 27],
-        [5, 28],
-        [7, 28],
+        [34, 26],
+        [35, 26],
+        [36, 26],
+        [34, 27],
+        [36, 27],
       ] as const) {
         setTile(dock, x, y, "#");
       }
     });
     expect(messages).toContainEqual(
-      expect.stringContaining('post "lounge_gate" at (6,28) cannot be reached from ramp'),
+      expect.stringContaining('post "lounge_gate" at (35,27) cannot be reached from ramp'),
     );
   });
 
@@ -125,7 +125,7 @@ describe("dock map validation", () => {
       dock.width = 50;
       dock.rows = dock.rows.map((r) => `${r}${r[0] === "#" ? "#" : " "}`.padEnd(50, "#"));
     });
-    expect(messages).toContainEqual(expect.stringContaining("50 x 30 exceeds the 48 x 36 cap"));
+    expect(messages).toContainEqual(expect.stringContaining("50 x 29 exceeds the 48 x 36 cap"));
   });
 
   it("rejects characters missing from the legend and rows of the wrong width", () => {
@@ -136,7 +136,7 @@ describe("dock map validation", () => {
       messagesAfter((dock) => {
         dock.rows = dock.rows.map((r, y) => (y === 3 ? r.slice(1) : r));
       }),
-    ).toContainEqual(expect.stringContaining("row 3 is 37 wide, expected width 38"));
+    ).toContainEqual(expect.stringContaining("row 3 is 39 wide, expected width 40"));
   });
 
   it("needs exactly one gate, warehouse door, staging area and delivery bay", () => {
