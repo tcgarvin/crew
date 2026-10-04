@@ -9,40 +9,41 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 ```
 Green Meridian, field pad 2 (dock.green_meridian)
 planet dock for Green Meridian (port.green_meridian)
-38 x 28 tiles; M berth box 36 x 20 at (1,0)
+40 x 29 tiles; M berth box 36 x 20 at (2,1)
 
-Freighter Mk1 (deck.freighter_mk1) docked at (3,2)
+Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
-   01234567890123456789012345678901234567
- 0  ====================================
- 1  ====================================
- 2  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 3  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 4  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 5  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 6  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 7  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 8  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 9  ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-10  ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-11  ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-12  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-13  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-14  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-15  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-16  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-17  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-18  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-19  ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-20  ....................v..........v....
-21  %%...........................dddd...
-22  ..................ssss.......dddd...
-23  ..................ssss.......dddd...
-24  .......2...4....%.ssss.....1........
-25  ......................%%.#######.%%.
-26  3.....................%%.#######....
-27
+   0123456789012345678901234567890123456789
+ 0  ......................................
+ 1  .====================================.
+ 2  .====================================.
+ 3  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 4  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 5  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 6  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 7  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 8  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+ 9  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+10  .==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==.
+11  .==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==.
+12  .==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==.
+13  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+14  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+15  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+16  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+17  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+18  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+19  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+20  .==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==.
+21 ......................v..........v......
+22 %%.....dddd......ssss.................%%
+23 .......dddd......ssss...................
+24 .......dddd......ssss....%..2...4.......
+25 .........1.............................3
+26 ......#######%%.........................
+27 .%%...#######%%.........................
+28 ......#######...........................
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -51,27 +52,28 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
 
 Posts (4):
-  1  produce_shed: warehouseDoor, the produce shed doors, at (28,24) facing n; regular: Bo Sandoval
-  2  coop_stall: marketStall, the growers' co-op stall, at (8,24) facing n
-  3  pad_gate: gate, the lane up to the Greenhouse Lounge, at (1,26) facing e
-  4  pad_bench: bench, the bench under the awning, at (12,24) facing n; regular: Tilde Haugen
+  1  produce_shed: warehouseDoor, the produce shed doors, at (9,25) facing n; regular: Bo Sandoval
+  2  coop_stall: marketStall, the growers' co-op stall, at (28,24) facing n
+  3  pad_gate: gate, the lane up to the Greenhouse Lounge, at (39,25) facing w
+  4  pad_bench: bench, the bench under the awning, at (32,24) facing n; regular: Tilde Haugen
 
 Ramp landings (deck.freighter_mk1):
-  personnel_ramp: (32,20)
-  cargo_ramp: (21,20)
+  personnel_ramp: (33,21)
+  cargo_ramp: (22,21)
 
 Areas (2):
-  staging: freightStaging (19,22) 4 x 3
-  delivery: deliveryBay (30,21) 4 x 3
+  staging: freightStaging (17,22) 4 x 3
+  delivery: deliveryBay (7,22) 4 x 3
 
-Props (4):
-  planters_pad: planter (1,21) 2 x 1 rot=0, blocking
-  produce_crates: crates (23,25) 2 x 2 rot=0, blocking
-  water_drums: barrels (34,25) 2 x 1 rot=0, blocking
-  pad_lamp: lamp (17,24) 1 x 1 rot=0, blocking
+Props (5):
+  planters_pad: planter (0,22) 2 x 1 rot=0, blocking
+  planters_bow: planter (38,22) 2 x 1 rot=0, blocking
+  produce_crates: crates (13,26) 2 x 2 rot=0, blocking
+  water_drums: barrels (1,27) 2 x 1 rot=0, blocking
+  pad_lamp: lamp (25,24) 1 x 1 rot=0, blocking
 
 Foreground (1):
-  awning (6,23) 8 x 2
+  awning (27,23) 7 x 2
 
 Palette: floor #a29a80, wall #5e4b35, accent #7fb069, sky #cdd98c
 ```

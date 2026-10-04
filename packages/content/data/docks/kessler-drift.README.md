@@ -9,39 +9,39 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 ```
 Kessler Drift, ore berth 3 (dock.kessler_drift)
 station dock for Kessler Drift (port.kessler_drift)
-36 x 27 tiles; M berth box 36 x 20 at (0,1)
+40 x 27 tiles; M berth box 36 x 20 at (2,1)
 
-Freighter Mk1 (deck.freighter_mk1) docked at (2,3)
+Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
-   012345678901234567890123456789012345
- 0 ####################################
- 1 ====================================
- 2 ====================================
- 3 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 4 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 5 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 6 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 7 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 8 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 9 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-10 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-11 ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-12 ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-13 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-14 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-15 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-16 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-17 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-18 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-19 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-20 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-21 #%..................v..........v..%#
-22 #%...................2............%#
-23 ##................%%%%%%%%%%%%..ddd#
-24 ###..........ssss...............ddd#
-25 ####.3...1.%.ssss..........4.###...#
-26 ####################################
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   ====================================
+ 2   ====================================
+ 3   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 4   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 5   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 6   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 7   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 8   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 9   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+10   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+11   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+12   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+13   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+14   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+15   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+16   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+17   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+18   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+19   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+20   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+21 ##....................v..........v....##
+22 ##.%.%%...............................##
+23 ###%...ddd......ssss.%%%%%%%%%%%%....2##
+24 ####...ddd......ssss..................##
+25 #####.....4.................1.%...3.####
+26 ########################################
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -50,30 +50,30 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
 
 Posts (4):
-  1  assay_window: kiosk, the assay window, at (9,25) facing n; regular: Osric Tan
-  2  shift_board: kiosk, the shift board, at (21,22) facing w; regular: Greta Lindholm
-  3  canteen_hatch: gate, the hatch to the canteen ring, at (5,25) facing n
-  4  ore_store: warehouseDoor, the ore-store lock, at (27,25) facing n
+  1  assay_window: kiosk, the assay window, at (28,25) facing n; regular: Osric Tan
+  2  shift_board: kiosk, the shift board, at (37,23) facing w; regular: Greta Lindholm
+  3  canteen_hatch: gate, the hatch to the canteen ring, at (34,25) facing n
+  4  ore_store: warehouseDoor, the ore-store lock, at (10,25) facing n
 
 Ramp landings (deck.freighter_mk1):
-  personnel_ramp: (31,21)
-  cargo_ramp: (20,21)
+  personnel_ramp: (33,21)
+  cargo_ramp: (22,21)
 
 Areas (2):
-  staging: freightStaging (13,24) 4 x 2
-  delivery: deliveryBay (32,23) 3 x 2
+  staging: freightStaging (16,23) 4 x 2
+  delivery: deliveryBay (7,23) 3 x 2
 
 Props (4):
-  conveyor: conveyor (18,23) 12 x 1 rot=0, blocking
-  ore_carts: barrels (1,21) 1 x 2 rot=0, blocking
-  drill_heads: crates (34,21) 1 x 2 rot=0, blocking
-  lamp_assay: lamp (11,25) 1 x 1 rot=0, blocking
+  conveyor: conveyor (21,23) 12 x 1 rot=0, blocking
+  ore_carts: barrels (3,22) 1 x 2 rot=0, blocking
+  drill_heads: crates (5,22) 2 x 1 rot=0, blocking
+  lamp_assay: lamp (30,25) 1 x 1 rot=0, blocking
 
 Foreground (4):
-  rockWall (0,0) 36 x 1
-  rockWall (0,23) 4 x 4
-  rockWall (29,25) 3 x 2
-  rockWall (0,26) 36 x 1
+  rockWall (0,0) 40 x 1
+  rockWall (0,21) 2 x 5
+  rockWall (38,21) 2 x 5
+  rockWall (0,26) 40 x 1
 
 Palette: floor #4a4640, wall #2b2724, accent #d9a441
 ```

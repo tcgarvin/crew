@@ -9,39 +9,40 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 ```
 Vesper Gate, quiet berth (dock.vesper_gate)
 station dock for Vesper Gate (port.vesper_gate)
-36 x 27 tiles; M berth box 36 x 20 at (0,1)
+40 x 28 tiles; M berth box 36 x 20 at (2,1)
 
-Freighter Mk1 (deck.freighter_mk1) docked at (2,3)
+Freighter Mk1 (deck.freighter_mk1) docked at (4,3)
 
    0         1         2         3
-   012345678901234567890123456789012345
- 0 ####################################
- 1 ====================================
- 2 ====================================
- 3 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 4 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 5 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 6 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 7 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 8 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
- 9 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-10 ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
-11 ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-12 ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
-13 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-14 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-15 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-16 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-17 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-18 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-19 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-20 ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
-21 #...................v..........v.%%#
-22 #........1.........................#
-23 #%..................sss.......ddd..#
-24 #%..................sss.......ddd..#
-25 #............5.....%...............#
-26 #####.3.########.2.#######.4.#######
+   0123456789012345678901234567890123456789
+ 0 ########################################
+ 1   ====================================
+ 2   ====================================
+ 3   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 4   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 5   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 6   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 7   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 8   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+ 9   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+10   ==EEEEEEEENNNNGGGGGGQQQQQQQQQQBBBB==
+11   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+12   ==EEEEEEEECCCCCCCCCCCCCCCCCCCCCCCC==
+13   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+14   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+15   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+16   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+17   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+18   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+19   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+20   ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
+21 #.....................v..........v.....#
+22 #.............................1........#
+23 #................sss..................%#
+24 #.........ddd....sss..................%#
+25 #.........ddd..................5.......#
+26 #.........................%%........%..#
+27 ###########.4.#########.3.#######.2.####
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -50,28 +51,28 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
 
 Posts (5):
-  1  dock_keeper: kiosk, the dock keeper's lectern, at (9,22) facing n; regular: Jonah Weir
-  2  chapel_doors: gate, the chapel doors, at (17,26) facing n; regular: Sister Aurelie Doucet
-  3  apothecary: marketStall, the apothecary stall, at (6,26) facing n
-  4  gate_stores: warehouseDoor, the Gate Stores hatch, at (27,26) facing n
-  5  chapel_bench: bench, the bench by the chapel doors, at (13,25) facing n
+  1  dock_keeper: kiosk, the dock keeper's lectern, at (30,22) facing n; regular: Jonah Weir
+  2  chapel_doors: gate, the chapel doors, at (34,27) facing n; regular: Sister Aurelie Doucet
+  3  apothecary: marketStall, the apothecary stall, at (24,27) facing n
+  4  gate_stores: warehouseDoor, the Gate Stores hatch, at (12,27) facing n
+  5  chapel_bench: bench, the bench by the chapel doors, at (31,25) facing n
 
 Ramp landings (deck.freighter_mk1):
-  personnel_ramp: (31,21)
-  cargo_ramp: (20,21)
+  personnel_ramp: (33,21)
+  cargo_ramp: (22,21)
 
 Areas (2):
-  staging: freightStaging (20,23) 3 x 2
-  delivery: deliveryBay (30,23) 3 x 2
+  staging: freightStaging (17,23) 3 x 2
+  delivery: deliveryBay (10,24) 3 x 2
 
 Props (3):
-  candles_chapel: lamp (19,25) 1 x 1 rot=0, blocking
-  memorial_planters: planter (1,23) 1 x 2 rot=0, blocking
-  med_crates: crates (33,21) 2 x 1 rot=0, blocking
+  candles_chapel: lamp (36,26) 1 x 1 rot=0, blocking
+  memorial_planters: planter (38,23) 1 x 2 rot=0, blocking
+  med_crates: crates (26,26) 2 x 1 rot=0, blocking
 
 Foreground (2):
-  bayWall (0,0) 36 x 1
-  terminalEdge (0,26) 36 x 1
+  bayWall (0,0) 40 x 1
+  terminalEdge (0,27) 40 x 1
 
 Palette: floor #2e2b36, wall #17151c, accent #c9a86a
 ```
