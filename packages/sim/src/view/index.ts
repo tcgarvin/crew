@@ -1,11 +1,10 @@
 /**
- * AgentView builder, render projection, and narrator digest inputs. This is the only
- * truth-shaped surface the planner is allowed to see.
+ * The AgentView (the only truth-shaped surface the planner is allowed to see) and its plain-data
+ * snapshot for the inspector.
  */
 import type { KernelRegistry, Unregister } from "../core/registry";
 import { buildAgentView } from "./agentView";
 
-export { buildAgentView } from "./agentView";
 export { toAgentViewSnapshot } from "./snapshot";
 
 /** Install the W4a AgentView builder on `registry`. */
