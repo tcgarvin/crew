@@ -44,7 +44,7 @@
   "market": [
     {
       "itemDefId": "item.ration_pack",
-      "count": 10,
+      "count": 60,
       "price": 12
     },
     {

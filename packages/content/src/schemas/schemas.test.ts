@@ -333,6 +333,8 @@ const config = {
     reofferDays: 0.05,
     maxCratesPerJob: 6,
     passage: { ashoreDaysMin: 0.05, ashoreDaysMax: 0.15, overdueDays: 0.1 },
+    // D80: off unless a test turns it on.
+    foodReserve: { lowBelowDays: 0, restockToDays: 0 },
     market: {
       priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
       maxStockPerCommand: 4,

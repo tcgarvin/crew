@@ -144,6 +144,8 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
         ashoreDaysMax: 3 / day,
         overdueDays: 10 / day,
       },
+      // D80: off unless a test turns it on.
+      foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,

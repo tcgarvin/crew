@@ -8,7 +8,9 @@
  *     (D70, `captain-ashore.ts`; this replaced `jobBoard` and D42's wait for the dock),
  *  4. walks passengers off and on, times their stay ashore and raises the overdue card
  *     (passengers-and-galaxy §3, `passage.ts`); it runs before the job sweep so a passage that
- *     completes this tick is paid this tick.
+ *     completes this tick is paid this tick,
+ *  5. keeps the ship's stores (D80, `reserve.ts`): docked at a port that sells what is low, it
+ *     raises `reserveLow` for the shortfall, which the crew buy as they buy a part.
  *
  * D40 (2026-10-01): the narrator is the only source of work. The deterministic job source that
  * used to live beside this system (posting template offers while docked) is gone; `captainAshore`
@@ -24,6 +26,7 @@ import { sweepCaptainAshore } from "./captain-ashore";
 import { syncDockFreight } from "./dock-hands";
 import { expireStaleOffers, payJobIfDue, raiseUnloadProblems } from "./jobs";
 import { sweepPassages } from "./passage";
+import { sweepReserves } from "./reserve";
 
 function sweepJobs(ctx: StepCtx): void {
   const travel = ctx.state.travel;
@@ -51,5 +54,6 @@ export const commerceSystem: System = {
     sweepPassages(ctx);
     sweepJobs(ctx);
     sweepCaptainAshore(ctx);
+    sweepReserves(ctx);
   },
 };

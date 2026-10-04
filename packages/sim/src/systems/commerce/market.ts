@@ -7,9 +7,9 @@
  * by `count × price` (a `purchase` transaction), the units appear on the deck at the buyer's
  * feet (handed over the ramp; SD §14.6 no teleporting, the buyer is standing there), every crew
  * member is told where they are (a `reported` item fact, as the ship-familiarity briefing does),
- * and `partsBought` is emitted. The `partsNeeded` problem is then settled here too: resolved when
- * the purchase covers it, otherwise its count drops by what was bought and its revision bumps so
- * the `buyParts` task re-derives for the rest.
+ * and `partsBought` is emitted. The `partsNeeded` (or D80 `reserveLow`) problems for the item are
+ * then settled here too: resolved when the purchase covers one, otherwise its count drops by what
+ * was bought and its revision bumps so the `buyParts` task re-derives for the rest.
  *
  * D63, with the port's dock alongside: the counter is the dock's market stall (or, with no stall,
  * the market through its gate) and the units are handed over into the buyer's hands; the buyer
@@ -85,13 +85,22 @@ function spawnBought(
   const location: PhysicalLocation =
     handover === "hands" ? { kind: "carriedBy", actorId: buyer.id } : atFeet(buyer.location);
   const ids: ItemId[] = [];
-  const units = def.stacking === "unique" ? count : 1;
-  for (let i = 0; i < units; i++) {
+  // One item per unique unit; stackables in stacks of at most `maxStack` (D80: a restock of
+  // rations is a hundred units), as the scenario spawns them.
+  const chunk = def.stacking === "unique" ? 1 : Math.max(1, def.maxStack);
+  for (let left = count; left > 0; left -= chunk) {
     const id = allocateId(ctx.state, "item");
     const item: Item =
       def.stacking === "unique"
         ? { id, defId: def.id, stacking: "unique", condition: 1, location }
-        : { id, defId: def.id, stacking: "stack", count, reserved: 0, location };
+        : {
+            id,
+            defId: def.id,
+            stacking: "stack",
+            count: Math.min(chunk, left),
+            reserved: 0,
+            location,
+          };
     ctx.state.items[id] = item;
     ids.push(id);
   }
@@ -142,9 +151,9 @@ function reportToCrew(ctx: StepCtx, buyer: Actor, itemIds: readonly ItemId[]): v
   }
 }
 
-function settlePartsNeeded(
+function settlePurchase(
   ctx: StepCtx,
-  problem: ProblemOfKind<"partsNeeded">,
+  problem: ProblemOfKind<"partsNeeded" | "reserveLow">,
   bought: number,
 ): void {
   if (bought >= problem.payload.count) {
@@ -208,9 +217,9 @@ export function buyFromMarket(
   });
 
   for (const problem of Object.values(ctx.state.work.problems)) {
-    if (problem.kind !== "partsNeeded" || problem.status !== "open") continue;
-    if (problem.payload.itemDefId !== itemDefId) continue;
-    settlePartsNeeded(ctx, problem, count);
+    if (problem.kind !== "partsNeeded" && problem.kind !== "reserveLow") continue;
+    if (problem.status !== "open" || problem.payload.itemDefId !== itemDefId) continue;
+    settlePurchase(ctx, problem, count);
   }
   return { count, cost, itemIds };
 }

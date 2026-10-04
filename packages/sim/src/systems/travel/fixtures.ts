@@ -162,6 +162,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         ashoreDaysMax: 3 / FIXTURE_DAY,
         overdueDays: 10 / FIXTURE_DAY,
       },
+      // D80: off unless a test turns it on.
+      foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,

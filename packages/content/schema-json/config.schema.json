@@ -579,6 +579,21 @@
           "required": ["ashoreDaysMin", "ashoreDaysMax", "overdueDays"],
           "additionalProperties": false
         },
+        "foodReserve": {
+          "type": "object",
+          "properties": {
+            "lowBelowDays": {
+              "type": "number",
+              "minimum": 0
+            },
+            "restockToDays": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["lowBelowDays", "restockToDays"],
+          "additionalProperties": false
+        },
         "market": {
           "type": "object",
           "properties": {
@@ -628,6 +643,7 @@
         "reofferDays",
         "maxCratesPerJob",
         "passage",
+        "foodReserve",
         "market"
       ],
       "additionalProperties": false

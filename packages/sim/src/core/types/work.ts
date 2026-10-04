@@ -12,7 +12,8 @@
  * 1. The *owning system* detects a condition and creates or revises a `Problem` row in
  *    `state.work.problems`. Equipment creates `machineSymptom` / `machineFault` /
  *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload`,
- *    travel `courseToPlot` (D78); the watch creates `stationToStaff` (D77). Before creating, it looks up an open problem with the same `dedupeKey`
+ *    travel `courseToPlot` (D78); the watch creates `stationToStaff` (D77); commerce creates
+ *    `reserveLow` (D80). Before creating, it looks up an open problem with the same `dedupeKey`
  *    and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for one fault).
  * 2. The *work system* (W4) derives tasks from problems through the `TaskDerivationTable`: one
  *    rule per `ProblemKind`, each returning `TaskSpec`s. Each owning system exports the rules for
@@ -125,6 +126,13 @@ export interface ProblemPayloads {
    * task while the ship is docked at a port whose market sells it and the ship can pay.
    */
   partsNeeded: { machineId: MachineId; itemDefId: ItemDefId; count: number };
+  /**
+   * D80: the ship's stores of `itemDefId` are below the reserve it keeps (food in days of the
+   * crew's hunger, spares in units), and the port it is docked at sells it: `count` more units
+   * bring it back up. Owner: commerce, which raises it only while docked at such a port and
+   * derives the same `buyParts` task `partsNeeded` does. Routine: nothing is broken yet.
+   */
+  reserveLow: { itemDefId: ItemDefId; count: number };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -172,7 +180,9 @@ export type TaskStatus = "pending" | "claimed" | "active" | "blocked" | "complet
 export type TaskTarget =
   | { kind: "machine"; machineId: MachineId }
   | { kind: "item"; itemId: ItemId }
-  | { kind: "door"; doorId: DoorId };
+  | { kind: "door"; doorId: DoorId }
+  /** D80: a purchase for the ship's stores, at this port's market (no machine waits on it). */
+  | { kind: "market"; portId: PortDefId };
 
 /**
  * Where the task's physical progress lives (SD §14.4). The task holds a reference, never the

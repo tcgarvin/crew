@@ -240,7 +240,7 @@ function marketHereLine(state: State, content: ContentBundle, portId: PortDefId)
   return lines.length === 0 ? "nothing" : lines.join(", ");
 }
 
-/** D47: why a `partsNeeded` problem is still open, in the words the prompt teaches. */
+/** D47: why a `partsNeeded` (or D80 `reserveLow`) problem is still open, in the prompt's words. */
 function partsReason(state: State, content: ContentBundle, itemDefId: ItemDefId): string {
   const block = marketBlock(state, content, itemDefId);
   const t = state.travel;
@@ -466,6 +466,10 @@ function machineSection(state: State, content: ContentBundle, tickRate: number):
 
 function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBundle): string {
   const base = `- ${p.kind} (${p.visibility}) since tick ${p.createdTick}`;
+  if (p.kind === "reserveLow") {
+    // D80: routine restocking at a port that sells it; nothing is broken.
+    return `${base}: the ship's stores are low; ${p.payload.count}x ${itemName(content, p.payload.itemDefId)} would restock them; ${partsReason(state, content, p.payload.itemDefId)}`;
+  }
   if (p.kind !== "partsNeeded") return base;
   // D47: the stalled repair and what would unstick it, so the model can stock a market or tell
   // the story of a part that is not here.

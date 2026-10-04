@@ -1004,6 +1004,13 @@ export interface ConfigDef {
        */
       readonly overdueDays: Days;
     };
+    /**
+     * D80: the food the ship keeps aboard, in days of its people's hunger (the nutrition of the
+     * food aboard over eaters × `needs.hungerPerDay`). Below `lowBelowDays`, while docked at a
+     * port whose market sells food, the crew buy enough to bring it to `restockToDays`
+     * (`reserveLow`, bought like a part). `lowBelowDays` 0 turns it off.
+     */
+    readonly foodReserve: { readonly lowBelowDays: Days; readonly restockToDays: Days };
     /** D47: the parts market. */
     readonly market: {
       /** Multipliers over a port's content price for the narrator's `stockMarket` price tiers. */

@@ -114,6 +114,11 @@ export const configDefSchema = z.strictObject({
       .refine((p) => p.ashoreDaysMin <= p.ashoreDaysMax, {
         message: "ashoreDaysMin must be <= ashoreDaysMax",
       }),
+    foodReserve: z
+      .strictObject({ lowBelowDays: nonNegative, restockToDays: nonNegative })
+      .refine((r) => r.lowBelowDays <= r.restockToDays, {
+        message: "lowBelowDays must be <= restockToDays",
+      }),
     market: z.strictObject({
       priceTiers: z.strictObject({ cheap: positive, fair: positive, dear: positive }),
       maxStockPerCommand: nonNegativeInt,

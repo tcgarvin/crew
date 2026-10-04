@@ -127,6 +127,10 @@
       "ashoreDaysMax": 0.15,
       "overdueDays": 0.1
     },
+    "foodReserve": {
+      "lowBelowDays": 2,
+      "restockToDays": 5
+    },
     "market": {
       "priceTiers": {
         "cheap": 0.6,
