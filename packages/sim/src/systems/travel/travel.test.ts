@@ -4,10 +4,10 @@
  * full output, and staffing is untested here (no `pilotStation` machine in the fixture).
  */
 import { describe, expect, it } from "vitest";
+import { raiseHookIfIdle } from "../../core/hooks";
 import type { Command } from "../../core/types/commands";
 import type { ActorId, CommandId, HookId } from "../../core/types/ids";
 import { FIX, PORTS, advanceThroughHooks, freightTestWorld } from "./fixtures";
-import { raiseHookIfIdle } from "./hooks";
 
 let counter = 0;
 function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {

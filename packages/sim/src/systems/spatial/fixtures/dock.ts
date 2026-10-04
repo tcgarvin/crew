@@ -99,7 +99,7 @@ function withRamps(deck: DeckDef): DeckDef {
   };
 }
 
-export function dockContent(): ContentBundle {
+function dockContent(): ContentBundle {
   const base = deck12Content();
   const deck = base.decks[DECK12.deck];
   if (deck === undefined) throw new Error("deck12 content lost its deck");

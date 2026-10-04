@@ -71,7 +71,7 @@ export const tileOf = (location: { x: number; y: number }): TileCoord => ({
 });
 
 /** Resolve a move target to a tile on this deck, or undefined if it is not one. */
-export function resolveTarget(geometry: DeckGeometry, target: MoveTarget): TileCoord | undefined {
+function resolveTarget(geometry: DeckGeometry, target: MoveTarget): TileCoord | undefined {
   if ("machineId" in target) {
     const position = geometry.interactionPositions.find(
       (p) => p.machineId === target.machineId && p.key === target.positionKey,

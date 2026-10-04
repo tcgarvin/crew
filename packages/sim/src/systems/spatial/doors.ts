@@ -98,7 +98,7 @@ function step(ctx: StepCtx, door: Door, seconds: number): boolean {
   return door.transitionProgress >= 1 - 1e-9;
 }
 
-export function updateDoor(ctx: StepCtx, door: Door, nav: NavDoor): void {
+function updateDoor(ctx: StepCtx, door: Door, nav: NavDoor): void {
   const { config } = ctx;
   const powered = doorHasPower(ctx.state, door, nav);
   const occupied = door.occupants.length > 0;

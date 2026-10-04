@@ -8,49 +8,8 @@ import { navCacheBuilder } from "./geometry";
 import { movementSystem } from "./movement";
 import { navRefreshSystem } from "./topology";
 
-export {
-  attachDock,
-  deckToDock,
-  detachDock,
-  type DockHost,
-  dockToDeck,
-  isOnDock,
-  occupantsOfDock,
-  rampLanding,
-} from "./dock";
-export { doorHasPower, doorWillOpen, doorsSystem, isPowerDomainLive } from "./doors";
-export { estimateTravelTicks, knownRoute } from "./estimates";
-export {
-  checkDockFitsDeck,
-  compartmentAt,
-  deckGeometry,
-  dockFloorMask,
-  doorBetween,
-  isDockFloor,
-  isDockTile,
-  isWalkable,
-  navCacheBuilder,
-  rebuildNav,
-} from "./geometry";
-export { spatialViolations } from "./invariants";
-export {
-  derivedPosition,
-  type InteractionTarget,
-  type MoveTarget,
-  movementSystem,
-  requestMove,
-  stopMovement,
-} from "./movement";
-export { findPath, pathLength, type PathPolicy } from "./pathfind";
-export {
-  holdsReservation,
-  interactionsAt,
-  releaseReservations,
-  reservationHolders,
-  tryReserve,
-} from "./reservations";
-export { actorPolicy, schematicPolicy } from "./routing";
-export { navRefreshSystem } from "./topology";
+export { checkDockFitsDeck, compartmentAt, deckGeometry, isWalkable } from "./geometry";
+export { type MoveTarget, requestMove } from "./movement";
 
 /**
  * Register the spatial cache builder and systems. Call before `createWorld`/`restore` so the nav

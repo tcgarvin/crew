@@ -39,7 +39,7 @@ import { type RepairOutOfReach, repairOutOfReach } from "../equipment/supplies";
 import { commandActor } from "./roster";
 
 /** Prompt key of the gate card; `@crew/content` `templates.ts` renders it. */
-export const DEPARTURE_GATE_PROMPT_KEY = "travel.departureGate";
+const DEPARTURE_GATE_PROMPT_KEY = "travel.departureGate";
 
 /**
  * Why a machine counts as impaired, worst first. `faultDerated` is a `fault` whose output is
@@ -47,7 +47,7 @@ export const DEPARTURE_GATE_PROMPT_KEY = "travel.departureGate";
  */
 export type ImpairmentReason = "blocked" | "faultDerated" | "fault" | "lowOutput";
 
-export interface Impairment {
+interface Impairment {
   readonly machineId: MachineId;
   readonly machineName: string;
   readonly reason: ImpairmentReason;
@@ -62,7 +62,7 @@ const SEVERITY: Readonly<Record<ImpairmentReason, number>> = {
 };
 
 /** What the gate reads: truth, content and the thresholds in config. */
-export type GateCtx = Pick<StepCtx, "state" | "content" | "config">;
+type GateCtx = Pick<StepCtx, "state" | "content" | "config">;
 
 function impairmentOf(ctx: GateCtx, machine: Machine, def: MachineDef): Impairment | undefined {
   const base = { machineId: machine.id, machineName: def.name, output: machine.output };
@@ -81,7 +81,7 @@ function impairmentOf(ctx: GateCtx, machine: Machine, def: MachineDef): Impairme
 }
 
 /** Every impairment among `engine`/`generator` machines, in machine key order. */
-export function impairments(ctx: GateCtx): Impairment[] {
+function impairments(ctx: GateCtx): Impairment[] {
   const found: Impairment[] = [];
   for (const machine of Object.values(ctx.state.machines)) {
     const def = ctx.content.machines[machine.defId];
@@ -131,10 +131,7 @@ function portHere(ctx: Pick<StepCtx, "state">): PortDefId | undefined {
 }
 
 /** D71: why holding for `impairment` would never end, or `undefined` when its repair can finish. */
-export function impairmentOutOfReach(
-  ctx: GateCtx,
-  impairment: Impairment,
-): RepairOutOfReach | undefined {
+function impairmentOutOfReach(ctx: GateCtx, impairment: Impairment): RepairOutOfReach | undefined {
   const machine = ctx.state.machines[impairment.machineId];
   const def = machine === undefined ? undefined : ctx.content.machines[machine.defId];
   if (machine === undefined || def === undefined) return undefined;
@@ -157,13 +154,8 @@ function worstOf(found: readonly Impairment[]): Impairment | undefined {
   return worst;
 }
 
-/** The most serious impairment among `engine`/`generator` machines, or none. */
-export function worstImpairment(ctx: GateCtx): Impairment | undefined {
-  return worstOf(impairments(ctx));
-}
-
 /** A gate card is already queued (pending) for the captain. */
-export function gateDecisionPending(ctx: Pick<StepCtx, "state">): boolean {
+function gateDecisionPending(ctx: Pick<StepCtx, "state">): boolean {
   const { records, queue } = ctx.state.decisions;
   return queue.some((id) => {
     const decision = records[id];

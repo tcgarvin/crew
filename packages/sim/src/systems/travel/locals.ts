@@ -19,7 +19,7 @@
  *   witness, and a local who cannot leave must not stand there forever.
  */
 import { configTicks } from "../../core/clock";
-import { dockAlongside, dockPost, isDockPoint, postTile } from "../../core/docks";
+import { dockAlongside, postTile } from "../../core/docks";
 import {
   clearDockside,
   dockNeedsDressing,
@@ -69,7 +69,7 @@ function localPolicy(ctx: Pick<Ctx, "state">, geometry: DeckGeometry): PathPolic
  * false, leaving the local as they were, when there is no route on the dock floor. Standing on
  * `to` already is success.
  */
-export function walkLocal(ctx: Ctx, local: Local, to: TileCoord): boolean {
+function walkLocal(ctx: Ctx, local: Local, to: TileCoord): boolean {
   // A registry without spatial (commerce-only tests) has no nav grid: no route, so a dock hand's
   // errand falls back to the instant behaviour, with its `dockHandGaveUp` event.
   const geometry = ctx.caches.nav.decks[local.location.deckId];
@@ -263,12 +263,6 @@ function behave(ctx: Ctx, local: Local, dock: DockDef): void {
   }
 }
 
-/** The dock's warehouse door tile (deck frame), or its gate when it has none. */
-export function dockExit(dock: DockDef, via: "warehouseDoor" | "gate"): TileCoord | undefined {
-  const post = dockPost(dock, via) ?? dockPost(dock, via === "gate" ? "warehouseDoor" : "gate");
-  return post === undefined ? undefined : postTile(dock, post);
-}
-
 // ---------------------------------------------------------------------------------------------
 // The dock coming and going
 // ---------------------------------------------------------------------------------------------
@@ -362,11 +356,3 @@ export const localsSystem: System = {
     }
   },
 };
-
-/** For invariants: is this local somewhere a local may be (the dock alongside's floor)? */
-export function localOnDockFloor(
-  ctx: Pick<Ctx, "content" | "state">,
-  local: Pick<Local, "location">,
-): boolean {
-  return isDockPoint(ctx.content, ctx.state, local.location.x, local.location.y);
-}

@@ -18,28 +18,8 @@ export function registerTravel(registry: KernelRegistry): void {
   registry.registerCommandHandler("acceptDepartureRisk", acceptDepartureRisk);
 }
 
-export { travelSystem } from "./travel";
-export {
-  hasOpenCargoWork,
-  hasRunnableBuyPartsWork,
-  propulsionFactor,
-  portStoreLocation,
-  theDeckId,
-  voyageHeldAtWaypoint,
-  waitingForPassenger,
-} from "./travel";
+export { waitingForPassenger } from "./travel";
 export { hopCount, nextHop, shortestPath, type ShortestPath } from "./graph";
-export { commandActor, isFitForCommand } from "./roster";
-export { captainIsIdleAt, raiseHookIfIdle } from "./hooks";
-export {
-  DEPARTURE_GATE_PROMPT_KEY,
-  departureCleared,
-  impairmentKey,
-  worstImpairment,
-} from "./departure-gate";
 export { jobBlockingAcceptance } from "./in-hand";
 export { travelTaskDerivations } from "./tasks";
-export { travelViolations } from "./invariants";
-export { localsSystem, standingOn } from "./locals";
-export { stageDock, stagingAnswered } from "./staging";
-export { takeCratesIntoStore, withdrawJobCrates } from "./dock-custody";
+export { stagingAnswered } from "./staging";

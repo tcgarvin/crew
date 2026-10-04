@@ -12,6 +12,7 @@
  */
 import { configTicks } from "../../core/clock";
 import { dockForPort, dockedPortOf, isOnDock } from "../../core/docks";
+import { raiseHookIfIdle } from "../../core/hooks";
 import { allocateId } from "../../core/ids";
 import { affordableUnits } from "../../core/markets";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -40,7 +41,6 @@ import { syncRampPassability } from "../spatial/geometry";
 import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
-import { raiseHookIfIdle } from "./hooks";
 import { dismissLocals, dressDockAlongside } from "./locals";
 import { stageDockIfDue, stagingAnswered } from "./staging";
 import { portStoreLocation } from "./stores";
@@ -57,7 +57,7 @@ export { portStoreLocation } from "./stores";
  * does not re-derive it. A ship with no engine machine (test fixtures) is treated as unconstrained
  * (factor 1) rather than permanently drifting.
  */
-export function propulsionFactor(
+function propulsionFactor(
   machines: Readonly<Record<string, Machine>>,
   machineDefs: ReadonlyMap<string, readonly MachineTag[]>,
 ): number {
@@ -270,7 +270,7 @@ function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
  * open too; this holds the ship even if that work were gone, since a crate on the dock is left
  * behind when the dock goes.
  */
-export function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean {
   const portId = dockedPortOf(ctx.state.travel);
   if (ctx.state.deck.dock === undefined || portId === undefined) return false;
   return Object.values(ctx.state.jobs).some(
@@ -307,7 +307,7 @@ export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boole
  * and money allow at least one unit), i.e. one that derives a runnable `buyParts` task. The
  * voyage waits for it, so a stalled repair can buy its part on the way through.
  */
-export function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return false;
   return Object.values(ctx.state.work.problems).some(
@@ -346,7 +346,7 @@ export function waitingForPassenger(
  * A decision card is queued for the captain (any origin), or (D70) one is on its way to them in
  * person: the ship does not leave while someone is walking over with word.
  */
-export function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
+function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
   const { records, queue, held } = ctx.state.decisions;
   return held.length > 0 || queue.some((id) => records[id]?.status === "pending");
 }
@@ -361,7 +361,7 @@ export function cardsAwaitingDelivery(ctx: Pick<StepCtx, "state">): boolean {
  * work, a purchasable part, a hold for repairs and a pending card each keep it docked; the
  * travel system plans the next hop the first tick none of them applies.
  */
-export function voyageHeldAtWaypoint(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function voyageHeldAtWaypoint(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return (
     hasOpenCargoWork(ctx) ||
     hasRunnableBuyPartsWork(ctx) ||

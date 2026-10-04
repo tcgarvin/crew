@@ -30,7 +30,7 @@ export function operateTiles(ctx: DerivationCtx, machineId: MachineId): TileCoor
 
 // W6 decision: `stationToStaff` derives one `staffStation` task with no accumulated work
 // (occupancy is binary); `estimatedWorkSeconds` uses `config.travel.staffEstimateSeconds`.
-export const deriveStationToStaff: DeriveTasks<"stationToStaff"> = (problem, ctx) => {
+const deriveStationToStaff: DeriveTasks<"stationToStaff"> = (problem, ctx) => {
   const spec: TaskSpec = {
     derivationKey: "staff",
     type: "staffStation",

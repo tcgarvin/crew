@@ -161,7 +161,7 @@ export function rotateOffset(offset: TileCoord, rotation: 0 | 90 | 180 | 270): T
   }
 }
 
-export interface GeometryInputs {
+interface GeometryInputs {
   readonly deck: DeckDef;
   readonly machineDefs: (id: MachineDef["id"]) => MachineDef | undefined;
   /** Compartment instance by `CompartmentDef.key`. */
@@ -175,7 +175,7 @@ export interface GeometryInputs {
 }
 
 /** Deck-frame tiles of a dock's walkable floor. Throws on a malformed map. */
-export function dockFloorTiles(dock: DockDef): TileCoord[] {
+function dockFloorTiles(dock: DockDef): TileCoord[] {
   const mask = dockFloorMask(dock);
   const tiles: TileCoord[] = [];
   for (let y = 0; y < dock.height; y++) {
@@ -199,7 +199,7 @@ function gridBounds(deck: DeckDef, dock: DockDef | undefined): Grid {
 }
 
 /** Build the static geometry for one deck and any grafted dock. Pure; dynamic state starts clear. */
-export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
+function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
   const { deck, dock } = inputs;
   const grid = gridBounds(deck, dock);
   const { originX, originY, width, height } = grid;
@@ -424,7 +424,7 @@ export function syncRampPassability(
 }
 
 /** The dock map grafted onto `deckId` in this state, if any; throws if content lacks it. */
-export function dockLayoutFor(
+function dockLayoutFor(
   content: ContentBundle,
   state: ReadonlyWorldState,
   deckId: DeckDefId,

@@ -28,7 +28,7 @@ export function jobInHand(job: ReadonlyJob): boolean {
  * the way out, `fromPortId` once ashore or homeward), or `undefined` for a job that is not a
  * live passage, or one whose passenger is at their last port and only has to walk off.
  */
-export function passageBound(
+function passageBound(
   state: Pick<ReadonlyWorldState, "travel">,
   job: ReadonlyJob,
 ): PortDefId | undefined {
