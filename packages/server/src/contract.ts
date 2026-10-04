@@ -67,20 +67,6 @@
  */
 import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
 
-/** Every route, for the client and for tests. */
-export const ROUTES = {
-  health: { method: "GET", path: "/api/health" },
-  authAnon: { method: "POST", path: "/api/auth/anon" },
-  listGames: { method: "GET", path: "/api/games" },
-  createGame: { method: "POST", path: "/api/games" },
-  openGame: { method: "POST", path: "/api/games/:id/open" },
-  putSave: { method: "PUT", path: "/api/games/:id/save" },
-  getSave: { method: "GET", path: "/api/games/:id/save" },
-  narrator: { method: "POST", path: "/api/games/:id/narrator" },
-} as const;
-
-export type RouteName = keyof typeof ROUTES;
-
 /** Uniform error body for every non-2xx response. */
 export interface ApiError {
   readonly error: {

@@ -15,15 +15,18 @@ import { gzipSync } from "node:zlib";
 import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
 import type { Hono } from "hono";
 import { z } from "zod";
-import { type Db, narratorCallKind } from "../db/types";
+import type { AppEnv } from "../auth";
+import { type Db, type LogNarratorCallInput, narratorCallKind } from "../db/types";
 import type { Env } from "../env";
-import { type RunNarrator, isRetryableFailure, narratorFailure } from "../narrator";
+import { apiError, loadOwnedGame, parseJsonBody } from "../http";
+import {
+  type NarratorOutcome,
+  type RunNarrator,
+  isRetryableFailure,
+  narratorFailure,
+} from "../narrator";
 import { saveEnvelopeSchema } from "../validation";
 import { runAfterResponse } from "../waitUntil";
-
-export interface NarratorRouteEnv {
-  Variables: { userId: string };
-}
 
 /**
  * Loose shape check only: `hook`'s exact discriminated-union shape and `recentEvents`' element
@@ -57,22 +60,77 @@ const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision"
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";
 
+/** The log fields of a call the model never answered (refused, or the narrator threw). */
+const UNANSWERED = {
+  model: MODEL_PLACEHOLDER,
+  promptVersion: PROMPT_VERSION_PLACEHOLDER,
+  inputTokens: null,
+  outputTokens: null,
+  response: null,
+} as const;
+
+/**
+ * The warn lines a narrator answer can leave in the server log. `stagingFloor`: a staging call
+ * in `null` mode, whose failure is answered with the floor set.
+ */
+function warnAboutAnswer(
+  gameId: string,
+  hookKind: string,
+  outcome: NarratorOutcome,
+  latencyMs: number,
+  { stagingFloor }: { readonly stagingFloor: boolean },
+): void {
+  const response = outcome.response;
+  const failure = narratorFailure(outcome);
+  if (stagingFloor && failure !== undefined) {
+    // D67: the server answers with the floor set (the null narrator's empty plan) and says
+    // so; never an error panel for staging.
+    console.warn(`[narrator] staging fallback ${failure.reason}`, {
+      gameId,
+      model: response.model,
+      promptVersion: response.promptVersion,
+      latencyMs,
+      error: failure.message,
+    });
+  } else if (response.fallback !== undefined) {
+    // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
+    // the API key: `error` is the narrator's own failure text (for a transport failure,
+    // `OpenRouter <status>: <response body>`), never the request or its headers.
+    console.warn("[narrator] fallback", {
+      gameId,
+      hookKind,
+      fallback: response.fallback,
+      model: response.model,
+      promptVersion: response.promptVersion,
+      latencyMs,
+      error: outcome.error ?? null,
+    });
+  }
+
+  if (response.dropped !== undefined && response.dropped.length > 0) {
+    // D46: an intent the translator dropped is otherwise only visible in the call log's
+    // response jsonb. Kinds and reasons only: the reasons are the translator's own text,
+    // never the model's prose or the request.
+    console.warn("[narrator] dropped", {
+      gameId,
+      hookKind,
+      dropped: response.dropped.map((d) => ({ kind: d.kind, reason: d.reason })),
+    });
+  }
+}
+
 export function registerNarratorRoutes(
-  app: Hono<NarratorRouteEnv>,
+  app: Hono<AppEnv>,
   db: Db,
   env: Env,
   runNarrator: RunNarrator,
 ): void {
   app.post("/api/games/:id/narrator", async (c) => {
-    const userId = c.get("userId");
     const gameId = c.req.param("id");
-    const game = await db.getGame(gameId);
-    if (!game || game.userId !== userId) {
-      return c.json({ error: { code: "notFound", message: "No such game." } }, 404);
-    }
+    const game = await loadOwnedGame(db, c.get("userId"), gameId);
+    if (!game) return apiError(c, 404, "notFound", "No such game.");
 
-    const raw = await c.req.json().catch(() => undefined);
-    const parsed = narratorRequestSchema.safeParse(raw);
+    const parsed = await parseJsonBody(c, narratorRequestSchema);
     if (!parsed.success) {
       return c.json(
         {
@@ -83,10 +141,7 @@ export function registerNarratorRoutes(
       );
     }
     if (parsed.data.gameId !== undefined && parsed.data.gameId !== gameId) {
-      return c.json(
-        { error: { code: "badRequest", message: "gameId does not match the route." } },
-        400,
-      );
+      return apiError(c, 400, "badRequest", "gameId does not match the route.");
     }
     // Shape-checked, not deep-validated against `@crew/sim`'s exact unions (see schema comment).
     // `gameId` always comes from the path, not the (optional) body field — see schema comment.
@@ -107,29 +162,28 @@ export function registerNarratorRoutes(
       isMilestone: true,
     });
 
-    const logRejection = (status: "budgetExceeded", error: string) =>
+    type CallLogFields = Omit<
+      LogNarratorCallInput,
+      "gameId" | "hookKind" | "basisSaveId" | "request"
+    >;
+    const logCall = (fields: CallLogFields) =>
       db.logNarratorCall({
         gameId,
         hookKind: reqBody.hook.kind,
         basisSaveId: basisSave.id,
-        model: MODEL_PLACEHOLDER,
-        promptVersion: PROMPT_VERSION_PLACEHOLDER,
-        inputTokens: null,
-        outputTokens: null,
-        latencyMs: null,
-        status,
         request: reqBody,
-        response: null,
-        error,
+        ...fields,
       });
+    const logRejection = (error: string) =>
+      logCall({ ...UNANSWERED, latencyMs: null, status: "budgetExceeded", error });
 
     // The 429 body says which rule fired (D43): the client waits out the hourly cap but treats
     // spacing as a deliberate "no narration this time", not a failure.
     const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS, kind);
     if (callsInWindow >= env.narratorMaxCallsPerHour) {
       const message = `Hourly narrator call budget (${env.narratorMaxCallsPerHour}) exceeded for this game.`;
-      await logRejection("budgetExceeded", message);
-      return c.json({ error: { code: "budgetExceeded", reason: "hourly", message } }, 429);
+      await logRejection(message);
+      return apiError(c, 429, "budgetExceeded", message, { reason: "hourly" });
     }
 
     // Spacing is measured from the last story call the model answered: a failed attempt narrated
@@ -144,8 +198,8 @@ export function registerNarratorRoutes(
       const lastTick = lastBasis?.savedAtTick ?? 0;
       if (reqBody.snapshot.savedAtTick - lastTick < MIN_TICKS_BETWEEN_NARRATOR_CALLS) {
         const message = `Too soon since the last narrator call (min ${MIN_TICKS_BETWEEN_NARRATOR_CALLS} ticks).`;
-        await logRejection("budgetExceeded", message);
-        return c.json({ error: { code: "budgetExceeded", reason: "spacing", message } }, 429);
+        await logRejection(message);
+        return apiError(c, 429, "budgetExceeded", message, { reason: "spacing" });
       }
     }
 
@@ -161,79 +215,31 @@ export function registerNarratorRoutes(
       const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;
       const failure = narratorFailure(outcome);
-      if (failure !== undefined && staging && env.narratorFallback === "null") {
-        // D67: the server answers with the floor set (the null narrator's empty plan) and says
-        // so; never an error panel for staging.
-        console.warn(`[narrator] staging fallback ${failure.reason}`, {
-          gameId,
-          model: response.model,
-          promptVersion: response.promptVersion,
-          latencyMs,
-          error: failure.message,
-        });
-      } else if (response.fallback !== undefined) {
-        // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
-        // the API key: `error` is the narrator's own failure text (for a transport failure,
-        // `OpenRouter <status>: <response body>`), never the request or its headers.
-        console.warn("[narrator] fallback", {
-          gameId,
-          hookKind: reqBody.hook.kind,
-          fallback: response.fallback,
-          model: response.model,
-          promptVersion: response.promptVersion,
-          latencyMs,
-          error: outcome.error ?? null,
-        });
-      }
-
-      if (response.dropped !== undefined && response.dropped.length > 0) {
-        // D46: an intent the translator dropped is otherwise only visible in the call log's
-        // response jsonb. Kinds and reasons only: the reasons are the translator's own text,
-        // never the model's prose or the request.
-        console.warn("[narrator] dropped", {
-          gameId,
-          hookKind: reqBody.hook.kind,
-          dropped: response.dropped.map((d) => ({ kind: d.kind, reason: d.reason })),
-        });
-      }
+      warnAboutAnswer(gameId, reqBody.hook.kind, outcome, latencyMs, {
+        stagingFloor: staging && env.narratorFallback === "null",
+      });
 
       // D43: in `error` mode a fallback is refused, never served. The call is logged as an
       // error with its reason; the client retries (the sim stays halted) or pauses the game, or
       // for a staging call (D67) acknowledges the hook with the floor set once it gives up.
       if (failure !== undefined && env.narratorFallback === "error") {
-        await db.logNarratorCall({
-          gameId,
-          hookKind: reqBody.hook.kind,
-          basisSaveId: basisSave.id,
+        await logCall({
+          ...UNANSWERED,
           model: response.model,
           promptVersion: response.promptVersion,
-          inputTokens: null,
-          outputTokens: null,
           latencyMs,
           status: "error",
-          request: reqBody,
-          response: null,
           error: `${failure.reason}: ${failure.message}`,
         });
         const retryable = isRetryableFailure(failure);
-        return c.json(
-          {
-            error: {
-              code: "narratorUnavailable",
-              reason: failure.reason,
-              message: failure.message,
-              retryable,
-            },
-          },
-          retryable ? 502 : 503,
-        );
+        return apiError(c, retryable ? 502 : 503, "narratorUnavailable", failure.message, {
+          reason: failure.reason,
+          retryable,
+        });
       }
 
       await runAfterResponse(async () => {
-        await db.logNarratorCall({
-          gameId,
-          hookKind: reqBody.hook.kind,
-          basisSaveId: basisSave.id,
+        await logCall({
           // W9: the response carries model, prompt version and usage; `fallback` (null path and
           // why) is kept in the `response` jsonb.
           model: response.model,
@@ -242,7 +248,6 @@ export function registerNarratorRoutes(
           outputTokens: response.usage?.outputTokens ?? null,
           latencyMs,
           status: "ok",
-          request: reqBody,
           response,
           error: null,
         });
@@ -265,21 +270,8 @@ export function registerNarratorRoutes(
         latencyMs,
         error: message,
       });
-      await db.logNarratorCall({
-        gameId,
-        hookKind: reqBody.hook.kind,
-        basisSaveId: basisSave.id,
-        model: MODEL_PLACEHOLDER,
-        promptVersion: PROMPT_VERSION_PLACEHOLDER,
-        inputTokens: null,
-        outputTokens: null,
-        latencyMs,
-        status: "error",
-        request: reqBody,
-        response: null,
-        error: message,
-      });
-      return c.json({ error: { code: "narratorFailed", message } }, 502);
+      await logCall({ ...UNANSWERED, latencyMs, status: "error", error: message });
+      return apiError(c, 502, "narratorFailed", message);
     }
   });
 }

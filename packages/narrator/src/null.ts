@@ -1,3 +1,4 @@
+import { templateCard } from "@crew/content";
 /**
  * The deterministic null narrator (PLAN §3 `NullNarrator`, review N3): the answer when no model
  * is configured and the fallback for every model failure, so the game stays playable with the
@@ -29,7 +30,6 @@ import {
 } from "./contract";
 import { JOB_QUANTITY_UNITS, type Snapshot, portName } from "./lookups";
 import { PROMPT_VERSION } from "./prompts/system";
-import { templateCard } from "./templates";
 import { translateIntents } from "./translate";
 
 export const NULL_NARRATOR_MODEL = "null-narrator";

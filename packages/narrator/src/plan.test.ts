@@ -3,8 +3,9 @@
  * no provider-side size cap), so it must stay small and game-independent: no per-game enums.
  */
 import { describe, expect, it } from "vitest";
+import { buildNarratorPlanSchema } from "./contract";
 import { approachRequest } from "./fixtures";
-import { planJsonSchema, planSchemaFor } from "./plan";
+import { planJsonSchema } from "./plan";
 import { content } from "./test-support";
 
 const MAX_SCHEMA_BYTES = 8 * 1024;
@@ -25,7 +26,7 @@ describe("plan JSON schema size (D45, D53)", () => {
   it("stays under the prompt budget for the real content bundle and a fixture snapshot", () => {
     const req = approachRequest(content());
     expect(req.snapshot.state.machines).not.toEqual({});
-    const json = planJsonSchema(planSchemaFor());
+    const json = planJsonSchema(buildNarratorPlanSchema());
     const text = JSON.stringify(json);
     const bytes = Buffer.byteLength(text, "utf8");
     const enums = enumArrays(json);

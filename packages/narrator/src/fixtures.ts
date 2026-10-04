@@ -284,50 +284,46 @@ function captainSteppedAshore(state: WorldState, content: ContentBundle): ActorI
 }
 
 /**
- * Docked at Kessler Drift with nothing on offer; the captain has just stepped onto the dock to
- * look for work (D40, D70).
+ * The approach fixture's crew and money docked at `portId` with nothing on offer, the captain
+ * just stepped onto the dock to look for work (D40, D70).
  */
-export function captainAshoreRequest(content: ContentBundle, seed = 11): NarratorRequest {
+function captainAshoreAt(
+  content: ContentBundle,
+  seed: number,
+  portId: PortDefId,
+  gameId: string,
+): NarratorRequest {
   const base = approachRequest(content, seed);
   const tick = 2_400;
   const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
   snapshot.state.tick = tick;
-  snapshot.state.travel = { stage: "docked", portId: DRIFT };
+  snapshot.state.travel = { stage: "docked", portId };
   alignDock(snapshot.state, content);
   const actorId = captainSteppedAshore(snapshot.state, content);
   const hook = {
     id: allocateId(snapshot.state, "hook"),
     kind: "captainAshore" as const,
-    context: { portId: DRIFT, actorId },
+    context: { portId, actorId },
     tick,
   };
   snapshot.state.narrator.pendingHook = hook;
-  return { gameId: "fixture-board", hook, snapshot, recentEvents: [] };
+  return { gameId, hook, snapshot, recentEvents: [] };
+}
+
+/** Docked at Kessler Drift; the captain has just stepped onto the dock to look for work. */
+export function captainAshoreRequest(content: ContentBundle, seed = 11): NarratorRequest {
+  return captainAshoreAt(content, seed, DRIFT, "fixture-board");
 }
 
 /**
- * Passengers-and-galaxy §9 (live suite): docked at Crossroads Hub with nothing on offer, where
- * Ossory Station is two hops away (Hub, Kessler Drift, Ossory) and Tern's Rest one long leg, so
- * a `captainAshore` answer can reach for a far port. The approach fixture's crew and money, but the
- * ship never left the Hub.
+ * Passengers-and-galaxy §9 (live suite): docked at Crossroads Hub, where Ossory Station is two
+ * hops away (Hub, Kessler Drift, Ossory) and Tern's Rest one long leg, so a `captainAshore`
+ * answer can reach for a far port. The ship never left the Hub.
  */
 export function farCaptainAshoreRequest(content: ContentBundle, seed = 11): NarratorRequest {
-  const base = approachRequest(content, seed);
-  const tick = 2_400;
-  const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
-  snapshot.state.tick = tick;
-  snapshot.state.travel = { stage: "docked", portId: HUB };
-  alignDock(snapshot.state, content);
-  const actorId = captainSteppedAshore(snapshot.state, content);
-  const hook = {
-    id: allocateId(snapshot.state, "hook"),
-    kind: "captainAshore" as const,
-    context: { portId: HUB, actorId },
-    tick,
-  };
-  snapshot.state.narrator.pendingHook = hook;
-  snapshot.state.narrator.lastNarrativeTick = 0;
-  return { gameId: "fixture-far-board", hook, snapshot, recentEvents: [] };
+  const req = captainAshoreAt(content, seed, HUB, "fixture-far-board");
+  req.snapshot.state.narrator.lastNarrativeTick = 0;
+  return req;
 }
 
 /** The far fixture's far port, for tests that assert on it. */

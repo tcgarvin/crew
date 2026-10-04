@@ -1,3 +1,4 @@
+import { templateCard } from "@crew/content";
 /**
  * Digest projection (PLAN §3): a compact, LLM-readable view of the snapshot for one narrator
  * call. Pure and deterministic: the same inputs give the same text, byte for byte, so it can be
@@ -32,16 +33,17 @@ import {
   type Snapshot,
   type State,
   faultDiscovery,
+  itemName,
   machineCompartment,
   machineName,
   offerPortNow,
   pathBetween,
   placePhrase,
+  portHereOrNext,
   portName,
   voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
-import { templateCard } from "./templates";
 
 /**
  * Policy prompt keys whose template text is the card the captain sees (D36 gate, the passengers
@@ -72,6 +74,16 @@ interface Section {
   /** Which end to trim from. Events trim oldest (top) first. */
   readonly trimFrom: "start" | "end";
 }
+
+/** The priority of a section that is never trimmed. */
+const NEVER_DROPS = Number.POSITIVE_INFINITY;
+
+/** A section trimmed from its end, the usual case. */
+function section(heading: string, lines: string[], priority: number): Section {
+  return { heading, lines, priority, trimFrom: "end" };
+}
+
+type Actor = State["actors"][keyof State["actors"]];
 
 function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
@@ -205,11 +217,7 @@ function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
       ? "job offers possible now: none (not docked; offers are made in person at the dock)"
       : `job offers possible now: fromPort ${offerPort}`,
   );
-  return { heading: "Ship", lines, priority: Number.POSITIVE_INFINITY, trimFrom: "end" };
-}
-
-function itemName(content: ContentBundle, itemDefId: string): string {
-  return content.items[itemDefId as ItemDefId]?.name ?? itemDefId;
+  return section("Ship", lines, NEVER_DROPS);
 }
 
 /** D47: "Spare Parts x4 at 120 cr, Coolant Canister x3 at 60 cr", or "nothing". */
@@ -268,7 +276,7 @@ function partsShortfallNote(state: State, content: ContentBundle): string {
 function aboardLine(
   snapshot: Snapshot,
   content: ContentBundle,
-  actor: State["actors"][keyof State["actors"]],
+  actor: Actor,
   job: DeepReadonly<Job> | undefined,
 ): string {
   const state = snapshot.state;
@@ -321,8 +329,8 @@ function passageOf(state: State, actorId: string): DeepReadonly<Job> | undefined
 function passengersAshoreAt(
   state: State,
   portId: PortDefId,
-): { readonly actor: State["actors"][keyof State["actors"]]; readonly job: DeepReadonly<Job> }[] {
-  const ashore: { actor: State["actors"][keyof State["actors"]]; job: DeepReadonly<Job> }[] = [];
+): { readonly actor: Actor; readonly job: DeepReadonly<Job> }[] {
+  const ashore: { actor: Actor; job: DeepReadonly<Job> }[] = [];
   for (const actor of Object.values(state.actors)) {
     if (actor.passenger !== true || actor.availability !== "offShip") continue;
     const loc = actor.location;
@@ -363,14 +371,12 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
     const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
     const def = content.crew[actor.defId];
     const bio = def?.bio;
-    // D38: the voice line is how this person sounds on every card.
+    // D38: the voice line is how this person sounds on every card. D41: the captain's voice is
+    // how they come across, for how others react to them.
     const voice = def?.voice;
+    const captain = isCaptain(actor) ? "this is the captain, the player; never a speaker. " : "";
     const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}`;
-    if (isCaptain(actor)) {
-      // D41: the captain's voice is how they come across, for how others react to them.
-      return `- ${actor.name}${roles}${status}: this is the captain, the player; never a speaker. ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
-    }
-    return `- ${actor.name}${roles}${status}: ${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
+    return `- ${actor.name}${roles}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
   // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.
   // One whose passage has ended is not aboard: left behind or put off, they are off ship at a
@@ -396,7 +402,7 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
   if (npcs.length > 0) {
     lines.push(`- NPCs: ${npcs.map((a) => a.name).join(", ")}`);
   }
-  return { heading: `Crew (${actors.length})`, lines, priority: 6, trimFrom: "end" };
+  return section(`Crew (${actors.length})`, lines, 6);
 }
 
 function machineSection(state: State, content: ContentBundle, tickRate: number): Section {
@@ -444,7 +450,7 @@ function machineSection(state: State, content: ContentBundle, tickRate: number):
     const names = [...quiet].map(([name, n]) => (n > 1 ? `${name} x${n}` : name));
     lines.push(`- running normally: ${names.join(", ")}`);
   }
-  return { heading: "Machines", lines, priority: 8, trimFrom: "end" };
+  return section("Machines", lines, 8);
 }
 
 function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBundle): string {
@@ -462,7 +468,7 @@ function problemSection(state: State, content: ContentBundle): Section {
     .filter((p) => p.status === "open")
     .sort((a, b) => a.createdTick - b.createdTick || a.id.localeCompare(b.id))
     .map((p) => problemLine(p, state, content));
-  return { heading: "Open problems", lines, priority: 4, trimFrom: "end" };
+  return section("Open problems", lines, 4);
 }
 
 function jobSection(state: State, content: ContentBundle): Section {
@@ -471,9 +477,7 @@ function jobSection(state: State, content: ContentBundle): Section {
     .filter((j) => live.has(j.status))
     .sort((a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id))
     .map((j) => {
-      const cargo = j.cargo
-        .map((c) => `${c.count}x ${content.items[c.itemDefId]?.name ?? c.itemDefId}`)
-        .join(", ");
+      const cargo = j.cargo.map((c) => `${c.count}x ${itemName(content, c.itemDefId)}`).join(", ");
       // §2.3: a far destination says how far, so the model knows the job is a voyage.
       const path = pathBetween(content, j.fromPortId, j.toPortId);
       const far =
@@ -492,25 +496,20 @@ function jobSection(state: State, content: ContentBundle): Section {
           : `${passage.roundTrip ? "round-trip passage" : "one-way passage"} (${passage.endReason ?? `leg ${passage.leg}`})${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
       return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}${far}, ${kind}`;
     });
-  return { heading: "Jobs", lines, priority: 7, trimFrom: "end" };
+  return section("Jobs", lines, 7);
 }
 
 /** D63, D67: "On the dock" with a dock alongside; none in flight. */
 function dockSections(state: State, content: ContentBundle): Section[] {
   const dock = onDockLines(state, content);
-  return dock === undefined ? [] : [{ ...dock, priority: 6, trimFrom: "end" }];
+  return dock === undefined ? [] : [section(dock.heading, dock.lines, 6)];
 }
 
 /** D67: the staging call's own section, the dock it is dressing; never trimmed. */
 function stagingSections(content: ContentBundle, hook: DeepReadonly<NarratorHook>): Section[] {
   if (hook.kind !== "stageDock") return [];
-  return [
-    {
-      ...stagingDockLines(content, hook),
-      priority: Number.POSITIVE_INFINITY,
-      trimFrom: "end",
-    },
-  ];
+  const dock = stagingDockLines(content, hook);
+  return [section(dock.heading, dock.lines, NEVER_DROPS)];
 }
 
 /**
@@ -527,8 +526,7 @@ function stagingSections(content: ContentBundle, hook: DeepReadonly<NarratorHook
  */
 function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: ContentBundle): Section {
   const state = snapshot.state;
-  const t = state.travel;
-  const portId = offerPortNow(state) ?? (t.stage === "docked" ? t.portId : t.toPortId);
+  const portId = portHereOrNext(state);
   const lines: string[] = [];
   const named = new Set<string>();
   const port = content.ports[portId];
@@ -568,12 +566,7 @@ function peopleSection(snapshot: Snapshot, notes: NarratorNotes, content: Conten
     );
     for (const seed of seeds) lines.push(`- ${seed.name}, ${seed.role}: ${seed.note}`);
   }
-  return {
-    heading: `People you know here (${portName(content, portId)})`,
-    lines,
-    priority: 5.5,
-    trimFrom: "end",
-  };
+  return section(`People you know here (${portName(content, portId)})`, lines, 5.5);
 }
 
 function decisionSection(state: State, content: ContentBundle): Section {
@@ -590,7 +583,7 @@ function decisionSection(state: State, content: ContentBundle): Section {
     const prompt = d.prompt.prose ?? `${d.prompt.key} ${JSON.stringify(d.prompt.params)}`;
     return `- ${d.id} (${d.origin}): ${prompt}`;
   });
-  return { heading: "Pending decisions", lines, priority: 9, trimFrom: "end" };
+  return section("Pending decisions", lines, 9);
 }
 
 /**
@@ -609,12 +602,7 @@ function heldSection(state: State): Section {
           : "walking over to the ship";
     return `- ${held.decisionId} from ${held.speaker} (${how}; not shown yet): ${what}`;
   });
-  return {
-    heading: "Cards on their way to the captain in person",
-    lines,
-    priority: 9,
-    trimFrom: "end",
-  };
+  return section("Cards on their way to the captain in person", lines, 9);
 }
 
 function eventSection(events: readonly SimEvent[], state: State, content: ContentBundle): Section {
@@ -631,12 +619,11 @@ function eventSection(events: readonly SimEvent[], state: State, content: Conten
 
 function budgetSection(state: State): Section {
   const b = state.narrator.budget;
-  return {
-    heading: "Your budget",
-    lines: [`spawns remaining: ${b.spawnsRemaining}`, `faults remaining: ${b.faultsRemaining}`],
-    priority: Number.POSITIVE_INFINITY,
-    trimFrom: "end",
-  };
+  const lines = [
+    `spawns remaining: ${b.spawnsRemaining}`,
+    `faults remaining: ${b.faultsRemaining}`,
+  ];
+  return section("Your budget", lines, NEVER_DROPS);
 }
 
 function notesSection(notes: NarratorNotes): Section {
@@ -656,7 +643,7 @@ function notesSection(notes: NarratorNotes): Section {
     lines.push(`cast: ${c.name}${where}: ${c.note}`);
   }
   for (const r of notes.lastRejections) lines.push(`rejected last time: ${r}`);
-  return { heading: "Your notes so far", lines, priority: 5, trimFrom: "end" };
+  return section("Your notes so far", lines, 5);
 }
 
 /**
@@ -709,12 +696,11 @@ export function buildDigest(
   maxChars: number = DIGEST_MAX_CHARS,
 ): NarratorDigest {
   const state = snapshot.state;
-  const hookSection: Section = {
-    heading: "Why you were called",
-    lines: [hook === undefined ? "no hook recorded" : hookLine(hook, recentEvents, state, content)],
-    priority: Number.POSITIVE_INFINITY,
-    trimFrom: "end",
-  };
+  const hookSection = section(
+    "Why you were called",
+    [hook === undefined ? "no hook recorded" : hookLine(hook, recentEvents, state, content)],
+    NEVER_DROPS,
+  );
   // D67: the staging call has no story levers, so it is not shown the story budget.
   const staging = hook?.kind === "stageDock";
   const sections: Section[] = [

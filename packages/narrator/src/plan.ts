@@ -1,14 +1,9 @@
 /**
- * The structured-output schema for one call: W0's `buildNarratorPlanSchema`, plus its JSON
- * Schema form for `output_config.format`. D45: the schema is the same for every game; ids are
- * plain strings the translator validates against the snapshot and content.
+ * The JSON Schema form of a plan schema (W0's `buildNarratorPlanSchema`, or the staging plan's).
+ * D45: the schema is the same for every game; ids are plain strings the translator validates
+ * against the snapshot and content.
  */
 import { z } from "zod";
-import { type NarratorPlanSchema, buildNarratorPlanSchema } from "./contract";
-
-export function planSchemaFor(): NarratorPlanSchema {
-  return buildNarratorPlanSchema();
-}
 
 /**
  * JSON Schema for the prompt (D53): the story plan's, or the staging plan's (D67). `$schema` is

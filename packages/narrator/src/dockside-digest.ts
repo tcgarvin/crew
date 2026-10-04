@@ -24,7 +24,7 @@ import {
   isInDockArea,
   isOnDock,
 } from "@crew/sim";
-import { type State, portName } from "./lookups";
+import { type State, itemName, portName } from "./lookups";
 import { STAGING_AREA_SPOT } from "./staging/plan";
 
 export interface DockLines {
@@ -34,10 +34,6 @@ export interface DockLines {
 
 export function personLine(person: DeepReadonly<JobIssuer>): string {
   return `${person.name} (${person.org === undefined ? person.role : `${person.role}, ${person.org}`})`;
-}
-
-function itemName(content: ContentBundle, itemDefId: string): string {
-  return content.items[itemDefId as ItemDefId]?.name ?? itemDefId;
 }
 
 function postName(dock: DockDef, key: string): string {

@@ -7,21 +7,21 @@
 
 type WaitUntilFn = (promise: Promise<unknown>) => void;
 
-let cachedWaitUntil: WaitUntilFn | null | undefined;
-
-async function resolveWaitUntil(): Promise<WaitUntilFn | null> {
-  if (cachedWaitUntil !== undefined) return cachedWaitUntil;
+/** `waitUntil`, or undefined when `@vercel/functions` is not installed. */
+async function probeWaitUntil(): Promise<WaitUntilFn | undefined> {
   try {
     // Dynamic + a non-literal-looking specifier so bundlers don't try to resolve this at build
     // time when the package isn't installed.
     const specifier = "@vercel/functions";
     const mod = (await import(/* @vite-ignore */ specifier)) as { waitUntil?: WaitUntilFn };
-    cachedWaitUntil = typeof mod.waitUntil === "function" ? mod.waitUntil : null;
+    return typeof mod.waitUntil === "function" ? mod.waitUntil : undefined;
   } catch {
-    cachedWaitUntil = null;
+    return undefined;
   }
-  return cachedWaitUntil;
 }
+
+/** The probe runs once per process. */
+let waitUntilProbe: Promise<WaitUntilFn | undefined> | undefined;
 
 /**
  * Runs `work` so it can finish after the response is sent when a Vercel request context is
@@ -29,7 +29,8 @@ async function resolveWaitUntil(): Promise<WaitUntilFn | null> {
  * swallowed here; callers that care should catch inside `work`.
  */
 export async function runAfterResponse(work: () => Promise<void>): Promise<void> {
-  const waitUntil = await resolveWaitUntil();
+  waitUntilProbe ??= probeWaitUntil();
+  const waitUntil = await waitUntilProbe;
   if (waitUntil) {
     try {
       waitUntil(work());

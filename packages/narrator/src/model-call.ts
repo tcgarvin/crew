@@ -5,7 +5,12 @@
  * JSON against its own schema.
  */
 import type { FallbackReason } from "./contract";
-import { type ModelResult, type ModelTransport, TransportError } from "./transport";
+import {
+  type ModelRequest,
+  type ModelResult,
+  type ModelTransport,
+  TransportError,
+} from "./transport";
 
 export class FallbackError extends Error {
   constructor(
@@ -17,27 +22,13 @@ export class FallbackError extends Error {
   }
 }
 
-export interface ModelCall {
-  readonly model: string;
-  readonly system: readonly string[];
-  readonly user: string;
-  readonly schemaName: string;
-  readonly jsonSchema: Readonly<Record<string, unknown>>;
-  readonly maxTokens: number;
-  readonly timeoutMs: number;
-}
+/** A `ModelRequest` with a timeout in place of the abort signal. */
+type ModelCall = Omit<ModelRequest, "signal"> & { readonly timeoutMs: number };
 
 export async function callModel(transport: ModelTransport, call: ModelCall): Promise<ModelResult> {
+  const { timeoutMs, ...request } = call;
   try {
-    return await transport({
-      model: call.model,
-      system: call.system,
-      user: call.user,
-      schemaName: call.schemaName,
-      jsonSchema: call.jsonSchema,
-      maxTokens: call.maxTokens,
-      signal: AbortSignal.timeout(call.timeoutMs),
-    });
+    return await transport({ ...request, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     if (err instanceof TransportError) throw new FallbackError(err.kind, err.message);
     if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {

@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { MintRateLimiter, clientIp, hashToken, mintToken, requireAuth } from "./auth";
+import { type AppEnv, MintRateLimiter, clientIp, hashToken, mintToken, requireAuth } from "./auth";
 import type { AuthAnonResponse } from "./contract";
 import { createDb } from "./db/client";
 import type { Db } from "./db/types";
 import { type Env, loadEnv } from "./env";
+import { apiError } from "./http";
 import { type RunNarrator, defaultNarrator } from "./narrator";
 import { registerGameRoutes } from "./routes/games";
 import { registerNarratorRoutes } from "./routes/narrator";
@@ -17,9 +18,7 @@ export type { Env } from "./env";
 export { defaultNarrator, nullNarrator } from "./narrator";
 export type { NarratorCtx, NarratorOutcome, RunNarrator } from "./narrator";
 
-export interface AppEnv {
-  Variables: { userId: string };
-}
+export type { AppEnv } from "./auth";
 
 export interface AppDeps {
   readonly db: Db;
@@ -42,14 +41,11 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
 
   app.post("/api/auth/anon", async (c) => {
     if (!mintLimiter.allow(clientIp(c))) {
-      return c.json(
-        {
-          error: {
-            code: "badRequest",
-            message: "Too many tokens minted from this IP; try again later.",
-          },
-        },
+      return apiError(
+        c,
         429,
+        "badRequest",
+        "Too many tokens minted from this IP; try again later.",
       );
     }
     const token = mintToken();

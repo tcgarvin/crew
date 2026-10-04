@@ -19,18 +19,19 @@ import {
   migrateState,
 } from "@crew/sim";
 import { buildCapabilities } from "./capabilities";
-import type {
-  DroppedIntent,
-  FallbackReason,
-  NarratorPlan,
-  NarratorPlanSchema,
-  NarratorRequest,
-  NarratorResponse,
-  TranslationResult,
+import {
+  type DroppedIntent,
+  type FallbackReason,
+  type NarratorPlan,
+  type NarratorPlanSchema,
+  type NarratorRequest,
+  type NarratorResponse,
+  type TranslationResult,
+  buildNarratorPlanSchema,
 } from "./contract";
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
-import type { State } from "./lookups";
+import { type State, portName } from "./lookups";
 import { FallbackError, callModel, contentOf, parseJsonReply, schemaIssue } from "./model-call";
 import {
   type MetIssuer,
@@ -42,7 +43,7 @@ import {
   parseNotes,
 } from "./notes";
 import { nullNarratorResponse } from "./null";
-import { planJsonSchema, planSchemaFor } from "./plan";
+import { planJsonSchema } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
 import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
@@ -103,7 +104,8 @@ export interface NarratorRun {
 
 let cachedBundle: ContentBundle | undefined;
 
-function defaultContent(): ContentBundle {
+/** The validated `@crew/content` bundle, loaded once per process. */
+export function defaultContent(): ContentBundle {
   if (cachedBundle === undefined) {
     const result = loadBundle();
     if (!result.ok) {
@@ -163,7 +165,7 @@ function issuersMet(commands: readonly NarratorCommand[], content: ContentBundle
     if (typeof issuer === "string") return [];
     const who = issuer.org === undefined ? issuer.role : `${issuer.role}, ${issuer.org}`;
     if (passenger === true) {
-      const to = content.ports[toPortId]?.name ?? toPortId;
+      const to = portName(content, toPortId);
       const back = roundTrip === true ? " and back" : "";
       return [
         { name: issuer.name, note: `${who}; passenger, bound for ${to}${back}`, portId: null },
@@ -192,7 +194,7 @@ function passengerPlacement(
 ): PassengerPlacement | undefined {
   const passage = job.passage;
   if (passage === undefined) return undefined;
-  const name = (id: PortDefId) => content.ports[id]?.name ?? id;
+  const name = (id: PortDefId) => portName(content, id);
   if (job.status === "declined" || job.status === "expired") {
     return {
       portId: job.fromPortId,
@@ -266,11 +268,6 @@ function textsShown(translated: TranslationResult): string[] {
 }
 
 /**
- * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
- * cast sightings, D31 card history, D32 thread beats, D39 beat cards, and why intents were
- * dropped).
- */
-/**
  * D45: a cast entry's `portId` is a plain string in the plan; empty, or a port that does not
  * exist, means nowhere in particular.
  */
@@ -281,6 +278,11 @@ function castWritten(plan: NarratorPlan, content: ContentBundle) {
   }));
 }
 
+/**
+ * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
+ * cast sightings, D31 card history, D32 thread beats, D39 beat cards, and why intents were
+ * dropped).
+ */
 function notesFrom(
   plan: NarratorPlan,
   previous: NarratorNotes,
@@ -388,7 +390,7 @@ export async function runNarratorWithTrace(
   if (ctx.transport === undefined) {
     return fallback("notConfigured", "no model transport configured");
   }
-  const schema = planSchemaFor();
+  const schema = buildNarratorPlanSchema();
   let rawContent: string | undefined;
   try {
     const result = await callModel(ctx.transport, {

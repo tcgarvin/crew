@@ -6,6 +6,7 @@ import {
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  type ItemDefId,
   type Job,
   type Machine,
   type MachineFault,
@@ -24,6 +25,10 @@ export type State = DeepReadonly<WorldState>;
 
 export function portName(content: ContentBundle, portId: string): string {
   return content.ports[portId as PortDefId]?.name ?? portId;
+}
+
+export function itemName(content: ContentBundle, itemDefId: string): string {
+  return content.items[itemDefId as ItemDefId]?.name ?? itemDefId;
 }
 
 export function machineName(content: ContentBundle, machine: DeepReadonly<Machine>): string {
@@ -129,10 +134,7 @@ export function pathBetween(
   return { path: found.path, hops: hopCount(found.path), distance: found.distance };
 }
 
-/**
- * The port the ship is at or heading for next: the docked port, or the far end of the leg in
- * progress. Undefined only when the travel state names no port at all (it always does).
- */
+/** The port the ship is at or heading for next: the docked port, or the far end of the leg. */
 export function portHereOrNext(state: State): PortDefId {
   const travel = state.travel;
   return travel.stage === "docked" ? travel.portId : travel.toPortId;

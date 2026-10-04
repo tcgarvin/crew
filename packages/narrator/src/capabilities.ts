@@ -22,6 +22,7 @@ import {
   SPAWN_QUANTITY_UNITS,
   type State,
   faultWindowSeconds,
+  itemName,
   machineCompartment,
   machineName,
   pathBetween,
@@ -74,7 +75,7 @@ export function marketLine(
     .filter(([, line]) => line.count > 0)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([itemDefId, line]) => {
-      const name = content.items[itemDefId as keyof ContentBundle["items"]]?.name ?? itemDefId;
+      const name = itemName(content, itemDefId);
       const base = basePriceFor(content, config, portId, itemDefId as keyof ContentBundle["items"]);
       return `${itemDefId} "${name}" x${line.count} (${priceTierWord(line.price, base, config)})`;
     });

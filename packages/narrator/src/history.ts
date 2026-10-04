@@ -1,3 +1,4 @@
+import { templateCard } from "@crew/content";
 /**
  * D31: the server's record of which cards the captain has seen (`NarratorNotes.cardsShown`). The
  * model never writes it. Two sources feed it:
@@ -10,13 +11,10 @@
  * has no decision ID when it is recorded (the kernel mints it on apply), so it is matched to its
  * decision later by title and the ID is filled in then.
  */
-import type { DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
+import type { ContentBundle, DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
 import type { DecisionCardProse } from "./contract";
 import type { State } from "./lookups";
 import { type CardShown, NOTES_LIMITS, clipWords } from "./notes";
-import { templateCard } from "./templates";
-
-type ContentBundle = Parameters<typeof templateCard>[1];
 
 const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -27,17 +25,11 @@ function fromRecord(
 ): CardShown | undefined {
   const record = state.decisions.records[decisionId];
   if (record === undefined) return undefined;
-  const text = templateCard(record, content);
+  const tick = record.deliveredTick ?? record.createdTick;
   return {
-    tick: record.deliveredTick ?? record.createdTick,
+    ...fromCard(templateCard(record, content), tick),
     decisionId,
-    title: text.title,
-    speaker: text.speaker ?? null,
-    gist: clipWords(text.situation, NOTES_LIMITS.gistWords),
-    leftLabel: text.leftLabel,
-    rightLabel: text.rightLabel,
     chosen: record.chosen ?? null,
-    closedThread: null,
   };
 }
 

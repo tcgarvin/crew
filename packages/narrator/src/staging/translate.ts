@@ -27,6 +27,14 @@ import {
   findItemDef,
 } from "@crew/sim";
 import type { DroppedIntent } from "../contract";
+import {
+  type Outcome,
+  collapseWhitespace,
+  invalidIntentReason,
+  kindOf,
+  no,
+  ok,
+} from "../intent-outcome";
 import { type Snapshot, portName } from "../lookups";
 import type { NarratorNotes } from "../notes";
 import { clipChars, commandIdFor, secretPhrases, textProblem } from "../translate";
@@ -56,12 +64,6 @@ export interface StagingTranslation {
   readonly dropped: readonly DroppedIntent[];
 }
 
-type Outcome<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly reason: string };
-const ok = <T>(value: T): Outcome<T> => ({ ok: true, value });
-const no = (reason: string): Outcome<never> => ({ ok: false, reason });
-
 interface Env {
   readonly ctx: StagingTranslationCtx;
   readonly dock: DockDef;
@@ -74,8 +76,6 @@ interface Env {
   readonly placed: Set<string>;
   ambience: string | undefined;
 }
-
-const collapse = (text: string) => text.trim().replace(/\s+/g, " ");
 
 /**
  * The kernel's text rule (non-blank, no control characters, no template braces, at most `max`
@@ -101,7 +101,7 @@ function softText(env: Env, raw: string, what: string, max: number): Outcome<str
 
 /** Text that is someone's identity (a name, a role): never clipped, refused when too long. */
 function hardText(env: Env, raw: string, what: string, max: number): Outcome<string> {
-  const text = collapse(raw);
+  const text = collapseWhitespace(raw);
   const problem = stagingTextProblem(env, text, what, max);
   return problem === undefined ? ok(text) : no(problem);
 }
@@ -229,14 +229,6 @@ function applyIntent(env: Env, intent: StagingIntent): string | undefined {
   }
 }
 
-function kindOf(raw: unknown): string {
-  if (raw !== null && typeof raw === "object" && "kind" in raw) {
-    const kind = (raw as { kind: unknown }).kind;
-    if (typeof kind === "string") return kind.slice(0, 40);
-  }
-  return "unknown";
-}
-
 function isStagingKind(kind: string): kind is StagingIntentKind {
   return (STAGING_INTENT_KINDS as readonly string[]).includes(kind);
 }
@@ -290,12 +282,7 @@ export function translateStaging(
     }
     const parsed = intentSchemas[kind].safeParse(raw);
     if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      dropped.push({
-        intentIndex,
-        kind,
-        reason: `${kind}: invalid ${issue?.path.join(".") ?? ""} (${issue?.message ?? "bad shape"})`,
-      });
+      dropped.push({ intentIndex, kind, reason: invalidIntentReason(kind, parsed.error.issues) });
       return;
     }
     const problem = applyIntent(env, parsed.data);

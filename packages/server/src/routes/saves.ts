@@ -5,14 +5,12 @@
  */
 import { gunzipSync } from "node:zlib";
 import type { Hono } from "hono";
+import type { AppEnv } from "../auth";
 import type { GetSaveResponse, PutSaveResponse } from "../contract";
 import type { Db, GameRow, SaveRow } from "../db/types";
 import type { Env } from "../env";
+import { apiError, loadOwnedGame, parseJsonBody } from "../http";
 import { putSaveRequestSchema, saveEnvelopeSchema } from "../validation";
-
-export interface SaveRouteEnv {
-  Variables: { userId: string };
-}
 
 /** Shared with `routes/games.ts` (open) and `routes/narrator.ts`. */
 export function buildGetSaveResponse(game: GameRow, save: SaveRow): GetSaveResponse {
@@ -32,55 +30,36 @@ export function buildGetSaveResponse(game: GameRow, save: SaveRow): GetSaveRespo
   };
 }
 
-async function loadOwnedGame(db: Db, userId: string, gameId: string): Promise<GameRow | undefined> {
-  const game = await db.getGame(gameId);
-  if (!game || game.userId !== userId) return undefined;
-  return game;
-}
-
-export function registerSaveRoutes(app: Hono<SaveRouteEnv>, db: Db, env: Env): void {
+export function registerSaveRoutes(app: Hono<AppEnv>, db: Db, env: Env): void {
   app.put("/api/games/:id/save", async (c) => {
-    const userId = c.get("userId");
     const gameId = c.req.param("id");
-    const game = await loadOwnedGame(db, userId, gameId);
-    if (!game) return c.json({ error: { code: "notFound", message: "No such game." } }, 404);
+    const game = await loadOwnedGame(db, c.get("userId"), gameId);
+    if (!game) return apiError(c, 404, "notFound", "No such game.");
 
-    const raw = await c.req.json().catch(() => undefined);
-    const parsed = putSaveRequestSchema.safeParse(raw);
-    if (!parsed.success) {
-      return c.json({ error: { code: "badRequest", message: "Invalid save request body." } }, 400);
-    }
+    const parsed = await parseJsonBody(c, putSaveRequestSchema);
+    if (!parsed.success) return apiError(c, 400, "badRequest", "Invalid save request body.");
     const body = parsed.data;
 
     if (body.leaseEpoch < game.leaseEpoch) {
-      return c.json(
-        {
-          error: {
-            code: "staleLease",
-            message: "This tab's lease has been superseded by a newer one; reopen the game.",
-          },
-        },
+      return apiError(
+        c,
         409,
+        "staleLease",
+        "This tab's lease has been superseded by a newer one; reopen the game.",
       );
     }
 
-    let gzipped: Buffer;
-    try {
-      gzipped = Buffer.from(body.blob, "base64");
-    } catch {
-      return c.json({ error: { code: "badRequest", message: "blob is not valid base64." } }, 400);
-    }
+    // `Buffer.from` skips characters outside the base64 alphabet rather than throwing; a blob
+    // that decodes to garbage fails the gunzip below.
+    const gzipped = Buffer.from(body.blob, "base64");
     // Vercel functions cap request bodies at 4.5 MB; MAX_SAVE_BYTES (default 4 MB, gzipped)
     // leaves headroom for the base64 and JSON envelope overhead around it.
     if (gzipped.byteLength > env.maxSaveBytes) {
-      return c.json(
-        {
-          error: {
-            code: "payloadTooLarge",
-            message: `Save exceeds the ${env.maxSaveBytes}-byte (gzipped) limit.`,
-          },
-        },
+      return apiError(
+        c,
         413,
+        "payloadTooLarge",
+        `Save exceeds the ${env.maxSaveBytes}-byte (gzipped) limit.`,
       );
     }
 
@@ -88,32 +67,18 @@ export function registerSaveRoutes(app: Hono<SaveRouteEnv>, db: Db, env: Env): v
     try {
       envelopeJson = JSON.parse(gunzipSync(gzipped).toString("utf8"));
     } catch {
-      return c.json(
-        { error: { code: "badRequest", message: "blob does not gunzip to JSON." } },
-        400,
-      );
+      return apiError(c, 400, "badRequest", "blob does not gunzip to JSON.");
     }
     const envelope = saveEnvelopeSchema.safeParse(envelopeJson);
     if (!envelope.success) {
-      return c.json(
-        { error: { code: "badRequest", message: "Save envelope failed validation." } },
-        400,
-      );
+      return apiError(c, 400, "badRequest", "Save envelope failed validation.");
     }
     if (
       envelope.data.schemaVersion !== body.schemaVersion ||
       envelope.data.savedAtTick !== body.savedAtTick ||
       envelope.data.contentHash !== body.contentHash
     ) {
-      return c.json(
-        {
-          error: {
-            code: "badRequest",
-            message: "Envelope metadata does not match the request fields.",
-          },
-        },
-        400,
-      );
+      return apiError(c, 400, "badRequest", "Envelope metadata does not match the request fields.");
     }
 
     const saved = await db.putSave({
@@ -131,14 +96,11 @@ export function registerSaveRoutes(app: Hono<SaveRouteEnv>, db: Db, env: Env): v
   });
 
   app.get("/api/games/:id/save", async (c) => {
-    const userId = c.get("userId");
     const gameId = c.req.param("id");
-    const game = await loadOwnedGame(db, userId, gameId);
-    if (!game) return c.json({ error: { code: "notFound", message: "No such game." } }, 404);
+    const game = await loadOwnedGame(db, c.get("userId"), gameId);
+    if (!game) return apiError(c, 404, "notFound", "No such game.");
     const head = await db.getHeadSave(gameId);
-    if (!head) {
-      return c.json({ error: { code: "notFound", message: "This game has no save yet." } }, 404);
-    }
+    if (!head) return apiError(c, 404, "notFound", "This game has no save yet.");
     return c.json(buildGetSaveResponse(game, head));
   });
 }
