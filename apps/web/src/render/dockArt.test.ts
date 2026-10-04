@@ -322,13 +322,13 @@ describe("dockShape", () => {
       const shape = dockShape(dock);
       return { ...shape, ...dockSurface(shape, settingOf(dock)) };
     };
-    // A pier out into open sky. Green Meridian's field ring fell inside its berth box at the
-    // conversion (D72), so it reads as open until its map is re-authored with a field round the box.
+    // A farming world's pad set into the field.
     expect(byPort("port.green_meridian")).toMatchObject({
-      berthStyle: "open",
-      floorPattern: "planks",
-      overSky: true,
+      berthStyle: "pad",
+      floorPattern: "slabs",
+      overSky: false,
     });
+    // A pier out into open sky.
     expect(byPort("port.terns_rest")).toMatchObject({
       berthStyle: "open",
       floorPattern: "planks",

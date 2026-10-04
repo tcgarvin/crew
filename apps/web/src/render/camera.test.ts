@@ -92,7 +92,7 @@ describe("camera framing at both ends", () => {
       // Dots are at least 8 px across and labels 11 px whatever the scale; at 12 px a tile the
       // compartment labels still show (they need more than 8). The Hub converted to its berth
       // box (D72) sits exactly at 12; its re-authored map is to bring it back above.
-      expect(t.scale, dock.dock.id).toBeGreaterThanOrEqual(12);
+      expect(t.scale, dock.dock.id).toBeGreaterThan(12);
     }
   });
 });
