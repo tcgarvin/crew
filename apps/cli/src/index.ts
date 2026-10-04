@@ -30,6 +30,10 @@ function formatIssue(issue: ValidationIssue): string {
   return `  [${issue.level}] ${issue.path.join(".")}: ${issue.message}`;
 }
 
+function validationFailure(command: string, issues: readonly ValidationIssue[]): CliResult {
+  return fail([`${command}: content failed validation`, ...issues.map(formatIssue)].join("\n"));
+}
+
 /** Repo root, resolved from this file's location so the CLI works from any cwd. */
 function repoRoot(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -98,11 +102,7 @@ export function runContentRenderDeck(deckId: string | undefined): CliResult {
   }
   const result = loadBundle();
   if (!result.ok) {
-    return fail(
-      ["content render-deck: content failed validation", ...result.issues.map(formatIssue)].join(
-        "\n",
-      ),
-    );
+    return validationFailure("content render-deck", result.issues);
   }
   const deck = result.bundle.decks[deckId as DeckDefId];
   if (deck === undefined) {
@@ -130,11 +130,7 @@ export function runContentRenderDock(dockId: string | undefined, outDir?: string
   }
   const result = loadBundle();
   if (!result.ok) {
-    return fail(
-      ["content render-dock: content failed validation", ...result.issues.map(formatIssue)].join(
-        "\n",
-      ),
-    );
+    return validationFailure("content render-dock", result.issues);
   }
   const bundle = result.bundle;
   const dock = bundle.docks?.[dockId as DockDefId];
