@@ -15,18 +15,14 @@ import {
   createTaskDerivationRegistry,
   defaultTaskDerivations,
 } from "./derivation";
-import { type StageExecutor, equipmentStages } from "./execute";
 import { perceptionSystem } from "./perception";
+import { type StageExecutor, equipmentStages } from "./steps";
 import { createDerivationSystem, createExecutionSystem } from "./work";
 
 export { AMBIENT_FALLBACK, ambientChatSystem } from "./ambient";
-export {
-  activityRef,
-  abortActivity,
-  equipmentStages,
-  type StageExecutor,
-  type WorkDeps,
-} from "./execute";
+export { activityRef } from "./backoff";
+export { abortActivity } from "./execute";
+export { equipmentStages, type StageExecutor, type WorkDeps } from "./steps";
 export {
   createTaskDerivationRegistry,
   defaultTaskDerivations,

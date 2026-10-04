@@ -5,7 +5,8 @@
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { TaskDerivationRegistry } from "./derivation";
 import { runDerivation } from "./derivation";
-import { type WorkDeps, expireClaims, stepActor } from "./execute";
+import { expireClaims, stepActor } from "./execute";
+import type { WorkDeps } from "./steps";
 
 export const DERIVATION_EVERY_TICKS = 10;
 
