@@ -6,6 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Context, Next } from "hono";
 import type { Db } from "./db/types";
+import { apiError } from "./http";
 
 const TOKEN_BYTES = 32;
 
@@ -52,20 +53,22 @@ declare module "hono" {
   }
 }
 
+/** The Hono env of every authed route: `requireAuth` sets `userId`. */
+export interface AppEnv {
+  Variables: { userId: string };
+}
+
 /** Middleware: resolves `Authorization: Bearer <token>` to a user id, or 401s. */
 export function requireAuth(db: Db) {
   return async (c: Context, next: Next) => {
     const header = c.req.header("authorization") ?? c.req.header("Authorization");
     const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : undefined;
     if (!token) {
-      return c.json(
-        { error: { code: "unauthorized", message: "Missing Authorization: Bearer <token>." } },
-        401,
-      );
+      return apiError(c, 401, "unauthorized", "Missing Authorization: Bearer <token>.");
     }
     const user = await db.getUserByTokenHash(hashToken(token));
     if (!user) {
-      return c.json({ error: { code: "unauthorized", message: "Unknown or revoked token." } }, 401);
+      return apiError(c, 401, "unauthorized", "Unknown or revoked token.");
     }
     c.set("userId", user.id);
     return next();
