@@ -12,15 +12,14 @@ import { isInDockArea } from "../../core/docks";
 import type { DockHandErrand } from "../../core/types/dockside";
 import type { JobId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
+import { errandFor } from "./dock-hands";
 import { offerStagingDock } from "./jobs";
 
 export function commerceViolations(world: Pick<World, "state" | "content">): string[] {
   const out: string[] = [];
   const { state, content } = world;
   const errand = (jobId: JobId, kind: DockHandErrand["kind"]) =>
-    Object.values(state.dockside.locals).some(
-      (l) => l.errand?.jobId === jobId && l.errand.kind === kind,
-    );
+    errandFor(world, jobId, kind) !== undefined;
   for (const job of Object.values(state.jobs)) {
     const fetching = errand(job.id, "withdrawOffer");
     if (job.status === "declined" || job.status === "expired") {

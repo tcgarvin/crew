@@ -121,12 +121,14 @@ function endErrand(ctx: Ctx, local: Local, dock: DockDef): void {
     settleLocal(ctx, local);
     return;
   }
+  backThroughDoor(ctx, local, dock);
+}
+
+/** Send `local` back in through the warehouse door, gone once there; at once with no door. */
+function backThroughDoor(ctx: Ctx, local: Local, dock: DockDef): void {
   const door = dockPost(dock, "warehouseDoor");
-  if (door === undefined) {
-    delete ctx.state.dockside.locals[local.id];
-    return;
-  }
-  sendLocalAway(ctx, local, postTile(dock, door));
+  if (door === undefined) delete ctx.state.dockside.locals[local.id];
+  else sendLocalAway(ctx, local, postTile(dock, door));
 }
 
 /** Carry the picked-up crates back through the warehouse door, then gone (or settled). */
@@ -135,13 +137,8 @@ function carryBackIn(ctx: Ctx, local: Local, dock: DockDef, label: string): void
   if (errand === undefined || errand.kind === "stageOffer") return;
   errand.phase = "return";
   local.label = label;
-  const door = dockPost(dock, "warehouseDoor");
-  if (door === undefined) {
-    delete ctx.state.dockside.locals[local.id];
-    return;
-  }
   // A receiver goes in with the delivery too: their job here is done.
-  sendLocalAway(ctx, local, postTile(dock, door));
+  backThroughDoor(ctx, local, dock);
 }
 
 /**
@@ -217,15 +214,20 @@ function dispatchWithdrawal(ctx: Ctx, job: Job): void {
   if (!sendLocalTo(ctx, hand, target)) finishNow(ctx, hand, dock, "noRoute");
 }
 
+/** Those of `itemIds` lying in the delivery bay of the dock alongside. */
+function inDeliveryBay(ctx: Ctx, itemIds: readonly ItemId[]): ItemId[] {
+  return itemIds.filter((itemId) => {
+    const item = ctx.state.items[itemId];
+    return item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay");
+  });
+}
+
 /**
  * The crates of `job` the port should take in now: the ones in the delivery bay of the dock
  * alongside, once every unload of the job there is done. Empty otherwise.
  */
 function deliveredInBay(ctx: Ctx, job: Job, dock: DockDef): ItemId[] {
-  const inBay = job.cargoItemIds.filter((itemId) => {
-    const item = ctx.state.items[itemId];
-    return item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay");
-  });
+  const inBay = inDeliveryBay(ctx, job.cargoItemIds);
   if (inBay.length === 0) return [];
   const unloads = Object.values(ctx.state.work.problems).filter(
     (p) =>
@@ -309,12 +311,7 @@ function driveErrand(ctx: Ctx, local: Local, dock: DockDef, giveUpTicks: number)
       carryBackIn(ctx, local, dock, `taking ${crateCount(local.carrying.length)} back in`);
       return;
     case "takeDelivery": {
-      const still = errand.itemIds.filter((id) => {
-        const item = ctx.state.items[id];
-        return (
-          item !== undefined && isInDockArea(ctx.content, ctx.state, item.location, "deliveryBay")
-        );
-      });
+      const still = inDeliveryBay(ctx, errand.itemIds);
       local.carrying = crateDefs(ctx, still);
       takeCratesIntoStore(ctx, job, still, dock.portId);
       carryBackIn(ctx, local, dock, "taking the delivery in");
