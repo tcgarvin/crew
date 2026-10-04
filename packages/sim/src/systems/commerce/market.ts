@@ -30,9 +30,6 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { resolveProblem } from "../equipment/problems";
 import { writeFact } from "../work/facts";
 
-/** Moved to `core/markets` so travel can read it without a travel/commerce import cycle. */
-export { affordableUnits } from "../../core/markets";
-
 /** Why a purchase cannot happen here, for the digest and the narrator; `undefined` = it can. */
 export type MarketBlock = "notDocked" | "notSoldHere" | "cannotAfford";
 

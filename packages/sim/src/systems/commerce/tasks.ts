@@ -7,10 +7,10 @@
  * from `DerivationCtx.state` (which dock is grafted) and content (its areas and posts).
  */
 import { dockAlongsideAt, dockAreaTiles, marketCounter } from "../../core/docks";
+import { affordableUnits } from "../../core/markets";
 import type { TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
 import type { CompletionPredicate, DeriveTasks, TaskSpec } from "../../core/types/work";
-import { affordableUnits } from "./market";
 
 function firstDeck(content: ContentBundle) {
   const [deck] = Object.values(content.decks);
@@ -21,7 +21,7 @@ function firstDeck(content: ContentBundle) {
 // crate); `estimatedWorkSeconds` uses the W6-added `config.commerce.haulEstimateSeconds`
 // (a short, uniform placeholder — actual haul time is walking + pick/drop, not
 // modelled by the derivation table).
-export const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
+const deriveCargoToLoad: DeriveTasks<"cargoToLoad"> = (problem, ctx) => {
   const deck = firstDeck(ctx.content);
   const zone = deck?.zones.find((z) => z.key === problem.payload.stowageZoneKey);
   const spec: TaskSpec = {
@@ -58,7 +58,7 @@ function rotated<T>(tiles: readonly T[], start: number): T[] {
  * delivery bay (custody is checked there); each crate of the job aims at its own bay tile
  * first. Without a dock it goes across a cargo transfer tile into the port's store, as before.
  */
-export const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
+const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
   const { itemId, jobId, portId, storeKey } = problem.payload;
   const spec = (interactionTiles: TileCoord[], completion: CompletionPredicate): TaskSpec => ({
     derivationKey: "unload",
@@ -101,7 +101,7 @@ export const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) 
  * (`marketCounter`, D63): the dock's stall, its gate when it has no stall, or with no dock a cargo
  * transfer tile.
  */
-export const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
+const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return [];
   const { itemDefId, count, machineId } = problem.payload;

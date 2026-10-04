@@ -13,10 +13,9 @@
  * on withdrawal, in after delivery) is a dock hand's walk, `dock-hands.ts`. A port without a dock
  * keeps the store and the transfer tiles.
  */
-import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
 import { queueOrHold } from "../../core/delivery";
-import { dockAlongside, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
+import { dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { CargoClass, DockDef, ExternalStoreDef, PortDef } from "../../core/types/content";
@@ -43,7 +42,7 @@ import { awaitsFamiliarityBrief } from "../work/perception";
 // ---------------------------------------------------------------------------------------------
 
 /** Role given to an issuer known only by a bare name (old saves, string-issuer drafts). */
-export const LEGACY_ISSUER_ROLE = "shipper";
+const LEGACY_ISSUER_ROLE = "shipper";
 
 /** Text key for the pitch of a job whose draft carried none. */
 export const DEFAULT_PITCH_KEY = "job.pitch.default";
@@ -71,16 +70,11 @@ export function normaliseIssuer(issuer: string | Readonly<JobIssuer>): JobIssuer
 // Price bands (D6)
 // ---------------------------------------------------------------------------------------------
 
-/** Distance of the direct route from `port` to `toPortId`, if one is listed. */
-export function routeDistance(port: PortDef, toPortId: PortDefId): number | undefined {
-  return port.routes.find((r) => r.toPortId === toPortId)?.distance;
-}
-
 /**
  * Passengers-and-galaxy §2.3: the distance pay is banded over is the shortest path, so a job
  * may name any reachable port and a two-hop haul pays for two legs.
  */
-export function pathDistance(
+function pathDistance(
   ctx: Pick<StepCtx, "content">,
   fromPortId: PortDefId,
   toPortId: PortDefId,
@@ -102,7 +96,7 @@ export function cargoClassOf(
 }
 
 /** Total cargo units across all lines (a stack of two crates counts as two). */
-export function totalCargoUnits(cargo: readonly CargoLine[]): number {
+function totalCargoUnits(cargo: readonly CargoLine[]): number {
   return cargo.reduce((sum, line) => sum + line.count, 0);
 }
 

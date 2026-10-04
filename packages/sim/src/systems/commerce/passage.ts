@@ -380,7 +380,7 @@ export function overdueCardRaised(state: ReadonlyWorldState, jobId: JobId): bool
 }
 
 /** The overdue card is in front of the captain (or queued) and not yet answered. */
-export function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
+function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
   return overdueCardsOf(state, jobId).some((d) => d.status === "pending");
 }
 

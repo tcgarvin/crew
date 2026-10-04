@@ -20,31 +20,10 @@ export function registerCommerce(registry: KernelRegistry): void {
   registry.registerCommandHandler("endPassage", endPassage);
 }
 
-export { commerceSystem } from "./commerce";
-export { spawnAtBoundary } from "./command-handlers";
-export {
-  checkPriceBand,
-  cargoClassOf,
-  deliveryComplete,
-  acceptJob,
-  offerStagingDock,
-  stageOfferedFreight,
-  raiseUnloadProblems,
-  payJobIfDue,
-  expireStaleOffers,
-  routeDistance,
-  spawnCargoItem,
-  cargoStowageZoneKey,
-} from "./jobs";
-export { checkPassageBand, jobFulfilled } from "./jobs";
 export {
   PASSENGER_CREW_DEF_ID,
   PASSENGER_OVERDUE_PROMPT_KEY,
-  loungeLocation,
-  overdueCardRaised,
-  passengerSpawnTile,
-  sweepPassages,
 } from "./passage";
 export { commerceTaskDerivations } from "./tasks";
-export { errandFor, syncDockFreight } from "./dock-hands";
-export { affordableUnits, buyFromMarket, marketBlock, type MarketBlock } from "./market";
+export { affordableUnits } from "../../core/markets";
+export { marketBlock } from "./market";
