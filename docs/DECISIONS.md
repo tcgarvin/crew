@@ -1363,3 +1363,31 @@ the engine to 0.167 output and held the ship for good. Measured after: two round
 days on both scenarios (one before), no one at hunger ≥ 0.9 (45% of person-time before), every
 hold lifted, about 110 s adrift in three days. The captain's share of the helm fell from ~28% to
 ~10% once starving standers stopped calling relief.
+
+*D76 addendum (slice-2 QA).* Fast-forward slows only for news the player should stop for (a
+hazard, an empty helm, the engines going down, the limp), not for faults the crew handle or the
+engines coming back, and not again within 120 s of view time after a slowdown; the line it
+lights leads its tick in the log and clears after 8 s or at the next slowdown. Measured: about
+1.2 slowdowns a watch at 8× before, 0.1–0.3 after. Person labels are placed to avoid each other,
+room plates and machine names (shortening to "Jax — relieving Noor" in a crowd), and the
+inspector says roles and known problems in words, once per kind, at the tick tapped.
+
+*D77 addendum (slice-2 QA).* The browser QA found Blue, Dane alone, leaving cargo untouched for a
+whole 400 s watch when the ship docked in it, and the helm's designation, relief and sleep
+churning near the bell. Cargo in port is all hands awake, not the watch's: `cargoToLoad` and
+`cargoToUnload` skip the off-duty rule, and sleepers sleep on. The bill puts a non-officer in
+every section (Blue = Dane, Sunniva; dayworkers Bettina, Oyelaran), and gangway watch is the
+on-watch section's non-officer's (the helm's stander when that is one, else its best pilot),
+since it needs no piloting. The bell pulls people, not the moment's state: no relief is raised
+within the handover lead plus `reliefNoShowSeconds` of the bell (the oncoming relieves); someone
+walking up to an empty helm stays designated until they sit or drop it, and a better-placed hand
+relieves them by handover; someone already in the seat changes posts without a handover or a
+"takes the helm". Sleep is anchored to the bill: routine tiredness is slept off in one's sleep
+watch (the watch after one's own; for a dayworker the first watch off after their last on), from
+`needs.bedtimeAbove` (0.3); outside it only pressing tiredness sends anyone to bed; a sleep is
+interrupted only by containment or above; standing at the helm or the gangway tires at the awake
+rate. Rounds are walked aboard, never from the dock. Measured over three days: the Blue cargo
+stall from 322 s to 4 s, the helm empty 54–81 s while not docked (from 85–96), sleep starts
+within about ten seconds of the same time of day for everyone from day 2, and 2.6–3.0
+handovers a watch (one at the bell, the rest meal reliefs). Not changed: with a course plotted,
+the stander sits at the helm through a docked repair hold.
