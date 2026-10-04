@@ -9,60 +9,25 @@
  */
 import { describe, expect, it } from "vitest";
 import { isInDockArea, isOnDock } from "../../core/docks";
-import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY } from "../../core/fixtures/tiny-content";
-import { checkInvariants } from "../../core/invariants";
 import { getRenderFrame } from "../../core/render";
-import type { SimEvent } from "../../core/types/events";
 import type { ActorId, JobId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
-import { spatialViolations } from "../spatial/invariants";
-import { ackHook } from "../travel/fixtures-dock";
-import { travelViolations } from "../travel/invariants";
 import { addEngineFault } from "../work/fixtures/crew-deck";
-import { workViolations } from "../work/invariants";
 import {
+  MINUTE,
   PARTS,
   QUAY_WORK,
+  accept,
   dockWorkWorld,
   offerFreight,
   onTile,
+  run,
   send,
+  setCourse,
   tileAt,
 } from "./fixtures-dock";
-import { commerceViolations } from "./invariants";
-
-const MINUTE = 20 * 60;
-
-/** Step tick by tick, acknowledging hooks, checking every invariant, until `until` or `ticks`. */
-function run(
-  test: TestWorld,
-  ticks: number,
-  until?: (world: World) => boolean,
-  each?: (world: World) => void,
-): SimEvent[] {
-  const { kernel, world } = test;
-  const events: SimEvent[] = [];
-  for (let i = 0; i < ticks; i++) {
-    ackHook(test);
-    const result = kernel.advance(world, 1);
-    events.push(...result.events);
-    const violations = [
-      ...checkInvariants(world.state),
-      ...spatialViolations(world),
-      ...workViolations(world),
-      ...travelViolations(world),
-      ...commerceViolations(world),
-    ];
-    if (violations.length > 0) {
-      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-    }
-    each?.(world);
-    if (until?.(world)) break;
-  }
-  return events;
-}
 
 function job(world: World, id: JobId) {
   const found = world.state.jobs[id];
@@ -78,14 +43,6 @@ const loadWork = (world: World, id: JobId) =>
   Object.values(world.state.work.problems).filter(
     (p) => p.kind === "cargoToLoad" && p.payload.jobId === id,
   );
-
-function accept(test: TestWorld, id: JobId): void {
-  send(test, { source: "player", kind: "acceptContract", payload: { jobId: id } });
-}
-
-function setCourse(test: TestWorld, to = TINY.port2): void {
-  send(test, { source: "player", kind: "setCourse", payload: { destinationPortId: to } });
-}
 
 describe("freight on offer is staged on the dock (D63)", () => {
   it("sets an offer's crates out on the staging area, nobody's, and withdraws them on decline", () => {
