@@ -59,7 +59,9 @@ export const PASSENGER_OVERDUE_PROMPT_KEY = "commerce.passengerOverdue";
 /** Backoff ref the work system writes when a `wander` plan cannot be built (`plans.ts`). */
 const WANDER_BACKOFF_REF = "wander";
 
-const SIM_CAUSE: Pick<EventDraft, "causeIds" | "source"> = { causeIds: [], source: "sim" };
+type Cause = Pick<EventDraft, "causeIds" | "source">;
+
+const SIM_CAUSE: Cause = { causeIds: [], source: "sim" };
 
 // ---------------------------------------------------------------------------------------------
 // Places
@@ -126,6 +128,11 @@ function arrivalTile(ctx: Pick<StepCtx, "state" | "content">): TileCoord {
   return tile;
 }
 
+/** Standing in the middle of `tile` on `deck`. */
+function onTile(deck: DeckDef, tile: TileCoord): PhysicalLocation {
+  return { kind: "onDeck", deckId: deck.id, x: tile.x + 0.5, y: tile.y + 0.5 };
+}
+
 function dockedAt(state: ReadonlyWorldState, portId: PortDefId): boolean {
   return state.travel.stage === "docked" && state.travel.portId === portId;
 }
@@ -144,11 +151,7 @@ function passengerEvent(job: Job, actor: Pick<Actor, "id" | "name">) {
  * aboard) and `passenger: true` (no work, no post, no helm). Emits `entitySpawned` and
  * `passengerBoarded`. The caller has validated that the template exists.
  */
-export function spawnPassenger(
-  ctx: ApplyCtx,
-  job: Job,
-  cause: Pick<EventDraft, "causeIds" | "source">,
-): ActorId {
+export function spawnPassenger(ctx: ApplyCtx, job: Job, cause: Cause): ActorId {
   const def = findCrewDef(ctx.content, ctx.state, PASSENGER_CREW_DEF_ID);
   if (def === undefined) throw new Error(`passage: no "${PASSENGER_CREW_DEF_ID}" crew template`);
   const deck = theDeck(ctx);
@@ -162,12 +165,7 @@ export function spawnPassenger(
       : { x: Math.floor(local.location.x), y: Math.floor(local.location.y) };
   if (local !== undefined) delete ctx.state.dockside.locals[local.id];
   const id: ActorId = allocateId(ctx.state, "actor");
-  const actor = newActor(id, def, {
-    kind: "onDeck",
-    deckId: deck.id,
-    x: tile.x + 0.5,
-    y: tile.y + 0.5,
-  });
+  const actor = newActor(id, def, onTile(deck, tile));
   actor.name = job.issuerPerson.name;
   actor.crew = true;
   actor.passenger = true;
@@ -286,6 +284,13 @@ function despawn(ctx: StepCtx, actor: Actor): void {
   delete ctx.state.actors[actor.id];
 }
 
+function clearAshoreTimes(passage: JobPassage): void {
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete passage.returnsAtTick;
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete passage.ashoreSinceTick;
+}
+
 function endPassageWith(
   ctx: ApplyCtx,
   job: Job,
@@ -293,13 +298,10 @@ function endPassageWith(
   actor: Pick<Actor, "id" | "name">,
   reason: PassageEndReason,
   portId: PortDefId,
-  cause: Pick<EventDraft, "causeIds" | "source"> = SIM_CAUSE,
+  cause: Cause = SIM_CAUSE,
 ): void {
   passage.endReason = reason;
-  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete passage.returnsAtTick;
-  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete passage.ashoreSinceTick;
+  clearAshoreTimes(passage);
   ctx.emit({
     ...cause,
     type: "passageEnded",
@@ -353,13 +355,10 @@ function returnAboard(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor)
   const deck = theDeck(ctx);
   // D63: they come back through the gate and walk aboard (`walkAboard`).
   const tile = arrivalTile(ctx);
-  actor.location = { kind: "onDeck", deckId: deck.id, x: tile.x + 0.5, y: tile.y + 0.5 };
+  actor.location = onTile(deck, tile);
   actor.availability = "available";
   passage.leg = "back";
-  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete passage.returnsAtTick;
-  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
-  delete passage.ashoreSinceTick;
+  clearAshoreTimes(passage);
   ctx.emit({
     ...SIM_CAUSE,
     type: "passengerReturned",
@@ -380,7 +379,7 @@ export function overdueCardRaised(state: ReadonlyWorldState, jobId: JobId): bool
 }
 
 /** The overdue card is in front of the captain (or queued) and not yet answered. */
-export function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
+function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
   return overdueCardsOf(state, jobId).some((d) => d.status === "pending");
 }
 
@@ -554,11 +553,7 @@ export function sweepPassages(ctx: StepCtx): void {
  * ship may leave. Aboard: `putOff`; the sweep walks them off at the next docking (now, if
  * docked). The job fails and its open luggage work is dropped where it stands.
  */
-export function endPassageEarly(
-  ctx: ApplyCtx,
-  job: Job,
-  cause: Pick<EventDraft, "causeIds" | "source">,
-): void {
+export function endPassageEarly(ctx: ApplyCtx, job: Job, cause: Cause): void {
   const passage = job.passage;
   if (passage === undefined || passage.endReason !== undefined) return;
   const actor = ctx.state.actors[passage.actorId];

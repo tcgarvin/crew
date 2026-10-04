@@ -5,20 +5,14 @@
  * the passenger steps off the deck the moment the ship docks (the walk cannot be planned).
  */
 import { describe, expect, it } from "vitest";
+import { cmd } from "../../core/fixtures/test-world";
 import { createKernel } from "../../core/kernel";
 import { createRegistry } from "../../core/registry";
 import type { Command } from "../../core/types/commands";
 import type { ContentBundle } from "../../core/types/content";
 import type { NarratorHook } from "../../core/types/decisions";
 import type { SimEvent } from "../../core/types/events";
-import type {
-  ActorId,
-  CommandId,
-  DecisionId,
-  JobId,
-  MachineDefId,
-  PortDefId,
-} from "../../core/types/ids";
+import type { ActorId, DecisionId, JobId, MachineDefId, PortDefId } from "../../core/types/ids";
 import type { Kernel, World } from "../../core/types/kernel";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { Item } from "../../core/types/ship";
@@ -35,12 +29,6 @@ import {
 } from "../travel/fixtures";
 import { registerCommerce } from "./index";
 import { PASSENGER_OVERDUE_PROMPT_KEY } from "./passage";
-
-let counter = 0;
-function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
-  counter += 1;
-  return { ...command, id: `cmd:passage-test:${counter}` as CommandId };
-}
 
 const TICK_RATE = 20;
 

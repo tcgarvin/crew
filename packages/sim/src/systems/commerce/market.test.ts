@@ -9,17 +9,16 @@
  */
 import { describe, expect, it } from "vitest";
 import { rebuildItemIndexes } from "../../core/caches";
-import type { TestWorld } from "../../core/fixtures/test-world";
+import { type TestWorld, cmd } from "../../core/fixtures/test-world";
 import { TINY, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
 import { checkInvariants } from "../../core/invariants";
 import { createKernel } from "../../core/kernel";
 import { effectiveMarket } from "../../core/markets";
 import { createRegistry } from "../../core/registry";
 import { describeEvent } from "../../core/render";
-import type { Command } from "../../core/types/commands";
 import type { ContentBundle, MachineDef } from "../../core/types/content";
 import type { SimEvent } from "../../core/types/events";
-import type { CommandId, HookId, ItemDefId, MachineId, PortDefId } from "../../core/types/ids";
+import type { HookId, ItemDefId, MachineId, PortDefId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerEquipmentSystems } from "../equipment/register";
@@ -159,12 +158,6 @@ function marketWorld(options: MarketWorldOptions = {}): TestWorld {
   place(world, MARA, { x: 3, y: 6 });
   place(world, JON, { x: 9, y: 3 });
   return { registry, kernel, world };
-}
-
-let counter = 0;
-function cmd<C extends Omit<Command, "id">>(command: C): C & { id: CommandId } {
-  counter += 1;
-  return { ...command, id: `cmd:market-test:${counter}` as CommandId };
 }
 
 /** Step tick by tick, acknowledging hooks and checking invariants; stops on `until` or a card. */

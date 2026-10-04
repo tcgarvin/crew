@@ -16,6 +16,7 @@
  */
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY, tinyEffectiveConfig } from "../../core/fixtures/tiny-content";
+import { checkInvariants } from "../../core/invariants";
 import { createKernel } from "../../core/kernel";
 import { createRegistry } from "../../core/registry";
 import type { Command } from "../../core/types/commands";
@@ -27,17 +28,29 @@ import type {
   DockDef,
   MachineDef,
 } from "../../core/types/content";
+import type { SimEvent } from "../../core/types/events";
 import type { CommandId, CrewDefId, ItemDefId, JobId, PortDefId } from "../../core/types/ids";
+import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerEquipmentSystems } from "../equipment/register";
 import { registerNeeds } from "../needs/index";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
 import { registerSpatial } from "../spatial/index";
-import { FAR_DOCK, HOME_DOCK, docksideConfig, docksideContent } from "../travel/fixtures-dock";
+import { spatialViolations } from "../spatial/invariants";
+import {
+  FAR_DOCK,
+  HOME_DOCK,
+  ackHook,
+  docksideConfig,
+  docksideContent,
+} from "../travel/fixtures-dock";
 import { registerTravel } from "../travel/index";
+import { travelViolations } from "../travel/invariants";
 import { ALL_DERIVATIONS, CREW } from "../work/fixtures/crew-deck";
 import { registerWork } from "../work/index";
+import { workViolations } from "../work/invariants";
 import { registerCommerce } from "./index";
+import { commerceViolations } from "./invariants";
 import { PASSENGER_CREW_DEF_ID } from "./passage";
 
 export const PARTS = "item.test.parts" as ItemDefId;
@@ -284,3 +297,43 @@ export function tileAt(location: PhysicalLocation | undefined): TileCoord | unde
 /** Was this tile one of `tiles`? */
 export const onTile = (tiles: readonly TileCoord[], tile: TileCoord | undefined): boolean =>
   tile !== undefined && tiles.some((t) => t.x === tile.x && t.y === tile.y);
+
+/** One sim-minute in ticks (20 Hz). */
+export const MINUTE = 20 * 60;
+
+/** Step tick by tick, acknowledging hooks, checking every invariant, until `until` or `ticks`. */
+export function run(
+  test: TestWorld,
+  ticks: number,
+  until?: (world: World) => boolean,
+  each?: (world: World) => void,
+): SimEvent[] {
+  const { kernel, world } = test;
+  const events: SimEvent[] = [];
+  for (let i = 0; i < ticks; i++) {
+    ackHook(test);
+    const result = kernel.advance(world, 1);
+    events.push(...result.events);
+    const violations = [
+      ...checkInvariants(world.state),
+      ...spatialViolations(world),
+      ...workViolations(world),
+      ...travelViolations(world),
+      ...commerceViolations(world),
+    ];
+    if (violations.length > 0) {
+      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
+    }
+    each?.(world);
+    if (until?.(world)) break;
+  }
+  return events;
+}
+
+export function accept(test: TestWorld, id: JobId): void {
+  send(test, { source: "player", kind: "acceptContract", payload: { jobId: id } });
+}
+
+export function setCourse(test: TestWorld, to = TINY.port2): void {
+  send(test, { source: "player", kind: "setCourse", payload: { destinationPortId: to } });
+}

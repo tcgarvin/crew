@@ -14,55 +14,22 @@ import { TINY } from "../../core/fixtures/tiny-content";
 import { checkInvariants } from "../../core/invariants";
 import { getRenderFrame } from "../../core/render";
 import type { Actor } from "../../core/types/actor";
-import type { SimEvent } from "../../core/types/events";
 import type { ItemId, JobId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
-import { spatialViolations } from "../spatial/invariants";
-import { ackHook } from "../travel/fixtures-dock";
-import { travelViolations } from "../travel/invariants";
 import { STOWAGE_TILES } from "../work/fixtures/crew-deck";
-import { workViolations } from "../work/invariants";
 import {
+  MINUTE,
   QUAY_WORK,
   TRUCK,
+  accept,
   dockWorkWorld,
   offerFreight,
   onTile,
-  send,
+  run,
+  setCourse,
   tileAt,
 } from "./fixtures-dock";
-import { commerceViolations } from "./invariants";
-
-const MINUTE = 20 * 60;
-
-function run(
-  test: TestWorld,
-  ticks: number,
-  until?: (world: World) => boolean,
-  each?: (world: World) => void,
-): SimEvent[] {
-  const { kernel, world } = test;
-  const events: SimEvent[] = [];
-  for (let i = 0; i < ticks; i++) {
-    ackHook(test);
-    const result = kernel.advance(world, 1);
-    events.push(...result.events);
-    const violations = [
-      ...checkInvariants(world.state),
-      ...spatialViolations(world),
-      ...workViolations(world),
-      ...travelViolations(world),
-      ...commerceViolations(world),
-    ];
-    if (violations.length > 0) {
-      throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);
-    }
-    each?.(world);
-    if (until?.(world)) break;
-  }
-  return events;
-}
 
 function truckOf(world: World) {
   const truck = Object.values(world.state.items).find((i) => i.defId === TRUCK);
@@ -103,14 +70,6 @@ const aboard = (world: World, itemId: ItemId) => {
   const location = world.state.items[itemId]?.location;
   return location?.kind === "onDeck" && !isOnDock(world.content, world.state, location);
 };
-
-function accept(test: TestWorld, id: JobId): void {
-  send(test, { source: "player", kind: "acceptContract", payload: { jobId: id } });
-}
-
-function setCourse(test: TestWorld, to = TINY.port2): void {
-  send(test, { source: "player", kind: "setCourse", payload: { destinationPortId: to } });
-}
 
 /** Watch a run: the most crates seen on the truck at once, and who held several claims. */
 function tripLog() {

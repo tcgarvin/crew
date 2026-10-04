@@ -13,10 +13,9 @@
  * on withdrawal, in after delivery) is a dock hand's walk, `dock-hands.ts`. A port without a dock
  * keeps the store and the transfer tiles.
  */
-import { rebuildItemIndexes } from "../../core/caches";
 import type { ApplyCtx } from "../../core/commands";
 import { queueOrHold } from "../../core/delivery";
-import { dockAlongside, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
+import { dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { CargoClass, DockDef, ExternalStoreDef, PortDef } from "../../core/types/content";
@@ -32,6 +31,7 @@ import type {
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
+import type { ProblemOfKind } from "../../core/types/work";
 import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
@@ -43,7 +43,7 @@ import { awaitsFamiliarityBrief } from "../work/perception";
 // ---------------------------------------------------------------------------------------------
 
 /** Role given to an issuer known only by a bare name (old saves, string-issuer drafts). */
-export const LEGACY_ISSUER_ROLE = "shipper";
+const LEGACY_ISSUER_ROLE = "shipper";
 
 /** Text key for the pitch of a job whose draft carried none. */
 export const DEFAULT_PITCH_KEY = "job.pitch.default";
@@ -71,21 +71,23 @@ export function normaliseIssuer(issuer: string | Readonly<JobIssuer>): JobIssuer
 // Price bands (D6)
 // ---------------------------------------------------------------------------------------------
 
-/** Distance of the direct route from `port` to `toPortId`, if one is listed. */
-export function routeDistance(port: PortDef, toPortId: PortDefId): number | undefined {
-  return port.routes.find((r) => r.toPortId === toPortId)?.distance;
-}
-
 /**
  * Passengers-and-galaxy §2.3: the distance pay is banded over is the shortest path, so a job
- * may name any reachable port and a two-hop haul pays for two legs.
+ * may name any reachable port and a two-hop haul pays for two legs. The reason when the two
+ * ports cannot carry a band: unknown, the same, or no chain of routes between them.
  */
-export function pathDistance(
+function bandRoute(
   ctx: Pick<StepCtx, "content">,
   fromPortId: PortDefId,
   toPortId: PortDefId,
-): number | undefined {
-  return shortestPath(ctx.content.ports, fromPortId, toPortId)?.distance;
+): { readonly distance: number } | { readonly reason: string } {
+  for (const portId of [fromPortId, toPortId]) {
+    if (ctx.content.ports[portId] === undefined) return { reason: `unknown port "${portId}"` };
+  }
+  if (fromPortId === toPortId) return { reason: "destination must differ from the origin" };
+  const distance = shortestPath(ctx.content.ports, fromPortId, toPortId)?.distance;
+  if (distance === undefined) return { reason: `no route from "${fromPortId}" to "${toPortId}"` };
+  return { distance };
 }
 
 /** Every cargo line must share one `CargoClass` (the band is keyed by class, not per-item). */
@@ -102,7 +104,7 @@ export function cargoClassOf(
 }
 
 /** Total cargo units across all lines (a stack of two crates counts as two). */
-export function totalCargoUnits(cargo: readonly CargoLine[]): number {
+function totalCargoUnits(cargo: readonly CargoLine[]): number {
   return cargo.reduce((sum, line) => sum + line.count, 0);
 }
 
@@ -146,12 +148,9 @@ export function checkPriceBand(
 ): string | null {
   if (!Number.isInteger(pay) || pay < 0) return "pay must be a nonnegative integer";
   if (cargo.length === 0) return "cargo must have at least one line";
-  const fromPort = ctx.content.ports[fromPortId];
-  if (fromPort === undefined) return `unknown port "${fromPortId}"`;
-  if (ctx.content.ports[toPortId] === undefined) return `unknown port "${toPortId}"`;
-  if (fromPortId === toPortId) return "destination must differ from the origin";
-  const distance = pathDistance(ctx, fromPortId, toPortId);
-  if (distance === undefined) return `no route from "${fromPortId}" to "${toPortId}"`;
+  const route = bandRoute(ctx, fromPortId, toPortId);
+  if ("reason" in route) return route.reason;
+  const { distance } = route;
   const cargoClass = cargoClassOf(ctx, cargo);
   if (cargoClass === undefined) return "cargo lines must share one cargo class";
   const band = ctx.config.commerce.priceBands[cargoClass];
@@ -175,14 +174,10 @@ export function checkPassageBand(
   pay: number,
 ): string | null {
   if (!Number.isInteger(pay) || pay < 0) return "pay must be a nonnegative integer";
-  const fromPort = ctx.content.ports[fromPortId];
-  if (fromPort === undefined) return `unknown port "${fromPortId}"`;
-  if (ctx.content.ports[toPortId] === undefined) return `unknown port "${toPortId}"`;
-  if (fromPortId === toPortId) return "destination must differ from the origin";
-  const distance = pathDistance(ctx, fromPortId, toPortId);
-  if (distance === undefined) return `no route from "${fromPortId}" to "${toPortId}"`;
+  const route = bandRoute(ctx, fromPortId, toPortId);
+  if ("reason" in route) return route.reason;
   const band = ctx.config.commerce.priceBands.passenger;
-  const fareDistance = roundTrip ? distance * 2 : distance;
+  const fareDistance = roundTrip ? route.distance * 2 : route.distance;
   const min = Math.round(band.min * fareDistance);
   const max = Math.round(band.max * fareDistance);
   if (pay < min || pay > max) return `fare ${pay} outside passenger band [${min}, ${max}]`;
@@ -211,24 +206,25 @@ type Cause = Pick<EventDraft, "causeIds" | "source">;
 const SYSTEM_CAUSE: Cause = { causeIds: [], source: "system" };
 
 /**
- * Create one freight item of `job` at `location` (owner: commerce), with no work attached. The
- * "kernel spawn path": allocate-and-insert directly, the same pattern `scenarioSpawn`'s `apply()`
- * uses. Staging an offer (D63) stops here; `spawnCargoItem` also opens the load work.
+ * Create one item at `location`, a freight item of a job when `freight` names it (owner:
+ * commerce), with no work attached. The "kernel spawn path": allocate-and-insert directly, the
+ * same pattern `scenarioSpawn`'s `apply()` uses. Staging an offer (D63) stops here;
+ * `spawnCargoItem` also opens the load work, and `spawnAtBoundary` spawns store items this way.
  */
-function spawnFreightItem(
+export function spawnItem(
   ctx: ApplyCtx,
-  job: Pick<Job, "id">,
   def: { readonly id: ItemDefId },
   count: number,
   stacking: "unique" | "stackable",
   location: PhysicalLocation,
   cause: Cause,
+  freight: Pick<Item, "jobId">,
 ): ItemId {
   const id = allocateId(ctx.state, "item");
   const item: Item =
     stacking === "unique"
-      ? { id, defId: def.id, stacking: "unique", location, condition: 1, jobId: job.id }
-      : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, jobId: job.id };
+      ? { id, defId: def.id, stacking: "unique", location, condition: 1, ...freight }
+      : { id, defId: def.id, stacking: "stack", location, count, reserved: 0, ...freight };
   ctx.state.items[id] = item;
   ctx.caches.dirty.inventory = true;
   ctx.emit({
@@ -240,6 +236,32 @@ function spawnFreightItem(
   return id;
 }
 
+type CargoProblemDraft = {
+  [K in "cargoToLoad" | "cargoToUnload"]: Pick<ProblemOfKind<K>, "kind" | "payload">;
+}["cargoToLoad" | "cargoToUnload"];
+
+/** Open a public, routine `cargoToLoad`/`cargoToUnload` problem at `portId` (owner: commerce). */
+function openCargoProblem(
+  ctx: ApplyCtx,
+  draft: CargoProblemDraft,
+  dedupeKey: string,
+  portId: PortDefId,
+): void {
+  const problemId = allocateId(ctx.state, "problem") as ProblemId;
+  ctx.state.work.problems[problemId] = {
+    id: problemId,
+    ...draft,
+    owner: "commerce",
+    visibility: "public",
+    dedupeKey,
+    status: "open",
+    createdTick: ctx.tick,
+    revision: 1,
+    baseUrgency: "routineObligation",
+    location: { kind: "port", portId },
+  };
+}
+
 /** Open the `cargoToLoad` problem for one freight item of an accepted job (owner: commerce). */
 function raiseLoadProblem(
   ctx: ApplyCtx,
@@ -247,20 +269,12 @@ function raiseLoadProblem(
   itemId: ItemId,
   stowageZoneKey: string,
 ): void {
-  const problemId = allocateId(ctx.state, "problem") as ProblemId;
-  ctx.state.work.problems[problemId] = {
-    id: problemId,
-    kind: "cargoToLoad",
-    payload: { jobId: job.id, itemId, stowageZoneKey },
-    owner: "commerce",
-    visibility: "public",
-    dedupeKey: `cargoToLoad:${job.id}:${itemId}`,
-    status: "open",
-    createdTick: ctx.tick,
-    revision: 1,
-    baseUrgency: "routineObligation",
-    location: { kind: "port", portId: job.fromPortId },
-  };
+  openCargoProblem(
+    ctx,
+    { kind: "cargoToLoad", payload: { jobId: job.id, itemId, stowageZoneKey } },
+    `cargoToLoad:${job.id}:${itemId}`,
+    job.fromPortId,
+  );
 }
 
 /**
@@ -279,7 +293,7 @@ export function spawnCargoItem(
   /** Event attribution; defaults to the unattributed system cause `acceptJob` has always used. */
   cause: Cause = SYSTEM_CAUSE,
 ): ItemId {
-  const id = spawnFreightItem(ctx, job, def, count, stacking, location, cause);
+  const id = spawnItem(ctx, def, count, stacking, location, cause, { jobId: job.id });
   raiseLoadProblem(ctx, job, id, stowageZoneKey);
   return id;
 }
@@ -352,7 +366,7 @@ export function stageOfferedFreight(ctx: ApplyCtx, job: Job, cause: Cause = SYST
     const def = ctx.defs.item(line.itemDefId);
     for (let i = 0; i < line.count; i++) {
       const location = locations[ids.length] as PhysicalLocation;
-      ids.push(spawnFreightItem(ctx, job, def, 1, def.stacking, location, cause));
+      ids.push(spawnItem(ctx, def, 1, def.stacking, location, cause, { jobId: job.id }));
     }
   }
   job.cargoItemIds = ids;
@@ -443,20 +457,12 @@ export function raiseUnloadProblems(
         ? `cargoToUnload:${job.id}:${itemId}`
         : `cargoToUnload:${job.id}:${itemId}:${portId}`;
     if (Object.values(ctx.state.work.problems).some((p) => p.dedupeKey === dedupeKey)) continue;
-    const problemId = allocateId(ctx.state, "problem") as ProblemId;
-    ctx.state.work.problems[problemId] = {
-      id: problemId,
-      kind: "cargoToUnload",
-      payload: { jobId: job.id, itemId, portId, storeKey },
-      owner: "commerce",
-      visibility: "public",
+    openCargoProblem(
+      ctx,
+      { kind: "cargoToUnload", payload: { jobId: job.id, itemId, portId, storeKey } },
       dedupeKey,
-      status: "open",
-      createdTick: ctx.tick,
-      revision: 1,
-      baseUrgency: "routineObligation",
-      location: { kind: "port", portId },
-    };
+      portId,
+    );
   }
 }
 
@@ -515,10 +521,9 @@ export function jobFulfilled(
 
 /** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
 export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
-  if (job.status === "paid" || job.paymentTransactionId !== undefined) return;
+  if (job.paymentTransactionId !== undefined) return;
   if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") return;
   if (!jobFulfilled(ctx.state, ctx.content, job)) return;
-  job.status = "delivered";
   const txId: TransactionId = allocateId(ctx.state, "transaction");
   ctx.state.money.balance += job.pay;
   ctx.state.money.transactions[txId] = {

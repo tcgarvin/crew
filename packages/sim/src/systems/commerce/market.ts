@@ -30,9 +30,6 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { resolveProblem } from "../equipment/problems";
 import { writeFact } from "../work/facts";
 
-/** Moved to `core/markets` so travel can read it without a travel/commerce import cycle. */
-export { affordableUnits } from "../../core/markets";
-
 /** Why a purchase cannot happen here, for the digest and the narrator; `undefined` = it can. */
 export type MarketBlock = "notDocked" | "notSoldHere" | "cannotAfford";
 
@@ -66,6 +63,16 @@ export function marketStoreLocation(port: PortDef): PhysicalLocation {
  */
 export type Handover = "feet" | "hands";
 
+/** The middle of the tile someone on deck stands on. */
+function atFeet(location: Extract<PhysicalLocation, { kind: "onDeck" }>): PhysicalLocation {
+  return {
+    kind: "onDeck",
+    deckId: location.deckId,
+    x: Math.floor(location.x) + 0.5,
+    y: Math.floor(location.y) + 0.5,
+  };
+}
+
 function spawnBought(
   ctx: StepCtx,
   buyer: Actor,
@@ -75,16 +82,8 @@ function spawnBought(
 ): ItemId[] {
   if (buyer.location.kind !== "onDeck") throw new Error("buyFromMarket: buyer is not on deck");
   const def = ctx.defs.item(itemDefId);
-  const { deckId } = buyer.location;
   const location: PhysicalLocation =
-    handover === "hands"
-      ? { kind: "carriedBy", actorId: buyer.id }
-      : {
-          kind: "onDeck",
-          deckId,
-          x: Math.floor(buyer.location.x) + 0.5,
-          y: Math.floor(buyer.location.y) + 0.5,
-        };
+    handover === "hands" ? { kind: "carriedBy", actorId: buyer.id } : atFeet(buyer.location);
   const ids: ItemId[] = [];
   const units = def.stacking === "unique" ? count : 1;
   for (let i = 0; i < units; i++) {
@@ -113,12 +112,7 @@ export function setDownBought(ctx: StepCtx, buyer: Actor, itemDefId: ItemDefId):
     if (held.kind !== "carriedBy" || held.actorId !== buyer.id || item.defId !== itemDefId) {
       continue;
     }
-    item.location = {
-      kind: "onDeck",
-      deckId: location.deckId,
-      x: Math.floor(location.x) + 0.5,
-      y: Math.floor(location.y) + 0.5,
-    };
+    item.location = atFeet(location);
     ids.push(item.id);
   }
   if (ids.length === 0) return ids;
