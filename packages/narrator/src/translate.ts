@@ -44,6 +44,14 @@ import {
   buildNarratorPlanSchema,
 } from "./contract";
 import {
+  type Outcome,
+  collapseWhitespace,
+  invalidIntentReason,
+  kindOf,
+  no,
+  ok,
+} from "./intent-outcome";
+import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
   type Snapshot,
@@ -63,12 +71,6 @@ const LABEL_MAX_CHARS = 48;
 const TITLE_MAX_CHARS = 60;
 const ISSUER_MAX_CHARS = 80;
 const DESCRIPTION_MAX_CHARS = 300;
-
-type Outcome<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly reason: string };
-const ok = <T>(value: T): Outcome<T> => ({ ok: true, value });
-const no = (reason: string): Outcome<never> => ({ ok: false, reason });
 
 /** D45: an id the model wrote that nothing in the game matches. */
 const unknownId = (what: string, id: string) =>
@@ -103,7 +105,7 @@ const NUMERIC_CONSEQUENCE = /[+-]\s?\d|\d[\d,.]*\s*(credits?\b|cr\b|%|percent\b)
 
 /** Whitespace collapsed, and clipped to `max` characters with an ellipsis. */
 export function clipChars(text: string, max: number): string {
-  const t = text.trim().replace(/\s+/g, " ");
+  const t = collapseWhitespace(text);
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
@@ -698,14 +700,6 @@ function policyCard(
 
 // ---------------------------------------------------------------------------------------------
 
-function kindOf(raw: unknown): string {
-  if (raw !== null && typeof raw === "object" && "kind" in raw) {
-    const kind = (raw as { kind: unknown }).kind;
-    if (typeof kind === "string") return kind.slice(0, 40);
-  }
-  return "unknown";
-}
-
 /** A story kind: the narrator vocabulary minus the staging call's (D66), which this never emits. */
 function isNarratorKind(kind: string): kind is NarratorCommand["kind"] {
   return (
@@ -773,13 +767,7 @@ export const translateIntents: TranslateIntents = (
     }
     const parsed = intentSchema.safeParse(raw);
     if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const where = issue?.path.join(".") ?? "";
-      dropped.push({
-        intentIndex,
-        kind,
-        reason: `${kind}: invalid ${where} (${issue?.message ?? "bad shape"})`,
-      });
+      dropped.push({ intentIndex, kind, reason: invalidIntentReason(kind, parsed.error.issues) });
       return;
     }
     const outcome = translateOne(env, parsed.data);
