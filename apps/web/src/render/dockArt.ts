@@ -806,14 +806,10 @@ export function drawDockForeground(
   for (const overShip of [false, true]) {
     ctx.save();
     ctx.beginPath();
-    if (overShip) {
-      ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
-      ctx.clip();
-    } else {
-      ctx.rect(view.minX, view.minY, view.maxX - view.minX, view.maxY - view.minY);
-      ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
-      ctx.clip("evenodd");
-    }
+    // Away from the ship: the view with the ship's rect cut out of it.
+    if (!overShip) ctx.rect(view.minX, view.minY, view.maxX - view.minX, view.maxY - view.minY);
+    ctx.rect(ship.minX, ship.minY, ship.maxX - ship.minX, ship.maxY - ship.minY);
+    ctx.clip(overShip ? "nonzero" : "evenodd");
     ctx.translate(paint.origin.x, paint.origin.y);
     for (const piece of dock.foreground) {
       const alpha = FOREGROUND_ALPHA[piece.kind];
