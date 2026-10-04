@@ -1237,3 +1237,19 @@ event logs and end states (a per-pass coolant index in equipment, a leaner A*, c
 lookups, and invariant paths built only on a violation). `crew pacing` on Mk2 against Mk1 at the
 gate: plain 450.6 sim-s against 459.7, freight 536.5 against 532.9, the same narrator calls, the
 1x stall 5.5 s against 8.1 s (the captain's longer walk ashore builds lead).
+
+*D72 addendum (portrait layout), from the slice-1 browser QA.* The camera's legibility test fitted
+the whole 390×700 window while the app gave the canvas only 390×382, so docked Mk2 drew at 8.3
+px a tile with room labels dropping out. On a portrait screen the canvas now gets most of the
+height: a one-row 36 px top bar, a headline fixed at two lines (so the canvas never resizes as
+it wraps), and a compact log strip under the canvas, `clamp(44px, 100dvh − 660px, 160px)`, which a
+toggle opens to the old 28vh at the cost of zoom. The fit pads 4 px instead of 12 when the deck
+is turned. The sizes live in `apps/web/src/ui/portraitLayout.ts` and reach the stylesheet as
+custom properties, so the test checks the canvas the app really lays out: at 390×700 every dock
+frames above 12 px a tile (Hub 12.95) and flight at 12.6; landscape is unchanged. A person's
+label is drawn only while their dot is on the canvas (no labels floating ahead of an arriving
+dock), and a room's plate only when it fits inside that room on screen. The same pass fixed
+pause, which stopped the worker but not playback (seconds of buffered movement kept playing):
+`FramePlayback.setPaused` freezes the view on its last frame. "Noor" left the locals' name table
+(replaced in its slot by "Ines"), and validation now rejects a generated given name equal to a
+crew member's first name.
