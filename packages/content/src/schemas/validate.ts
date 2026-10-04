@@ -409,10 +409,29 @@ function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void
   }
 }
 
-/** D25: every port with job templates has people to offer them, and every entry is a port. */
+/**
+ * D25: every port with job templates has people to offer them, and every entry is a port. No
+ * given name is a crew member's first name: labels and log lines call people by first name, so a
+ * dock local named like a crew member reads as them.
+ */
 function checkPeople(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const people = bundle.people;
   if (people === undefined) return;
+  const crewByFirstName = new Map(
+    Object.values(bundle.crew).map((crew) => [crew.name.split(" ")[0] ?? crew.name, crew.id]),
+  );
+  people.givenNames.forEach((given, i) => {
+    const crewId = crewByFirstName.get(given);
+    if (crewId !== undefined) {
+      issues.push(
+        issue(
+          "referential",
+          ["people", "givenNames", i],
+          `given name "${given}" is the first name of crew "${crewId}"`,
+        ),
+      );
+    }
+  });
   for (const portId of Object.keys(people.ports)) {
     checkRef(bundle.ports, portId, "port", ["people", "ports", portId], issues);
   }
