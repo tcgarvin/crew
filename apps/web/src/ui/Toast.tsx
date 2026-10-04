@@ -1,3 +1,7 @@
+import { useCallback, useRef, useState } from "react";
+
+const TOAST_MS = 4_000;
+
 export interface ToastProps {
   readonly message: string | undefined;
 }
@@ -10,4 +14,16 @@ export function Toast({ message }: ToastProps) {
       {message}
     </output>
   );
+}
+
+/** The toast's message and a stable `show` that replaces it and hides it after `TOAST_MS`. */
+export function useToast(): readonly [string | undefined, (message: string) => void] {
+  const [message, setMessage] = useState<string>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const show = useCallback((next: string) => {
+    setMessage(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setMessage(undefined), TOAST_MS);
+  }, []);
+  return [message, show];
 }
