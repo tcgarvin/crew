@@ -252,6 +252,14 @@ export function createHost(deps: HostDeps): Host {
     }
   }
 
+  /** The ring entry nearest `tick`; with none yet, the requester is told so and gets `undefined`. */
+  function ringEntryFor(requestId: string, tick: Tick): RingEntry | undefined {
+    const entry = nearestRingEntry(tick);
+    if (!entry)
+      deps.postMessage({ type: "error", requestId, message: "no snapshot available yet" });
+    return entry;
+  }
+
   function handleMessage(message: ToWorker): void {
     switch (message.type) {
       case "load": {
@@ -328,15 +336,8 @@ export function createHost(deps: HostDeps): Host {
         return;
       }
       case "requestSnapshotAt": {
-        const entry = nearestRingEntry(message.tick);
-        if (!entry) {
-          deps.postMessage({
-            type: "error",
-            requestId: message.requestId,
-            message: "no snapshot available yet",
-          });
-          return;
-        }
+        const entry = ringEntryFor(message.requestId, message.tick);
+        if (!entry) return;
         deps.postMessage({
           type: "snapshot",
           requestId: message.requestId,
@@ -346,15 +347,8 @@ export function createHost(deps: HostDeps): Host {
         return;
       }
       case "requestAgentView": {
-        const entry = nearestRingEntry(message.tick);
-        if (!entry) {
-          deps.postMessage({
-            type: "error",
-            requestId: message.requestId,
-            message: "no snapshot available yet",
-          });
-          return;
-        }
+        const entry = ringEntryFor(message.requestId, message.tick);
+        if (!entry) return;
         try {
           const snapshotWorld = deps.kernel.restore(entry.envelope, deps.content);
           const view = deps.kernel.getAgentView(snapshotWorld, message.actorId);
