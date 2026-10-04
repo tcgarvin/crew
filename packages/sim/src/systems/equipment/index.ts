@@ -8,6 +8,6 @@ export {
   REPAIR_CONDITION_RESTORE,
 } from "./equipment";
 export type { RecipeCtx, RecipeOutcome } from "./recipes";
-export { advanceStage, beginStage, completeStage } from "./recipes";
+export { advanceStage } from "./recipes";
 export { registerEquipmentSystems } from "./register";
 export { equipmentTaskDerivation } from "./tasks";

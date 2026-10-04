@@ -50,7 +50,7 @@ import type { ProblemOfKind } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
 import { repairShortfall, unitsAboard } from "./supplies";
-import { clamp } from "./util";
+import { clamp, machineEvent } from "./util";
 
 /** W5 decision: see module doc — pending `MachineDef` field for diagnosis. */
 export const DIAGNOSE_SECONDS = 20;
@@ -321,14 +321,13 @@ function updateMode(ctx: StepCtx, machine: Machine, def: MachineDef): void {
     machine.actualMode = blocked ? "off" : machine.desiredMode;
   }
   if (machine.actualMode === wasMode) return;
-  ctx.emit({
-    type: "machineModeChanged",
-    subjectIds: [machine.id],
-    causeIds: [],
-    source: "sim",
-    locationRef: { kind: "machine", machineId: machine.id },
-    payload: { machineId: machine.id, from: wasMode, to: machine.actualMode },
-  });
+  ctx.emit(
+    machineEvent("machineModeChanged", machine.id, {
+      machineId: machine.id,
+      from: wasMode,
+      to: machine.actualMode,
+    }),
+  );
 }
 
 function updateOutput(ctx: StepCtx, machine: Machine, def: MachineDef, faults: FaultEffects): void {
@@ -349,14 +348,13 @@ function updateOutput(ctx: StepCtx, machine: Machine, def: MachineDef, faults: F
       : 0;
   machine.output = newOutput;
   if (oldOutput < 1 || newOutput >= 1) return;
-  ctx.emit({
-    type: "machineDerated",
-    subjectIds: [machine.id],
-    causeIds: [],
-    source: "sim",
-    locationRef: { kind: "machine", machineId: machine.id },
-    payload: { machineId: machine.id, output: newOutput, cause: derateCause(factors) },
-  });
+  ctx.emit(
+    machineEvent("machineDerated", machine.id, {
+      machineId: machine.id,
+      output: newOutput,
+      cause: derateCause(factors),
+    }),
+  );
 }
 
 /** Wear and hazard accumulate only while truly operating; a crossed threshold draws a fault. */

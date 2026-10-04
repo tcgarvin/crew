@@ -1,25 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { cmd } from "../../core/fixtures/test-world";
 import { allocateId } from "../../core/ids";
-import type { ActorId, ProblemId, TaskId } from "../../core/types/ids";
+import type { ActorId, MachineId, ProblemId, TaskId } from "../../core/types/ids";
 import type { Machine } from "../../core/types/ship";
 import type { DerivationCtx, ProblemOfKind, Task, TaskSpec } from "../../core/types/work";
 import { w5TestWorld } from "./fixtures/test-world";
 import { W5 } from "./fixtures/w5-content";
-import { advanceStage, beginStage, completeStage } from "./recipes";
+import { type RecipeCtx, type RecipeOutcome, advanceStage } from "./recipes";
 import { equipmentTaskDerivation } from "./tasks";
 
-function byDef(world: ReturnType<typeof w5TestWorld>["world"], defId: string): Machine {
+type W5World = ReturnType<typeof w5TestWorld>["world"];
+
+/** Enough ticks to finish any stage outright. */
+const ALL_THE_TICKS = Number.MAX_SAFE_INTEGER;
+
+/** 20s of diagnosis at 20 ticks/s. */
+const DIAGNOSE_TICKS = 20 * 20;
+
+function byDef(world: W5World, defId: string): Machine {
   const machine = Object.values(world.state.machines).find((m) => m.defId === defId);
   if (machine === undefined) throw new Error(`no machine for ${defId}`);
   return machine;
 }
 
-function installTask(
-  world: ReturnType<typeof w5TestWorld>["world"],
-  problemId: ProblemId,
-  spec: TaskSpec,
-): TaskId {
+function installTask(world: W5World, problemId: ProblemId, spec: TaskSpec): TaskId {
   const id = allocateId(world.state, "task");
   const task: Task = {
     id,
@@ -35,10 +39,7 @@ function installTask(
 }
 
 /** Fire `wornBearing` on the engine immediately via `scheduleFault`, going through `applyFault`. */
-function injectEngineFault(
-  world: ReturnType<typeof w5TestWorld>["world"],
-  kernel: ReturnType<typeof w5TestWorld>["kernel"],
-) {
+function injectEngineFault(world: W5World, kernel: ReturnType<typeof w5TestWorld>["kernel"]) {
   const engine = byDef(world, W5.engine);
   kernel.enqueueCommand(
     world,
@@ -52,7 +53,7 @@ function injectEngineFault(
   return engine.id;
 }
 
-function ctxOf(world: ReturnType<typeof w5TestWorld>["world"]): DerivationCtx {
+function ctxOf(world: W5World): DerivationCtx {
   return {
     content: world.content,
     config: world.config.values,
@@ -61,16 +62,56 @@ function ctxOf(world: ReturnType<typeof w5TestWorld>["world"]): DerivationCtx {
   };
 }
 
+function recipeCtxOf(world: W5World): RecipeCtx {
+  return {
+    state: world.state,
+    content: world.content,
+    config: world.config.values,
+    tick: world.state.tick,
+  };
+}
+
+function machineProblem<K extends "machineSymptom" | "machineFault">(
+  world: W5World,
+  kind: K,
+  machineId: MachineId,
+): ProblemOfKind<K> | undefined {
+  return Object.values(world.state.work.problems).find(
+    (p) => p.kind === kind && (p.payload as { machineId?: MachineId }).machineId === machineId,
+  ) as ProblemOfKind<K> | undefined;
+}
+
+function bearingsAboard(world: W5World): number {
+  return Object.values(world.state.items)
+    .filter((i) => i.defId === W5.bearing && i.stacking === "stack")
+    .reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0);
+}
+
+/** Diagnose the machine's symptom outright, then install the repair task it leads to. */
+function diagnoseThenPlanRepair(
+  world: W5World,
+  recipeCtx: RecipeCtx,
+  machineId: MachineId,
+  techId: ActorId,
+): { readonly diagnosis: RecipeOutcome; readonly repairTaskId: TaskId } {
+  const symptom = machineProblem(world, "machineSymptom", machineId);
+  if (symptom === undefined) throw new Error("no symptom problem");
+  const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
+  const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
+  const diagnosis = advanceStage(recipeCtx, inspectTaskId, techId, DIAGNOSE_TICKS);
+  const fault = machineProblem(world, "machineFault", machineId);
+  if (fault === undefined) throw new Error("no fault problem");
+  const repairSpecs = equipmentTaskDerivation.machineFault?.(fault, ctxOf(world)) ?? [];
+  return { diagnosis, repairTaskId: installTask(world, fault.id, repairSpecs[0] as TaskSpec) };
+}
+
 describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () => {
   it("runs the full recipe, consuming the part exactly once and surviving a worker swap", () => {
     const { kernel, world } = w5TestWorld();
     const techId = Object.keys(world.state.actors)[0] as ActorId;
     const machineId = injectEngineFault(world, kernel);
 
-    const symptom = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineSymptom"> =>
-        p.kind === "machineSymptom" && p.payload.machineId === machineId,
-    );
+    const symptom = machineProblem(world, "machineSymptom", machineId);
     expect(symptom).toBeDefined();
     if (symptom === undefined) throw new Error("unreachable");
 
@@ -78,30 +119,15 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
     expect(inspectSpecs).toHaveLength(1);
     const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
 
-    const recipeCtx = {
-      state: world.state,
-      content: world.content,
-      config: world.config.values,
-      tick: world.state.tick,
-    };
-    expect(beginStage(recipeCtx, inspectTaskId, techId)).toMatchObject({
-      status: "inProgress",
-      progress: 0,
-    });
-
-    // 20s of diagnosis at 20 ticks/s.
-    const diagnoseTicks = 20 * 20;
-    const diagnosed = advanceStage(recipeCtx, inspectTaskId, techId, diagnoseTicks);
+    const recipeCtx = recipeCtxOf(world);
+    const diagnosed = advanceStage(recipeCtx, inspectTaskId, techId, DIAGNOSE_TICKS);
     expect(diagnosed.status).toBe("recipeComplete");
     expect(diagnosed.status === "recipeComplete" && diagnosed.events.map((e) => e.type)).toContain(
       "faultDiagnosed",
     );
     expect(world.state.work.problems[symptom.id]?.status).toBe("resolved");
 
-    const fault = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineFault"> =>
-        p.kind === "machineFault" && p.payload.machineId === machineId,
-    );
+    const fault = machineProblem(world, "machineFault", machineId);
     expect(fault).toBeDefined();
     if (fault === undefined) throw new Error("unreachable");
 
@@ -110,10 +136,7 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
     expect(repairSpecs[0]?.requiredTools).toEqual(["wrench"]);
     const repairTaskId = installTask(world, fault.id, repairSpecs[0] as TaskSpec);
 
-    const bearingCountBefore = Object.values(world.state.items)
-      .filter((i) => i.defId === W5.bearing && i.stacking === "stack")
-      .reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0);
-    expect(bearingCountBefore).toBe(2);
+    expect(bearingsAboard(world)).toBe(2);
 
     // First worker does half the repair...
     const repairTicks = 10 * 20;
@@ -122,13 +145,10 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
     expect(partial).toMatchObject({ status: "inProgress" });
     expect(partial.status === "inProgress" && partial.progress).toBeCloseTo(0.5, 1);
     // ...no part consumed yet at the halfway point.
-    const bearingMid = Object.values(world.state.items)
-      .filter((i) => i.defId === W5.bearing && i.stacking === "stack")
-      .reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0);
-    expect(bearingMid).toBe(2);
+    expect(bearingsAboard(world)).toBe(2);
 
     // ...then a different worker (the tech, who actually carries the part) finishes it.
-    const finished = completeStage(recipeCtx, repairTaskId, techId);
+    const finished = advanceStage(recipeCtx, repairTaskId, techId, ALL_THE_TICKS);
     expect(finished.status).toBe("recipeComplete");
     expect(finished.status === "recipeComplete" && finished.events.map((e) => e.type)).toContain(
       "faultRepaired",
@@ -139,43 +159,29 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
     expect(engine.condition).toBeGreaterThan(0.9); // restored, was already ~1
     expect(world.state.work.problems[fault.id]?.status).toBe("resolved");
 
-    const bearingAfter = Object.values(world.state.items)
-      .filter((i) => i.defId === W5.bearing && i.stacking === "stack")
-      .reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0);
-    expect(bearingAfter).toBe(1); // consumed exactly once
+    expect(bearingsAboard(world)).toBe(1); // consumed exactly once
   });
 
   it("survives a save/restore mid-repair", () => {
     const { kernel, world } = w5TestWorld();
     const techId = Object.keys(world.state.actors)[0] as ActorId;
     const machineId = injectEngineFault(world, kernel);
-    const symptom = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineSymptom"> =>
-        p.kind === "machineSymptom" && p.payload.machineId === machineId,
+    const symptom = machineProblem(
+      world,
+      "machineSymptom",
+      machineId,
     ) as ProblemOfKind<"machineSymptom">;
     const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
     const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
-    const recipeCtx = {
-      state: world.state,
-      content: world.content,
-      config: world.config.values,
-      tick: world.state.tick,
-    };
 
-    advanceStage(recipeCtx, inspectTaskId, techId, 10 * 20); // half of the 20s diagnosis
+    advanceStage(recipeCtxOf(world), inspectTaskId, techId, 10 * 20); // half of the 20s diagnosis
 
     const envelope = kernel.serialize(world);
     const restored = kernel.restore(envelope, world.content);
     const restoredEngine = byDef(restored, W5.engine);
     expect(restoredEngine.faults[0]?.repairStepProgress).toBeCloseTo(0.5, 1);
 
-    const restoredCtx = {
-      state: restored.state,
-      content: restored.content,
-      config: restored.config.values,
-      tick: restored.state.tick,
-    };
-    const done = advanceStage(restoredCtx, inspectTaskId, techId, 10 * 20);
+    const done = advanceStage(recipeCtxOf(restored), inspectTaskId, techId, 10 * 20);
     expect(done.status).toBe("recipeComplete");
   });
 });
@@ -185,34 +191,13 @@ describe("integrity restore on repair (D35)", () => {
     const { kernel, world } = w5TestWorld();
     const techId = Object.keys(world.state.actors)[0] as ActorId;
     const machineId = injectEngineFault(world, kernel);
-    const recipeCtx = {
-      state: world.state,
-      content: world.content,
-      config: world.config.values,
-      tick: world.state.tick,
-    };
-
-    const symptom = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineSymptom"> =>
-        p.kind === "machineSymptom" && p.payload.machineId === machineId,
-    );
-    if (symptom === undefined) throw new Error("no symptom problem");
-    const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
-    const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
-    beginStage(recipeCtx, inspectTaskId, techId);
-    expect(advanceStage(recipeCtx, inspectTaskId, techId, 20 * 20).status).toBe("recipeComplete");
-
-    const fault = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineFault"> =>
-        p.kind === "machineFault" && p.payload.machineId === machineId,
-    );
-    if (fault === undefined) throw new Error("no fault problem");
-    const repairSpecs = equipmentTaskDerivation.machineFault?.(fault, ctxOf(world)) ?? [];
-    const repairTaskId = installTask(world, fault.id, repairSpecs[0] as TaskSpec);
+    const recipeCtx = recipeCtxOf(world);
+    const { diagnosis, repairTaskId } = diagnoseThenPlanRepair(world, recipeCtx, machineId, techId);
+    expect(diagnosis.status).toBe("recipeComplete");
 
     const engine = byDef(world, W5.engine);
     engine.integrity = 0.05; // below `integrityInoperableBelow`: blocked
-    const finished = completeStage(recipeCtx, repairTaskId, techId);
+    const finished = advanceStage(recipeCtx, repairTaskId, techId, ALL_THE_TICKS);
     expect(finished.status).toBe("recipeComplete");
     expect(engine.faults).toEqual([]);
     expect(engine.integrity).toBe(world.config.values.equipment.integrityDerateBelow);
@@ -227,31 +212,11 @@ describe("integrity restore on repair (D35)", () => {
     const { kernel, world } = w5TestWorld();
     const techId = Object.keys(world.state.actors)[0] as ActorId;
     const machineId = injectEngineFault(world, kernel);
-    const recipeCtx = {
-      state: world.state,
-      content: world.content,
-      config: world.config.values,
-      tick: world.state.tick,
-    };
-    const symptom = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineSymptom"> =>
-        p.kind === "machineSymptom" && p.payload.machineId === machineId,
-    );
-    if (symptom === undefined) throw new Error("no symptom problem");
-    const inspectSpecs = equipmentTaskDerivation.machineSymptom?.(symptom, ctxOf(world)) ?? [];
-    const inspectTaskId = installTask(world, symptom.id, inspectSpecs[0] as TaskSpec);
-    beginStage(recipeCtx, inspectTaskId, techId);
-    advanceStage(recipeCtx, inspectTaskId, techId, 20 * 20);
-    const fault = Object.values(world.state.work.problems).find(
-      (p): p is ProblemOfKind<"machineFault"> =>
-        p.kind === "machineFault" && p.payload.machineId === machineId,
-    );
-    if (fault === undefined) throw new Error("no fault problem");
-    const repairSpecs = equipmentTaskDerivation.machineFault?.(fault, ctxOf(world)) ?? [];
-    const repairTaskId = installTask(world, fault.id, repairSpecs[0] as TaskSpec);
+    const recipeCtx = recipeCtxOf(world);
+    const { repairTaskId } = diagnoseThenPlanRepair(world, recipeCtx, machineId, techId);
     const engine = byDef(world, W5.engine);
     engine.integrity = 0.9;
-    completeStage(recipeCtx, repairTaskId, techId);
+    advanceStage(recipeCtx, repairTaskId, techId, ALL_THE_TICKS);
     expect(engine.integrity).toBe(0.9);
   });
 });
