@@ -13,6 +13,7 @@
  * 4. A passenger left behind or put off here earlier (D52), on the bench if the dock has one.
  */
 import { dockForPort, dockPost } from "./docks";
+import { byId } from "./ids";
 import { hashString32 } from "./rng";
 import type { DeepReadonly } from "./types/common";
 import type { ContentBundle, DockDef } from "./types/content";
@@ -74,7 +75,7 @@ function receivers(
   if (door === undefined) return [];
   return Object.values(state.jobs)
     .filter((job) => freightBoundHere(job, portId))
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }))
+    .sort(byId)
     .map((job) => ({
       name: dockHandName(content, state.seed, job.id),
       role: DOCK_HAND_ROLE,
@@ -106,7 +107,7 @@ function benchPassenger(state: FloorSetState, dock: DockDef, portId: PortDefId):
         location.portId === portId
       );
     })
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+    .sort(byId);
   const [first] = here;
   if (first === undefined) return [];
   return [

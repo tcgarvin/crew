@@ -76,3 +76,8 @@ export function wasAllocated(host: IdHost, id: InstanceId): boolean {
   const parsed = parseInstanceId(id);
   return parsed !== null && parsed.counter < host.nextId[parsed.kind];
 }
+
+/** Order records by instance ID, counters numerically (`a2` before `a10`): a stable order. */
+export function byId(a: { readonly id: string }, b: { readonly id: string }): number {
+  return a.id.localeCompare(b.id, "en", { numeric: true });
+}

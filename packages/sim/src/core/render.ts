@@ -6,6 +6,7 @@
  */
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
+import { byId } from "./ids";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation } from "./types/common";
 import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
@@ -637,7 +638,7 @@ function awaitedAboard(state: ReadonlyWorldState, content: ContentBundle): strin
   if (state.deck.dock === undefined) return undefined;
   const ashore = Object.values(state.actors)
     .filter((a) => a.disembarking !== true && isOnDock(content, state, a.location))
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+    .sort(byId);
   return ashore[0]?.name;
 }
 
@@ -793,7 +794,7 @@ export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionP
 /** D66: the locals on the dock alongside, in id order. */
 function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
   return Object.values(state.dockside.locals)
-    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }))
+    .sort(byId)
     .map((local) => ({
       id: local.id,
       name: local.name,
