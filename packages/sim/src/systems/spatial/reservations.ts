@@ -15,8 +15,15 @@ import type { DeckGeometry, NavInteractionPosition } from "../../core/types/nav"
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import { inBounds, tileIndex } from "./grid";
 
-export function reservationKey(deckId: DeckDefId, tile: TileCoord): string {
+function reservationKey(deckId: DeckDefId, tile: TileCoord): string {
   return `${deckId}:${tile.x},${tile.y}`;
+}
+
+/** The deck and tile a reservation key names (inverse of `reservationKey`). */
+export function parseReservationKey(key: string): { deckId: DeckDefId; tile: TileCoord } {
+  const [deckId, coords] = key.split(":");
+  const [x, y] = (coords ?? "").split(",").map(Number);
+  return { deckId: deckId as DeckDefId, tile: { x: x ?? Number.NaN, y: y ?? Number.NaN } };
 }
 
 /** Interaction positions on a tile (usually zero or one). */

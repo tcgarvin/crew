@@ -78,7 +78,8 @@ export const QUAY: DockDef = {
   ],
 };
 
-function withRamps(deck: DeckDef): DeckDef {
+/** The deck with the cargo ramp under (2,6) and the personnel ramp under (9,6). */
+export function withRamps(deck: DeckDef): DeckDef {
   const ramp = (key: string, x: number) => ({
     key,
     edge: { x, y: 6, side: "s" as const },
@@ -99,7 +100,7 @@ function withRamps(deck: DeckDef): DeckDef {
   };
 }
 
-export function dockContent(): ContentBundle {
+function dockContent(): ContentBundle {
   const base = deck12Content();
   const deck = base.decks[DECK12.deck];
   if (deck === undefined) throw new Error("deck12 content lost its deck");

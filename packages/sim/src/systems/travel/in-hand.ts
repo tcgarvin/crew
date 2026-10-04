@@ -28,15 +28,12 @@ export function jobInHand(job: ReadonlyJob): boolean {
  * the way out, `fromPortId` once ashore or homeward), or `undefined` for a job that is not a
  * live passage, or one whose passenger is at their last port and only has to walk off.
  */
-export function passageBound(
+function passageBound(
   state: Pick<ReadonlyWorldState, "travel">,
   job: ReadonlyJob,
 ): PortDefId | undefined {
   const passage = job.passage;
-  if (passage === undefined || passage.endReason !== undefined) return undefined;
-  if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") {
-    return undefined;
-  }
+  if (passage === undefined || passage.endReason !== undefined || !jobInHand(job)) return undefined;
   if (passage.leg === "out") {
     if (passage.roundTrip) return dockedAt(state, job.toPortId) ? job.fromPortId : job.toPortId;
     return dockedAt(state, job.toPortId) ? undefined : job.toPortId;
@@ -56,7 +53,7 @@ export function passageBound(
 export function jobBlockingAcceptance(state: JobsAndTravel): ReadonlyJob | undefined {
   return Object.values(state.jobs).find((job) => {
     if (job.status === "accepted") return true;
-    if (job.passage !== undefined) return jobInHand(job) && passageBound(state, job) !== undefined;
+    if (job.passage !== undefined) return passageBound(state, job) !== undefined;
     // Freight under way blocks until the ship is at its destination (D52); `jobInHand` counts
     // only passages once they leave, so it is not the test here.
     return job.status === "inTransit" && !dockedAt(state, job.toPortId);

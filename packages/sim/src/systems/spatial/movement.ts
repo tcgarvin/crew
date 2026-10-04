@@ -71,7 +71,7 @@ export const tileOf = (location: { x: number; y: number }): TileCoord => ({
 });
 
 /** Resolve a move target to a tile on this deck, or undefined if it is not one. */
-export function resolveTarget(geometry: DeckGeometry, target: MoveTarget): TileCoord | undefined {
+function resolveTarget(geometry: DeckGeometry, target: MoveTarget): TileCoord | undefined {
   if ("machineId" in target) {
     const position = geometry.interactionPositions.find(
       (p) => p.machineId === target.machineId && p.key === target.positionKey,
@@ -151,18 +151,16 @@ export function requestMove(
         : tileOf(location);
     const found = route(here);
     if (found === null) return false;
-    if (found.length === 1) {
-      releaseReservations(caches, actorId, { deckId: geometry.deckId, tile: destination });
-      tryReserve(caches, geometry, destination, actorId);
-      actor.movement = { kind: "stationary" };
-      actor.location = { kind: "onDeck", deckId: location.deckId, ...centre(destination) };
-      return true;
-    }
     path = copyPath(found);
   }
 
   releaseReservations(caches, actorId, { deckId: geometry.deckId, tile: destination });
   tryReserve(caches, geometry, destination, actorId);
+  if (path.length === 1) {
+    actor.movement = { kind: "stationary" };
+    actor.location = { kind: "onDeck", deckId: location.deckId, ...centre(destination) };
+    return true;
+  }
   actor.movement = {
     kind: "moving",
     path,
@@ -217,25 +215,28 @@ function carriedMass(ctx: StepCtx, actorId: ActorId): number {
   return kg;
 }
 
+/** Is `b` within half a tile of `a`: close enough to slow a walker passing (SD §7.4)? */
+export function withinHalfTile(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return dx * dx + dy * dy < 0.25;
+}
+
 function isOverlapping(actor: Actor, location: OnDeckLocation, actors: readonly Actor[]): boolean {
-  for (const other of actors) {
-    if (other.id === actor.id || other.location.kind !== "onDeck") continue;
-    if (other.location.deckId !== location.deckId) continue;
-    const dx = other.location.x - location.x;
-    const dy = other.location.y - location.y;
-    if (dx * dx + dy * dy < 0.25) return true;
-  }
-  return false;
+  return actors.some(
+    (other) =>
+      other.id !== actor.id &&
+      other.location.kind === "onDeck" &&
+      other.location.deckId === location.deckId &&
+      withinHalfTile(location, other.location),
+  );
 }
 
 function nearLocal(location: OnDeckLocation, locals: WorldState["dockside"]["locals"]): boolean {
-  for (const local of Object.values(locals)) {
-    if (local.location.deckId !== location.deckId) continue;
-    const dx = local.location.x - location.x;
-    const dy = local.location.y - location.y;
-    if (dx * dx + dy * dy < 0.25) return true;
-  }
-  return false;
+  return Object.values(locals).some(
+    (local) =>
+      local.location.deckId === location.deckId && withinHalfTile(location, local.location),
+  );
 }
 
 export function effectiveSpeed(

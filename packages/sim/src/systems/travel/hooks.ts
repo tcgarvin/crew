@@ -2,20 +2,17 @@
  * Narrator hook points owned by travel/commerce (PLAN §6 W6 item 5, D5).
  *
  * `NarratorHook` halts `advance()` (see `world.ts` `haltReason`); only one hook may be pending
- * at a time, so every call here is a no-op while one already is. `raiseHookIfIdle` itself moved
- * to `core/hooks.ts` (D37) and is re-exported here for the systems that import it from travel.
+ * at a time, so every call here is a no-op while one already is. `raiseHookIfIdle` itself lives
+ * in `core/hooks.ts` (D37).
  *
  * D70: the `captainAshore` ask (which replaced `jobBoard`) is raised by commerce when the captain
  * steps onto the dock looking for work (`systems/commerce/captain-ashore.ts`); whether there is
  * anything to look for is `captainIsIdleAt`, here.
  */
 import { configTicks } from "../../core/clock";
-import { raiseHookIfIdle } from "../../core/hooks";
 import type { PortDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import { jobInHand } from "./in-hand";
-
-export { raiseHookIfIdle };
 
 /** A passenger is walking down the ramp (§3.5/§4.2): the captain is not looking for work yet. */
 function somebodyDisembarking(ctx: Pick<StepCtx, "state">): boolean {

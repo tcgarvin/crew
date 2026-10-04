@@ -36,7 +36,8 @@ export { dockFloorMask, isDockFloor } from "../../core/docks";
 
 export const SIDE_BIT: Readonly<Record<EdgeSide, number>> = { n: 1, e: 2, s: 4, w: 8 };
 
-const SIDE_DELTA: Readonly<Record<EdgeSide, TileCoord>> = {
+/** The step to the tile across each side. */
+export const SIDE_DELTA: Readonly<Record<EdgeSide, TileCoord>> = {
   n: { x: 0, y: -1 },
   e: { x: 1, y: 0 },
   s: { x: 0, y: 1 },
@@ -72,7 +73,6 @@ export function sideTowards(from: TileCoord, to: TileCoord): EdgeSide | undefine
   return undefined;
 }
 
-/** Static floor that no machine stands on. */
 /**
  * Grid index of tile (x, y), or -1 off the grid. Same arithmetic as `grid.ts`, kept local
  * because these predicates are pathfinding's innermost calls and a cross-module call costs a
@@ -85,6 +85,7 @@ function cell(geometry: Grid, x: number, y: number): number {
   return gy * geometry.width + gx;
 }
 
+/** Static floor that no machine stands on. */
 export function isStaticWalkable(geometry: DeckGeometry, x: number, y: number): boolean {
   const i = cell(geometry, x, y);
   return i >= 0 && geometry.floor[i] === 1 && geometry.footprint[i] === 0;
@@ -161,7 +162,7 @@ export function rotateOffset(offset: TileCoord, rotation: 0 | 90 | 180 | 270): T
   }
 }
 
-export interface GeometryInputs {
+interface GeometryInputs {
   readonly deck: DeckDef;
   readonly machineDefs: (id: MachineDef["id"]) => MachineDef | undefined;
   /** Compartment instance by `CompartmentDef.key`. */
@@ -175,7 +176,7 @@ export interface GeometryInputs {
 }
 
 /** Deck-frame tiles of a dock's walkable floor. Throws on a malformed map. */
-export function dockFloorTiles(dock: DockDef): TileCoord[] {
+function dockFloorTiles(dock: DockDef): TileCoord[] {
   const mask = dockFloorMask(dock);
   const tiles: TileCoord[] = [];
   for (let y = 0; y < dock.height; y++) {
@@ -199,7 +200,7 @@ function gridBounds(deck: DeckDef, dock: DockDef | undefined): Grid {
 }
 
 /** Build the static geometry for one deck and any grafted dock. Pure; dynamic state starts clear. */
-export function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
+function buildDeckGeometry(inputs: GeometryInputs): DeckGeometry {
   const { deck, dock } = inputs;
   const grid = gridBounds(deck, dock);
   const { originX, originY, width, height } = grid;
@@ -424,7 +425,7 @@ export function syncRampPassability(
 }
 
 /** The dock map grafted onto `deckId` in this state, if any; throws if content lacks it. */
-export function dockLayoutFor(
+function dockLayoutFor(
   content: ContentBundle,
   state: ReadonlyWorldState,
   deckId: DeckDefId,

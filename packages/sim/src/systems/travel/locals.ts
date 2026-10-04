@@ -19,7 +19,7 @@
  *   witness, and a local who cannot leave must not stand there forever.
  */
 import { configTicks } from "../../core/clock";
-import { dockAlongside, dockPost, isDockPoint, postTile } from "../../core/docks";
+import { dockAlongside, postTile } from "../../core/docks";
 import {
   clearDockside,
   dockNeedsDressing,
@@ -35,18 +35,13 @@ import type { DeckGeometry } from "../../core/types/nav";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { deckGeometry, isDockTile, isWalkable } from "../spatial/geometry";
 import { indexAt } from "../spatial/grid";
-import { overlapSpeedFactor } from "../spatial/movement";
+import { centre, overlapSpeedFactor, tileOf, withinHalfTile } from "../spatial/movement";
 import { type PathPolicy, cachedPath, stepLength } from "../spatial/pathfind";
 import { takeCratesIntoStore, withdrawJobCrates } from "./dock-custody";
 
 type Ctx = StepCtx;
 
 const EPS = 1e-9;
-
-const tileOf = (p: { x: number; y: number }): TileCoord => ({
-  x: Math.floor(p.x),
-  y: Math.floor(p.y),
-});
 
 const sameTile = (a: TileCoord, b: TileCoord) => a.x === b.x && a.y === b.y;
 
@@ -69,7 +64,7 @@ function localPolicy(ctx: Pick<Ctx, "state">, geometry: DeckGeometry): PathPolic
  * false, leaving the local as they were, when there is no route on the dock floor. Standing on
  * `to` already is success.
  */
-export function walkLocal(ctx: Ctx, local: Local, to: TileCoord): boolean {
+function walkLocal(ctx: Ctx, local: Local, to: TileCoord): boolean {
   // A registry without spatial (commerce-only tests) has no nav grid: no route, so a dock hand's
   // errand falls back to the instant behaviour, with its `dockHandGaveUp` event.
   const geometry = ctx.caches.nav.decks[local.location.deckId];
@@ -94,7 +89,7 @@ export function walkLocal(ctx: Ctx, local: Local, to: TileCoord): boolean {
   }
   if (tail.length <= 1) {
     local.movement = { kind: "stationary" };
-    local.location = { deckId: local.location.deckId, x: to.x + 0.5, y: to.y + 0.5 };
+    local.location = { deckId: local.location.deckId, ...centre(to) };
     return true;
   }
   local.movement = { kind: "moving", path: tail, segmentIndex: 0, segmentDistanceTravelled: 0 };
@@ -116,12 +111,7 @@ function bodies(ctx: Ctx): { id: string; x: number; y: number }[] {
 }
 
 function crowded(local: Local, others: readonly { id: string; x: number; y: number }[]): boolean {
-  return others.some((o) => {
-    if (o.id === local.id) return false;
-    const dx = o.x - local.location.x;
-    const dy = o.y - local.location.y;
-    return dx * dx + dy * dy < 0.25;
-  });
+  return others.some((o) => o.id !== local.id && withinHalfTile(local.location, o));
 }
 
 /** Walk one local up to `budget` tiles. A tile turned unwalkable ends the walk there. */
@@ -134,12 +124,12 @@ function stepLocal(local: Local, geometry: DeckGeometry, budget: number): void {
     const b = movement.path[movement.segmentIndex + 1];
     if (a === undefined || b === undefined) {
       local.movement = { kind: "stationary" };
-      if (a !== undefined) local.location = { ...local.location, x: a.x + 0.5, y: a.y + 0.5 };
+      if (a !== undefined) local.location = { ...local.location, ...centre(a) };
       return;
     }
     if (movement.segmentDistanceTravelled === 0 && !isWalkable(geometry, b.x, b.y)) {
       local.movement = { kind: "stationary" };
-      local.location = { ...local.location, x: a.x + 0.5, y: a.y + 0.5 };
+      local.location = { ...local.location, ...centre(a) };
       return;
     }
     if (remaining <= EPS) return;
@@ -151,7 +141,7 @@ function stepLocal(local: Local, geometry: DeckGeometry, budget: number): void {
     if (movement.segmentDistanceTravelled >= length - EPS) {
       movement.segmentIndex += 1;
       movement.segmentDistanceTravelled = 0;
-      local.location = { ...local.location, x: b.x + 0.5, y: b.y + 0.5 };
+      local.location = { ...local.location, ...centre(b) };
       continue;
     }
     const t = movement.segmentDistanceTravelled / length;
@@ -263,12 +253,6 @@ function behave(ctx: Ctx, local: Local, dock: DockDef): void {
   }
 }
 
-/** The dock's warehouse door tile (deck frame), or its gate when it has none. */
-export function dockExit(dock: DockDef, via: "warehouseDoor" | "gate"): TileCoord | undefined {
-  const post = dockPost(dock, via) ?? dockPost(dock, via === "gate" ? "warehouseDoor" : "gate");
-  return post === undefined ? undefined : postTile(dock, post);
-}
-
 // ---------------------------------------------------------------------------------------------
 // The dock coming and going
 // ---------------------------------------------------------------------------------------------
@@ -362,11 +346,3 @@ export const localsSystem: System = {
     }
   },
 };
-
-/** For invariants: is this local somewhere a local may be (the dock alongside's floor)? */
-export function localOnDockFloor(
-  ctx: Pick<Ctx, "content" | "state">,
-  local: Pick<Local, "location">,
-): boolean {
-  return isDockPoint(ctx.content, ctx.state, local.location.x, local.location.y);
-}

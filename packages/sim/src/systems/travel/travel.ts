@@ -12,19 +12,12 @@
  */
 import { configTicks } from "../../core/clock";
 import { dockForPort, dockedPortOf, isOnDock } from "../../core/docks";
+import { raiseHookIfIdle } from "../../core/hooks";
 import { allocateId } from "../../core/ids";
 import { affordableUnits } from "../../core/markets";
-import type { PhysicalLocation, TileCoord } from "../../core/types/common";
-import type { ExternalStoreDef, MachineTag, PortDef } from "../../core/types/content";
+import type { PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
-import type {
-  ActorId,
-  DeckDefId,
-  DoorId,
-  MachineId,
-  PortDefId,
-  ProblemId,
-} from "../../core/types/ids";
+import type { DeckDefId, DoorId, MachineId, PortDefId, ProblemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
 import type {
@@ -40,12 +33,15 @@ import { syncRampPassability } from "../spatial/geometry";
 import { clearDock, endRecall, peopleAshore, recallAshore } from "./ashore";
 import { departureCleared } from "./departure-gate";
 import { nextHop } from "./graph";
-import { raiseHookIfIdle } from "./hooks";
 import { dismissLocals, dressDockAlongside } from "./locals";
 import { stageDockIfDue, stagingAnswered } from "./staging";
 import { portStoreLocation } from "./stores";
+import { operateTiles } from "./tasks";
 
 export { portStoreLocation } from "./stores";
+
+/** Travel away from the dock: the stage objects that carry route progress. */
+export type InFlight = Extract<TravelState, { stage: Exclude<TravelStage, "docked"> }>;
 
 // ---------------------------------------------------------------------------------------------
 // Propulsion
@@ -57,22 +53,13 @@ export { portStoreLocation } from "./stores";
  * does not re-derive it. A ship with no engine machine (test fixtures) is treated as unconstrained
  * (factor 1) rather than permanently drifting.
  */
-export function propulsionFactor(
-  machines: Readonly<Record<string, Machine>>,
-  machineDefs: ReadonlyMap<string, readonly MachineTag[]>,
-): number {
-  const engines = Object.values(machines).filter((m) =>
-    (machineDefs.get(m.defId) ?? []).includes("engine"),
+function propulsionFactor(ctx: Pick<StepCtx, "state" | "content">): number {
+  const engines = Object.values(ctx.state.machines).filter(
+    (m) => ctx.content.machines[m.defId]?.tags.includes("engine") === true,
   );
   if (engines.length === 0) return 1;
   const sum = engines.reduce((acc, m) => acc + (m.actualMode === "on" ? m.output : 0), 0);
   return sum / engines.length;
-}
-
-function machineTagsByDefId(
-  ctx: Pick<StepCtx, "content">,
-): ReadonlyMap<string, readonly MachineTag[]> {
-  return new Map(Object.values(ctx.content.machines).map((def) => [def.id, def.tags]));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -124,39 +111,15 @@ function bridgeConsole(ctx: Pick<StepCtx, "state" | "content">): Machine | undef
 
 /**
  * V1 staffing check (thin, per PLAN §6 item 1): any crew actor within 1 tile of one of the
- * console's `operate` interaction positions (rotation-adjusted, footprint origin from the
- * placement). W4 will replace this with a real claimed `stationToStaff` task.
+ * console's `operate` interaction positions. W4 will replace this with a real claimed
+ * `stationToStaff` task.
  */
-function rotate(offset: TileCoord, rotation: 0 | 90 | 180 | 270): TileCoord {
-  switch (rotation) {
-    case 0:
-      return offset;
-    case 90:
-      return { x: -offset.y, y: offset.x };
-    case 180:
-      return { x: -offset.x, y: -offset.y };
-    case 270:
-      return { x: offset.y, y: -offset.x };
-  }
-}
-
-function consoleOperatePositions(ctx: Pick<StepCtx, "content">, console_: Machine): TileCoord[] {
-  const deck = ctx.content.decks[theDeckId(ctx)];
-  const def = ctx.content.machines[console_.defId];
-  const placement = deck?.machines.find((p) => p.key === console_.placementKey);
-  if (deck === undefined || def === undefined || placement === undefined) return [];
-  return def.interactionPositions
-    .filter((p) => p.purposes.includes("operate"))
-    .map((p) => {
-      const rotated = rotate(p.offset, placement.rotation);
-      return { x: placement.origin.x + rotated.x, y: placement.origin.y + rotated.y };
-    });
-}
-
-function isStaffed(ctx: Pick<StepCtx, "state" | "content">): boolean {
-  const console_ = bridgeConsole(ctx);
+function isStaffed(
+  ctx: Pick<StepCtx, "state" | "content">,
+  console_: Machine | undefined,
+): boolean {
   if (console_ === undefined) return true;
-  const positions = consoleOperatePositions(ctx, console_);
+  const positions = operateTiles(ctx, console_.id);
   if (positions.length === 0) return true;
   const deckId = theDeckId(ctx);
   return Object.values(ctx.state.actors).some((actor) => {
@@ -174,16 +137,12 @@ function isStaffed(ctx: Pick<StepCtx, "state" | "content">): boolean {
 // stationToStaff problem bookkeeping
 // ---------------------------------------------------------------------------------------------
 
-function findOpenProblem(ctx: Pick<StepCtx, "state">, dedupeKey: string) {
-  return Object.values(ctx.state.work.problems).find(
-    (p) => p.dedupeKey === dedupeKey && p.status === "open",
-  );
-}
-
 /** Open (or revise) `stationToStaff` while unstaffed; resolve it once staffed. Owner: travel. */
 function updateStaffingProblem(ctx: StepCtx, machineId: MachineId, staffed: boolean): void {
   const dedupeKey = `stationToStaff:${machineId}`;
-  const existing = findOpenProblem(ctx, dedupeKey) as ProblemOfKind<"stationToStaff"> | undefined;
+  const existing = Object.values(ctx.state.work.problems).find(
+    (p) => p.dedupeKey === dedupeKey && p.status === "open",
+  ) as ProblemOfKind<"stationToStaff"> | undefined;
   if (staffed) {
     if (existing !== undefined) existing.status = "resolved";
     return;
@@ -203,6 +162,14 @@ function updateStaffingProblem(ctx: StepCtx, machineId: MachineId, staffed: bool
     baseUrgency: "essentialOperation",
     location: { kind: "machine", machineId },
   };
+}
+
+/** Is the bridge staffed (or does it need nobody)? Keeps its `stationToStaff` problem in step. */
+function checkStaffing(ctx: StepCtx): boolean {
+  const console_ = bridgeConsole(ctx);
+  const staffed = isStaffed(ctx, console_);
+  if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
+  return staffed;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -233,23 +200,14 @@ const STAGE_ORDER: readonly Exclude<TravelStage, "docked">[] = [
   "docking",
 ];
 
-function nextStage(
-  stage: Exclude<TravelStage, "docked">,
-): Exclude<TravelStage, "docked"> | "docked" {
-  const index = STAGE_ORDER.indexOf(stage);
-  const next = STAGE_ORDER[index + 1];
-  return next ?? "docked";
+function nextStage(stage: InFlight["stage"]): TravelStage {
+  return STAGE_ORDER[STAGE_ORDER.indexOf(stage) + 1] ?? "docked";
 }
 
-function emitStageChanged(
-  ctx: StepCtx,
-  from: TravelStage,
-  to: TravelStage,
-  subjectIds: readonly ActorId[] = [],
-): void {
+function emitStageChanged(ctx: StepCtx, from: TravelStage, to: TravelStage): void {
   ctx.emit({
     type: "travelStageChanged",
-    subjectIds,
+    subjectIds: [],
     causeIds: [],
     source: "sim",
     payload: { from, to },
@@ -270,7 +228,7 @@ function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
  * open too; this holds the ship even if that work were gone, since a crate on the dock is left
  * behind when the dock goes.
  */
-export function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean {
   const portId = dockedPortOf(ctx.state.travel);
   if (ctx.state.deck.dock === undefined || portId === undefined) return false;
   return Object.values(ctx.state.jobs).some(
@@ -284,22 +242,26 @@ export function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): 
   );
 }
 
-/** Freight still to load: open `cargoToLoad` work, or accepted freight on the dock (D63). */
-function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
+/** Open freight work of `kinds`, or accepted freight on the dock (D63). */
+function hasOpenFreightWork(
+  ctx: Pick<StepCtx, "state" | "content">,
+  kinds: readonly ("cargoToLoad" | "cargoToUnload")[],
+): boolean {
   return (
     Object.values(ctx.state.work.problems).some(
-      (p) => p.kind === "cargoToLoad" && p.status === "open",
+      (p) => p.status === "open" && (kinds as readonly string[]).includes(p.kind),
     ) || acceptedFreightOnDock(ctx)
   );
 }
 
+/** Freight still to load: open `cargoToLoad` work, or accepted freight on the dock (D63). */
+function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return hasOpenFreightWork(ctx, ["cargoToLoad"]);
+}
+
 /** Open freight work (either direction) that must finish before the ship may leave. */
-export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
-  return (
-    Object.values(ctx.state.work.problems).some(
-      (p) => (p.kind === "cargoToLoad" || p.kind === "cargoToUnload") && p.status === "open",
-    ) || acceptedFreightOnDock(ctx)
-  );
+function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return hasOpenFreightWork(ctx, ["cargoToLoad", "cargoToUnload"]);
 }
 
 /**
@@ -307,7 +269,7 @@ export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boole
  * and money allow at least one unit), i.e. one that derives a runnable `buyParts` task. The
  * voyage waits for it, so a stalled repair can buy its part on the way through.
  */
-export function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return false;
   return Object.values(ctx.state.work.problems).some(
@@ -346,14 +308,23 @@ export function waitingForPassenger(
  * A decision card is queued for the captain (any origin), or (D70) one is on its way to them in
  * person: the ship does not leave while someone is walking over with word.
  */
-export function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
+function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
   const { records, queue, held } = ctx.state.decisions;
   return held.length > 0 || queue.some((id) => records[id]?.status === "pending");
 }
 
-/** D70: a card is waiting to be delivered in person; departure waits for the meeting. */
-export function cardsAwaitingDelivery(ctx: Pick<StepCtx, "state">): boolean {
-  return ctx.state.decisions.held.length > 0;
+/**
+ * What keeps a ship with a course set docked: freight still moving through the open ramp
+ * (Integration 2), a passenger ashore or walking off (passengers §3.3: the ship never leaves them
+ * quietly, only through the overdue card or `endPassage`), or (D70) a card on its way to the
+ * captain in person. Departure prep begins the first tick none of them applies.
+ */
+export function departureWaits(ctx: Pick<StepCtx, "state" | "content">): boolean {
+  return (
+    hasOpenCargoWork(ctx) ||
+    waitingForPassenger(ctx.state) !== undefined ||
+    ctx.state.decisions.held.length > 0
+  );
 }
 
 /**
@@ -361,7 +332,7 @@ export function cardsAwaitingDelivery(ctx: Pick<StepCtx, "state">): boolean {
  * work, a purchasable part, a hold for repairs and a pending card each keep it docked; the
  * travel system plans the next hop the first tick none of them applies.
  */
-export function voyageHeldAtWaypoint(ctx: Pick<StepCtx, "state" | "content">): boolean {
+function voyageHeldAtWaypoint(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return (
     hasOpenCargoWork(ctx) ||
     hasRunnableBuyPartsWork(ctx) ||
@@ -473,22 +444,15 @@ function advanceTravel(ctx: StepCtx): void {
         updateStaffingProblem(
           ctx,
           console_.id,
-          waiting || (isStaffed(ctx) && !hasOpenCargoWork(ctx)),
+          waiting || (isStaffed(ctx, console_) && !hasOpenCargoWork(ctx)),
         );
       }
     }
-    // Passengers §3.3: a planned voyage home waits docked for the passenger ashore.
-    if (planned !== undefined && waitingForPassenger(ctx.state) !== undefined) return;
-    // D70: nor while someone is on their way to the captain with word (a held card).
-    if (planned !== undefined && cardsAwaitingDelivery(ctx)) return;
+    if (planned === undefined || departureWaits(ctx)) return;
     // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
-    if (planned !== undefined && !hasOpenCargoWork(ctx) && departureCleared(ctx)) {
-      beginDeparture(ctx, planned);
-    }
+    if (departureCleared(ctx)) beginDeparture(ctx, planned);
     return;
   }
-
-  const machineDefs = machineTagsByDefId(ctx);
 
   if (travel.stage === "preparingDeparture") {
     // D63: loading includes accepted freight still lying on the dock (cargo work, so it blocks
@@ -502,9 +466,7 @@ function advanceTravel(ctx: StepCtx): void {
     const ashore = peopleAshore(ctx);
     const holdRamps = ashore.length > 0 || (openCargo && ctx.state.deck.dock !== undefined);
     requestRamps(ctx, holdRamps ? "open" : "closed");
-    const console_ = bridgeConsole(ctx);
-    const staffed = isStaffed(ctx);
-    if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
+    const staffed = checkStaffing(ctx);
     // Loading crew may be out on the dock fetching freight; the call waits for the cargo.
     if (ashore.length === 0) endRecall(travel);
     else if (!openCargo) recallAshore(ctx, travel, ashore);
@@ -521,15 +483,10 @@ function advanceTravel(ctx: StepCtx): void {
     }
   }
 
-  if (travel.stage === "docking") {
-    const console_ = bridgeConsole(ctx);
-    const staffed = isStaffed(ctx);
-    if (console_ !== undefined) updateStaffingProblem(ctx, console_.id, staffed);
-    if (!staffed) return; // stalled
-  }
+  if (travel.stage === "docking" && !checkStaffing(ctx)) return; // stalled
 
   if (travel.stage === "transit") {
-    const factor = propulsionFactor(ctx.state.machines, machineDefs);
+    const factor = propulsionFactor(ctx);
     const drifting = factor <= 0;
     if (drifting !== travel.drifting) {
       travel.drifting = drifting;
@@ -565,7 +522,7 @@ function advanceTravel(ctx: StepCtx): void {
 /** Run the current timed stage's clock; returns the new progress (capped at 1). */
 function advanceStageTimer(
   ctx: StepCtx,
-  travel: Extract<TravelState, { stage: Exclude<TravelStage, "docked"> }>,
+  travel: InFlight,
   stage: Exclude<TravelStage, "docked" | "transit">,
 ): number {
   const durationTicks = stageDurationTicks(ctx, stage);
@@ -606,10 +563,7 @@ function castOffDock(ctx: StepCtx, portId: PortDefId): void {
 }
 
 function advanceStage(ctx: StepCtx): void {
-  const travel = ctx.state.travel as Extract<
-    TravelState,
-    { stage: Exclude<TravelStage, "docked"> }
-  >;
+  const travel = ctx.state.travel as InFlight;
   const from = travel.stage;
   const to = nextStage(from);
   if (from === "undocking") castOffDock(ctx, travel.fromPortId);
