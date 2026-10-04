@@ -19,6 +19,7 @@ import { DOCK } from "../spatial/fixtures/dock";
 import { deckGeometry } from "../spatial/geometry";
 import { spatialViolations } from "../spatial/invariants";
 import { requestMove } from "../spatial/movement";
+import { withoutRounds } from "../work/fixtures/crew-deck";
 import { workViolations } from "../work/invariants";
 import {
   FAR_DOCK,
@@ -158,6 +159,7 @@ describe("departure waits for everyone on the dock (D61)", () => {
   it("keeps the ramps down and calls someone on the quay back aboard before leaving", () => {
     const test = docksideWorld();
     const { world } = test;
+    withoutRounds(world);
     place(world, MARA, DOCK.farQuay);
     setCourse(test, TINY.port2);
     const prep = run(test, 40, () => false);

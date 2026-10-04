@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { PlannerConfig } from "../../core/types/pipeline";
 import { enumerateCandidates } from "../../planner/candidates";
 import { selectIntent } from "../../planner/select";
-import { JON, MARA, addCrateToLoad, addEngineFault, crewWorld, place } from "./fixtures/crew-deck";
+import {
+  JON,
+  MARA,
+  addCrateToLoad,
+  addEngineFault,
+  crewWorld,
+  place,
+  withoutRounds,
+} from "./fixtures/crew-deck";
 import { run } from "./fixtures/run";
 
 function actorOf(tw: ReturnType<typeof crewWorld>, id: typeof MARA) {
@@ -35,6 +43,7 @@ describe("selectIntent", () => {
   it("ranks the highest urgency class first, then time to intervention", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
+    withoutRounds(world);
     actorOf(tw, JON).availability = "incapacitated";
     place(world, MARA, { x: 2, y: 6 });
     addCrateToLoad(world, { x: 3, y: 6 });
@@ -58,6 +67,7 @@ describe("selectIntent", () => {
   it("returns idle when there is nothing to do, and continue while committed", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
+    withoutRounds(world);
     const view = kernel.getAgentView(world, MARA);
     expect(selectIntent(view, plannerConfig(tw))).toEqual({ kind: "idle" });
     actorOf(tw, MARA).needs.fatigue = 0.6;
