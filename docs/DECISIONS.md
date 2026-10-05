@@ -1507,3 +1507,17 @@ from the counter before the carrier takes it up, and the stander is relieved hun
 after sailing (plans now route around them, but the inspector can still show a tool "on the dock";
 a perception rule that the dock is gone once undocked is the cleaner fix); the plain pacing
 scenario earns nothing and goes negative buying provisions and spares by day 8.
+
+*D82 addendum (slice-3 QA).* A mop trip's tiles come from the grid when the plan is built
+(`cleanPlan` calls the derivation's own `tilesToMop`), not from the task: settling a trip bumps
+the problem's revision, but the task's `interactionTiles` refresh only at the next derivation pass
+(every 10 ticks), and a hand who claimed in that gap re-mopped the tiles just cleaned (4 of 9
+traced trips; the cargo hold never came clean in port). After: a QA corridor came clean in 4
+trips, not 5; six days measure dirty 0.67–1.0 a day, cleaned 0.5–0.67, mopping 4.2–6.1 %. Between
+tiles the mopper reads "mopping the <room>", not "walking to" it. Not closed: any task can be
+claimed while its revision lags its problem's; plans that read a count or target off the task
+could see the same lag, and none was audited.
+
+*Slice 3 also ships with (QA, minor):* instant steps never show their own labels ("fetching the
+mop", "serving dinner": the walk reads "walking to stores"); at 390 px the new labels always
+truncate; a trip over a room's twelve dirtiest tiles can jump between clusters.
