@@ -25,8 +25,12 @@ import {
  *   → routineObligation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
- * - rest/socialize → voluntaryActivity;
- * - recreation (slice 4, `recreation.ts`) → routineObligation or voluntaryActivity, off duty;
+ * - rest/socialize → the need's urgency as above, `voluntaryActivity` below the seek threshold
+ *   (D84 tuning: a social or comfort need past the threshold is routine, so it ranks with a game
+ *   off watch instead of always losing to it, and nobody comes on watch starved for company; the
+ *   hold then ends when the need is met, `systems/work/steps.ts`);
+ * - recreation (slice 4, `recreation.ts`) → routineObligation or voluntaryActivity off duty,
+ *   voluntaryActivity on duty;
  * - a `privateTalk` summons (slice 4, `cabins.ts`) → essentialOperation.
  *
  * - on duty with nothing else to do (D77: `rounds.ts`, the post until rounds land) →
@@ -441,7 +445,7 @@ function leisureCandidate(
   if (tile === undefined) return { ref: activity, reason: "noLounge" };
   const ticks = view.estimateTravelTicks(tile);
   if (ticks === null) return { ref: activity, reason: "unreachableTarget" };
-  return personal(activity, "voluntaryActivity", ticks, view.tick, {
+  return personal(activity, needUrgency(need, config) ?? "voluntaryActivity", ticks, view.tick, {
     kind: "personal",
     activity,
     tile,

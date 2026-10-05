@@ -1,21 +1,25 @@
 /**
  * The recreation candidate (slice 4, calls 1 and 2): one candidate per person, the best-scored
- * activity, never above routine class and offered off duty only: anything above
- * `needs.seekThreshold`; between `recreation.joinAbove` and the seek threshold only joining an
- * open session (a neutral player makes up the table when they have time on their hands); nothing
- * below. Every recreation candidate is `routineObligation` (W1 deviation from call 1, which made
+ * activity, never above routine class: off duty anything above `needs.seekThreshold`; between
+ * `recreation.joinAbove` and the seek threshold only joining an open session (a neutral player
+ * makes up the table when they have time on their hands); nothing below. On duty (D84 tuning) only
+ * above the seek threshold and at `voluntaryActivity`, as rest and chat are (`leisureCandidate`):
+ * any routine work still wins, but a cook with nothing on the stove bakes or plays instead of
+ * standing idle at the post (the post and rounds are voluntary too and rank by travel). Every recreation candidate is `routineObligation` (W1 deviation from call 1, which made
  * the join voluntary): off watch everyone is in a voluntary rest or chat hold, which a voluntary
  * candidate never interrupts, so a voluntary join never filled a table.
  *
  * Each `ActivityDef` the deck has a venue for is scored: interest (strong like 3, like 2, neutral
  * 1, dislike 0, never chosen; the 3/2/1/0 rule is `core/interests.ts` `interestScore`, which the
- * planner may not import, so it is restated here), +1 for an open session with room, +0.5 for a
- * session holding someone the actor likes (affinity above `social.preferAbove`), −∞ for one
+ * planner may not import, so it is restated here), +2 for an open session with room (D84 tuning;
+ * call 2 said +1), +1 for hosting a group activity (D84 tuning: company is worth something), +0.5
+ * for a session holding someone the actor likes (affinity above `social.preferAbove`), −∞ for one
  * holding someone at or below `social.avoidBelow`; with mood above `mood.highAbove` group
  * activities +1; with mood below `mood.lowBelow` solo only (a group game's `solo` variant, or a
- * min-1 group activity played alone). Joining needs score ≥ 1; hosting needs score ≥ 2; playing
- * a solo activity needs ≥ 1 (a bored person with nothing they like still does something). Ties:
- * join over host over solo, then travel, then id. Emits `recreate:<activityId>` with
+ * min-1 group activity played alone). Joining needs score ≥ 1; hosting needs a like (interest
+ * ≥ 2); playing a solo activity needs ≥ 1 (a bored person with nothing they like still does
+ * something). Ties: join over host over solo, then travel, then the bigger table (D84 tuning: the
+ * vids before the two-player video game at the one vid screen), then id. Emits `recreate:<activityId>` with
  * `choice.activityId`, `choice.role` and (joining) `choice.sessionId`.
  *
  * Reads `self.interests`, `self.affinity`, `self.mood`, `sessions()`, `travel()`, known items
@@ -44,6 +48,20 @@ interface Option {
 }
 
 const ROLE_ORDER: Readonly<Record<RecreateRole, number>> = { join: 0, host: 1, solo: 2 };
+
+/**
+ * D84 tuning: an open session with room is worth +2 (call 2 said +1), so a neutral joiner (1 + 2)
+ * makes up a table against their own strong-liked solo (3), and the join-over-solo tie fills it;
+ * at +1 a third of sessions collapsed for want of a second player.
+ */
+const OPEN_SESSION_BONUS = 2;
+
+/**
+ * D84 tuning: hosting a group activity is worth its interest + 1 (company is worth something), so
+ * a liked debate (2 + 1) ties a strong-liked solo (3) and the host-over-solo tie opens it; at bare
+ * interest nobody ever hosted a debate.
+ */
+const HOST_COMPANY_BONUS = 1;
 
 /** Strong like 3, like 2, neutral 1, dislike 0 (`core/interests.ts` `interestScore`). */
 export function interestScoreOf(view: AgentView, tag: InterestTag): number {
@@ -210,7 +228,7 @@ function optionsFor(view: AgentView, config: PlannerConfig, def: Def, routine: b
     if (!hasRoom(view, config, def, session)) continue;
     add(
       "join",
-      interest + 1 + high + companyBonus(view, config, session),
+      interest + OPEN_SESSION_BONUS + high + companyBonus(view, config, session),
       sessionTile(view, session),
       session,
     );
@@ -218,7 +236,7 @@ function optionsFor(view: AgentView, config: PlannerConfig, def: Def, routine: b
   // One game of a kind at a time: with cards already on (open, or full and running), a second
   // table would only gather nobody and collapse (the fifth of five would-be hosts).
   if (routine && interest >= 2 && ofDef.length === 0) {
-    add("host", interest + high, venueTile(view, def));
+    add("host", interest + HOST_COMPANY_BONUS + high, venueTile(view, def));
   }
   return out;
 }
@@ -231,15 +249,19 @@ const better = (a: Option, b: Option | undefined): boolean =>
       ? ROLE_ORDER[a.role] < ROLE_ORDER[b.role]
       : a.ticks !== b.ticks
         ? a.ticks < b.ticks
-        : a.def.id < b.def.id);
+        : a.def.participants.max !== b.def.participants.max
+          ? a.def.participants.max > b.def.participants.max
+          : a.def.id < b.def.id);
 
 export function recreationCandidate(
   view: AgentView,
   config: PlannerConfig,
 ): Candidate | Rejection | undefined {
-  if (view.self.onDuty) return undefined;
   const boredom = view.self.needs.recreation;
-  if (boredom <= config.recreation.joinAbove) return undefined;
+  const onDuty = view.self.onDuty;
+  if (boredom <= (onDuty ? config.needs.seekThreshold : config.recreation.joinAbove)) {
+    return undefined;
+  }
   const routine = boredom > config.needs.seekThreshold;
   // A plan that could not be built backs off the bare ref (`startPersonal`); a failed game its own.
   if (backingOff(view, "recreate")) return { ref: "recreate", reason: "backoff" };
@@ -261,7 +283,8 @@ export function recreationCandidate(
   // A join below the seek threshold is routine too, not voluntary: off watch everyone is already
   // in a voluntary rest or chat hold, which a voluntary candidate never interrupts (same-class
   // commitment), so the open table would never fill. The mess call is routine for the same reason.
-  const urgency: UrgencyClass = "routineObligation";
+  // On duty it is voluntary, so the watch's work (routine) always comes first.
+  const urgency: UrgencyClass = onDuty ? "voluntaryActivity" : "routineObligation";
   return personal(`recreate:${best.def.id}`, urgency, best.ticks, view.tick, {
     kind: "personal",
     activity: "recreate",

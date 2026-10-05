@@ -12,17 +12,20 @@
  * A solo play of an activity that is itself (not a group game's `solo` variant: reading, the
  * harmonica, baking) resolves its outcome when it completes, through the same
  * `resolveOutcome(ctx, session, def)` a session uses, with a one-person session that is never
- * stored: the harmonica is a performance for the room, the bake a tray of treats. A completed
+ * stored: the harmonica is a performance for the room (its one `sessionEnded`, D84 tuning), the
+ * bake a tray of treats. A completed
  * step leaves its session itself (`finishActivity` does not call `abortActivity`).
  *
  * Owner: W1 of ship life slice 4.
  */
+import { allocateId } from "../../core/ids";
 import type { Actor } from "../../core/types/actor";
 import type { ActivityDef } from "../../core/types/content";
 import type { SessionId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { GroupSession } from "../../core/types/state";
 import { resolveOutcome } from "../social/outcomes";
+import { emitSim } from "../work/events";
 import type { StepResult } from "../work/steps";
 import { type RecreateStep, playsVariant } from "./common";
 import { joinSession, joinable, leaveSession, openSession, sessionAtVenue } from "./sessions";
@@ -30,29 +33,43 @@ import { venueAt, venueTakenByAnother } from "./venues";
 
 const OCCUPIED: StepResult = { fail: "occupiedPosition" };
 
-/** A solo play's outcome, through a one-person session that is never stored. */
-function resolveSolo(ctx: StepCtx, actor: Actor, def: ActivityDef): void {
+/**
+ * A solo play's outcome, through a one-person session that is never stored. A performance (the
+ * harmonica) is for the room, so it ends with a `sessionEnded` line ("Bettina Solheim played the
+ * harmonica in the lounge", D84 tuning); the session's id is allocated for that event like any
+ * other (it names a real, if unstored, one-person session), and only then, so other solo plays
+ * use none.
+ */
+function resolveSolo(ctx: StepCtx, actor: Actor, step: RecreateStep, def: ActivityDef): void {
   const venue = venueAt(ctx, actor, def);
   if (venue === undefined) return;
+  const perform = def.outcome === "perform";
+  const startedTick = ctx.tick - step.ticksDone;
   const session: GroupSession = {
-    // Never stored or emitted: `resolveOutcome` only reads the members, host and venue.
-    id: `solo:${actor.id}` as SessionId,
+    id: perform ? allocateId(ctx.state, "session") : (`solo:${actor.id}` as SessionId),
     activityId: def.id,
     venue,
     hostId: actor.id,
     members: [actor.id],
-    openedTick: ctx.tick,
-    startedTick: ctx.tick,
+    openedTick: startedTick,
+    startedTick,
     endsAtTick: ctx.tick,
   };
   resolveOutcome(ctx, session, def);
+  if (!perform) return;
+  emitSim(ctx, "sessionEnded", [actor.id], {
+    sessionId: session.id,
+    activityId: def.id,
+    outcome: "perform",
+    memberIds: [actor.id],
+  });
 }
 
 function runSolo(ctx: StepCtx, actor: Actor, step: RecreateStep, def: ActivityDef): StepResult {
   if (step.ticksDone >= step.ticksNeeded) return "done";
   step.ticksDone += 1;
   if (step.ticksDone < step.ticksNeeded) return "wait";
-  resolveSolo(ctx, actor, def);
+  resolveSolo(ctx, actor, step, def);
   return "done";
 }
 

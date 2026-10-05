@@ -279,7 +279,7 @@
   },
   "recreation": {
     "joinAbove": 0.25,
-    "gatherSeconds": 30,
+    "gatherSeconds": 45,
     "lateJoinSeconds": 20,
     "collapseBackoffDays": 0.1
   },

@@ -236,18 +236,21 @@ describe("mood (call 2)", () => {
     expect(sessions(world)).toHaveLength(0);
   });
 
-  it("a high-mood person hosts rather than sitting alone", () => {
+  it("a low-mood person keeps to a book, a high-mood one hosts rather than sitting alone", () => {
     const fixture = looked({ activities: CARDS_ONLY });
     const { world } = fixture;
-    // Keen on reading, fond of cards: alone with a book at an ordinary mood...
+    // Keen on reading, fond of cards: alone with a book when low... (D84 tuning: at an ordinary
+    // mood hosting is worth its interest + 1, which ties the book and hosts, so the contrast is
+    // drawn from low spirits now, not ordinary ones.)
     const jax = world.state.actors[JAX];
     if (jax === undefined) throw new Error("no Jax");
     jax.interests = { likes: ["reading", "cards"], strong: "reading", dislikes: [] };
     setNeed(world, "recreation", 0.6, [JAX]);
     const view = () => fixture.registry.buildAgentView(world, JAX);
     const config = world.config.values;
-    const plain = recreationCandidate(view(), config);
-    expect(plain !== undefined && "choice" in plain ? plain.choice : undefined).toMatchObject({
+    setMood(world, JAX, -0.6);
+    const low = recreationCandidate(view(), config);
+    expect(low !== undefined && "choice" in low ? low.choice : undefined).toMatchObject({
       activityId: ACTIVITY.reading,
       role: "solo",
     });

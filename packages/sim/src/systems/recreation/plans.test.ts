@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { TestWorld } from "../../core/fixtures/test-world";
+import { tickerLine } from "../../core/render";
 import type { ActivityDef } from "../../core/types/content";
 import type { ActivityDefId, ActorId, ProblemId, SessionId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
@@ -117,6 +118,59 @@ describe("the harmonica (call 13)", () => {
     expect(back.kind === "onDeck" && { x: Math.floor(back.x), y: Math.floor(back.y) }).toEqual(
       BETTINA_LOCKER,
     );
+  });
+});
+
+describe("a solo performance (D84 tuning)", () => {
+  it("the harmonica ends with one sessionEnded, a performance on the ticker; a book with none", () => {
+    const fixture = redOffWatch();
+    const { world } = fixture;
+    setNeed(world, "recreation", 0.6, [BETTINA]);
+    let played = false;
+    // The line is said from where the performer stands, so read it the tick it is emitted.
+    let line: string | null | undefined;
+    const events = runUntil(
+      fixture,
+      150,
+      (w) => played && w.state.actors[BETTINA]?.activity.kind === "idle",
+      (w, fresh) => {
+        const step = stepOf(w, BETTINA);
+        if (step?.kind === "recreate" && step.activityId === ACTIVITY.music) played = true;
+        const ended = fresh.find((e) => e.type === "sessionEnded");
+        if (line === undefined && ended !== undefined) line = tickerLine(ended, w.state, w.content);
+      },
+    );
+    const ended = events.filter((e) => e.type === "sessionEnded");
+    expect(ended).toHaveLength(1);
+    const [performance] = ended;
+    if (performance?.type !== "sessionEnded") throw new Error("no performance");
+    expect(performance.payload).toMatchObject({
+      activityId: ACTIVITY.music,
+      outcome: "perform",
+      memberIds: [BETTINA],
+    });
+    // A real id, allocated for the one-person session; it was never a row, so never opened.
+    expect(performance.payload.sessionId).toMatch(/^s\d+$/);
+    expect(world.state.social.sessions[performance.payload.sessionId]).toBeUndefined();
+    expect(events.some((e) => e.type === "sessionOpened" || e.type === "sessionStarted")).toBe(
+      false,
+    );
+    expect(line).toMatch(/^Bettina \w+ played the harmonica in the lounge$/);
+    // Reading is solo with outcome `none`: no line (call 18), no id spent.
+    const reader = redOffWatch();
+    setNeed(reader.world, "recreation", 0.6, [MARA]);
+    let read = false;
+    const readerEvents = runUntil(
+      reader,
+      200,
+      (w) => read && w.state.actors[MARA]?.activity.kind === "idle",
+      (w) => {
+        const step = stepOf(w, MARA);
+        if (step?.kind === "recreate" && step.activityId === ACTIVITY.reading) read = true;
+      },
+    );
+    expect(read).toBe(true);
+    expect(readerEvents.some((e) => e.type === "sessionEnded")).toBe(false);
   });
 });
 

@@ -13,7 +13,8 @@
  *   the galley's `cook`/`serve` are `systems/galley/`'s; D82: the `mop` stage is `systems/dirt/`'s.
  * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
  *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
- *   fully met while on duty; off duty they last until the planner finds something more urgent.
+ *   fully met while on duty, or when taken because the need pressed (D84 tuning); otherwise, off
+ *   duty, they last until the planner finds something more urgent.
  * - A helm hold (`staff`) ends when the stander is relieved or the watch post closes (D77,
  *   `systems/watch/helm.ts`); while it lasts the stander learns piloting (`skillGainPerDay`,
  *   capped at 10). A gangway hold ends when the ship sails or they are no longer the stander.
@@ -545,6 +546,14 @@ function learnAtTheHelm(ctx: StepCtx, actor: Actor): void {
   actor.skills = { ...actor.skills, piloting: Math.min(SKILL_CAP, now + perTick) };
 }
 
+/**
+ * D84 tuning: a rest or chat taken because the need pressed (above voluntary class, the planner's
+ * `leisureCandidate`) ends when the need is met, off duty too, so the person replans: otherwise
+ * the routine hold outlasted every routine game and the off watch was one long chat.
+ */
+const leisurePressed = (actor: Actor): boolean =>
+  actor.activity.kind === "personal" && actor.activity.urgency !== "voluntaryActivity";
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -556,9 +565,9 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
       return slept && (rested || shiftCalls);
     }
     case "rest":
-      return onDuty && actor.needs.comfort <= 0;
+      return (onDuty || leisurePressed(actor)) && actor.needs.comfort <= 0;
     case "socialize":
-      return onDuty && actor.needs.social <= 0;
+      return (onDuty || leisurePressed(actor)) && actor.needs.social <= 0;
     case "staff":
       if (helmHoldDone(ctx, actor, step)) return true;
       learnAtTheHelm(ctx, actor);
