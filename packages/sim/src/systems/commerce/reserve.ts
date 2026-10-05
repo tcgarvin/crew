@@ -2,7 +2,7 @@
  * D80: the stores the ship keeps aboard, bought at port like a part (D47) when they run low.
  *
  * Provisions (D81) are reckoned in days of meals (`systems/galley/provisions.ts`
- * `provisionsDays`: servings aboard over eaters × `time.watchesPerDay`). Under
+ * `provisionsDays`: a crate a meal, a meal a watch, so crates over `time.watchesPerDay`). Under
  * `galley.lowBelowDays`, while docked at a port whose market sells a `provisions`-tagged item,
  * the crates that bring it to `galley.restockToDays` are a `reserveLow` problem for that item.
  * `galley.lowBelowDays` 0 turns it off.
@@ -32,7 +32,7 @@ import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { ProblemOfKind } from "../../core/types/work";
 import { resolveProblem } from "../equipment/problems";
 import { unitsAboard } from "../equipment/supplies";
-import { provisionsDays, provisionsDefs, servingsPerDay } from "../galley/provisions";
+import { cratesPerDay, provisionsDays, provisionsDefs } from "../galley/provisions";
 
 type ReserveCtx = Pick<StepCtx, "content" | "config"> & {
   readonly state: Pick<ReadonlyWorldState, "items" | "jobs" | "actors" | "markets">;
@@ -100,19 +100,18 @@ function foodShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveSho
 
 /**
  * D81: the provisions to buy here, if the galley's days of meals are low and the market sells a
- * `provisions` item (the first by id): the crates that bring the days to `restockToDays`.
+ * `provisions` item (the first by id): the crates that bring the days to `restockToDays`, a
+ * crate a meal (`galley/provisions.ts`).
  */
 function provisionsShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
-  const { lowBelowDays, restockToDays, servingsPerCrate } = ctx.config.galley;
-  if (lowBelowDays <= 0 || servingsPerCrate <= 0) return [];
+  const { lowBelowDays, restockToDays } = ctx.config.galley;
+  if (lowBelowDays <= 0) return [];
   const days = provisionsDays(ctx.state, ctx.content, ctx.config);
   if (days >= lowBelowDays) return [];
   const sold = new Set(stock);
   const def = provisionsDefs(ctx.content).find((d) => sold.has(d.id));
   if (def === undefined) return [];
-  const crates = wholeUnits(
-    ((restockToDays - days) * servingsPerDay(ctx.state, ctx.config)) / servingsPerCrate,
-  );
+  const crates = wholeUnits((restockToDays - days) * cratesPerDay(ctx.config));
   return crates > 0 ? [{ itemDefId: def.id, count: crates }] : [];
 }
 

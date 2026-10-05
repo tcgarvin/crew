@@ -54,6 +54,7 @@ const config = {
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
     routineAgingDays: AGING_DAYS,
+    cleaningAgingDays: AGING_DAYS,
   },
 } as PlannerConfig;
 

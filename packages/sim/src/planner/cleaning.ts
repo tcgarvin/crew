@@ -4,7 +4,7 @@
  * By the room's tags against the actor's roles (`ROOM_AFFINITY`: cook → galley, mess; deckhand →
  * cargo hold, corridor, gym, airlock; engineer → engineering; medic → infirmary; captain, first
  * officer, pilot → bridge; lounge, quarters, cabins and stores belong to nobody); anyone once the
- * problem is `urgency.routineAgingDays` old; and anyone while it is essential (a filthy galley or
+ * problem is `urgency.cleaningAgingDays` old; and anyone while it is essential (a filthy galley or
  * infirmary). Cleaning keeps the off-duty rule (`candidates.ts`), so on-duty crew with nothing to
  * do clean before they walk rounds (routine beats voluntary) and off-duty crew never clean.
  *
@@ -40,10 +40,10 @@ export function isCleaningTask(task: TaskView): boolean {
   return task.type === "cleanCompartment";
 }
 
-/** Has the problem waited `urgency.routineAgingDays` (ticks inline: the planner has no clock)? */
+/** Has the problem waited `urgency.cleaningAgingDays` (ticks inline: the planner has no clock)? */
 function aged(view: AgentView, config: PlannerConfig, problem: ProblemView): boolean {
   const agingTicks =
-    config.urgency.routineAgingDays * config.time.daySeconds * config.time.tickRate;
+    config.urgency.cleaningAgingDays * config.time.daySeconds * config.time.tickRate;
   return view.tick - problem.createdTick >= agingTicks;
 }
 

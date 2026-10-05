@@ -2601,6 +2601,10 @@
             "routineAgingDays": {
               "type": "number",
               "exclusiveMinimum": 0
+            },
+            "cleaningAgingDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
             }
           },
           "required": [
@@ -2608,7 +2612,8 @@
             "needSurvivalAbove",
             "heatContainmentAbove",
             "heatSurvivalAbove",
-            "routineAgingDays"
+            "routineAgingDays",
+            "cleaningAgingDays"
           ],
           "additionalProperties": false
         },

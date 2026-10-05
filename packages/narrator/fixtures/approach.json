@@ -11,8 +11,8 @@
   "snapshot": {
     "schemaVersion": 9,
     "simVersion": "0.1.0",
-    "contentHash": "6dbcf98207ff8e4b",
-    "configHash": "6dbcf98207ff8e4b",
+    "contentHash": "9c8da2ab1d472b97",
+    "configHash": "9c8da2ab1d472b97",
     "savedAtTick": 1800,
     "config": {
       "time": {
@@ -51,8 +51,8 @@
         "bedtimeAbove": 0.3,
         "initialRange": {
           "hunger": {
-            "min": 0.2,
-            "max": 0.6
+            "min": 0,
+            "max": 0.2
           },
           "fatigue": {
             "min": 0.1,
@@ -82,7 +82,8 @@
         "needSurvivalAbove": 0.9,
         "heatContainmentAbove": 0.7,
         "heatSurvivalAbove": 0.9,
-        "routineAgingDays": 0.075
+        "routineAgingDays": 0.075,
+        "cleaningAgingDays": 0.25
       },
       "equipment": {
         "hazardScale": 1,
@@ -146,8 +147,8 @@
         },
         "sparesReserve": 3,
         "foodReserve": {
-          "lowBelowDays": 2,
-          "restockToDays": 5
+          "lowBelowDays": 1,
+          "restockToDays": 2
         },
         "market": {
           "priceTiers": {
@@ -221,14 +222,14 @@
         "spareServings": 1,
         "servingsPerCrate": 12,
         "mealSpoilDays": 0.25,
-        "mealCallHungerAbove": 0.2,
-        "lowBelowDays": 1,
-        "restockToDays": 4,
+        "mealCallHungerAbove": 0.1,
+        "lowBelowDays": 2,
+        "restockToDays": 5,
         "goodCookingAbove": 6,
         "poorCookingBelow": 3
       },
       "dirt": {
-        "footfallPerStep": 0.004,
+        "footfallPerStep": 0.01,
         "bootsPickup": 0.15,
         "bootsShed": 0.25,
         "dockGrimePerStep": 0.08,
@@ -301,7 +302,7 @@
       "nextId": {
         "actor": 10,
         "machine": 34,
-        "item": 24,
+        "item": 16,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -2073,110 +2074,6 @@
         },
         "i11": {
           "id": "i11",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 10.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i12": {
-          "id": "i12",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 11.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i13": {
-          "id": "i13",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 12.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i14": {
-          "id": "i14",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 13.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i15": {
-          "id": "i15",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 14.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i16": {
-          "id": "i16",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 15.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i17": {
-          "id": "i17",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 16.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i18": {
-          "id": "i18",
-          "defId": "item.ration_pack",
-          "stacking": "stack",
-          "location": {
-            "kind": "onDeck",
-            "deckId": "deck.freighter_mk2",
-            "x": 17.5,
-            "y": 10.5
-          },
-          "count": 20,
-          "reserved": 0
-        },
-        "i19": {
-          "id": "i19",
           "defId": "item.coolant_canister",
           "stacking": "stack",
           "location": {
@@ -2188,8 +2085,8 @@
           "count": 4,
           "reserved": 0
         },
-        "i20": {
-          "id": "i20",
+        "i12": {
+          "id": "i12",
           "defId": "item.med_kit",
           "stacking": "stack",
           "location": {
@@ -2201,8 +2098,8 @@
           "count": 3,
           "reserved": 0
         },
-        "i21": {
-          "id": "i21",
+        "i13": {
+          "id": "i13",
           "defId": "item.hand_truck",
           "stacking": "unique",
           "location": {
@@ -2213,8 +2110,8 @@
           },
           "condition": 1
         },
-        "i22": {
-          "id": "i22",
+        "i14": {
+          "id": "i14",
           "defId": "item.provisions",
           "stacking": "stack",
           "location": {
@@ -2226,8 +2123,8 @@
           "count": 18,
           "reserved": 0
         },
-        "i23": {
-          "id": "i23",
+        "i15": {
+          "id": "i15",
           "defId": "item.mop",
           "stacking": "unique",
           "location": {

@@ -23,6 +23,7 @@ import type {
 import { cleanPlan } from "../dirt/clean";
 import { cookPlan } from "../galley/cook";
 import { carryMealPlan, eatPlan } from "../galley/eat";
+import { estimateTravelTicks } from "../spatial/estimates";
 import { plotCoursePlan } from "../travel/course";
 import { gangwayPlan, helmPlan } from "../watch/helm";
 import { roundsPlan } from "../watch/rounds";
@@ -117,13 +118,25 @@ function distance(a: TileCoord, b: TileCoord): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-/** Known, not-absent items matching `predicate`, nearest first by believed tile. */
+/**
+ * Known, not-absent items matching `predicate`, nearest first by the schematic walk from where
+ * the actor stands (`estimateTravelTicks`, the planner's own measure), leaving out any the
+ * schematic has no route to. Measured by the walk and not as the crow flies because beliefs go
+ * stale: a toolkit seen on the dock at the last port is still "on the dock" once the ship has
+ * sailed, and a plan that fetched the nearest believed tool by distance sent the engineer to
+ * that dock tile from the mess, failed, backed off and tried again, while a toolkit lay beside
+ * the machine (the slice-3 tuning run: the ship drifted two days on a generator fault). The
+ * planner (`taskTravel`) already skips tools it cannot route to; now the plan agrees with it.
+ * Off the deck (ashore), by distance as before.
+ */
 function knownItemsNearest(
   ctx: StepCtx,
   actor: Actor,
   predicate: (defId: ItemId) => boolean,
 ): ItemId[] {
-  const here = actor.location.kind === "onDeck" ? tileOf(actor.location) : { x: 0, y: 0 };
+  const onDeck = actor.location.kind === "onDeck" ? actor.location : undefined;
+  const here = onDeck === undefined ? { x: 0, y: 0 } : tileOf(onDeck);
+  const geometry = onDeck === undefined ? undefined : ctx.caches.nav.decks[onDeck.deckId];
   const candidates: { itemId: ItemId; d: number }[] = [];
   for (const fact of Object.values(actor.knowledge)) {
     if (fact.factType !== "itemLocation" || fact.value.absent === true) continue;
@@ -131,7 +144,12 @@ function knownItemsNearest(
     if (!predicate(itemId)) continue;
     const tile = pickupTile(ctx, actor, fact.value.location);
     if (tile === undefined) continue;
-    candidates.push({ itemId, d: distance(here, tile) });
+    const d =
+      geometry === undefined
+        ? distance(here, tile)
+        : estimateTravelTicks(geometry, here, tile, ctx.config, 1, ctx.caches);
+    if (d === null) continue;
+    candidates.push({ itemId, d });
   }
   candidates.sort((a, b) => a.d - b.d || (a.itemId < b.itemId ? -1 : 1));
   return candidates.map((c) => c.itemId);

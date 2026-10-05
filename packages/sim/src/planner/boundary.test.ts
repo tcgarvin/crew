@@ -68,6 +68,7 @@ const config: PlannerConfig = {
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
     routineAgingDays: 0.075,
+    cleaningAgingDays: 0.25,
   },
   needs: {
     hungerPerDay: 0,

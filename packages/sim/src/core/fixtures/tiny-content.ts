@@ -111,6 +111,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
       routineAgingDays: 60 / day,
+      cleaningAgingDays: 60 / day,
     },
     equipment: {
       hazardScale: 1,

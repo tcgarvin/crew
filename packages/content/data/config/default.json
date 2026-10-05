@@ -36,8 +36,8 @@
     "bedtimeAbove": 0.3,
     "initialRange": {
       "hunger": {
-        "min": 0.2,
-        "max": 0.6
+        "min": 0,
+        "max": 0.2
       },
       "fatigue": {
         "min": 0.1,
@@ -67,7 +67,8 @@
     "needSurvivalAbove": 0.9,
     "heatContainmentAbove": 0.7,
     "heatSurvivalAbove": 0.9,
-    "routineAgingDays": 0.075
+    "routineAgingDays": 0.075,
+    "cleaningAgingDays": 0.25
   },
   "equipment": {
     "hazardScale": 1,
@@ -131,8 +132,8 @@
     },
     "sparesReserve": 3,
     "foodReserve": {
-      "lowBelowDays": 2,
-      "restockToDays": 5
+      "lowBelowDays": 1,
+      "restockToDays": 2
     },
     "market": {
       "priceTiers": {
@@ -206,14 +207,14 @@
     "spareServings": 1,
     "servingsPerCrate": 12,
     "mealSpoilDays": 0.25,
-    "mealCallHungerAbove": 0.2,
-    "lowBelowDays": 1,
-    "restockToDays": 4,
+    "mealCallHungerAbove": 0.1,
+    "lowBelowDays": 2,
+    "restockToDays": 5,
     "goodCookingAbove": 6,
     "poorCookingBelow": 3
   },
   "dirt": {
-    "footfallPerStep": 0.004,
+    "footfallPerStep": 0.01,
     "bootsPickup": 0.15,
     "bootsShed": 0.25,
     "dockGrimePerStep": 0.08,

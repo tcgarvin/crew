@@ -1,11 +1,17 @@
 /**
  * The provisions reserve, counted in days of meals (D81, reconciling D80's food rule).
  *
- * A crate of `provisions` makes `galley.servingsPerCrate` servings; a served `meal` on the counter
- * is one. Servings aboard over the people aboard who eat times `time.watchesPerDay` (a meal a
- * watch) is how many days the galley can cook for. Commerce's `reserveLow` (`commerce/reserve.ts`)
- * buys crates against `galley.lowBelowDays` / `restockToDays`; the digest and `crew beats` print
- * the days. Ration packs are not provisions: they stay D80's `commerce.foodReserve`, the fallback.
+ * A crate of `provisions` is one meal: the serve uses the crate up and sets `servingsPerMeal`
+ * servings on the counter (`cook.ts` `runServe`), whatever `galley.servingsPerCrate` says the
+ * crate could have made; the rest is the waste of cooking for a crew. So the galley can cook for
+ * `crates / time.watchesPerDay` days, plus the servings already on the counter or in hand as a
+ * fraction of a meal. Counting the crates as servings (the gate's first reckoning) read eight days
+ * for the eighteen crates the scenario stows and the ship ran dry in six without ever asking a
+ * market, because the day the count fell under `galley.lowBelowDays` was the last.
+ *
+ * Commerce's `reserveLow` (`commerce/reserve.ts`) buys crates against `galley.lowBelowDays` /
+ * `restockToDays`; the digest and `crew beats` print the days. Ration packs are not provisions:
+ * they stay D80's `commerce.foodReserve`, the fallback.
  *
  * Owner: W1 of ship life slice 3 (complete at the gate; W1 may extend, not rename).
  */
@@ -43,37 +49,36 @@ export function provisionsCratesAboard(state: ProvisionsState, content: Provisio
   return crates;
 }
 
-/** Servings aboard: the crates' worth plus served meals still on the counter or in hand. */
-export function servingsAboard(
-  state: ProvisionsState,
-  content: ProvisionsContent,
-  config: ConfigDef,
+/**
+ * Servings a serve sets on the counter: everyone aboard who eats plus `galley.spareServings`,
+ * never more than a crate makes, at least one.
+ */
+export function servingsPerMeal(
+  state: Pick<ReadonlyWorldState, "actors">,
+  config: Pick<ConfigDef, "galley">,
 ): number {
-  const aboard = unitsAboard(state);
-  let servings = provisionsCratesAboard(state, content) * config.galley.servingsPerCrate;
-  const meal = mealDef(content);
-  if (meal !== undefined) servings += aboard.get(meal.id) ?? 0;
-  return servings;
+  const { spareServings, servingsPerCrate } = config.galley;
+  return Math.max(1, Math.min(eatersAboard(state) + spareServings, servingsPerCrate));
 }
 
-/** Servings the people aboard eat in a day: one each per watch. */
-export function servingsPerDay(
-  state: Pick<ReadonlyWorldState, "actors">,
-  config: ConfigDef,
-): number {
-  return eatersAboard(state) * config.time.watchesPerDay;
+/** Crates the galley cooks in a day: one a meal, a meal a watch. */
+export function cratesPerDay(config: Pick<ConfigDef, "time">): number {
+  return config.time.watchesPerDay;
 }
 
 /**
- * Days of meals the galley can still cook (`servingsAboard` over `servingsPerDay`); `Infinity`
- * with nobody aboard to feed.
+ * Days of meals the galley can still cook: the crates aboard, plus the served meals still on the
+ * counter or in hand as a fraction of a meal, over the crates a day; `Infinity` with nobody
+ * aboard to feed.
  */
 export function provisionsDays(
   state: ProvisionsState,
   content: ProvisionsContent,
-  config: ConfigDef,
+  config: Pick<ConfigDef, "galley" | "time">,
 ): number {
-  const perDay = servingsPerDay(state, config);
-  if (perDay <= 0) return Number.POSITIVE_INFINITY;
-  return servingsAboard(state, content, config) / perDay;
+  if (eatersAboard(state) <= 0) return Number.POSITIVE_INFINITY;
+  const meal = mealDef(content);
+  const served = meal === undefined ? 0 : (unitsAboard(state).get(meal.id) ?? 0);
+  const meals = provisionsCratesAboard(state, content) + served / servingsPerMeal(state, config);
+  return meals / cratesPerDay(config);
 }

@@ -13,12 +13,12 @@ export function registerGalley(registry: KernelRegistry): Unregister {
 export { consumeServing, eatPlan, mealCallStandsFor, runConsume } from "./eat";
 export { galleySystem } from "./galley";
 export {
+  cratesPerDay,
   eatersAboard,
   mealDef,
   provisionsCratesAboard,
   provisionsDays,
   provisionsDefs,
-  servingsAboard,
-  servingsPerDay,
+  servingsPerMeal,
 } from "./provisions";
 export { galleyTaskDerivations } from "./tasks";

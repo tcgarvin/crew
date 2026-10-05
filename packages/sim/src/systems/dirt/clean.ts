@@ -2,7 +2,7 @@
  * Cleaning (D82): the `cleanCompartment` plan and its `mop` work stage.
  *
  * `cleanPlan`: the mop (in hand already, or the nearest one the actor knows of), then for each of
- * the task's `interactionTiles` (dirtiest first) a `moveTo` and `mopSecondsPerTile` of `mop` work
+ * the task's `interactionTiles` (in the trip's order, `tasks.ts`) a `moveTo` and `mopSecondsPerTile` of `mop` work
  * (`workRate`-scaled), then back to the `cleaningLocker` zone to `putDown` the mop, and last the
  * trip's settling: a `mop` step of no ticks. `runMop` on a tile sets its cell to
  * `max(0, cell − mopPerTile × 255)`; the settling step resolves `compartmentDirty` with

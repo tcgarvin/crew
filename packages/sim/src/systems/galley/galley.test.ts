@@ -337,7 +337,8 @@ describe("the helm's plate, the counter's last serving (D81 call 5)", () => {
 
 describe("provisions (D81 call 8, through D80's reserveLow)", () => {
   it("says provisionsLow at the serve that takes the crates under lowBelowDays", () => {
-    const config = galleyConfig({ lowBelowDays: 1, restockToDays: 4 });
+    // A crate is a meal and the fixture's day is two watches, so one crate is half a day.
+    const config = galleyConfig({ lowBelowDays: 0.5, restockToDays: 4 });
     const fixture = galleyWorld({ config, crates: 1 });
     const events = runToSecond(fixture, GALLEY_WATCH);
     const low = ofType(events, "provisionsLow");
@@ -356,15 +357,15 @@ describe("provisions (D81 call 8, through D80's reserveLow)", () => {
           p.kind === "reserveLow" && p.payload.itemDefId === GALLEY.provisions,
       );
     runUntil(fixture, 5, () => reserve().length > 0);
-    // Five aboard, two watches: ten servings a day; four days is 40 servings, four crates.
-    expect(reserve()[0]?.payload.count).toBe(4);
+    // A crate is a meal and the fixture's day is two watches: four days is eight crates.
+    expect(reserve()[0]?.payload.count).toBe(8);
     const events = runUntil(fixture, 120, () => reserve().every((p) => p.status !== "open"));
     const bought = ofType(events, "partsBought");
     expect(bought.map((e) => e.payload.itemDefId)).toEqual([GALLEY.provisions]);
     const crates = Object.values(world.state.items)
       .filter((i) => i.defId === GALLEY.provisions && i.location.kind === "onDeck")
       .reduce((n, i) => n + (i.stacking === "stack" ? i.count : 1), 0);
-    expect(crates).toBe(4);
+    expect(crates).toBe(8);
     expect(reserve().map((p) => p.status)).toEqual(["resolved"]);
   });
 });

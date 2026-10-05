@@ -250,8 +250,11 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     const report = formatBeatsReport([result]);
     expect(report).toContain("# Beats: 1 day, 3 watches of 400 s");
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
-    // D83: the galley and dirt columns are in the report (their numbers are the tuning's).
-    for (const row of ["mealsServed", "eatenHot", "eatenRation", "mealsMissed", "roomsCleaned"]) {
+    // D81/D83: the cook serves a meal before each bell, so a day is three meals, none missed.
+    expect(result.beats.mealsServed).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
+    expect(result.beats.mealsMissed.total).toBe(0);
+    expect(report).toContain("| mealsServed | 3 | 1.00 | 1 | 1 |");
+    for (const row of ["eatenHot", "eatenRation", "roomsCleaned"]) {
       expect(report).toContain(`| ${row} | `);
     }
     expect(report).toContain("| filthy rooms at watch end | ");

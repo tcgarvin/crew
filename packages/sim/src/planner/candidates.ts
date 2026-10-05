@@ -50,7 +50,13 @@ import {
   personal,
   sameTile,
 } from "./common";
-import { eatCandidate, galleyTaskAllowed, galleyTaskExempt, isGalleyTask } from "./galley";
+import {
+  eatCandidate,
+  galleyTaskAllowed,
+  galleyTaskExempt,
+  isGalleyTask,
+  mealCallFor,
+} from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
 import { dutyIdleCandidate } from "./rounds";
 
@@ -359,6 +365,12 @@ function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rej
   const fatigue = view.self.needs.fatigue;
   const urgency = sleepUrgency(view, config, fatigue);
   if (urgency === undefined) return undefined;
+  // D81: dinner before bed. Bedtime (routine) waits while the mess call stands, so the off-going
+  // section eats the meal served before its bell instead of sleeping through the plate's life
+  // and waking to rations; pressing tiredness still sleeps.
+  if (urgency === "routineObligation" && mealCallFor(view, config) !== undefined) {
+    return { ref: "sleep", reason: "mealCall" };
+  }
   const occupied = occupiedTiles(view);
   const mine = view.self.berth?.machineId;
   const assigned = new Set(view.assignedBeds());

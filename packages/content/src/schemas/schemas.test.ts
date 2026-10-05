@@ -343,6 +343,7 @@ const config = {
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
     routineAgingDays: 0.1,
+    cleaningAgingDays: 0.1,
   },
   equipment: {
     hazardScale: 1,

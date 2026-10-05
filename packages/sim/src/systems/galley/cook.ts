@@ -40,11 +40,11 @@ import {
 import { type StepResult, touchInventory, workRate } from "../work/steps";
 import { mealQuality, positionTiles, roomTierAt, servingTiles, tileAt, unitsOf } from "./kitchen";
 import {
-  eatersAboard,
+  cratesPerDay,
   mealDef,
   provisionsCratesAboard,
   provisionsDays,
-  servingsPerDay,
+  servingsPerMeal,
 } from "./provisions";
 
 type StepOf<K extends ActivityStep["kind"]> = Extract<ActivityStep, { kind: K }>;
@@ -160,11 +160,12 @@ function callTheMess(ctx: StepCtx, cook: Actor, servings: StackItem): void {
  * down, so it is said once per fall (and again after a restock runs down).
  */
 function noteProvisionsLow(ctx: StepCtx): void {
-  const { lowBelowDays, servingsPerCrate } = ctx.config.galley;
-  const perDay = servingsPerDay(ctx.state, ctx.config);
+  const { lowBelowDays } = ctx.config.galley;
+  const perDay = cratesPerDay(ctx.config);
   if (lowBelowDays <= 0 || perDay <= 0) return;
   const crates = provisionsCratesAboard(ctx.state, ctx.content);
-  const daysOf = (n: number) => (n * servingsPerCrate) / perDay;
+  // A crate is a meal (`provisions.ts`), so the days are the crates over the crates a day.
+  const daysOf = (n: number) => n / perDay;
   if (daysOf(crates + 1) < lowBelowDays || daysOf(crates) >= lowBelowDays) return;
   const days = provisionsDays(ctx.state, ctx.content, ctx.config);
   emitSim(ctx, "provisionsLow", [], { crates, days: Math.round(days * 100) / 100 });
@@ -193,7 +194,7 @@ export function runServe(ctx: StepCtx, actor: Actor, _step: StepOf<"serve">): St
     roomTierAt(ctx.state, ctx.content, location.deckId, stoveTile),
     ctx.config,
   );
-  const count = Math.min(eatersAboard(ctx.state) + config.spareServings, config.servingsPerCrate);
+  const count = servingsPerMeal(ctx.state, ctx.config);
   useUp(ctx, crate);
   const id = allocateId(ctx.state, "item");
   const here = tileAt(location);
@@ -201,7 +202,7 @@ export function runServe(ctx: StepCtx, actor: Actor, _step: StepOf<"serve">): St
     id,
     defId: meal.id,
     stacking: "stack",
-    count: Math.max(1, count),
+    count,
     reserved: 0,
     location: { kind: "onDeck", deckId: location.deckId, x: here.x + 0.5, y: here.y + 0.5 },
     meal: {

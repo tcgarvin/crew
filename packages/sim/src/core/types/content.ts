@@ -943,10 +943,17 @@ export interface ConfigDef {
     readonly heatContainmentAbove: number;
     readonly heatSurvivalAbove: number;
     /**
-     * Age in days after which a routine obligation outranks younger ones in class. Not read yet;
-     * renamed with the other day knobs (D76).
+     * Age in days after which a routine obligation is anyone's: a plate for the helm goes to the
+     * cook or a dayworker before (D81). Renamed with the other day knobs (D76).
      */
     readonly routineAgingDays: Days;
+    /**
+     * Age in days after which a dirty room is anyone's on duty to mop; before it only the roles
+     * that keep the room (`cleaningRolesFor`) do. Longer than `routineAgingDays`, so a dirty
+     * corridor is the deckhand's for most of a watch and not the whole crew's after ninety
+     * seconds (D82).
+     */
+    readonly cleaningAgingDays: Days;
   };
   readonly equipment: {
     /** Global hazard multiplier for tuning sweeps. */
@@ -1196,8 +1203,9 @@ export interface ConfigDef {
     /** Hunger above which a known hot meal is a routine candidate (well under `seekThreshold`). */
     readonly mealCallHungerAbove: number;
     /**
-     * D80/D81: the provisions reserve, in days of meals (servings aboard over eaters ×
-     * `time.watchesPerDay`). Below `lowBelowDays`, docked at a port whose market sells
+     * D80/D81: the provisions reserve, in days of meals (a crate is a meal and a meal a watch,
+     * so crates aboard over `time.watchesPerDay`, plus the plates on the counter as a fraction of
+     * one). Below `lowBelowDays`, docked at a port whose market sells
      * provisions, the crew buy crates to bring it to `restockToDays` (`reserveLow`, bought like a
      * part). 0 turns it off. Ration packs are `commerce.foodReserve`'s.
      */

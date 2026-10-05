@@ -68,6 +68,7 @@ export const configDefSchema = z.strictObject({
     heatContainmentAbove: unitInterval,
     heatSurvivalAbove: unitInterval,
     routineAgingDays: positive,
+    cleaningAgingDays: positive,
   }),
   equipment: z.strictObject({
     hazardScale: nonNegative,

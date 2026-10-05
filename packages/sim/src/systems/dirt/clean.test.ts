@@ -1,7 +1,7 @@
 /**
  * Mopping (D82) on the dirt fixture with the planner: who mops which room, a full trip (fetch the
- * mop, the dirtiest tiles first, the mop back in the locker, `roomCleaned`), and cleaning against
- * rounds on and off duty.
+ * mop, the dirty tiles nearest first, the mop back in the locker, `roomCleaned`), and cleaning
+ * against rounds on and off duty.
  */
 import { describe, expect, it } from "vitest";
 import type { TestWorld } from "../../core/fixtures/test-world";
@@ -77,7 +77,7 @@ function moppers(test: TestWorld, ticks: number): ActorId[] {
 }
 
 describe("a mopping trip (D82)", () => {
-  it("the deckhand fetches the mop, works the dirtiest tiles first, puts it back; roomCleaned", () => {
+  it("the deckhand fetches the mop, works the dirty tiles nearest first, puts it back; roomCleaned", () => {
     const test = dirtWorld();
     soilSpots(test, HOLD_SPOTS);
     const order: TileCoord[] = [];
@@ -100,8 +100,16 @@ describe("a mopping trip (D82)", () => {
     const cleaned = eventsOf(log, "roomCleaned");
     expect(cleaned).toHaveLength(1);
     expect(cleaned[0]?.payload).toMatchObject({ key: "hall", byActorId: JON });
-    // One trip, the dirtiest tile first, with the mop in hand.
-    expect(order).toEqual(HOLD_SPOTS);
+    // One trip over every soiled tile, walked nearest first from the locker at (11,5) (the
+    // tuning commit: a dirtiest-first trip zigzagged the room), with the mop in hand.
+    expect(order).toEqual([
+      { x: 8, y: 6 },
+      { x: 7, y: 5 },
+      { x: 6, y: 6 },
+      { x: 5, y: 5 },
+      { x: 4, y: 6 },
+      { x: 3, y: 5 },
+    ]);
     expect(carriedWhileMopping).toBe(true);
     // Mopped to nothing, bar the odd footstep since.
     for (const t of HOLD_SPOTS) expect(cellAt(test, t)).toBeLessThan(10);
@@ -147,7 +155,7 @@ describe("who mops (D82)", () => {
     soilSpots(test, HOLD_SPOTS);
     const config = test.world.config.values;
     const agingTicks =
-      config.urgency.routineAgingDays * config.time.daySeconds * config.time.tickRate;
+      config.urgency.cleaningAgingDays * config.time.daySeconds * config.time.tickRate;
     // Before aging (a pass to raise, a derivation, then the aging window): not her room.
     expect(moppers(test, agingTicks - 40)).toEqual([]);
     expect(moppers(test, 400)).toEqual([MARA]);
@@ -166,7 +174,7 @@ describe("who mops (D82)", () => {
     soilSpots(test, ENGINEERING_SPOTS);
     const config = test.world.config.values;
     const agingTicks =
-      config.urgency.routineAgingDays * config.time.daySeconds * config.time.tickRate;
+      config.urgency.cleaningAgingDays * config.time.daySeconds * config.time.tickRate;
     // Nobody may take it before it ages, and Priya (off duty) never: after aging the on-duty
     // crew go instead.
     const who = moppers(test, agingTicks + 400);

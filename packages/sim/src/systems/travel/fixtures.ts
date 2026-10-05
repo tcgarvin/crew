@@ -123,6 +123,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
       routineAgingDays: 60 / FIXTURE_DAY,
+      cleaningAgingDays: 60 / FIXTURE_DAY,
     },
     equipment: {
       hazardScale: 1,
