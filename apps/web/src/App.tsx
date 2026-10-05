@@ -62,6 +62,7 @@ import { personWords } from "./ui/actorWords";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
 import { clockSections, shipClock } from "./ui/clock";
 import { dockInspection } from "./ui/dockInspection";
+import { gatheringLine } from "./ui/gathering";
 import { inspectItem } from "./ui/itemInspection";
 import {
   type CardEntry,
@@ -613,7 +614,18 @@ export function App() {
             return;
           }
           const name = bundle.machines[machine.defId]?.name;
-          setInspectorData({ kind: "machine", machine, ...(name === undefined ? {} : { name }) });
+          const gathering = gatheringLine(
+            msg.state,
+            machine.id,
+            bundle.activities,
+            config.values.time.tickRate,
+          );
+          setInspectorData({
+            kind: "machine",
+            machine,
+            ...(name === undefined ? {} : { name }),
+            ...(gathering === undefined ? {} : { gathering }),
+          });
         },
       );
     },

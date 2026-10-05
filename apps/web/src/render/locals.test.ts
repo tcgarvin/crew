@@ -277,6 +277,7 @@ describe("local labels", () => {
         local({ id: "o1", x: 3, y: 3 }),
         local({ id: "o2", x: 3.2, y: 3, label: "waiting for a delivery" }),
       ],
+      sessions: [],
     } as unknown as RenderFrame;
     const { ctx, calls } = mockCanvas();
     drawActorLabels(ctx, { scale: 20, offsetX: 0, offsetY: 0 }, frame, false, 800, 600);
