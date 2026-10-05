@@ -6,7 +6,7 @@
  * Generic shape: acquire(item) = moveTo(believed spot) + pickUp → moveTo(target) → work/hold →
  * commit (consume, putDown).
  */
-import { configTicks } from "../../core/clock";
+import { configTicks, dayTicks } from "../../core/clock";
 import { marketCounter } from "../../core/docks";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -20,6 +20,9 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { plotCoursePlan } from "../travel/course";
+import { gangwayPlan, helmPlan } from "../watch/helm";
+import { roundsPlan } from "../watch/rounds";
 import { lookForWorkPlan, meetingPlan } from "./shore";
 
 export type PlanResult =
@@ -196,14 +199,9 @@ function haulPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 function machineTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.target.kind !== "machine") return blocked("unreachableTarget");
   const machineId = task.target.machineId;
-  if (task.type === "staffStation") {
-    const target = interactionTarget(ctx, actor, machineId, "operate");
-    if (target === undefined) return blocked("unreachableTarget");
-    return planOf([
-      { kind: "moveTo", target, requested: false },
-      { kind: "hold", hold: "staff", sinceTick: ctx.tick },
-    ]);
-  }
+  // D77: the helm's plan is the watch's (standby, handover, seat); D78: the plot's is travel's.
+  if (task.type === "staffStation") return helmPlan(ctx, actor, task);
+  if (task.type === "plotCourse") return plotCoursePlan(ctx, actor, task);
   const supplies = supplySteps(ctx, actor, task);
   if (typeof supplies === "string") return blocked(supplies);
   const target = interactionTarget(ctx, actor, machineId, "repair");
@@ -276,7 +274,7 @@ function eatPlan(
   itemId: ItemId | undefined,
   table: TileCoord | undefined,
 ): PlanResult {
-  const mealTicks = configTicks(ctx.config, ctx.config.needs.mealSeconds);
+  const mealTicks = dayTicks(ctx.config, ctx.config.needs.mealDays);
   const meal: ActivityStep[] = [
     ...(table === undefined
       ? []
@@ -322,6 +320,10 @@ export function buildPersonalPlan(
       return lookForWorkPlan(ctx, actor);
     case "meetSpeaker":
       return meetingPlan(ctx, intent.decisionId);
+    case "rounds":
+      return roundsPlan(ctx, actor);
+    case "standWatch":
+      return gangwayPlan(ctx, actor);
     case "rest":
     case "socialize":
     case "wander":

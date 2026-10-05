@@ -49,7 +49,7 @@
     },
     {
       "itemDefId": "item.ration_pack",
-      "count": 12,
+      "count": 80,
       "price": 9
     },
     {
@@ -89,7 +89,7 @@
   "routes": [
     {
       "toPortId": "port.green_meridian",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

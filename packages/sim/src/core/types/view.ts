@@ -8,7 +8,7 @@
  *
  * The render frame is truth (D7: the player's map shows truth) but only what the canvas needs.
  */
-import type { Capacities, FactType, KnownFact, Needs } from "./actor";
+import type { Capacities, FactType, KnownFact, Needs, Thought } from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
 import type {
   CargoClass,
@@ -51,6 +51,35 @@ export interface InventoryEntry {
   readonly count: number;
 }
 
+/**
+ * D77: who stands the helm, as the sim decides it (`systems/watch/helm.ts` `helmRoleOf`): this
+ * section's `stander`, the next section's `oncoming` stander near the bell, a `relief` while a
+ * relief post is open, or `none`. The planner's helm rule reads only this.
+ */
+export type HelmRole = "stander" | "oncoming" | "relief" | "none";
+
+/** D77: the actor's place in the watch, from the bill and the tick. */
+export interface WatchView {
+  /** Their section's key; absent for a dayworker. */
+  readonly section?: LocalKey;
+  /** Their section has the watch now (always false for a dayworker). */
+  readonly onWatch: boolean;
+  readonly dayworker: boolean;
+  readonly helmRole: HelmRole;
+  /** Captain or first officer in the section on watch, and not its helm-stander. */
+  readonly officerOfTheWatch: boolean;
+  /**
+   * D77 addendum: this is their sleep watch (the one after their own), when routine tiredness
+   * is slept off; outside it only pressing tiredness sends them to bed. Present when true.
+   */
+  readonly sleepWatch?: true;
+  /**
+   * D77 addendum: they stand gangway watch now: docked with no helm watch wanted, and the
+   * section on watch's gangway stander (`gangwayStanderOf`). Present when true.
+   */
+  readonly gangway?: true;
+}
+
 /** The actor's own state: they always know their body, needs and what they carry. */
 export interface SelfView {
   readonly id: ActorId;
@@ -67,8 +96,12 @@ export interface SelfView {
   readonly compartmentId?: CompartmentId;
   readonly activity: DeepReadonly<Activity>;
   readonly inventory: readonly InventoryEntry[];
-  /** From the shift schedule at the current tick. */
+  /** D77: on duty now: their section has the watch, or a dayworker in working hours. */
   readonly onDuty: boolean;
+  /** D77: their place in the watch. */
+  readonly watch: WatchView;
+  /** D79: what is on their mind (`Actor.thoughts`); mood is their clamped sum. */
+  readonly thoughts: readonly DeepReadonly<Thought>[];
   readonly lastPlannedTick: Tick;
   /** W4a addition: the actor's own retry backoff (`Actor.workBackoff`); refs → retry tick. */
   readonly backoff?: Readonly<Record<string, Tick>>;
@@ -76,6 +109,8 @@ export interface SelfView {
   readonly passenger?: true;
   /** Passengers §3.5: walking off the ship; the planner keeps out of the way. */
   readonly disembarking?: true;
+  /** D61: standing out on the dock alongside rather than aboard. Present when true. */
+  readonly onDock?: true;
   /** D74: the bed assigned to this actor (`WorldState.berths`); absent while unberthed. */
   readonly berth?: { readonly machineId: MachineId };
 }

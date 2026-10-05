@@ -5,13 +5,15 @@
  * read from `actor.activity` (owned by work); needs never starts or stops one: personal-need
  * activities are planner candidates, not problems (W0 decision 23).
  *
- * - hunger: rises at `hungerPerSecond`; eating reduces it at the meal's commit point (work).
- * - fatigue: rises at `fatiguePerSecondWorking` while on a task, `fatiguePerSecondAwake`
- *   otherwise; falls at `fatigueRecoveryPerSecondAsleep` while asleep in a bunk.
- * - comfort: falls at `comfortRecoveryPerSecondResting` while resting, socializing or asleep;
- *   rises at `comfortPerSecond` otherwise.
- * - social: falls at `socialRecoveryPerSecondChatting` while socializing; rises otherwise.
+ * - hunger: rises at `hungerPerDay`; eating reduces it at the meal's commit point (work).
+ * - fatigue: rises at `fatiguePerDayWorking` while on a task's hands-on steps,
+ *   `fatiguePerDayAwake` otherwise (a watch stood at the helm or the gangway included, D77
+ *   addendum); falls at `fatigueRecoveryPerDayAsleep` while asleep in a bunk.
+ * - comfort: falls at `comfortRecoveryPerDayResting` while resting, socializing or asleep;
+ *   rises at `comfortPerDay` otherwise.
+ * - social: falls at `socialRecoveryPerDayChatting` while socializing; rises otherwise.
  * Rates are scaled by trait modifiers (`hungerRate`, `fatigueRate`, `comfortRate`, `socialRate`).
+ * They are authored per ship's day and converted to per second here, where read (D76).
  *
  * W4a decision: severe fatigue impairs capacities through existing config, no new fields: above
  * `urgency.needSurvivalAbove`, `capacities.movement` and `.manipulation` fall linearly from 1 to
@@ -23,12 +25,14 @@
  * `urgency.needSurvivalAbove`, emitted at `notable` significance (so it reaches the ticker);
  * crossing `needs.seekThreshold` either way is `trace`. No separate `needCritical` event kind.
  */
+import { perDayToPerSecond } from "../../core/clock";
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import type { Actor, NeedKey } from "../../core/types/actor";
 import type { TraitModifierKey } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { currentHold } from "../work/activity";
 import { berthsSystem } from "./berths";
+import { moodSystem } from "./mood";
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
@@ -47,23 +51,26 @@ function traitMultiplier(ctx: StepCtx, actor: Actor, key: TraitModifierKey): num
   return multiplier;
 }
 
-/** Signed change per second for each need given what the actor is doing now. */
-function needRates(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
+/** Signed change per day for each need given what the actor is doing now. */
+function needRatesPerDay(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
   const needs = ctx.config.needs;
   const hold = currentHold(actor.activity);
   const asleep = hold === "sleep";
   const resting = asleep || hold === "rest" || hold === "socialize";
-  const working = actor.activity.kind === "task";
+  // D77 addendum: standing a watch (a `staff` or `gangway` hold) tires at the awake rate; it is
+  // hands-on work that tires at the working rate. A stander's watch plus a day awake then stays
+  // below pressing tiredness, so the one sleep a day falls in their sleep watch.
+  const working = actor.activity.kind === "task" && hold === undefined;
   const fatigue = asleep
-    ? -needs.fatigueRecoveryPerSecondAsleep
+    ? -needs.fatigueRecoveryPerDayAsleep
     : working
-      ? needs.fatiguePerSecondWorking
-      : needs.fatiguePerSecondAwake;
+      ? needs.fatiguePerDayWorking
+      : needs.fatiguePerDayAwake;
   return {
-    hunger: needs.hungerPerSecond,
+    hunger: needs.hungerPerDay,
     fatigue,
-    comfort: resting ? -needs.comfortRecoveryPerSecondResting : needs.comfortPerSecond,
-    social: hold === "socialize" ? -needs.socialRecoveryPerSecondChatting : needs.socialPerSecond,
+    comfort: resting ? -needs.comfortRecoveryPerDayResting : needs.comfortPerDay,
+    social: hold === "socialize" ? -needs.socialRecoveryPerDayChatting : needs.socialPerDay,
   };
 }
 
@@ -91,9 +98,9 @@ export function fatigueCapacity(fatigue: number, severeAbove: number, floor: num
 }
 
 function updateActor(ctx: StepCtx, actor: Actor, dt: number): void {
-  const rates = needRates(ctx, actor);
+  const rates = needRatesPerDay(ctx, actor);
   for (const key of Object.keys(rates) as NeedKey[]) {
-    const rate = rates[key];
+    const rate = perDayToPerSecond(ctx.config, rates[key]);
     // Trait modifiers scale deprivation, not recovery.
     const scaled = rate > 0 ? rate * traitMultiplier(ctx, actor, RATE_MODIFIER[key]) : rate;
     const before = actor.needs[key];
@@ -128,7 +135,12 @@ export const needsSystem: System = {
 
 /** Needs, then the berth rule (D74), both in phase 5. */
 export function registerNeeds(registry: KernelRegistry): Unregister {
-  const unregister = [registry.registerSystem(needsSystem), registry.registerSystem(berthsSystem)];
+  const unregister = [
+    registry.registerSystem(needsSystem),
+    // D79: mood from live thoughts, after the needs it sits beside.
+    registry.registerSystem(moodSystem),
+    registry.registerSystem(berthsSystem),
+  ];
   return () => {
     for (const undo of unregister) undo();
   };

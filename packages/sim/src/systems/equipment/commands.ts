@@ -32,6 +32,11 @@ const scheduleFault: CommandHandler<"scheduleFault", null> = {
     if (latest - earliest > maxWindow) {
       return reject("outOfBounds", `window ${latest - earliest} ticks exceeds max ${maxWindow}`);
     }
+    // D78: the fault budget is spent here (it never was before) and refilled every
+    // `budgetRefillDays`, so an empty one is a rejection like `scheduleHazard`'s.
+    if (ctx.state.narrator.budget.faultsRemaining <= 0) {
+      return reject("budgetExhausted", "scheduleFault: narrator fault budget exhausted");
+    }
     return ok(null);
   },
   apply(ctx, command) {
@@ -44,6 +49,7 @@ const scheduleFault: CommandHandler<"scheduleFault", null> = {
       ...machine.scheduledFaults,
       { faultKey, fireAtTick, causeCommandId: command.id },
     ];
+    ctx.state.narrator.budget.faultsRemaining -= 1;
     return NO_TEMP_REFS;
   },
 };

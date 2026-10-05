@@ -557,7 +557,7 @@ export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
   });
 }
 
-/** Expire stale offers (`config.commerce.jobOfferTtlSeconds`). */
+/** Expire stale offers (`config.commerce.jobOfferTtlDays`). */
 export function expireStaleOffers(ctx: ApplyCtx): void {
   for (const job of Object.values(ctx.state.jobs)) {
     if (job.status === "offered" && ctx.tick > job.expiresAtTick) {

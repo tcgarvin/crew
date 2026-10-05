@@ -18,7 +18,13 @@ import { allocateId } from "../../../core/ids";
 import { createKernel } from "../../../core/kernel";
 import { createRegistry } from "../../../core/registry";
 import type { TileCoord } from "../../../core/types/common";
-import type { ConfigDef, ContentBundle, CrewDef, MachineDef } from "../../../core/types/content";
+import type {
+  ConfigDef,
+  ContentBundle,
+  CrewDef,
+  MachineDef,
+  WatchBillDef,
+} from "../../../core/types/content";
 import type {
   ActorId,
   CrewDefId,
@@ -117,25 +123,36 @@ function extraCrew(base: CrewDef): Record<CrewDefId, CrewDef> {
       roleTags: i % 2 === 0 ? ["engineer"] : ["deckhand"],
       skills: { engineering: i % 3, cargo: 2 + (i % 2) },
       startingInventory: [],
-      shift: i % 2 === 0 ? "alpha" : "beta",
     };
   });
   return out;
 }
 
-/** Tiny config with a second (off-duty-at-start) shift. */
+/** D77: hold off rounds for good, for tests written against a crew that stands idle on duty. */
+export function withoutRounds(world: World): void {
+  for (const actor of Object.values(world.state.actors)) {
+    actor.workBackoff = { ...(actor.workBackoff ?? {}), rounds: Number.MAX_SAFE_INTEGER };
+  }
+}
+
+/**
+ * Tiny config: a 600 s day of two watches, so the scenarios' `alpha` section stands `[0, 300)`
+ * and `beta` (off duty at start) `[300, 600)` (D77; the shift windows these tests were written
+ * against). The day knobs keep their durations in seconds.
+ */
 export function crewConfig(overrides: Partial<ConfigDef> = {}): ConfigDef {
-  const base = tinyConfig();
+  const base = tinyConfig({ daySeconds: 600, watchesPerDay: 2 });
+  return { ...base, ...overrides };
+}
+
+/** D77: crew of eight: the even extras stand `alpha` with Mara and Jon, the odd ones `beta`. */
+function crewEightBill(extras: readonly CrewDefId[]): WatchBillDef {
   return {
-    ...base,
-    shifts: {
-      cycleSeconds: 600,
-      shifts: [
-        { key: "alpha", workWindows: [[0, 300]] },
-        { key: "beta", workWindows: [[300, 600]] },
-      ],
-    },
-    ...overrides,
+    sections: [
+      { key: "alpha", members: [TINY.mara, DECK12.jon, ...extras.filter((_, i) => i % 2 === 0)] },
+      { key: "beta", members: extras.filter((_, i) => i % 2 === 1) },
+    ],
+    dayworkers: [],
   };
 }
 
@@ -197,6 +214,10 @@ export function crewContent(config: ConfigDef = crewConfig()): ContentBundle {
           { itemDefId: TINY.wrench, count: 1, zoneKey: "engStores" },
         ],
         initialFaults: [],
+        watchBill: {
+          sections: [{ key: "alpha", members: [TINY.mara, DECK12.jon] }],
+          dayworkers: [],
+        },
       },
       [CREW.scenario8]: {
         id: CREW.scenario8,
@@ -210,6 +231,7 @@ export function crewContent(config: ConfigDef = crewConfig()): ContentBundle {
           { itemDefId: TINY.wrench, count: 1, zoneKey: "engStores" },
         ],
         initialFaults: [],
+        watchBill: crewEightBill(Object.keys(extras) as CrewDefId[]),
       },
     },
     hash: "crew-deck-v1",

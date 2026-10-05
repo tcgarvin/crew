@@ -1,6 +1,8 @@
+import { HAZARD_KINDS } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildCapabilities } from "./capabilities";
 import { captainAshoreRequest, quietTooLongRequest } from "./fixtures";
+import { pathBetween, routeDistance } from "./lookups";
 import { content } from "./test-support";
 
 describe("buildCapabilities", () => {
@@ -49,7 +51,7 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the five narrator levers (D47 added stockMarket)", () => {
+  it("names exactly the six narrator levers (D47 added stockMarket, D78 scheduleHazard)", () => {
     const levers = [...text.matchAll(/^## \d\. (\w+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
@@ -57,8 +59,33 @@ describe("buildCapabilities", () => {
       "scheduleFault",
       "surfaceDecision",
       "stockMarket",
+      "scheduleHazard",
     ]);
-    expect(text).toContain("You have exactly five levers");
+    expect(text).toContain("You have exactly six levers");
+    expect(text).not.toContain("five levers");
+  });
+
+  it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (D78)", () => {
+    const config = req.snapshot.config;
+    expect(text).toContain(
+      "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check for whoever has the helm",
+    );
+    for (const kind of HAZARD_KINDS) expect(text).toContain(`${kind} (`);
+    const { easy, hard, brutal } = config.hazards.difficulty;
+    expect(text).toContain(`difficulty: easy (${easy}), hard (${hard}), brutal (${brutal})`);
+    const max = config.narrator.maxFaultWindowSeconds;
+    expect(
+      text.match(
+        new RegExp(`muchLater \\(${Math.round((2 * max) / 3)}s-${Math.round(max)}s\\)`, "g"),
+      ),
+    ).toHaveLength(2);
+    expect(text).toContain("Uses one hazard from the budget in the digest.");
+    expect(text).toContain("One hazard waits at a time.");
+    expect(text).toContain(
+      "The sim rolls it against whoever has the helm when it goes off, never you",
+    );
+    expect(text).toContain(`about ${Math.round(config.hazards.delaySeconds)}s lost on the leg`);
+    expect(text).toContain("With nobody at the helm it is a scrape and a delay both.");
   });
 
   it("lists every port's character, legs and distance from the port the ship is heading for (§2.4)", () => {
@@ -72,13 +99,15 @@ describe("buildCapabilities", () => {
     const reach = Object.fromEntries(
       [...text.matchAll(/^- (port\.\w+) ".*\n.*\n {2}from here: (.*)$/gm)].map((m) => [m[1], m[2]]),
     );
+    // Distances come from content (D76 made the spur legs a watch long); the topology is pinned.
+    const far = (to: string) => pathBetween(content(), "port.green_meridian", to)?.distance;
     expect(reach).toEqual({
-      "port.crossroads_hub": "1 hop, 45s transit in all",
+      "port.crossroads_hub": `1 hop, ${far("port.crossroads_hub")}s transit in all`,
       "port.green_meridian": "here (the ship is at or heading for this port)",
-      "port.kessler_drift": "1 hop, 70s transit in all",
-      "port.ossory_station": "2 hops, 190s transit in all via port.kessler_drift",
-      "port.terns_rest": "2 hops, 135s transit in all via port.crossroads_hub",
-      "port.vesper_gate": "1 hop, 120s transit in all",
+      "port.kessler_drift": `1 hop, ${far("port.kessler_drift")}s transit in all`,
+      "port.ossory_station": `2 hops, ${far("port.ossory_station")}s transit in all via port.kessler_drift`,
+      "port.terns_rest": `2 hops, ${far("port.terns_rest")}s transit in all via port.crossroads_hub`,
+      "port.vesper_gate": `1 hop, ${far("port.vesper_gate")}s transit in all`,
     });
   });
 
@@ -117,8 +146,12 @@ describe("buildCapabilities", () => {
     const docked = buildCapabilities(req.snapshot.state, content(), req.snapshot.config);
     expect(docked).toContain('"From here" is measured from port.kessler_drift (Kessler Drift)');
     expect(docked).toContain('port.ossory_station "Ossory Station"');
+    const leg = routeDistance(content(), "port.kessler_drift", "port.ossory_station");
     expect(docked).toMatch(
-      /port\.ossory_station "Ossory Station".*\n.*\n {2}from here: 1 hop, 120s transit in all$/m,
+      new RegExp(
+        `port\\.ossory_station "Ossory Station".*\\n.*\\n {2}from here: 1 hop, ${leg}s transit in all$`,
+        "m",
+      ),
     );
   });
 

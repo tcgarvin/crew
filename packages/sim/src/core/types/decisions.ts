@@ -179,8 +179,13 @@ export interface NarratorState {
    * the last hook raised (any kind). Drives `quietTooLong`.
    */
   lastNarrativeTick: Tick;
-  /** Remaining narrator-caused spawns/faults before the budget refills. */
-  budget: { spawnsRemaining: number; faultsRemaining: number };
+  /**
+   * Remaining narrator-caused spawns/faults/hazards before the budget refills (every
+   * `config.narrator.budgetRefillDays`, `core/pipeline.ts`).
+   */
+  budget: { spawnsRemaining: number; faultsRemaining: number; hazardsRemaining: number };
+  /** D78: the tick the budget was last refilled (world creation counts as one). */
+  budgetRefilledTick: Tick;
   /** Resolved hooks, most recent last, trimmed to a small tail (for the digest). */
   recentHookIds: HookId[];
   /**

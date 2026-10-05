@@ -1,9 +1,15 @@
 /**
- * A narrow end-to-end check that the two commands this task added handlers for really do round
+ * A narrow end-to-end check that narrator commands with their own handlers really do round
  * trip: `translateIntents` builds them from a plan, and the real kernel (with commerce
  * registered, D6's owner for `spawnAtBoundary`) accepts them, not just a mocked snapshot.
  */
-import { createKernel, createRegistry, registerCommerce } from "@crew/sim";
+import {
+  type PortDefId,
+  createKernel,
+  createRegistry,
+  registerCommerce,
+  registerTravel,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorPlan, TranslationCtx } from "./contract";
 import { FIXTURE_SCENARIO } from "./fixtures";
@@ -155,5 +161,43 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
       const result = kernel.enqueueCommand(world, command);
       expect(result.status).toBe("accepted");
     }
+  });
+
+  it("accepts a translated scheduleHazard once a course is set, and spends the hazard budget (D78)", () => {
+    const bundle = content();
+    const registry = createRegistry();
+    registerTravel(registry);
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(FIXTURE_SCENARIO, 7, bundle, {
+      values: bundle.config,
+      hash: bundle.hash,
+    });
+    const travel = world.state.travel;
+    if (travel.stage !== "docked") throw new Error("expected a new world to start docked");
+    world.state.travel = { ...travel, plannedDestinationId: "port.kessler_drift" as PortDefId };
+    const budget = world.state.narrator.budget.hazardsRemaining;
+    const ctx: TranslationCtx = {
+      snapshot: kernel.serialize(world),
+      content: bundle,
+      hookTick: world.state.tick,
+      callId: "call-hazard",
+    };
+    const { commands, dropped } = translateIntents(
+      emptyPlan({
+        intents: [
+          { kind: "scheduleHazard", hazard: "ionStorm", difficulty: "brutal", window: "later" },
+        ] as unknown as NarratorPlan["intents"],
+      }),
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    const [command] = commands;
+    if (command === undefined) throw new Error("no command");
+    expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    kernel.advance(world, 2);
+    expect(world.state.hazards).toMatchObject([
+      { kind: "ionStorm", difficulty: bundle.config.hazards.difficulty.brutal },
+    ]);
+    expect(world.state.narrator.budget.hazardsRemaining).toBe(budget - 1);
   });
 });

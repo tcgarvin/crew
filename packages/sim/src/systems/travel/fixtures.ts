@@ -7,6 +7,12 @@
  * exactly (ramp door, engine, two crew spawn points) without touching a fixture other
  * workstreams share.
  */
+import {
+  FIXTURE_HAZARDS,
+  FIXTURE_MOOD,
+  FIXTURE_THOUGHTS,
+  fixtureWatches,
+} from "../../core/fixtures/ship-life";
 import { createKernel } from "../../core/kernel";
 import { type KernelRegistry, createRegistry } from "../../core/registry";
 import type { ConfigDef, ContentBundle } from "../../core/types/content";
@@ -44,17 +50,26 @@ export const FIX = {
   scenario: "scenario.freight" as ScenarioDefId,
 } as const;
 
+/**
+ * The fixture's ship's day (D76). Day knobs are written as `seconds / FIXTURE_DAY` so the values
+ * the tests were written against stay visible and the conversion stays exact.
+ */
+export const FIXTURE_DAY = 1200;
+
 export interface FixtureConfigOverrides {
+  /** A fixture convenience in seconds, stored as `narrator.quietTooLongDays`. */
   quietTooLongSeconds?: number;
   dockingFee?: number;
   hookOnEvents?: readonly string[];
   maxCratesPerJob?: number;
   passage?: ConfigDef["commerce"]["passage"];
+  /** D80: `travel.limpSpeedFraction` (0, no limp, by default). */
+  limpSpeedFraction?: number;
 }
 
 export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef {
   return {
-    time: { tickRate: 20 },
+    time: { tickRate: 20, daySeconds: FIXTURE_DAY, watchesPerDay: 3 },
     movement: {
       walkSpeed: 2,
       passDelaySeconds: 0.5,
@@ -71,18 +86,19 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       rampOpenSeconds: 2,
     },
     needs: {
-      hungerPerSecond: 0.001,
-      fatiguePerSecondAwake: 0.001,
-      fatiguePerSecondWorking: 0.002,
-      fatigueRecoveryPerSecondAsleep: 0.01,
-      comfortPerSecond: 0.001,
-      comfortRecoveryPerSecondResting: 0.01,
-      socialPerSecond: 0.001,
-      socialRecoveryPerSecondChatting: 0.01,
+      hungerPerDay: 0.001 * FIXTURE_DAY,
+      fatiguePerDayAwake: 0.001 * FIXTURE_DAY,
+      fatiguePerDayWorking: 0.002 * FIXTURE_DAY,
+      fatigueRecoveryPerDayAsleep: 0.01 * FIXTURE_DAY,
+      comfortPerDay: 0.001 * FIXTURE_DAY,
+      comfortRecoveryPerDayResting: 0.01 * FIXTURE_DAY,
+      socialPerDay: 0.001 * FIXTURE_DAY,
+      socialRecoveryPerDayChatting: 0.01 * FIXTURE_DAY,
       seekThreshold: 0.5,
-      mealSeconds: 10,
-      sleepMinSeconds: 60,
+      mealDays: 10 / FIXTURE_DAY,
+      sleepDays: 60 / FIXTURE_DAY,
       wakeBelow: 0.1,
+      bedtimeAbove: 0.3,
       initialRange: {
         hunger: { min: 0, max: 0 },
         fatigue: { min: 0, max: 0 },
@@ -96,7 +112,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       claimLeaseSeconds: 10,
       timeBucketSeconds: 5,
       retryBackoffSeconds: 5,
-      skillGainPerSecond: 0.001,
+      skillGainPerDay: 0.001 * FIXTURE_DAY,
       workSpeedPerSkillLevel: 0.1,
     },
     urgency: {
@@ -104,7 +120,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       needSurvivalAbove: 0.9,
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
-      routineAgingSeconds: 60,
+      routineAgingDays: 60 / FIXTURE_DAY,
     },
     equipment: {
       hazardScale: 1,
@@ -124,6 +140,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       nominalSpeed: 5,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      // D80: no limp unless a test turns it on.
+      limpSpeedFraction: overrides.limpSpeedFraction ?? 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
       dockHandGiveUpSeconds: 30,
@@ -139,16 +157,19 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         hazardous: { min: 3, max: 8 },
         passenger: { min: 2, max: 4 },
       },
-      jobOfferTtlSeconds: 120,
+      jobOfferTtlDays: 120 / FIXTURE_DAY,
       dockingFee: overrides.dockingFee ?? 0,
       haulEstimateSeconds: 5,
-      reofferSeconds: 60,
+      reofferDays: 60 / FIXTURE_DAY,
       maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
       passage: overrides.passage ?? {
-        ashoreSecondsMin: 3,
-        ashoreSecondsMax: 3,
-        overdueSeconds: 10,
+        ashoreDaysMin: 3 / FIXTURE_DAY,
+        ashoreDaysMax: 3 / FIXTURE_DAY,
+        overdueDays: 10 / FIXTURE_DAY,
       },
+      // D80: off unless a test turns them on.
+      sparesReserve: 0,
+      foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,
@@ -157,14 +178,15 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       },
     },
     narrator: {
-      quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
+      quietTooLongDays: (overrides.quietTooLongSeconds ?? 600) / FIXTURE_DAY,
       approachHookLeadSeconds: 1,
       maxSpawnsPerCommand: 3,
       maxFaultWindowSeconds: 60,
       spawnBudget: 3,
       faultBudget: 2,
-      budgetRefillSeconds: 600,
+      budgetRefillDays: 600 / FIXTURE_DAY,
       hookOnEvents: overrides.hookOnEvents ?? [],
+      hazardBudget: 2,
     },
     host: {
       runAheadCapSeconds: 60,
@@ -173,8 +195,12 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       localSaveEverySeconds: 30,
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
+      slowDownOnEvents: [],
     },
-    shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 600]] }] },
+    // D77: everyone is a dayworker on every watch: always on duty, as before watches.
+    watches: fixtureWatches([0, 1, 2]),
+    mood: FIXTURE_MOOD,
+    hazards: FIXTURE_HAZARDS,
     social: {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
@@ -297,7 +323,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: ["captain"],
         skills: { piloting: 6 },
         startingInventory: [],
-        shift: "alpha",
         bio: "Runs the boat.",
         voice: "Plain and brief.",
       },
@@ -307,7 +332,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: ["firstOfficer", "engineer"],
         skills: { piloting: 4 },
         startingInventory: [],
-        shift: "alpha",
         bio: "Backs up the captain.",
         voice: "Plain and brief.",
       },
@@ -317,7 +341,6 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         roleTags: [],
         skills: {},
         startingInventory: [],
-        shift: "alpha",
         bio: "A paying passenger.",
         voice: "Whoever they turn out to be.",
       },
@@ -413,8 +436,10 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         startingMoney: 100,
         startingItems: [],
         initialFaults: [],
+        watchBill: { sections: [], dayworkers: [FIX.captain, FIX.firstOfficer] },
       },
     },
+    thoughts: FIXTURE_THOUGHTS,
     config,
     hash: "fixture-content-v1",
   };

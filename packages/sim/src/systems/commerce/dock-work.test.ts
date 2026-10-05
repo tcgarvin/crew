@@ -15,6 +15,7 @@ import { getRenderFrame } from "../../core/render";
 import type { ActorId, JobId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
+import { isOnDuty } from "../watch/duty";
 import { addEngineFault } from "../work/fixtures/crew-deck";
 import {
   MINUTE,
@@ -505,5 +506,37 @@ describe("a schema-3 save docked mid-loading (D63)", () => {
     setCourse({ ...test, world: restored });
     run({ ...test, world: restored }, 6 * MINUTE, (w) => w.state.travel.stage === "undocking");
     expect(restored.state.travel.stage).toBe("undocking");
+  });
+});
+
+describe("cargo in port is all hands awake (D77 addendum, the slice-2 QA stall)", () => {
+  it("loads with nobody on the bill: both crew are off duty on the second watch and still carry the crates aboard", () => {
+    const test = dockWorkWorld();
+    const { world } = test;
+    const values = world.config.values;
+    // Mara and Jon stand `alpha`, [0, 300) s of the 600 s day: from 300 s nobody is on duty.
+    world.state.tick = 300 * values.time.tickRate;
+    for (const actor of Object.values(world.state.actors)) {
+      actor.needs.fatigue = 0;
+      expect(isOnDuty(actor.schedule, world.state.tick, values)).toBe(false);
+    }
+    const id = offerFreight(test);
+    const crates = [...job(world, id).cargoItemIds];
+    accept(test, id);
+    run(test, 1);
+    expect(loadWork(world, id).map((p) => p.status)).toEqual(["open", "open", "open"]);
+    const aboard = (w: World) =>
+      crates.every((itemId) => {
+        const location = w.state.items[itemId]?.location;
+        return location?.kind === "onDeck" && !isOnDock(w.content, w.state, location);
+      });
+    const loading = run(test, 4 * MINUTE, aboard);
+    expect(aboard(world)).toBe(true);
+    // Still in the off-duty watch: it was the off-duty crew who loaded.
+    expect(world.state.tick).toBeLessThan(600 * values.time.tickRate);
+    const hauled = loading.filter(
+      (e) => e.type === "taskCompleted" && e.payload.haul?.to === "ship",
+    );
+    expect(hauled).toHaveLength(3);
   });
 });

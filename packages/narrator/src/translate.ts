@@ -59,6 +59,7 @@ import {
   type State,
   fareFor,
   faultDiscovery,
+  faultWindowSeconds,
   faultWindowTicks,
   livePassage,
   offerPortNow,
@@ -155,6 +156,7 @@ export function textProblem(text: string, secrets: readonly string[]): string | 
 interface Tally {
   spawns: number;
   faults: number;
+  hazards: number;
   cardUsed: boolean;
   /** D39: the thread this call's beat card was attributed to. */
   beatCardThread: string | undefined;
@@ -380,6 +382,66 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
     payload: {
       machineId: machine.id,
       faultKey: intent.faultKey,
+      windowTicks: [windowTicks[0], windowTicks[1]],
+    },
+  });
+}
+
+/**
+ * D78: why a hazard has no leg to lie on, or undefined. The kernel accepts one while a course is
+ * planned or the ship is underway; it fires at the first `transit` tick at or after its moment,
+ * so one placed after this leg's transit would wait for some later leg the story did not choose.
+ * The translator therefore also refuses the end of a leg (approach, docking) and a window that
+ * opens after the transit left at nominal speed (a drift only lengthens it).
+ */
+function hazardLegProblem(
+  env: Env,
+  window: Intent<"scheduleHazard">["window"],
+): string | undefined {
+  const travel = env.snapshot.state.travel;
+  if (travel.stage === "docked") {
+    return travel.plannedDestinationId === undefined
+      ? "the ship is docked with no course set; a hazard needs a leg to lie on"
+      : undefined;
+  }
+  if (travel.stage === "approaching" || travel.stage === "docking") {
+    return `the ship is ${travel.stage}: this leg's transit is over; place it on the next leg once a course is set`;
+  }
+  if (travel.stage !== "transit") return undefined;
+  const config = env.snapshot.config;
+  const left =
+    Math.max(0, travel.routeDistance - travel.routeProgress) / config.travel.nominalSpeed;
+  const [opens] = faultWindowSeconds(config)[window];
+  if (opens < left) return undefined;
+  return `window ${window} opens after this leg's transit ends (~${Math.round(left)}s left); use soon, or place it on the next leg`;
+}
+
+/**
+ * D78: `scheduleHazard`, the sixth lever. The tier becomes `config.hazards.difficulty`, the window
+ * is the fault windows' (same kernel bound), it spends the hazard budget, and one hazard waits at
+ * a time: a second on top of one not yet fired is the "never twice in a row" rule made firm.
+ */
+function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<NarratorDraft> {
+  const { snapshot } = env;
+  const config = snapshot.config;
+  if (snapshot.state.hazards.length > 0 || env.tally.hazards > 0) {
+    return no("a hazard is already waiting on the ship's path; let it fire first");
+  }
+  const budget = snapshot.state.narrator.budget.hazardsRemaining - env.tally.hazards;
+  if (budget <= 0) return no("hazard budget exhausted");
+  const leg = hazardLegProblem(env, intent.window);
+  if (leg !== undefined) return no(leg);
+  const windowTicks = faultWindowTicks(config, intent.window);
+  const maxWindow = configTicks(config, config.narrator.maxFaultWindowSeconds);
+  if (windowTicks[1] - windowTicks[0] > maxWindow || windowTicks[0] < 0) {
+    return no("window outside config bounds");
+  }
+  env.tally.hazards += 1;
+  return ok({
+    kind: "scheduleHazard",
+    payload: {
+      kind: intent.hazard,
+      difficulty: config.hazards.difficulty[intent.difficulty],
       windowTicks: [windowTicks[0], windowTicks[1]],
     },
   });
@@ -628,6 +690,8 @@ function translateByKind(env: Env, intent: NarratorIntent): Outcome<NarratorDraf
       return translateDecision(env, intent);
     case "stockMarket":
       return translateStock(env, intent);
+    case "scheduleHazard":
+      return translateHazard(env, intent);
   }
 }
 
@@ -743,6 +807,7 @@ export const translateIntents: TranslateIntents = (
     tally: {
       spawns: 0,
       faults: 0,
+      hazards: 0,
       // D70: a card on its way to the captain in person is as good as on screen.
       cardUsed:
         snapshot.state.decisions.queue.length > 0 || snapshot.state.decisions.held.length > 0,

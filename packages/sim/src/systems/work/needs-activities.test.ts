@@ -6,7 +6,7 @@ import { GALLEY_TILE, JON, MARA, crewWorld, itemAt, place } from "./fixtures/cre
 import { eventsOf, run } from "./fixtures/run";
 
 describe("eating", () => {
-  it("walks to the rations, eats for mealSeconds, hunger drops and the stack loses exactly one", () => {
+  it("walks to the rations, eats for mealDays, hunger drops and the stack loses exactly one", () => {
     const tw = crewWorld();
     const { world } = tw;
     const mara = world.state.actors[MARA];
@@ -33,7 +33,7 @@ describe("eating", () => {
     const labels = log.labels[MARA] ?? [];
     expect(labels).toContain("walking to galley");
     expect(labels).toContain("eating");
-    // Meal took at least mealSeconds.
+    // Meal took at least mealDays.
     const started = log.events.find(
       (e) => e.type === "actionStarted" && e.payload.action === "eat",
     );
@@ -79,8 +79,9 @@ describe("sleeping", () => {
     if (mara === undefined || jon === undefined) throw new Error("no crew");
     place(world, MARA, { x: 1, y: 5 });
     place(world, JON, { x: 2, y: 5 });
-    mara.needs.fatigue = 0.6;
-    jon.needs.fatigue = 0.6;
+    // D77: both are on watch, so only pressing tiredness sends them to bed now.
+    mara.needs.fatigue = 0.75;
+    jon.needs.fatigue = 0.75;
 
     const bothAsleep = () =>
       mara.activity.kind === "personal" &&
@@ -104,12 +105,15 @@ describe("sleeping", () => {
     expect(rest.labels[MARA]).toEqual(["asleep"]);
   });
 
-  it("wakes after sleepMinSeconds once fatigue is below wakeBelow", () => {
+  it("wakes after sleepDays once fatigue is below wakeBelow", () => {
     const tw = crewWorld();
     const { world } = tw;
     const mara = world.state.actors[MARA];
     if (mara === undefined) throw new Error("no mara");
     place(world, MARA, { x: 2, y: 2 });
+    // D77: off watch (her section stands [0, 300) s), so she turns in at routine tiredness and
+    // nothing but `wakeBelow` wakes her.
+    world.state.tick = 300 * world.config.values.time.tickRate;
     mara.needs.fatigue = 0.55;
     const log = run(tw, 20 * 120, () => eventsOfTypeSeen(tw, "wokeUp"));
     const slept = eventsOf(log, "fellAsleep")[0];

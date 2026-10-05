@@ -14,6 +14,7 @@ import { machineDefSchema } from "./machine";
 import { peopleTableDefSchema } from "./people";
 import { portDefSchema } from "./port";
 import { scenarioDefSchema } from "./scenario";
+import { thoughtDefSchema } from "./thought";
 
 export * from "./bundle";
 export * from "./config";
@@ -26,6 +27,7 @@ export * from "./people";
 export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
+export * from "./thought";
 export * from "./validate";
 export { HULL_CLASS_BOX, shipAtInBerth } from "./geometry";
 export { dockRampLandings, dockWalkableMask } from "./validate-dock";
@@ -42,6 +44,7 @@ export const DEF_SCHEMAS = {
   people: peopleTableDefSchema,
   config: configDefSchema,
   dock: dockDefSchema,
+  thought: thoughtDefSchema,
   bundle: contentBundleSchema,
 } as const;
 

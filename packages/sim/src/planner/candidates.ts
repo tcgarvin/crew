@@ -14,25 +14,32 @@ import {
  * - symptom inspection and fault work escalate from the actor's *known* machine temperature
  *   (`machineStatus` fact): ≥ `heatSurvivalAbove` → immediateSurvival, ≥ `heatContainmentAbove`
  *   → containment;
- * - `stationToStaff` → essentialOperation;
+ * - `stationToStaff` → essentialOperation (D77: who may take the helm is `helm.ts`'s);
+ * - `courseToPlot` (D78) → essentialOperation;
  * - `partsNeeded` (D47) → the owner's base urgency (the repair it unblocks);
+ * - `reserveLow` (D80) → the owner's base urgency (routine: restocking, nothing broken);
  * - `cargoToLoad`/`cargoToUnload`, symptom inspection (`machineSymptom`) and `maintenanceDue`
  *   → routineObligation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
  * - rest/socialize → voluntaryActivity.
  *
- * - going to one's duty post (on duty, nothing else to do) → voluntaryActivity.
+ * - on duty with nothing else to do (D77: `rounds.ts`, the post until rounds land) →
+ *   voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
  *
- * Shifts: off duty, routine and essential tasks are not candidates (emergencies —
- * containment and above — ignore shifts, SD §11.4). Off-duty actors rest or socialize when
- * nothing else applies; on-duty actors only socialize/rest when the need is actually high.
+ * Duty (D77, the watch bill): off duty, routine and essential tasks are not candidates
+ * (emergencies, containment and above, ignore duty, SD §11.4), except cargo in port, which is all
+ * hands awake. Off-duty actors rest or socialize when nothing else applies; on-duty actors only
+ * socialize/rest when the need is actually high. Routine sleep is taken in one's sleep watch.
  */
 import type { DeepReadonly, TileCoord } from "../core/types/common";
-import type { CompartmentDef, MachineTag, RoleTag, ToolKind } from "../core/types/content";
+import type { MachineTag, ToolKind } from "../core/types/content";
 import type { ActorId, ItemId, MachineId } from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView, KnownItemView, ProblemView, TaskView } from "../core/types/view";
+import { backingOff, loungeTile, personal, sameTile } from "./common";
+import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
+import { dutyIdleCandidate } from "./rounds";
 
 /** What the selector ranks. `estimateTicks` is time to useful intervention (SD §15.3 step 5). */
 export interface Candidate {
@@ -65,13 +72,6 @@ export interface CandidateSet {
 }
 
 export const urgencyIndex = (u: UrgencyClass): number => URGENCY_CLASSES.indexOf(u);
-
-const backingOff = (view: AgentView, ref: string): boolean => {
-  const until = view.self.backoff?.[ref];
-  return until !== undefined && view.tick < until;
-};
-
-const sameTile = (a: TileCoord, b: TileCoord): boolean => a.x === b.x && a.y === b.y;
 
 const inMyHands = (view: AgentView, item: KnownItemView): boolean =>
   item.location.kind === "carriedBy" && item.location.actorId === view.self.id;
@@ -123,9 +123,14 @@ export function taskUrgency(
     case "cargoToUnload":
       return "routineObligation";
     case "stationToStaff":
+      // D77: the watch post is essential and the relief post routine; the watch says which.
+      return problem.baseUrgency;
+    case "courseToPlot":
       return "essentialOperation";
     case "partsNeeded":
       // D47: the part gates a repair the owner already rated; buying it is as pressing as fixing.
+      return problem.baseUrgency;
+    case "reserveLow":
       return problem.baseUrgency;
   }
 }
@@ -166,7 +171,7 @@ function workTile(view: AgentView, task: TaskView): TileCoord | undefined {
   if (first !== undefined) return first;
   if (task.target.kind !== "machine") return undefined;
   const machineId = task.target.machineId;
-  const purpose = task.type === "staffStation" ? "operate" : "repair";
+  const purpose = task.type === "staffStation" || task.type === "plotCourse" ? "operate" : "repair";
   const tiles =
     view.schematic.machines().find((m) => m.machineId === machineId)?.interactionTiles ?? [];
   return (tiles.find((t) => t.purposes.includes(purpose)) ?? tiles[0])?.tile;
@@ -254,10 +259,23 @@ function taskCandidate(
   for (const need of task.requiredSkills) {
     if ((view.self.skills[need.skill] ?? 0) < need.min) return reject("insufficientCompetency");
   }
-  const betterQualified = deferTo(view, config, task);
+  // D77: the helm's posts and the course plot are the watch's to hand out (`helm.ts`), which
+  // also decides whether they skip deference and the off-duty rule.
+  const helm = isHelmTask(task);
+  if (helm && !helmTaskAllowed(view, task)) return reject("notMyHelm");
+  const exempt = helm && helmTaskExempt(view, task);
+  const betterQualified = exempt ? undefined : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
-  if (!view.self.onDuty && urgencyIndex(urgency) > urgencyIndex("containment"))
+  // D77 addendum: cargo in port is all hands awake, not the watch's: nobody off duty is turned
+  // away from a crate (the sleeping sleep on, since the hold is not interrupted for routine work).
+  const allHands = problem.kind === "cargoToLoad" || problem.kind === "cargoToUnload";
+  if (
+    !exempt &&
+    !allHands &&
+    !view.self.onDuty &&
+    urgencyIndex(urgency) > urgencyIndex("containment")
+  )
     return reject("offDuty");
   const travel = taskTravel(view, task, problem);
   if (typeof travel === "string") return reject(travel);
@@ -284,20 +302,13 @@ export function needUrgency(value: number, config: PlannerConfig): UrgencyClass 
   return undefined;
 }
 
-function personal(
-  ref: string,
-  urgency: UrgencyClass,
-  estimateTicks: number,
-  tick: number,
-  choice: Extract<Candidate["choice"], { kind: "personal" }>,
-): Candidate {
-  return { ref, urgency, estimateTicks, skill: 0, ageTick: tick, stableId: ref, choice };
-}
-
 function eatCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const urgency = needUrgency(view.self.needs.hunger, config);
   if (urgency === undefined) return undefined;
-  const mealTicks = Math.ceil(config.needs.mealSeconds * config.time.tickRate);
+  // `mealDays` in ticks, inline because the planner may not import `core/clock` (D76).
+  const mealTicks = Math.ceil(
+    config.needs.mealDays * config.time.daySeconds * config.time.tickRate,
+  );
   const food = view.knownItems().filter((i) => i.tags.includes("food") && !i.absent);
   const table = messTile(view);
   const toTable = (from?: TileCoord): number => {
@@ -377,10 +388,16 @@ const betterBed = (a: BedChoice, b: BedChoice | undefined): boolean =>
  * backing off; otherwise in the unassigned pool, a quarters bunk before a nearer bed elsewhere.
  * A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is for
  * patients).
+ *
+ * D77 (addendum): routine tiredness is slept off in one's sleep watch, the watch after one's own
+ * (`watch.sleepWatch`), and there anyone past bedtime (fatigue above `needs.bedtimeAbove`) turns
+ * in, so a sleep a day sits in the same window every day ("Priya sleeps after her watch") instead
+ * of drifting with the fatigue rate. Outside it only pressing fatigue sends them, through relief
+ * at the helm.
  */
 function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const fatigue = view.self.needs.fatigue;
-  const urgency = needUrgency(fatigue, config);
+  const urgency = sleepUrgency(view, config, fatigue);
   if (urgency === undefined) return undefined;
   const occupied = occupiedTiles(view);
   const mine = view.self.berth?.machineId;
@@ -413,35 +430,20 @@ function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rej
   });
 }
 
-type CompartmentView = DeepReadonly<CompartmentDef>;
-
-/** The first compartment carrying one of `tags`, in tag order. */
-function compartmentTagged(view: AgentView, tags: readonly string[]): CompartmentView | undefined {
-  const deck = view.schematic.deck;
-  return tags
-    .map((tag) => deck.compartments.find((c: CompartmentView) => c.tags.includes(tag)))
-    .find((c) => c !== undefined);
-}
-
-/** Deterministic per-actor floor spot in the first compartment carrying one of `tags`. */
-function loungeTile(view: AgentView, tags: readonly string[]): TileCoord | undefined {
-  const deck = view.schematic.deck;
-  const compartment = compartmentTagged(view, tags);
-  if (compartment === undefined) return undefined;
-  const reserved = view.schematic.machines().flatMap((m) => m.interactionTiles.map((t) => t.tile));
-  const tiles: TileCoord[] = [];
-  deck.tiles.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      const tile = { x, y };
-      if (row[x] !== compartment.symbol || !view.schematic.isFloor(tile)) continue;
-      if (reserved.some((r) => sameTile(r, tile))) continue;
-      tiles.push(tile);
-    }
-  });
-  if (tiles.length === 0) return undefined;
-  let hash = 0;
-  for (const ch of view.self.id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return tiles[hash % tiles.length];
+/**
+ * How pressing a sleep is: pressing tiredness (past `needEssentialAbove`) anywhere; routine
+ * tiredness, and bedtime (fatigue past `needs.bedtimeAbove`), only in the sleep watch; nothing
+ * otherwise.
+ */
+export function sleepUrgency(
+  view: Pick<AgentView, "self">,
+  config: PlannerConfig,
+  fatigue: number,
+): UrgencyClass | undefined {
+  const urgency = needUrgency(fatigue, config);
+  if (urgency !== undefined && urgency !== "routineObligation") return urgency;
+  if (view.self.watch.sleepWatch !== true) return undefined;
+  return fatigue > config.needs.bedtimeAbove ? "routineObligation" : undefined;
 }
 
 function leisureCandidate(
@@ -461,39 +463,6 @@ function leisureCandidate(
   return personal(activity, "voluntaryActivity", ticks, view.tick, {
     kind: "personal",
     activity,
-    tile,
-  });
-}
-
-/**
- * W4a decision: where an on-duty actor with nothing better to do waits, by role (first role with
- * a matching compartment tag wins). A vocabulary mapping, not a tunable. Being at one's post is
- * also how an engineer comes to hear a grinding pump.
- */
-const POST_TAGS: Readonly<Record<RoleTag, readonly string[]>> = {
-  captain: ["bridge"],
-  firstOfficer: ["bridge"],
-  pilot: ["bridge"],
-  engineer: ["engineering"],
-  deckhand: ["cargoHold"],
-  cook: ["galley"],
-  medic: ["infirmary"],
-};
-
-function postCandidate(view: AgentView): Candidate | Rejection | undefined {
-  if (!view.self.onDuty) return undefined;
-  const tags = view.self.roleTags.flatMap((role) => POST_TAGS[role]);
-  const post = compartmentTagged(view, tags);
-  const here = view.self.tile;
-  if (post === undefined || here === undefined) return undefined;
-  if (view.schematic.deck.tiles[here.y]?.[here.x] === post.symbol) return undefined;
-  if (backingOff(view, "wander")) return { ref: "post", reason: "backoff" };
-  const tile = loungeTile(view, tags);
-  const ticks = tile === undefined ? null : view.estimateTravelTicks(tile);
-  if (tile === undefined || ticks === null) return { ref: "post", reason: "unreachableTarget" };
-  return personal("post", "voluntaryActivity", ticks, view.tick, {
-    kind: "personal",
-    activity: "wander",
     tile,
   });
 }
@@ -523,7 +492,10 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   add(sleepCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
-  if (!passenger) add(postCandidate(view));
+  if (!passenger) {
+    add(gangwayCandidate(view, config));
+    add(dutyIdleCandidate(view, config));
+  }
   return { candidates, rejected };
 }
 

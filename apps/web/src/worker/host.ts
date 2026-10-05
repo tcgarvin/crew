@@ -351,12 +351,18 @@ export function createHost(deps: HostDeps): Host {
         if (!entry) return;
         try {
           const snapshotWorld = deps.kernel.restore(entry.envelope, deps.content);
+          // Slice-2 QA: the ring holds a snapshot every couple of seconds, so a thought had in
+          // between showed up late. Play the copy forward to the tick the viewer tapped at; a
+          // halt on that copy (a hook or card) stops it there, which is where the view stood too.
+          if (message.tick > entry.tick) {
+            deps.kernel.advance(snapshotWorld, message.tick - entry.tick);
+          }
           const view = deps.kernel.getAgentView(snapshotWorld, message.actorId);
           deps.postMessage({
             type: "agentViewResult",
             requestId: message.requestId,
             actorId: message.actorId,
-            tick: entry.tick,
+            tick: snapshotWorld.state.tick,
             view: toAgentViewSnapshot(view),
           });
         } catch (error) {

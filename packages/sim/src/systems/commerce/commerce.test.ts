@@ -130,7 +130,7 @@ describe("commerce: decision perspective (D8)", () => {
 describe("commerce: captainAshore hook", () => {
   it("raises captainAshore when docked with nothing on, and not again within the cooldown", () => {
     // D40/D46: the narrator is the only source of work, so a fresh world docked at its start
-    // port asks for an offer on the first tick, and asks again only after reofferSeconds.
+    // port asks for an offer on the first tick, and asks again only after reofferDays.
     const { world, kernel } = freightTestWorld();
 
     const first = kernel.advance(world, 1);

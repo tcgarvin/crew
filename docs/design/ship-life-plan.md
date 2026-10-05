@@ -3,9 +3,11 @@
 Status: plan, 2026-10-04. Design and rationale: `docs/design/ship-life.md` (section references
 below are to that file unless marked Dockside). Five slices, as §12. Each slice ends deployed,
 with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
-playtest, and a pause to take stock. Slices 1 and 2 are planned in full below; slices 3–5 are
-sequenced and will be refined after the slice before them lands. Each slice adds its own
-`D<n>` entries. Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74).
+playtest, and a pause to take stock. Slices 1–4 are planned in full below; slice 5 is
+sequenced and will be refined after slice 4 lands. Each slice adds its own `D<n>` entries.
+Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74); slices 3 and 4 were planned
+the same day against slice 2's gate and plan, before its workstreams merged, slice 4 also
+against slice 3's plan.
 
 Slice 1 is built by one serial *contract gate* followed by parallel workstreams in separate
 worktrees. The gate changes every shared type and leaves the repo green; each workstream then owns
@@ -1031,29 +1033,1410 @@ drops to 1× on the first fault.
 
 ## Slice 3: Mess call and dirt
 
-Save schema 8 → 9 (dirt grid, provisions, boots).
+Scope (§12.3, §4, §5): `provisions` and `hot_meal` items; the cook's meal before each bell, eaten
+at the mess tables, the oncoming watch first; the helm-stander's plate carried up; spoilage;
+ration packs as the fallback; `provisionsLow` and buying provisions at port like parts; a dirt
+grid per deck fed by footfall, boots, port grime and dust and the things people do; room tiers
+with thoughts; `compartmentDirty` → mopping with the mop from the cleaning locker, by role
+affinity, by on-duty crew with nothing better to do; the grime tint, the room inspector, ticker
+lines on tier changes; the digest's galley and dirt lines; the beats report as the tuning tool.
+Save schema 8 → 9 (migrated). Prompt v0.22 (`pnpm test:live` once). Built on slice 2 as planned
+and as its gate notes said it was built (`ship-life-slice2-gate-notes.md`, deleted at slice 2's
+integration; read it in git history): sections and the bell,
+`helmRoleOf`/`whoHasTheHelm`, `addThought`, `crew beats`, day-relative knobs.
 
-1. `provisions` and `hot_meal` items; `cookMeal` on the bell; `eat` at a mess seat; meals to the
-   helm; spoilage; `buyProvisions`; `provisionsLow`. Stores zones come into use (pantry, parts).
-2. Dirt grid per deck, footfall, boots, port `grime`/`airborneDust` on dock maps, event deposits,
-   room tiers, `compartmentDirty` → `cleanCompartment` with the mop from the cleaning locker.
-3. Renderer: grime tint per tile at low cadence; inspector room tier; ticker on tier transitions.
-4. Digest: galley state, provisions days.
+Built as one serial gate commit, then five parallel workstreams, then a tuning commit by the lead.
 
-Checkpoint: the mess fills three times a day; a trail from the cargo ramp after a muddy port.
+### Calls made
+
+1. **A hot meal on the counter is what fills the mess, not a hunger timer.** Today eating is
+   need-driven (`seekThreshold` 0.5) and solitary. Now the galley serves a stack of `hot_meal`
+   on the `serving` zone before each bell and tells every crew member where it is (a `reported`
+   item fact, the way a purchase is reported): that is the mess call. The planner's eat candidate
+   (`planner/galley.ts`) takes a known hot meal at routine class from
+   `galley.mealCallHungerAbove` (0.2, well under `seekThreshold`) when the person is a dayworker,
+   off watch, or in the section that stands the next watch (`self.watch.nextOnWatch`, new) before
+   the bell; the section on watch waits for the bell and eats as the off-going. Need-driven eating
+   stays as it is and prefers a known hot meal to a ration. Nobody is pulled off a routine or
+   higher activity for a meal (same-class candidates never interrupt): a hauler finishes the
+   crate, a sleeper eats on waking, and the gangway stander's hold ends for the meal call
+   (`gangwayHoldDone`) with the gangway candidate suppressed while it stands
+   (`mealCallFor(view, config)`, exported from `planner/galley.ts`, read by `planner/helm.ts`).
+2. **The meal is a problem the galley owns, not a personal activity.** `galleySystem` raises
+   `mealToCook { watchIndex }` at `bell − mealLeadDays` for the coming watch (dedupe
+   `meal:<watchIndex>`, public, routine), resolves it when the serve commits, and cancels it with
+   `mealMissed` at `bell + mealGraceDays`. It derives one `cookMeal` task at the stove's `use`
+   tile with `requiredSkills: [{ cooking, min: 1 }]` and no consumables: the plan is the galley's
+   own (`cookPlan`), one crate of provisions split off the nearest known stack, `cookSeconds` of
+   `cook` work at the stove (skill-scaled through `workRate`), a step to the serving zone and the
+   `serve` commit, which consumes the crate and spawns `crewAboard + spareServings` servings
+   (never more than `servingsPerCrate`) on the serving tile. The generic `supplySteps` is not
+   used: it carries the whole stack (it does for spare parts today), and eighteen crates of
+   provisions walking to the stove is not the picture.
+3. **The cook cooks every meal; anyone with cooking ≥ 1 substitutes after a wait.** `cookMeal`
+   is exempt from the off-duty rule and `deferTo` for the `cook` role (as helm tasks are for the
+   stander, slice 2 call 6): Bettina is a dayworker off during the third watch and still cooks
+   it, sleeping in between. Anyone else may claim it only once the problem is
+   `galley.substituteAfterDays` old (the cook asleep, ashore, in the infirmary, or just slow).
+   The substitute's dinner is as good as their skill. No `cookUnavailable` state: age is the
+   signal.
+4. **Quality is the cook's skill, lowered a step by a dirty galley, and it rides on the item.**
+   `MealQuality = "poor" | "plain" | "good"`: cooking ≥ `goodCookingAbove` (6) good, <
+   `poorCookingBelow` (3) poor, else plain; the galley at `dirty` or worse drops it one step.
+   `Item.meal = { quality, spoilsAtTick, cookId }` is set at the serve, so a later cook or a
+   content retune never rewrites a plate already on the counter. Thoughts on eating
+   (`consumeServing`, shared by the eat step and the helm meal): `ateWell` (+0.1, 0.3 day) for
+   good, `burntDinner` (−0.1, 0.3 day) for poor, nothing for plain; `ateRationPack` (−0.05, 0.3
+   day) for any `food` without a `meal`; `ateInDirtyMess` (−0.1, 0.5 day) and `ateInFilthyMess`
+   (−0.2, 0.5 day) by the room the eater is in: two keys rather than a doubled value, because a
+   thought's value is copied from its def (D79). Five new `THOUGHT_KEYS`, all non-stacking.
+5. **Meals go to the helm, and the stander eats in the seat.** When a meal is served, someone
+   holds the helm (`whoHasTheHelm`) and no serving lies within reach of the seat, the galley
+   raises `mealToCarry { toActorId, machineId }` → one `carryMeal` task (routine; the cook or a
+   dayworker, anyone after `routineAgingDays`): split one serving off the counter, walk to the
+   helm's `standby` tile, set it down. The stander never leaves the hold to eat: a `staff` hold
+   is essential class and the planner would not let a routine meal interrupt it, and a vacancy
+   for a meal is exactly what slice 2's relief and `helmUnattended` would punish. Instead the
+   galley runs the meal on the spot: with a serving within reach of the seat-holder and their
+   hunger above the call threshold, `galley.helmMeal = { actorId, itemId, startedTick }` counts
+   `needs.mealDays` and then `consumeServing` runs (hunger, thought, `ateMeal`, a crumb of dirt);
+   the label reads "at the helm, eating". One-handed, like a real watch. `urgency.routineAgingDays`
+   is read for the first time, here and in call 11.
+6. **Eating happens at a mess seat.** The eat plan's table is a free `use` position of a
+   `messTable` machine (eight seats on Mk2), chosen against the reservation cache at plan time
+   (truth, as plans may use it), else a floor tile in the mess as today; a seat lost on the way
+   (`occupiedPosition`) backs the meal off for `retryBackoffSeconds` and the next plan picks
+   another. Someone already in the mess or galley eats where they stand.
+7. **Spoilage is time on the item, swept by the galley.** `mealSpoilDays` (0.25, so a serving
+   outlives one sleep) after the serve, `galleySystem` removes a spoiled serving, emits
+   `mealSpoiled` and deposits `dirt.deposits.spoiledMeal` on its tile. Ration packs never spoil.
+   With `spareServings: 1` one plate spoils per meal, which is the galley's steady trickle of dirt
+   and the reason the cook mops it.
+8. **Provisions are a stackable crate, bought like parts, through the parts code.** `item.provisions`
+   (tag `provisions`, mass 2, `maxStack` 20; `galley.servingsPerCrate` 12), eighteen in the
+   `pantry` zone at the start (six days for nine with waste). `provisionsLow { itemDefId, count }`
+   (owner galley, public, routine; dedupe `provisionsLow`) is open while the servings aboard
+   cover under `galley.lowBelowDays` (1) of `crewAboard × watchesPerDay`; `count` is the crates
+   that bring it to `restockToDays` (4). Commerce derives the same `buyParts` task spec it derives
+   for `partsNeeded` (one `buySpec` helper; target the galley compartment; label "buying
+   provisions" from the item name) and `buyFromMarket` settles both kinds. No new task type, no
+   new command: the narrator's `stockMarket` already stocks any item. Bought crates are set down
+   at the top of the cargo ramp as parts are and the cook fetches from the nearest known stack;
+   no haul to the pantry this slice. Every port market lists provisions.
+9. **Items and tags.** `ITEM_TAGS` + `provisions`, `meal`; `TOOL_KINDS` + `mop`; `item.hot_meal`
+   (`food`, `consumable`, `meal`; nutrition 0.4 against the ration's 0.25; mass 0.5; three meals
+   a day at 0.4 keeps hunger near zero, so the call threshold decides who comes, not starvation)
+   and `item.mop` (unique `tool`, kind `mop`), one in the `cleaning_locker` zone. The galley finds
+   provisions and the meal def by tag, and L2 requires exactly one `meal`-tagged def and at least
+   one `provisions`-tagged def, so no item id lives in config.
+10. **Dirt is one quantised row-major grid per deck, in state, owned by `systems/dirt`.**
+    `WorldState.dirt = { cells: Record<DeckDefId, number[]>, tiers: Record<LocalKey, DirtTier>,
+    dustThisVisit: number }`, a cell an integer 0..255 (255 = 1.0) at `y × width + x` over the
+    authored deck bounds (dock floor has no cell). 720 small integers on Mk2 are about 2.5 KB of
+    JSON in a save; no typed array in state (CONTRACTS rule 2). `core/dirt-grid.ts` holds the
+    index arithmetic and `emptyCells(deck)`, so `core/world.ts` and the migration can allocate
+    without importing systems (the `core/watch-bill.ts` precedent). `Actor.boots: number` in
+    [0, 1] is the only other state.
+11. **Footfall and boots live in movement; everything else deposits through one function.**
+    Spatial's `advanceActor` calls `trackFootfall(ctx, actor, geometry, from, to)`
+    (`systems/dirt/footfall.ts`) when a segment completes: on a deck tile the tile gains
+    `footfallPerStep` plus `boots × bootsShed`, boots lose that and gain `tile × bootsPickup`
+    (after the shed); on a dock tile boots gain `grime × dockGrimePerStep` (the map's `grime`).
+    A documented cross-system write, like the hazard scrape writing `scheduledFaults`. Every
+    other source calls `depositDirt(state, content, config, deckId, tile, amount)` from
+    `systems/dirt/deposit.ts` with the amount from `config.dirt.deposits`: `serving` at the
+    serve, `eating` at the eater's tile, `cooking` at the stove, `spoiledMeal`, `repair` round
+    the machine when a recipe completes (`equipment/recipes.ts`, pure over state so the recipe
+    context suffices), `cargo` where a crate is set down (`steps.ts` `runPutDown`). Sparring and
+    exercise deposits wait for slice 4's activities. Airborne dust is the dirt system's own: while
+    docked at a map with `airborneDust > 0`, deck tiles within `airborneDustRadiusTiles` of an
+    open ramp door gain `airborneDust × airborneDustPerDay` (falling linearly with distance) until
+    `dustThisVisit` reaches `airborneDustVisitCap`, reset when the ship undocks. The cap is what
+    keeps a dusty port from being a chore.
+12. **Rooms are the unit of tiers, problems and thoughts.** `roomDirt = (1 − roomMaxWeight) ×
+    mean + roomMaxWeight × max` over the room's floor cells; tiers `clean | untidy | dirty |
+    filthy` at `dirt.tiers.{untidy, dirty, filthy}` with `tierHysteresis` on the way down, written
+    to `dirt.tiers[key]` by `dirtSystem` (equipment phase, every `updateEverySeconds`) so a
+    transition is seen once: `roomDirty` and `roomFilthy` (notable, ticker) rising, `roomTidied`
+    (trace) falling, `roomCleaned { byActorId }` (notable) when a `compartmentDirty` resolves
+    while someone holds its task. `roomFilthy` joins `host.slowDownOnEvents` (§9: a filthy-tier
+    transition slows fast-forward). The "first field day" line is cut.
+13. **Cleaning is a task with affinity, aging and a tier-driven class.** `compartmentDirty {
+    compartmentId, key, tier }` (owner dirt, public, dedupe `dirty:<key>`) opens at `dirty`,
+    resolves below `untidy`; `baseUrgency` is routine, essential while `filthy` and the room is
+    tagged `galley` or `infirmary` (revision bumped on each tier change, so the task refreshes).
+    It derives one `cleanCompartment` task: `requiredTools: ["mop"]`, target `{ kind:
+    "compartment" }` (new `TaskTarget` variant), `interactionTiles` the room's `mopTilesPerTrip`
+    dirtiest cells at or above half the `untidy` threshold, dirtiest first. `cleanPlan`: the mop
+    (generic `supplySteps`: it is unique), each tile a `moveTo` and `mopSecondsPerTile` of `mop`
+    work that sets the cell to `max(0, cell − mopPerTile × 255)`, then back to the cleaning
+    locker and `putDown`. A trip that ends with the room still dirty releases the task and the
+    next trip re-derives the tiles. Who: `cleanTaskAllowed` in `planner/cleaning.ts`, by the
+    room's tags against the actor's roles (cook → galley, mess; deckhand → cargoHold, corridor,
+    gym, airlock; engineer → engineering; medic → infirmary; captain, first officer, pilot →
+    bridge; lounge, quarters, cabins and stores belong to nobody), anyone once the problem is
+    `routineAgingDays` old, and anyone at essential class. Cleaning is routine and rounds are
+    voluntary (slice 2 call 10), so **on-duty crew with nothing to do clean before they walk
+    rounds, and off-duty crew never clean** (the off-duty rule rejects routine tasks); within
+    routine class a dirty room competes with cargo on travel estimate, which the tier thresholds
+    and the beats report keep honest (risk below).
+14. **The renderer gets dirt on its own channel, at its own cadence, keyed by tick.** Not in the
+    `RenderFrame`: frames come every 2 ticks and at 8× that is 80 a second; 720 numbers each
+    would be most of the frame traffic for a picture that changes in minutes. `Kernel` gains
+    `getDirtFrame(world): DirtFrame { tick, deckId, width, height, cells: Uint8Array }` and the
+    worker host posts `{ type: "dirt", frame }` on load and whenever the tick crosses a multiple
+    of `host.dirtFrameEverySeconds` (5); the main thread queues them by tick and applies the
+    newest whose tick ≤ `viewTick` in the playback step, the way slice 2 queues slowdowns, so the
+    future never leaks (D14). `interpolateFrame` is untouched. The canvas draws a translucent
+    grime square per cell over the room fill, alpha `min(dirt.tintMaxAlpha, cell / 255 ×
+    tintScale)`, skipping cells under 8: a path is visible as a darker lane, a room as a wash.
+15. **The inspector learns rooms.** A tap on bare deck floor selects `{ kind: "room", id:
+    compartmentKey }` (last in `pickAt`, after machines); the inspector asks for the snapshot at
+    the view tick and shows the room's name, its tier as the subtitle, the mean and worst cell,
+    and who is mopping it. Rooms come from `state.dirt.tiers` and `cells`, so the frame carries
+    nothing new.
+16. **Units.** Days (D76): `mealLeadDays`, `mealGraceDays`, `mealSpoilDays`,
+    `substituteAfterDays`, `lowBelowDays`, `restockToDays`, `airborneDustPerDay`. Seconds:
+    `cookSeconds` and `mopSecondsPerTile` (work at a machine or a tile), `updateEverySeconds`
+    (a cadence of the sim, not of ship life) and `host.dirtFrameEverySeconds` (host real time).
+    Per step or per event, unitless: footfall, boots, deposits.
+17. **Schema 9 migrates, and gives an old save its stores.** `dirt` zeroed per deck in
+    `deck.tiles`, `tiers` empty, `dustThisVisit` 0, `boots` 0, `galley: { lastMealWatch:
+    watchIndexAt(tick) }`. A schema-8 save has no provisions and no mop; the migration spawns the
+    scenario's `provisions` and `mop` starting lines into their zones as fresh items (ids from
+    `nextId`), so a loaded game cooks tonight instead of eating rations until the next port, and
+    says so in `warnings`. Narrator fixtures are regenerated, never hand-edited.
+18. **Beats report is the tuning instrument.** `crew beats` (slice 2 W6) gains per watch: meals
+    served, servings eaten hot and as rations, meals missed, servings spoiled, rooms at `dirty`
+    and `filthy` at the end of the watch, rooms cleaned; per person the share of time `cooking`,
+    `mopping` (beside `eating`); provisions days at the end. Targets for the tuning commit: the
+    mess fills three times a day (at least six people eat within 0.05 day of each serve), a room
+    reaches `filthy` at most once a day, mopping under a tenth of on-duty time, no meal missed
+    with the cook aboard and awake.
+19. **The digest says what the galley is doing and which rooms are dirty.** Ship section:
+    `galley: 10 hot meals on the counter (good, Bettina Solheim), next meal due in ~90s;
+    provisions 16 crates, about 5 days` and `dirt: galley dirty; cargo hold filthy` (only when
+    some room is at `dirty` or worse); `provisionsLow` and `compartmentDirty` get problem lines
+    (`provisionsLow` reuses `partsReason`). Mood lines already show the new thoughts' labels.
+    Prompt v0.22 adds a galley-and-dirt paragraph: the cook's meals and a burnt dinner or a
+    missed one are the crew's story to tell, provisions run out and are bought at ports
+    (`stockMarket` may stock `item.provisions`), a filthy room is the ship's own failing; never
+    invent food the sim has not cooked. `provisionsLow` and `roomFilthy` are narrative events (the
+    digest sees them; they re-arm the quiet timer) and not hooked.
+20. **The headline does not change.** Freight and the captain ashore already fill it; "buying
+    provisions" shows on the buyer's label and in the ticker's `partsBought` line.
+21. **Baking for fun and the galley-after-every-meal rule are not special-cased.** Baking is
+    slice 4's recreation; the cook mops the galley because affinity sends her there, and the
+    spoiled-plate trickle makes sure there is something to mop.
+
+### Gate: contracts (one agent, serial)
+
+Everything below lands as one commit with all four checks green. Stubs are fine where behaviour
+is a workstream's; types, schemas, generated schemas, the migration, the ticker lines, the
+protocol and the minimum content to keep the bundle valid are not. Every stub is a named
+function in a file its stream owns, called from the shared file, so no stream edits
+`candidates.ts`, `plans.ts`, `steps.ts`, `labels.ts`, `render.ts`, `movement.ts`,
+`equipment/recipes.ts`, `commerce/tasks.ts`, `commerce/market.ts` or `derivation.ts` after the
+gate.
+
+**Sim types.**
+
+- `core/types/content.ts`: `ITEM_TAGS` + `provisions`, `meal`; `TOOL_KINDS` + `mop`;
+  `THOUGHT_KEYS` + `ateWell`, `burntDinner`, `ateRationPack`, `ateInDirtyMess`,
+  `ateInFilthyMess`; `DIRT_TIERS = ["clean", "untidy", "dirty", "filthy"]` / `DirtTier`;
+  `MEAL_QUALITIES` / `MealQuality`; `DockDef.grime: number` and `airborneDust: number` (both
+  0..1, required; doc comment: how much a dock tile loads boots, and whether the air settles on
+  the deck near an open ramp); `ConfigDef.galley { mealLeadDays; mealGraceDays; cookSeconds;
+  substituteAfterDays; spareServings; servingsPerCrate; mealSpoilDays; mealCallHungerAbove;
+  lowBelowDays; restockToDays; goodCookingAbove; poorCookingBelow }`, `ConfigDef.dirt {
+  footfallPerStep; bootsPickup; bootsShed; dockGrimePerStep; airborneDustPerDay;
+  airborneDustRadiusTiles; airborneDustVisitCap; deposits { cooking; serving; eating;
+  spoiledMeal; repair; cargo }; depositRadiusTiles; roomMaxWeight; tiers { untidy; dirty; filthy
+  }; tierHysteresis; mopPerTile; mopSecondsPerTile; mopTilesPerTrip; updateEverySeconds;
+  tintScale; tintMaxAlpha }`, `host.dirtFrameEverySeconds`.
+- `core/types/state.ts`: `WorldState.dirt: DirtState` (call 10; owner dirt),
+  `WorldState.galley: GalleyState = { lastMealWatch: number; helmMeal?: { actorId; itemId;
+  startedTick } }` (owner galley), `SCHEMA_VERSION = 9` and its history line.
+  `core/types/actor.ts`: `Actor.boots: number`. `core/types/ship.ts`: `ItemBase.meal?: MealInfo
+  { quality: MealQuality; spoilsAtTick: Tick; cookId: ActorId }`.
+- `core/types/work.ts`: `ProblemOwner` + `galley`, `dirt`; `ProblemPayloads` + `mealToCook {
+  watchIndex }`, `mealToCarry { toActorId; machineId }`, `provisionsLow { itemDefId; count }`,
+  `compartmentDirty { compartmentId; key; tier }`; `TASK_TYPES` + `cookMeal`, `carryMeal`,
+  `cleanCompartment`; `TaskTarget` + `{ kind: "compartment"; compartmentId }`; `ProgressRef` +
+  `{ kind: "meal"; watchIndex }`, `{ kind: "room"; compartmentId }`; `WorkStageKey` + `cook`,
+  `mop`; `ActivityStep` + `{ kind: "serve" }` (the commit: consume the carried crate, spawn the
+  servings at the actor's feet, report them to the crew); `PROBLEM_KIND_SET` in
+  `systems/work/derivation.ts` follows. `core/types/view.ts`: `WatchView.nextOnWatch: boolean`;
+  `DirtFrame`; `core/types/kernel.ts`: `Kernel.getDirtFrame`; `core/types/protocol.ts`:
+  `FromWorker` + `{ type: "dirt"; frame: DirtFrame }`.
+- Events: new `core/types/events/galley.ts` with `mealServed { cookId; servings; quality }`
+  (notable), `mealMissed { watchIndex }` (notable), `mealSpoiled { count }` (trace),
+  `mealCarried { toActorId; byActorId }` (trace), `provisionsLow { crates; days }` (narrative);
+  `events/needs.ts` `ateMeal` payload gains `quality?: MealQuality` and `ration: boolean`; new
+  `events/dirt.ts` with `roomDirty { compartmentId; key }` (notable), `roomFilthy` (narrative),
+  `roomTidied` (trace), `roomCleaned { compartmentId; key; byActorId }` (notable);
+  `events/index.ts` merges both. No new commands; `contracts.test.ts` is untouched.
+- `core/dirt-grid.ts` (owner W2): `cellIndex(deck, tile)`, `emptyCells(deck)`,
+  `roomCells(deck, compartmentKey)` (cached per deck def). `core/world.ts`: `emptyState` gains
+  `dirt`, `galley`; `createWorld` allocates cells for the instantiated deck and sets every spawned
+  actor's `boots` to 0 (`core/command-handlers.ts` spawn path writes `boots: 0`).
+- `core/migrations.ts` `8:` (call 17), with the provisions/mop spawn reading
+  `content.scenarios[raw.scenarioId]` and `content.items`; `save.test.ts` adds an 8 → 9 case
+  (`packages/narrator/fixtures/*.json` are schema-8 envelopes). `core/invariants.ts`: each deck
+  in `deck.tiles` has a `dirt.cells` row of `width × height` integers in [0, 255], `boots` in
+  [0, 1], `item.meal.spoilsAtTick` an integer, `galley.helmMeal.actorId` an actor; `restore`
+  rebuilds nothing new (cells are state).
+- `systems/galley/` (new; owner W1): `galley.ts` (`galleySystem`, needs phase after the watch
+  system; stub: no-op), `cook.ts` (stubs: `cookPlan` blocked, `runCook` throws
+  `NotImplementedError`, `runServe` throws), `eat.ts` (`eatPlan` and `runConsume` **moved here
+  verbatim** from `plans.ts`/`steps.ts`, `consumeServing(ctx, actor, item)` stub wrapping today's
+  consume, `carryMealPlan` blocked), `tasks.ts` (`deriveMealToCook`, `deriveMealToCarry`
+  returning `[]`), `index.ts` with `registerGalley(registry)`; `apps/web/src/worker/registry.ts`
+  and `apps/cli/src/pacing.ts` `createPacingRegistry` register it after needs;
+  `packages/sim/src/index.ts` exports `registerGalley`, `registerDirt`, `DIRT_TIERS`,
+  `provisionsDays`.
+- `systems/dirt/` (new; owner W2): `dirt.ts` (`dirtSystem`, equipment phase, `every` from
+  `updateEverySeconds`; stub: no-op), `footfall.ts` (`trackFootfall` no-op), `deposit.ts`
+  (`depositDirt` no-op), `grid.ts` (`roomDirt`, `tierOf` stubs returning 0 and `clean`),
+  `clean.ts` (`cleanPlan` blocked, `runMop` throws), `tasks.ts` (`deriveCompartmentDirty`
+  returning `[]`), `index.ts` with `registerDirt(registry)`, registered after equipment.
+- `systems/spatial/movement.ts`: the one `trackFootfall` call in `advanceActor` where a segment
+  completes, after `crossedRamp`. `systems/equipment/recipes.ts`: `depositDirt` for `repair`
+  where a recipe completes. `systems/work/steps.ts`: `runPutDown` deposits `cargo` for a
+  `cargo`-tagged item; `work` stage `cook` → `runCook`, `mop` → `runMop`; `serve` → `runServe`;
+  `consume` → the galley's `runConsume`. `systems/work/plans.ts`: `buildTaskPlan` routes
+  `cookMeal` → `cookPlan`, `carryMeal` → `carryMealPlan`, `cleanCompartment` → `cleanPlan`;
+  `buildPersonalPlan` `eat` → the galley's `eatPlan`. `labels.ts` gains the strings below (text
+  only). `work/claims.ts` unchanged.
+- `systems/commerce/tasks.ts`: `buySpec(problem, ctx, itemDefId, count, target)` shared by
+  `partsNeeded` and the new `provisionsLow` rule (target the first `galley`-tagged compartment);
+  `commerce/market.ts` `buyFromMarket` settles open `provisionsLow` problems for the item as it
+  settles `partsNeeded`. Complete at the gate, not stubbed (it is the parts code with a second
+  caller). `docs/CONTRACTS.md` "How work is advertised": the galley owns `mealToCook`,
+  `mealToCarry`, `provisionsLow`; dirt owns `compartmentDirty`; commerce answers `provisionsLow`.
+- `planner/galley.ts` (owner W1): `eatCandidate` **moved verbatim** from `candidates.ts`,
+  `mealCallFor(view, config)` stub returning `undefined`, `galleyTaskAllowed(view, task)` stub
+  returning today's rule (true) and `galleyTaskExempt` (false); `planner/cleaning.ts` (owner
+  W2): `cleanTaskAllowed(view, task)` stub returning true. `candidates.ts`: `taskCandidate`
+  routes `cookMeal`/`carryMeal` through `galleyTaskAllowed`/`galleyTaskExempt` (the helm
+  pattern), `cleanCompartment` through `cleanTaskAllowed`; `taskUrgency`: `mealToCook`,
+  `mealToCarry`, `provisionsLow` → routine, `compartmentDirty` → `problem.baseUrgency`;
+  `workTile` handles a `compartment` target (first interaction tile); `planner/helm.ts`
+  `gangwayCandidate` returns undefined while `mealCallFor` is set (one line; W1 of slice 2 is
+  merged). `view/agentView.ts`: `watch.nextOnWatch`.
+- `systems/watch/helm.ts` `gangwayHoldDone`: also ends when `mealCallStandsFor(ctx, actor)`
+  (stub in `systems/galley/eat.ts` returning false; W1: a known `meal` item on deck and hunger
+  above `mealCallHungerAbove`) says so; `labels.ts` `hold` label at the helm reads "at the helm,
+  eating" while `galley.helmMeal` names the actor.
+- `core/render.ts`: `getDirtFrame`; ticker lines (streams write none): `mealServed` → "Bettina
+  Solheim served dinner: 10 hot meals" ("… a poor dinner" for `poor`), `mealMissed` → "No hot
+  meal this watch", `provisionsLow` → "Provisions are running low: about a day left",
+  `roomDirty` → "The galley is dirty", `roomFilthy` → "The cargo hold is filthy", `roomCleaned`
+  → "Priya Kessler mopped the galley"; `partsBought` already reads "Bought 6× provisions at …".
+  `TICKER_TRACE_TYPES` unchanged (`ateMeal` stays quiet). `apps/web/src/worker/host.ts` posts
+  the dirt frame on load and at the cadence (`HostDeps.dirtFrameEverySeconds`); `host.test.ts`
+  gets one case.
+
+**Content and schemas (`packages/content`).**
+
+- `schemas/primitives.ts` enums for the new tags, tool kind, thought keys (the `AssertEqual`
+  guards force it); `schemas/dock.ts` `grime`, `airborneDust` in [0, 1]; `schemas/config.ts` the
+  `galley` and `dirt` blocks and `host.dirtFrameEverySeconds`; `schemas/bundle.ts` `thoughts`
+  strict object over the nine keys; `crew content schemas` regenerated. `validate.ts` L2: exactly
+  one `meal`-tagged item def, at least one `provisions`-tagged def; the L3 zone rules are W3's.
+- Data: `items/provisions.json`, `hot-meal.json`, `mop.json`; `thoughts/` five files (call 4
+  values, labels "ate well", "burnt dinner", "ate a ration pack", "ate in a dirty mess", "ate in
+  a filthy mess"); the six dock maps gain `grime`/`airborneDust` (hub 0.2/0, Kessler 0.3/0,
+  Ossory 0.3/0, Vesper 0.2/0, Green Meridian 0.8/0.2 the muddy one, Tern's Rest 0.5/0.8 the
+  dusty one); `scenarios/default.json` `startingItems` + `provisions × 18` in `pantry` and
+  `mop × 1` in `cleaning_locker`; `config/default.json` `galley { mealLeadDays: 0.08,
+  mealGraceDays: 0.1, cookSeconds: 30, substituteAfterDays: 0.025, spareServings: 1,
+  servingsPerCrate: 12, mealSpoilDays: 0.25, mealCallHungerAbove: 0.2, lowBelowDays: 1,
+  restockToDays: 4, goodCookingAbove: 6, poorCookingBelow: 3 }`, `dirt { footfallPerStep: 0.004,
+  bootsPickup: 0.15, bootsShed: 0.25, dockGrimePerStep: 0.08, airborneDustPerDay: 0.5,
+  airborneDustRadiusTiles: 6, airborneDustVisitCap: 0.3, deposits { cooking: 0.04, serving: 0.03,
+  eating: 0.02, spoiledMeal: 0.08, repair: 0.05, cargo: 0.03 }, depositRadiusTiles: 1,
+  roomMaxWeight: 0.3, tiers { untidy: 0.12, dirty: 0.3, filthy: 0.55 }, tierHysteresis: 0.05,
+  mopPerTile: 1, mopSecondsPerTile: 2, mopTilesPerTrip: 12, updateEverySeconds: 1, tintScale:
+  1.2, tintMaxAlpha: 0.35 }`, `host.dirtFrameEverySeconds: 5`, `host.slowDownOnEvents` +
+  `roomFilthy`; `freighter-mk1.json` gains `pantry`, `serving` and `cleaning_locker` zones so
+  W3's hull rule holds on both decks; `loader.ts` imports; `loader.test.ts` counts (items 16,
+  thoughts 9).
+- Hand-built sim bundles: `core/fixtures/ship-life.ts` `FIXTURE_THOUGHTS` gains the five defs
+  and the module gains `FIXTURE_GALLEY` and `FIXTURE_DIRT`; every fixture config (`tinyConfig`,
+  `fixtureConfig`, `crewConfig`, `w5-content`, `berth-deck` if it builds one) spreads them and
+  adds `dirtFrameEverySeconds` to its `host` block; fixture docks (`spatial/fixtures/dock.ts`, the
+  travel and commerce `fixtures-dock.ts`) gain `grime: 0, airborneDust: 0`; `example-world.ts`
+  actors' `boots`, state `dirt` and `galley`; `frozen-migrations.ts` untouched.
+
+**Tests the gate must fix to stay green** (literals and renames only): `loader.test.ts` and
+`schemas.test.ts` counts; `kernel.test.ts`/`pipeline.test.ts` if they build `emptyState` by
+hand; `planner.test.ts`/`work.test.ts` import paths if they call `eatCandidate` or `eatPlan`
+directly; `save.test.ts` 8 → 9; `apps/web/src/worker/host.test.ts` sees one more message kind;
+`integration.test.ts` registers nothing new (the registry does); narrator `digest.test.ts` is
+untouched (it reads no new field yet); fixtures under `packages/narrator/fixtures/` load through
+the migration (regenerated at integration).
+
+### Workstreams (parallel after the gate)
+
+No two streams edit the same file. `docs/DECISIONS.md`, `packages/content/schema-json/*`,
+`packages/content/data/config/default.json`, `packages/narrator/fixtures/*` and the deck and
+dock READMEs are the lead's at integration. Each stream's report names the files it touched,
+the D-entry text it proposes, and the beats it saw in a headless run.
+
+**W1 — Sim: the galley loop, meals, provisions, the helm's plate.**
+Owns `packages/sim/src/systems/galley/**` (+ tests and `fixtures/galley-deck.ts`: a small deck
+with a galley, a stove with a `use` tile, a `serving` zone beside it, a `pantry` zone, one
+four-seat mess table, a helm with `seat` and `standby`, five crew in two sections with a cook)
+and `planner/galley.ts` (+ test). `systems/watch/helm.ts` and `planner/helm.ts` are the gate's:
+W1 reaches them through `mealCallStandsFor` and `mealCallFor`.
+- `galley.ts` (`galleySystem`): raise `mealToCook` at `bell − mealLeadDays` for the coming
+  watch (once per watch, `galley.lastMealWatch`), cancel at `bell + mealGraceDays` with
+  `mealMissed`; sweep spoiled servings (`mealSpoiled`, deposit); `provisionsLow` raise, revise
+  (`count`) and resolve against `provisionsDays(state, content, config)`; `mealToCarry` raise and
+  resolve (call 5); the helm meal (`galley.helmMeal`, `needs.mealDays`, then `consumeServing`).
+- `cook.ts`: `cookPlan` (nearest known `provisions` stack → `pickUp` split → stove `use` →
+  `work cook` for `cookSeconds` scaled by `workRate` → `moveTo` the serving zone's first tile →
+  `serve`), `runCook` (counts), `runServe` (consume the carried crate, spawn the servings with
+  `meal` set from the cook's skill and the galley's tier, report them to every crew member
+  aboard, `mealServed`, deposit `cooking` at the stove and `serving` at the counter, resolve
+  `mealToCook`). Blocked `inaccessibleSupply` with no provisions known: the task backs off and
+  the meal is missed at grace.
+- `eat.ts`: `eatPlan` prefers a `meal` item, takes a free mess seat (call 6), falls back to the
+  mess floor; `runConsume` → `consumeServing`: hunger by `nutrition`, the thought by `meal.quality`
+  or `ateRationPack`, `ateInDirtyMess`/`ateInFilthyMess` by the eater's room tier
+  (`state.dirt.tiers`), deposit `eating`, `ateMeal` with `quality` and `ration`; `carryMealPlan`
+  (split one serving → helm `standby` → `putDown`); `tasks.ts` derivations (`cookMeal` at the
+  stove's `use` tile, skills cooking ≥ 1, `estimatedWorkSeconds: cookSeconds`, progress `{ kind:
+  "meal" }`; `carryMeal` at the helm's standby tile, no skills, `estimatedWorkSeconds` 0).
+- `planner/galley.ts`: `mealCallFor` (call 1), `eatCandidate` with the call and the meal
+  preference, `galleyTaskAllowed` (cook always; cooking ≥ 1 after `substituteAfterDays`;
+  `carryMeal` for cook or dayworker, anyone after `routineAgingDays`), `galleyTaskExempt` (the
+  cook on `cookMeal`).
+- Labels: "fetching provisions", "cooking", "serving dinner", "taking a plate to the helm",
+  "at the helm, eating"; "eating" and "buying provisions" already read right.
+- Tests (`galley.test.ts`, `cook.test.ts`, `eat.test.ts`, `planner/galley.test.ts` on the
+  galley fixture and on `crewWorld`): the problem opens `mealLeadDays` before the bell and the
+  cook takes it off duty; Bettina serves ten good servings before the bell; with Bettina asleep
+  Tomas cooks after `substituteAfterDays` and the dinner is poor; the oncoming section eats
+  before the bell and the off-going after, at seats, and the ticker shows one `mealServed`; a
+  sleeper is not woken and eats on waking; with no serving a hungry person eats a ration and
+  thinks `ateRationPack`; a spoiled serving is swept at `mealSpoilDays` and dirties the counter;
+  the stander's plate is carried to the standby tile by the cook and eaten in the seat with no
+  `helmUnattended`, no `relief` and no change in `whoHasTheHelm`; the gangway stander comes to
+  dinner and goes back; `provisionsLow` opens under a day of servings and the crew buy provisions
+  at the next port through the `buyParts` task (`partsBought` names the provisions); after
+  `provisionsLow` is settled it closes; a dirty galley lowers quality a step.
+Done when the sim suite is green and a `crewWorld` day shows three `mealServed` and no
+`mealMissed`.
+
+**W2 — Sim: the dirt grid, footfall, dust, deposits, tiers, cleaning.**
+Owns `packages/sim/src/systems/dirt/**` (+ tests and `fixtures/dirt-deck.ts`: a two-room deck
+with a corridor, a cleaning locker zone with a mop, a cargo ramp onto a fixture dock with
+`grime: 0.8, airborneDust: 1`, three crew), `core/dirt-grid.ts` (+ test), `planner/cleaning.ts`
+(+ test), `systems/spatial/movement.test.ts` (the footfall case only, in a new `describe`).
+- `footfall.ts` (call 11), `deposit.ts` (`depositDirt` with `depositRadiusTiles` spread, floor
+  cells only), `grid.ts` (`roomDirt`, `tierOf` with hysteresis against the stored tier),
+  `dirt.ts` (`dirtSystem`: airborne dust while docked with the cap; tiers and transitions with
+  their events; `compartmentDirty` raise, revise on tier change with `baseUrgency` per call 13,
+  resolve below `untidy` with `roomCleaned` when someone holds its task), `tasks.ts`
+  (`deriveCompartmentDirty`: the dirtiest cells, `requiredTools: ["mop"]`, progress `{ kind:
+  "room" }`, `estimatedWorkSeconds: mopSecondsPerTile × tiles`), `clean.ts` (`cleanPlan`,
+  `runMop`), `planner/cleaning.ts` (`cleanTaskAllowed`, call 13).
+- Labels: "fetching the mop", "mopping the galley" (the room's name), "putting the mop away".
+- Tests: a walk across a clean corridor leaves `footfallPerStep` on each tile; boots loaded on
+  the fixture dock shed a decaying trail from the ramp into the hold; dust settles near the open
+  ramp while docked and stops at the visit cap, resets after undocking; a `repair` deposit lands
+  round the machine; `roomDirt` weights the worst tile; tiers rise at the thresholds and fall
+  with hysteresis, each transition one event; `compartmentDirty` opens at `dirty`, routine, and
+  turns essential for a filthy galley; the deckhand (not the cook) mops the hold, the cook mops
+  the galley, the captain mops nothing until the problem ages, anyone mops a filthy infirmary;
+  a mopping trip fetches the mop, works the dirtiest tiles first, puts the mop back, and the
+  problem resolves with `roomCleaned`; an on-duty engineer with a dirty engineering room mops
+  before walking rounds, and an off-duty one does not; a 720-cell save round-trips through
+  `checkInvariants`.
+Done when the sim suite is green and the dirt fixture shows a visible trail (cells > 30 on a
+line of tiles from the ramp) after one docked visit.
+
+**W3 — Content: validator rules, markets, Mk1 zones, READMEs.**
+Owns `packages/content/src/schemas/validate.ts`, `validate-hull.ts`, `validate-dock.ts` and
+their tests, `packages/content/data/ports/*.json`, `data/decks/freighter-mk1.json` (after the
+gate's zones, if the validator objects), `README`s under `data/`.
+- Hull contract: zones tagged `pantry`, `serving` and `cleaningLocker` (one or more tiles each);
+  some `serving` tile is adjacent to a `stove`'s `use` position (the cook sets plates down
+  within reach); `messTable` seats (`use` positions) ≥ 4. Dock L3: `grime` and `airborneDust`
+  in [0, 1]; a station's dock has `airborneDust` 0 (D61: a station has no sky). L2: the gate's
+  `meal`/`provisions` tag rules get failing tests.
+- Ports: a `provisions` market line at every port (hub 8 at 50, Kessler 6 at 55, Ossory 6 at
+  60, Vesper 6 at 50, Green Meridian 12 at 35, Tern's Rest 4 at 70); `loader.test.ts` route
+  symmetry stays.
+- Tests: one failing synthetic case per rule; the authored bundle passes; README regeneration
+  for Mk1 (zones) with `crew content render-deck`.
+Done when `crew content validate` is green and every rule has a failing test.
+
+**W4 — Web: the grime tint, the dirt channel, the room inspector, slowdown on filthy.**
+Owns `apps/web/**` except `worker/registry.ts` and `worker/host.ts` (the gate's).
+- `App.tsx`: a `dirtQueueRef` of `DirtFrame`s from `dirt` messages; in the playback `onStep`,
+  apply the newest with `tick <= viewTick` to `dirt` state; `DeckCanvas` takes `dirt` and
+  redraws on change. `render/grime.ts` (+ test): `grimeAlpha(cell, config)` and `drawGrime`,
+  called from `drawFrame` after `drawCompartments` and before `drawWalls`, in tile space; one
+  colour (`#5a4a30`), cells under 8 skipped. `pick.ts`: a `room` selection on bare deck floor
+  after machines. `ui/roomInspection.ts` (+ test): `inspectRoom(state, bundle, layout, key)` →
+  a `PlaceInspection` (title the room's name, subtitle its tier, text the mean and worst cell
+  and who is mopping, from `actor.activity` labels). `Inspector.tsx` renders it as a place.
+  `log.ts`/`Log.tsx`: nothing new (the slowdown highlight is slice 2's; `roomFilthy` arrives
+  through config).
+- Test pins: `fullSim.test.ts` (meals change the crew's walks; the haul and departure bounds
+  rechecked), `integration.test.ts` registers nothing new, `dockside.test.ts` and
+  `captain-ashore.test.ts` tick budgets if the captain now eats between asks.
+Done when the web suite is green, a browser run at 8× shows a lane darkening down the central
+corridor over a day, a tap on the galley floor opens "Galley — dirty", and the game drops to 1×
+on the first `roomFilthy`.
+
+**W5 — Narrator and CLI: the digest's galley and dirt, the prompt, the beats report.**
+Owns `packages/narrator/**`, `packages/server/src/routes/narrator*.test.ts`, `apps/cli/**`.
+- `digest.ts`: the Ship lines of call 19 (`provisionsDays` from `@crew/sim`; the counter's
+  servings and quality from the `meal` items on the `serving` zone; "next meal due" from
+  `watchTicks` and `mealLeadDays`), the `dirt:` line, `problemLine` for `provisionsLow` (via
+  `partsReason`) and `compartmentDirty` ("the cargo hold is filthy; the deckhand's to mop");
+  `prompts/system.ts` v0.22 paragraph (call 19); `capabilities.ts`: provisions appear in the
+  market lists on their own; one sentence under `stockMarket` that provisions are an item it
+  may stock; `prompts/hooks.ts`: quietTooLong may make a meal the beat.
+- `apps/cli/src/beats.ts`: the counters and shares of call 18, `provisionsDays` at the end;
+  `pacing.test.ts` hook-count and timing pins moved for the meals (people walk to the mess
+  three times a day); `index.test.ts` usage string unchanged.
+- Tests: `digest.test.ts` galley and dirt lines on a fixture with servings on the counter and
+  a dirty galley; `translate.test.ts` unchanged (no new intents); `run.test.ts` and
+  `kernel-integration.test.ts` on regenerated fixtures; server tests unchanged; `beats.test.ts`
+  a one-day run reports three meals served.
+Done when the narrator, server and CLI suites are green, `crew beats --days 3` prints the new
+columns, and the lead runs `pnpm test:live` once.
+
+### Integration order
+
+1. **Gate** on `ship-life-3` (branched from `main` after slice 2 merges): the four checks;
+   `crew content validate`; a browser smoke run (nothing cooks or dirties yet: the stubs keep
+   today's behaviour, meals are rations from the hold, provisions sit in the pantry).
+2. **W3** (content) first: its zone and tag rules hold on the gate content; the four checks;
+   `crew content validate` reports nothing; READMEs regenerated.
+3. **W2** (dirt), then **W1** (galley): the four checks after each; `crew pacing` after W1 shows
+   `mealServed` three times in a day with no `mealMissed`; after W2 the pacing voyage's
+   `roomDirty` count is recorded for the tuning commit.
+4. **W4** (web): the four checks; browser at 390×700 and 1280×800 with the tint on.
+5. **W5**: regenerate `packages/narrator/fixtures/*` with `crew narrator fixtures` first (schema
+   8 → 9, provisions in the pantry), then the four checks; `pnpm test:live` once; `crew beats
+   --days 3 --scenario both`, numbers recorded for the D-entry.
+6. **Tuning commit (lead):** against the call 18 targets: `footfallPerStep` and the tier
+   thresholds until a room goes `dirty` about once a day and `filthy` rarely; `mealLeadDays` so
+   the serve lands before `handoverLeadSeconds`; `hot_meal.nutrition` and
+   `mealCallHungerAbove` until six or more eat at each serve; `pacing.test.ts` and
+   `beats.test.ts` expectations moved; both reports kept beside the D-entry.
+7. D-entries, `README.md` note ("the cook serves three meals a day; rooms get dirty and are
+   mopped"), deploy via the `ops` agent, phone playtest: a 10-minute 1× session shows a meal
+   served before a bell, the mess filling, and after Green Meridian a trail from the cargo ramp
+   into the hold.
+
+### Risks and hidden coupling
+
+- **Hot files with one owner and gate stubs**: `planner/candidates.ts`, `systems/work/plans.ts`,
+  `steps.ts`, `labels.ts`, `core/render.ts`, `systems/spatial/movement.ts`,
+  `systems/equipment/recipes.ts`, `systems/commerce/tasks.ts`, `commerce/market.ts`,
+  `work/derivation.ts`, `planner/helm.ts`, `apps/web/src/worker/host.ts`. The gate writes every
+  call site and the streams reach them only through their own files (`systems/galley/*`,
+  `systems/dirt/*`, `planner/galley.ts`, `planner/cleaning.ts`). A stream that finds it needs a
+  line in another's file asks the lead, who adds it at integration.
+- **Slice 2's streams are not merged while this is planned.** The gate assumes `whoHasTheHelm`,
+  `helmRoleOf`, `gangwayHoldDone`, `gangwayCandidate`, `addThought` with the non-stacking
+  refresh, `moodSystem` pruning, `crew beats` and `watch.nextOnWatch`'s inputs exist as the
+  slice 2 plan and gate notes describe. If a name or signature moved at slice 2 integration,
+  the gate follows the code, not this plan, and says so in its report.
+- **Same-class commitment is the whole meal rhythm.** The call is routine; so are hauling,
+  gangway watch and sleep. The plan relies on three things: the gangway hold ending for the
+  call (`gangwayHoldDone`) with its candidate suppressed; the helm meal bypassing the planner;
+  and haulers and sleepers simply eating later. If the beats report shows fewer than six at the
+  counter per serve, the first knob is `mealCallHungerAbove`, not the urgency class: raising a
+  meal to essential would pull people off cargo and the helm.
+- **Cleaning competes with cargo inside routine class** on travel estimate, and a dirty room is
+  always nearer than the dock. The tier thresholds make `dirty` rare (once a day per room), the
+  affinity table keeps the deckhand on the hold and the cook on the galley, and the beats
+  report's `mopping` share is the tripwire; if hauling starves, the lead raises `tiers.dirty`
+  before touching urgency.
+- **Rounds lose to cleaning by design** (voluntary against routine): the officer of the watch
+  mops only an aged room, so Mara still walks her rounds, but Priya in a dirty engineering room
+  mops first. A reader who expects engineers' rounds to continue through a dirty room is wrong
+  until the room is clean. The beats report's `rounds` share says whether that is too much.
+- **The provisions stack and `supplySteps`**: the generic supply step picks up a whole stack
+  (`split: false`); the cook's plan splits one crate. The same whole-stack pickup is why
+  `buyParts`'s crates are set down at the ramp rather than carried to the pantry; a cook
+  fetching from the ramp walks the length of the ship, which the digest will show as a long
+  "fetching provisions". A haul into the pantry is slice 4's if it grates.
+- **The helm meal is a hold that eats**: `galley.helmMeal` is state (a save mid-meal resumes it),
+  the serving within reach must still exist at the end (someone else may take it; then no
+  effect and the carry problem re-raises), and the label is the only visible sign. `labels.ts`
+  reads `state.galley.helmMeal`; `whoHasTheHelm` is untouched.
+- **`THOUGHT_KEYS` is a required content table**: five new keys mean five defs in every
+  hand-built bundle through `FIXTURE_THOUGHTS`, and `schemas/bundle.ts`'s strict object lists
+  them; a missed one fails at `createWorld` with a clear message.
+- **`DockDef.grime`/`airborneDust` are required fields**: six maps, three fixture docks, and
+  `scripts/convert-dock-berth.mts` is not rerun (it is a one-off). The `validate-dock` tests'
+  synthetic docks need the two fields.
+- **Save size and the dirt channel**: 720 cells are 2.5 KB of JSON per snapshot in the host's
+  ring (every 2 s; the ring holds 180 s) and per remote save; fine. The dirt message is 720
+  bytes every 5 sim-seconds; at 8× that is one a second. `Uint8Array` is structured-clone safe
+  but is not JSON: it never enters state, only `DirtFrame`.
+- **Playback and the future**: the dirt queue must be keyed by tick and applied at `viewTick`,
+  never on arrival; a snapshot request for the room inspector uses the view tick as the machine
+  inspector does. A tint that updates before the footsteps that made it would read as a bug.
+- **Counts and literals pinned in tests**: items 13 → 16 and thoughts 4 → 9 in `loader.test.ts`;
+  `fullSim.test.ts` haul and prep bounds move with three meals a day; `pacing.test.ts` timings;
+  `digest.test.ts` the Ship section's line order (galley and dirt lines go after the market
+  line); the `index.test.ts` CLI usage string is unchanged.
+- **The migration spawns items**: the only migration so far that allocates ids. It must use
+  `nextId.item` and the scenario's zones exactly as `scenarioSetupCommands` does (chunks of
+  `maxStack`, zone tiles round-robin), or `checkInvariants` rejects the restore; `save.test.ts`
+  checks the crates are in the pantry and the counters moved.
+- **Narrator call volume**: `provisionsLow` and `roomFilthy` are narrative but not hooked;
+  `mealServed` is notable. No new call sources; `quietTooLong` may now talk about dinner.
+- **Mk1 must satisfy the new hull rules**: the gate adds its three zones; W3's rule tests that
+  both decks pass. Mk1 keeps no scenario, so it never cooks.
+- **Dock fixture docks and `isDockTile`**: boots load from `content.docks[state.deck.dock.dockId]
+  .grime`; a fixture with a dock graft but no `docks` table in its bundle reads grime 0, which
+  the footfall test must not rely on by accident.
+
+### D-entries for slice 3 (D80 onward, provisional; the lead renumbers at integration)
+
+- **D80.** Mess call: the galley serves a hot meal before each bell from a crate of provisions
+  and tells the crew; the oncoming watch eats first at the mess tables and the off-going after
+  the bell; the cook cooks every meal and anyone with cooking ≥ 1 substitutes after a wait;
+  quality is the cook's skill, lowered by a dirty galley, and gives a thought; the helm-stander's
+  plate is carried up and eaten in the seat; servings spoil; ration packs are the fallback with
+  a thought; `provisionsLow` is bought at port through the parts code; provisions on every
+  market.
+- **D81.** Dirt: one quantised grid per deck in state; footfall and boots in movement, port
+  grime and airborne dust from the dock map with a per-visit cap, deposits from cooking,
+  eating, spoilage, repair and cargo; rooms are the unit of tiers (clean, untidy, dirty,
+  filthy, with hysteresis), of the `compartmentDirty` problem and of the eating thoughts;
+  cleaning is a mop task by role affinity, by anyone once aged, essential for a filthy galley
+  or infirmary, routine class so on-duty idle crew clean before rounds and off-duty crew never
+  do; the renderer's tint rides its own tick-keyed channel at a low cadence; the inspector
+  shows a room's tier; filthy slows fast-forward.
+- **D82.** Save schema 9 migrates 8 (dirt zeroed, boots, the galley's bookkeeping, and the
+  scenario's provisions and mop spawned so an old save eats tonight); the digest's galley and
+  dirt lines and prompt v0.22; `crew beats` counts meals, spoilage, missed meals, dirty rooms
+  and mopping, and is the instrument the tuning commit answers to.
 
 ## Slice 4: Off watch
 
-Save schema 9 → 10 (recreation, interests, relationships, sessions, rivalries).
+Scope (§12.4, §3, §7, §11 items 5, 8, 10): a fifth need, `recreation`; interests and value axes
+per person with the nine hand-authored; topics as content; relationships (directed affinity) fed
+by ambient chat, seats and activities; `ActivityDef` content and the twelve starter activities;
+group sessions announced ship-wide, joined, started, collapsed to solo; contest, bond, debate and
+perform outcomes with rivalries; the lounge, gym, workbench, book shelf and viewport live; cabin
+thoughts (own cabin, noisy bunkroom, no bunk); the harmonica fetched from Bettina's locker and a
+book from the shelf; the captain's table; `privateTalk` as a card side effect in the captain's
+cabin; the digest's off-watch, interest, relationship, rivalry and berth lines; the beats report
+as the tuning tool. Save schema 9 → 10 (migrated). Prompt v0.23 (`pnpm test:live` once). Built on
+slice 2 as its gate notes say it was built and on slice 3 as planned (`systems/galley/eat.ts`,
+`planner/galley.ts`, `depositDirt`, `Item.meal`, `crew beats`); if a slice 3 name moved at its
+integration, the gate follows the code and says so.
 
-1. Recreation need; `interests`/`values` per actor with the hand-authored nine; topics content.
-2. `ActivityDef` content and the twelve activities; `GroupSession`; joining and collapse to solo;
-   contest/bond/debate/perform outcomes; rivalries; affinity from ambient chat.
-3. Cabin thoughts (own cabin, noisy bunkroom); the harmonica fetched from Bettina's locker;
-   `privateTalk` command in the captain's cabin.
-4. Digest lines for mood, rivalries, cabin status; narrator capability text; `pnpm test:live`.
+Fixes the slice 1 QA note: `rest` and `socialize` leave the bunkroom for the lounge, and the
+furniture placed in slice 1 (games table, vid screen, exercise rig, workbench, desks, the book
+shelf, viewport and sparring mat zones) is used.
 
-Checkpoint: two people keep ending up at the same card table and the digest names the rivalry.
+Built as one serial gate commit, then six parallel workstreams, then a tuning commit by the lead.
+
+### Calls made
+
+1. **Recreation is a need, not a problem, and it never goes above routine class.**
+   `Needs.recreation` rises at `needs.recreationPerDay` (0.6: the seek threshold in a bit under
+   a day). The planner's `recreationCandidate` (`planner/recreation.ts`) is offered off duty
+   only: `routineObligation` above `seekThreshold`, `voluntaryActivity` above
+   `recreation.joinAbove` (0.25, so a game fills the way the mess call fills), nothing below.
+   `needUrgency` is not used for it: nobody leaves the helm or a crate to play cards, and the
+   watch's relief rule (hunger, fatigue, comfort, social past `needEssentialAbove`) does not
+   know the new key. On-duty crew with nothing to do still walk rounds (slice 2); recreation is
+   what the off-going watch does. Restoring is per tick while the activity runs
+   (`restores.<need> / durationDays` per day, from the def), so an interrupted game restores in
+   proportion; `fatigueCost` is charged the same way. Needs reads this through one hook,
+   `recreationRatesFor(ctx, actor)` in `systems/recreation/needs.ts`, called from
+   `needRatesPerDay`.
+2. **One candidate per person: the best-scored activity, not one per activity.** Candidates in a
+   class rank by travel estimate, which would make the nearest game the chosen one. So
+   `recreationCandidate` scores every `ActivityDef` itself (interest: strong like 3, like 2,
+   neutral 1, dislike 0; a dislike is never chosen; +1 for an open session with room, +0.5 for
+   a session holding someone the actor likes (affinity > 0), −∞ for one holding someone at or
+   below `social.avoidBelow` (−3); hosts with mood above `mood.highAbove` add 1 to group
+   activities; mood below `mood.lowBelow` removes group activities altogether, solo only) and
+   emits one candidate (`recreate:<activityId>`), ties broken by join over host over solo, then
+   travel. Joining an open session needs score ≥ 1 and recreation above `joinAbove` (a neutral
+   player makes up the table when they have time on their hands); hosting needs a like (score
+   ≥ 2). The design's "score ≥ 2 to walk over" is kept for hosting and relaxed for joining so a
+   two-person game is not a coin toss on who likes what.
+3. **Sessions are common knowledge, like the roster.** `WorldState.social.sessions` (owner:
+   recreation) holds every open or running `GroupSession`; `AgentView.sessions()` returns them
+   all (the intercom: on a 36-tile ship everyone knows cards are on). No facts, no messages:
+   the planner reads truth here as it reads `assignedBeds`. `docs/CONTRACTS.md` says so.
+4. **The session row is the venue's, the hold is the person's.** `GroupSession { id; activityId;
+   venue: SessionVenue; hostId; members: ActorId[]; openedTick; startedTick?; endsAtTick?;
+   topicId? }` with `SessionVenue = { compartmentId } & ({ machineId } | { zoneKey } | {})`.
+   A member's plan ends in a `recreate` step (`{ kind: "recreate"; activityId; role: "host" |
+   "join" | "solo"; sessionId?; ticksDone; ticksNeeded }`; a step kind, not a hold, because it
+   carries the activity). On its first tick a `host` opens a session (or joins one already open
+   for the activity at the venue), a `join` joins (full, gone or already running past
+   `recreation.lateJoinSeconds`: fail `occupiedPosition`, backoff), a `solo` just starts
+   counting. Members are the people at the venue; nobody en route counts. The `recreationSystem`
+   (needs phase, every tick) starts a session at `participants.max` members or at `openedTick +
+   gatherSeconds` with at least `min`, collapses it at `gatherSeconds` with fewer (the host's
+   step becomes `solo` with the def's `solo` variant, or fails; the others' steps fail), ends a
+   contest or debate at once with no result when a member leaves and fewer than `min` remain,
+   and resolves it at `endsAtTick`. `leaveRecreation(ctx, actor)` is called from
+   `abortActivity` so a bell, a meal call or an essential task takes the member out of the
+   session the tick they leave; it also sets down a book or instrument they were holding.
+5. **Outcomes are the social system's, resolved at the end.** `resolveOutcome(ctx, session, def)`
+   in `systems/social/outcomes.ts`: *contest* picks the winner by `rng.weighted("social")` over
+   members with weight `1 + interestScore`, records the tally for winner against each loser,
+   gives `thoughts.win`/`thoughts.lose`, moves affinity by `def.affinity`
+   (`winnerToLoser`, `loserToWinner`, `participants`), and at a streak of
+   `social.rivalry.streakFor` (3) gives the loser `keepsBeatingMe` (refId the winner), −1
+   affinity and `rivalryStreak`; *debate* picks a topic from `def.topics` (`rng.pick`),
+   computes each member's stance (the dot product of their `values` and the topic's `weights`),
+   and for each pair: |Δ| ≤ `social.debate.agreeWithin` (2) → `spiritedTalk` (+) and +2 both
+   ways; |Δ| ≥ `argueBeyond` (4) → `argued` (−, refId the other) and −2 both ways, one
+   `argument` event per session (narrative); between: nothing; anyone awake in the venue
+   compartment who is not a member and does not like debate gets `gotLectured` (−) — the
+   design's lectured partner, moved to the bystander since members chose to be there;
+   *perform* gives everyone awake in the compartment who is not the performer `enjoyedMusic`
+   (+, music likers) or `hatedTheNoise` (−, dislikers), likers +1 to the performer; *bond*
+   gives members `goodCompany` (+) and +1 affinity all round; *none* nothing. Then
+   `skillGain` (`perDay × durationDays`, capped at 10), `dirt` (`depositDirt` at the venue
+   tile), `produces` (a stack spawned on the zone's first tile with `Item.meal` set so the
+   galley sweeps it), and `risk` (per member, `rng.chance("social", injuryChance)` →
+   `sparringBruise` and `tookAKnock`).
+6. **Sparring injuries are a thought and a ticker line this slice; the medic's work is slice 5.**
+   There is no injury state (bodies are deferred, PLAN §7), and a fake `incapacitated` would
+   stop needs, perception and the planner for the person. `risk.injuryChance` stays in the def
+   and the sim's whole effect is `sparringBruise` (−0.1, 0.5 day) and "Tomas Ruiz took a knock
+   sparring" (notable). Slice 5 adds `patientToTreat`, the medbay bed and first-aid skill with
+   drills, and reads the same field. Honest and visible, nothing pretended.
+7. **Baking is in: the twelfth activity, and its treat is a snack.** Venue the stove, solo,
+   interest cooking, `blockedByProblems: ["mealToCook"]` so it never competes with dinner (the
+   planner sees public problems), `produces: { itemDefId: "item.treat", count: 4, zoneTag:
+   "serving" }`. `item.treat` (`food`, `consumable`, `treat`; nutrition 0.05) spoils like a
+   serving (`Item.meal` set at the bake, so slice 3's sweep clears leftovers). Anyone with
+   hunger above `galley.treatHungerAbove` (0.1) and a known treat takes it as an `eat`
+   candidate at voluntary class, eaten where found (`planner/galley.ts` gains the rule, three
+   lines; `consumeServing` gives `ateATreat` (+0.1) for a `treat`-tagged item). "Bettina
+   Solheim baked a tray of treats" is the ticker line. First thing to cut if the slice runs
+   long: delete one JSON file and the three planner lines.
+8. **Interests and values are state on the actor, authored for the nine, generated for the
+   rest.** `Actor.interests = { likes: InterestTag[]; strong?: InterestTag; dislikes:
+   InterestTag[] }` (`strong` ∈ `likes`, invariant) and `Actor.values = { orderFreedom;
+   faithReason; loyaltyAmbition }` (integers in [−2, 2]; the positive end is the second word).
+   `CrewDef.interests?` and `CrewDef.values?`; absent, `core/interests.ts`
+   `generateInterests(rng)` draws two likes (the first strong), a dislike with probability 0.5,
+   values uniform, on the `setup` stream at spawn (`scenarioSpawn`, the narrator's spawn path
+   through the same handler). The migration uses `interestsFromSeed(actorId)` (a keyed hash,
+   no rng) for an unauthored def. Soft state: the narrator does not edit it this slice
+   (GDD §17 waits for a lever).
+9. **Relationships live in `WorldState.social`, sparse and directed, not on the actor.**
+   `social.relationships: Record<ActorId, Record<ActorId, Relationship>>` with `Relationship =
+   { affinity: number; lastChatTick?: Tick }`, an entry only once something moved it; affinity
+   an integer clamped to `social.affinityRange` (±10). `social.rivalries:
+   Record<RivalryKey, Rivalry>` with `RivalryKey = "<a>|<b>|<activityId>"` (ids in ascending
+   order) and `Rivalry = { wins: number; losses: number; streak: number }` (`a`'s wins, `a`'s
+   losses, streak positive for `a`'s run and negative for `b`'s). Nine people make at most 72
+   relationship entries and a handful of rivalries: under 4 KB of JSON in a save, which the
+   snapshot ring and remote saves carry without noticing. The actor sees their own side as
+   `SelfView.affinity: Readonly<Record<ActorId, number>>` (what they feel; nobody reads the
+   other direction). `pruneSocial` drops entries for ids no longer in `actors` (a passenger who
+   walked off). `moodWorkFactor` is untouched; affinity has no effect on work.
+10. **Ambient chat moves affinity, once a day per pair.** `onConversation(ctx, a, b)` in
+    `systems/social/chat.ts`, called from `ambientChatSystem` after it emits `conversation`:
+    +1 both ways unless the pair's `lastChatTick` is within `social.chatAffinityEveryDays` (1).
+    Nothing else about ambient chat changes; members of a running session still chat, which is
+    the table talk.
+11. **Seats and partners prefer friends and avoid enemies, and the captain keeps a table.** The
+    galley's `eatPlan` (slice 3 call 6) picks its seat through `seatPreference(ctx, actor,
+    seats)` in `systems/social/seating.ts`: a free seat adjacent to someone the actor has
+    affinity > 0 with first, never one adjacent to someone at or below `avoidBelow`, else the
+    nearest. Once a day (`social.captainsTableDay`, the ship's day of the last one), the
+    captain's seat is the one beside the crew member at the tables with the highest affinity
+    (on even days) or the lowest (odd days); both get +1 and the crew member `satWithTheCaptain`
+    (+0.05, 0.5 day); `captainsTable { withActorId }` (trace). §11 item 8 at its smallest: a
+    seat choice and a thought, no new activity.
+12. **Venues are resolved from content tags at plan time, against the reservation cache.**
+    `ActivityDef.venue` is an ordered list of alternatives, each `{ machineTag?; zoneTag?;
+    compartmentTag?; own?: true }` (`own` restricts a machine to the actor's berth compartment:
+    reading at one's own desk); the first alternative present on the deck wins
+    (`venues.ts` `resolveVenue`). A machine venue stands at a `use` position not reserved and
+    not under another member; a zone venue at a free zone tile; a compartment venue at a
+    `loungeTile`-style floor tile. A session's venue is fixed when it opens; a joiner's plan
+    takes a free position of that venue. A seat lost on the way (`occupiedPosition`) backs off
+    and replans, as the mess seat does. `participants.max` ≤ the venue's positions is W4's
+    L3 rule; a deck lacking a venue (Mk1 has no lounge or gym) simply never offers that
+    activity, and the validator says which.
+13. **Items an activity needs are fetched and put back.** `ActivityDef.requires?: { itemTag:
+    ItemTag; own?: true }`: reading takes a `book` (split off the shelf's stack), music takes
+    the `instrument` whose `ownerId` is the actor (`KnownItemView.ownerId` is added so the
+    planner can see it is hers). The plan is acquire (slice 3's shape: `moveTo` the believed
+    tile, `pickUp`) → venue → `recreate` → carry it home → `putDown`: home is the item's
+    locker tile for an owned item (`berths.ts` exposes `lockerTileOf(deck, bedKey)`), the first
+    tile of the `bookShelf` zone for a book. The walk from the bunkroom locker to the lounge
+    with a harmonica is the visible fetch §7 asks for. An item not where believed fails the
+    plan (`inaccessibleSupply`) and backs off; a person interrupted carrying one sets it down
+    where they stand (`leaveRecreation`).
+14. **Cabin thoughts come at waking and from the berth rule.** `ownCabin` (+0.1, 0.5 day) when a
+    sleep hold ends in the actor's own berth and the bed stands in a `cabin`-tagged compartment;
+    `noisyBunkroom` (−0.1, 0.5 day) when a sleep hold ends in a `quarters` compartment and the
+    sleeper was disturbed for at least `cabins.noisySeconds` (60): the sleep hold step carries
+    `disturbedTicks`, which `cabinsSystem` (needs phase, every tick) advances while anyone
+    awake and not asleep is in the sleeper's compartment (`caches.index.actorsByCompartment`);
+    both through `onWoke(ctx, actor)` in `systems/cabins/cabins.ts`, called from `leaveHold`.
+    `noBunkOfMyOwn` (−0.1, 1 day, non-stacking, refreshed) is given by `cabinsSystem` every
+    `cabins.checkEverySeconds` (60) to crew with no `berths` entry. "Sleeping in the bunkroom
+    while someone in it is awake" is the design's rule; a minute's threshold keeps a single
+    passer-by from counting.
+15. **`privateTalk` is a card side effect, not a seventh lever.** Card options run as the
+    `player` (D-entries on `surfaceDecision`), so the narrator offers a side with `effect:
+    "privateTalk"` and `talkWith` (a crew name) and `tone` (`warm` | `stern`), and the player's
+    choice issues `privateTalk { actorId; tone }`, a player-authority command (also allowed to
+    `system` and `scenario`, not to `narrator` directly: the player chooses who is called in).
+    Validation: `actorId` is crew aboard, available, not the command actor; no talk pending;
+    the command actor has a cabin (`captainsCabin` for the captain, `officersCabin` for the
+    first officer standing in, D8) → `preconditionFailed` otherwise. Apply writes
+    `social.privateTalk = { captainId; actorId; tone; requestedTick }` and emits
+    `privateTalkCalled` (notable: "Mara Osei asked Priya Kessler for a word in the captain's
+    cabin"). Both see it as `SelfView.summons` and take a `privateTalk` personal candidate at
+    `essentialOperation` (it interrupts cards, rounds and rest; it does not interrupt the helm,
+    same class). Plans: the captain to their desk's `seat`, the other to the cabin floor tile
+    nearest the desk, then a `confer` step that counts `cabins.privateTalkSeconds` (20) only
+    while both are in the cabin; the captain's step applies the outcome: `warm` → +2 crew to
+    captain, +1 captain to crew, `heardOut` (+0.1, 1 day); `stern` → −2 and 0, `dressedDown`
+    (−0.15, 1 day); `privateTalkHeld` (narrative), and clears the talk, which ends the other's
+    step. Not both in the cabin by `requestedTick + privateTalkWaitSeconds` (120): `cabinsSystem`
+    clears it with `privateTalkMissed` (notable) and both steps fail `dependencyPending`. The
+    narrator sees the result at its next call and can build on it; the capabilities text under
+    `surfaceDecision` names the effect and the two tones. Lever count stays six.
+16. **Rest and chat move to the lounge.** `leisureCandidate` tags become `rest: ["lounge",
+    "mess", "quarters"]` and `socialize: ["lounge", "mess"]`; `loungeTile` already skips
+    interaction tiles, so resters stand clear of the seats. A one-line gate change that
+    empties the bunkroom of idlers.
+17. **Group sessions render as one plate, members' labels drop.** `RenderFrame.sessions:
+    RenderSession[] { id; activityId; label; x; y; memberIds; running }` (the venue tile
+    centre; `label` "playing cards" or the def's `waitingLabel`), built by `getRenderFrame`
+    from `social.sessions`. The canvas draws one plate per session at the venue
+    (`"cards — Jax, Tomas, Dane"`, first names, 34 characters, the same plate style) and skips
+    the per-actor label of anyone in `memberIds` (their `actionLabel` still feeds the
+    inspector). Four stacked "Name — playing cards" plates over a 2×1 table at phone scale were
+    the alternative. Solo activities keep the ordinary label ("reading", "playing the
+    harmonica"). A tap on the venue machine shows the session in the machine inspector.
+18. **The ticker says who won and little else.** Per group session at most two lines:
+    `sessionStarted` (notable; "Jax Okonkwo, Tomas Ruiz and Dane Whitcross are playing cards in
+    the lounge") and `sessionEnded` (notable for `contest` with a winner, `debate` with an
+    argument or a spirited talk, `perform`; null, so no line, for `bond`, `none`, `abandoned`).
+    `rivalryStreak` (notable), `tookAKnock` (notable), `treatsBaked` (notable),
+    `privateTalkCalled`/`privateTalkMissed` (notable), `privateTalkHeld` and `argument`
+    (narrative: digest and the quiet timer), everything else trace (`sessionOpened`,
+    `sessionJoined`, `sessionCollapsed`, `sessionLeft`, `captainsTable`, `affinityChanged`,
+    `interestsAssigned`). `host.slowDownOnEvents` + `argument`. Solo recreation makes no ticker
+    line at all. The beats report counts notable-or-better lines per watch (call 22) and the
+    target is twelve.
+19. **Thought keys stay a closed set; activities reference them.** `ActivityDef.thoughts` names
+    keys from `THOUGHT_KEYS`, never new ids (D79 made the set closed and the table required;
+    per-activity thought ids would reopen it). Seventeen new keys: `wonContest` (+0.1, 0.3 day,
+    stacks), `lostContest` (−0.05, 0.3, stacks), `keepsBeatingMe` (−0.15, 1, refId),
+    `goodCompany` (+0.05, 0.3), `spiritedTalk` (+0.1, 0.5), `argued` (−0.15, 0.5, refId),
+    `gotLectured` (−0.05, 0.3), `enjoyedMusic` (+0.1, 0.3), `hatedTheNoise` (−0.1, 0.3),
+    `sparringBruise` (−0.1, 0.5), `ownCabin` (+0.1, 0.5), `noisyBunkroom` (−0.1, 0.5),
+    `noBunkOfMyOwn` (−0.1, 1), `satWithTheCaptain` (+0.05, 0.5), `heardOut` (+0.1, 1),
+    `dressedDown` (−0.15, 1), `ateATreat` (+0.1, 0.3). Labels are lower-case phrases; a
+    `{ref}` placeholder in a label ("{ref} keeps beating me") is filled with the refId's name by
+    the inspector and the digest, else the key's label stands alone. `thoughts.*` in a def is
+    L2-checked against the key set.
+20. **Topics are a content table with a weight vector; stance is a dot product.** `TopicDef {
+    id; label; weights: { orderFreedom; faithReason; loyaltyAmbition } }` (weights in [−1, 1]),
+    seven authored: `the_guild` (orderFreedom −1, loyaltyAmbition +0.5), `politics` (orderFreedom +1, loyaltyAmbition −0.5), `faith`
+    (faithReason −1), `philosophy` (faithReason +0.5, orderFreedom +0.5), `the_league`
+    (loyaltyAmbition +1), `old_captains` (loyaltyAmbition −0.5, orderFreedom −0.5), `the_vid`
+    (all 0: watching together always agrees, which is the bond). Debate names its topics; vids
+    name `the_vid` and resolve as `bond`, so a vid is never an argument. `seedTopic` (slice 5)
+    adds to the same table at run time.
+21. **Units.** Days (D76): `recreationPerDay`, `durationDays` and `solo.durationDays`,
+    `collapseBackoffDays`, `chatAffinityEveryDays`, `skillGain.perDay`. Seconds (a wait at a
+    place, a real-time feel): `gatherSeconds` (30), `lateJoinSeconds` (20), `noisySeconds`,
+    `checkEverySeconds`, `privateTalkSeconds`, `privateTalkWaitSeconds`. Unitless: scores,
+    affinity, stances, restores.
+22. **Beats report is the tuning instrument.** `crew beats` gains per watch: sessions opened,
+    started, collapsed, abandoned, by activity; contests, arguments, spirited talks,
+    performances; solo activities by kind; ticker lines (notable or narrative events) per
+    watch; per person the share of time `recreating` (label class from the activity labels)
+    and the longest stretch with recreation above `seekThreshold`; affinity extremes and
+    rivalries at the end. Targets for the tuning commit: at least one group session per watch;
+    every off-watch person recreates at least once a day; collapses under 30% of sessions;
+    ticker lines at most twelve per watch; nobody with recreation above 0.8 for more than a
+    day; the checkpoint ("two people keep ending up at the same card table and the digest
+    names the rivalry") visible in a three-day run as a `Jax Okonkwo vs Tomas Ruiz at cards`
+    line.
+23. **Schema 10 migrates.** `needs.recreation: 0.3` for everyone; `interests`/`values` from the
+    crew def (`MigrationContext.content` gains `crew`) or `interestsFromSeed`; `social:
+    emptySocial()`; `nextId.session: 1`; `item.book × 3` spawned on the `bookShelf` zone's tiles
+    the way slice 3 spawns provisions (ids from `nextId.item`, `warnings` says so); the sleep
+    hold step's `disturbedTicks` absent means 0. The harmonica already lies in Bettina's locker
+    (D74). Narrator fixtures regenerated, never hand-edited.
+24. **The digest sees off-watch life; the prompt gets an off-watch paragraph.** Ship section
+    gains `off watch: cards in the lounge (Jax Okonkwo, Tomas Ruiz, Dane Whitcross); Bettina
+    Solheim playing the harmonica in the lounge` (sessions and solo recreation now) and
+    `rivalries: Tomas Ruiz vs Jax Okonkwo at cards (0–3, Jax Okonkwo's run of 3)` (any rivalry
+    with ≥ 3 games or a streak ≥ 2). Crew lines gain, after `good at`, `likes: cards (keen),
+    vids; dislikes: exercise`, `close to: Jax Okonkwo; at odds with: Priya Kessler` (affinity
+    ≥ 3 and ≤ −3, two each at most), and `berth: own cabin | bunkroom | none`. Mood lines
+    already show the new thoughts' labels with `{ref}` filled. Prompt v0.23: cards, vids,
+    arguments and rivalries are the sim's and the crew's story to tell, never invented; an
+    argument or a rivalry is the kind of thing a card is made of; `privateTalk` is a side
+    effect the captain's cabin makes possible, warm or stern, and its outcome shows in
+    affinity next call; interests are who people are and the narrator writes to them.
+    `quietTooLong` may make a rivalry or an argument the beat. `capabilities.ts` describes the
+    `privateTalk` side effect under `surfaceDecision` and lists each person's likes in the crew
+    block it already writes. Lever count unchanged.
+25. **Cut.** `ActivityDef.noise` (no reader; the noisy bunkroom counts people, not activities);
+    `loner` restoring recreation faster in a cabin (no trait modifier reads recreation yet;
+    `recreationRate` is added as a modifier key for symmetry and `loner` gets 0.8 on it);
+    `gossip` and `stargazing` as interest tags stay (stargazing is an activity; gossip scores
+    nothing until a `gossip` activity exists); a card made from a rivalry (the narrator's,
+    through the digest); the captain's table as an activity.
+
+### Gate: contracts (one agent, serial)
+
+Everything below lands as one commit with all four checks green. Stubs are fine where behaviour
+is a workstream's; types, schemas, generated schemas, the migration, the ticker lines, the
+protocol, the command and the minimum content to keep the bundle valid are not. Every stub is a
+named function in a file its stream owns, called from the shared file, so no stream edits
+`candidates.ts`, `common.ts`, `plans.ts`, `steps.ts`, `actions.ts`, `execute.ts`, `labels.ts`,
+`needs.ts`, `ambient.ts`, `render.ts`, `agentView.ts`, `world.ts`, `migrations.ts`,
+`command-handlers.ts`, `systems/galley/eat.ts` or `planner/galley.ts` after the gate.
+
+**Sim types.**
+
+- `core/types/actor.ts`: `Needs.recreation`; `Actor.interests: Interests`, `Actor.values:
+  Values`; `Interests = { likes: InterestTag[]; strong?: InterestTag; dislikes: InterestTag[] }`,
+  `Values = { orderFreedom: number; faithReason: number; loyaltyAmbition: number }`.
+- `core/types/content.ts`: `INTEREST_TAGS = ["cards", "boardgames", "vids", "debate", "music",
+  "exercise", "sparring", "reading", "tinkering", "cooking", "stargazing", "gossip"]` /
+  `InterestTag`; `ITEM_TAGS` + `book`, `instrument`, `treat`; `TRAIT_MODIFIERS` +
+  `recreationRate`; `THOUGHT_KEYS` + the seventeen keys of call 19; `ACTIVITY_OUTCOMES =
+  ["contest", "bond", "debate", "perform", "none"]`; `ActivityDef { id: ActivityDefId; label;
+  waitingLabel; interest: InterestTag; venue: VenueDef[]; participants: { min; max };
+  durationDays: Days; restores: Partial<Record<"recreation" | "social" | "comfort", number>>;
+  fatigueCost?: number; solo?: { label; durationDays: Days; restores }; outcome:
+  ActivityOutcome; thoughts?: Partial<Record<"win" | "lose" | "joined" | "listened" |
+  "listenedDislike", ThoughtKey>>; affinity?: { participants: number; winnerToLoser: number;
+  loserToWinner: number }; topics?: TopicDefId[]; skillGain?: { skill: SkillId; perDay: number
+  }; risk?: { injuryChance: number }; dirt?: number; requires?: { itemTag: ItemTag; own?: true
+  }; produces?: { itemDefId: ItemDefId; count: number; zoneTag: string }; transitOnly?: true;
+  blockedByProblems?: ProblemKind[] }`; `VenueDef`; `TopicDef`; `CrewDef.interests?`,
+  `CrewDef.values?`; `ContentBundle.activities: Readonly<Record<ActivityDefId, ActivityDef>>`
+  and `topics: Readonly<Record<TopicDefId, TopicDef>>` (both required); `ConfigDef.needs.
+  recreationPerDay` and `initialRange.recreation`; `ConfigDef.recreation { joinAbove;
+  gatherSeconds; lateJoinSeconds; collapseBackoffDays }`; `ConfigDef.social` gains
+  `chatAffinity; chatAffinityEveryDays; affinityRange; avoidBelow; preferAbove; rivalry {
+  streakFor }; debate { agreeWithin; argueBeyond }` (the chat template block stays);
+  `ConfigDef.cabins { noisySeconds; checkEverySeconds; privateTalkSeconds;
+  privateTalkWaitSeconds }`; `ConfigDef.galley.treatHungerAbove`. `core/types/ids.ts`:
+  `ActivityDefId`, `TopicDefId`, `SessionId`, `NextIdCounters` + `session`.
+- `core/types/state.ts`: `WorldState.social: SocialState = { relationships; rivalries; sessions:
+  Record<SessionId, GroupSession>; captainsTableDay: number; privateTalk?: PrivateTalk }`
+  (calls 4, 9, 15; owners: recreation for `sessions`, social for the rest, cabins for
+  `privateTalk`), `SCHEMA_VERSION = 10` and its history line. `core/types/ship.ts`: nothing
+  (`ownerId` and `meal` exist).
+- `core/types/work.ts`: `PERSONAL_ACTIVITIES` + `recreate`, `privateTalk`; `ActivityStep` +
+  `{ kind: "recreate"; activityId; role; sessionId?; ticksDone; ticksNeeded }` and `{ kind:
+  "confer"; ticksDone; ticksNeeded }`; the `hold` step gains `disturbedTicks?: number`;
+  `ActionStages` + `recreate: "waiting" | "playing"`, `confer: "talking"`; the personal
+  `Intent` and the `Candidate` choice gain `activityId?: ActivityDefId` and `sessionId?:
+  SessionId`. `core/types/view.ts`: `SelfView.interests`, `values`, `affinity`, `summons?: {
+  withActorId: ActorId; compartmentId: CompartmentId; captain: boolean }`;
+  `KnownItemView.ownerId?`; `SessionView` (the row plus the def's label) and
+  `AgentView.sessions()`; `AgentView.travel(): { stage: TravelStage }` unless slice 2's W1
+  added an equivalent (the gate uses it then); `RenderSession` and `RenderFrame.sessions`;
+  `AgentViewSnapshot.sessions`.
+- Commands: `core/types/commands/cabins.ts` (new) with `privateTalk { actorId: ActorId; tone:
+  "warm" | "stern" }`; `commands/index.ts` merges it; `authority.ts`: `AUTHORITY.player`,
+  `system` and `scenario` + `privateTalk` (not `narrator`); `contracts.test.ts` lists follow.
+  The handler (validate per call 15, apply) is complete at the gate in
+  `systems/cabins/private-talk.ts` (owner W3 fills the plan and step; the command itself is a
+  contract), registered by `registerCabins`.
+- Events: new `core/types/events/recreation.ts` with `sessionOpened { sessionId; activityId;
+  hostId }` (trace), `sessionJoined { sessionId; actorId }` (trace), `sessionStarted {
+  sessionId; activityId; memberIds; compartmentId }` (notable), `sessionCollapsed { sessionId;
+  activityId; toSolo: boolean }` (trace), `sessionLeft { sessionId; actorId }` (trace),
+  `sessionEnded { sessionId; activityId; outcome: ActivityOutcome | "abandoned"; memberIds;
+  winnerId?; topicId?; argued?: boolean }` (notable), `tookAKnock { actorId; activityId }`
+  (notable), `treatsBaked { cookId; count }` (notable); new `events/social.ts` with
+  `affinityChanged { fromActorId; toActorId; delta; affinity }` (trace), `rivalryStreak {
+  winnerId; loserId; activityId; streak }` (notable), `argument { aId; bId; topicId }`
+  (narrative), `captainsTable { captainId; withActorId }` (trace); new `events/cabins.ts` with
+  `privateTalkCalled { captainId; actorId }` (notable), `privateTalkHeld { captainId;
+  actorId; tone }` (narrative), `privateTalkMissed { captainId; actorId }` (notable),
+  `interestsAssigned { actorId }` (trace); `events/index.ts` merges all three.
+- `core/interests.ts` (owner W3): `generateInterests(rng, stream)`, `interestsFromSeed(id)`,
+  `interestScore(interests, tag)` (3/2/1/0), `stanceOn(values, topic)`; `core/social.ts`
+  (owner W2): `emptySocial()`, `affinityOf(social, from, to)`, `rivalryKey(a, b, activityId)`;
+  `core/world.ts`: `emptyState` gains `social` and `nextId.session`; `createWorld`/the spawn
+  handler write `interests`, `values` (from the def or generated) and `needs.recreation` (from
+  `initialRange`). `core/berths.ts`: `lockerTileOf(deck, bedKey)` exported (the existing lookup,
+  named).
+- `core/migrations.ts` `9:` (call 23); `core/types/save.ts` `MigrationContext.content` + `crew`;
+  `save.test.ts` adds a 9 → 10 case. `core/invariants.ts`: `needs.recreation` in [0, 1];
+  `interests.strong` ∈ `likes`, likes and dislikes disjoint, tags in the enum; values integers
+  in [−2, 2]; `social.relationships` keys are actors and affinities integers within
+  `affinityRange`; every session's members are actors on deck, ids below `nextId.session`,
+  `startedTick ≤ endsAtTick`; `privateTalk` names two actors.
+- `systems/recreation/` (new; owner W1): `recreation.ts` (`recreationSystem`, needs phase after
+  mood; stub no-op), `sessions.ts` (`openSession`, `joinSession`, `leaveRecreation` stubs:
+  the leave stub is a no-op), `plans.ts` (`recreatePlan` stub blocked), `steps.ts`
+  (`runRecreate` throws `NotImplementedError`), `needs.ts` (`recreationRatesFor` returning
+  undefined), `venues.ts` (`resolveVenue` stub), `index.ts` with `registerRecreation(registry)`.
+- `systems/social/` (new; owner W2): `relationships.ts` (`moveAffinity`, `pruneSocial` stubs),
+  `outcomes.ts` (`resolveOutcome` stub: deletes nothing, returns), `chat.ts`
+  (`onConversation` no-op), `seating.ts` (`seatPreference` returning `seats[0]`),
+  `social.ts` (`socialSystem`, needs phase, every 100 ticks; stub no-op), `index.ts` with
+  `registerSocial`.
+- `systems/cabins/` (new; owner W3): `cabins.ts` (`cabinsSystem` needs phase, stub no-op;
+  `onWoke` no-op), `private-talk.ts` (the command handler, complete; `privateTalkPlan` stub
+  blocked; `runConfer` throws; `leaveTalk` no-op), `index.ts` with `registerCabins`
+  (the system and the command). `apps/web/src/worker/registry.ts` and `apps/cli/src/pacing.ts`
+  register recreation, social and cabins after needs (and after galley, if slice 3 placed it
+  there); `packages/sim/src/index.ts` exports `registerRecreation`, `registerSocial`,
+  `registerCabins`, `INTEREST_TAGS`, `ACTIVITY_OUTCOMES`, `interestScore`, `affinityOf`.
+- `planner/recreation.ts` (owner W1): `recreationCandidate(view, config)` stub undefined;
+  `planner/cabins.ts` (owner W3): `summonsCandidate(view)` stub undefined. `candidates.ts`:
+  `enumerateCandidates` adds both (summons before the task loop so it ranks with its class;
+  recreation after `leisureCandidate`); `leisureCandidate` tags per call 16; `PlannerConfig`
+  gains `recreation`, `social`, `mood` (the planner reads `avoidBelow`, `preferAbove`,
+  `joinAbove`, the mood bands). `planner/galley.ts`: the treat rule (call 7).
+- `systems/work/plans.ts`: `buildPersonalPlan` `recreate` → `recreatePlan`, `privateTalk` →
+  `privateTalkPlan`; `steps.ts`: `recreate` → `runRecreate`, `confer` → `runConfer`;
+  `actions.ts`: the two action kinds; `labels.ts`: the strings of W1 and W3 below (text
+  only: `recreateLabel(ctx, step)` reads the def's `label`/`waitingLabel`/`solo.label`;
+  `conferLabel`); `execute.ts`: `abortActivity` calls `leaveRecreation` and `leaveTalk` before
+  the activity is cleared; `leaveHold` calls `onWoke` for a sleep hold. `systems/needs/needs.ts`:
+  `RATE_MODIFIER.recreation = "recreationRate"`, `needRatesPerDay` merges
+  `recreationRatesFor`'s rates when it returns them, else `recreation: recreationPerDay`.
+  `systems/work/ambient.ts`: the `onConversation` call. `systems/galley/eat.ts`: the seat is
+  `seatPreference`'s; `consumeServing` gives `ateATreat` for a `treat`.
+- `view/agentView.ts`: the new `SelfView` fields, `sessions()`, `travel()`, `ownerId` on known
+  items; `toAgentViewSnapshot` carries sessions. `core/render.ts`: `RenderFrame.sessions`
+  (venue tile centre from the machine footprint, zone or compartment; `label` from the def by
+  `startedTick`); ticker lines (streams write none): `sessionStarted` → "Jax Okonkwo, Tomas
+  Ruiz and Dane Whitcross are playing cards in the lounge" (two: "X and Y are…"),
+  `sessionEnded` → contest "Jax Okonkwo won at cards" / debate argued "Priya Kessler and Dane
+  Whitcross argued about the Guild", not argued "Priya Kessler and Oyelaran Abiodun had a
+  spirited talk about faith" / perform "Bettina Solheim played the harmonica in the lounge" /
+  null otherwise, `rivalryStreak` → "Jax Okonkwo has beaten Tomas Ruiz three times running at
+  cards", `tookAKnock` → "Tomas Ruiz took a knock sparring", `treatsBaked` → "Bettina Solheim
+  baked a tray of treats", `argument` → null (the `sessionEnded` line carries it),
+  `privateTalkCalled` → "Mara Osei asked Priya Kessler for a word in the captain's cabin",
+  `privateTalkHeld` → "Mara Osei had a word with Priya Kessler", `privateTalkMissed` → "Priya
+  Kessler never made it to the captain's cabin"; `describeEvent` falls back to the generic line
+  for the trace kinds. `docs/CONTRACTS.md`: sessions are common knowledge (call 3); the
+  `AgentView` list gains `sessions()`.
+
+**Content and schemas (`packages/content`).**
+
+- `schemas/primitives.ts` enums for the interest tags, item tags, trait modifier, thought keys,
+  outcomes (`AssertEqual` guards); new `schemas/activity.ts` (`activityDefSchema`, strict:
+  `participants.min ≥ 1`, `max ≥ min`, `durationDays` positive, `restores` values in [0, 1],
+  `affinity` integers in [−3, 3], `risk.injuryChance` in [0, 1], `solo` forbidden when `min ===
+  1`) and `schemas/topic.ts` (weights in [−1, 1]); `schemas/crew.ts` `interests?` (likes 1–3,
+  `strong` ∈ likes, dislikes 0–2, disjoint) and `values?` (integers in [−2, 2]);
+  `schemas/config.ts` the new blocks and keys; `schemas/bundle.ts` `activities`, `topics` as
+  records and `thoughts` strict over every key; `crew content schemas` regenerated.
+  `validate.ts` L2: `thoughts.*` keys exist, `topics` refs, `produces.itemDefId` refs,
+  `requires.itemTag` names a tag some item def carries, `blockedByProblems` kinds; the L3 venue
+  rules are W4's.
+- Data: `activities/` twelve files — `cards` (gamesTable + lounge; 2–4; 0.1 day; contest; solo
+  "playing solitaire" 0.06; restores recreation 0.4, social 0.3; win/lose thoughts; affinity
+  participants +1, loserToWinner −1), `board_game` (gamesTable; 2; 0.08; contest; same
+  thoughts; no solo), `vids` (vidScreen; 1–4; 0.12; bond; topics `the_vid`; `joined`
+  `goodCompany`), `video_game` (vidScreen; 1–2; 0.06; contest; win/lose), `debate` (lounge,
+  mess; 2–3; 0.06; debate; topics the six; restores recreation 0.3, social 0.4), `exercise`
+  (exerciseRig; 1; 0.05; none; fatigueCost 0.1; dirt 0.03), `sparring` (sparringMat zone; 2;
+  0.04; contest; win/lose; risk 0.05; dirt 0.05; fatigueCost 0.1), `reading` (desk own, then
+  lounge; 1; 0.08; none; requires `book`; restores recreation 0.35, comfort 0.1), `music`
+  (lounge, mess; 1; 0.05; perform; requires `instrument` own; listened `enjoyedMusic`,
+  listenedDislike `hatedTheNoise`), `tinkering` (workbench; 1; 0.1; none; skillGain
+  engineering 0.2/day), `stargazing` (viewport zone; 1–2; 0.06; bond; transitOnly; joined
+  `goodCompany`), `baking` (stove; 1; 0.05; none; blockedByProblems `mealToCook`; produces
+  `item.treat` × 4 at `serving`); `topics/` seven files (call 20); `thoughts/` seventeen
+  files (call 19); `items/book.json` (stackable, `maxStack` 6, tag `book`, mass 0.3),
+  `items/treat.json` (call 7); `harmonica.json` gains the `instrument` tag; the nine crew files
+  gain `interests` and `values` (Bettina: strong music, cooking, dislikes sparring; Mara:
+  strong stargazing, reading, dislikes vids; Jax: strong cards, vids, dislikes reading; Tomas:
+  strong sparring, cards, dislikes debate; Priya: strong tinkering, debate, dislikes cards;
+  Oyelaran: strong reading, debate, dislikes sparring; Sunniva: strong exercise, gossip,
+  dislikes music; Dane: strong boardgames, music, dislikes exercise; Noor: strong vids,
+  stargazing, dislikes boardgames; values: Mara (−1, 0, −2), Dane (−2, 0, −1), Priya (1, 2,
+  1), Tomas (1, −1, 0), Jax (2, 1, 2), Bettina (0, −2, −1), Oyelaran (−1, 1, −1), Sunniva (1,
+  0, 1), Noor (0, −1, 1)); `passenger.json` untouched (generated); `traits/loner.json`
+  `recreationRate: 0.8`; `scenarios/default.json` `startingItems` + `book × 3` in
+  `book_shelf`; `config/default.json`: `needs.recreationPerDay: 0.6`,
+  `initialRange.recreation: { min: 0.2, max: 0.5 }`, `recreation { joinAbove: 0.25,
+  gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 }`, `social` +
+  `chatAffinity: 1, chatAffinityEveryDays: 1, affinityRange: 10, avoidBelow: -3, preferAbove:
+  0, rivalry { streakFor: 3 }, debate { agreeWithin: 2, argueBeyond: 4 }`, `cabins {
+  noisySeconds: 60, checkEverySeconds: 60, privateTalkSeconds: 20, privateTalkWaitSeconds: 120
+  }`, `galley.treatHungerAbove: 0.1`, `host.slowDownOnEvents` + `argument`; `loader.ts`
+  imports; `loader.test.ts` counts (items 18, thoughts 26, activities 12, topics 7).
+- Hand-built sim bundles: `core/fixtures/ship-life.ts` `FIXTURE_THOUGHTS` gains the seventeen
+  defs and the module gains `FIXTURE_ACTIVITIES` (cards, reading, exercise: enough for the
+  three outcomes the fixtures exercise), `FIXTURE_TOPICS`, `FIXTURE_RECREATION`,
+  `FIXTURE_SOCIAL`, `FIXTURE_CABINS`; every fixture config and content spreads them;
+  `example-world.ts` actors' `interests`, `values`, `needs.recreation`, state `social`;
+  `frozen-migrations.ts` untouched.
+
+**Tests the gate must fix to stay green** (literals and renames only): `loader.test.ts` and
+`schemas.test.ts` counts; `contracts.test.ts` command lists; `kernel.test.ts`/
+`pipeline.test.ts` if they build `emptyState` by hand; `needs.test.ts` if it enumerates need
+keys; `planner/boundary.test.ts` if it builds a `PlannerConfig` by hand; `save.test.ts` 9 → 10;
+`integration.test.ts` registers nothing new (the registry does); narrator `digest.test.ts` is
+untouched (nothing new is read yet); `Inspector.test.tsx` if it lists the need rows; fixtures
+under `packages/narrator/fixtures/` load through the migration (regenerated at integration).
+
+### Workstreams (parallel after the gate)
+
+No two streams edit the same file. `docs/DECISIONS.md`, `packages/content/schema-json/*`,
+`packages/content/data/config/default.json`, `packages/narrator/fixtures/*` and the deck
+READMEs are the lead's at integration. Each stream's report names the files it touched, the
+D-entry text it proposes, and the beats it saw in a headless run.
+
+**W1 — Sim: the recreation need, venues, sessions, the recreate step, the planner's choice.**
+Owns `packages/sim/src/systems/recreation/**` (+ tests and `fixtures/lounge-deck.ts`: a small
+deck with a lounge holding a games table with four seats, a vid screen, a `bookShelf` zone with
+a book stack and a `viewport` zone; a gym with an exercise rig and a `sparringMat` zone; a
+bunkroom with four bunks and lockers; six crew in two sections with authored interests, one
+with an owned `instrument` in their locker) and `planner/recreation.ts` (+ test).
+- `recreation.ts` (`recreationSystem`): the lifecycle of call 4 (start, collapse, abandon,
+  end), `endsAtTick` from `durationDays`, `sessionStarted`/`sessionCollapsed`/`sessionEnded`,
+  `resolveOutcome` at the end (W2's), the host's collapse backoff
+  (`recreate:<activityId>` for `collapseBackoffDays`).
+- `sessions.ts`: `openSession` (allocates `nextId.session`; a session already open for the
+  activity at the venue is joined instead), `joinSession` (room, not running past
+  `lateJoinSeconds`, `sessionJoined`), `leaveRecreation` (remove from `members`, `sessionLeft`;
+  set down a carried `book`/`instrument` where the actor stands and `seeItem`; a contest or
+  debate under `min` ends `abandoned`).
+- `venues.ts`: `resolveVenue(ctx, actor, def, session?)` → `{ venue: SessionVenue; target:
+  StepTarget | TileCoord }` by call 12 (machine `use` positions through the reservation cache
+  and members' tiles; zone tiles free of actors; compartment floor by `loungeTile`'s rule
+  computed over state; `own` against `state.berths` and the bed's compartment).
+- `plans.ts`: `recreatePlan` (requires → acquire; venue; `recreate`; home → `putDown`; the
+  home tile by call 13; `transitOnly` against `state.travel.stage`; `blockedByProblems`
+  against open problems).
+- `steps.ts`: `runRecreate` (first tick by role; waiting while the session is open; counting
+  while solo or started; done when the session is gone after starting or `ticksDone ≥
+  ticksNeeded` solo; the collapse-to-solo rewrite of the step; `occupiedPosition` on a failed
+  join).
+- `needs.ts`: `recreationRatesFor` (call 1).
+- `planner/recreation.ts`: `recreationCandidate` (call 2), reading `self.interests`,
+  `self.affinity`, `sessions()`, `travel()`, known items (`ownerId` for `own`),
+  `knownProblems()` for `blockedByProblems`, the deck's zones and machines for venue presence.
+- Labels: the def's `label` while playing, `waitingLabel` while the session is open, the
+  `solo.label` after a collapse; "fetching the harmonica" / "fetching a book" on the acquire
+  walk (`labels.ts` `recreateLabel`, which the gate wrote; W1 may ask for a string).
+- Tests (`recreation.test.ts`, `sessions.test.ts`, `venues.test.ts`, `plans.test.ts`,
+  `planner/recreation.test.ts` on the lounge fixture and on `crewWorld`): off watch with
+  recreation above the threshold, the cards-liker hosts at the games table and the ticker is
+  quiet until a second arrives; the second (a neutral with time on their hands) joins and the
+  session starts with `sessionStarted` once; a third who dislikes cards never comes; a session
+  nobody joins collapses at `gatherSeconds` to solitaire for the host and the host backs off
+  hosting; a bell pulls the oncoming stander out mid-game (`sessionLeft`) and a two-hand
+  contest ends `abandoned` with no winner; recreation falls during the game by the def's
+  restores and not while waiting; a low-mood person plays solitaire rather than hosting; a
+  high-mood person hosts rather than sitting alone; stargazing is offered in transit and not
+  docked; the harmonica owner fetches it from her locker, plays in the lounge and puts it
+  back, and nobody else ever picks it up; a reader takes a book to her own desk when she has a
+  cabin and to the lounge when she has not; an interrupted reader sets the book down where
+  she stands and the shelf's stack is one short; baking is not offered while `mealToCook` is
+  open; on `crewWorld` a day shows at least one `sessionStarted`.
+Done when the sim suite is green and the lounge fixture shows a game of cards start, end with
+a winner (W2's stub makes it `none` until W2 merges: the test pins the winner only after), and
+collapse, each in one headless run.
+
+**W2 — Sim: relationships, outcomes, rivalries, ambient affinity, seats, the captain's table.**
+Owns `packages/sim/src/systems/social/**` (+ tests), `core/social.ts` (+ test),
+`systems/needs/invariants.ts` (the social invariants beside mood and berths).
+- `relationships.ts`: `moveAffinity(ctx, from, to, delta)` (clamped, integer, entry created on
+  first move, `affinityChanged` trace), `pruneSocial`; `social.ts` (`socialSystem`, every 100
+  ticks: prune).
+- `outcomes.ts`: `resolveOutcome` per call 5; the rivalry tally and `rivalryStreak`; debate
+  stances through `stanceOn`; bystanders from `caches.index.actorsByCompartment`, awake only;
+  `skillGain`, `dirt` (slice 3's `depositDirt`), `produces` (a stack at the zone's first tile,
+  `Item.meal` from the baker's skill and the galley tier through slice 3's quality rule,
+  `treatsBaked`), `risk` (`tookAKnock`, `sparringBruise`).
+- `chat.ts`: `onConversation` (call 10). `seating.ts`: `seatPreference` and the captain's table
+  (call 11), `captainsTable` trace.
+- Tests (`outcomes.test.ts`, `relationships.test.ts`, `seating.test.ts`, `chat.test.ts` on
+  W1's lounge fixture with hand-built sessions, and on `crewWorld`): a contest between a keen
+  player and a neutral one is won by the keen one more often than not over twenty seeded
+  rolls, each loss gives `lostContest` and −1 toward the winner; the third straight loss gives
+  `keepsBeatingMe` with the winner's id as `refId`, `rivalryStreak`, and the tally reads
+  (0–3); a win by the loser resets the streak; a debate between values (2, 1, 2) and (−2, 0,
+  −1) on `the_guild` is an `argument` with −2 each way and `argued` on both, between (1, 2,
+  1) and (−1, 1, −1) on `philosophy` a `spiritedTalk`; a bystander who does not like debate is
+  `gotLectured`; a performance gives the music-liker in the room `enjoyedMusic` and +1 toward
+  the player, the disliker `hatedTheNoise`, the neutral nothing, and someone asleep nothing; a
+  vid session is a bond: `goodCompany` and +1 all round, never an argument; ambient chat gives
+  +1 each way once and not again within a day; affinity never leaves [−10, 10]; an eater sits
+  beside a friend and never beside an enemy when a seat is free; the captain's first meal of
+  the day seats her beside her highest-affinity crew member and the next day's beside the
+  lowest, each with `satWithTheCaptain`; a passenger who left is pruned from
+  `relationships`; sparring at 1.0 injury chance gives both `sparringBruise` and two
+  `tookAKnock` lines; tinkering raises engineering by `perDay × durationDays`.
+Done when the sim suite is green and `crewWorld` over three days shows a rivalry key with three
+or more games.
+
+**W3 — Sim: cabins, `privateTalk`, interests generation.**
+Owns `packages/sim/src/systems/cabins/**` (+ tests), `planner/cabins.ts` (+ test),
+`core/interests.ts` (+ test), `core/berths.ts` for `lockerTileOf` only (+ a case in
+`berths.test.ts`).
+- `cabins.ts` (`cabinsSystem`): `disturbedTicks` on sleep holds; `noBunkOfMyOwn` every
+  `checkEverySeconds`; the private-talk timeout (`privateTalkMissed`); `onWoke` (`ownCabin`,
+  `noisyBunkroom`).
+- `private-talk.ts`: `privateTalkPlan` (the captain to the desk `seat` of their cabin, the
+  other to the free cabin floor tile nearest the desk, then `confer`), `runConfer` (counts
+  only while both are in the cabin compartment; the captain's step applies the outcome of
+  call 15 through W2's `moveAffinity`, `privateTalkHeld`, clears `social.privateTalk`; the
+  other's step is done once it is cleared), `leaveTalk` (an aborted party: the talk stays
+  pending until the timeout; nothing else).
+- `planner/cabins.ts`: `summonsCandidate` (essential class; the captain's and the other's;
+  rejected `notAboard` when the summons names someone not on the roster).
+- `core/interests.ts`: `generateInterests`, `interestsFromSeed` (deterministic: the same id
+  gives the same interests), `interestScore`, `stanceOn`.
+- Labels: "going to the captain's cabin" (the walk, both; "going to the first officer's cabin"
+  when the FO holds it), "having a word with Priya Kessler" / "having a word with the captain"
+  (`confer`).
+- Tests (`cabins.test.ts`, `private-talk.test.ts`, `planner/cabins.test.ts`,
+  `interests.test.ts` on `berthContent`/`crewWorld`): the captain wakes in her cabin with
+  `ownCabin`; a bunkroom sleeper with someone awake in the room for a minute wakes with
+  `noisyBunkroom`, one with a passer-by for five seconds does not; the tenth crew member on an
+  eight-bunk deck gets `noBunkOfMyOwn`, refreshed daily, and loses it when a bunk frees; a
+  `privateTalk` card side, chosen, sends both to the cabin, the talk takes twenty seconds with
+  both present, `warm` moves affinity +2/+1 with `heardOut`, `stern` −2/0 with `dressedDown`,
+  the ticker shows the call and the talk; the command is rejected for a passenger, for the
+  captain herself, for someone ashore, and while a talk is pending; a talk whose crew member
+  is at the helm waits and times out with `privateTalkMissed` (the helm is not interrupted);
+  with the captain asleep the first officer holds it in the officers' cabin; generated
+  interests always have a strong like inside the likes and never a tag both liked and
+  disliked; `interestsFromSeed` is stable.
+Done when the sim suite is green.
+
+**W4 — Content: validator rules, data tuning, READMEs.**
+Owns `packages/content/src/schemas/validate.ts`, `validate-hull.ts` and their tests,
+`packages/content/data/activities/*`, `data/topics/*`, `data/crew/*.json` (interests and
+values after the gate's first pass), `data/decks/freighter-mk1.json` (if a zone is needed),
+`README`s under `data/`.
+- L3 (per deck, per activity): a `machineTag` venue names a tag some machine on the deck
+  carries with at least `participants.max` `use` positions; a `zoneTag` venue a zone with at
+  least `max` tiles; a `compartmentTag` venue a compartment; an activity with no venue present
+  on a deck is a `physical` *note* naming the deck and activity (Mk1 lacks the lounge and gym),
+  not an error, and the authored Mk2 must have every one (an error for the default scenario's
+  deck). `requires.own` only with a `personal`-tagged item def carrying the tag; `produces.
+  zoneTag` present on the deck. L2: `participants.max ≤ 4` (the legibility ceiling for one
+  plate), `solo` present when `min ≥ 2` and `outcome` is not `contest` (a game that can be
+  played alone must say how).
+- Data: a second pass over values and interests so every group activity has at least two
+  likers across the off-watch overlaps (Red+Blue, White+Blue, all off on the third watch),
+  and no two people are alike; the twelve defs' durations and restores against call 22's
+  targets after W1 lands (the lead's tuning commit moves them further).
+- Tests: one failing synthetic case per rule; the authored bundle passes; README regeneration
+  for Mk2 (`crew content render-deck`) listing which activities each room hosts.
+Done when `crew content validate` is green and every rule has a failing test.
+
+**W5 — Narrator and CLI: the digest's off-watch lines, the `privateTalk` side effect, the
+prompt, the beats report.**
+Owns `packages/narrator/**`, `packages/server/src/routes/narrator*.test.ts`, `apps/cli/**`.
+- `digest.ts`: the lines of call 24 (`off watch:` from `social.sessions` and the actors'
+  `recreate` steps; `rivalries:` from `social.rivalries` with the names in the key's order;
+  crew `likes`/`dislikes`, `close to`/`at odds with` from `social.relationships`, `berth` from
+  `berths` and the bed's compartment tags), `{ref}` in thought labels filled from `refId`;
+  `contract.ts`: `decisionSide.effect` + `privateTalk`, `talkWith: idOf("crew member name,
+  or empty")`, `tone: z.enum(["warm", "stern", ""])` (empty for none, D45); `translate.ts`:
+  `privateTalkSide` resolving the name to an aboard crew member (dropped with a reason for the
+  captain, a passenger, someone ashore, a pending talk) through `playerSide`;
+  `capabilities.ts`: the side effect under `## 4. surfaceDecision` ("a private word in the
+  captain's cabin, warm or stern; the crew member walks there and the talk moves how they
+  feel about the captain") and `likes:` in the crew lines it writes; `prompts/system.ts` v0.23
+  (call 24); `prompts/hooks.ts` `quietTooLong` may build a card from a rivalry or an argument,
+  `notableEvent` text for `argument`.
+- `apps/cli/src/beats.ts`: the counters and shares of call 22; `pacing.test.ts` hook-count and
+  timing pins if the lounge changes walks; `index.test.ts` usage string unchanged.
+- Tests: `digest.test.ts` off-watch, rivalry, likes and berth lines on a fixture with a
+  running session and a rivalry (the crew-line regexes keep `; mood: …; good at: ` intact: the
+  new clauses follow `good at`); `translate.test.ts` `privateTalk` side cases (unknown name,
+  the captain, a passenger, pending talk, warm and stern); `capabilities.test.ts` text (six
+  levers still); `run.test.ts` and `kernel-integration.test.ts` on regenerated fixtures;
+  server tests on the new player command kind; `beats.test.ts` a one-day run reports at least
+  one session started.
+Done when the narrator, server and CLI suites are green, `crew beats --days 3` prints the new
+columns, and the lead runs `pnpm test:live` once.
+
+**W6 — Web: the session plate, the inspector's people, the machine inspector's gathering.**
+Owns `apps/web/**` except `worker/registry.ts` (the gate's).
+- `render/draw.ts` (+ `draw.test.ts`): `drawSessionPlates` after `drawActorLabels`, one plate
+  per `frame.sessions` at the venue's screen point, text `"${label} — ${first names}"` (34
+  characters; waiting: `"${waitingLabel} — ${host's first name}"`), the same plate style and
+  overlap push; `drawActorLabels` skips actors whose id is in any session's `memberIds`
+  (`sessionMemberIds(frame)` in `render/sessions.ts`, + test). `host/playback.ts`
+  `interpolateFrame`: `sessions` snap to `next`.
+- `ui/Inspector.tsx`, `actorWords.ts` (+ tests): a Recreation need row; `interestsLine`
+  ("likes cards (keen), vids; dislikes reading"); `relationshipsLines` ("close to Jax Okonkwo
+  (+4)", "at odds with Priya Kessler (−3)", top two each way, from `self.affinity` and the
+  roster's names); `thoughtText` fills `{ref}`; `MachineInspector` gains a "Gathering" line
+  when a session's venue is the machine ("cards: Jax, Tomas, Dane, 40 s in" from the frame
+  and view tick); `pick.ts` unchanged.
+- `log.ts`/`Log.tsx`: nothing new (the slowdown highlight is slice 2's; `argument` arrives
+  through config).
+- Test pins: `fullSim.test.ts` (off-watch walks change the lounge's traffic; haul and
+  departure bounds rechecked), `integration.test.ts` registers nothing new, `dockside.test.ts`
+  and `captain-ashore.test.ts` tick budgets if the captain now plays cards between asks.
+Done when the web suite is green, a browser run at 390×700 shows one plate over the games
+table reading "cards — Jax, Tomas" with no name labels under it, a tap on the table shows the
+gathering, and a tap on Jax shows his likes and who he is close to.
+
+### Integration order
+
+1. **Gate** on `ship-life-4` (branched from `main` after slice 3 merges): the four checks;
+   `crew content validate`; a browser smoke run (nobody plays yet: the stubs keep today's
+   behaviour except that resters now stand in the lounge).
+2. **W4** (content) first: its venue rules hold on the gate content; the four checks; `crew
+   content validate` reports Mk1's missing venues as notes and nothing else; READMEs
+   regenerated.
+3. **W3** (cabins, interests), then **W2** (social), then **W1** (recreation): the four checks
+   after each; `crew pacing` after W1 shows `sessionStarted` in a day with no
+   `invariantViolated`; after W2 the first `rivalryStreak` in a three-day `crew beats` is
+   recorded for the tuning commit.
+4. **W6** (web): the four checks; browser at 390×700 and 1280×800 with a game on.
+5. **W5**: regenerate `packages/narrator/fixtures/*` with `crew narrator fixtures` first (schema
+   9 → 10, books on the shelf, interests on everyone), then the four checks; `pnpm test:live`
+   once; `crew beats --days 3 --scenario both`, numbers recorded for the D-entry.
+6. **Tuning commit (lead):** against the call 22 targets: `recreationPerDay` and `joinAbove`
+   until every off-watch person recreates daily and sessions fill; `gatherSeconds` and
+   `durationDays` until collapses are under 30% and the lounge is busy without one game
+   running into the next bell; `chatAffinity` and the outcome deltas until affinities spread
+   over a week without pinning at ±10; ticker lines per watch under twelve, or
+   `sessionStarted` for `bond` sessions goes trace; `pacing.test.ts` and `beats.test.ts`
+   expectations moved; both reports kept beside the D-entry.
+7. D-entries, `README.md` note ("off watch, the crew play cards, spar and read; the digest
+   names rivalries"), deploy via the `ops` agent, phone playtest: a 10-minute 1× session shows
+   a plate over the games table with two or three first names on it, a ticker line naming a
+   winner, and Bettina walking from the bunkroom to the lounge with the harmonica.
+
+### Risks and hidden coupling
+
+- **Hot files with one owner and gate stubs**: `planner/candidates.ts`, `planner/common.ts`,
+  `planner/galley.ts`, `systems/work/plans.ts`, `steps.ts`, `actions.ts`, `execute.ts`,
+  `labels.ts`, `systems/needs/needs.ts`, `systems/work/ambient.ts`, `systems/galley/eat.ts`,
+  `core/render.ts`, `view/agentView.ts`, `core/world.ts`, `core/migrations.ts`,
+  `core/command-handlers.ts`, `apps/web/src/worker/registry.ts`. The gate writes every call
+  site and the streams reach them only through their own files (`systems/recreation/*`,
+  `systems/social/*`, `systems/cabins/*`, `planner/recreation.ts`, `planner/cabins.ts`,
+  `core/interests.ts`, `core/social.ts`). A stream that finds it needs a line in another's file
+  asks the lead, who adds it at integration.
+- **Slice 3 is not merged while this is planned.** The gate assumes `systems/galley/eat.ts`'s
+  seat choice, `consumeServing`, `planner/galley.ts`'s `eatCandidate`, `Item.meal`,
+  `depositDirt`, `galley.mealCallHungerAbove` and `crew beats` exist as the slice 3 plan
+  describes. If a name moved at slice 3 integration, the gate follows the code and says so.
+  If slice 2's W6 left `beats.ts` elsewhere, W5 follows it.
+- **Sessions and the step share a lifecycle across two owners.** W1 owns the row and the step,
+  W2 owns what happens at the end. The contract is `resolveOutcome(ctx, session, def)` called
+  exactly once, after which W1 deletes the row; W2 never touches `sessions`. The gate's stub
+  returns without effect, so W1's tests see `outcome: "none"`-shaped endings until W2 merges
+  (W1 pins the winner only in a test marked for W2).
+- **Members are the people at the venue, and arrivals race the gather timer.** A joiner who
+  walks twenty tiles can arrive after a two-hand session collapsed to solitaire; they fail
+  `occupiedPosition`, back off, and may host their own. `gatherSeconds` 30 covers the
+  bunkroom-to-lounge walk on Mk2 (about 12 tiles); the beats report's collapse share is the
+  tripwire, and the next step if it is high is counting a planned joiner as `coming` on the
+  row (a `joinSession` at plan time with a release on abort), not a longer timer.
+- **Same-class commitment and the lounge.** Recreation is routine at most; the mess call,
+  hauling and gangway watch are routine too, so nobody is pulled off a crate for cards, and a
+  game already running is not interrupted by a meal call (same class). A player leaves a game
+  only for essential work, the bell (duty) or a survival need. If the beats report shows
+  people skipping dinner for cards, `mealCallHungerAbove` is not the knob: the eat candidate's
+  age (`ageTick`) already ranks it ahead of a younger game in the same class.
+- **Reservation of `use` positions by several personal activities.** Sleep, eat (slice 3) and
+  now recreation all pick machine positions against the reservation cache at plan time and
+  find out on arrival. Four seats at the games table with four would-be players converging is
+  the first time four reservations race; `occupiedPosition` backoff and the `max` cap
+  (`joinSession` refuses the fifth) keep it bounded. W1 measures it on the lounge fixture with
+  five hosts.
+- **`Needs` gains a key, and every place that enumerates needs must follow**: `RATE_MODIFIER`,
+  `initialRange`, the migration, invariants, `needs.test.ts`, the inspector's rows, the digest's
+  `needs:` clause (`needWord` over the keys it lists; `recreation` reads "bored" above the
+  threshold), `scenarioSetNeeds`'s payload (scenario-only). TypeScript catches the typed ones;
+  the digest's word list and the inspector rows are W5's and W6's to find.
+- **`THOUGHT_KEYS` is a required content table**: seventeen new keys mean seventeen defs in
+  every hand-built bundle through `FIXTURE_THOUGHTS`; `schemas/bundle.ts` lists them; a missed
+  one fails at `createWorld` with a clear message.
+- **`{ref}` in thought labels** is a convention three readers share (inspector, digest, and
+  the beats report if it prints thoughts); a label with `{ref}` on a thought without `refId`
+  renders the placeholder, so the validator (W4) rejects `{ref}` in the label of a key the sim
+  never gives a `refId` (the gate lists `keepsBeatingMe` and `argued` as the two that get one).
+- **Ambient chat inside a session gives affinity twice a day at most** (once from the chat,
+  once from the outcome); with `chatAffinityEveryDays` 1 and bond +1, two friends who play
+  nightly reach +10 in a week. The tuning commit watches the affinity spread; `affinityRange`
+  is the cap, not the cure.
+- **The treat and the mess call share the serving zone**: four treats on the counter next to
+  ten servings. `eatCandidate` prefers a `meal`-tagged item over a `treat` when hungry enough
+  for a meal, and the treat rule fires only below the meal call's threshold, so a treat never
+  replaces dinner. The galley's sweep spoils both.
+- **`privateTalk` is the first player command that moves people.** It writes an intent through
+  the planner (a summons the view carries), never `pendingIntent` directly (D70's shore walk
+  does that from commerce; the cabin keeps to the planner so the helm rule stands). A captain
+  at the helm never answers her own summons: the command actor is never the stander while a
+  hand qualifies (D77), and the FO case is tested.
+- **Save size**: `social` is under 4 KB of JSON at nine people and grows with the square of
+  the crew; at the legibility ceiling of nine that is the design's bound. Sessions are at most
+  three or four rows. Nothing typed-array, nothing in caches.
+- **Counts and literals pinned in tests**: items 16 → 18 (book and treat),
+  thoughts 9 → 26; `contracts.test.ts` player command list; `capabilities.test.ts` keeps "six
+  levers"; `digest.test.ts` the crew-line regexes (new clauses after `good at`);
+  `loader.test.ts` `personal` tags (the harmonica gains `instrument`, keeps `personal`).
+- **Narrator call volume**: `argument` and `privateTalkHeld` are narrative (digest, quiet
+  timer) and not hooked; no new call sources. `sessionStarted` is notable and reaches the
+  ticker and the uploaded events; at three to five sessions a watch that is the loudest new
+  source, and the tuning commit's twelve-line target is where it is held.
+- **Mk1 never recreates** beyond compartment-venue activities (debate in the mess, music in
+  the mess): it has no lounge, gym, book shelf or viewport. Mk1 keeps no scenario, so nothing
+  depends on it; the validator's notes say which activities it lacks.
+
+### D-entries for slice 4 (D83 onward, provisional; the lead renumbers at integration)
+
+- **D83.** Off watch: a fifth need, recreation, met by activities from a content table
+  (`ActivityDef`: venue tags, participants, duration, restores, outcome, thoughts, affinity,
+  topics, skill gain, risk, dirt, a required item, a product); interests and value axes per
+  person, authored for the nine and generated for the rest; one planner candidate per person,
+  the best-scored activity by interest, mood and company; group sessions are common knowledge
+  (the intercom), opened by a host at the venue, joined by whoever walks over, started at the
+  gather timer or when full, collapsed to the solo variant, ended by the bell or an essential
+  task; the rest and chat candidates move to the lounge; a session renders as one plate at the
+  venue and the ticker says who won.
+- **D84.** Relationships: directed affinity in `WorldState.social`, sparse, ±10, moved by
+  ambient chat once a day per pair, by outcomes (contest, bond, debate on a topic by the dot
+  product of values and weights, perform for whoever is in the room), by seats (friends
+  beside, enemies apart; the captain's table once a day) and by `privateTalk`; a per-pair
+  per-activity tally with a streak that becomes a rivalry thought and a ticker line; a
+  sparring injury is a thought and a line this slice, the medic's work waits for slice 5;
+  baking makes treats eaten as snacks.
+- **D85.** Cabins: own-cabin and noisy-bunkroom thoughts at waking, no-bunk daily; personal
+  items are fetched from lockers and put back (the harmonica), books from the shelf;
+  `privateTalk` is a card side effect the player chooses, a player-authority command that
+  summons a crew member to the command actor's cabin for a warm or stern word with an affinity
+  outcome; the lever count stays six.
+- **D86.** Save schema 10 migrates 9 (recreation, interests, `social`, books on the shelf);
+  the digest's off-watch, rivalry, likes, relationship and berth lines and prompt v0.23;
+  `crew beats` counts sessions, outcomes, solo recreation and ticker lines per watch and is
+  the instrument the tuning commit answers to.
 
 ## Slice 5: The bridge, later stations
 

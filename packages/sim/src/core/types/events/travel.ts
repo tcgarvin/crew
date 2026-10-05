@@ -1,7 +1,9 @@
 /** Travel events (W6). */
+import type { HazardKind } from "../content";
 import type {
   ActorId,
   DockDefId,
+  HazardId,
   ItemDefId,
   ItemId,
   LocalId,
@@ -17,6 +19,20 @@ export interface TravelEventPayloads {
   departed: { readonly fromPortId: PortDefId; readonly toPortId: PortDefId };
   arrived: { readonly portId: PortDefId };
   driftingChanged: { readonly drifting: boolean };
+  /**
+   * D80: in transit the engines are below `travel.limpSpeedFraction` and no repair can bring them
+   * back with what is aboard: `machineId`'s `faultKey` repair is short of `itemDefId` (a `tool`
+   * nothing aboard provides, or `part`s), so the ship limps on at `speedFraction` of nominal.
+   * Raised the tick the limp begins; it ends unannounced when the engine is repaired (with
+   * `driftingChanged`) or the leg ends.
+   */
+  shipLimping: {
+    readonly machineId: MachineId;
+    readonly faultKey: LocalKey;
+    readonly itemDefId: ItemDefId;
+    readonly need: "tool" | "part";
+    readonly speedFraction: number;
+  };
   /** D36: the captain chose to wait for repairs to `machineId` before departing. */
   departureHeld: { readonly machineId: MachineId };
   /** D36: the captain chose to depart with `machineId` impaired. */
@@ -27,7 +43,9 @@ export interface TravelEventPayloads {
    * D71: the departure goes ahead with `machineId` impaired because its `faultKey` repair is
    * short of `itemDefId` (a `tool` nothing aboard provides, or `part`s) and the market at
    * `portId` cannot supply it. Raised instead of the gate card when no other repair is worth
-   * waiting for, or when it ends a hold for repairs that could no longer finish.
+   * waiting for, or when it ends a hold for repairs that could no longer finish. D80: one per
+   * fault; a machine impaired only by another's (an engine starved by the generator) is told
+   * through the other's.
    */
   departureRepairOutOfReach: {
     readonly machineId: MachineId;
@@ -66,6 +84,38 @@ export interface TravelEventPayloads {
   };
   /** D66: the staging plan's one line for the log as the dock comes alongside. */
   dockAmbience: { readonly portId: PortDefId; readonly line: string };
+  /** D78: `actorId` plotted the course to `toPortId` at the nav terminal. */
+  coursePlotted: { readonly toPortId: PortDefId; readonly actorId: ActorId };
+  /** D78: a `scheduleHazard` placed hazard `hazardId` on the leg. */
+  hazardScheduled: { readonly hazardId: HazardId; readonly kind: HazardKind };
+  /**
+   * D78: a navigation hazard fired in transit and the helm rolled against it: `standerId` (absent:
+   * nobody at the helm) at piloting `skill` against `difficulty`. `unattended` is a scrape and a
+   * delay both. `scrapedMachineId` is the machine a scrape put a fault on (absent: no scrape, or
+   * no machine with a fault catalog to take it); `lostSeconds` is the delay (0 without one).
+   */
+  navHazard: {
+    readonly hazardId: HazardId;
+    readonly kind: HazardKind;
+    readonly difficulty: number;
+    readonly standerId?: ActorId;
+    readonly skill: number;
+    readonly outcome: "clean" | "scrape" | "delay" | "unattended";
+    readonly scrapedMachineId?: MachineId;
+    readonly lostSeconds: number;
+  };
+  /**
+   * D78: hazard `hazardId` never fired and is dropped with its leg, `fromPortId` → `toPortId`:
+   * transit ended before it fell due, or (absent `toPortId`) the course was given up in port
+   * before the leg began. A hazard lies on the leg it was placed on and never carries to another.
+   */
+  navHazardMissed: {
+    readonly hazardId: HazardId;
+    readonly kind: HazardKind;
+    readonly difficulty: number;
+    readonly fromPortId: PortDefId;
+    readonly toPortId?: PortDefId;
+  };
 }
 
 export const TRAVEL_EVENT_SIGNIFICANCE = {
@@ -73,6 +123,7 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   departed: "narrative",
   arrived: "narrative",
   driftingChanged: "narrative",
+  shipLimping: "narrative",
   departureHeld: "narrative",
   departureRiskAccepted: "narrative",
   departureHoldLifted: "narrative",
@@ -83,4 +134,10 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   dockDressed: "trace",
   // The staging call sets the stage and never moves the plot (D57): shown, never narrative.
   dockAmbience: "notable",
+  coursePlotted: "notable",
+  hazardScheduled: "trace",
+  // The helm's stakes: in the digest and the ticker, but not hooked (D78).
+  navHazard: "narrative",
+  // A fact for the narrator's digest that its hazard came to nothing; no story, no ticker line.
+  navHazardMissed: "notable",
 } as const satisfies SignificanceCatalog<TravelEventPayloads>;

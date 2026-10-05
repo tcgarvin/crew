@@ -22,7 +22,7 @@ import {
   type Problem,
   type SimEvent,
   actionLabel,
-  configTicks,
+  dayTicks,
   describeEvent,
   effectiveMarket,
   marketBlock,
@@ -44,6 +44,7 @@ import {
   voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
+import { dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
 /**
  * Policy prompt keys whose template text is the card the captain sees (D36 gate, the passengers
@@ -190,17 +191,30 @@ function travelLine(state: State, content: ContentBundle): string {
     return `travel: docked at ${portName(content, t.portId)} (${t.portId})${course}`;
   }
   const progress = t.routeDistance > 0 ? t.routeProgress / t.routeDistance : 0;
-  const drifting = t.drifting ? ", DRIFTING (propulsion lost)" : "";
+  // D80: a limp is the engine down with no repair possible aboard; the ship crawls on.
+  const drifting =
+    t.limping === true
+      ? ", LIMPING (propulsion lost, no repair possible aboard; crawling on at a fraction of speed)"
+      : t.drifting
+        ? ", DRIFTING (propulsion lost)"
+        : "";
   return `travel: ${t.stage}, under way ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ${pct(progress)} of route${drifting}${bound}`;
 }
 
-function shipSection(snapshot: Snapshot, content: ContentBundle): Section {
+function shipSection(
+  snapshot: Snapshot,
+  content: ContentBundle,
+  recentEvents: readonly SimEvent[],
+): Section {
   const state = snapshot.state;
   const t = state.travel;
   const lines: string[] = [];
   const secs = Math.round(ticksToSeconds(state.tick, snapshot.config.time.tickRate));
   lines.push(`tick ${state.tick} (${secs}s into the game)`);
   lines.push(travelLine(state, content));
+  // D77, D78: who has the watch and the helm, and the helm's stakes since the last call.
+  lines.push(watchLine(state, content, snapshot.config));
+  lines.push(...helmEventLines(recentEvents, state, content, snapshot.config));
   lines.push(`money: ${state.money.balance} credits`);
   if (t.stage === "docked") {
     // D47: what is on sale here, with prices (this is private to the model; cards carry no numbers).
@@ -232,7 +246,7 @@ function marketHereLine(state: State, content: ContentBundle, portId: PortDefId)
   return lines.length === 0 ? "nothing" : lines.join(", ");
 }
 
-/** D47: why a `partsNeeded` problem is still open, in the words the prompt teaches. */
+/** D47: why a `partsNeeded` (or D80 `reserveLow`) problem is still open, in the prompt's words. */
 function partsReason(state: State, content: ContentBundle, itemDefId: ItemDefId): string {
   const block = marketBlock(state, content, itemDefId);
   const t = state.travel;
@@ -270,7 +284,7 @@ function partsShortfallNote(state: State, content: ContentBundle): string {
 /**
  * Passengers-and-galaxy §3.2: the "Aboard" line for a passenger: name, passenger, where to and
  * whether they come back, where they are on deck now; while ashore, where and when they are due
- * back (and overdue, once `ashoreSinceTick + overdueSeconds` has passed); while walking off,
+ * back (and overdue, once `ashoreSinceTick + overdueDays` has passed); while walking off,
  * "going down the ramp".
  */
 function aboardLine(
@@ -301,7 +315,7 @@ function aboardLine(
     const overdueAt =
       since === undefined
         ? undefined
-        : since + configTicks(config, config.commerce.passage.overdueSeconds);
+        : since + dayTicks(config, config.commerce.passage.overdueDays);
     const overdue =
       overdueAt !== undefined && state.tick >= overdueAt
         ? `; OVERDUE (expected by tick ${overdueAt})`
@@ -369,14 +383,17 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
       .join(", ");
     const where = placePhrase(content, state, actor.location);
     const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
+    // D77: their section and whether they are on now; D79: mood and what weighs on them.
+    const duty = ` ${dutyTag(actor, state.tick, snapshot.config)}`;
+    const mood = moodPhrase(actor, state.tick, content, snapshot.config);
     const def = content.crew[actor.defId];
     const bio = def?.bio;
     // D38: the voice line is how this person sounds on every card. D41: the captain's voice is
     // how they come across, for how others react to them.
     const voice = def?.voice;
     const captain = isCaptain(actor) ? "this is the captain, the player; never a speaker. " : "";
-    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; good at: ${skills || "nothing in particular"}`;
-    return `- ${actor.name}${roles}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
+    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}; good at: ${skills || "nothing in particular"}`;
+    return `- ${actor.name}${roles}${duty}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
   // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.
   // One whose passage has ended is not aboard: left behind or put off, they are off ship at a
@@ -455,6 +472,10 @@ function machineSection(state: State, content: ContentBundle, tickRate: number):
 
 function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBundle): string {
   const base = `- ${p.kind} (${p.visibility}) since tick ${p.createdTick}`;
+  if (p.kind === "reserveLow") {
+    // D80: routine restocking at a port that sells it; nothing is broken.
+    return `${base}: the ship's stores are low; ${p.payload.count}x ${itemName(content, p.payload.itemDefId)} would restock them; ${partsReason(state, content, p.payload.itemDefId)}`;
+  }
   if (p.kind !== "partsNeeded") return base;
   // D47: the stalled repair and what would unstick it, so the model can stock a market or tell
   // the story of a part that is not here.
@@ -622,6 +643,7 @@ function budgetSection(state: State): Section {
   const lines = [
     `spawns remaining: ${b.spawnsRemaining}`,
     `faults remaining: ${b.faultsRemaining}`,
+    `hazards remaining: ${b.hazardsRemaining}`,
   ];
   return section("Your budget", lines, NEVER_DROPS);
 }
@@ -706,7 +728,7 @@ export function buildDigest(
   const sections: Section[] = [
     hookSection,
     ...(hook === undefined ? [] : stagingSections(content, hook)),
-    shipSection(snapshot, content),
+    shipSection(snapshot, content, recentEvents),
     ...(staging ? [] : [budgetSection(state)]),
     decisionSection(state, content),
     heldSection(state),

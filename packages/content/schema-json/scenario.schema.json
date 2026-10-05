@@ -71,6 +71,42 @@
         "required": ["placementKey", "faultKey"],
         "additionalProperties": false
       }
+    },
+    "watchBill": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+                }
+              }
+            },
+            "required": ["key", "members"],
+            "additionalProperties": false
+          }
+        },
+        "dayworkers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          }
+        }
+      },
+      "required": ["sections", "dayworkers"],
+      "additionalProperties": false
     }
   },
   "required": [

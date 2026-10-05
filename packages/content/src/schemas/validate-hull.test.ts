@@ -10,16 +10,33 @@ import {
   checkScenarioCrewSpawns,
 } from "./validate-hull";
 
+type Position = MachineTagTable[string]["interactionPositions"][number];
+
+const position = (key: string, purposes: Position["purposes"]): Position => ({
+  key,
+  offset: { x: -1, y: 0 },
+  purposes,
+  capacity: 1,
+});
+
+/** The helm's seat and, apart from it, the standby tile the oncoming waits on (D77). */
+const HELM_POSITIONS = [position("seat", ["operate", "repair"]), position("standby", ["use"])];
+
+const tagged = (tag: MachineTag, interactionPositions = [position("front", ["use"])]) => ({
+  tags: [tag],
+  interactionPositions,
+});
+
 const MACHINES: MachineTagTable = {
-  "machine.engine": { tags: ["engine"] },
-  "machine.pump": { tags: ["cooling"] },
-  "machine.stove": { tags: ["stove"] },
-  "machine.table": { tags: ["messTable"] },
-  "machine.bunk": { tags: ["bed"] },
-  "machine.medbed": { tags: ["medBed"] },
-  "machine.helm": { tags: ["pilotStation"] },
-  "machine.nav": { tags: ["navStation"] },
-} satisfies Record<string, { tags: MachineTag[] }>;
+  "machine.engine": tagged("engine"),
+  "machine.pump": tagged("cooling"),
+  "machine.stove": tagged("stove"),
+  "machine.table": tagged("messTable"),
+  "machine.bunk": tagged("bed"),
+  "machine.medbed": tagged("medBed"),
+  "machine.helm": tagged("pilotStation", HELM_POSITIONS),
+  "machine.nav": tagged("navStation"),
+};
 
 const door = (key: string, x: number, y: number, side: string, kind = "interior") => ({
   key,
@@ -106,9 +123,12 @@ function format(issues: readonly ValidationIssue[]): string[] {
   return issues.map((i) => `${i.level} ${i.path.join(".")}: ${i.message}`);
 }
 
-function hullMessages(edit?: (deck: RawDeck) => void): string[] {
+function hullMessages(
+  edit?: (deck: RawDeck) => void,
+  machines: MachineTagTable = MACHINES,
+): string[] {
   const issues: ValidationIssue[] = [];
-  checkHullContract(deckWith(edit), MACHINES, issues);
+  checkHullContract(deckWith(edit), machines, issues);
   return format(issues);
 }
 
@@ -207,6 +227,23 @@ describe("hull contract (D72)", () => {
       deck.machines.push({ ...placed("helm_2", "machine.helm", 2), origin: { x: 2, y: 2 } });
     });
     expect(messages).toEqual([`${AT}.machines: needs exactly one pilotStation machine, found 2`]);
+  });
+
+  it("requires the pilot station's standby position, apart from its seat (D77)", () => {
+    const helmWith = (...positions: Position[]) => ({
+      ...MACHINES,
+      "machine.helm": tagged("pilotStation", positions),
+    });
+    const expected = [
+      `${AT}.machines: pilot station "helm_1" (machine.helm) has no standby position: a "use" position apart from its "operate" seat`,
+    ];
+    expect(hullMessages(undefined, helmWith(position("seat", ["operate", "repair"])))).toEqual(
+      expected,
+    );
+    // A seat that is also a `use` position is no standby: the oncoming would wait in the seat.
+    expect(hullMessages(undefined, helmWith(position("seat", ["operate", "use"])))).toEqual(
+      expected,
+    );
   });
 
   it("requires exactly one nav station", () => {

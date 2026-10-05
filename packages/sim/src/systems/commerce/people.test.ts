@@ -149,7 +149,7 @@ describe("save migration 1 → 2 (D25)", () => {
     const migrated = migrateState(
       schemaOneState(),
       1,
-      { content: freightTestWorld().world.content },
+      { content: freightTestWorld().world.content, config: freightTestWorld().world.config.values },
       migrations,
       6,
     ) as {

@@ -16,6 +16,7 @@ import {
   type PortDefId,
   SCHEMA_VERSION,
   type SaveEnvelope,
+  fillConfig,
   migrateState,
 } from "@crew/sim";
 import { buildCapabilities } from "./capabilities";
@@ -324,14 +325,17 @@ function notesFrom(
 /**
  * A snapshot from an older build (a client mid-deploy, a stored fixture) is upgraded with the
  * kernel's save migrations before anything reads it, so the digest and translator only ever see
- * the current state shape.
+ * the current state shape; its config gets any key it lacks from the loaded content, as `restore`
+ * does (D76 renamed the day knobs within schema 7, so an older snapshot has the old names).
  */
 function currentSnapshot(snapshot: SaveEnvelope, content: ContentBundle): SaveEnvelope {
-  if (snapshot.schemaVersion === SCHEMA_VERSION) return snapshot;
+  const config = fillConfig(snapshot.config, content.config).values;
+  if (snapshot.schemaVersion === SCHEMA_VERSION) return { ...snapshot, config };
   const state = migrateState(JSON.parse(JSON.stringify(snapshot.state)), snapshot.schemaVersion, {
     content,
+    config,
   }) as SaveEnvelope["state"];
-  return { ...snapshot, schemaVersion: SCHEMA_VERSION, state };
+  return { ...snapshot, schemaVersion: SCHEMA_VERSION, state, config };
 }
 
 /** `runNarrator` plus the intermediate artefacts, for the eval harness. */

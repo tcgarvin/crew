@@ -2,7 +2,7 @@
  * Commerce command handlers (PLAN §6 W6 items 3–4): `offerJob`, `acceptContract`, `declineJob`,
  * and (passengers-and-galaxy §4.2) `endPassage`.
  */
-import { configTicks } from "../../core/clock";
+import { dayTicks } from "../../core/clock";
 import { newActor } from "../../core/command-handlers";
 import {
   type AppliedCommand,
@@ -152,7 +152,7 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       pay,
       status: "offered",
       offeredTick: ctx.tick,
-      expiresAtTick: ctx.tick + configTicks(ctx.config, ctx.config.commerce.jobOfferTtlSeconds),
+      expiresAtTick: ctx.tick + dayTicks(ctx.config, ctx.config.commerce.jobOfferTtlDays),
       cargoItemIds: [],
       causeCommandId: command.id,
       // `actorId` is a placeholder until acceptance spawns the passenger (`acceptContract`).

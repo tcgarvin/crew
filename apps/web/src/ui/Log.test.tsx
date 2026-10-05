@@ -3,7 +3,7 @@ import type { Decision, Tick } from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Log } from "./Log";
-import type { CardEntry } from "./log";
+import type { CardEntry, EventEntry } from "./log";
 
 const entry: CardEntry = {
   key: "card:1",
@@ -38,6 +38,28 @@ describe("Log", () => {
   it("marks an unnamed close without a name, and an ordinary card not at all (D56)", () => {
     expect(render({ ...text, closesThread: "" })).toContain("✓ Story closed</span>");
     expect(render(text)).not.toContain("Story closed");
+  });
+
+  it("styles the line that slowed the game down, and no other (D76)", () => {
+    const lines: EventEntry[] = [
+      {
+        key: "e:1",
+        tick: 3 as Tick,
+        kind: "event",
+        text: "Debris field",
+        significance: "narrative",
+      },
+      { key: "e:2", tick: 2 as Tick, kind: "event", text: "Bell.", significance: "notable" },
+    ];
+    const html = renderToStaticMarkup(
+      <Log
+        entries={[{ ...lines[0], highlight: true } as EventEntry, lines[1] as EventEntry]}
+        cardText={() => text}
+        onOpenDecision={() => undefined}
+      />,
+    );
+    expect(html).toContain('class="log-line log-line-narrative log-line-highlight">Debris field<');
+    expect(html).toContain('class="log-line log-line-notable">Bell.<');
   });
 
   it("starts compact, with a toggle to show more (D72: the portrait strip under the canvas)", () => {

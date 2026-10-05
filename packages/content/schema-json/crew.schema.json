@@ -55,10 +55,6 @@
         "additionalProperties": false
       }
     },
-    "shift": {
-      "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
-    },
     "bio": {
       "type": "string"
     },
@@ -67,6 +63,6 @@
       "minLength": 1
     }
   },
-  "required": ["id", "name", "roleTags", "skills", "startingInventory", "shift", "bio", "voice"],
+  "required": ["id", "name", "roleTags", "skills", "startingInventory", "bio", "voice"],
   "additionalProperties": false
 }

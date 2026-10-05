@@ -120,7 +120,13 @@ describe("save migration 4 → 5 (D66)", () => {
       tick: 5,
     };
     raw.schemaVersion = 4;
-    const migrated = migrateState(raw, 4, { content: world.content }, migrations, 6) as WorldState;
+    const migrated = migrateState(
+      raw,
+      4,
+      { content: world.content, config: world.config.values },
+      migrations,
+      6,
+    ) as WorldState;
     expect(migrated.schemaVersion).toBe(6);
     expect(migrated.dockside).toEqual({ locals: {}, props: [] });
     expect(migrated.nextId.local).toBe(1);
@@ -138,11 +144,23 @@ describe("save migration 4 → 5 (D66)", () => {
     raw.narrator.lastNarrativeEvent = event;
     raw.schemaVersion = 4;
     const older = JSON.parse(JSON.stringify(raw)) as typeof raw;
-    const migrated = migrateState(raw, 4, { content: world.content }, migrations, 6) as WorldState;
+    const migrated = migrateState(
+      raw,
+      4,
+      { content: world.content, config: world.config.values },
+      migrations,
+      6,
+    ) as WorldState;
     expect(migrated.narrator.pendingNotable).toEqual(event);
     // An older one was already checked the tick after it.
     older.narrator.lastNarrativeEvent = { ...event, tick: (raw.tick as number) - 1 };
-    const done = migrateState(older, 4, { content: world.content }, migrations, 6) as WorldState;
+    const done = migrateState(
+      older,
+      4,
+      { content: world.content, config: world.config.values },
+      migrations,
+      6,
+    ) as WorldState;
     expect(done.narrator.pendingNotable).toBeUndefined();
   });
 });

@@ -10,7 +10,7 @@
  *    draws `returnsAtTick` on the `commerce` stream, the voyage home is planned at once and the
  *    travel system holds departure for them (`waitingForPassenger`, travel.ts).
  *  - leg `ashore`: at `returnsAtTick` they walk back aboard (leg `back`). Not back
- *    `config.commerce.passage.overdueSeconds` after going ashore, the first officer brings one
+ *    `config.commerce.passage.overdueDays` after going ashore, the first officer brings one
  *    policy card, "Wait for them" / "Leave without them" (D29, D37); leaving is `endPassage`.
  *  - leg `back`, docked at `fromPortId`: they walk off, despawn, `completed`, paid once.
  *
@@ -27,7 +27,7 @@
  * spawn point); one walking off walks down and out through the gate, where they step off; one
  * coming back from ashore appears at the gate and walks aboard the same way.
  */
-import { configTicks } from "../../core/clock";
+import { configTicks, dayTicks, daysToSeconds } from "../../core/clock";
 import { newActor } from "../../core/command-handlers";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
@@ -334,7 +334,8 @@ function planVoyageHome(ctx: StepCtx, job: Job): void {
 
 function goAshore(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor, port: PortDef): void {
   stepAshore(ctx, actor, port);
-  const { ashoreSecondsMin, ashoreSecondsMax } = ctx.config.commerce.passage;
+  const ashoreSecondsMin = daysToSeconds(ctx.config, ctx.config.commerce.passage.ashoreDaysMin);
+  const ashoreSecondsMax = daysToSeconds(ctx.config, ctx.config.commerce.passage.ashoreDaysMax);
   const seconds =
     ashoreSecondsMax > ashoreSecondsMin
       ? ashoreSecondsMin + (ashoreSecondsMax - ashoreSecondsMin) * ctx.rng.float("commerce")
@@ -448,7 +449,7 @@ function sweepAshore(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor):
   }
   const since = passage.ashoreSinceTick;
   if (since === undefined) return;
-  const overdueTicks = configTicks(ctx.config, ctx.config.commerce.passage.overdueSeconds);
+  const overdueTicks = dayTicks(ctx.config, ctx.config.commerce.passage.overdueDays);
   if (ctx.tick - since < overdueTicks) return;
   if (overdueCardRaised(ctx.state, job.id)) return;
   raiseOverdueCard(ctx, job, actor, job.toPortId);

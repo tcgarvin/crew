@@ -10,7 +10,7 @@ import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation } from "./types/common";
-import type { ConfigDef, ContentBundle, ItemDef } from "./types/content";
+import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
@@ -31,7 +31,7 @@ import type {
   RenderTravel,
   TickerEntry,
 } from "./types/view";
-import type { ActionKind } from "./types/work";
+import type { ActionKind, ProblemKind } from "./types/work";
 
 const ACTION_VERBS: Readonly<Record<ActionKind, string>> = {
   walk: "walking",
@@ -149,6 +149,8 @@ const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
   "decisionPending",
   "commandRejected",
   "invariantViolated",
+  // D78: the narrator's bookkeeping (its hazard came to nothing); the player saw nothing happen.
+  "navHazardMissed",
 ]);
 
 /** Should `event` reach the ticker at all? (`describeEvent` may still drop it with `null`.) */
@@ -171,6 +173,39 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
   approaching: "On approach",
   docking: "Docking",
 };
+
+/** D78: how each navigation hazard kind reads in the ticker. */
+const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
+  debrisField: "Debris field",
+  asteroidBelt: "Asteroid belt",
+  ionStorm: "Ion storm",
+};
+
+/** D77: "white" → "White", for "Bell. White section has the watch." */
+function sectionName(key: string): string {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** D78: the ticker line for a navigation hazard's outcome. */
+function navHazardLine(event: Extract<SimEvent, { type: "navHazard" }>, n: Names): string {
+  const { kind, outcome, standerId, scrapedMachineId, lostSeconds } = event.payload;
+  const head = HAZARD_NAMES[kind];
+  const scraped =
+    scrapedMachineId === undefined
+      ? "scraped through"
+      : `scraped through, the ${n.machineLower(scrapedMachineId)} took it`;
+  const lost = `lost ${Math.round(lostSeconds)} s`;
+  switch (outcome) {
+    case "clean":
+      return `${head}: ${n.actor(standerId ?? "") ?? "the helm"} took us through clean`;
+    case "scrape":
+      return `${head}: ${scraped}`;
+    case "delay":
+      return `${head}: ${lost} working round it`;
+    case "unattended":
+      return `${head}: nobody at the helm; scraped through and ${lost}`;
+  }
+}
 
 /** Passengers §3.5: how a passage's ending reads in the ticker, by `PassageEndReason`. */
 const PASSAGE_END_LINES: Readonly<
@@ -285,6 +320,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Docked at ${n.port(event.payload.portId)}`;
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
+    case "shipLimping": {
+      const { machineId, faultKey, itemDefId, need, speedFraction } = event.payload;
+      const what = need === "tool" ? "No" : "Not enough";
+      return `${what} ${n.itemDef(itemDefId)} aboard to fix the ${n.machineLower(machineId)}'s ${n.faultName(machineId, faultKey)}: limping on at ${Math.round(speedFraction * 100)}% speed`;
+    }
     case "departureHeld":
       return `Holding for repairs to the ${n.machineLower(event.payload.machineId)}`;
     case "departureRiskAccepted":
@@ -353,6 +393,22 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "decisionResolved":
       return null;
+    case "bell": {
+      const key = event.payload.sectionKey;
+      return key === undefined ? "Bell." : `Bell. ${sectionName(key)} section has the watch.`;
+    }
+    case "helmRelieved": {
+      const by = n.actor(event.payload.byActorId) ?? "Someone";
+      const fromId = event.payload.fromActorId;
+      const from = fromId === undefined ? undefined : (n.actor(fromId) ?? "someone");
+      return from === undefined ? `${by} takes the helm` : `${by} relieves ${from} at the helm`;
+    }
+    case "helmUnattended":
+      return "Nobody at the helm";
+    case "coursePlotted":
+      return `Course plotted for ${n.port(event.payload.toPortId)}`;
+    case "navHazard":
+      return navHazardLine(event, n);
     default:
       return undefined;
   }
@@ -598,8 +654,17 @@ function loadingLine(count: FreightCount): string {
   return `loading cargo (${count.done} of ${count.total} ${crates(count.total)} aboard)`;
 }
 
-function hasOpenProblem(state: ReadonlyWorldState, kind: "stationToStaff"): boolean {
+function hasOpenProblem(state: ReadonlyWorldState, kind: ProblemKind): boolean {
   return Object.values(state.work.problems).some((p) => p.kind === kind && p.status === "open");
+}
+
+/**
+ * D77: the helm is empty while its watch is wanted. The watch post is open for the whole of
+ * underway, so an open `stationToStaff` problem no longer means nobody is at the helm; the
+ * watch system's vacancy mark does.
+ */
+function helmWaiting(state: ReadonlyWorldState): boolean {
+  return state.watch.helm.unattendedSinceTick !== undefined;
 }
 
 /**
@@ -667,7 +732,7 @@ function captainAshoreLine(state: ReadonlyWorldState): string | undefined {
 export function shipHeadline(
   state: ReadonlyWorldState,
   content: ContentBundle,
-  nominalSpeed: number,
+  speeds: Pick<ConfigDef["travel"], "nominalSpeed" | "limpSpeedFraction">,
 ): string {
   const travel = state.travel;
   if (travel.stage === "docked") {
@@ -691,8 +756,12 @@ export function shipHeadline(
     }
     if (travel.plannedDestinationId !== undefined) {
       const to = portName(content, travel.plannedDestinationId);
-      return travel.holdForRepairs === true
-        ? `${here} — holding for repairs before departing for ${to}`
+      if (travel.holdForRepairs === true) {
+        return `${here} — holding for repairs before departing for ${to}`;
+      }
+      // D78: the course is travel's open `courseToPlot` until someone plots it.
+      return hasOpenProblem(state, "courseToPlot")
+        ? `Preparing to depart for ${to} — waiting on a course`
         : `Preparing to depart for ${to}`;
     }
     // Offers are the card's story to tell, not the headline's (D34): the headline only says what
@@ -710,7 +779,7 @@ export function shipHeadline(
       if (ashore !== undefined) {
         return `Waiting for ${ashore} to come aboard — preparing to depart for ${to}`;
       }
-      if (hasOpenProblem(state, "stationToStaff")) {
+      if (helmWaiting(state)) {
         return `Preparing to depart for ${to} — waiting for someone at the helm`;
       }
       if (waitingOnRamps(state)) return `Preparing to depart for ${to} — raising the ramps`;
@@ -721,9 +790,14 @@ export function shipHeadline(
     case "departing":
       return `Departing ${portName(content, travel.fromPortId)} for ${to}`;
     case "transit": {
-      const speed = nominalSpeed * engineFactor(state, content);
-      if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
       const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
+      if (travel.limping === true) {
+        // D80: the engine is down and nothing aboard can fix it; the engineer coaxes it along.
+        const crawl = speeds.nominalSpeed * speeds.limpSpeedFraction;
+        return `Limping on to ${to} on a crippled engine — ${formatEta(remaining / crawl)}`;
+      }
+      const speed = speeds.nominalSpeed * engineFactor(state, content);
+      if (travel.drifting || speed <= 0) return `Adrift on the way to ${to} — engines down`;
       const voyage = travel.voyageDestinationId;
       const leg =
         voyage === undefined || voyage === travel.toPortId
@@ -734,7 +808,7 @@ export function shipHeadline(
     case "approaching":
       return `Approaching ${to}`;
     case "docking":
-      return hasOpenProblem(state, "stationToStaff")
+      return helmWaiting(state)
         ? `Docking at ${to} — waiting for someone at the helm`
         : `Docking at ${to}`;
   }
@@ -863,6 +937,6 @@ export function getRenderFrame(world: World): RenderFrame {
     ...(dock === undefined ? {} : { dock }),
     locals: renderLocals(state),
     dockProps: renderDockProps(state, content),
-    headline: shipHeadline(state, content, world.config.values.travel.nominalSpeed),
+    headline: shipHeadline(state, content, world.config.values.travel),
   };
 }

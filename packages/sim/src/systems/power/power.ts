@@ -46,7 +46,10 @@ function placementDomains(deck: DeckDef): ReadonlyMap<string, LocalKey | undefin
 }
 
 /** The power domain a machine's placement names, or `undefined` if it is not on any bus. */
-export function domainKeyOf(ctx: StepCtx, machine: Machine): LocalKey | undefined {
+export function domainKeyOf(
+  ctx: Pick<StepCtx, "content">,
+  machine: Pick<Machine, "deckId" | "placementKey">,
+): LocalKey | undefined {
   const deck = ctx.content.decks[machine.deckId as DeckDefId];
   return deck === undefined ? undefined : placementDomains(deck).get(machine.placementKey);
 }

@@ -16,9 +16,12 @@ import type { ActorId, DecisionId, JobId, MachineDefId, PortDefId } from "../../
 import type { Kernel, World } from "../../core/types/kernel";
 import type { DeckGeometry } from "../../core/types/nav";
 import type { Item } from "../../core/types/ship";
+import { registerPlannerDefaults } from "../../planner/index";
+import { registerSpatial } from "../spatial/index";
 import { registerTravel } from "../travel";
 import {
   FIX,
+  FIXTURE_DAY,
   type FixtureConfigOverrides,
   type FixtureWorld,
   PORTS,
@@ -27,7 +30,10 @@ import {
   fixtureEffectiveConfig,
   freightTestWorld,
 } from "../travel/fixtures";
-import { registerCommerce } from "./index";
+import { travelTaskDerivations } from "../travel/tasks";
+import { registerWatch } from "../watch/index";
+import { registerWork } from "../work/index";
+import { commerceTaskDerivations, registerCommerce } from "./index";
 import { PASSENGER_OVERDUE_PROMPT_KEY } from "./passage";
 
 const TICK_RATE = 20;
@@ -347,7 +353,13 @@ describe("passage lifecycle", () => {
     const run = offerAndAccept(
       150,
       { roundTrip: true },
-      { passage: { ashoreSecondsMin: 20, ashoreSecondsMax: 20, overdueSeconds: 5 } },
+      {
+        passage: {
+          ashoreDaysMin: 20 / FIXTURE_DAY,
+          ashoreDaysMax: 20 / FIXTURE_DAY,
+          overdueDays: 5 / FIXTURE_DAY,
+        },
+      },
     );
     const { world, kernel } = run;
     const arrived = runUntil(
@@ -859,7 +871,11 @@ describe("endPassage and the course", () => {
 
 describe("the overdue card and the return", () => {
   const LATE: FixtureConfigOverrides = {
-    passage: { ashoreSecondsMin: 20, ashoreSecondsMax: 20, overdueSeconds: 5 },
+    passage: {
+      ashoreDaysMin: 20 / FIXTURE_DAY,
+      ashoreDaysMax: 20 / FIXTURE_DAY,
+      overdueDays: 5 / FIXTURE_DAY,
+    },
   };
 
   /** Ashore at b, run to the tick before the overdue card is due. */
@@ -976,6 +992,14 @@ describe("the bridge while the ship waits for a passenger", () => {
     const registry = createRegistry();
     registerTravel(registry);
     registerCommerce(registry);
+    // D77: the helm watch is the watch's, and the helm is manned by someone holding its seat, so
+    // the crew must be able to walk up and take it.
+    registerSpatial(registry);
+    registerWatch(registry);
+    registerWork(registry, {
+      derivations: { ...travelTaskDerivations, ...commerceTaskDerivations },
+    });
+    registerPlannerDefaults(registry);
     const kernel = createKernel(registry);
     const config = fixtureConfig();
     const base = fixtureContent(config);

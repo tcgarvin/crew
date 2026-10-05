@@ -1,10 +1,22 @@
 import type { AgentViewSnapshot, Machine } from "@crew/sim";
-import { actorSubtitle, rosterRole } from "./actorWords";
+import {
+  type PersonWords,
+  actorSubtitle,
+  problemLines,
+  rosterRole,
+  thoughtText,
+} from "./actorWords";
 import type { LocalInspection } from "./localInspection";
 import type { PlaceInspection } from "./placeInspection";
 
 export type InspectorData =
-  | { readonly kind: "actor"; readonly view: AgentViewSnapshot; readonly label?: string }
+  | {
+      readonly kind: "actor";
+      readonly view: AgentViewSnapshot;
+      readonly label?: string;
+      /** D77/D79: their watch, mood and thoughts in words (`personWords`). */
+      readonly person: PersonWords;
+    }
   | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
   | { readonly kind: "item"; readonly item: ItemInspection }
   /** Dockside phase 2: a dock post, or the dock itself; phase 3 (D68): a staged prop. */
@@ -55,7 +67,9 @@ export function Inspector({ data, onClose }: InspectorProps) {
           ×
         </button>
         {data.kind === "loading" && <p>Loading…</p>}
-        {data.kind === "actor" && <ActorInspector view={data.view} label={data.label} />}
+        {data.kind === "actor" && (
+          <ActorInspector view={data.view} label={data.label} person={data.person} />
+        )}
         {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
         {data.kind === "item" && <ItemInspector item={data.item} />}
         {data.kind === "place" && <PlaceInspector place={data.place} />}
@@ -65,8 +79,18 @@ export function Inspector({ data, onClose }: InspectorProps) {
   );
 }
 
-function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: string | undefined }) {
+function ActorInspector({
+  view,
+  label,
+  person,
+}: {
+  view: AgentViewSnapshot;
+  label?: string | undefined;
+  person: PersonWords;
+}) {
   const self = view.self;
+  // Passengers stand no watch (passengers §3.2): the bill and the helm are the crew's.
+  const crew = self.passenger !== true;
   return (
     <div>
       <h2>{self.name}</h2>
@@ -74,6 +98,34 @@ function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: stri
       <dl className="inspector-grid">
         <dt>Activity</dt>
         <dd>{label ?? self.activity.kind}</dd>
+        {crew && (
+          <>
+            <dt>Watch</dt>
+            <dd>{person.watch}</dd>
+          </>
+        )}
+        {crew && person.helm !== undefined && (
+          <>
+            <dt>Duty</dt>
+            <dd>{person.helm}</dd>
+          </>
+        )}
+        <dt>Mood</dt>
+        <dd className={`inspector-mood inspector-mood-${person.mood}`}>{person.mood}</dd>
+        <dt>Thoughts</dt>
+        <dd>
+          {person.thoughts.length === 0 ? (
+            <span className="inspector-empty">nothing in particular</span>
+          ) : (
+            <ul className="inspector-thoughts">
+              {person.thoughts.map((t) => (
+                <li key={t.key} className={t.value < 0 ? "thought-down" : "thought-up"}>
+                  {thoughtText(t)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </dd>
         <dt>Hunger</dt>
         <dd>{Math.round(self.needs.hunger * 100)}%</dd>
         <dt>Fatigue</dt>
@@ -82,14 +134,12 @@ function ActorInspector({ view, label }: { view: AgentViewSnapshot; label?: stri
         <dd>{Math.round(self.needs.comfort * 100)}%</dd>
         <dt>Social</dt>
         <dd>{Math.round(self.needs.social * 100)}%</dd>
-        <dt>Mood</dt>
-        <dd>{self.mood.toFixed(2)}</dd>
       </dl>
       <h3>Known problems</h3>
       {view.problems.length === 0 && <p className="inspector-empty">None known.</p>}
       <ul>
-        {view.problems.map((p) => (
-          <li key={p.id}>{p.kind}</li>
+        {problemLines(view.problems).map((line) => (
+          <li key={line.kind}>{line.text}</li>
         ))}
       </ul>
       <h3>Roster</h3>

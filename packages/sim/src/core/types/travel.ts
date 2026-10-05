@@ -66,6 +66,12 @@ export type TravelState =
       portId: PortDefId;
       /** Set by `setCourse`; departure prep begins when cleared to go. */
       plannedDestinationId?: PortDefId;
+      /**
+       * D78: the course to `plannedDestinationId` is plotted (the nav terminal's `plotCourse`
+       * commit). Departure prep waits for it; `setCourse` and a voyage's next hop clear it, and
+       * the `preparingDeparture` object is built without it, so it never carries.
+       */
+      coursePlotted?: true;
     } & DepartureGateFlags &
       VoyageFields)
   | ({
@@ -77,8 +83,18 @@ export type TravelState =
       /** Route distance covered in transit, same units as `PortDef.routes.distance`. Never resets. */
       routeProgress: number;
       routeDistance: number;
-      /** Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed). */
+      /**
+       * Propulsion lost: progress halted until repaired (SD §17.1: stranded ≠ destroyed), unless
+       * the ship is `limping`.
+       */
       drifting: boolean;
+      /**
+       * D80, `transit` only: the engines are below `travel.limpSpeedFraction` and no repair can
+       * bring them back with what is aboard, so the ship makes way at that fraction of
+       * `nominalSpeed` (`shipLimping` said so when it began). Absent otherwise; every later
+       * stage builds a fresh object without it.
+       */
+      limping?: true;
       stageStartedTick: Tick;
       /**
        * D61, `preparingDeparture` only: the tick prep first called someone on the dock aboard.
@@ -214,7 +230,7 @@ export interface Job {
   paymentTransactionId?: TransactionId;
   /**
    * Integration 2 addition: tick the offer was declined or expired. Drives the `captainAshore`
-   * re-ask cooldown (`config.commerce.reofferSeconds`, D40).
+   * re-ask cooldown (`config.commerce.reofferDays`, D40).
    */
   closedTick?: Tick;
   /** Command that created it (narrator audit). */

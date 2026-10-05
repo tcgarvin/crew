@@ -14,6 +14,7 @@ import type {
   ScenarioDefId,
 } from "../types/ids";
 import type { EffectiveConfig } from "../types/kernel";
+import { FIXTURE_HAZARDS, FIXTURE_MOOD, FIXTURE_THOUGHTS, fixtureWatches } from "./ship-life";
 
 export const TINY = {
   deck: "deck.tiny.main" as DeckDefId,
@@ -29,9 +30,29 @@ export const TINY = {
   scenario: "scenario.tiny" as ScenarioDefId,
 } as const;
 
-export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): ConfigDef {
+/**
+ * The fixture's default ship's day (D76): 600 s of two watches, so the scenario's one section
+ * (`alpha`) stands `[0, 300)` of every 600 s, the duty window the tests were written against
+ * (D77), and dayworkers keep the same hours.
+ */
+export const TINY_DAY = 600;
+
+export interface TinyConfigOptions {
+  /** A fixture convenience in seconds, stored as `narrator.quietTooLongDays`. */
+  readonly quietTooLongSeconds?: number;
+  /** Ship's day length; the day knobs below keep their durations in seconds whatever it is. */
+  readonly daySeconds?: number;
+  readonly watchesPerDay?: number;
+}
+
+/**
+ * Day knobs are written as `seconds / day` and rates as `perSecond * day`, so the values the tests
+ * were written against stay visible and the conversion is exact for any `daySeconds`.
+ */
+export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
+  const day = options.daySeconds ?? TINY_DAY;
   return {
-    time: { tickRate: 20 },
+    time: { tickRate: 20, daySeconds: day, watchesPerDay: options.watchesPerDay ?? 2 },
     movement: {
       walkSpeed: 2,
       passDelaySeconds: 0.5,
@@ -48,18 +69,19 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       rampOpenSeconds: 2,
     },
     needs: {
-      hungerPerSecond: 0.001,
-      fatiguePerSecondAwake: 0.001,
-      fatiguePerSecondWorking: 0.002,
-      fatigueRecoveryPerSecondAsleep: 0.01,
-      comfortPerSecond: 0.001,
-      comfortRecoveryPerSecondResting: 0.01,
-      socialPerSecond: 0.001,
-      socialRecoveryPerSecondChatting: 0.01,
+      hungerPerDay: 0.001 * day,
+      fatiguePerDayAwake: 0.001 * day,
+      fatiguePerDayWorking: 0.002 * day,
+      fatigueRecoveryPerDayAsleep: 0.01 * day,
+      comfortPerDay: 0.001 * day,
+      comfortRecoveryPerDayResting: 0.01 * day,
+      socialPerDay: 0.001 * day,
+      socialRecoveryPerDayChatting: 0.01 * day,
       seekThreshold: 0.5,
-      mealSeconds: 10,
-      sleepMinSeconds: 60,
+      mealDays: 10 / day,
+      sleepDays: 60 / day,
       wakeBelow: 0.1,
+      bedtimeAbove: 0.3,
       initialRange: {
         hunger: { min: 0, max: 0 },
         fatigue: { min: 0, max: 0 },
@@ -73,7 +95,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       claimLeaseSeconds: 10,
       timeBucketSeconds: 5,
       retryBackoffSeconds: 5,
-      skillGainPerSecond: 0.001,
+      skillGainPerDay: 0.001 * day,
       workSpeedPerSkillLevel: 0.1,
     },
     urgency: {
@@ -81,7 +103,7 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       needSurvivalAbove: 0.9,
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
-      routineAgingSeconds: 60,
+      routineAgingDays: 60 / day,
     },
     equipment: {
       hazardScale: 1,
@@ -100,6 +122,8 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       nominalSpeed: 1,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
+      // D80: no limp unless a test turns it on.
+      limpSpeedFraction: 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
       dockHandGiveUpSeconds: 30,
@@ -115,28 +139,36 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
         hazardous: { min: 3, max: 8 },
         passenger: { min: 2, max: 4 },
       },
-      jobOfferTtlSeconds: 120,
+      jobOfferTtlDays: 120 / day,
       dockingFee: 0,
       haulEstimateSeconds: 5,
-      passage: { ashoreSecondsMin: 3, ashoreSecondsMax: 3, overdueSeconds: 10 },
+      passage: {
+        ashoreDaysMin: 3 / day,
+        ashoreDaysMax: 3 / day,
+        overdueDays: 10 / day,
+      },
+      // D80: off unless a test turns them on.
+      sparesReserve: 0,
+      foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
         priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
         maxStockPerCommand: 4,
         defaultPrice: 100,
         buySeconds: 3,
       },
-      reofferSeconds: 60,
+      reofferDays: 60 / day,
       maxCratesPerJob: 6,
     },
     narrator: {
-      quietTooLongSeconds: overrides.quietTooLongSeconds ?? 600,
+      quietTooLongDays: (options.quietTooLongSeconds ?? 600) / day,
       approachHookLeadSeconds: 5,
       maxSpawnsPerCommand: 3,
       maxFaultWindowSeconds: 60,
       spawnBudget: 3,
       faultBudget: 2,
-      budgetRefillSeconds: 600,
+      budgetRefillDays: 600 / day,
       hookOnEvents: [],
+      hazardBudget: 2,
     },
     host: {
       runAheadCapSeconds: 60,
@@ -145,8 +177,11 @@ export function tinyConfig(overrides: { quietTooLongSeconds?: number } = {}): Co
       localSaveEverySeconds: 30,
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
+      slowDownOnEvents: [],
     },
-    shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+    watches: fixtureWatches([0]),
+    mood: FIXTURE_MOOD,
+    hazards: FIXTURE_HAZARDS,
     social: {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
@@ -276,7 +311,6 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         roleTags: ["captain"],
         skills: { piloting: 6 },
         startingInventory: [{ itemDefId: TINY.rations, count: 3 }],
-        shift: "alpha",
         bio: "Keeps the ship flying.",
         voice: "Plain and brief.",
       },
@@ -333,8 +367,10 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
         startingMoney: 500,
         startingItems: [{ itemDefId: TINY.wrench, count: 1, zoneKey: "stores" }],
         initialFaults: [],
+        watchBill: { sections: [{ key: "alpha", members: [TINY.mara] }], dayworkers: [] },
       },
     },
+    thoughts: FIXTURE_THOUGHTS,
     config,
     hash: "tiny-content-v1",
   };

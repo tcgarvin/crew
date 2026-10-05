@@ -51,11 +51,19 @@ const narratorRequestSchema = z.object({
 const NARRATOR_CALL_WINDOW_MS = 60 * 60 * 1000;
 const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
 /**
- * D37: hooks the player is waiting on. A policy card can follow another hook within a few ticks
- * (the departure gate right after an arrival), and refusing it would show the card undressed;
- * the hourly cap still applies.
+ * Hooks the sim raises once and never again, so a spacing refusal (which the client acknowledges
+ * unanswered, D43) would lose them for good; the hourly cap still applies. The spacing rule is
+ * for the hooks the sim raises again on its own (`quietTooLong`, `notableEvent`): a refused one
+ * costs one check-in.
+ * - `policyDecision` (D37): a policy card can follow another hook within a few ticks (the
+ *   departure gate right after an arrival), and refusing it would show the card undressed.
+ * - `captainAshore` (D70): asked once per docking, the tick the captain steps onto the dock,
+ *   which can come a few ticks after another call (the delivery's `notableEvent` at a
+ *   destination). Refused, the docking's one ask was spent on nothing and the ship looked for
+ *   work for good (offline, the ask is the only source of work). The sim already spaces it: one
+ *   per docking.
  */
-const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision"]);
+const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision", "captainAshore"]);
 
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";

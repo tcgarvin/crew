@@ -1,7 +1,9 @@
 {
   "$schema": "../../schema-json/config.schema.json",
   "time": {
-    "tickRate": 20
+    "tickRate": 20,
+    "daySeconds": 1200,
+    "watchesPerDay": 3
   },
   "movement": {
     "walkSpeed": 2,
@@ -19,18 +21,19 @@
     "rampOpenSeconds": 2
   },
   "needs": {
-    "hungerPerSecond": 0.000833,
-    "fatiguePerSecondAwake": 0.000556,
-    "fatiguePerSecondWorking": 0.000833,
-    "fatigueRecoveryPerSecondAsleep": 0.00833,
-    "comfortPerSecond": 0.000556,
-    "comfortRecoveryPerSecondResting": 0.0167,
-    "socialPerSecond": 0.000417,
-    "socialRecoveryPerSecondChatting": 0.00833,
+    "hungerPerDay": 0.9996,
+    "fatiguePerDayAwake": 0.6672,
+    "fatiguePerDayWorking": 0.9996,
+    "fatigueRecoveryPerDayAsleep": 4.25,
+    "comfortPerDay": 0.6672,
+    "comfortRecoveryPerDayResting": 20.04,
+    "socialPerDay": 0.5004,
+    "socialRecoveryPerDayChatting": 9.996,
     "seekThreshold": 0.5,
-    "mealSeconds": 15,
-    "sleepMinSeconds": 90,
+    "mealDays": 0.0125,
+    "sleepDays": 0.2,
     "wakeBelow": 0.15,
+    "bedtimeAbove": 0.3,
     "initialRange": {
       "hunger": {
         "min": 0.2,
@@ -56,7 +59,7 @@
     "claimLeaseSeconds": 4,
     "timeBucketSeconds": 1,
     "retryBackoffSeconds": 5,
-    "skillGainPerSecond": 0.0002,
+    "skillGainPerDay": 0.24,
     "workSpeedPerSkillLevel": 0.08
   },
   "urgency": {
@@ -64,7 +67,7 @@
     "needSurvivalAbove": 0.9,
     "heatContainmentAbove": 0.7,
     "heatSurvivalAbove": 0.9,
-    "routineAgingSeconds": 90
+    "routineAgingDays": 0.075
   },
   "equipment": {
     "hazardScale": 1,
@@ -85,6 +88,7 @@
     "nominalSpeed": 1,
     "staffEstimateSeconds": 0,
     "departureMinOutput": 0.5,
+    "limpSpeedFraction": 0.2,
     "recallAboardSeconds": 60,
     "localShuffleSeconds": 8,
     "dockHandGiveUpSeconds": 30,
@@ -115,15 +119,20 @@
         "max": 12
       }
     },
-    "jobOfferTtlSeconds": 600,
+    "jobOfferTtlDays": 0.5,
     "dockingFee": 150,
     "haulEstimateSeconds": 5,
-    "reofferSeconds": 90,
+    "reofferDays": 0.075,
     "maxCratesPerJob": 6,
     "passage": {
-      "ashoreSecondsMin": 60,
-      "ashoreSecondsMax": 180,
-      "overdueSeconds": 120
+      "ashoreDaysMin": 0.05,
+      "ashoreDaysMax": 0.15,
+      "overdueDays": 0.1
+    },
+    "sparesReserve": 3,
+    "foodReserve": {
+      "lowBelowDays": 2,
+      "restockToDays": 5
     },
     "market": {
       "priceTiers": {
@@ -137,21 +146,23 @@
     }
   },
   "narrator": {
-    "quietTooLongSeconds": 60,
+    "quietTooLongDays": 0.333333,
     "approachHookLeadSeconds": 10,
     "maxSpawnsPerCommand": 3,
     "maxFaultWindowSeconds": 90,
     "spawnBudget": 3,
     "faultBudget": 2,
-    "budgetRefillSeconds": 300,
+    "budgetRefillDays": 0.25,
     "hookOnEvents": [
       "driftingChanged",
+      "shipLimping",
       "contractCompleted",
       "departureRiskAccepted",
       "departureHoldLifted",
       "departureRepairOutOfReach",
       "passengerReturned"
-    ]
+    ],
+    "hazardBudget": 2
   },
   "host": {
     "runAheadCapSeconds": 60,
@@ -159,24 +170,30 @@
     "snapshotEverySeconds": 1,
     "localSaveEverySeconds": 10,
     "remoteSaveEverySeconds": 60,
-    "frameEveryTicks": 2
+    "frameEveryTicks": 2,
+    "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
   },
-  "shifts": {
-    "cycleSeconds": 1200,
-    "shifts": [
-      {
-        "key": "alpha",
-        "workWindows": [[0, 600]]
-      },
-      {
-        "key": "beta",
-        "workWindows": [[600, 1200]]
-      },
-      {
-        "key": "gamma",
-        "workWindows": [[300, 900]]
-      }
-    ]
+  "watches": {
+    "dayworkerOnWatches": [0, 1],
+    "handoverLeadSeconds": 30,
+    "handoverSeconds": 5,
+    "reliefMaxDays": 0.1,
+    "reliefNoShowSeconds": 45,
+    "longWatchFactor": 1.25,
+    "helmUnattendedSeconds": 20,
+    "roundsStopSeconds": 4,
+    "roundsEveryDays": 0.08,
+    "plotCourseSeconds": 20
+  },
+  "mood": {
+    "lowBelow": -0.4,
+    "highAbove": 0.4,
+    "lowWorkSpeed": 0.9,
+    "highWorkSpeed": 1.05
+  },
+  "hazards": {
+    "difficulty": { "easy": 3, "hard": 5, "brutal": 7 },
+    "delaySeconds": 60
   },
   "social": {
     "chatRadiusTiles": 2,

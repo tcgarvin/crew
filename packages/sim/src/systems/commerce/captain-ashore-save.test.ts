@@ -38,7 +38,13 @@ describe("save migration 5 → 6 (D70)", () => {
       context: { portId: PORTS.a },
       tick: 400,
     };
-    const migrated = migrateState(raw, 5, { content: {} as never }, migrations, 6) as WorldState;
+    const migrated = migrateState(
+      raw,
+      5,
+      { content: {} as never, config: {} as never },
+      migrations,
+      6,
+    ) as WorldState;
     expect(migrated.schemaVersion).toBe(6);
     expect(migrated.decisions.held).toEqual([]);
     expect(
@@ -70,7 +76,7 @@ describe("save migration 5 → 6 (D70)", () => {
     const migrated = migrateState(
       raw,
       5,
-      { content: {} as never },
+      { content: {} as never, config: {} as never },
       migrations,
       6,
     ) as unknown as Raw;

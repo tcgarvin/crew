@@ -4,7 +4,6 @@ import { z } from "zod";
 import {
   crewDefIdSchema,
   itemCountSchema,
-  localKeySchema,
   roleTagSchema,
   skillLevelsSchema,
   traitDefIdSchema,
@@ -18,7 +17,6 @@ export const crewDefSchema = z.strictObject({
   skills: skillLevelsSchema,
   traits: z.array(traitDefIdSchema).exactOptional(),
   startingInventory: z.array(itemCountSchema),
-  shift: localKeySchema,
   bio: z.string(),
   /** D38: how they talk and handle the captain; required so every crew member sounds like someone. */
   voice: z.string().min(1),

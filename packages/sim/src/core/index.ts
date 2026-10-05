@@ -4,7 +4,17 @@
  */
 export * from "./types";
 export { actionLabel, describeEvent, getRenderFrame } from "./render";
-export { configTicks, ticksToSeconds } from "./clock";
+export {
+  configTicks,
+  dayTicks,
+  daysToSeconds,
+  perDayToPerSecond,
+  ticksToSeconds,
+  watchIndexAt,
+  watchOfDay,
+  watchSeconds,
+  watchTicks,
+} from "./clock";
 export { enqueueCommand, ok, reject, type Validation } from "./commands";
 export { findItemDef } from "./defs";
 export {
@@ -29,5 +39,5 @@ export { checkInvariants } from "./invariants";
 export { createKernel, kernel } from "./kernel";
 export { createRegistry, type KernelRegistry, NotImplementedError } from "./registry";
 export { createRngApi, seedAllStreams, seedStream } from "./rng";
-export { migrateState, migrations, restore, serialize } from "./save";
+export { fillConfig, migrateState, migrations, restore, serialize } from "./save";
 export { advance, createWorld, haltReason } from "./world";

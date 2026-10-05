@@ -28,14 +28,16 @@
     "tick": 1600
   },
   "snapshot": {
-    "schemaVersion": 7,
+    "schemaVersion": 8,
     "simVersion": "0.1.0",
-    "contentHash": "9ca94c7aa56944bb",
-    "configHash": "9ca94c7aa56944bb",
+    "contentHash": "2b5ba8ae6e43463e",
+    "configHash": "2b5ba8ae6e43463e",
     "savedAtTick": 1600,
     "config": {
       "time": {
-        "tickRate": 20
+        "tickRate": 20,
+        "daySeconds": 1200,
+        "watchesPerDay": 3
       },
       "movement": {
         "walkSpeed": 2,
@@ -53,18 +55,19 @@
         "rampOpenSeconds": 2
       },
       "needs": {
-        "hungerPerSecond": 0.000833,
-        "fatiguePerSecondAwake": 0.000556,
-        "fatiguePerSecondWorking": 0.000833,
-        "fatigueRecoveryPerSecondAsleep": 0.00833,
-        "comfortPerSecond": 0.000556,
-        "comfortRecoveryPerSecondResting": 0.0167,
-        "socialPerSecond": 0.000417,
-        "socialRecoveryPerSecondChatting": 0.00833,
+        "hungerPerDay": 0.9996,
+        "fatiguePerDayAwake": 0.6672,
+        "fatiguePerDayWorking": 0.9996,
+        "fatigueRecoveryPerDayAsleep": 4.25,
+        "comfortPerDay": 0.6672,
+        "comfortRecoveryPerDayResting": 20.04,
+        "socialPerDay": 0.5004,
+        "socialRecoveryPerDayChatting": 9.996,
         "seekThreshold": 0.5,
-        "mealSeconds": 15,
-        "sleepMinSeconds": 90,
+        "mealDays": 0.0125,
+        "sleepDays": 0.2,
         "wakeBelow": 0.15,
+        "bedtimeAbove": 0.3,
         "initialRange": {
           "hunger": {
             "min": 0.2,
@@ -90,7 +93,7 @@
         "claimLeaseSeconds": 4,
         "timeBucketSeconds": 1,
         "retryBackoffSeconds": 5,
-        "skillGainPerSecond": 0.0002,
+        "skillGainPerDay": 0.24,
         "workSpeedPerSkillLevel": 0.08
       },
       "urgency": {
@@ -98,7 +101,7 @@
         "needSurvivalAbove": 0.9,
         "heatContainmentAbove": 0.7,
         "heatSurvivalAbove": 0.9,
-        "routineAgingSeconds": 90
+        "routineAgingDays": 0.075
       },
       "equipment": {
         "hazardScale": 1,
@@ -119,6 +122,7 @@
         "nominalSpeed": 1,
         "staffEstimateSeconds": 0,
         "departureMinOutput": 0.5,
+        "limpSpeedFraction": 0.2,
         "recallAboardSeconds": 60,
         "localShuffleSeconds": 8,
         "dockHandGiveUpSeconds": 30,
@@ -149,15 +153,20 @@
             "max": 12
           }
         },
-        "jobOfferTtlSeconds": 600,
+        "jobOfferTtlDays": 0.5,
         "dockingFee": 150,
         "haulEstimateSeconds": 5,
-        "reofferSeconds": 90,
+        "reofferDays": 0.075,
         "maxCratesPerJob": 6,
         "passage": {
-          "ashoreSecondsMin": 60,
-          "ashoreSecondsMax": 180,
-          "overdueSeconds": 120
+          "ashoreDaysMin": 0.05,
+          "ashoreDaysMax": 0.15,
+          "overdueDays": 0.1
+        },
+        "sparesReserve": 3,
+        "foodReserve": {
+          "lowBelowDays": 2,
+          "restockToDays": 5
         },
         "market": {
           "priceTiers": {
@@ -171,21 +180,23 @@
         }
       },
       "narrator": {
-        "quietTooLongSeconds": 60,
+        "quietTooLongDays": 0.333333,
         "approachHookLeadSeconds": 10,
         "maxSpawnsPerCommand": 3,
         "maxFaultWindowSeconds": 90,
         "spawnBudget": 3,
         "faultBudget": 2,
-        "budgetRefillSeconds": 300,
+        "budgetRefillDays": 0.25,
         "hookOnEvents": [
           "driftingChanged",
+          "shipLimping",
           "contractCompleted",
           "departureRiskAccepted",
           "departureHoldLifted",
           "departureRepairOutOfReach",
           "passengerReturned"
-        ]
+        ],
+        "hazardBudget": 2
       },
       "host": {
         "runAheadCapSeconds": 60,
@@ -193,24 +204,34 @@
         "snapshotEverySeconds": 1,
         "localSaveEverySeconds": 10,
         "remoteSaveEverySeconds": 60,
-        "frameEveryTicks": 2
+        "frameEveryTicks": 2,
+        "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
       },
-      "shifts": {
-        "cycleSeconds": 1200,
-        "shifts": [
-          {
-            "key": "alpha",
-            "workWindows": [[0, 600]]
-          },
-          {
-            "key": "beta",
-            "workWindows": [[600, 1200]]
-          },
-          {
-            "key": "gamma",
-            "workWindows": [[300, 900]]
-          }
-        ]
+      "watches": {
+        "dayworkerOnWatches": [0, 1],
+        "handoverLeadSeconds": 30,
+        "handoverSeconds": 5,
+        "reliefMaxDays": 0.1,
+        "reliefNoShowSeconds": 45,
+        "longWatchFactor": 1.25,
+        "helmUnattendedSeconds": 20,
+        "roundsStopSeconds": 4,
+        "roundsEveryDays": 0.08,
+        "plotCourseSeconds": 20
+      },
+      "mood": {
+        "lowBelow": -0.4,
+        "highAbove": 0.4,
+        "lowWorkSpeed": 0.9,
+        "highWorkSpeed": 1.05
+      },
+      "hazards": {
+        "difficulty": {
+          "easy": 3,
+          "hard": 5,
+          "brutal": 7
+        },
+        "delaySeconds": 60
       },
       "social": {
         "chatRadiusTiles": 2,
@@ -232,7 +253,7 @@
       }
     },
     "state": {
-      "schemaVersion": 7,
+      "schemaVersion": 8,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 1600,
@@ -247,7 +268,7 @@
       "nextId": {
         "actor": 10,
         "machine": 34,
-        "item": 13,
+        "item": 22,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -258,7 +279,8 @@
         "claim": 1,
         "transaction": 2,
         "event": 1,
-        "local": 3
+        "local": 3,
+        "hazard": 1
       },
       "actors": {
         "a1": {
@@ -297,8 +319,12 @@
           },
           "traits": [],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "alpha"
+            "section": {
+              "key": "red",
+              "index": 0
+            }
           },
           "activity": {
             "kind": "idle"
@@ -345,8 +371,12 @@
           },
           "traits": ["trait.steady", "trait.methodical"],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "beta"
+            "section": {
+              "key": "blue",
+              "index": 2
+            }
           },
           "activity": {
             "kind": "idle"
@@ -393,8 +423,12 @@
           },
           "traits": ["trait.night_owl"],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "alpha"
+            "section": {
+              "key": "red",
+              "index": 0
+            }
           },
           "activity": {
             "kind": "idle"
@@ -441,8 +475,12 @@
           },
           "traits": ["trait.brisk_walker"],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "beta"
+            "section": {
+              "key": "white",
+              "index": 1
+            }
           },
           "activity": {
             "kind": "idle"
@@ -489,8 +527,12 @@
           },
           "traits": [],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "alpha"
+            "section": {
+              "key": "white",
+              "index": 1
+            }
           },
           "activity": {
             "kind": "idle"
@@ -537,9 +579,8 @@
           },
           "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
           "mood": 0,
-          "schedule": {
-            "shiftKey": "gamma"
-          },
+          "thoughts": [],
+          "schedule": {},
           "activity": {
             "kind": "idle"
           },
@@ -585,9 +626,8 @@
           },
           "traits": [],
           "mood": 0,
-          "schedule": {
-            "shiftKey": "gamma"
-          },
+          "thoughts": [],
+          "schedule": {},
           "activity": {
             "kind": "idle"
           },
@@ -633,8 +673,12 @@
           },
           "traits": [],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "beta"
+            "section": {
+              "key": "blue",
+              "index": 2
+            }
           },
           "activity": {
             "kind": "idle"
@@ -681,8 +725,12 @@
           },
           "traits": [],
           "mood": 0,
+          "thoughts": [],
           "schedule": {
-            "shiftKey": "beta"
+            "section": {
+              "key": "red",
+              "index": 0
+            }
           },
           "activity": {
             "kind": "idle"
@@ -1970,6 +2018,123 @@
         },
         "i10": {
           "id": "i10",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 9.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i11": {
+          "id": "i11",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 10.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i12": {
+          "id": "i12",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 11.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i13": {
+          "id": "i13",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 12.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i14": {
+          "id": "i14",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 13.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i15": {
+          "id": "i15",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 14.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i16": {
+          "id": "i16",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 15.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i17": {
+          "id": "i17",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 16.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i18": {
+          "id": "i18",
+          "defId": "item.ration_pack",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 17.5,
+            "y": 10.5
+          },
+          "count": 20,
+          "reserved": 0
+        },
+        "i19": {
+          "id": "i19",
           "defId": "item.coolant_canister",
           "stacking": "stack",
           "location": {
@@ -1981,8 +2146,8 @@
           "count": 4,
           "reserved": 0
         },
-        "i11": {
-          "id": "i11",
+        "i20": {
+          "id": "i20",
           "defId": "item.med_kit",
           "stacking": "stack",
           "location": {
@@ -1994,8 +2159,8 @@
           "count": 3,
           "reserved": 0
         },
-        "i12": {
-          "id": "i12",
+        "i21": {
+          "id": "i21",
           "defId": "item.hand_truck",
           "stacking": "unique",
           "location": {
@@ -2038,6 +2203,11 @@
           "hookId": "k1"
         }
       },
+      "watch": {
+        "lastBellWatch": 0,
+        "helm": {}
+      },
+      "hazards": [],
       "jobs": {},
       "money": {
         "balance": 5000,
@@ -2061,7 +2231,7 @@
             "price": 60
           },
           "item.ration_pack": {
-            "count": 20,
+            "count": 160,
             "price": 8
           },
           "item.med_kit": {
@@ -2077,6 +2247,10 @@
           "item.coolant_canister": {
             "count": 2,
             "price": 75
+          },
+          "item.ration_pack": {
+            "count": 60,
+            "price": 10
           }
         },
         "port.green_meridian": {
@@ -2085,7 +2259,7 @@
             "price": 150
           },
           "item.ration_pack": {
-            "count": 30,
+            "count": 200,
             "price": 6
           }
         },
@@ -2103,7 +2277,7 @@
             "price": 110
           },
           "item.ration_pack": {
-            "count": 6,
+            "count": 40,
             "price": 14
           }
         },
@@ -2113,7 +2287,7 @@
             "price": 55
           },
           "item.ration_pack": {
-            "count": 12,
+            "count": 80,
             "price": 9
           },
           "item.spare_parts_stack": {
@@ -2123,7 +2297,7 @@
         },
         "port.terns_rest": {
           "item.ration_pack": {
-            "count": 10,
+            "count": 60,
             "price": 12
           },
           "item.coolant_canister": {
@@ -2153,8 +2327,10 @@
         "lastNarrativeTick": 1600,
         "budget": {
           "spawnsRemaining": 3,
-          "faultsRemaining": 2
+          "faultsRemaining": 2,
+          "hazardsRemaining": 2
         },
+        "budgetRefilledTick": 0,
         "recentHookIds": [],
         "pendingHook": {
           "id": "k1",

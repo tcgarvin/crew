@@ -5,12 +5,12 @@
  * D40 (D46 as amended): the narrator is the only source of work. The sim never offers a job on
  * its own; the `captainAshore` hook (D70, was `jobBoard`) is the captain looking for work, raised
  * once per docking when
- * nothing is on (and not within `commerce.reofferSeconds` of a declined or expired offer there).
+ * nothing is on (and not within `commerce.reofferDays` of a declined or expired offer there).
  * It is never re-raised on a timer: pacing is the narrator's judgement, so an unanswered ask
  * stays unanswered until the next docking or a `quietTooLong` check-in.
  */
 import { describe, expect, it } from "vitest";
-import { configTicks } from "../../core/clock";
+import { dayTicks } from "../../core/clock";
 import { cmd } from "../../core/fixtures/test-world";
 import type { HookId, JobId } from "../../core/types/ids";
 import type { Kernel, World } from "../../core/types/kernel";
@@ -49,7 +49,7 @@ function forgetThisDockingsAsk(world: World): void {
 }
 
 function reofferTicks(world: World): number {
-  return configTicks(world.config.values, world.config.values.commerce.reofferSeconds);
+  return dayTicks(world.config.values, world.config.values.commerce.reofferDays);
 }
 
 /** A fresh world past its first-tick `captainAshore` ask. */
@@ -151,7 +151,7 @@ describe("commerce: captainAshore is the ask (D40)", () => {
     expect(world.state.narrator.pendingHook).toBeUndefined();
   });
 
-  it("waits reofferSeconds after a decline before asking again", () => {
+  it("waits reofferDays after a decline before asking again", () => {
     const { world, kernel } = dockedWorldAfterFirstAsk();
     kernel.enqueueCommand(
       world,

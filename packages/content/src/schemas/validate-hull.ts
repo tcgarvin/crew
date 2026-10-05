@@ -8,7 +8,8 @@
  * - **Rooms**: compartments tagged `bridge`, `quarters` (or at least one `cabin`), `mess`,
  *   `galley`, `engineering`, `cargoHold` and `airlock`.
  * - **Machines**: exactly one `pilotStation` and one `navStation`; at least one `engine`,
- *   `messTable` and `stove`.
+ *   `messTable` and `stove`. The pilot station has a `use` position apart from its seat, the
+ *   standby tile where the oncoming watch waits to take the helm (D77).
  * - **Zones and spawns**: a `cargoStowage` zone; a `crew` and a `passenger` spawn point; every
  *   `locker` zone serves a bed (`machineKey`) and no bed has two lockers.
  * - **Per scenario**: enough `crew` spawn points for the crew, and beds (`bed`, never `medBed`)
@@ -20,8 +21,10 @@ import type { DeckDef, MachineDef, MachineTag, ScenarioDef, TileCoord } from "@c
 import { HULL_CLASS_BOX, at } from "./geometry";
 import { type Path, type ValidationIssue, issue } from "./issues";
 
-/** The machine defs a deck's placements name; only their tags matter here. */
-export type MachineTagTable = Readonly<Record<string, Pick<MachineDef, "tags">>>;
+/** The machine defs a deck's placements name; only their tags and positions matter here. */
+export type MachineTagTable = Readonly<
+  Record<string, Pick<MachineDef, "tags" | "interactionPositions">>
+>;
 
 /** Each entry is satisfied by a compartment carrying any one of its tags. */
 const REQUIRED_COMPARTMENT_TAGS: readonly (readonly string[])[] = [
@@ -180,6 +183,34 @@ function checkMachineTags(
   }
 }
 
+/**
+ * D77: the helm plan is `moveTo standby → handover → moveTo seat → hold`, so the pilot station's
+ * def needs a `use` position that is not also an `operate` one: the oncoming waits there while the
+ * off-going still holds the seat. A deck with no pilot station or an unknown def is reported
+ * elsewhere (`checkMachineTags`, L2).
+ */
+function checkPilotStandby(
+  deck: DeckDef,
+  machines: MachineTagTable,
+  issues: ValidationIssue[],
+): void {
+  for (const placement of deck.machines) {
+    const def = machines[placement.machineDefId];
+    if (def?.tags.includes("pilotStation") !== true) continue;
+    const standby = def.interactionPositions.some(
+      (p) => p.purposes.includes("use") && !p.purposes.includes("operate"),
+    );
+    if (standby) continue;
+    issues.push(
+      issue(
+        "physical",
+        [...deckPath(deck), "machines"],
+        `pilot station "${placement.key}" (${placement.machineDefId}) has no standby position: a "use" position apart from its "operate" seat`,
+      ),
+    );
+  }
+}
+
 function checkZonesAndSpawns(deck: DeckDef, issues: ValidationIssue[]): void {
   const path = deckPath(deck);
   if (!deck.zones.some((z) => z.tags.includes("cargoStowage"))) {
@@ -235,6 +266,7 @@ export function checkHullContract(
   checkRamps(deck, issues);
   checkCompartmentTags(deck, issues);
   checkMachineTags(deck, machines, issues);
+  checkPilotStandby(deck, machines, issues);
   checkZonesAndSpawns(deck, issues);
   checkLockers(deck, machines, issues);
 }

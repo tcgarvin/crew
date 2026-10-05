@@ -3,6 +3,7 @@
  * untrusted JSON and must tolerate missing or odd fields: anything it does not recognise is left
  * for the invariants to judge.
  */
+import { watchIndexAt } from "./clock";
 import { berthDock, dockAreaTiles } from "./docks";
 import { SaveCompatibilityError } from "./save-error";
 import type { TileCoord } from "./types/common";
@@ -292,6 +293,71 @@ function refuseBeforeShipLife(): never {
   throw new SaveCompatibilityError("save predates ship life (schema 6); start a new game");
 }
 
+/**
+ * 7 → 8 (D77-D79): watches replace shifts; thoughts, hazards and the hazard budget.
+ * - `schedule.shiftKey` becomes `{ section }`: the actor's crew def's section in the watch bill
+ *   of the save's scenario in the content restored against, its index the section's place in the
+ *   bill. A scenario without a bill, or a def in no section (a narrator-spawned hand, a passenger),
+ *   is a dayworker (`{}`). The bill is read inline rather than through `core/watch-bill.ts`, so
+ *   this migration stays as shipped whatever that file becomes.
+ * - `thoughts: []` on every actor; `watch` with the bell already rung for the save's watch (no
+ *   bell on the first tick after load); `hazards: []`, `nextId.hazard` 1.
+ * - The narrator budget gains `hazardsRemaining` at the config's `hazardBudget`, and the refill
+ *   clock starts at the save's tick.
+ * - Every `stationToStaff` problem is the watch's (`owner: "watch"`, `post: "watch"`), and its
+ *   task keeps its identity under the new derivation key (`staff:watch`), so a pilot at the helm
+ *   in the save stays there.
+ */
+function watchesAndThoughts(raw: unknown, { content, config }: MigrationContext): unknown {
+  if (!isRecord(raw)) return raw;
+  const tick =
+    typeof raw.tick === "number" && Number.isInteger(raw.tick) && raw.tick >= 0 ? raw.tick : 0;
+  const scenario =
+    typeof raw.scenarioId === "string"
+      ? Object.values(content.scenarios).find((s) => s.id === raw.scenarioId)
+      : undefined;
+  const sectionOf = new Map<string, { key: string; index: number }>();
+  scenario?.watchBill?.sections.forEach((section, index) => {
+    for (const member of section.members) sectionOf.set(member, { key: section.key, index });
+  });
+  if (isRecord(raw.actors)) {
+    for (const actor of Object.values(raw.actors)) {
+      if (!isRecord(actor)) continue;
+      const section = typeof actor.defId === "string" ? sectionOf.get(actor.defId) : undefined;
+      actor.schedule = section === undefined ? {} : { section: { ...section } };
+      if (!Array.isArray(actor.thoughts)) actor.thoughts = [];
+    }
+  }
+  if (!isRecord(raw.watch)) raw.watch = { lastBellWatch: watchIndexAt(config, tick), helm: {} };
+  if (!Array.isArray(raw.hazards)) raw.hazards = [];
+  if (isRecord(raw.nextId) && typeof raw.nextId.hazard !== "number") raw.nextId.hazard = 1;
+  const narrator = raw.narrator;
+  if (isRecord(narrator)) {
+    if (isRecord(narrator.budget) && typeof narrator.budget.hazardsRemaining !== "number") {
+      narrator.budget.hazardsRemaining = config.narrator.hazardBudget;
+    }
+    if (typeof narrator.budgetRefilledTick !== "number") narrator.budgetRefilledTick = tick;
+  }
+  const staffing = new Set<string>();
+  if (isRecord(raw.work) && isRecord(raw.work.problems)) {
+    for (const [id, problem] of Object.entries(raw.work.problems)) {
+      if (!isRecord(problem) || problem.kind !== "stationToStaff") continue;
+      problem.owner = "watch";
+      if (isRecord(problem.payload)) problem.payload.post = "watch";
+      staffing.add(id);
+    }
+  }
+  if (isRecord(raw.work) && isRecord(raw.work.tasks)) {
+    for (const task of Object.values(raw.work.tasks)) {
+      if (!isRecord(task) || typeof task.problemId !== "string") continue;
+      if (staffing.has(task.problemId) && task.derivationKey === "staff") {
+        task.derivationKey = "staff:watch";
+      }
+    }
+  }
+  return raw;
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
@@ -299,4 +365,5 @@ export const migrations: MigrationRegistry = {
   4: addDockside,
   5: captainAshore,
   6: refuseBeforeShipLife,
+  7: watchesAndThoughts,
 };

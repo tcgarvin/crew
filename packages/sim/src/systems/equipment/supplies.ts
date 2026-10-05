@@ -15,7 +15,7 @@
 import { isNobodysFreight } from "../../core/freight";
 import { affordableUnits } from "../../core/markets";
 import type { ContentBundle, MachineDef, ToolKind } from "../../core/types/content";
-import type { ItemDefId, LocalKey, PortDefId } from "../../core/types/ids";
+import type { ItemDefId, LocalKey, MachineId, PortDefId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import type { Machine, MachineFault } from "../../core/types/ship";
 
@@ -111,6 +111,8 @@ export function repairShortfall(
 
 /** A diagnosed fault whose repair is short of something the port cannot sell (or not afford). */
 export interface RepairOutOfReach extends SupplyShortfall {
+  /** The machine whose fault it is. */
+  readonly machineId: MachineId;
   readonly faultKey: LocalKey;
 }
 
@@ -122,7 +124,7 @@ export interface RepairOutOfReach extends SupplyShortfall {
 export function repairOutOfReach(
   state: Pick<ReadonlyWorldState, "items" | "jobs" | "markets" | "money">,
   content: Pick<ContentBundle, "items" | "ports">,
-  machine: Pick<Machine, "faults">,
+  machine: Pick<Machine, "id" | "faults">,
   def: MachineDef,
   faultKeys: ReadonlySet<LocalKey>,
   portId: PortDefId | undefined,
@@ -135,7 +137,9 @@ export function repairOutOfReach(
         portId === undefined
           ? 0
           : affordableUnits(state, content, portId, line.itemDefId, line.count);
-      if (buyable < line.count) return { ...line, faultKey: fault.faultKey };
+      if (buyable < line.count) {
+        return { ...line, machineId: machine.id, faultKey: fault.faultKey };
+      }
     }
   }
   return undefined;

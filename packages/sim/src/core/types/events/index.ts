@@ -19,6 +19,7 @@ import { PERCEPTION_EVENT_SIGNIFICANCE, type PerceptionEventPayloads } from "./p
 import type { Significance, SignificanceCatalog } from "./significance";
 import { SPATIAL_EVENT_SIGNIFICANCE, type SpatialEventPayloads } from "./spatial";
 import { TRAVEL_EVENT_SIGNIFICANCE, type TravelEventPayloads } from "./travel";
+import { WATCH_EVENT_SIGNIFICANCE, type WatchEventPayloads } from "./watch";
 import { WORK_EVENT_SIGNIFICANCE, type WorkEventPayloads } from "./work";
 
 export type * from "./commerce";
@@ -30,6 +31,7 @@ export type * from "./perception";
 export type * from "./significance";
 export type * from "./spatial";
 export type * from "./travel";
+export type * from "./watch";
 export type * from "./work";
 
 /** All event payloads keyed by type. To add a system, extend this with its map. */
@@ -42,7 +44,8 @@ export interface EventPayloadMap
     PerceptionEventPayloads,
     TravelEventPayloads,
     CommerceEventPayloads,
-    DecisionEventPayloads {}
+    DecisionEventPayloads,
+    WatchEventPayloads {}
 
 export type EventType = keyof EventPayloadMap;
 
@@ -57,6 +60,7 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...TRAVEL_EVENT_SIGNIFICANCE,
   ...COMMERCE_EVENT_SIGNIFICANCE,
   ...DECISION_EVENT_SIGNIFICANCE,
+  ...WATCH_EVENT_SIGNIFICANCE,
 };
 
 /** `sim` for pipeline-originated events; otherwise the source of the command that caused it. */

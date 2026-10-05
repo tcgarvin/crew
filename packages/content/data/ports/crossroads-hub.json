@@ -54,7 +54,7 @@
     },
     {
       "itemDefId": "item.ration_pack",
-      "count": 20,
+      "count": 160,
       "price": 8
     },
     {
@@ -115,7 +115,7 @@
     },
     {
       "toPortId": "port.terns_rest",
-      "distance": 90
+      "distance": 400
     }
   ]
 }

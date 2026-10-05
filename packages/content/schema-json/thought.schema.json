@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "durationDays": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "stacks": {
+      "type": "boolean"
+    }
+  },
+  "required": ["key", "label", "value", "durationDays", "stacks"],
+  "additionalProperties": false
+}

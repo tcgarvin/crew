@@ -20,7 +20,13 @@ import { isTickerEvent } from "./render";
 import { createRngApi, seedAllStreams } from "./rng";
 import type { Command, ScenarioSpawn } from "./types/commands";
 import type { PhysicalLocation, TileCoord } from "./types/common";
-import type { ConfigDef, ContentBundle, DeckDef, ScenarioDef } from "./types/content";
+import {
+  type ConfigDef,
+  type ContentBundle,
+  type DeckDef,
+  type ScenarioDef,
+  THOUGHT_KEYS,
+} from "./types/content";
 import type { SimEvent } from "./types/events";
 import type {
   CommandId,
@@ -36,6 +42,7 @@ import type { AdvanceHalt, AdvanceResult, EffectiveConfig, World } from "./types
 import type { RngApi } from "./types/pipeline";
 import type { Machine } from "./types/ship";
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
+import { resolveWatchBill, sectionsByCrewDef } from "./watch-bill";
 
 function emptyState(scenario: ScenarioDef, seed: number): WorldState {
   return {
@@ -55,6 +62,8 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     berths: {},
     work: { problems: {}, tasks: {}, claims: {}, plannerRotation: 0 },
     travel: { stage: "docked", portId: scenario.startPortId },
+    watch: { lastBellWatch: 0, helm: {} },
+    hazards: [],
     jobs: {},
     money: { balance: 0, transactions: {} },
     markets: {},
@@ -62,7 +71,8 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     decisions: { records: {}, queue: [], held: [] },
     narrator: {
       lastNarrativeTick: 0,
-      budget: { spawnsRemaining: 0, faultsRemaining: 0 },
+      budget: { spawnsRemaining: 0, faultsRemaining: 0, hazardsRemaining: 0 },
+      budgetRefilledTick: 0,
       recentHookIds: [],
     },
     commands: { queue: [], recentIds: [], nextSeq: 1 },
@@ -163,12 +173,15 @@ const centre = (tile: TileCoord) => ({ x: tile.x + 0.5, y: tile.y + 0.5 });
  * The scenario's setup commands. W2 decision: crew take `crew` spawn points in order, wrapping if
  * there are more crew than points; starting inventory is carried; loose stores are placed on
  * their zone's tiles round-robin, stackables split into `maxStack` chunks and uniques one each.
+ * D77: each crew member spawns with their section of the watch bill (the scenario's, or one
+ * generated for a fixture without), or none as a dayworker.
  */
 function scenarioSetupCommands(
   scenario: ScenarioDef,
   deck: DeckDef,
   content: ContentBundle,
   state: WorldState,
+  config: ConfigDef,
 ): Command[] {
   const commandId = (n: number) => `cmd:scenario:${scenario.id}:${n}` as CommandId;
   const spawns: ScenarioSpawn[] = [];
@@ -183,6 +196,9 @@ function scenarioSetupCommands(
     return counts;
   };
 
+  const sections = sectionsByCrewDef(
+    resolveWatchBill(scenario, deck, content, config.time.watchesPerDay),
+  );
   const crewPoints = deck.spawnPoints.filter((p) => p.tags.includes("crew"));
   if (scenario.crew.length > 0 && crewPoints.length === 0) {
     throw new Error(`Deck "${deck.id}" has no crew spawn points`);
@@ -191,11 +207,13 @@ function scenarioSetupCommands(
     const point = crewPoints[index % crewPoints.length];
     if (point === undefined) throw new Error("unreachable: no crew spawn point");
     const actorRef = nextRef();
+    const section = sections.get(crewDefId);
     spawns.push({
       kind: "actor",
       tempRef: actorRef,
       crewDefId,
       location: { kind: "onDeck", deckId: deck.id, ...centre(point.tile) },
+      ...(section === undefined ? {} : { section }),
     });
     const crewDef = content.crew[crewDefId];
     for (const line of crewDef?.startingInventory ?? []) {
@@ -301,6 +319,11 @@ export function createWorld(
   if (!Number.isInteger(scenario.startingMoney) || scenario.startingMoney < 0) {
     throw new Error(`Scenario "${scenarioId}": startingMoney must be a nonnegative integer`);
   }
+  // D79: thoughts are raised by sim code by key, so content must define every one.
+  const missingThoughts = THOUGHT_KEYS.filter((key) => content.thoughts?.[key] === undefined);
+  if (missingThoughts.length > 0) {
+    throw new Error(`Content has no thought def for ${missingThoughts.join(", ")}`);
+  }
 
   const state = emptyState(scenario, seed);
   seedMarkets(state, content);
@@ -308,6 +331,7 @@ export function createWorld(
   state.narrator.budget = {
     spawnsRemaining: values.narrator.spawnBudget,
     faultsRemaining: values.narrator.faultBudget,
+    hazardsRemaining: values.narrator.hazardBudget,
   };
   const world: World = { state, caches: emptyCaches(), content, config };
   const rng = createRngApi(state);
@@ -337,7 +361,7 @@ export function createWorld(
     tick: 0,
     emit: buffer.emit,
   };
-  for (const command of scenarioSetupCommands(scenario, deck, content, state)) {
+  for (const command of scenarioSetupCommands(scenario, deck, content, state, values)) {
     applyCommandNow(registry, ctx, command);
   }
   // D74: berths by rank from tick 0, and each crew member's belongings in their locker.

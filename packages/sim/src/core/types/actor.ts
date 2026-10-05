@@ -7,7 +7,7 @@
  * observation in W4/W5); `skills` by work (experience gain); `availability` by needs/bodies.
  */
 import type { PhysicalLocation, Tick, TileCoord } from "./common";
-import type { RoleTag, SkillLevels } from "./content";
+import type { RoleTag, SkillLevels, ThoughtKey } from "./content";
 import type {
   ActorId,
   CrewDefId,
@@ -89,11 +89,36 @@ export interface RouteFailure {
 }
 
 /**
- * Schedule (SD §11.4). `shiftKey` indexes `config.shifts.shifts`; on/off duty is derived from
- * the tick, not stored.
+ * Schedule (SD §11.4, D77). The watch section this person stands, from the scenario's watch bill
+ * at spawn; absent for a dayworker (anyone not in a section, a narrator-spawned hand included).
+ * On/off duty is derived from the tick (`systems/watch/duty.ts`), never stored. The bill itself
+ * is not stored either: it is these sections, read off the actors (`watchBillOf`).
  */
 export interface Schedule {
-  shiftKey: LocalKey;
+  section?: WatchSection;
+}
+
+/**
+ * D77: a section of the watch bill. `index` is the section's place in the bill, which is the
+ * watch of the day it stands (`watchOfDay(tick) === index`); stored beside the key because a
+ * generated bill (`core/watch-bill.ts`) exists nowhere else to look it up.
+ */
+export interface WatchSection {
+  readonly key: LocalKey;
+  readonly index: number;
+}
+
+/**
+ * D79: something on a person's mind. Mood is the clamped sum of live thoughts' `value`s; the
+ * value is copied from the def when the thought is had, so a content retune never rewrites one
+ * already held. `refId` names who or what it is about, when that matters.
+ */
+export interface Thought {
+  key: ThoughtKey;
+  value: number;
+  /** First tick the thought no longer counts. */
+  expiresAtTick: Tick;
+  refId?: EntityId;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -185,6 +210,8 @@ export interface Actor {
   traits: TraitDefId[];
   /** Mood in [-1, 1]; bounded effects on work and willingness (SD §11.3). */
   mood: number;
+  /** D79: live thoughts, which mood sums (owner: `core/thoughts.ts` adds, needs prunes). */
+  thoughts: Thought[];
   schedule: Schedule;
   activity: Activity;
   /**

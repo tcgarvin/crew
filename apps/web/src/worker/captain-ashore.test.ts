@@ -284,6 +284,11 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
       );
     });
     expect(isOnDock(world.content, world.state, captainOf(world).location)).toBe(false);
+    // D77: she has the watch and, awake (tiredness waits for the watch's end), would walk her
+    // rounds, and her way to the hold runs out of the personnel ramp and along the dock to the
+    // cargo ramp while both are down. Hold her rounds so she stays aboard for this case.
+    const captain = captainOf(world);
+    captain.workBackoff = { ...(captain.workBackoff ?? {}), rounds: Number.MAX_SAFE_INTEGER };
     // A quiet check-in's offer, from someone beyond the gate: they walk in as a visitor.
     send(kernel, world, hubOffer(world, { name: "Ilse Brandt", role: "broker" }));
     const run = drive(kernel, world, 20 * 120, answerNothing, (_w, r) => r.cards.length > 0);
@@ -341,17 +346,20 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
     );
     expect(run.cards.length).toBeGreaterThan(0);
     expect(run.cards.every((c) => c.docked)).toBe(true);
-    // At the destination the captain goes ashore while the crew unload, and the headline says
-    // so over the crate count until they are back.
+    // At the destination the command actor goes ashore while the crew unload, and the headline
+    // says so over the crate count until they are back. D77: on this seed the captain is asleep
+    // when the ship docks (her section's watch has ended), so it is the first officer (D8).
     let seen = "";
     drive(kernel, world, 20 * 120, answerNothing, (w) => {
       const line = getRenderFrame(w).headline;
       if (line.includes("is ashore looking for work")) seen = line;
       return seen !== "";
     });
-    expect(seen).toBe(
-      `Docked at Kessler Drift — ${captainOf(world).name} is ashore looking for work`,
+    const ashore = Object.values(world.state.actors).find(
+      (a) => a.activity.kind === "personal" && a.activity.activity === "lookForWork",
     );
+    expect(ashore?.roleTags.some((r) => r === "captain" || r === "firstOfficer")).toBe(true);
+    expect(seen).toBe(`Docked at Kessler Drift — ${ashore?.name} is ashore looking for work`);
   });
 
   it("survives a save and restore mid-walk, and the card still comes up in person", () => {

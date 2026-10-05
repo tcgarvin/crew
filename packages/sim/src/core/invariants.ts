@@ -190,7 +190,39 @@ function actorViolations(state: ReadonlyWorldState): string[] {
     for (const [need, value] of Object.entries(actor.needs)) {
       if (!(value >= 0 && value <= 1)) out.push(`actors.${actor.id}.needs.${need} is ${value}`);
     }
+    // D79: a thought's value is a finite number and it expires on a whole tick.
+    actor.thoughts.forEach((thought, i) => {
+      const where = `actors.${actor.id}.thoughts[${i}]`;
+      if (!Number.isFinite(thought.value)) out.push(`${where}.value is ${thought.value}`);
+      if (!Number.isInteger(thought.expiresAtTick)) {
+        out.push(`${where}.expiresAtTick is ${thought.expiresAtTick}`);
+      }
+    });
+    // D77: a section has a key and a place in the bill.
+    const section = actor.schedule.section;
+    if (
+      section !== undefined &&
+      (section.key.length === 0 || !Number.isInteger(section.index) || section.index < 0)
+    ) {
+      out.push(`actors.${actor.id}.schedule.section is ${JSON.stringify(section)}`);
+    }
   }
+  return out;
+}
+
+/** D78: scheduled hazards carry allocated ids, once each. */
+function hazardViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  state.hazards.forEach((hazard, i) => {
+    const where = `hazards[${i}]`;
+    const parsed = parseInstanceId(hazard.id);
+    if (parsed?.kind !== "hazard" || parsed.counter >= state.nextId.hazard) {
+      out.push(`${where} has unallocated id ${hazard.id}`);
+    }
+    if (seen.has(hazard.id)) out.push(`${where} repeats id ${hazard.id}`);
+    seen.add(hazard.id);
+  });
   return out;
 }
 
@@ -285,6 +317,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...actorViolations(state),
     ...marketViolations(state),
     ...berthViolations(state),
+    ...hazardViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

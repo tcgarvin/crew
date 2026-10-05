@@ -88,15 +88,38 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits and the default scenario", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario and 4 thoughts", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
       scenarios: Record<string, unknown>;
+      thoughts: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
+    expect(Object.keys(bundle.thoughts).sort()).toEqual([
+      "doubleWatch",
+      "helmCleanPass",
+      "helmScrape",
+      "stoodLongWatch",
+    ]);
+  });
+
+  it("stands the default scenario's watch in three sections, Blue with a deckhand for the gangway, and two dayworkers (D77)", () => {
+    const bundle = authoredBundle();
+    const bill =
+      bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios]
+        ?.watchBill;
+    expect(bill?.sections.map((s) => s.key)).toEqual(["red", "white", "blue"]);
+    expect(bill?.sections[0]?.members).toEqual([
+      "crew.noor_haddad",
+      "crew.mara_osei",
+      "crew.priya_kessler",
+    ]);
+    expect(bill?.sections[2]?.members).toEqual(["crew.dane_whitcross", "crew.sunniva_park"]);
+    expect(bill?.sections.flatMap((s) => s.members)).toHaveLength(7);
+    expect(bill?.dayworkers).toEqual(["crew.bettina_solheim", "crew.oyelaran_abiodun"]);
   });
 
   it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (D73)", () => {
@@ -206,13 +229,15 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     ]);
   });
 
-  it("puts every far port on a single long spur off one core port", () => {
+  it("puts every far port on a single long spur off one core port, a watch long (D76)", () => {
     const spur = (id: string) => ports[id as keyof typeof ports]?.routes;
     expect(spur("port.ossory_station")).toEqual([
-      { toPortId: "port.kessler_drift", distance: 120 },
+      { toPortId: "port.kessler_drift", distance: 400 },
     ]);
-    expect(spur("port.vesper_gate")).toEqual([{ toPortId: "port.green_meridian", distance: 120 }]);
-    expect(spur("port.terns_rest")).toEqual([{ toPortId: "port.crossroads_hub", distance: 90 }]);
+    expect(spur("port.vesper_gate")).toEqual([{ toPortId: "port.green_meridian", distance: 400 }]);
+    expect(spur("port.terns_rest")).toEqual([{ toPortId: "port.crossroads_hub", distance: 400 }]);
+    const { time, travel } = bundle.config;
+    expect(400 / travel.nominalSpeed).toBe(time.daySeconds / time.watchesPerDay);
   });
 
   it("lists every route in both directions with the same distance", () => {

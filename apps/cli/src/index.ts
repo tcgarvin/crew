@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ValidationIssue, contentJsonSchemas, loadBundle } from "@crew/content";
 import { type ContentBundle, type DeckDefId, type DockDefId, checkDockFitsDeck } from "@crew/sim";
+import { runBeatsCli } from "./beats";
 import { runPacingCli } from "./pacing";
 import { renderDeck } from "./render-deck";
 import { renderDockReadme } from "./render-dock";
@@ -177,13 +178,18 @@ function runContent(sub: string | undefined, rest: readonly string[]): CliResult
 export function crew(argv: readonly string[]): CliResult {
   const [command, sub, ...rest] = argv;
   if (command === undefined) {
-    return fail("crew: no command given (try `crew content validate` or `crew pacing`)");
+    return fail(
+      "crew: no command given (try `crew content validate`, `crew pacing` or `crew beats`)",
+    );
   }
   if (command === "content") {
     return runContent(sub, rest);
   }
   if (command === "pacing") {
     return runPacingCli(sub === undefined ? rest : [sub, ...rest]);
+  }
+  if (command === "beats") {
+    return runBeatsCli(sub === undefined ? rest : [sub, ...rest]);
   }
   return fail(`crew: unknown command "${command}"`);
 }

@@ -4,7 +4,7 @@
  * finalises the tick's events (phase 8).
  */
 import { rebuildActorIndex, rebuildItemIndexes } from "./caches";
-import { configTicks } from "./clock";
+import { dayTicks } from "./clock";
 import { applyDueCommands, pushCapped } from "./commands";
 import { raisePolicyDecisionHookIfDue } from "./decisions";
 import { createDefLookup } from "./defs";
@@ -171,7 +171,7 @@ function runPlannerStage(
  * `lastNarrativeTick` to the raise tick, so after `acknowledgeHook` the next hook needs another
  * full quiet window.
  *
- * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongSeconds`
+ * Pacing follow-up (passengers-and-galaxy §2.2): a quiet check-in means `quietTooLongDays`
  * with no narrator contact at all, so every hook kind re-arms the timer (see `core/hooks.ts`),
  * and the timer runs last in the tick so that any other hook raised in the same tick
  * (`stageDock`, `captainAshore`, `notableEvent` in phase 4; `policyDecision` just before this
@@ -183,7 +183,7 @@ const quietTimerSystem: System = {
   run(ctx) {
     const narrator = ctx.state.narrator;
     if (narrator.pendingHook !== undefined) return;
-    const quietTicks = configTicks(ctx.config, ctx.config.narrator.quietTooLongSeconds);
+    const quietTicks = dayTicks(ctx.config, ctx.config.narrator.quietTooLongDays);
     if (ctx.tick - narrator.lastNarrativeTick < quietTicks) return;
     raiseHookIfIdle(ctx, "quietTooLong", { quietSinceTick: narrator.lastNarrativeTick });
   },
@@ -225,6 +225,28 @@ export const decisionPendingSystem: System = {
 };
 
 /**
+ * D78: the narrator budget refills (D6 promised it; nothing ran it before) every
+ * `narrator.budgetRefillDays`: spawns, faults and hazards back to their config values, from the
+ * tick of the last refill (world creation, for a fresh game). Phase 8, before the quiet timer, so
+ * a hook raised this tick sees the refilled budget.
+ */
+const budgetRefillSystem: System = {
+  name: "core.budgetRefill",
+  phase: "finalize",
+  run(ctx) {
+    const narrator = ctx.state.narrator;
+    const every = dayTicks(ctx.config, ctx.config.narrator.budgetRefillDays);
+    if (ctx.tick - narrator.budgetRefilledTick < every) return;
+    narrator.budget = {
+      spawnsRemaining: ctx.config.narrator.spawnBudget,
+      faultsRemaining: ctx.config.narrator.faultBudget,
+      hazardsRemaining: ctx.config.narrator.hazardBudget,
+    };
+    narrator.budgetRefilledTick = ctx.tick;
+  },
+};
+
+/**
  * Index refresh (phase 2): item holder/container indexes when `dirty.inventory`, and the
  * actor-by-compartment index every tick (cheap; actors move every tick).
  */
@@ -250,6 +272,7 @@ export function coreSystems(registry: KernelRegistry): System[] {
     },
     indexSystem,
     decisionPendingSystem,
+    budgetRefillSystem,
     quietTimerSystem,
   ];
 }

@@ -7,18 +7,22 @@
  *   loader before defs are keyed; see `loader.ts`); each namespace matches its table; local keys
  *   unique within their def; a zone's `machineKey` names a placement on its deck; scenario
  *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
- *   bands `min <= max`; config numbers finite.
+ *   bands `min <= max`; config numbers finite. D77: every watch-bill member is in the scenario's
+ *   crew, and dayworkers' watches exist in the day; D79: each thought sits under its own key.
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
  *   some item def, and carried from the start by every scenario whose deck has the machine
  *   (D71). The hull contract (`validate-hull.ts`, D72): size class, bow east, ramps south, the
- *   rooms, stations, zones and spawn points every deck needs, lockers serving beds; a scenario's
- *   crew each get a crew spawn point. Dock maps (`validate-dock.ts`): rows against the legend,
- *   the berth box on the map and void, each deck's ramp landings on floor, posts and areas on
- *   floor and reachable from both landings, the quay row under the box walkable, the size cap; a
- *   scenario's ship fits every berth box and has beds for its crew + 1 (`checkScenarioBeds`).
+ *   rooms, stations, zones and spawn points every deck needs, the helm's standby position (D77),
+ *   lockers serving beds; a scenario's crew each get a crew spawn point. D77: a scenario's watch
+ *   bill has a section per watch of the day, each with a helm-qualified member, and only a
+ *   fixture-sized crew may go without one (`checkScenarioWatchBill`). Dock maps
+ *   (`validate-dock.ts`): rows against the legend, the berth box on the map and void, each deck's
+ *   ramp landings on floor, posts and areas on floor and reachable from both landings, the quay
+ *   row under the box walkable, the size cap; a scenario's ship fits every berth box and has beds
+ *   for its crew + 1 (`checkScenarioBeds`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -30,6 +34,7 @@ import type {
   MachinePlacementDef,
   PortDef,
   ScenarioDef,
+  SkillId,
   TileCoord,
   TileEdge,
   TraitDef,
@@ -272,9 +277,6 @@ function checkCrew(crew: CrewDef, bundle: ContentBundle, issues: ValidationIssue
       issues,
     );
   });
-  if (!bundle.config.shifts.shifts.some((s) => s.key === crew.shift)) {
-    issues.push(issue("referential", [...path, "shift"], `unknown shift "${crew.shift}"`));
-  }
 }
 
 function checkTrait(trait: TraitDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -393,6 +395,52 @@ function checkScenario(
       );
     }
   });
+  checkWatchBillCrew(scenario, path, issues);
+}
+
+/** D77: every watch-bill member is one of the scenario's crew (L1 has ruled out duplicates). */
+function checkWatchBillCrew(scenario: ScenarioDef, path: Path, issues: ValidationIssue[]): void {
+  const bill = scenario.watchBill;
+  if (bill === undefined) return;
+  const crew = new Set<string>(scenario.crew);
+  const check = (id: string, memberPath: Path) => {
+    if (!crew.has(id)) {
+      issues.push(
+        issue("referential", memberPath, `"${id}" is in the watch bill but not the crew`),
+      );
+    }
+  };
+  bill.sections.forEach((section, i) => {
+    section.members.forEach((id, j) => {
+      check(id, [...path, "watchBill", "sections", i, "members", j]);
+    });
+  });
+  bill.dayworkers.forEach((id, j) => check(id, [...path, "watchBill", "dayworkers", j]));
+}
+
+/** D77: dayworkers' watches are watches of the day, each listed once. */
+function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const watches = bundle.config.time.watchesPerDay;
+  const seen = new Set<number>();
+  bundle.config.watches.dayworkerOnWatches.forEach((watch, i) => {
+    const path: Path = ["config", "watches", "dayworkerOnWatches", i];
+    if (watch >= watches) {
+      issues.push(issue("referential", path, `watch ${watch} is not one of the ${watches} a day`));
+    }
+    if (seen.has(watch)) issues.push(issue("referential", path, `watch ${watch} is listed twice`));
+    seen.add(watch);
+  });
+}
+
+/** D79: each thought def sits under its own key. */
+function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  for (const [key, def] of Object.entries(bundle.thoughts)) {
+    if (def.key !== key) {
+      issues.push(
+        issue("referential", ["thoughts", key, "key"], `thought "${def.key}" is under "${key}"`),
+      );
+    }
+  }
 }
 
 function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -466,6 +514,8 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   for (const scenario of Object.values(bundle.scenarios)) checkScenario(scenario, bundle, issues);
   checkPriceBands(bundle, issues);
   checkPeople(bundle, issues);
+  checkDayworkerWatches(bundle, issues);
+  checkThoughtKeys(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;
@@ -798,6 +848,75 @@ function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: Validati
   }
 }
 
+/** D77: more crew than this need an authored watch bill; the generated one is for test fixtures. */
+const MAX_CREW_WITHOUT_WATCH_BILL = 3;
+
+/** The skill and level a helm-stander needs on `deck`: its pilot station's operator requirement. */
+function helmRequirement(
+  deck: DeckDef,
+  bundle: ContentBundle,
+): { readonly skill: SkillId; readonly min: number } | undefined {
+  for (const placement of deck.machines) {
+    const def = bundle.machines[placement.machineDefId];
+    if (def?.tags.includes("pilotStation") !== true) continue;
+    return def.operation.operatorSkill ?? { skill: "piloting", min: 0 };
+  }
+  return undefined; // the hull contract reports a deck without a pilot station
+}
+
+/**
+ * D77 (ship life plan, slice 2 call 4): section `i` stands watch `i` of the day with no wrap, so
+ * an authored bill has exactly `time.watchesPerDay` sections or some watch has nobody on it; each
+ * section needs a member qualified for the helm, or its watch has no stander. Membership, nobody
+ * listed twice and dayworkers apart from the sections are L1 and L2. A scenario without a bill
+ * gets a generated one, which is for fixtures of at most `MAX_CREW_WITHOUT_WATCH_BILL` crew.
+ */
+function checkScenarioWatchBill(
+  scenario: ScenarioDef,
+  deck: DeckDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const path: Path = ["scenarios", scenario.id];
+  const bill = scenario.watchBill;
+  if (bill === undefined) {
+    if (scenario.crew.length <= MAX_CREW_WITHOUT_WATCH_BILL) return;
+    issues.push(
+      issue(
+        "physical",
+        [...path, "crew"],
+        `${scenario.crew.length} crew and no watch bill: author one (a section per watch, each with a helm-stander, and dayworkers); a generated bill is for fixtures of at most ${MAX_CREW_WITHOUT_WATCH_BILL} crew`,
+      ),
+    );
+    return;
+  }
+  const watches = bundle.config.time.watchesPerDay;
+  if (bill.sections.length !== watches) {
+    issues.push(
+      issue(
+        "physical",
+        [...path, "watchBill", "sections"],
+        `${bill.sections.length} watch-bill sections for ${watches} watches a day; each watch needs its section`,
+      ),
+    );
+  }
+  const helm = helmRequirement(deck, bundle);
+  if (helm === undefined) return;
+  bill.sections.forEach((section, i) => {
+    const qualified = section.members.some(
+      (id) => (bundle.crew[id]?.skills[helm.skill] ?? 0) >= helm.min,
+    );
+    if (qualified) return;
+    issues.push(
+      issue(
+        "physical",
+        [...path, "watchBill", "sections", i, "members"],
+        `no qualified helm-stander in section "${section.key}" (needs ${helm.skill} ${helm.min})`,
+      ),
+    );
+  });
+}
+
 /** L3: geometry and physical plausibility. */
 export function validatePhysical(bundle: ContentBundle): readonly ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -818,6 +937,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     if (deck === undefined) continue; // reported by L2
     checkScenarioCrewSpawns(scenario, deck, issues);
     checkScenarioBeds(scenario, deck, bundle.machines, issues);
+    checkScenarioWatchBill(scenario, deck, bundle, issues);
   }
   checkRecipeToolsSatisfiable(bundle, issues);
   checkScenarioCarriesRecipeTools(bundle, issues);

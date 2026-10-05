@@ -16,8 +16,10 @@
  * - `NarratorCommand`: the kernel's strict command subset. Only the translator produces these.
  */
 import {
+  type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  HAZARD_KINDS,
   JOB_URGENCIES,
   MARKET_PRICE_TIERS,
   type NarratorCommand,
@@ -172,6 +174,16 @@ export const QUANTITIES = ["one", "few", "several"] as const;
  * the item; the translator parses it and clamps again to `config.commerce.market.maxStockPerCommand`.
  */
 export const STOCK_COUNTS = ["0", "1", "2", "3", "4"] as const;
+/**
+ * D78: a hazard's difficulty as the model writes it; the translator maps the tier to the
+ * piloting difficulty in `config.hazards.difficulty`, so the model never writes the number.
+ */
+export const HAZARD_DIFFICULTIES = [
+  "easy",
+  "hard",
+  "brutal",
+] as const satisfies readonly (keyof ConfigDef["hazards"]["difficulty"])[];
+export type HazardDifficulty = (typeof HAZARD_DIFFICULTIES)[number];
 
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
@@ -227,6 +239,15 @@ export function buildNarratorPlanSchema() {
     window: z.enum(FAULT_WINDOWS),
   });
 
+  // D78: the sixth lever, a piloting check for whoever has the helm when it fires. The hazard's
+  // own kind is `hazard` because `kind` is the intent's discriminant.
+  const scheduleHazard = z.strictObject({
+    kind: z.literal("scheduleHazard"),
+    hazard: z.enum(HAZARD_KINDS),
+    difficulty: z.enum(HAZARD_DIFFICULTIES),
+    window: z.enum(FAULT_WINDOWS),
+  });
+
   // D47: what a port sells. The only way a part gets to a port; the crew buy it themselves.
   const stockMarket = z.strictObject({
     kind: z.literal("stockMarket"),
@@ -274,7 +295,14 @@ export function buildNarratorPlanSchema() {
     /** Private reasoning summary for the audit log; never shown to the player. */
     rationale: z.string(),
     intents: z.array(
-      z.union([offerJob, spawnAtBoundary, scheduleFault, surfaceDecision, stockMarket]),
+      z.union([
+        offerJob,
+        spawnAtBoundary,
+        scheduleFault,
+        surfaceDecision,
+        stockMarket,
+        scheduleHazard,
+      ]),
     ),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */
     card: z

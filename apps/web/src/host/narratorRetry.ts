@@ -2,6 +2,10 @@
  * Retry scheduler for narrator calls (D43): a pure state machine the host drives. Feed it the
  * failure of each attempt and it says what to do next: wait and retry, acknowledge the hook
  * without an answer (spacing rule only), or give up so the game pauses on the error panel.
+ * The server spaces only the hooks the sim raises again on its own (`quietTooLong`,
+ * `notableEvent`), so an unanswered one costs a check-in; a hook raised once (`captainAshore`,
+ * one ask per docking; `policyDecision`) is never spaced (D70 addendum). Retrying a spaced hook
+ * could not help anyway: the world is halted on it, so its tick never moves past the window.
  *
  * A model/transport failure backs off through `RETRY_DELAYS_MS` (about a minute in all, which
  * the run-ahead lead mostly hides). The hourly call budget is waited out in

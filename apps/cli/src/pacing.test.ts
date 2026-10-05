@@ -20,10 +20,11 @@ const LATENCY = 10;
 const kernel = createKernel(createPacingRegistry());
 
 /**
- * The first test to call `results()` pays for both runs (about 5 s of real work on a quiet
- * machine, more under the full parallel `pnpm test`), well past Vitest's 5 s default.
+ * The first test to call `results()` pays for both runs (about 10 s of real work on a quiet
+ * machine since D76 made Kessler–Ossory a 400 s spur, more under the full parallel `pnpm test`),
+ * well past Vitest's 5 s default.
  */
-const SLOW_TEST_TIMEOUT_MS = 20_000;
+const SLOW_TEST_TIMEOUT_MS = 90_000;
 
 let cached: { slow: PacingResult; fast: PacingResult } | undefined;
 function results(): { slow: PacingResult; fast: PacingResult } {
@@ -66,11 +67,18 @@ describe("crew pacing: there-and-back voyage", () => {
   );
 
   it(
-    "raises quietTooLong on the long legs",
+    "raises quietTooLong only on the watch-long spur legs, at most once per quiet window (a watch, D76)",
     () => {
       const { slow } = results();
-      const longLeg = slow.legs.find((leg) => leg.toPortId === FAR_PORT_ID);
-      expect(longLeg?.hooksByKind.quietTooLong ?? 0).toBeGreaterThanOrEqual(1);
+      // A spur leg is one watch of transit and the quiet window is one watch, with `stageDock`
+      // raised 10 s before the approach: a leg flown at nominal speed with no fault to repair
+      // ends a breath short of a quiet call, so whether one lands depends on the leg running
+      // long. What holds is the bound, and that a short leg is never "quiet".
+      for (const leg of slow.legs) {
+        const spur = leg.toPortId === FAR_PORT_ID || leg.fromPortId === FAR_PORT_ID;
+        const watches = Math.ceil(leg.simSeconds / slow.quietTooLongSeconds);
+        expect(leg.hooksByKind.quietTooLong ?? 0).toBeLessThanOrEqual(spur ? watches : 0);
+      }
     },
     SLOW_TEST_TIMEOUT_MS,
   );

@@ -132,12 +132,21 @@ const inertMachine = (name: string, tag: string) => ({
   tags: [tag],
   faults: [],
 });
+/** The helm: a seat, a standby tile apart from it (D77), and piloting 3 to stand it. */
+const helm = {
+  ...inertMachine("helm", "pilotStation"),
+  interactionPositions: [
+    { key: "seat", offset: { x: -1, y: 0 }, purposes: ["operate", "repair"], capacity: 1 },
+    { key: "standby", offset: { x: 0, y: 1 }, purposes: ["use"], capacity: 1 },
+  ],
+  operation: { requiresOperator: true, operatorSkill: { skill: "piloting", min: 3 } },
+};
 const furniture = [
   inertMachine("engine", "engine"),
   inertMachine("stove", "stove"),
   inertMachine("table", "messTable"),
   inertMachine("bunk", "bed"),
-  inertMachine("helm", "pilotStation"),
+  helm,
   inertMachine("nav", "navStation"),
 ];
 
@@ -157,7 +166,6 @@ const crew = {
   roleTags: ["captain"],
   skills: { piloting: 5 },
   startingInventory: [],
-  shift: "alpha",
   bio: "Test captain.",
   voice: "Plain and brief.",
 };
@@ -219,9 +227,23 @@ const scenario = {
   initialFaults: [],
 };
 
+const thought = (key: string, value: number, stacks: boolean) => ({
+  key,
+  label: key,
+  value,
+  durationDays: 0.5,
+  stacks,
+});
+const thoughts = {
+  stoodLongWatch: thought("stoodLongWatch", -0.15, false),
+  doubleWatch: thought("doubleWatch", -0.25, false),
+  helmCleanPass: thought("helmCleanPass", 0.1, true),
+  helmScrape: thought("helmScrape", -0.1, true),
+};
+
 const band = { min: 1, max: 3 };
 const config = {
-  time: { tickRate: 20 },
+  time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
   movement: {
     walkSpeed: 2,
     passDelaySeconds: 0.3,
@@ -238,18 +260,19 @@ const config = {
     rampOpenSeconds: 2,
   },
   needs: {
-    hungerPerSecond: 0.001,
-    fatiguePerSecondAwake: 0.0008,
-    fatiguePerSecondWorking: 0.0012,
-    fatigueRecoveryPerSecondAsleep: 0.004,
-    comfortPerSecond: 0.0005,
-    comfortRecoveryPerSecondResting: 0.003,
-    socialPerSecond: 0.0005,
-    socialRecoveryPerSecondChatting: 0.01,
+    hungerPerDay: 1.2,
+    fatiguePerDayAwake: 0.96,
+    fatiguePerDayWorking: 1.44,
+    fatigueRecoveryPerDayAsleep: 4.8,
+    comfortPerDay: 0.6,
+    comfortRecoveryPerDayResting: 3.6,
+    socialPerDay: 0.6,
+    socialRecoveryPerDayChatting: 12,
     seekThreshold: 0.5,
-    mealSeconds: 15,
-    sleepMinSeconds: 60,
+    mealDays: 0.0125,
+    sleepDays: 0.05,
     wakeBelow: 0.1,
+    bedtimeAbove: 0.3,
     initialRange: {
       hunger: { min: 0.2, max: 0.6 },
       fatigue: { min: 0.1, max: 0.5 },
@@ -263,7 +286,7 @@ const config = {
     claimLeaseSeconds: 4,
     timeBucketSeconds: 1,
     retryBackoffSeconds: 5,
-    skillGainPerSecond: 0.0001,
+    skillGainPerDay: 0.12,
     workSpeedPerSkillLevel: 0.1,
   },
   urgency: {
@@ -271,7 +294,7 @@ const config = {
     needSurvivalAbove: 0.95,
     heatContainmentAbove: 0.7,
     heatSurvivalAbove: 0.9,
-    routineAgingSeconds: 120,
+    routineAgingDays: 0.1,
   },
   equipment: {
     hazardScale: 1,
@@ -290,6 +313,8 @@ const config = {
     nominalSpeed: 1,
     staffEstimateSeconds: 0,
     departureMinOutput: 0.5,
+    // D80: no limp unless a test turns it on.
+    limpSpeedFraction: 0,
     recallAboardSeconds: 60,
     localShuffleSeconds: 8,
     dockHandGiveUpSeconds: 30,
@@ -305,12 +330,15 @@ const config = {
       hazardous: band,
       passenger: band,
     },
-    jobOfferTtlSeconds: 300,
+    jobOfferTtlDays: 0.25,
     dockingFee: 0,
     haulEstimateSeconds: 5,
-    reofferSeconds: 60,
+    reofferDays: 0.05,
     maxCratesPerJob: 6,
-    passage: { ashoreSecondsMin: 60, ashoreSecondsMax: 180, overdueSeconds: 120 },
+    passage: { ashoreDaysMin: 0.05, ashoreDaysMax: 0.15, overdueDays: 0.1 },
+    // D80: off unless a test turns them on.
+    sparesReserve: 0,
+    foodReserve: { lowBelowDays: 0, restockToDays: 0 },
     market: {
       priceTiers: { cheap: 0.6, fair: 1, dear: 1.6 },
       maxStockPerCommand: 4,
@@ -319,14 +347,15 @@ const config = {
     },
   },
   narrator: {
-    quietTooLongSeconds: 180,
+    quietTooLongDays: 0.15,
     approachHookLeadSeconds: 10,
     maxSpawnsPerCommand: 4,
     maxFaultWindowSeconds: 120,
     spawnBudget: 4,
     faultBudget: 2,
-    budgetRefillSeconds: 600,
+    budgetRefillDays: 0.5,
     hookOnEvents: [],
+    hazardBudget: 2,
   },
   host: {
     runAheadCapSeconds: 60,
@@ -335,8 +364,22 @@ const config = {
     localSaveEverySeconds: 10,
     remoteSaveEverySeconds: 60,
     frameEveryTicks: 2,
+    slowDownOnEvents: [],
   },
-  shifts: { cycleSeconds: 600, shifts: [{ key: "alpha", workWindows: [[0, 300]] }] },
+  watches: {
+    dayworkerOnWatches: [0, 1],
+    handoverLeadSeconds: 30,
+    handoverSeconds: 5,
+    reliefMaxDays: 0.1,
+    reliefNoShowSeconds: 45,
+    longWatchFactor: 1.25,
+    helmUnattendedSeconds: 20,
+    roundsStopSeconds: 4,
+    roundsEveryDays: 0.08,
+    plotCourseSeconds: 20,
+  },
+  mood: { lowBelow: -0.4, highAbove: 0.4, lowWorkSpeed: 0.9, highWorkSpeed: 1.05 },
+  hazards: { difficulty: { easy: 3, hard: 5, brutal: 7 }, delaySeconds: 60 },
   social: { chatRadiusTiles: 2, chatCooldownSeconds: 45, templateLines: ["{a} joked"] },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
 };
@@ -373,7 +416,7 @@ const cases = [
     name: "config",
     schema: configDefSchema,
     valid: config,
-    invalid: { ...config, time: { tickRate: 0 } },
+    invalid: { ...config, time: { ...config.time, tickRate: 0 } },
   },
 ] as const;
 
@@ -458,6 +501,7 @@ describe("bundle validation", () => {
     scenarios: { [scenario.id]: scenario },
     people,
     docks: {},
+    thoughts,
     config,
     hash: "test",
   };
@@ -465,6 +509,27 @@ describe("bundle validation", () => {
   it("L1 accepts a structurally valid bundle", () => {
     expect(contentBundleSchema.safeParse(bundle).success).toBe(true);
     expect(validateStructure(bundle).ok).toBe(true);
+  });
+
+  it("L1 requires every thought def, and a bill with distinct sections and members (D77, D79)", () => {
+    const { helmScrape: _missing, ...three } = thoughts;
+    expect(validateStructure({ ...bundle, thoughts: three }).ok).toBe(false);
+    const bill = (sections: unknown, dayworkers: unknown) => ({
+      ...bundle,
+      scenarios: { [scenario.id]: { ...scenario, watchBill: { sections, dayworkers } } },
+    });
+    const red = { key: "red", members: ["crew.test.mara"] };
+    expect(validateStructure(bill([red], [])).ok).toBe(true);
+    expect(validateStructure(bill([], [])).ok).toBe(false);
+    expect(validateStructure(bill([red, { key: "red", members: [] }], [])).ok).toBe(false);
+    expect(validateStructure(bill([red], ["crew.test.mara"])).ok).toBe(false);
+    expect(
+      validateStructure(bill([red, { key: "white", members: ["crew.test.mara"] }], [])).ok,
+    ).toBe(false);
+    expect(
+      validateStructure(bill([{ key: "red", members: ["crew.test.mara", "crew.test.mara"] }], []))
+        .ok,
+    ).toBe(false);
   });
 
   it("L1 reports issues with paths", () => {
@@ -491,6 +556,35 @@ describe("bundle validation", () => {
       expect(
         issues.some((i) => i.level === "referential" && i.message.includes("item.test.other")),
       ).toBe(true);
+    });
+
+    it("rejects a watch-bill member who is not in the scenario's crew (D77)", () => {
+      const billed = {
+        ...scenario,
+        watchBill: {
+          sections: [{ key: "red", members: ["crew.test.mara"] }],
+          dayworkers: ["crew.test.stranger"],
+        },
+      };
+      const issues = referenceIssues({ ...bundle, scenarios: { [scenario.id]: billed } });
+      expect(
+        issues.some((i) => i.message.includes("crew.test.stranger") && i.message.includes("bill")),
+      ).toBe(true);
+      const ok = { ...billed, watchBill: { ...billed.watchBill, dayworkers: [] } };
+      expect(referenceIssues({ ...bundle, scenarios: { [scenario.id]: ok } })).toEqual([]);
+    });
+
+    it("rejects a dayworker watch outside the day, or listed twice (D77)", () => {
+      const bad = { ...config, watches: { ...config.watches, dayworkerOnWatches: [1, 3, 1] } };
+      const issues = referenceIssues({ ...bundle, config: bad });
+      expect(issues.some((i) => i.message.includes("watch 3 is not one of the 3"))).toBe(true);
+      expect(issues.some((i) => i.message.includes("watch 1 is listed twice"))).toBe(true);
+    });
+
+    it("rejects a thought filed under another thought's key (D79)", () => {
+      const swapped = { ...thoughts, doubleWatch: thoughts.stoodLongWatch };
+      const issues = referenceIssues({ ...bundle, thoughts: swapped });
+      expect(issues.some((i) => i.path.join(".") === "thoughts.doubleWatch.key")).toBe(true);
     });
 
     it("rejects an id outside its table's namespace", () => {
@@ -726,6 +820,89 @@ describe("bundle validation", () => {
     it("accepts a scenario that carries every tool its deck's recipes need", () => {
       const issues = physicalIssues(bundle);
       expect(issues.filter((i) => i.message.includes("no starting item provides"))).toEqual([]);
+    });
+
+    it("holds the pilot station to its standby position (D77)", () => {
+      const seatOnly = { ...helm, interactionPositions: helm.interactionPositions.slice(0, 1) };
+      const issues = physicalIssues({
+        ...bundle,
+        machines: { ...bundle.machines, [helm.id]: seatOnly },
+      });
+      expect(issues.map((i) => i.message)).toContain(
+        'pilot station "helm1" (machine.test.helm) has no standby position: a "use" position apart from its "operate" seat',
+      );
+    });
+
+    describe("the watch bill (D77)", () => {
+      /** Hands with the given piloting; the helm needs 3. */
+      const hand = (name: string, piloting: number) => ({
+        ...crew,
+        id: `crew.test.${name}`,
+        name,
+        roleTags: ["deckhand"],
+        skills: { piloting },
+      });
+      const hands = [hand("jon", 1), hand("kit", 3), hand("lee", 0), hand("max", 4)];
+      const crewTable = Object.fromEntries([crew, ...hands].map((c) => [c.id, c]));
+      const crewIds = Object.keys(crewTable);
+      const section = (key: string, ...names: string[]) => ({
+        key,
+        members: names.map((n) => `crew.test.${n}`),
+      });
+
+      /** Watch-bill issues (path under `watchBill`, or the no-bill rule) for this scenario. */
+      const billIssues = (patch: Record<string, unknown>) =>
+        physicalIssues({
+          ...bundle,
+          crew: crewTable,
+          scenarios: { [scenario.id]: { ...scenario, crew: crewIds, ...patch } },
+        })
+          .filter((i) => i.path.includes("watchBill") || i.message.includes("watch bill"))
+          .map((i) => `${i.path.join(".")}: ${i.message}`);
+
+      const AT = "scenarios.scenario.test.default";
+
+      it("accepts a section per watch, each with a qualified helm-stander", () => {
+        const watchBill = {
+          sections: [
+            section("red", "mara", "lee"),
+            section("white", "kit"),
+            section("blue", "max"),
+          ],
+          dayworkers: ["crew.test.jon"],
+        };
+        expect(billIssues({ watchBill })).toEqual([]);
+      });
+
+      it("rejects a bill with fewer or more sections than watches a day", () => {
+        const two = { sections: [section("red", "mara"), section("white", "kit")], dayworkers: [] };
+        expect(billIssues({ watchBill: two })).toEqual([
+          `${AT}.watchBill.sections: 2 watch-bill sections for 3 watches a day; each watch needs its section`,
+        ]);
+        const four = {
+          sections: [section("a", "mara"), section("b", "kit"), section("c"), section("d")],
+          dayworkers: [],
+        };
+        expect(billIssues({ watchBill: four })[0]).toContain("4 watch-bill sections for 3");
+      });
+
+      it("rejects a section with nobody qualified to stand the helm", () => {
+        const watchBill = {
+          sections: [section("red", "mara"), section("white", "jon", "lee"), section("blue")],
+          dayworkers: ["crew.test.kit"],
+        };
+        expect(billIssues({ watchBill })).toEqual([
+          `${AT}.watchBill.sections.1.members: no qualified helm-stander in section "white" (needs piloting 3)`,
+          `${AT}.watchBill.sections.2.members: no qualified helm-stander in section "blue" (needs piloting 3)`,
+        ]);
+      });
+
+      it("allows no bill for a fixture of at most three crew, and requires one above", () => {
+        expect(billIssues({ crew: crewIds.slice(0, 3) })).toEqual([]);
+        expect(billIssues({})).toEqual([
+          `${AT}.crew: 5 crew and no watch bill: author one (a section per watch, each with a helm-stander, and dayworkers); a generated bill is for fixtures of at most 3 crew`,
+        ]);
+      });
     });
   });
 });

@@ -12,6 +12,7 @@ import {
   crewWorld,
   itemAt,
   place,
+  withoutRounds,
 } from "./fixtures/crew-deck";
 import { eventsOf, run } from "./fixtures/run";
 
@@ -62,6 +63,7 @@ describe("inspecting", () => {
   it("the higher-engineering actor takes the inspection; labels go walking → inspecting", () => {
     const tw = crewWorld();
     const { world } = tw;
+    withoutRounds(world);
     place(world, MARA, { x: 8, y: 2 });
     place(world, JON, { x: 8, y: 3 });
     const { problemId } = addPumpSymptom(world);
@@ -80,6 +82,7 @@ describe("inspecting", () => {
   it("a discovered symptom is invisible from another room until the actor walks in", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
+    withoutRounds(world);
     place(world, MARA, { x: 1, y: 2 });
     place(world, JON, { x: 0, y: 6 });
     const jon = world.state.actors[JON];
@@ -166,6 +169,7 @@ describe("discrepancies", () => {
   it("a moved ration stack is noted absent, the meal fails with a reason, backoff is honoured, and eating resumes once found", () => {
     const tw = crewWorld();
     const { world } = tw;
+    withoutRounds(world);
     const mara = world.state.actors[MARA];
     const jon = world.state.actors[JON];
     if (mara === undefined || jon === undefined) throw new Error("no crew");

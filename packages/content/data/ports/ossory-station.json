@@ -59,7 +59,7 @@
     },
     {
       "itemDefId": "item.ration_pack",
-      "count": 6,
+      "count": 40,
       "price": 14
     }
   ],
@@ -94,7 +94,7 @@
   "routes": [
     {
       "toPortId": "port.kessler_drift",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

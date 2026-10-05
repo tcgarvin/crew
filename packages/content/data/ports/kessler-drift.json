@@ -51,6 +51,11 @@
       "itemDefId": "item.coolant_canister",
       "count": 2,
       "price": 75
+    },
+    {
+      "itemDefId": "item.ration_pack",
+      "count": 60,
+      "price": 10
     }
   ],
   "jobTemplates": [
@@ -92,7 +97,7 @@
     },
     {
       "toPortId": "port.ossory_station",
-      "distance": 120
+      "distance": 400
     }
   ]
 }

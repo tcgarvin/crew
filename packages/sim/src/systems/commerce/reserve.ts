@@ -1,0 +1,167 @@
+/**
+ * D80: the stores the ship keeps aboard, bought at port like a part (D47) when they run low.
+ *
+ * Food is reckoned in days: the nutrition of the food aboard over the people aboard who eat
+ * (crew and passengers) times `needs.hungerPerDay`. Under `commerce.foodReserve.lowBelowDays`,
+ * while docked at a port whose market sells food, the shortfall to `restockToDays` is a
+ * `reserveLow` problem (owner commerce, public, routine) for that food, and commerce derives the
+ * same `buyParts` task it derives for `partsNeeded` (`tasks.ts`). Ship-life slice 3's
+ * `provisionsLow` has the same shape and replaces the food rule when the galley cooks.
+ *
+ * Spares are reckoned in units: each `spare`-tagged item the market sells is kept at
+ * `commerce.sparesReserve` units aboard, so a fault far from port finds its part in the hold.
+ * A repair short of a part right now is `partsNeeded` (D47) and is bought on top of this.
+ *
+ * Raised, revised and settled against truth every tick, and only while docked at a port whose
+ * market has the item in stock: underway, or where nothing is for sale, the crew can do nothing
+ * about it, so there is no problem to show. The purchase settles it at the counter
+ * (`market.ts`); the next tick's count against what is aboard confirms it.
+ */
+import { allocateId } from "../../core/ids";
+import { effectiveMarket } from "../../core/markets";
+import type { ItemDefId, PortDefId, ProblemId } from "../../core/types/ids";
+import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
+import type { ProblemOfKind } from "../../core/types/work";
+import { resolveProblem } from "../equipment/problems";
+import { unitsAboard } from "../equipment/supplies";
+
+type ReserveCtx = Pick<StepCtx, "content" | "config"> & {
+  readonly state: Pick<ReadonlyWorldState, "items" | "jobs" | "actors" | "markets">;
+};
+
+/** One store the ship should buy more of here. */
+export interface ReserveShortfall {
+  readonly itemDefId: ItemDefId;
+  readonly count: number;
+}
+
+/** People aboard who eat: crew and passengers who are neither dead nor off the ship. */
+function eaters(state: ReserveCtx["state"]): number {
+  return Object.values(state.actors).filter(
+    (a) => a.crew && a.availability !== "dead" && a.availability !== "offShip",
+  ).length;
+}
+
+/** Hunger the people aboard work off in a day. */
+function hungerPerDay(ctx: ReserveCtx): number {
+  return eaters(ctx.state) * ctx.config.needs.hungerPerDay;
+}
+
+/**
+ * D80: days of food aboard at the current mouths (nutrition aboard over the day's hunger);
+ * `Infinity` with nobody aboard to feed.
+ */
+export function foodDaysAboard(ctx: ReserveCtx): number {
+  const perDay = hungerPerDay(ctx);
+  if (perDay <= 0) return Number.POSITIVE_INFINITY;
+  let nutrition = 0;
+  for (const [defId, units] of unitsAboard(ctx.state)) {
+    const def = ctx.content.items[defId];
+    if (def?.tags.includes("food") !== true) continue;
+    nutrition += units * (def.nutrition ?? 0);
+  }
+  return nutrition / perDay;
+}
+
+/** Units to buy for a fractional need, rounded up but not past float noise (14.000000000000002). */
+function wholeUnits(need: number): number {
+  return Math.ceil(need - 1e-9);
+}
+
+/** Item defs the market at `portId` has in stock, by id. */
+function inStock(ctx: ReserveCtx, portId: PortDefId): ItemDefId[] {
+  return Object.entries(effectiveMarket(ctx.state, ctx.content, portId))
+    .filter(([, line]) => line.count > 0)
+    .map(([defId]) => defId as ItemDefId)
+    .sort();
+}
+
+/** The food to buy here, if food is low and the market sells some (the first by id). */
+function foodShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
+  const { lowBelowDays, restockToDays } = ctx.config.commerce.foodReserve;
+  const days = foodDaysAboard(ctx);
+  if (days >= lowBelowDays) return [];
+  const food = stock
+    .map((defId) => ctx.content.items[defId])
+    .find((def) => def?.tags.includes("food") === true && (def.nutrition ?? 0) > 0);
+  if (food?.nutrition === undefined) return [];
+  const units = wholeUnits(((restockToDays - days) * hungerPerDay(ctx)) / food.nutrition);
+  return units > 0 ? [{ itemDefId: food.id, count: units }] : [];
+}
+
+/** Each `spare`-tagged item sold here that the ship holds fewer than the reserve of. */
+function spareShortfalls(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
+  const reserve = ctx.config.commerce.sparesReserve;
+  if (reserve <= 0) return [];
+  const aboard = unitsAboard(ctx.state);
+  const short: ReserveShortfall[] = [];
+  for (const defId of stock) {
+    if (ctx.content.items[defId]?.tags.includes("spare") !== true) continue;
+    const missing = reserve - (aboard.get(defId) ?? 0);
+    if (missing > 0) short.push({ itemDefId: defId, count: missing });
+  }
+  return short;
+}
+
+/**
+ * D80: what the ship should buy at `portId` to keep its reserves, among what the market there has
+ * in stock. Empty when nothing is low or nothing that would help is for sale.
+ */
+export function reserveShortfalls(ctx: ReserveCtx, portId: PortDefId): ReserveShortfall[] {
+  const stock = inStock(ctx, portId);
+  return [...foodShortfall(ctx, stock), ...spareShortfalls(ctx, stock)];
+}
+
+const dedupeKeyOf = (itemDefId: ItemDefId): string => `reserveLow:${itemDefId}`;
+
+function openReserveProblems(ctx: Pick<StepCtx, "state">): ProblemOfKind<"reserveLow">[] {
+  return Object.values(ctx.state.work.problems).filter(
+    (p): p is ProblemOfKind<"reserveLow"> => p.kind === "reserveLow" && p.status === "open",
+  );
+}
+
+function raiseReserveLow(ctx: StepCtx, portId: PortDefId, shortfall: ReserveShortfall): void {
+  const id = allocateId(ctx.state, "problem") as ProblemId;
+  ctx.state.work.problems[id] = {
+    id,
+    kind: "reserveLow",
+    payload: { itemDefId: shortfall.itemDefId, count: shortfall.count },
+    owner: "commerce",
+    visibility: "public",
+    dedupeKey: dedupeKeyOf(shortfall.itemDefId),
+    status: "open",
+    createdTick: ctx.tick,
+    revision: 1,
+    baseUrgency: "routineObligation",
+    location: { kind: "port", portId },
+  };
+}
+
+/**
+ * Keep `reserveLow` in step with the stores: open (revised to the live count) for each shortfall
+ * at the port the ship is docked at; resolved once there is nothing left to buy here (the stores
+ * are back up, the market sold out, or the ship has left).
+ */
+export function sweepReserves(ctx: StepCtx): void {
+  const travel = ctx.state.travel;
+  const docked = travel.stage === "docked";
+  const wanted = docked ? reserveShortfalls(ctx, travel.portId) : [];
+  const byKey = new Map(wanted.map((s) => [dedupeKeyOf(s.itemDefId), s]));
+  for (const problem of openReserveProblems(ctx)) {
+    const shortfall = byKey.get(problem.dedupeKey);
+    if (shortfall !== undefined) {
+      byKey.delete(problem.dedupeKey);
+      if (problem.payload.count !== shortfall.count) {
+        problem.payload = { ...problem.payload, count: shortfall.count };
+        problem.revision += 1;
+      }
+      continue;
+    }
+    // Resolved whether the stores are back up or the market here sold out: either way nothing is
+    // left to buy, and (D63) a buyer still carrying a purchase aboard keeps their task.
+    const event = resolveProblem(ctx.state, problem.dedupeKey);
+    if (event !== undefined) ctx.emit(event);
+  }
+  if (!docked) return;
+  for (const shortfall of byKey.values()) raiseReserveLow(ctx, travel.portId, shortfall);
+}

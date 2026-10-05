@@ -4,8 +4,16 @@
 import { describe, expect, it } from "vitest";
 import { tinyTestWorld } from "./fixtures/test-world";
 import { TINY } from "./fixtures/tiny-content";
-import { doorOpenFraction, formatEta, renderItems, renderTravel, shipHeadline } from "./render";
-import type { ItemId, JobId, ProblemId } from "./types/ids";
+import {
+  describeEvent,
+  doorOpenFraction,
+  formatEta,
+  renderItems,
+  renderTravel,
+  shipHeadline,
+} from "./render";
+import type { SimEvent } from "./types/events";
+import type { ActorId, EventId, HazardId, ItemId, JobId, MachineId, ProblemId } from "./types/ids";
 import type { WorldState } from "./types/state";
 import type { Job, JobPassage } from "./types/travel";
 import type { Problem } from "./types/work";
@@ -98,7 +106,7 @@ function underway(
 }
 
 function headline(state: WorldState, content = tinyTestWorld().world.content): string {
-  return shipHeadline(state, content, 1);
+  return shipHeadline(state, content, { nominalSpeed: 1, limpSpeedFraction: 0 });
 }
 
 describe("shipHeadline", () => {
@@ -168,6 +176,26 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
   });
 
+  it("says the departure waits on a course while one is to plot (D78)", () => {
+    const { world } = tinyTestWorld();
+    world.state.travel = { stage: "docked", portId: TINY.port, plannedDestinationId: TINY.port2 };
+    const id = "p.course" as ProblemId;
+    world.state.work.problems[id] = {
+      id,
+      kind: "courseToPlot",
+      payload: { toPortId: TINY.port2 },
+      owner: "travel",
+      visibility: "public",
+      dedupeKey: "courseToPlot",
+      status: "open",
+      createdTick: 0,
+      revision: 1,
+      baseUrgency: "essentialOperation",
+      location: { kind: "port", portId: TINY.port },
+    };
+    expect(headline(world.state)).toBe("Preparing to depart for Far Dock — waiting on a course");
+  });
+
   it("names the stage for undocking, approach and docking", () => {
     const { world } = tinyTestWorld();
     underway(world.state, "undocking");
@@ -176,6 +204,37 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Approaching Far Dock");
     underway(world.state, "docking");
     expect(headline(world.state)).toBe("Docking at Far Dock");
+  });
+
+  it("waits for the helm in prep and docking only while it is empty, not while its post is open (D77)", () => {
+    const { world } = tinyTestWorld();
+    // The watch post is open for the whole of underway; on its own it says nothing.
+    const id = "p.watch" as ProblemId;
+    world.state.work.problems[id] = {
+      id,
+      kind: "stationToStaff",
+      payload: { machineId: "m.helm" as MachineId, post: "watch" },
+      owner: "watch",
+      visibility: "public",
+      dedupeKey: "stationToStaff:watch",
+      status: "open",
+      createdTick: 0,
+      revision: 1,
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId: "m.helm" as MachineId },
+    };
+    underway(world.state, "preparingDeparture");
+    expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
+    underway(world.state, "docking");
+    expect(headline(world.state)).toBe("Docking at Far Dock");
+
+    world.state.watch.helm.unattendedSinceTick = 0;
+    underway(world.state, "preparingDeparture");
+    expect(headline(world.state)).toBe(
+      "Preparing to depart for Far Dock — waiting for someone at the helm",
+    );
+    underway(world.state, "docking");
+    expect(headline(world.state)).toBe("Docking at Far Dock — waiting for someone at the helm");
   });
 
   it("gives an ETA in transit, and says so when adrift", () => {
@@ -322,5 +381,96 @@ describe("renderItems", () => {
     const frame = kernel.getRenderFrame(world);
     expect(frame.headline).toBe("Docked at Tiny Dock — looking for work");
     expect(frame.items.length).toBe(2);
+  });
+});
+
+describe("ticker lines for the watch and the helm (D77, D78)", () => {
+  const { world } = tinyTestWorld();
+  const mara = "a1" as ActorId;
+  const pump = Object.values(world.state.machines)[0]?.id as MachineId;
+  let seq = 0;
+  const line = (draft: Pick<SimEvent, "type" | "payload" | "significance">): string =>
+    describeEvent(
+      {
+        id: `e${++seq}` as EventId,
+        tick: 1,
+        seq,
+        subjectIds: [],
+        causeIds: [],
+        source: "sim",
+        ...draft,
+      } as SimEvent,
+      world.state,
+      world.content,
+    );
+  const hazard = {
+    hazardId: "h1" as HazardId,
+    kind: "debrisField",
+    difficulty: 5,
+    skill: 6,
+  } as const;
+
+  it("rings the bell with the section that has the watch", () => {
+    expect(line({ type: "bell", significance: "notable", payload: { watchIndex: 4 } })).toBe(
+      "Bell.",
+    );
+    expect(
+      line({
+        type: "bell",
+        significance: "notable",
+        payload: { watchIndex: 4, sectionKey: "white" },
+      }),
+    ).toBe("Bell. White section has the watch.");
+  });
+
+  it("says who took the helm, from whom, and when nobody has it", () => {
+    expect(
+      line({
+        type: "helmRelieved",
+        significance: "notable",
+        payload: { machineId: pump, byActorId: mara },
+      }),
+    ).toBe("Mara Voss takes the helm");
+    expect(
+      line({
+        type: "helmRelieved",
+        significance: "notable",
+        payload: { machineId: pump, byActorId: mara, fromActorId: mara },
+      }),
+    ).toBe("Mara Voss relieves Mara Voss at the helm");
+    expect(
+      line({
+        type: "helmUnattended",
+        significance: "narrative",
+        payload: { machineId: pump, seconds: 20 },
+      }),
+    ).toBe("Nobody at the helm");
+  });
+
+  it("names the plotted course and each hazard outcome", () => {
+    expect(
+      line({
+        type: "coursePlotted",
+        significance: "notable",
+        payload: { toPortId: TINY.port2, actorId: mara },
+      }),
+    ).toBe("Course plotted for Far Dock");
+    type NavPayload = Extract<SimEvent, { type: "navHazard" }>["payload"];
+    const nav = (payload: Partial<NavPayload>) =>
+      line({
+        type: "navHazard",
+        significance: "narrative",
+        payload: { ...hazard, outcome: "clean", lostSeconds: 0, ...payload },
+      });
+    expect(nav({ standerId: mara })).toBe("Debris field: Mara Voss took us through clean");
+    expect(nav({ outcome: "scrape", scrapedMachineId: pump })).toBe(
+      "Debris field: scraped through, the coolant pump took it",
+    );
+    expect(nav({ outcome: "delay", lostSeconds: 60 })).toBe(
+      "Debris field: lost 60 s working round it",
+    );
+    expect(nav({ outcome: "unattended", scrapedMachineId: pump, lostSeconds: 60 })).toBe(
+      "Debris field: nobody at the helm; scraped through and lost 60 s",
+    );
   });
 });

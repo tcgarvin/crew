@@ -1,20 +1,22 @@
 /**
- * Task derivation for the problem kinds commerce owns (`cargoToLoad`, `cargoToUnload`, and D47's
- * `partsNeeded`, which equipment raises and commerce answers from the port market; CONTRACTS
- * "How work is advertised"). Exported as a `Partial<TaskDerivationTable>` for `systems/work/`
- * (W4) to merge. Both derive one `haul` task; `interactionTiles` come from geometry: the
+ * Task derivation for the problem kinds commerce owns (`cargoToLoad`, `cargoToUnload`, D80's
+ * `reserveLow`, and D47's `partsNeeded`, which equipment raises and commerce answers from the
+ * port market; CONTRACTS "How work is advertised"). Exported as a `Partial<TaskDerivationTable>`
+ * for `systems/work/` (W4) to merge. The cargo kinds derive one `haul` task, the market kinds one
+ * `buyParts` task (`buySpec`); `interactionTiles` come from geometry: the
  * manifest's stowage zone, the deck's cargo transfer tiles, or (D63) the dock alongside, read
  * from `DerivationCtx.state` (which dock is grafted) and content (its areas and posts).
  */
 import { dockAlongsideAt, dockAreaTiles, marketCounter } from "../../core/docks";
 import { affordableUnits } from "../../core/markets";
 import type { TileCoord } from "../../core/types/common";
-import type { ItemId } from "../../core/types/ids";
+import type { ItemDefId, ItemId, PortDefId } from "../../core/types/ids";
 import type {
   CompletionPredicate,
   DerivationCtx,
   DeriveTasks,
   TaskSpec,
+  TaskTarget,
 } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
 
@@ -104,18 +106,23 @@ const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
 };
 
 /**
- * D47: a `partsNeeded` problem derives one `buyParts` task only while the ship is docked at a
- * port whose market has the item and the ship can pay for at least one unit; otherwise it
- * derives nothing (the problem stays open and the digest says why). The task carries the units
- * to buy in its `progressRef`; any crew member may take it (no skill, no tool), the planner
- * ranks it at the problem's urgency, and the buyer walks to the market's counter
- * (`marketCounter`, D63): the dock's stall, its gate when it has no stall, or with no dock a cargo
- * transfer tile.
+ * D47: one `buyParts` task for `count` of `itemDefId`, only while the ship is docked at a port
+ * whose market has the item and the ship can pay for at least one unit; otherwise nothing (the
+ * problem stays open and the digest says why). The task carries the units to buy in its
+ * `progressRef`; any crew member may take it (no skill, no tool), the planner ranks it at the
+ * problem's urgency, and the buyer walks to the market's counter (`marketCounter`, D63): the
+ * dock's stall, its gate when it has no stall, or with no dock a cargo transfer tile. Shared by
+ * `partsNeeded` and D80's `reserveLow`, which differ only in what the task names as its target.
  */
-const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
+function buySpec(
+  problem: { readonly baseUrgency: TaskSpec["baseUrgency"] },
+  ctx: DerivationCtx,
+  itemDefId: ItemDefId,
+  count: number,
+  target: (portId: PortDefId) => TaskTarget,
+): TaskSpec[] {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return [];
-  const { itemDefId, count, machineId } = problem.payload;
   const units = affordableUnits(ctx.state, ctx.content, travel.portId, itemDefId, count);
   if (units <= 0) return [];
   const counter = marketCounter(ctx.content, ctx.state, travel.portId);
@@ -126,7 +133,7 @@ const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
   const spec: TaskSpec = {
     derivationKey: "buy",
     type: "buyParts",
-    target: { kind: "machine", machineId },
+    target: target(travel.portId),
     baseUrgency: problem.baseUrgency,
     requiredSkills: [],
     requiredTools: [],
@@ -139,10 +146,23 @@ const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
     estimatedWorkSeconds: ctx.config.commerce.market.buySeconds,
   };
   return [spec];
+}
+
+/** D47: the part a stalled repair needs; the task names the machine it unblocks. */
+const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
+  const { itemDefId, count, machineId } = problem.payload;
+  return buySpec(problem, ctx, itemDefId, count, () => ({ kind: "machine", machineId }));
+};
+
+/** D80: restocking the ship's stores; the task names the market it buys from. */
+const deriveReserveLow: DeriveTasks<"reserveLow"> = (problem, ctx) => {
+  const { itemDefId, count } = problem.payload;
+  return buySpec(problem, ctx, itemDefId, count, (portId) => ({ kind: "market", portId }));
 };
 
 export const commerceTaskDerivations = {
   cargoToLoad: deriveCargoToLoad,
   cargoToUnload: deriveCargoToUnload,
   partsNeeded: derivePartsNeeded,
+  reserveLow: deriveReserveLow,
 };

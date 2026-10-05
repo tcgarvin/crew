@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   type CommandId,
   type DecisionId,
@@ -17,6 +18,7 @@ import {
   departureGateRequest,
   farCaptainAshoreRequest,
   passengerAboardRequest,
+  passengerOverdueRequest,
   quietTooLongRequest,
   stageDockRequest,
 } from "./fixtures";
@@ -24,7 +26,7 @@ import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { HOOK_INSTRUCTIONS, STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
-import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator } from "./run";
+import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator, runNarratorWithTrace } from "./run";
 import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
 import { TransportError } from "./transport";
 
@@ -826,7 +828,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.20");
+    expect(PROMPT_VERSION).toBe("v0.21");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -891,9 +893,21 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
-    expect(STATIC_RULES).toContain("Only use the five levers");
-    expect(STATIC_RULES).toContain("surfaceDecision, stockMarket");
-    expect(STATIC_RULES).not.toContain("four levers");
+    expect(STATIC_RULES).toContain("Only use the six levers");
+    expect(STATIC_RULES).toContain("surfaceDecision, stockMarket, scheduleHazard");
+    expect(STATIC_RULES).not.toContain("five levers");
+  });
+
+  it("tells the model about the watch, the empty helm and the hazard lever (D77-D79, v0.21)", () => {
+    expect(STATIC_RULES).toContain("The ship keeps watches. The day is three watches");
+    expect(STATIC_RULES).toContain("who has the helm (and since when)");
+    expect(STATIC_RULES).toContain("You never set moods or thoughts");
+    expect(STATIC_RULES).toContain("An empty helm");
+    expect(STATIC_RULES).toContain("is the ship's own failing");
+    expect(STATIC_RULES).toContain("A hazard is the helm's stakes");
+    expect(STATIC_RULES).toContain("never while another fault is unrepaired");
+    expect(STATIC_RULES).toContain("you never decide who that is or how it goes");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleHazard on a long leg");
   });
 });
 
@@ -921,6 +935,42 @@ describe("fixtures and kernel authority (N6)", () => {
     ]) {
       expect(() => kernel.restore(req.snapshot, content())).not.toThrow();
     }
+  });
+
+  it("migrates a stored schema-7 snapshot to 8 with the scenario's watch bill (D77)", () => {
+    // A frozen copy of the schema-7 `approach.json`: the fixtures under `fixtures/` are
+    // regenerated with the kernel, so they stop being schema 7.
+    const stored = JSON.parse(
+      readFileSync(new URL("./testdata/schema7-approach.json", import.meta.url), "utf8"),
+    ) as NarratorRequest;
+    expect(stored.snapshot.schemaVersion).toBe(7);
+    const restored = createKernel(createRegistry()).restore(stored.snapshot, content());
+    const actors = Object.values(restored.state.actors);
+    const captain = actors.find((a) => a.roleTags.includes("captain"));
+    expect(captain?.schedule).toEqual({ section: { key: "red", index: 0 } });
+    expect(actors.find((a) => a.defId === "crew.dane_whitcross")?.schedule.section?.key).toBe(
+      "blue",
+    );
+    expect(actors.find((a) => a.defId === "crew.bettina_solheim")?.schedule).toEqual({});
+    expect(actors.every((a) => a.thoughts.length === 0)).toBe(true);
+    expect(restored.state.hazards).toEqual([]);
+  });
+
+  it("reads a stored snapshot whose config predates the day units (D76) with the loaded values", async () => {
+    // Stored before D76: `commerce.passage.overdueSeconds`, no `overdueDays`. The digest's
+    // OVERDUE line needs the window, so a missing key would throw rather than render. The
+    // config is put back to its pre-D76 shape by hand, so this holds however the fixtures move.
+    const stored = structuredClone(passengerOverdueRequest(content()));
+    const passage = stored.snapshot.config.commerce.passage as unknown as Record<string, unknown>;
+    passage.overdueSeconds = 150;
+    // biome-ignore lint/performance/noDelete: the stored config must lack the key.
+    delete passage.overdueDays;
+    const run = await runNarratorWithTrace(stored, {
+      gameId: stored.gameId,
+      content: content(),
+      notes: EMPTY_NOTES,
+    });
+    expect(run.trace.digest).toContain("OVERDUE");
   });
 
   it("rejects a forbidden kind from the narrator regardless of prompt", () => {

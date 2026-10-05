@@ -72,9 +72,14 @@ describe("serialize / restore", () => {
     expect(() =>
       restore({ ...envelope, schemaVersion: SCHEMA_VERSION + 1 }, world.content, registry),
     ).toThrow(/newer than this build supports/);
-    expect(() => migrateState({}, SCHEMA_VERSION - 1, { content: world.content }, {})).toThrow(
-      SaveCompatibilityError,
-    );
+    expect(() =>
+      migrateState(
+        {},
+        SCHEMA_VERSION - 1,
+        { content: world.content, config: world.config.values },
+        {},
+      ),
+    ).toThrow(SaveCompatibilityError);
   });
 
   it("refuses a schema-6 save rather than migrating its pre-ship-life geometry (D74)", () => {
@@ -83,6 +88,101 @@ describe("serialize / restore", () => {
     const old = { ...envelope, schemaVersion: 6, state: { ...envelope.state, schemaVersion: 6 } };
     expect(() => restore(old, world.content, registry)).toThrow(SaveCompatibilityError);
     expect(() => restore(old, world.content, registry)).toThrow(/predates ship life/);
+  });
+
+  it("migrates a schema-7 save to 8: sections from the scenario's bill, empty thoughts and hazards, the hazard budget (D77-D79)", () => {
+    const { world, kernel, registry } = tinyTestWorld();
+    kernel.advance(world, 40);
+    const envelope = serialize(world);
+    // Schema 7's shape: shifts, no thoughts, no watch or hazards, a two-line budget, staffing
+    // problems owned by travel without a post.
+    type Json = Record<string, unknown>;
+    const at = (value: unknown, key: string) => (value as Json)[key] as Json;
+    const raw = JSON.parse(JSON.stringify(envelope.state)) as Json;
+    raw.schemaVersion = 7;
+    for (const actor of Object.values(at(raw, "actors")) as Json[]) {
+      actor.schedule = { shiftKey: "alpha" };
+    }
+    const strip = (value: Json, key: string) => {
+      const { [key]: _gone, ...rest } = value;
+      return rest;
+    };
+    const stripped = strip(strip(raw, "watch"), "hazards");
+    stripped.nextId = strip(at(raw, "nextId"), "hazard");
+    stripped.actors = Object.fromEntries(
+      Object.entries(at(raw, "actors")).map(([id, actor]) => [
+        id,
+        strip(actor as Json, "thoughts"),
+      ]),
+    );
+    const narrator = strip(at(raw, "narrator"), "budgetRefilledTick");
+    narrator.budget = strip(at(narrator, "budget"), "hazardsRemaining");
+    stripped.narrator = narrator;
+    const problems = at(at(stripped, "work"), "problems");
+    problems.p99 = {
+      id: "p99",
+      kind: "stationToStaff",
+      payload: { machineId: "m1" },
+      owner: "travel",
+      visibility: "public",
+      dedupeKey: "stationToStaff:m1",
+      status: "resolved",
+      createdTick: 1,
+      revision: 1,
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId: "m1" },
+    };
+    const nextId = at(stripped, "nextId");
+    nextId.problem = Math.max(nextId.problem as number, 100);
+    const old = { ...envelope, schemaVersion: 7, state: stripped } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const state = restored.state;
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.actors["a1" as never]?.schedule).toEqual({ section: { key: "alpha", index: 0 } });
+    expect(state.actors["a1" as never]?.thoughts).toEqual([]);
+    expect(state.watch).toEqual({ lastBellWatch: 0, helm: {} });
+    expect(state.hazards).toEqual([]);
+    expect(state.nextId.hazard).toBe(1);
+    expect(state.narrator.budget.hazardsRemaining).toBe(world.config.values.narrator.hazardBudget);
+    expect(state.narrator.budgetRefilledTick).toBe(40);
+    expect(state.work.problems["p99" as never]).toMatchObject({
+      owner: "watch",
+      payload: { machineId: "m1", post: "watch" },
+    });
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(60);
+  });
+
+  it("restores a save whose config has the pre-D76 seconds names: new names from content, old ones unread", () => {
+    const { world, kernel, registry } = tinyTestWorld();
+    const envelope = serialize(world);
+    // A schema-7 save from before the day units: the same knobs under their seconds names.
+    const { mealDays: _meal, ...needs } = envelope.config.needs;
+    const { quietTooLongDays: _quiet, ...narrator } = envelope.config.narrator;
+    const { daySeconds: _day, watchesPerDay: _watches, ...time } = envelope.config.time;
+    const old = {
+      ...envelope,
+      config: {
+        ...envelope.config,
+        time,
+        needs: { ...needs, mealSeconds: 10 },
+        narrator: { ...narrator, quietTooLongSeconds: 600 },
+      },
+    } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const values = restored.config.values;
+    expect(values.needs.mealDays).toBe(world.content.config.needs.mealDays);
+    expect(values.narrator.quietTooLongDays).toBe(world.content.config.narrator.quietTooLongDays);
+    expect(values.time.daySeconds).toBe(world.content.config.time.daySeconds);
+    expect(values.time.watchesPerDay).toBe(world.content.config.time.watchesPerDay);
+    expect(restored.warnings.join("\n")).toMatch(
+      /config\.needs\.mealDays.*config\.narrator\.quietTooLongDays/s,
+    );
+    // The world runs on: the quiet timer reads the filled key, not the stale one.
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(world.state.tick + 20);
   });
 
   it("restores a save made with other content, with a warning", () => {
