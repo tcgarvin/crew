@@ -45,6 +45,7 @@ import {
   drawSky,
 } from "./scenery";
 import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
+import { sessionMemberIds, sessionPlateText } from "./sessions";
 import { disc } from "./shapes";
 import { type StarLayer, drawStars } from "./stars";
 
@@ -688,12 +689,19 @@ export function crewLabelTexts(actor: Pick<RenderActor, "name" | "actionLabel">)
   return short.length < full.length ? [full, short] : [full];
 }
 
-/** One label over a person's dot, deck frame. */
+/**
+ * Who a label is for, in the order they are placed: a group session's plate (slice 4) first, as
+ * it stands for several people; then the crew; the dock's locals last.
+ */
+const LABEL_RANK = { session: 0, crew: 1, local: 2 } as const;
+
+/** One label over a person's dot (or a session's venue), deck frame. */
 interface PersonLabel {
   readonly x: number;
   readonly y: number;
   /** Preferred first (`crewLabelTexts`). */
   readonly texts: readonly string[];
+  readonly rank: (typeof LABEL_RANK)[keyof typeof LABEL_RANK];
   /** The dock's own people (D68) are labelled in a dimmer colour, so the crew read first. */
   readonly local: boolean;
   /** Pushing a loaded hand truck or trolley, drawn beside the dot: the label clears its handle. */
@@ -714,16 +722,33 @@ function truckPushers(frame: RenderFrame): Set<string> {
 
 const LOCAL_TEXT_COLOR = "#b9c4cf";
 
-/** The crew's labels, then the labels of locals doing something (`localLabelText`). */
+/**
+ * One plate per group session at its venue (`sessionPlateText`), the crew's labels but for the
+ * sessions' members (slice 4, call 17), then the labels of locals doing something
+ * (`localLabelText`).
+ */
 function personLabels(frame: RenderFrame): PersonLabel[] {
   const pushers = truckPushers(frame);
-  const labels: PersonLabel[] = frame.actors.map((actor) => ({
-    x: actor.x,
-    y: actor.y,
-    texts: crewLabelTexts(actor),
+  const members = sessionMemberIds(frame);
+  const labels: PersonLabel[] = frame.sessions.map((session) => ({
+    x: session.x,
+    y: session.y,
+    texts: [sessionPlateText(session, frame)],
+    rank: LABEL_RANK.session,
     local: false,
-    pushing: pushers.has(actor.id),
+    pushing: false,
   }));
+  for (const actor of frame.actors) {
+    if (members.has(actor.id)) continue;
+    labels.push({
+      x: actor.x,
+      y: actor.y,
+      texts: crewLabelTexts(actor),
+      rank: LABEL_RANK.crew,
+      local: false,
+      pushing: pushers.has(actor.id),
+    });
+  }
   for (const local of frame.locals) {
     const text = localLabelText(local);
     if (text !== undefined) {
@@ -731,6 +756,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
         x: local.x,
         y: local.y,
         texts: [truncateLabel(text, 34)],
+        rank: LABEL_RANK.local,
         local: true,
         pushing: local.carrying > 0,
       });
@@ -774,10 +800,7 @@ function placePersonLabels(
     // D72: a label names a dot the player can see. While the dock slides in, its people are still
     // off the canvas, and a label clamped onto the edge would float there on its own.
     .filter(({ at: [x, y] }) => x >= 0 && x <= viewportWidth && y >= 0 && y <= viewportHeight)
-    .sort(
-      (a, b) =>
-        Number(a.entry.local) - Number(b.entry.local) || b.at[1] - a.at[1] || a.at[0] - b.at[0],
-    );
+    .sort((a, b) => a.entry.rank - b.entry.rank || b.at[1] - a.at[1] || a.at[0] - b.at[0]);
   const requests: LabelRequest[] = shown.map(({ entry, at: [dotX, dotY] }) => ({
     dotX,
     dotY,
@@ -826,6 +849,7 @@ const LEADER_COLOR = "rgba(231, 237, 243, 0.55)";
  * Name/action labels for the crew and passengers, and for the dock's locals while they are doing
  * something (D68), drawn in real screen space (after any rotation is undone) so text always reads
  * upright, per task item 5. Crowded labels move around their dots and shorten (`placeLabels`).
+ * Slice 4: a group session is one plate at its venue in place of its members' labels.
  */
 export function drawActorLabels(
   ctx: CanvasRenderingContext2D,

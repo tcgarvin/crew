@@ -185,16 +185,29 @@ export const HAZARD_DIFFICULTIES = [
 ] as const satisfies readonly (keyof ConfigDef["hazards"]["difficulty"])[];
 export type HazardDifficulty = (typeof HAZARD_DIFFICULTIES)[number];
 
+/**
+ * D86: a `privateTalk` side's tone as the model writes it; empty for any other effect (D45: an
+ * empty string, not a nullable).
+ */
+export const PRIVATE_TALK_TONES = ["warm", "stern", ""] as const;
+
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
     label: z.string().describe("What the captain says or does, two to six words."),
     /**
      * Side effect when chosen; `setCourse` needs `coursePort`. Passengers-and-galaxy §4.2:
-     * `endPassage` puts the current passenger off at the next docking (no fare).
+     * `endPassage` puts the current passenger off at the next docking (no fare). D86:
+     * `privateTalk` calls a crew member (`talkWith`) to the captain's cabin for a word in `tone`.
      */
-    effect: z.enum(["none", "setCourse", "endPassage"]),
+    effect: z.enum(["none", "setCourse", "endPassage", "privateTalk"]),
     coursePort: z.string().describe("Port id if effect is setCourse; else empty."),
+    talkWith: z
+      .string()
+      .describe("Crew member's full name, as Crew lists it, if effect is privateTalk; else empty."),
+    tone: z
+      .enum(PRIVATE_TALK_TONES)
+      .describe("warm or stern if effect is privateTalk; else empty."),
   });
 
   // D25: every offer comes from a named person who says something; D24: nobody talks pay.

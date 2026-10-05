@@ -63,12 +63,15 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  registerCabins,
   registerCommerce,
   registerDirt,
   registerEquipmentSystems,
   registerGalley,
   registerNeeds,
   registerPlannerDefaults,
+  registerRecreation,
+  registerSocial,
   registerSpatial,
   registerTravel,
   registerWatch,
@@ -194,6 +197,9 @@ export function createPacingRegistry(): KernelRegistry {
   registerNeeds(registry);
   registerWatch(registry);
   registerGalley(registry);
+  registerRecreation(registry);
+  registerSocial(registry);
+  registerCabins(registry);
   registerWork(registry, {
     derivations: {
       ...equipmentTaskDerivation,

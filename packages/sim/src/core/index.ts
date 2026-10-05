@@ -3,7 +3,7 @@
  * invariants and serialize/restore/migrate. Contracts are in `./types`.
  */
 export * from "./types";
-export { actionLabel, describeEvent, getDirtFrame, getRenderFrame } from "./render";
+export { actionLabel, describeEvent, getDirtFrame, getRenderFrame, tickerLine } from "./render";
 export { cellIndex, emptyCells, inGrid, roomCells } from "./dirt-grid";
 export {
   configTicks,

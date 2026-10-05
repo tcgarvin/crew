@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.the_vid",
+  "label": "the vid",
+  "weights": {
+    "orderFreedom": 0,
+    "faithReason": 0,
+    "loyaltyAmbition": 0
+  }
+}

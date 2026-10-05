@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "wonContest",
+  "label": "won a game",
+  "value": 0.1,
+  "durationDays": 0.3,
+  "stacks": true
+}

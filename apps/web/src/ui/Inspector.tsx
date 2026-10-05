@@ -17,7 +17,13 @@ export type InspectorData =
       /** D77/D79: their watch, mood and thoughts in words (`personWords`). */
       readonly person: PersonWords;
     }
-  | { readonly kind: "machine"; readonly machine: Machine; readonly name?: string }
+  | {
+      readonly kind: "machine";
+      readonly machine: Machine;
+      readonly name?: string;
+      /** Slice 4: the session held at this machine (`gatheringLine`), when there is one. */
+      readonly gathering?: string;
+    }
   | { readonly kind: "item"; readonly item: ItemInspection }
   /** Dockside phase 2: a dock post, or the dock itself; phase 3 (D68): a staged prop. */
   | { readonly kind: "place"; readonly place: PlaceInspection }
@@ -70,7 +76,9 @@ export function Inspector({ data, onClose }: InspectorProps) {
         {data.kind === "actor" && (
           <ActorInspector view={data.view} label={data.label} person={data.person} />
         )}
-        {data.kind === "machine" && <MachineInspector machine={data.machine} name={data.name} />}
+        {data.kind === "machine" && (
+          <MachineInspector machine={data.machine} name={data.name} gathering={data.gathering} />
+        )}
         {data.kind === "item" && <ItemInspector item={data.item} />}
         {data.kind === "place" && <PlaceInspector place={data.place} />}
         {data.kind === "local" && <LocalInspector local={data.local} />}
@@ -119,7 +127,7 @@ function ActorInspector({
           ) : (
             <ul className="inspector-thoughts">
               {person.thoughts.map((t) => (
-                <li key={t.key} className={t.value < 0 ? "thought-down" : "thought-up"}>
+                <li key={t.label} className={t.value < 0 ? "thought-down" : "thought-up"}>
                   {thoughtText(t)}
                 </li>
               ))}
@@ -134,6 +142,22 @@ function ActorInspector({
         <dd>{Math.round(self.needs.comfort * 100)}%</dd>
         <dt>Social</dt>
         <dd>{Math.round(self.needs.social * 100)}%</dd>
+        <dt>Recreation</dt>
+        <dd>{Math.round(self.needs.recreation * 100)}%</dd>
+        <dt>Off watch</dt>
+        <dd>{person.interests}</dd>
+        {person.relationships.length > 0 && (
+          <>
+            <dt>People</dt>
+            <dd>
+              <ul className="inspector-people">
+                {person.relationships.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        )}
       </dl>
       <h3>Known problems</h3>
       {view.problems.length === 0 && <p className="inspector-empty">None known.</p>}
@@ -159,7 +183,15 @@ function ActorInspector({
   );
 }
 
-function MachineInspector({ machine, name }: { machine: Machine; name?: string | undefined }) {
+function MachineInspector({
+  machine,
+  name,
+  gathering,
+}: {
+  machine: Machine;
+  name?: string | undefined;
+  gathering?: string | undefined;
+}) {
   return (
     <div>
       <h2>{name ?? machine.defId}</h2>
@@ -176,6 +208,12 @@ function MachineInspector({ machine, name }: { machine: Machine; name?: string |
         <dd>
           {machine.faults.length === 0 ? "none" : machine.faults.map((f) => f.faultKey).join(", ")}
         </dd>
+        {gathering !== undefined && (
+          <>
+            <dt>Gathering</dt>
+            <dd>{gathering}</dd>
+          </>
+        )}
       </dl>
     </div>
   );

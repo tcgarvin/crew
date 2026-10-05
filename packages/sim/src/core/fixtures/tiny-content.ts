@@ -15,11 +15,16 @@ import type {
 } from "../types/ids";
 import type { EffectiveConfig } from "../types/kernel";
 import {
+  FIXTURE_ACTIVITIES,
+  FIXTURE_CABINS,
   FIXTURE_DIRT,
   FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
   FIXTURE_MOOD,
+  FIXTURE_RECREATION,
+  FIXTURE_SOCIAL,
   FIXTURE_THOUGHTS,
+  FIXTURE_TOPICS,
   fixtureWatches,
 } from "./ship-life";
 
@@ -84,6 +89,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       comfortRecoveryPerDayResting: 0.01 * day,
       socialPerDay: 0.001 * day,
       socialRecoveryPerDayChatting: 0.01 * day,
+      recreationPerDay: 0.001 * day,
       seekThreshold: 0.5,
       mealDays: 10 / day,
       sleepDays: 60 / day,
@@ -94,6 +100,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
         fatigue: { min: 0, max: 0 },
         comfort: { min: 0, max: 0 },
         social: { min: 0, max: 0 },
+        recreation: { min: 0, max: 0 },
       },
     },
     work: {
@@ -197,7 +204,10 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
       templateLines: ["{a} joked about the food", "{a} and {b} swapped gossip from the last port"],
+      ...FIXTURE_SOCIAL,
     },
+    recreation: FIXTURE_RECREATION,
+    cabins: FIXTURE_CABINS,
     events: { tickerMaxEntries: 20, traceRingSize: 100 },
   };
 }
@@ -382,6 +392,8 @@ export function tinyContent(config: ConfigDef = tinyConfig()): ContentBundle {
       },
     },
     thoughts: FIXTURE_THOUGHTS,
+    activities: FIXTURE_ACTIVITIES,
+    topics: FIXTURE_TOPICS,
     config,
     hash: "tiny-content-v1",
   };

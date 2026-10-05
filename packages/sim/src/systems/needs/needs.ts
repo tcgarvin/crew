@@ -12,7 +12,10 @@
  * - comfort: falls at `comfortRecoveryPerDayResting` while resting, socializing or asleep;
  *   rises at `comfortPerDay` otherwise.
  * - social: falls at `socialRecoveryPerDayChatting` while socializing; rises otherwise.
- * Rates are scaled by trait modifiers (`hungerRate`, `fatigueRate`, `comfortRate`, `socialRate`).
+ * - recreation (slice 4): rises at `recreationPerDay`; while an activity runs, recreation's
+ *   `recreationRatesFor` gives the rates it sets (`systems/recreation/needs.ts`).
+ * Rates are scaled by trait modifiers (`hungerRate`, `fatigueRate`, `comfortRate`, `socialRate`,
+ * `recreationRate`).
  * They are authored per ship's day and converted to per second here, where read (D76).
  *
  * W4a decision: severe fatigue impairs capacities through existing config, no new fields: above
@@ -30,6 +33,7 @@ import type { KernelRegistry, Unregister } from "../../core/registry";
 import type { Actor, NeedKey } from "../../core/types/actor";
 import type { TraitModifierKey } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
+import { recreationRatesFor } from "../recreation/needs";
 import { currentHold } from "../work/activity";
 import { berthsSystem } from "./berths";
 import { moodSystem } from "./mood";
@@ -41,6 +45,7 @@ const RATE_MODIFIER: Readonly<Record<NeedKey, TraitModifierKey>> = {
   fatigue: "fatigueRate",
   comfort: "comfortRate",
   social: "socialRate",
+  recreation: "recreationRate",
 };
 
 function traitMultiplier(ctx: StepCtx, actor: Actor, key: TraitModifierKey): number {
@@ -66,18 +71,23 @@ function needRatesPerDay(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
     : working
       ? needs.fatiguePerDayWorking
       : needs.fatiguePerDayAwake;
-  return {
+  const rates = {
     hunger: needs.hungerPerDay,
     fatigue,
     comfort: resting ? -needs.comfortRecoveryPerDayResting : needs.comfortPerDay,
     social: hold === "socialize" ? -needs.socialRecoveryPerDayChatting : needs.socialPerDay,
+    recreation: needs.recreationPerDay,
   };
+  // Slice 4 (call 1): an activity under way sets its own rates (restores, fatigue cost).
+  const recreating = recreationRatesFor(ctx, actor);
+  return recreating === undefined ? rates : { ...rates, ...recreating };
 }
 
 function emitCrossings(ctx: StepCtx, actor: Actor, key: NeedKey, before: number, after: number) {
   const survival = ctx.config.urgency.needSurvivalAbove;
   const seek = ctx.config.needs.seekThreshold;
-  const critical = before <= survival && after > survival;
+  // Slice 4: boredom is never a survival matter (call 1), so it has no critical crossing.
+  const critical = key !== "recreation" && before <= survival && after > survival;
   if (!critical && before <= seek === after <= seek) return;
   ctx.emit({
     type: "needThresholdCrossed",

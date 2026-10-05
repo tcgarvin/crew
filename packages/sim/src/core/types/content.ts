@@ -10,8 +10,10 @@
  * normalised units where 1.0 is the machine's failure temperature. The kernel converts seconds
  * to ticks with ceil.
  */
+import type { Interests, Values } from "./actor";
 import type { Days, EdgeSide, Rotation, Seconds, TileCoord, TileEdge } from "./common";
 import type {
+  ActivityDefId,
   CrewDefId,
   DeckDefId,
   DockDefId,
@@ -20,8 +22,10 @@ import type {
   MachineDefId,
   PortDefId,
   ScenarioDefId,
+  TopicDefId,
   TraitDefId,
 } from "./ids";
+import type { ProblemKind } from "./work";
 
 // ---------------------------------------------------------------------------------------------
 // Shared vocabularies (closed enums the kernel branches on)
@@ -67,6 +71,12 @@ export const ITEM_TAGS = [
   "provisions",
   /** D81: a cooked serving (also `food`); carries `Item.meal` once served. */
   "meal",
+  /** Slice 4: something to read off the shelf (`ActivityDef.requires`). */
+  "book",
+  /** Slice 4: something to play (the harmonica); `personal` too, so it is someone's. */
+  "instrument",
+  /** Slice 4: a baked snack (also `food`), eaten where found; never `meal`. */
+  "treat",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
 
@@ -159,6 +169,36 @@ export const THOUGHT_KEYS = [
   /** D82: ate in a room at the `dirty` tier; `ateInFilthyMess` at `filthy` (two keys, D79). */
   "ateInDirtyMess",
   "ateInFilthyMess",
+  /** Slice 4: contest outcomes (`ActivityDef.thoughts.win`/`lose`). */
+  "wonContest",
+  "lostContest",
+  /** Slice 4: a losing streak at `social.rivalry.streakFor`; `refId` is the winner. */
+  "keepsBeatingMe",
+  /** Slice 4: a bond outcome, or `joined` a session. */
+  "goodCompany",
+  /** Slice 4: a debate within `social.debate.agreeWithin`. */
+  "spiritedTalk",
+  /** Slice 4: a debate beyond `social.debate.argueBeyond`; `refId` is the other. */
+  "argued",
+  /** Slice 4: a bystander to a debate who does not like debate. */
+  "gotLectured",
+  /** Slice 4: a performance heard by a music-liker / a music-disliker. */
+  "enjoyedMusic",
+  "hatedTheNoise",
+  /** Slice 4: a sparring knock (`ActivityDef.risk`). */
+  "sparringBruise",
+  /** Slice 4: woke in one's own cabin / in a bunkroom someone kept awake. */
+  "ownCabin",
+  "noisyBunkroom",
+  /** Slice 4: crew with no berth, refreshed by the cabins system. */
+  "noBunkOfMyOwn",
+  /** Slice 4: seated beside the captain at the captain's table. */
+  "satWithTheCaptain",
+  /** Slice 4: a `privateTalk`, warm / stern. */
+  "heardOut",
+  "dressedDown",
+  /** Slice 4: ate a `treat`-tagged item. */
+  "ateATreat",
 ] as const;
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
 
@@ -183,6 +223,34 @@ export type MealQuality = (typeof MEAL_QUALITIES)[number];
  */
 export const HAZARD_KINDS = ["debrisField", "asteroidBelt", "ionStorm"] as const;
 export type HazardKind = (typeof HAZARD_KINDS)[number];
+
+/**
+ * Slice 4: what people like doing off watch (`Actor.interests`, `ActivityDef.interest`). A closed
+ * set because the planner scores activities by it; `gossip` scores nothing until an activity
+ * names it.
+ */
+export const INTEREST_TAGS = [
+  "cards",
+  "boardgames",
+  "vids",
+  "debate",
+  "music",
+  "exercise",
+  "sparring",
+  "reading",
+  "tinkering",
+  "cooking",
+  "stargazing",
+  "gossip",
+] as const;
+export type InterestTag = (typeof INTEREST_TAGS)[number];
+
+/**
+ * Slice 4: how a group activity ends (`systems/social/outcomes.ts` `resolveOutcome`): a winner,
+ * a bond all round, a debate on a topic, a performance for the room, or nothing.
+ */
+export const ACTIVITY_OUTCOMES = ["contest", "bond", "debate", "perform", "none"] as const;
+export type ActivityOutcome = (typeof ACTIVITY_OUTCOMES)[number];
 
 // ---------------------------------------------------------------------------------------------
 // Deck
@@ -648,6 +716,13 @@ export interface CrewDef {
    * they want (that surfaces as narrator threads). The narrator writes them in it.
    */
   readonly voice: string;
+  /**
+   * Slice 4: what they like and dislike doing off watch. Absent, they are generated at spawn
+   * (`core/interests.ts` `generateInterests`, the `setup` stream).
+   */
+  readonly interests?: Interests;
+  /** Slice 4: where they stand on the three value axes. Absent, generated with `interests`. */
+  readonly values?: Values;
 }
 
 /** Things a trait may scale. Each modifier is a multiplier (1 = no effect). */
@@ -658,6 +733,8 @@ export const TRAIT_MODIFIERS = [
   "socialRate",
   "workSpeed",
   "walkSpeed",
+  /** Slice 4: scales `needs.recreationPerDay` (`loner` 0.8). */
+  "recreationRate",
 ] as const;
 export type TraitModifierKey = (typeof TRAIT_MODIFIERS)[number];
 
@@ -687,6 +764,99 @@ export interface ThoughtDef {
   readonly value: number;
   readonly durationDays: Days;
   readonly stacks: boolean;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Off watch (slice 4)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Slice 4: one place an activity can happen, matched against the ship's deck by tag. Exactly one
+ * of `machineTag` (stand at one of the machine's `use` positions), `zoneTag` (a free tile of a
+ * zone carrying the tag) or `compartmentTag` (a free floor tile of a compartment carrying it).
+ * `own` restricts a machine to the actor's berth compartment (reading at one's own desk).
+ */
+export interface VenueDef {
+  readonly machineTag?: MachineTag;
+  readonly zoneTag?: string;
+  readonly compartmentTag?: string;
+  readonly own?: true;
+}
+
+/** Slice 4: the needs an activity restores, as the total over its `durationDays`. */
+export type ActivityRestores = Readonly<
+  Partial<Record<"recreation" | "social" | "comfort", number>>
+>;
+
+/**
+ * Slice 4: an off-watch activity (`data/activities/`). `venue` is an ordered list of
+ * alternatives; the first present on the deck wins. `restores` and `fatigueCost` are totals over
+ * `durationDays`, applied per tick while it runs, so an interrupted game restores in proportion.
+ * `solo` is how a group activity is played alone when nobody joins (absent: the host gives up).
+ * `thoughts` names keys of the closed `THOUGHT_KEYS` set, never new ones.
+ */
+export interface ActivityDef {
+  readonly id: ActivityDefId;
+  /** Present-tense label while it runs: "playing cards". */
+  readonly label: string;
+  /** Label while the host waits for others: "waiting for a game of cards". */
+  readonly waitingLabel: string;
+  readonly interest: InterestTag;
+  readonly venue: readonly VenueDef[];
+  readonly participants: { readonly min: number; readonly max: number };
+  readonly durationDays: Days;
+  readonly restores: ActivityRestores;
+  /** Fatigue added over `durationDays` (exercise, sparring). */
+  readonly fatigueCost?: number;
+  readonly solo?: {
+    readonly label: string;
+    readonly durationDays: Days;
+    readonly restores: ActivityRestores;
+  };
+  readonly outcome: ActivityOutcome;
+  readonly thoughts?: Readonly<
+    Partial<Record<"win" | "lose" | "joined" | "listened" | "listenedDislike", ThoughtKey>>
+  >;
+  /** Integer affinity moves at the end: all members pairwise, winner to loser, loser to winner. */
+  readonly affinity?: {
+    readonly participants: number;
+    readonly winnerToLoser: number;
+    readonly loserToWinner: number;
+  };
+  /** A debate's (or a vid's) topics, one picked per session. */
+  readonly topics?: readonly TopicDefId[];
+  readonly skillGain?: { readonly skill: SkillId; readonly perDay: number };
+  /** Per member, per session: the chance of a knock (`sparringBruise`, `tookAKnock`). */
+  readonly risk?: { readonly injuryChance: number };
+  /** Dirt deposited at the venue tile at the end (`depositDirt`). */
+  readonly dirt?: number;
+  /** An item fetched first and put back after: a `book` off the shelf, one's own `instrument`. */
+  readonly requires?: { readonly itemTag: ItemTag; readonly own?: true };
+  /** Items spawned on the first tile of a zone carrying `zoneTag` at the end (baking). */
+  readonly produces?: {
+    readonly itemDefId: ItemDefId;
+    readonly count: number;
+    readonly zoneTag: string;
+  };
+  /** Offered only in transit (stargazing). */
+  readonly transitOnly?: true;
+  /** Not offered while a public problem of one of these kinds is open (baking vs dinner). */
+  readonly blockedByProblems?: readonly ProblemKind[];
+}
+
+/**
+ * Slice 4: something a debate is about. `weights` in [-1, 1] per value axis; a member's stance is
+ * the dot product with their `values` (`core/interests.ts` `stanceOn`).
+ */
+export interface TopicDef {
+  readonly id: TopicDefId;
+  /** Lower case, for the ticker: "the Guild", "faith". */
+  readonly label: string;
+  readonly weights: {
+    readonly orderFreedom: number;
+    readonly faithReason: number;
+    readonly loyaltyAmbition: number;
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -889,6 +1059,11 @@ export interface ConfigDef {
     readonly socialPerDay: number;
     /** About 10 a day chatting: a full deficit is cleared in 0.1 day. */
     readonly socialRecoveryPerDayChatting: number;
+    /**
+     * Slice 4: boredom per day (0.6: the seek threshold in a bit under a day). Activities restore
+     * it (`ActivityDef.restores.recreation`).
+     */
+    readonly recreationPerDay: number;
     /** Deficit above which a personal activity becomes a routine candidate. */
     readonly seekThreshold: number;
     /** D76: how long a meal takes, in days (0.0125 day is 15 s of a 1200 s day). */
@@ -913,7 +1088,7 @@ export interface ConfigDef {
      */
     readonly initialRange: Readonly<
       Record<
-        "hunger" | "fatigue" | "comfort" | "social",
+        "hunger" | "fatigue" | "comfort" | "social" | "recreation",
         { readonly min: number; readonly max: number }
       >
     >;
@@ -1214,6 +1389,11 @@ export interface ConfigDef {
     /** Cooking at or above this serves `good`; below `poorCookingBelow`, `poor`; else `plain`. */
     readonly goodCookingAbove: number;
     readonly poorCookingBelow: number;
+    /**
+     * Slice 4: hunger above which a known `treat` is a voluntary `eat` candidate, eaten where
+     * found (below `mealCallHungerAbove`, so a treat never replaces dinner).
+     */
+    readonly treatHungerAbove: number;
   };
   /**
    * D82: dirt. A cell is 0..255 (255 = 1.0 of dirt); footfall, boots and deposits are unitless
@@ -1277,6 +1457,42 @@ export interface ConfigDef {
     readonly chatCooldownSeconds: Seconds;
     /** Templates with `{a}` (speaker) and `{b}` (listener) placeholders. */
     readonly templateLines: readonly string[];
+    /** Slice 4: affinity an ambient chat moves, both ways (`systems/social/chat.ts`). */
+    readonly chatAffinity: number;
+    /** Slice 4: a pair's chat moves affinity at most once in this many days. */
+    readonly chatAffinityEveryDays: Days;
+    /** Slice 4: affinity is an integer in [-affinityRange, affinityRange]. */
+    readonly affinityRange: number;
+    /** Slice 4: at or below this, someone is avoided (seats, sessions). */
+    readonly avoidBelow: number;
+    /** Slice 4: above this, someone is sought out (seats, sessions). */
+    readonly preferAbove: number;
+    /** Slice 4: a losing run this long at one activity against one person is a rivalry. */
+    readonly rivalry: { readonly streakFor: number };
+    /** Slice 4: debate stances within `agreeWithin` agree; beyond `argueBeyond` argue. */
+    readonly debate: { readonly agreeWithin: number; readonly argueBeyond: number };
+  };
+  /** Slice 4: off-watch recreation (`systems/recreation/`). */
+  readonly recreation: {
+    /** Recreation above which joining an open session is a candidate (voluntary class). */
+    readonly joinAbove: number;
+    /** How long an open session waits for members before it starts or collapses. */
+    readonly gatherSeconds: Seconds;
+    /** How long after a session starts a latecomer may still join. */
+    readonly lateJoinSeconds: Seconds;
+    /** A host whose session collapsed does not host that activity again for this long. */
+    readonly collapseBackoffDays: Days;
+  };
+  /** Slice 4: berths and the captain's cabin (`systems/cabins/`). */
+  readonly cabins: {
+    /** A bunkroom sleeper disturbed this long wakes with `noisyBunkroom`. */
+    readonly noisySeconds: Seconds;
+    /** Cadence of the `noBunkOfMyOwn` check. */
+    readonly checkEverySeconds: Seconds;
+    /** How long a `privateTalk` lasts with both in the cabin. */
+    readonly privateTalkSeconds: Seconds;
+    /** A `privateTalk` not held this long after it was called is missed. */
+    readonly privateTalkWaitSeconds: Seconds;
   };
   readonly events: {
     readonly tickerMaxEntries: number;
@@ -1341,6 +1557,10 @@ export interface ContentBundle {
   readonly docks?: Readonly<Record<DockDefId, DockDef>>;
   /** D79: every thought's def; required, so a missing one fails validation (and `createWorld`). */
   readonly thoughts: Readonly<Record<ThoughtKey, ThoughtDef>>;
+  /** Slice 4: off-watch activities by id (required; may be empty in a hand-built bundle). */
+  readonly activities: Readonly<Record<ActivityDefId, ActivityDef>>;
+  /** Slice 4: debate topics by id (required; may be empty in a hand-built bundle). */
+  readonly topics: Readonly<Record<TopicDefId, TopicDef>>;
   readonly config: ConfigDef;
   readonly hash: string;
 }

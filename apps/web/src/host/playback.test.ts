@@ -33,6 +33,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     headline: "",
     locals: [],
     dockProps: [],
+    sessions: [],
   };
 }
 
@@ -86,6 +87,22 @@ describe("interpolateFrame", () => {
     const b = frame(10, 5, 5);
     const mid = interpolateFrame(a, b, 0.5);
     expect(firstActor(mid)).toEqual(firstActor(b));
+  });
+
+  it("snaps group sessions to the next frame (slice 4)", () => {
+    const a = frame(0, 0, 0);
+    const session = {
+      id: "session:1",
+      activityId: "activity.cards",
+      label: "playing cards",
+      x: 7,
+      y: 5,
+      memberIds: ["a1"],
+      running: true,
+    } as unknown as RenderFrame["sessions"][number];
+    const b: RenderFrame = { ...frame(10, 5, 5), sessions: [session] };
+    expect(interpolateFrame(a, b, 0.1).sessions).toEqual([session]);
+    expect(interpolateFrame(b, a, 0.1).sessions).toEqual([]);
   });
 });
 

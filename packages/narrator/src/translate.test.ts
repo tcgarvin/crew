@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from "vitest";
 import type { NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
 import {
+  FIXTURE_PASSENGER,
   approachRequest,
   farCaptainAshoreRequest,
   passengerAboardRequest,
@@ -61,8 +62,14 @@ const decision = {
   title: "A request at the ramp",
   speaker: "Oren Vale",
   situation: "A dock foreman asks whether we could run a sealed crate to the Hub on our way.",
-  left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
-  right: { label: "Not our business", effect: "none", coursePort: "" },
+  left: {
+    label: "Head for the Hub",
+    effect: "setCourse",
+    coursePort: "port.crossroads_hub",
+    talkWith: "",
+    tone: "",
+  },
+  right: { label: "Not our business", effect: "none", coursePort: "", talkWith: "", tone: "" },
   leftAftermath: "We set course for the Hub with the crate aboard.",
   rightAftermath: "The foreman nods and goes looking for another ship.",
   beatOfThread: "",
@@ -76,8 +83,8 @@ const beatCard = {
   speaker: "Dane Whitcross",
   situation:
     "Dane stops by the hatch, tablet in hand. “Captain. The aft sensor picked up something on the last sweep. Gone now. I have logged it.”",
-  left: { label: "Keep an eye on it.", effect: "none", coursePort: "" },
-  right: { label: "Probably nothing.", effect: "none", coursePort: "" },
+  left: { label: "Keep an eye on it.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+  right: { label: "Probably nothing.", effect: "none", coursePort: "", talkWith: "", tone: "" },
   leftAftermath: "Dane nods and adds it to his watch list.",
   rightAftermath: "Dane files it and goes back to his rounds.",
   beatOfThread: "the aft sensor",
@@ -157,7 +164,13 @@ describe("translateIntents: far ports (passengers-and-galaxy §2.3)", () => {
     const req = docked(approachRequest(content()), HUB);
     const card = {
       ...decision,
-      left: { label: "Make for Ossory", effect: "setCourse", coursePort: OSSORY },
+      left: {
+        label: "Make for Ossory",
+        effect: "setCourse",
+        coursePort: OSSORY,
+        talkWith: "",
+        tone: "",
+      },
     };
     const result = translateIntents(plan([card]), ctxOf(req));
     expect(result.dropped).toEqual([]);
@@ -459,7 +472,13 @@ describe("translateIntents: beat cards (D39)", () => {
     const req = docked(quietTooLongRequest(content()));
     const steering = {
       ...beatCard,
-      left: { label: "Head for the Hub", effect: "setCourse", coursePort: "port.crossroads_hub" },
+      left: {
+        label: "Head for the Hub",
+        effect: "setCourse",
+        coursePort: "port.crossroads_hub",
+        talkWith: "",
+        tone: "",
+      },
     };
     const result = translateIntents(plan([steering]), { ...ctxOf(req), threads: [sensorThread] });
     expect(result.commands).toEqual([]);
@@ -617,7 +636,13 @@ describe("translateIntents: drops with reasons", () => {
         { kind: "scheduleFault", machine: pump?.id, faultKey: "gremlins", window: "soon" },
         {
           ...decision,
-          left: { label: "Go", effect: "setCourse", coursePort: "port.nowhere" },
+          left: {
+            label: "Go",
+            effect: "setCourse",
+            coursePort: "port.nowhere",
+            talkWith: "",
+            tone: "",
+          },
         },
       ]),
       ctxOf(req),
@@ -743,7 +768,7 @@ describe("translateIntents: drops with reasons", () => {
     const leak = {
       ...decision,
       situation: "Priya swears she hears a grinding noise from the pump. Stop and check?",
-      left: { label: "Stop and check", effect: "none", coursePort: "" },
+      left: { label: "Stop and check", effect: "none", coursePort: "", talkWith: "", tone: "" },
     };
     const numbers = {
       ...leak,
@@ -778,8 +803,8 @@ describe("translateIntents: malicious plans (N6)", () => {
       title: "x",
       speaker: "",
       situation: "y",
-      left: { label: "a", effect: "setMoney", coursePort: "" },
-      right: { label: "b", effect: "none", coursePort: "" },
+      left: { label: "a", effect: "setMoney", coursePort: "", talkWith: "", tone: "" },
+      right: { label: "b", effect: "none", coursePort: "", talkWith: "", tone: "" },
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
@@ -920,7 +945,10 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
   });
 
   it("a passenger offer after the call's card is dropped with its own reason, never posted quietly", () => {
-    const card = { ...decision, left: { label: "Fine by me", effect: "none", coursePort: "" } };
+    const card = {
+      ...decision,
+      left: { label: "Fine by me", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    };
     const result = translateIntents(plan([card, passage]), atHub());
     expect(result.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
     expect(result.dropped).toEqual([
@@ -997,8 +1025,14 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     speaker: "Dane Whitcross",
     situation:
       "Dane finds the captain by the galley hatch. “She's been in the hold twice tonight, Captain. Nothing missing that I can see. I'd put her off at the Drift and be done.”",
-    left: { label: "Put her off at the Drift.", effect: "endPassage", coursePort: "" },
-    right: { label: "She stays.", effect: "none", coursePort: "" },
+    left: {
+      label: "Put her off at the Drift.",
+      effect: "endPassage",
+      coursePort: "",
+      talkWith: "",
+      tone: "",
+    },
+    right: { label: "She stays.", effect: "none", coursePort: "", talkWith: "", tone: "" },
     leftAftermath: "Dane nods; she goes down the ramp at the next port.",
     rightAftermath: "Dane says nothing more about it, for now.",
   };
@@ -1031,6 +1065,135 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     const ended = translateIntents(plan([putOff]), ctxOf({ ...req, snapshot }));
     expect(ended.commands).toEqual([]);
     expect(ended.dropped[0]?.reason).toContain("endPassage needs a passenger");
+  });
+});
+
+describe("translateIntents: a privateTalk side (D86)", () => {
+  const side = (talkWith: string, tone: string) => ({
+    label: "My cabin. Now.",
+    effect: "privateTalk",
+    coursePort: "",
+    talkWith,
+    tone,
+  });
+  const talk = (talkWith: string, tone = "stern") => ({
+    ...decision,
+    title: "Words at the card table",
+    speaker: "Dane Whitcross",
+    situation:
+      "Dane stops the captain in the corridor. “Jax and Tomas are at it again over the cards, Captain. Someone should have a word.”",
+    left: side(talkWith, tone),
+    right: { label: "Let them be.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    leftAftermath: "Jax is told to come up to the captain's cabin.",
+    rightAftermath: "Dane goes back to his station.",
+  });
+
+  function translated(req: NarratorRequest, intent: unknown) {
+    return translateIntents(plan([intent]), ctxOf(req));
+  }
+
+  function actorId(req: NarratorRequest, name: string): string {
+    const actor = Object.values(req.snapshot.state.actors).find((a) => a.name === name);
+    if (actor === undefined) throw new Error(`fixture: no ${name}`);
+    return actor.id;
+  }
+
+  it.each(["warm", "stern"] as const)(
+    "a %s word with a crew member → privateTalk for them, as a player command",
+    (tone) => {
+      const req = quietTooLongRequest(content());
+      const result = translated(req, talk("jax okonkwo", tone));
+      expect(result.dropped).toEqual([]);
+      const [command] = result.commands;
+      if (command?.kind !== "surfaceDecision") throw new Error("no card");
+      expect(command.payload.card.left.commands).toEqual([
+        { kind: "privateTalk", payload: { actorId: actorId(req, "Jax Okonkwo"), tone } },
+      ]);
+      expect(command.payload.card.right.commands).toEqual([]);
+      expect((AUTHORITY.player as readonly CommandKind[]).includes("privateTalk")).toBe(true);
+    },
+  );
+
+  it("drops the card when the name is nobody aboard, or the tone or name is missing", () => {
+    const req = quietTooLongRequest(content());
+    expect(translated(req, talk("Oren Vale")).dropped[0]?.reason).toBe(
+      'surfaceDecision: left: talkWith "Oren Vale" is nobody aboard; use a name listed under Crew',
+    );
+    expect(translated(req, talk("")).dropped[0]?.reason).toBe(
+      "surfaceDecision: left: privateTalk needs talkWith (a crew member's name)",
+    );
+    expect(translated(req, talk("Jax Okonkwo", "")).dropped[0]?.reason).toBe(
+      "surfaceDecision: left: privateTalk needs tone warm or stern",
+    );
+  });
+
+  it("never calls in the captain, who does the calling", () => {
+    const result = translated(quietTooLongRequest(content()), talk("Mara Osei"));
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: left: Mara Osei is the captain, who does the calling in",
+    );
+  });
+
+  it("never calls in a passenger", () => {
+    const result = translated(passengerAboardRequest(content()), talk(FIXTURE_PASSENGER));
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      `surfaceDecision: left: ${FIXTURE_PASSENGER} is not crew; only crew are called in for a word`,
+    );
+  });
+
+  it("never calls in someone ashore", () => {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const jax = Object.values(snapshot.state.actors).find((a) => a.name === "Jax Okonkwo");
+    if (jax === undefined) throw new Error("fixture: no Jax");
+    jax.availability = "offShip";
+    const result = translated({ ...req, snapshot }, talk("Jax Okonkwo"));
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: left: Jax Okonkwo is not aboard to be called in",
+    );
+  });
+
+  it("drops the card while a talk is already pending", () => {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.social.privateTalk = {
+      captainId: actorId(req, "Mara Osei") as never,
+      actorId: actorId(req, "Tomas Ruiz") as never,
+      tone: "warm",
+      requestedTick: snapshot.state.tick,
+    };
+    const result = translated({ ...req, snapshot }, talk("Jax Okonkwo"));
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: left: a private word is already pending; wait for it to be held or missed",
+    );
+  });
+
+  it("is not a beat card's side: a beat card's sides are effect none", () => {
+    const req = quietTooLongRequest(content());
+    const notes = {
+      ...emptyPlan().notes,
+      threads: [
+        {
+          title: "Cards",
+          scale: "beat" as const,
+          people: ["Jax Okonkwo"],
+          stage: "Jax keeps winning",
+          nextBeat: "Tomas says something",
+        },
+      ],
+    };
+    const result = translateIntents(
+      emptyPlan({
+        intents: [{ ...talk("Jax Okonkwo"), beatOfThread: "Cards" }] as NarratorPlan["intents"],
+        notes,
+      }),
+      ctxOf(req),
+    );
+    expect(result.commands).toEqual([]);
+    expect(result.dropped[0]?.reason).toContain("both must be effect none");
   });
 });
 

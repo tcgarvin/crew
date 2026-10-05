@@ -294,12 +294,12 @@ describe(
       // a pilot in the seat could not plot it, and prep itself waits for the plot), so the
       // stander leaves the gangway then, and the walk hides inside the loading whenever loading
       // is the long pole. When the plot finishes within a walk of the last crate, or after it
-      // (this seed's second call since the slice-3 tuning: loaded at about 299 s, plotted at
-      // 307.4 s, prep over at 324.6 s), the walk shows, and that is the rule at work, not a
-      // stall: so the pin is that the stander claims the post within seconds of the plot, and
-      // that prep ends within the fixed time of the later of its start and that walk. The run
-      // goes well past five minutes so the second call's prep ends inside it.
-      const { world, log } = runFullSim(20260930, TICK_RATE * 340, autoAccept);
+      // (this seed's second call since slice 4 sent idlers to the lounge: plotted at 326.1 s,
+      // prep over at 343.2 s), the walk shows, and that is the rule at work, not a stall: so the
+      // pin is that the stander claims the post within seconds of the plot, and that prep ends
+      // within the fixed time of the later of its start and that walk. The run goes well past
+      // five minutes so the second call's prep ends inside it.
+      const { world, log } = runFullSim(20260930, TICK_RATE * 380, autoAccept);
       const stageChanges = log.events.filter(
         (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
           e.type === "travelStageChanged",

@@ -61,6 +61,11 @@
       "itemDefId": "item.mop",
       "count": 1,
       "zoneKey": "cleaning_locker"
+    },
+    {
+      "itemDefId": "item.book",
+      "count": 3,
+      "zoneKey": "book_shelf"
     }
   ],
   "initialFaults": [],

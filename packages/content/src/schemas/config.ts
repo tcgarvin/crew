@@ -41,6 +41,7 @@ export const configDefSchema = z.strictObject({
     comfortRecoveryPerDayResting: nonNegative,
     socialPerDay: nonNegative,
     socialRecoveryPerDayChatting: nonNegative,
+    recreationPerDay: nonNegative,
     seekThreshold: unitInterval,
     mealDays: positive,
     sleepDays: positive,
@@ -51,6 +52,7 @@ export const configDefSchema = z.strictObject({
       fatigue: unitRange,
       comfort: unitRange,
       social: unitRange,
+      recreation: unitRange,
     }),
   }),
   work: z.strictObject({
@@ -185,6 +187,7 @@ export const configDefSchema = z.strictObject({
       restockToDays: nonNegative,
       goodCookingAbove: z.number().min(0).max(10),
       poorCookingBelow: z.number().min(0).max(10),
+      treatHungerAbove: unitInterval,
     })
     .refine((g) => g.lowBelowDays <= g.restockToDays, {
       message: "lowBelowDays must be <= restockToDays",
@@ -235,6 +238,29 @@ export const configDefSchema = z.strictObject({
     chatRadiusTiles: positive,
     chatCooldownSeconds: nonNegative,
     templateLines: z.array(z.string().min(1)).min(1),
+    chatAffinity: z.number().int().min(0).max(3),
+    chatAffinityEveryDays: nonNegative,
+    affinityRange: positiveInt,
+    avoidBelow: z.number().int(),
+    preferAbove: z.number().int(),
+    rivalry: z.strictObject({ streakFor: positiveInt }),
+    debate: z
+      .strictObject({ agreeWithin: nonNegative, argueBeyond: nonNegative })
+      .refine((d) => d.agreeWithin < d.argueBeyond, {
+        message: "agreeWithin must be < argueBeyond",
+      }),
+  }),
+  recreation: z.strictObject({
+    joinAbove: unitInterval,
+    gatherSeconds: positive,
+    lateJoinSeconds: nonNegative,
+    collapseBackoffDays: nonNegative,
+  }),
+  cabins: z.strictObject({
+    noisySeconds: positive,
+    checkEverySeconds: positive,
+    privateTalkSeconds: positive,
+    privateTalkWaitSeconds: positive,
   }),
   events: z.strictObject({ tickerMaxEntries: positiveInt, traceRingSize: positiveInt }),
 }) satisfies z.ZodType<ConfigDef>;

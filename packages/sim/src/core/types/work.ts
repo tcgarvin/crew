@@ -45,6 +45,7 @@ import type {
   ToolKind,
 } from "./content";
 import type {
+  ActivityDefId,
   ActorId,
   ClaimId,
   CompartmentId,
@@ -59,6 +60,7 @@ import type {
   MachineId,
   PortDefId,
   ProblemId,
+  SessionId,
   TaskId,
 } from "./ids";
 import type { WorldState } from "./state";
@@ -369,6 +371,10 @@ export interface ActionStages {
   operateStation: "operating";
   chat: "talking";
   wait: "waiting";
+  /** Slice 4: an off-watch activity: waiting for the session to start, or playing. */
+  recreate: "waiting" | "playing";
+  /** Slice 4: a `privateTalk` in the captain's cabin. */
+  confer: "talking";
 }
 
 export type ActionKind = keyof ActionStages;
@@ -419,6 +425,10 @@ export const PERSONAL_ACTIVITIES = [
   "rounds",
   /** D77: the section's helm-stander on gangway watch while docked. */
   "standWatch",
+  /** Slice 4: an off-watch activity (`ActivityDef`), alone or in a group session. */
+  "recreate",
+  /** Slice 4: answering (or holding) a `privateTalk` summons in the captain's cabin. */
+  "privateTalk",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -533,7 +543,38 @@ export type ActivityStep =
    * dock leaving) makes this a no-op.
    */
   | { kind: "deliverCard"; decisionId: DecisionId; withName: string }
-  | { kind: "hold"; hold: HoldKind; sinceTick: Tick };
+  | {
+      kind: "hold";
+      hold: HoldKind;
+      sinceTick: Tick;
+      /**
+       * Slice 4: on a sleep hold, ticks someone awake shared the sleeper's compartment
+       * (`systems/cabins/cabins.ts`); absent means 0.
+       */
+      disturbedTicks?: number;
+    }
+  /**
+   * Slice 4: an off-watch activity at its venue (`systems/recreation/steps.ts` `runRecreate`).
+   * On its first tick a `host` opens a session (or joins one already open for the activity
+   * there), a `join` joins `sessionId`, a `solo` starts counting. `ticksNeeded` counts while
+   * solo; a session member's step ends when the session does.
+   */
+  | {
+      kind: "recreate";
+      activityId: ActivityDefId;
+      role: RecreateRole;
+      sessionId?: SessionId;
+      ticksDone: number;
+      ticksNeeded: number;
+    }
+  /**
+   * Slice 4: a `privateTalk` in the cabin (`systems/cabins/private-talk.ts` `runConfer`); counts
+   * only while both are in the cabin.
+   */
+  | { kind: "confer"; ticksDone: number; ticksNeeded: number };
+
+/** Slice 4: how someone takes part in an activity (`recreate` step, planner candidate). */
+export type RecreateRole = "host" | "join" | "solo";
 
 /**
  * D65: one more haul task a hand-truck trip holds, besides the activity's own (`taskId`, the
@@ -620,6 +661,12 @@ export type Intent =
       tile?: TileCoord;
       /** D70, `meetSpeaker`: the held card the meeting delivers. */
       decisionId?: DecisionId;
+      /** Slice 4, `recreate`: the activity chosen. */
+      activityId?: ActivityDefId;
+      /** Slice 4, `recreate`: the open session to join. */
+      sessionId?: SessionId;
+      /** Slice 4, `recreate`: host, join or solo. */
+      role?: RecreateRole;
       urgency: UrgencyClass;
       trace: PlannerTrace;
     };

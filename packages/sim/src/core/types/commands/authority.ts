@@ -55,6 +55,8 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "holdDepartureForRepairs",
     "acceptDepartureRisk",
     "endPassage",
+    /** Slice 4: a card side's word in the captain's cabin (never the narrator's directly). */
+    "privateTalk",
   ],
   narrator: NARRATOR_COMMAND_KINDS,
   system: [
@@ -67,6 +69,7 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "holdDepartureForRepairs",
     "acceptDepartureRisk",
     "endPassage",
+    "privateTalk",
   ],
   scenario: [
     "scenarioSpawn",
@@ -82,5 +85,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "endPassage",
     "stageDock",
     "scheduleHazard",
+    "privateTalk",
   ],
 };

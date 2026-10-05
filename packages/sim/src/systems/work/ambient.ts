@@ -1,8 +1,9 @@
 /**
  * Ambient chat (PLAN §6 W4a item 5), phase 6, every 20 ticks: two awake crew who are not working
  * a task, within `social.chatRadiusTiles` of each other and both past their chat cooldown, have
- * a one-line conversation that shows in the ticker (`conversation`, notable). No relationship
- * effects in V1; the `socialize` hold is what actually meets the social need.
+ * a one-line conversation that shows in the ticker (`conversation`, notable). Slice 4: the social
+ * system's `onConversation` moves the pair's affinity; the `socialize` hold is what actually
+ * meets the social need.
  *
  * Tunables come from `config.social` (Integration 2 made it required). `AMBIENT_FALLBACK` is
  * kept as a reference value for fixtures. Speaker/listener order alternates by pass so the
@@ -12,6 +13,7 @@ import { configTicks } from "../../core/clock";
 import type { Actor } from "../../core/types/actor";
 import type { ConfigDef } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
+import { onConversation } from "../social/chat";
 import { isAsleep } from "./activity";
 import { emitSim } from "./events";
 
@@ -30,6 +32,13 @@ export const AMBIENT_FALLBACK: ConfigDef["social"] = {
     "{b} laughed at {a}'s joke about the engine",
     "{a} wondered aloud what the next job pays",
   ],
+  chatAffinity: 1,
+  chatAffinityEveryDays: 1,
+  affinityRange: 10,
+  avoidBelow: -3,
+  preferAbove: 0,
+  rivalry: { streakFor: 3 },
+  debate: { agreeWithin: 2, argueBeyond: 4 },
 };
 
 function eligible(ctx: StepCtx, actor: Actor, cooldownTicks: number): boolean {
@@ -69,6 +78,8 @@ export const ambientChatSystem: System = {
         const template = ctx.rng.pick("social", social.templateLines);
         const line = template.replaceAll("{a}", a.name).replaceAll("{b}", b.name);
         emitSim(ctx, "conversation", [a.id, b.id], { line });
+        // Slice 4 (call 10): a chat moves how the pair feel about each other.
+        onConversation(ctx, a, b);
         a.lastConversationTick = ctx.tick;
         b.lastConversationTick = ctx.tick;
         talked.add(a.id);

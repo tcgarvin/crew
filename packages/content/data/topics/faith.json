@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.faith",
+  "label": "faith",
+  "weights": {
+    "orderFreedom": 0,
+    "faithReason": -1,
+    "loyaltyAmbition": 0
+  }
+}

@@ -24,6 +24,7 @@
  */
 import { byId } from "./ids";
 import type { Actor } from "./types/actor";
+import type { TileCoord } from "./types/common";
 import type { ContentBundle, DeckDef, MachinePlacementDef } from "./types/content";
 import type { ActorId, LocalKey } from "./types/ids";
 import type { WorldState } from "./types/state";
@@ -132,6 +133,21 @@ export function assignBerths(state: WorldState, deck: DeckDef, content: BerthCon
   }
 }
 
+/**
+ * The tile of the locker serving the bed `bedKey` (the first tile of the `locker` zone whose
+ * `machineKey` names it); undefined for a bed without one. Slice 4: where an owned item is put
+ * back after use.
+ */
+export function lockerTileOf(
+  deck: Pick<DeckDef, "zones">,
+  bedKey: LocalKey,
+): TileCoord | undefined {
+  const locker = deck.zones.find(
+    (z) => z.machineKey === bedKey && z.tags.includes(LOCKER_ZONE_TAG),
+  );
+  return locker?.tiles[0];
+}
+
 /** Move each crew member's `personal` carried items into their berth's locker (module doc). */
 export function stowPersonalItems(
   state: WorldState,
@@ -139,10 +155,7 @@ export function stowPersonalItems(
   content: BerthContent & Pick<ContentBundle, "items">,
 ): void {
   for (const [actorId, bedKey] of Object.entries(state.berths) as [ActorId, LocalKey][]) {
-    const locker = deck.zones.find(
-      (z) => z.machineKey === bedKey && z.tags.includes(LOCKER_ZONE_TAG),
-    );
-    const tile = locker?.tiles[0];
+    const tile = lockerTileOf(deck, bedKey);
     if (tile === undefined) continue;
     for (const item of Object.values(state.items)) {
       const location = item.location;

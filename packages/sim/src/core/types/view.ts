@@ -8,9 +8,10 @@
  *
  * The render frame is truth (D7: the player's map shows truth) but only what the canvas needs.
  */
-import type { Capacities, FactType, KnownFact, Needs, Thought } from "./actor";
+import type { Capacities, FactType, Interests, KnownFact, Needs, Thought, Values } from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
 import type {
+  ActivityDef,
   CargoClass,
   DeckDef,
   DirtTier,
@@ -22,6 +23,7 @@ import type {
 } from "./content";
 import type { Significance } from "./events";
 import type {
+  ActivityDefId,
   ActorId,
   CompartmentId,
   DeckDefId,
@@ -36,9 +38,11 @@ import type {
   MachineDefId,
   MachineId,
   PortDefId,
+  SessionId,
   TraitDefId,
 } from "./ids";
 import type { DoorPhysicalState } from "./ship";
+import type { GroupSession } from "./state";
 import type { TravelStage } from "./travel";
 import type { Activity, Problem, Task } from "./work";
 
@@ -116,6 +120,25 @@ export interface SelfView {
   readonly onDock?: true;
   /** D74: the bed assigned to this actor (`WorldState.berths`); absent while unberthed. */
   readonly berth?: { readonly machineId: MachineId };
+  /** Slice 4: what they like doing off watch (`Actor.interests`). */
+  readonly interests: DeepReadonly<Interests>;
+  /** Slice 4: where they stand on the value axes (`Actor.values`). */
+  readonly values: Readonly<Values>;
+  /**
+   * Slice 4: what they feel about others (`social.relationships[self]`), by actor; absent = 0.
+   * Nobody reads the other direction.
+   */
+  readonly affinity: Readonly<Record<ActorId, number>>;
+  /**
+   * Slice 4: a pending `privateTalk` this actor is part of: `captain` true for the one who
+   * called it (they hold it at their desk), false for the one called in. `compartmentId` is the
+   * caller's cabin.
+   */
+  readonly summons?: {
+    readonly withActorId: ActorId;
+    readonly compartmentId: CompartmentId;
+    readonly captain: boolean;
+  };
 }
 
 /**
@@ -135,7 +158,15 @@ export interface KnownItemView {
   /** The actor looked and it was not there (see `FactValues.itemLocation.absent`). */
   readonly absent: boolean;
   readonly observedTick: Tick;
+  /** Slice 4: whose it is (`Item.ownerId`, a personal item); common knowledge, like the def. */
+  readonly ownerId?: ActorId;
 }
+
+/**
+ * Slice 4: a group session as everyone aboard knows it (the intercom): the row plus the
+ * activity's `label`.
+ */
+export type SessionView = DeepReadonly<GroupSession> & { readonly label: string };
 
 /** A task as its planner may see it. Claim bookkeeping is hidden (SD §14.5). */
 export type TaskView = DeepReadonly<Omit<Task, "claimState">> & {
@@ -211,6 +242,18 @@ export interface AgentView {
   /** W4a addition: items the actor holds a location belief about (plus what it carries). */
   knownItems(): readonly KnownItemView[];
   /**
+   * Slice 4: every open or running group session (`social.sessions`). Common knowledge, like
+   * the roster: on a ship this size everyone knows cards are on.
+   */
+  sessions(): readonly SessionView[];
+  /** Slice 4: the ship's travel stage (common knowledge: the ship is docked or under way). */
+  travel(): { readonly stage: TravelStage };
+  /**
+   * Slice 4: every off-watch activity def (`ContentBundle.activities`): what games the ship
+   * has is common knowledge, like the schematic. The recreation candidate scores them.
+   */
+  activities(): readonly DeepReadonly<ActivityDef>[];
+  /**
    * W4a addition: schematic travel estimate in ticks from `from` (default: the actor's tile) to
    * `to`, or null if the layout has no route. Wraps spatial's `estimateTravelTicks`, which the
    * planner may not import. Ignores congestion and dynamic door state.
@@ -229,6 +272,8 @@ export interface AgentViewSnapshot {
   readonly problems: readonly ProblemView[];
   readonly tasks: readonly TaskView[];
   readonly roster: readonly RosterEntry[];
+  /** Slice 4: the sessions the view saw. */
+  readonly sessions: readonly SessionView[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -429,6 +474,21 @@ export interface DirtFrame {
 }
 
 /**
+ * Slice 4: a group session drawn as one plate at its venue (members' own labels are skipped).
+ * `x`/`y` are the venue tile centre (tile units, deck frame); `label` is the def's `label` once
+ * running, its `waitingLabel` while open.
+ */
+export interface RenderSession {
+  readonly id: SessionId;
+  readonly activityId: ActivityDefId;
+  readonly label: string;
+  readonly x: number;
+  readonly y: number;
+  readonly memberIds: readonly ActorId[];
+  readonly running: boolean;
+}
+
+/**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
  * W0 decision: frames also carry `money` (HUD) and actor `name` (labels) beyond the minimum.
@@ -458,4 +518,6 @@ export interface RenderFrame {
    * "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".
    */
   readonly headline: string;
+  /** Slice 4: open and running group sessions, one plate each. */
+  readonly sessions: readonly RenderSession[];
 }

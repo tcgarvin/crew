@@ -63,6 +63,7 @@ function frame(crates: number): RenderFrame {
     headline: "",
     locals: [],
     dockProps: [],
+    sessions: [],
   };
 }
 

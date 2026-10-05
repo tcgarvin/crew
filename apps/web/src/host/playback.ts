@@ -62,6 +62,8 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     headline: next.headline,
     locals: interpolateLocals(prev.locals, next.locals, clamped),
     dockProps: next.dockProps,
+    // Slice 4: a session opens, fills and ends between frames; its plate snaps like the doors.
+    sessions: next.sessions,
   };
 }
 

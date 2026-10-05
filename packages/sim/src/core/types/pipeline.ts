@@ -223,8 +223,14 @@ export interface System {
  * What a planner may read about tuning.
  * W4a addition: `time`, so the planner can put travel (ticks, from the view) and work
  * (`estimatedWorkSeconds`) on one scale for SD §15.3 step 5.
+ *
+ * Slice 4: `recreation`, `social` and `mood`, for the recreation candidate's join threshold,
+ * affinity bands and mood bands.
  */
-export type PlannerConfig = Pick<ConfigDef, "work" | "urgency" | "needs" | "time" | "galley">;
+export type PlannerConfig = Pick<
+  ConfigDef,
+  "work" | "urgency" | "needs" | "time" | "galley" | "recreation" | "social" | "mood"
+>;
 
 /**
  * The planner (phase 7) is a pure function of one actor's view. It never sees `StepCtx`, state,

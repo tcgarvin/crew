@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "satWithTheCaptain",
+  "label": "sat with the captain",
+  "value": 0.05,
+  "durationDays": 0.5,
+  "stacks": false
+}

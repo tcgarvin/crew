@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "dressedDown",
+  "label": "dressed down by the captain",
+  "value": -0.15,
+  "durationDays": 1,
+  "stacks": false
+}

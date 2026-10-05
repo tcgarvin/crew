@@ -114,6 +114,7 @@ function makeFakeKernel(hookAtTick: number) {
         headline: "",
         locals: [],
         dockProps: [],
+        sessions: [],
       };
     },
     serialize: (world) =>
@@ -462,6 +463,7 @@ describe("createHost agent view (slice-2 QA)", () => {
           knownProblems: () => [],
           knownTasks: () => [],
           roster: () => [],
+          sessions: () => [],
         }) as never,
     };
   }

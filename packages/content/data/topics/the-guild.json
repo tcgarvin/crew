@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.the_guild",
+  "label": "the Guild",
+  "weights": {
+    "orderFreedom": -1,
+    "faithReason": 0,
+    "loyaltyAmbition": -0.5
+  }
+}

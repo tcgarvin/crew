@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.vids",
+  "label": "watching a vid",
+  "waitingLabel": "putting a vid on",
+  "interest": "vids",
+  "venue": [
+    {
+      "machineTag": "vidScreen"
+    }
+  ],
+  "participants": {
+    "min": 1,
+    "max": 4
+  },
+  "durationDays": 0.12,
+  "restores": {
+    "recreation": 0.4,
+    "social": 0.2
+  },
+  "outcome": "bond",
+  "thoughts": {
+    "joined": "goodCompany"
+  },
+  "topics": ["topic.the_vid"],
+  "affinity": {
+    "participants": 1,
+    "winnerToLoser": 0,
+    "loserToWinner": 0
+  }
+}

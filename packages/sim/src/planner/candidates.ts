@@ -25,7 +25,13 @@ import {
  *   → routineObligation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
- * - rest/socialize → voluntaryActivity.
+ * - rest/socialize → the need's urgency as above, `voluntaryActivity` below the seek threshold
+ *   (D84 tuning: a social or comfort need past the threshold is routine, so it ranks with a game
+ *   off watch instead of always losing to it, and nobody comes on watch starved for company; the
+ *   hold then ends when the need is met, `systems/work/steps.ts`);
+ * - recreation (slice 4, `recreation.ts`) → routineObligation or voluntaryActivity off duty,
+ *   voluntaryActivity on duty;
+ * - a `privateTalk` summons (slice 4, `cabins.ts`) → essentialOperation.
  *
  * - on duty with nothing else to do (D77: `rounds.ts`, the post until rounds land) →
  *   voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
@@ -37,9 +43,11 @@ import {
  */
 import type { DeepReadonly, TileCoord } from "../core/types/common";
 import type { MachineTag, ToolKind } from "../core/types/content";
-import type { ActorId, ItemId, MachineId } from "../core/types/ids";
+import type { ActivityDefId, ActorId, ItemId, MachineId, SessionId } from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView, KnownItemView, ProblemView, TaskView } from "../core/types/view";
+import type { RecreateRole } from "../core/types/work";
+import { summonsCandidate } from "./cabins";
 import { cleanTaskAllowed, isCleaningTask } from "./cleaning";
 import {
   backingOff,
@@ -58,6 +66,7 @@ import {
   mealCallFor,
 } from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
+import { recreationCandidate } from "./recreation";
 import { dutyIdleCandidate } from "./rounds";
 
 export { needUrgency } from "./common";
@@ -79,6 +88,10 @@ export interface Candidate {
         readonly targetId?: MachineId | ActorId;
         readonly itemId?: ItemId;
         readonly tile?: TileCoord;
+        /** Slice 4, `recreate`: the activity, the session to join, and how they take part. */
+        readonly activityId?: ActivityDefId;
+        readonly sessionId?: SessionId;
+        readonly role?: RecreateRole;
       };
 }
 
@@ -426,13 +439,13 @@ function leisureCandidate(
   const need = activity === "rest" ? view.self.needs.comfort : view.self.needs.social;
   if (view.self.onDuty && need <= config.needs.seekThreshold) return undefined;
   if (backingOff(view, activity)) return { ref: activity, reason: "backoff" };
-  const tags =
-    activity === "rest" ? ["quarters", "mess", "galley"] : ["mess", "galley", "quarters"];
+  // Slice 4 (call 16): rest and chat in the lounge, so idlers leave the bunkroom.
+  const tags = activity === "rest" ? ["lounge", "mess", "quarters"] : ["lounge", "mess"];
   const tile = loungeTile(view, tags);
   if (tile === undefined) return { ref: activity, reason: "noLounge" };
   const ticks = view.estimateTravelTicks(tile);
   if (ticks === null) return { ref: activity, reason: "unreachableTarget" };
-  return personal(activity, "voluntaryActivity", ticks, view.tick, {
+  return personal(activity, needUrgency(need, config) ?? "voluntaryActivity", ticks, view.tick, {
     kind: "personal",
     activity,
     tile,
@@ -455,6 +468,8 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   // work and has no post.
   const passenger = view.self.passenger === true;
   if (!passenger) {
+    // Slice 4: a summons ranks with its class (essential), so it goes before the task loop.
+    add(summonsCandidate(view, config));
     const problems = new Map(view.knownProblems().map((p) => [p.id as string, p]));
     const tasks = view.knownTasks();
     const liveTaskIds = new Set<string>(tasks.map((t) => t.id));
@@ -464,6 +479,7 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   add(sleepCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
+  add(recreationCandidate(view, config));
   if (!passenger) {
     add(gangwayCandidate(view, config));
     add(dutyIdleCandidate(view, config));
@@ -475,7 +491,17 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
 export function matchesActivity(candidate: Candidate, activity: DeepReadonly<Activity>): boolean {
   const choice = candidate.choice;
   if (activity.kind === "task") return choice.kind === "task" && choice.taskId === activity.taskId;
-  if (activity.kind === "personal")
-    return choice.kind === "personal" && choice.activity === activity.activity;
-  return false;
+  if (activity.kind !== "personal") return false;
+  if (choice.kind !== "personal" || choice.activity !== activity.activity) return false;
+  // Slice 4: one recreation is not another (cards is not the same as reading).
+  if (choice.activity === "recreate") return recreatingActivity(activity) === choice.activityId;
+  return true;
+}
+
+/** The activity a `recreate` plan is for (its `recreate` step's). */
+function recreatingActivity(
+  activity: Extract<DeepReadonly<Activity>, { kind: "personal" }>,
+): ActivityDefId | undefined {
+  const step = activity.plan?.steps.find((s) => s.kind === "recreate");
+  return step?.kind === "recreate" ? step.activityId : undefined;
 }

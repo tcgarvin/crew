@@ -13,5 +13,15 @@
   },
   "startingInventory": [],
   "bio": "Relief pilot; newest aboard, stands the Red watch under the captain's eye and logs every correction she makes.",
-  "voice": "Careful and precise, a beat slow to answer because she checks first. Reads numbers aloud to the decimal and uses the full term where Jax would use slang. Calls the captain \"Captain\", always, a little formally. Bad news comes figure first, then an apology she did not owe, then a sensible fix."
+  "voice": "Careful and precise, a beat slow to answer because she checks first. Reads numbers aloud to the decimal and uses the full term where Jax would use slang. Calls the captain \"Captain\", always, a little formally. Bad news comes figure first, then an apology she did not owe, then a sensible fix.",
+  "interests": {
+    "likes": ["vids", "stargazing"],
+    "strong": "vids",
+    "dislikes": ["boardgames"]
+  },
+  "values": {
+    "orderFreedom": 0,
+    "faithReason": -1,
+    "loyaltyAmbition": 1
+  }
 }

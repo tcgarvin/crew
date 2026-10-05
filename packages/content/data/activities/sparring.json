@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.sparring",
+  "label": "sparring",
+  "waitingLabel": "waiting for a sparring partner",
+  "interest": "sparring",
+  "venue": [
+    {
+      "zoneTag": "sparringMat"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 2
+  },
+  "durationDays": 0.04,
+  "restores": {
+    "recreation": 0.4,
+    "social": 0.1
+  },
+  "fatigueCost": 0.1,
+  "outcome": "contest",
+  "affinity": { "participants": 0, "winnerToLoser": 0, "loserToWinner": -1 },
+  "thoughts": {
+    "win": "wonContest",
+    "lose": "lostContest"
+  },
+  "risk": {
+    "injuryChance": 0.05
+  },
+  "dirt": 0.05
+}

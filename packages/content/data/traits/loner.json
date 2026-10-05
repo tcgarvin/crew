@@ -3,7 +3,8 @@
   "id": "trait.loner",
   "name": "Loner",
   "modifiers": {
-    "socialRate": 0.7
+    "socialRate": 0.7,
+    "recreationRate": 0.8
   },
   "excludes": ["trait.social_butterfly"]
 }

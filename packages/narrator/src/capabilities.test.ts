@@ -139,13 +139,22 @@ describe("buildCapabilities", () => {
 
   it("documents endPassage on a card side and that the sim raises the overdue card itself (§4.2, §3.3)", () => {
     expect(text).toContain("effect: none; setCourse to coursePort");
-    expect(text).toContain("or endPassage");
+    expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("endPassage puts the current passenger off");
     expect(text).toContain("They leave at the next docking (now, if docked) with no fare");
     expect(text).toContain("stay at that port as someone in your cast");
     expect(text).toContain("The sim raises its own card, brought by the first officer");
     expect(text).toContain("Wait for them / Leave without them");
     expect(text).toContain("you never cause it");
+  });
+
+  it("documents privateTalk as a card side effect, warm or stern, and keeps six levers (D86)", () => {
+    expect(text).toContain("endPassage; or privateTalk");
+    expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
+    expect(text).toContain("the talk moves how they feel about the captain");
+    expect(text).toContain("never the captain herself, a passenger or someone ashore");
+    expect(text).toContain("You have exactly six levers.");
+    expect(text.match(/^## \d\. /gm)).toHaveLength(6);
   });
 
   it("measures distance from the docked port when docked", () => {

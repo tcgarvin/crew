@@ -277,6 +277,122 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(60);
   });
 
+  it("migrates a schema-9 save to 10: recreation, interests from the crew def, an empty social slice and the scenario's books shelved (slice 4)", () => {
+    const BOOK = "item.tiny.book" as ItemDefId;
+    const interests = {
+      likes: ["cards" as const, "vids" as const],
+      strong: "cards" as const,
+      dislikes: [],
+    };
+    const values = { orderFreedom: 2, faithReason: 1, loyaltyAmbition: 2 };
+    // The tiny content with a book shelf the scenario stocks, and Mara's interests authored.
+    const shelfContent = (): ContentBundle => {
+      const base = tinyContent(tinyConfig());
+      const deck = base.decks[TINY.deck];
+      const scenario = base.scenarios[TINY.scenario];
+      const mara = base.crew[TINY.mara];
+      if (deck === undefined || scenario === undefined || mara === undefined) {
+        throw new Error("tiny content");
+      }
+      return {
+        ...base,
+        decks: {
+          [TINY.deck]: {
+            ...deck,
+            zones: [
+              ...deck.zones,
+              {
+                key: "book_shelf",
+                name: "Book Shelf",
+                tags: ["bookShelf"],
+                tiles: [{ x: 4, y: 3 }],
+              },
+            ],
+          },
+        },
+        items: {
+          ...base.items,
+          [BOOK]: {
+            id: BOOK,
+            name: "Book",
+            stacking: "stackable",
+            maxStack: 6,
+            tags: ["book"],
+            toolKinds: [],
+            mass: 0.3,
+          },
+        },
+        crew: { [TINY.mara]: { ...mara, interests, values } },
+        scenarios: {
+          [TINY.scenario]: {
+            ...scenario,
+            startingItems: [
+              ...scenario.startingItems,
+              { itemDefId: BOOK, count: 3, zoneKey: "book_shelf" },
+            ],
+          },
+        },
+      };
+    };
+    const registry = createRegistry();
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(TINY.scenario, 42, shelfContent(), tinyEffectiveConfig());
+    kernel.advance(world, 40);
+    const envelope = serialize(world);
+    type Json = Record<string, unknown>;
+    const at = (value: unknown, key: string) => (value as Json)[key] as Json;
+    const strip = (value: Json, key: string) => {
+      const { [key]: _gone, ...rest } = value;
+      return rest;
+    };
+    // Schema 9's shape: no social slice or session counter, no recreation, interests or values,
+    // and no books aboard.
+    const raw = JSON.parse(JSON.stringify(envelope.state)) as Json;
+    raw.schemaVersion = 9;
+    const stripped = strip(raw, "social");
+    stripped.nextId = strip(at(raw, "nextId"), "session");
+    stripped.actors = Object.fromEntries(
+      Object.entries(at(raw, "actors")).map(([id, actor]) => {
+        const old = strip(strip(actor as Json, "interests"), "values");
+        return [id, { ...old, needs: strip(at(actor, "needs"), "recreation") }];
+      }),
+    );
+    stripped.items = Object.fromEntries(
+      Object.entries(at(raw, "items")).filter(([, item]) => (item as Json).defId !== BOOK),
+    );
+    const old = { ...envelope, schemaVersion: 9, state: stripped } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const state = restored.state;
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.social).toEqual({
+      relationships: {},
+      rivalries: {},
+      sessions: {},
+      captainsTableDay: -1,
+    });
+    expect(state.nextId.session).toBe(1);
+    for (const actor of Object.values(state.actors)) {
+      expect(actor.needs.recreation).toBe(0.3);
+      expect(actor.interests).toEqual(interests);
+      expect(actor.values).toEqual(values);
+    }
+    // The books came back on the shelf, as a fresh stack below the moved counter.
+    const books = Object.values(state.items).filter((item) => item.defId === BOOK);
+    expect(books.reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0)).toBe(3);
+    for (const book of books) {
+      if (book.location.kind !== "onDeck") throw new Error("book not on deck");
+      expect({ x: Math.floor(book.location.x), y: Math.floor(book.location.y) }).toEqual({
+        x: 4,
+        y: 3,
+      });
+    }
+    expect(state.nextId.item).toBe(envelope.state.nextId.item + 1);
+    expect(restored.warnings.some((w) => /predates off watch/.test(w))).toBe(true);
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(60);
+  });
+
   it("restores a save whose config has the pre-D76 seconds names: new names from content, old ones unread", () => {
     const { world, kernel, registry } = tinyTestWorld();
     const envelope = serialize(world);

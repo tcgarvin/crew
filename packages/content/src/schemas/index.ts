@@ -4,6 +4,7 @@
  * `$schema` support and tooling.
  */
 import { z } from "zod";
+import { activityDefSchema } from "./activity";
 import { contentBundleSchema } from "./bundle";
 import { configDefSchema } from "./config";
 import { crewDefSchema, traitDefSchema } from "./crew";
@@ -15,7 +16,9 @@ import { peopleTableDefSchema } from "./people";
 import { portDefSchema } from "./port";
 import { scenarioDefSchema } from "./scenario";
 import { thoughtDefSchema } from "./thought";
+import { topicDefSchema } from "./topic";
 
+export * from "./activity";
 export * from "./bundle";
 export * from "./config";
 export * from "./crew";
@@ -28,6 +31,7 @@ export * from "./port";
 export * from "./primitives";
 export * from "./scenario";
 export * from "./thought";
+export * from "./topic";
 export * from "./validate";
 export { HULL_CLASS_BOX, shipAtInBerth } from "./geometry";
 export { dockRampLandings, dockWalkableMask } from "./validate-dock";
@@ -45,6 +49,8 @@ export const DEF_SCHEMAS = {
   config: configDefSchema,
   dock: dockDefSchema,
   thought: thoughtDefSchema,
+  activity: activityDefSchema,
+  topic: topicDefSchema,
   bundle: contentBundleSchema,
 } as const;
 

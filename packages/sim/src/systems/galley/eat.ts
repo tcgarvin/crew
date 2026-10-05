@@ -10,7 +10,7 @@
  *   another.
  * - `consumeServing` (the eat step's and the helm meal's commit): hunger falls by the item's
  *   `nutrition`; a served meal gives `ateWell` (good) or `burntDinner` (poor), food without a
- *   `meal` gives `ateRationPack`; eating in a room at `dirty` / `filthy` gives `ateInDirtyMess` /
+ *   `meal` gives `ateRationPack`, a `treat` gives `ateATreat` and nothing else (slice 4); eating in a room at `dirty` / `filthy` gives `ateInDirtyMess` /
  *   `ateInFilthyMess`; a crumb of `eating` dirt where they are; `ateMeal` with `quality` and
  *   `ration`.
  * - `mealCallStandsFor`: a served meal they know of on deck (not the helm-stander's plate) and
@@ -29,6 +29,7 @@ import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { ActivityStep, StepTarget, Task } from "../../core/types/work";
 import { depositDirt } from "../dirt/deposit";
+import { type SeatOption, seatPreference } from "../social/seating";
 import { reservationHolders, tileCapacity } from "../spatial/reservations";
 import { backoffRef, isBackingOff } from "../work/activity";
 import { emitSim } from "../work/events";
@@ -64,17 +65,18 @@ function seatsSpokenFor(ctx: StepCtx, actor: Actor): Set<string> {
 }
 
 /**
- * A free mess seat on the actor's deck nearest `from`: a `use` position of a `messTable` machine
- * nobody holds (the reservation cache: standing on it, or walking to it) or has planned to walk
- * to.
+ * The free mess seats on the actor's deck, nearest `from` first: `use` positions of `messTable`
+ * machines nobody holds (the reservation cache: standing on it, or walking to it) or has planned
+ * to walk to. A seat the actor already holds comes first of all (`held`). Slice 4: which one they
+ * take is `seatPreference`'s (`systems/social/seating.ts`).
  */
-function freeMessSeat(ctx: StepCtx, actor: Actor, from: TileCoord): StepTarget | undefined {
-  if (actor.location.kind !== "onDeck") return undefined;
+function freeMessSeats(ctx: StepCtx, actor: Actor, from: TileCoord): SeatOption[] {
+  if (actor.location.kind !== "onDeck") return [];
   const deckId = actor.location.deckId;
   const geometry = ctx.caches.nav.decks[deckId];
-  if (geometry === undefined) return undefined;
+  if (geometry === undefined) return [];
   const spoken = seatsSpokenFor(ctx, actor);
-  let best: { target: StepTarget; d: number } | undefined;
+  const seats: { seat: SeatOption; d: number }[] = [];
   for (const position of geometry.interactionPositions) {
     if (!position.purposes.includes("use")) continue;
     const machine = ctx.state.machines[position.machineId];
@@ -86,12 +88,15 @@ function freeMessSeat(ctx: StepCtx, actor: Actor, from: TileCoord): StepTarget |
     if (!mine && holders.length >= tileCapacity(geometry, position.tile)) continue;
     if (!mine && spoken.has(`${position.machineId}:${position.key}`)) continue;
     const d = mine ? -1 : manhattan(position.tile, from);
-    if (best === undefined || d < best.d) {
-      best = { target: { machineId: position.machineId, positionKey: position.key }, d };
-    }
+    const target = { machineId: position.machineId, positionKey: position.key };
+    seats.push({ seat: { target, tile: { ...position.tile }, held: mine }, d });
   }
-  return best?.target;
+  // Stable: equally near seats keep the nav cache's order, as the single pick did.
+  return seats.sort((a, b) => a.d - b.d).map(({ seat }) => seat);
 }
+
+const isTreat = (ctx: StepCtx, item: Item | undefined): boolean =>
+  item !== undefined && ctx.content.items[item.defId]?.tags.includes("treat") === true;
 
 /** Where the food is picked up from (its believed tile), else where the actor stands. */
 function pickupFrom(ctx: StepCtx, actor: Actor, itemId: ItemId | undefined): TileCoord {
@@ -117,10 +122,19 @@ export function eatPlan(
   // planner named nothing to fetch (a ration in hand does not stand in for the meal on the counter).
   const inHand =
     carried.find((item) => item.id === itemId) ??
-    carried.find((item) => item.meal !== undefined) ??
+    carried.find((item) => item.meal !== undefined && isMeal(ctx.content, item)) ??
     (itemId === undefined ? carried[0] : undefined);
-  const seat = freeMessSeat(ctx, actor, pickupFrom(ctx, actor, inHand?.id ?? itemId));
-  const to: StepTarget | undefined = seat ?? (table === undefined ? undefined : { ...table });
+  const food = inHand ?? (itemId === undefined ? undefined : ctx.state.items[itemId]);
+  // Slice 4 (call 7): a treat is eaten where it is found, not at the table.
+  const seat = isTreat(ctx, food)
+    ? undefined
+    : seatPreference(
+        ctx,
+        actor,
+        freeMessSeats(ctx, actor, pickupFrom(ctx, actor, inHand?.id ?? itemId)),
+      )?.target;
+  const to: StepTarget | undefined =
+    seat ?? (table === undefined || isTreat(ctx, food) ? undefined : { ...table });
   const meal: ActivityStep[] = [
     ...(to === undefined ? [] : [{ kind: "moveTo", target: to, requested: false } as const]),
     { kind: "work", stage: "eat", ticksDone: 0, ticksNeeded: mealTicks },
@@ -163,7 +177,9 @@ export function consumeServing(ctx: StepCtx, actor: Actor, item: Item): void {
   if (item.stacking === "stack" && item.count > 1) item.count -= 1;
   else delete ctx.state.items[item.id];
   touchInventory(ctx);
-  mealThoughts(ctx, actor, item);
+  // Slice 4 (call 7): a treat is its own thought, whatever its `meal` says.
+  if (isTreat(ctx, item)) addThought(ctx, actor, "ateATreat");
+  else mealThoughts(ctx, actor, item);
   const location = actor.location;
   if (location.kind === "onDeck") {
     deposit(ctx, location.deckId, tileAt(location), ctx.config.dirt.deposits.eating);
@@ -253,7 +269,10 @@ export function carryMealPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResul
     target: { x: standby.x, y: standby.y },
     requested: false,
   };
-  const inHand = carriedItems(ctx, actor.id).find((item) => item.meal !== undefined);
+  // Slice 4: a treat carries `meal` too (it spoils like a serving) but is nobody's plate.
+  const inHand = carriedItems(ctx, actor.id).find(
+    (item) => item.meal !== undefined && isMeal(ctx.content, item),
+  );
   if (inHand !== undefined) return planOf([toStandby, { kind: "putDown", itemId: inHand.id }]);
   const [nearest] = knownMealsFor(ctx, actor);
   if (nearest === undefined) return blocked("inaccessibleSupply");

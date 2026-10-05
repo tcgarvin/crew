@@ -58,6 +58,15 @@ export function actionFor(ctx: StepCtx, task: Task | undefined, step: ActivitySt
       const kind = RECIPE_ACTION[task?.derivationKey ?? ""] ?? "repair";
       return makeAction(kind, "working", tick, machineId);
     }
+    case "recreate": {
+      // Slice 4: playing once solo or the session has started; waiting for others before.
+      const session =
+        step.sessionId === undefined ? undefined : ctx.state.social.sessions[step.sessionId];
+      const playing = step.role === "solo" || session?.startedTick !== undefined;
+      return makeAction("recreate", playing ? "playing" : "waiting", tick);
+    }
+    case "confer":
+      return makeAction("confer", "talking", tick);
     case "hold":
       if (step.hold === "sleep") return makeAction("sleep", "asleep", tick);
       if (step.hold === "rest") return makeAction("wait", "waiting", tick);

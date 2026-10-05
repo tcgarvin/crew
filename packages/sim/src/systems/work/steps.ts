@@ -13,7 +13,8 @@
  *   the galley's `cook`/`serve` are `systems/galley/`'s; D82: the `mop` stage is `systems/dirt/`'s.
  * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
  *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
- *   fully met while on duty; off duty they last until the planner finds something more urgent.
+ *   fully met while on duty, or when taken because the need pressed (D84 tuning); otherwise, off
+ *   duty, they last until the planner finds something more urgent.
  * - A helm hold (`staff`) ends when the stander is relieved or the watch post closes (D77,
  *   `systems/watch/helm.ts`); while it lasts the stander learns piloting (`skillGainPerDay`,
  *   capped at 10). A gangway hold ends when the ship sails or they are no longer the stander.
@@ -32,6 +33,7 @@ import type { ActorId, ItemId, PortDefId, TaskId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { ActivityStep, BlockageReason, StepTarget, Task } from "../../core/types/work";
+import { runConfer } from "../cabins/private-talk";
 import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
 import { runMop } from "../dirt/clean";
 import { depositDirt } from "../dirt/deposit";
@@ -39,6 +41,7 @@ import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
+import { runRecreate } from "../recreation/steps";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
@@ -543,6 +546,14 @@ function learnAtTheHelm(ctx: StepCtx, actor: Actor): void {
   actor.skills = { ...actor.skills, piloting: Math.min(SKILL_CAP, now + perTick) };
 }
 
+/**
+ * D84 tuning: a rest or chat taken because the need pressed (above voluntary class, the planner's
+ * `leisureCandidate`) ends when the need is met, off duty too, so the person replans: otherwise
+ * the routine hold outlasted every routine game and the off watch was one long chat.
+ */
+const leisurePressed = (actor: Actor): boolean =>
+  actor.activity.kind === "personal" && actor.activity.urgency !== "voluntaryActivity";
+
 function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   const needs = ctx.config.needs;
   const onDuty = isOnDuty(actor.schedule, ctx.tick, ctx.config);
@@ -554,9 +565,9 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
       return slept && (rested || shiftCalls);
     }
     case "rest":
-      return onDuty && actor.needs.comfort <= 0;
+      return (onDuty || leisurePressed(actor)) && actor.needs.comfort <= 0;
     case "socialize":
-      return onDuty && actor.needs.social <= 0;
+      return (onDuty || leisurePressed(actor)) && actor.needs.social <= 0;
     case "staff":
       if (helmHoldDone(ctx, actor, step)) return true;
       learnAtTheHelm(ctx, actor);
@@ -631,5 +642,10 @@ export function runStep(
       return "wait";
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
+    // Slice 4: recreation's and the cabins' steps.
+    case "recreate":
+      return runRecreate(ctx, actor, step);
+    case "confer":
+      return runConfer(ctx, actor, step);
   }
 }

@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.the_league",
+  "label": "the League",
+  "weights": {
+    "orderFreedom": 0,
+    "faithReason": 0,
+    "loyaltyAmbition": 1
+  }
+}

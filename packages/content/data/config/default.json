@@ -29,6 +29,7 @@
     "comfortRecoveryPerDayResting": 20.04,
     "socialPerDay": 0.5004,
     "socialRecoveryPerDayChatting": 9.996,
+    "recreationPerDay": 0.6,
     "seekThreshold": 0.5,
     "mealDays": 0.0125,
     "sleepDays": 0.2,
@@ -49,6 +50,10 @@
       },
       "social": {
         "min": 0.1,
+        "max": 0.5
+      },
+      "recreation": {
+        "min": 0.2,
         "max": 0.5
       }
     }
@@ -177,7 +182,8 @@
       "helmUnattended",
       "driftingChanged",
       "shipLimping",
-      "roomFilthy"
+      "roomFilthy",
+      "argument"
     ],
     "dirtFrameEverySeconds": 5
   },
@@ -211,7 +217,8 @@
     "lowBelowDays": 2,
     "restockToDays": 5,
     "goodCookingAbove": 6,
-    "poorCookingBelow": 3
+    "poorCookingBelow": 3,
+    "treatHungerAbove": 0.1
   },
   "dirt": {
     "footfallPerStep": 0.01,
@@ -256,7 +263,31 @@
       "{a} and {b} swapped gossip from the last port",
       "{b} laughed at {a}'s joke about the engine",
       "{a} wondered aloud what the next job pays"
-    ]
+    ],
+    "chatAffinity": 1,
+    "chatAffinityEveryDays": 2,
+    "affinityRange": 10,
+    "avoidBelow": -3,
+    "preferAbove": 0,
+    "rivalry": {
+      "streakFor": 2
+    },
+    "debate": {
+      "agreeWithin": 2,
+      "argueBeyond": 4
+    }
+  },
+  "recreation": {
+    "joinAbove": 0.25,
+    "gatherSeconds": 45,
+    "lateJoinSeconds": 20,
+    "collapseBackoffDays": 0.1
+  },
+  "cabins": {
+    "noisySeconds": 60,
+    "checkEverySeconds": 60,
+    "privateTalkSeconds": 20,
+    "privateTalkWaitSeconds": 120
   },
   "events": {
     "tickerMaxEntries": 30,

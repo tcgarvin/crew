@@ -15,7 +15,7 @@
  */
 import type { Actor } from "../../core/types/actor";
 import type { TaskReleaseReason } from "../../core/types/events";
-import type { MachineId } from "../../core/types/ids";
+import type { ActivityDefId, MachineId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type {
@@ -26,7 +26,10 @@ import type {
   Intent,
   Task,
 } from "../../core/types/work";
+import { onWoke } from "../cabins/cabins";
+import { leaveTalk } from "../cabins/private-talk";
 import { setDownBought } from "../commerce/market";
+import { leaveRecreation } from "../recreation/sessions";
 import { stopMovement } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
 import { actionFor, refreshPresentation } from "./actions";
@@ -123,8 +126,15 @@ function tellCrew(ctx: StepCtx, teller: Actor, item: Item): void {
   }
 }
 
-function leaveHold(ctx: StepCtx, actor: Actor): void {
-  if (currentHold(actor.activity) === "sleep") emitSim(ctx, "wokeUp", [actor.id], {});
+/**
+ * Leaving the hold the actor is on. `completed`: the hold ended on its own condition (a sleep
+ * slept out), not because the activity was taken off them; only then do the cabins' waking
+ * thoughts come (slice 4, `onWoke`, with the hold still the current step).
+ */
+function leaveHold(ctx: StepCtx, actor: Actor, completed: boolean): void {
+  if (currentHold(actor.activity) !== "sleep") return;
+  if (completed) onWoke(ctx, actor);
+  emitSim(ctx, "wokeUp", [actor.id], {});
 }
 
 /** Stop whatever the actor is doing, releasing its claim. Safe to call when idle. */
@@ -135,7 +145,11 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
   endGateErrand(ctx, actor);
   if (actor.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, actor.id);
   else releaseReservations(ctx.caches, actor.id);
-  leaveHold(ctx, actor);
+  leaveHold(ctx, actor, false);
+  // Slice 4: out of any session (setting down a book or instrument) and off any talk, while the
+  // activity is still theirs to read.
+  leaveRecreation(ctx, actor);
+  leaveTalk(ctx, actor);
   if (activity.kind === "task" && activity.haul !== undefined) {
     // D65: the truck and its load go down here; each held task is settled on where its crate is.
     if (dropTruckLoad(ctx, actor, activity.haul.truckId)) touchInventory(ctx);
@@ -248,7 +262,7 @@ function advanceActivity(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
       failActivity(ctx, actor, result.fail);
       return;
     }
-    if (step.kind === "hold") leaveHold(ctx, actor);
+    if (step.kind === "hold") leaveHold(ctx, actor, true);
     completedStepEvent(ctx, actor);
     plan.stepIndex += 1;
     if (plan.stepIndex >= plan.steps.length) {
@@ -336,7 +350,15 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
 function samePersonal(activity: Activity, intent: Extract<Intent, { kind: "personal" }>): boolean {
   if (activity.kind !== "personal" || activity.activity !== intent.activity) return false;
   // D70: a meeting for another card (this one's delivered, they are walking back) is not the same.
+  if (intent.activity === "recreate") return recreateActivityOf(activity) === intent.activityId;
   return intent.activity !== "meetSpeaker" || meetingAhead({ activity }) === intent.decisionId;
+}
+
+/** The activity def a running `recreate` plays, read from its plan's `recreate` step. */
+function recreateActivityOf(activity: Activity): ActivityDefId | undefined {
+  if (activity.kind !== "personal") return undefined;
+  const step = activity.plan?.steps.find((s) => s.kind === "recreate");
+  return step?.kind === "recreate" ? step.activityId : undefined;
 }
 
 function startPersonal(
@@ -345,10 +367,14 @@ function startPersonal(
   intent: Extract<Intent, { kind: "personal" }>,
 ): void {
   if (samePersonal(actor.activity, intent)) return;
-  const ref = backoffRef.personal(
-    intent.activity,
-    intent.itemId ?? (intent.targetId as MachineId | undefined),
-  );
+  // A recreate intent backs off its own activity only, as `activityRef` names a running one.
+  const ref =
+    intent.activity === "recreate"
+      ? backoffRef.personal("recreate", intent.activityId)
+      : backoffRef.personal(
+          intent.activity,
+          intent.itemId ?? (intent.targetId as MachineId | undefined),
+        );
   // As for tasks: an activity that cannot be carried out leaves the current one alone.
   if (!buildPersonalPlan(ctx, actor, intent).ok) {
     setBackoff(ctx, actor, ref);

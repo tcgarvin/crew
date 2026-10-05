@@ -10,10 +10,10 @@
     "tick": 2400
   },
   "snapshot": {
-    "schemaVersion": 9,
+    "schemaVersion": 10,
     "simVersion": "0.1.0",
-    "contentHash": "9c8da2ab1d472b97",
-    "configHash": "9c8da2ab1d472b97",
+    "contentHash": "91ef2ca8e122579d",
+    "configHash": "91ef2ca8e122579d",
     "savedAtTick": 2400,
     "config": {
       "time": {
@@ -45,6 +45,7 @@
         "comfortRecoveryPerDayResting": 20.04,
         "socialPerDay": 0.5004,
         "socialRecoveryPerDayChatting": 9.996,
+        "recreationPerDay": 0.6,
         "seekThreshold": 0.5,
         "mealDays": 0.0125,
         "sleepDays": 0.2,
@@ -65,6 +66,10 @@
           },
           "social": {
             "min": 0.1,
+            "max": 0.5
+          },
+          "recreation": {
+            "min": 0.2,
             "max": 0.5
           }
         }
@@ -193,7 +198,8 @@
           "helmUnattended",
           "driftingChanged",
           "shipLimping",
-          "roomFilthy"
+          "roomFilthy",
+          "argument"
         ],
         "dirtFrameEverySeconds": 5
       },
@@ -227,7 +233,8 @@
         "lowBelowDays": 2,
         "restockToDays": 5,
         "goodCookingAbove": 6,
-        "poorCookingBelow": 3
+        "poorCookingBelow": 3,
+        "treatHungerAbove": 0.1
       },
       "dirt": {
         "footfallPerStep": 0.01,
@@ -280,7 +287,31 @@
           "{a} and {b} swapped gossip from the last port",
           "{b} laughed at {a}'s joke about the engine",
           "{a} wondered aloud what the next job pays"
-        ]
+        ],
+        "chatAffinity": 1,
+        "chatAffinityEveryDays": 2,
+        "affinityRange": 10,
+        "avoidBelow": -3,
+        "preferAbove": 0,
+        "rivalry": {
+          "streakFor": 2
+        },
+        "debate": {
+          "agreeWithin": 2,
+          "argueBeyond": 4
+        }
+      },
+      "recreation": {
+        "joinAbove": 0.25,
+        "gatherSeconds": 45,
+        "lateJoinSeconds": 20,
+        "collapseBackoffDays": 0.1
+      },
+      "cabins": {
+        "noisySeconds": 60,
+        "checkEverySeconds": 60,
+        "privateTalkSeconds": 20,
+        "privateTalkWaitSeconds": 120
       },
       "events": {
         "tickerMaxEntries": 30,
@@ -288,12 +319,12 @@
       }
     },
     "state": {
-      "schemaVersion": 9,
+      "schemaVersion": 10,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 2400,
       "rng": {
-        "setup": [1494455598, 1813422184, 3346825992, 2642480718],
+        "setup": [624639101, 3782221826, 3611072834, 2642480727],
         "failures": [2695369535, 960197874, 4139707991, 331545582],
         "perception": [2529467439, 2466509179, 3806309496, 3389621],
         "social": [4013384287, 356094304, 665230829, 3499190074],
@@ -303,7 +334,7 @@
       "nextId": {
         "actor": 10,
         "machine": 34,
-        "item": 16,
+        "item": 17,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -315,7 +346,8 @@
         "transaction": 2,
         "event": 1,
         "local": 5,
-        "hazard": 1
+        "hazard": 1,
+        "session": 1
       },
       "actors": {
         "a1": {
@@ -337,7 +369,8 @@
             "hunger": 0,
             "fatigue": 0,
             "comfort": 0.1,
-            "social": 0
+            "social": 0,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -355,6 +388,16 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["stargazing", "reading", "boardgames"],
+            "strong": "stargazing",
+            "dislikes": ["vids"]
+          },
+          "values": {
+            "orderFreedom": -1,
+            "faithReason": 0,
+            "loyaltyAmbition": -2
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -390,7 +433,8 @@
             "hunger": 0.13,
             "fatigue": 0.21,
             "comfort": 0.1,
-            "social": 0.17
+            "social": 0.17,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -408,6 +452,16 @@
           "traits": ["trait.steady", "trait.methodical"],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["boardgames", "music", "reading"],
+            "strong": "boardgames",
+            "dislikes": ["exercise"]
+          },
+          "values": {
+            "orderFreedom": -2,
+            "faithReason": 0,
+            "loyaltyAmbition": -1
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -443,7 +497,8 @@
             "hunger": 0.26,
             "fatigue": 0.42,
             "comfort": 0.1,
-            "social": 0.34
+            "social": 0.34,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -461,6 +516,16 @@
           "traits": ["trait.night_owl"],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["tinkering", "debate"],
+            "strong": "tinkering",
+            "dislikes": ["cards"]
+          },
+          "values": {
+            "orderFreedom": 1,
+            "faithReason": 2,
+            "loyaltyAmbition": 1
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -496,7 +561,8 @@
             "hunger": 0.39,
             "fatigue": 0.63,
             "comfort": 0.1,
-            "social": 0.51
+            "social": 0.51,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -514,6 +580,16 @@
           "traits": ["trait.brisk_walker"],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["sparring", "cards"],
+            "strong": "sparring",
+            "dislikes": ["debate"]
+          },
+          "values": {
+            "orderFreedom": 1,
+            "faithReason": -1,
+            "loyaltyAmbition": 0
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -549,7 +625,8 @@
             "hunger": 0.52,
             "fatigue": 0.84,
             "comfort": 0.1,
-            "social": 0.68
+            "social": 0.68,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -567,6 +644,16 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["cards", "vids"],
+            "strong": "cards",
+            "dislikes": ["reading"]
+          },
+          "values": {
+            "orderFreedom": 2,
+            "faithReason": 1,
+            "loyaltyAmbition": 2
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -602,7 +689,8 @@
             "hunger": 0.65,
             "fatigue": 0.10000000000000009,
             "comfort": 0.1,
-            "social": 0.050000000000000044
+            "social": 0.050000000000000044,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -620,6 +708,16 @@
           "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["music", "cooking"],
+            "strong": "music",
+            "dislikes": ["sparring"]
+          },
+          "values": {
+            "orderFreedom": 0,
+            "faithReason": -2,
+            "loyaltyAmbition": -1
+          },
           "boots": 0,
           "schedule": {},
           "activity": {
@@ -650,7 +748,8 @@
             "hunger": 0.78,
             "fatigue": 0.31000000000000005,
             "comfort": 0.1,
-            "social": 0.21999999999999997
+            "social": 0.21999999999999997,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -668,6 +767,16 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["reading", "debate"],
+            "strong": "reading",
+            "dislikes": ["sparring"]
+          },
+          "values": {
+            "orderFreedom": -1,
+            "faithReason": 1,
+            "loyaltyAmbition": -1
+          },
           "boots": 0,
           "schedule": {},
           "activity": {
@@ -698,7 +807,8 @@
             "hunger": 0.010000000000000009,
             "fatigue": 0.52,
             "comfort": 0.1,
-            "social": 0.3900000000000001
+            "social": 0.3900000000000001,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -716,6 +826,16 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["exercise", "sparring", "gossip"],
+            "strong": "exercise",
+            "dislikes": ["music"]
+          },
+          "values": {
+            "orderFreedom": 1,
+            "faithReason": 0,
+            "loyaltyAmbition": 1
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -751,7 +871,8 @@
             "hunger": 0.14,
             "fatigue": 0.73,
             "comfort": 0.1,
-            "social": 0.56
+            "social": 0.56,
+            "recreation": 0.3
           },
           "capacities": {
             "movement": 1,
@@ -769,6 +890,16 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "interests": {
+            "likes": ["vids", "stargazing"],
+            "strong": "vids",
+            "dislikes": ["boardgames"]
+          },
+          "values": {
+            "orderFreedom": 0,
+            "faithReason": -1,
+            "loyaltyAmbition": 1
+          },
           "boots": 0,
           "schedule": {
             "section": {
@@ -2139,6 +2270,19 @@
             "y": 18.5
           },
           "condition": 1
+        },
+        "i16": {
+          "id": "i16",
+          "defId": "item.book",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 6.5,
+            "y": 0.5
+          },
+          "count": 3,
+          "reserved": 0
         }
       },
       "berths": {
@@ -2202,6 +2346,12 @@
       },
       "galley": {
         "lastMealWatch": 0
+      },
+      "social": {
+        "relationships": {},
+        "rivalries": {},
+        "sessions": {},
+        "captainsTableDay": -1
       },
       "jobs": {},
       "money": {

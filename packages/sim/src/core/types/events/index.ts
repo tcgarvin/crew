@@ -10,6 +10,7 @@
 import type { CommandSource } from "../commands";
 import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
+import { CABINS_EVENT_SIGNIFICANCE, type CabinsEventPayloads } from "./cabins";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";
 import { DECISION_EVENT_SIGNIFICANCE, type DecisionEventPayloads } from "./decisions";
 import { DIRT_EVENT_SIGNIFICANCE, type DirtEventPayloads } from "./dirt";
@@ -18,12 +19,15 @@ import { GALLEY_EVENT_SIGNIFICANCE, type GalleyEventPayloads } from "./galley";
 import { KERNEL_EVENT_SIGNIFICANCE, type KernelEventPayloads } from "./kernel";
 import { NEEDS_EVENT_SIGNIFICANCE, type NeedsEventPayloads } from "./needs";
 import { PERCEPTION_EVENT_SIGNIFICANCE, type PerceptionEventPayloads } from "./perception";
+import { RECREATION_EVENT_SIGNIFICANCE, type RecreationEventPayloads } from "./recreation";
 import type { Significance, SignificanceCatalog } from "./significance";
+import { SOCIAL_EVENT_SIGNIFICANCE, type SocialEventPayloads } from "./social";
 import { SPATIAL_EVENT_SIGNIFICANCE, type SpatialEventPayloads } from "./spatial";
 import { TRAVEL_EVENT_SIGNIFICANCE, type TravelEventPayloads } from "./travel";
 import { WATCH_EVENT_SIGNIFICANCE, type WatchEventPayloads } from "./watch";
 import { WORK_EVENT_SIGNIFICANCE, type WorkEventPayloads } from "./work";
 
+export type * from "./cabins";
 export type * from "./commerce";
 export type * from "./decisions";
 export type * from "./dirt";
@@ -32,7 +36,9 @@ export type * from "./galley";
 export type * from "./kernel";
 export type * from "./needs";
 export type * from "./perception";
+export type * from "./recreation";
 export type * from "./significance";
+export type * from "./social";
 export type * from "./spatial";
 export type * from "./travel";
 export type * from "./watch";
@@ -51,7 +57,10 @@ export interface EventPayloadMap
     DecisionEventPayloads,
     WatchEventPayloads,
     GalleyEventPayloads,
-    DirtEventPayloads {}
+    DirtEventPayloads,
+    RecreationEventPayloads,
+    SocialEventPayloads,
+    CabinsEventPayloads {}
 
 export type EventType = keyof EventPayloadMap;
 
@@ -69,7 +78,20 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...WATCH_EVENT_SIGNIFICANCE,
   ...GALLEY_EVENT_SIGNIFICANCE,
   ...DIRT_EVENT_SIGNIFICANCE,
+  ...RECREATION_EVENT_SIGNIFICANCE,
+  ...SOCIAL_EVENT_SIGNIFICANCE,
+  ...CABINS_EVENT_SIGNIFICANCE,
 };
+
+/**
+ * The off-watch family (slice 4, D84-D87): recreation, social and cabin events. The beats report
+ * counts their ticker lines per watch against call 22's twelve.
+ */
+export const OFF_WATCH_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  ...(Object.keys(RECREATION_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(SOCIAL_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(CABINS_EVENT_SIGNIFICANCE) as EventType[]),
+]);
 
 /** `sim` for pipeline-originated events; otherwise the source of the command that caused it. */
 export type EventSource = CommandSource | "sim";

@@ -22,6 +22,7 @@ import type { CrewDef, DirtTier, HazardKind, ItemDef } from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
 import type { DocksideState } from "./dockside";
 import type {
+  ActivityDefId,
   ActorId,
   ClaimId,
   CommandId,
@@ -39,7 +40,9 @@ import type {
   PortDefId,
   ProblemId,
   ScenarioDefId,
+  SessionId,
   TaskId,
+  TopicDefId,
 } from "./ids";
 import type { Compartment, DeckState, Door, Item, Machine, PowerState } from "./ship";
 import type { Job, MoneyState, TravelState } from "./travel";
@@ -65,8 +68,87 @@ import type { Claim, Problem, Task } from "./work";
  * 9 (2026-10-04): ship life slice 3 (D81-D83): `dirt` (a cell grid per deck and room tiers),
  * `galley` (the meal's bookkeeping), `Actor.boots`, `Item.meal`. Migrated; an old save also gets
  * the scenario's provisions and mop spawned so it cooks tonight.
+ * 10 (2026-10-05): ship life slice 4 (D84-D87): `needs.recreation`, `Actor.interests` and
+ * `values`, `social` (relationships, rivalries, group sessions, the captain's table, a private
+ * talk) and `nextId.session`. Migrated; an old save also gets the scenario's books on the shelf.
  */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
+
+/** Slice 4: what one person feels about another (directed). An entry exists once moved. */
+export interface Relationship {
+  /** Integer in [-social.affinityRange, social.affinityRange]. */
+  affinity: number;
+  /** Last ambient chat between the pair that moved affinity (`social.chatAffinityEveryDays`). */
+  lastChatTick?: Tick;
+}
+
+/** Slice 4: `"<a>|<b>|<activityId>"` with the two actor ids in ascending order (`rivalryKey`). */
+export type RivalryKey = string;
+
+/**
+ * Slice 4: the tally between two people at one activity, from `a`'s side (the key's first id):
+ * `a`'s wins and losses, and the current run, positive for `a`'s, negative for `b`'s.
+ */
+export interface Rivalry {
+  wins: number;
+  losses: number;
+  streak: number;
+}
+
+/**
+ * Slice 4: where a session happens: a compartment, and in it a machine (the games table) or a
+ * zone (the sparring mat), or neither (the lounge floor).
+ */
+export type SessionVenue = { compartmentId: CompartmentId } & (
+  | { machineId: MachineId }
+  | { zoneKey: LocalKey }
+  | Record<never, never>
+);
+
+/**
+ * Slice 4: a group activity, open (gathering) or running. The row is the venue's; each member's
+ * part is their `recreate` step. Members are the people at the venue; nobody en route counts.
+ * Common knowledge (`AgentView.sessions()`), like the roster.
+ */
+export interface GroupSession {
+  id: SessionId;
+  activityId: ActivityDefId;
+  venue: SessionVenue;
+  hostId: ActorId;
+  members: ActorId[];
+  openedTick: Tick;
+  /** Set when it starts (at `participants.max`, or the gather timer with at least `min`). */
+  startedTick?: Tick;
+  /** When it resolves; set with `startedTick`. */
+  endsAtTick?: Tick;
+  /** A debate's topic, picked when it starts. */
+  topicId?: TopicDefId;
+}
+
+/**
+ * Slice 4: the captain (or the first officer standing in) has called someone in for a word in
+ * their cabin (`privateTalk`). Owner: cabins.
+ */
+export interface PrivateTalk {
+  captainId: ActorId;
+  actorId: ActorId;
+  tone: "warm" | "stern";
+  requestedTick: Tick;
+}
+
+/**
+ * Slice 4: social life. Owners: recreation for `sessions`, cabins for `privateTalk`, social for
+ * the rest (relationships, rivalries, the captain's table). Sparse: under 4 KB at nine people.
+ */
+export interface SocialState {
+  /** `relationships[from][to]`: what `from` feels about `to`. */
+  relationships: Record<ActorId, Record<ActorId, Relationship>>;
+  rivalries: Record<RivalryKey, Rivalry>;
+  sessions: Record<SessionId, GroupSession>;
+  /** The ship's day (`dayIndexAt`) of the last captain's table; -1 before the first. */
+  captainsTableDay: number;
+  privateTalk?: PrivateTalk;
+}
 
 /**
  * D82: dirt. Owner: dirt (`systems/dirt/`). `cells[deckId]` is one row-major integer per authored
@@ -187,6 +269,8 @@ export interface WorldState {
   dirt: DirtState;
   /** Owner: galley (D81). */
   galley: GalleyState;
+  /** Slice 4: owners per `SocialState` (recreation, social, cabins). */
+  social: SocialState;
   /** Owner: commerce (W6). */
   jobs: Record<JobId, Job>;
   /** Owner: commerce (W6). Integer credits. */

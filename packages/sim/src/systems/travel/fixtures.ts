@@ -8,11 +8,16 @@
  * workstreams share.
  */
 import {
+  FIXTURE_ACTIVITIES,
+  FIXTURE_CABINS,
   FIXTURE_DIRT,
   FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
   FIXTURE_MOOD,
+  FIXTURE_RECREATION,
+  FIXTURE_SOCIAL,
   FIXTURE_THOUGHTS,
+  FIXTURE_TOPICS,
   fixtureWatches,
 } from "../../core/fixtures/ship-life";
 import { createKernel } from "../../core/kernel";
@@ -96,6 +101,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       comfortRecoveryPerDayResting: 0.01 * FIXTURE_DAY,
       socialPerDay: 0.001 * FIXTURE_DAY,
       socialRecoveryPerDayChatting: 0.01 * FIXTURE_DAY,
+      recreationPerDay: 0.001 * FIXTURE_DAY,
       seekThreshold: 0.5,
       mealDays: 10 / FIXTURE_DAY,
       sleepDays: 60 / FIXTURE_DAY,
@@ -106,6 +112,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         fatigue: { min: 0, max: 0 },
         comfort: { min: 0, max: 0 },
         social: { min: 0, max: 0 },
+        recreation: { min: 0, max: 0 },
       },
     },
     work: {
@@ -211,7 +218,10 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,
       templateLines: ["{a} joked about the food", "{a} and {b} swapped gossip from the last port"],
+      ...FIXTURE_SOCIAL,
     },
+    recreation: FIXTURE_RECREATION,
+    cabins: FIXTURE_CABINS,
     events: { tickerMaxEntries: 20, traceRingSize: 100 },
   };
 }
@@ -446,6 +456,8 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
       },
     },
     thoughts: FIXTURE_THOUGHTS,
+    activities: FIXTURE_ACTIVITIES,
+    topics: FIXTURE_TOPICS,
     config,
     hash: "fixture-content-v1",
   };

@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.board_game",
+  "label": "playing a board game",
+  "waitingLabel": "setting up a board game",
+  "interest": "boardgames",
+  "venue": [
+    {
+      "machineTag": "gamesTable"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 2
+  },
+  "durationDays": 0.08,
+  "restores": {
+    "recreation": 0.4,
+    "social": 0.2
+  },
+  "outcome": "contest",
+  "thoughts": {
+    "win": "wonContest",
+    "lose": "lostContest"
+  },
+  "affinity": {
+    "participants": 1,
+    "winnerToLoser": 0,
+    "loserToWinner": -2
+  }
+}

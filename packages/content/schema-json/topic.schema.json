@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "weights": {
+      "type": "object",
+      "properties": {
+        "orderFreedom": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "faithReason": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "loyaltyAmbition": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        }
+      },
+      "required": ["orderFreedom", "faithReason", "loyaltyAmbition"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["id", "label", "weights"],
+  "additionalProperties": false
+}

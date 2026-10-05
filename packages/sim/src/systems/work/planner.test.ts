@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PlannerConfig } from "../../core/types/pipeline";
 import { enumerateCandidates, sleepUrgency } from "../../planner/candidates";
 import { selectIntent } from "../../planner/select";
+import { currentStep } from "./activity";
 import {
   JON,
   MARA,
@@ -20,8 +21,8 @@ function actorOf(tw: ReturnType<typeof crewWorld>, id: typeof MARA) {
 }
 
 function plannerConfig(tw: ReturnType<typeof crewWorld>): PlannerConfig {
-  const { work, urgency, needs, time, galley } = tw.world.config.values;
-  return { work, urgency, needs, time, galley };
+  const { work, urgency, needs, time, galley, recreation, social, mood } = tw.world.config.values;
+  return { work, urgency, needs, time, galley, recreation, social, mood };
 }
 
 describe("selectIntent", () => {
@@ -140,5 +141,64 @@ describe("selectIntent", () => {
       kind: "personal",
       activity: "eat",
     });
+  });
+
+  it("rest and chat take the need's urgency past the seek threshold, voluntary below (D84 tuning)", () => {
+    const tw = crewWorld();
+    const { world, kernel } = tw;
+    withoutRounds(world);
+    world.state.tick = 300 * world.config.values.time.tickRate; // Mara off duty
+    const urgencyOf = (activity: "rest" | "socialize") =>
+      enumerateCandidates(kernel.getAgentView(world, MARA), plannerConfig(tw)).candidates.find(
+        (c) => c.choice.kind === "personal" && c.choice.activity === activity,
+      )?.urgency;
+    const mara = actorOf(tw, MARA);
+    mara.needs.social = 0.3;
+    mara.needs.comfort = 0.3;
+    expect(urgencyOf("socialize")).toBe("voluntaryActivity");
+    expect(urgencyOf("rest")).toBe("voluntaryActivity");
+    mara.needs.social = 0.6;
+    mara.needs.comfort = 0.75;
+    // So a lonely person off watch is not always beaten to the lounge by a routine game.
+    expect(urgencyOf("socialize")).toBe("routineObligation");
+    expect(urgencyOf("rest")).toBe("essentialOperation");
+  });
+
+  it("a chat taken because the need pressed ends when it is met, off duty too (D84 tuning)", () => {
+    const tw = crewWorld();
+    const { world } = tw;
+    withoutRounds(world);
+    world.state.tick = 300 * world.config.values.time.tickRate;
+    const mara = actorOf(tw, MARA);
+    mara.needs.social = 0.6;
+    const holding = (what: readonly string[], urgency: string) => (w: typeof world) => {
+      const activity = w.state.actors[MARA]?.activity;
+      return (
+        activity?.kind === "personal" &&
+        what.includes(activity.activity) &&
+        activity.urgency === urgency &&
+        currentStep(activity)?.kind === "hold"
+      );
+    };
+    const chatting = holding(["socialize"], "routineObligation");
+    run(tw, 400, chatting);
+    expect(chatting(world)).toBe(true);
+    // Met, the routine hold ends and she replans: off duty with nothing pressing, an idle rest
+    // or chat (before the tuning the routine chat went on until something essential came up).
+    const idling = holding(["rest", "socialize"], "voluntaryActivity");
+    run(tw, 2000, (w) => (w.state.actors[MARA]?.needs.social ?? 1) <= 0);
+    expect(mara.needs.social).toBe(0);
+    run(tw, 40, idling);
+    expect(idling(world)).toBe(true);
+    // The idle chat lasts off duty (until the planner finds something more pressing).
+    const held = () => {
+      const activity = world.state.actors[MARA]?.activity;
+      return activity?.kind === "personal"
+        ? { activity: activity.activity, urgency: activity.urgency, sinceTick: activity.sinceTick }
+        : undefined;
+    };
+    const before = held();
+    run(tw, 200);
+    expect(held()).toEqual(before);
   });
 });

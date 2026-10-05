@@ -137,6 +137,9 @@ function runPlannerStage(
     needs: config.needs,
     time: config.time,
     galley: config.galley,
+    recreation: config.recreation,
+    social: config.social,
+    mood: config.mood,
   };
   const due = dueActors(actorIds, base.tick, config.work.reconsiderEveryTicks);
   for (const actorId of due) {

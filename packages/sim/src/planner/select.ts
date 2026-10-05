@@ -74,6 +74,9 @@ function toIntent(best: Candidate, t: PlannerTrace): Intent {
     ...(choice.targetId === undefined ? {} : { targetId: choice.targetId }),
     ...(choice.itemId === undefined ? {} : { itemId: choice.itemId }),
     ...(choice.tile === undefined ? {} : { tile: { x: choice.tile.x, y: choice.tile.y } }),
+    ...(choice.activityId === undefined ? {} : { activityId: choice.activityId }),
+    ...(choice.sessionId === undefined ? {} : { sessionId: choice.sessionId }),
+    ...(choice.role === undefined ? {} : { role: choice.role }),
     urgency: best.urgency,
     trace: t,
   };

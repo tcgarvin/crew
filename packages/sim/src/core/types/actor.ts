@@ -7,7 +7,7 @@
  * observation in W4/W5); `skills` by work (experience gain); `availability` by needs/bodies.
  */
 import type { PhysicalLocation, Tick, TileCoord } from "./common";
-import type { RoleTag, SkillLevels, ThoughtKey } from "./content";
+import type { InterestTag, RoleTag, SkillLevels, ThoughtKey } from "./content";
 import type {
   ActorId,
   CrewDefId,
@@ -29,9 +29,32 @@ export interface Needs {
   fatigue: number;
   comfort: number;
   social: number;
+  /** Slice 4: boredom; restored by off-watch activities, never above routine class. */
+  recreation: number;
 }
 
 export type NeedKey = keyof Needs;
+
+/**
+ * Slice 4: what someone likes doing off watch. `strong` is one of `likes` (a keen one); likes and
+ * dislikes never share a tag.
+ */
+export interface Interests {
+  likes: InterestTag[];
+  strong?: InterestTag;
+  dislikes: InterestTag[];
+}
+
+/**
+ * Slice 4: where someone stands on three value axes, integers in [-2, 2]; the positive end is the
+ * second word (`orderFreedom` +2 is all for freedom). A debate's stance is their dot product with
+ * a topic's weights.
+ */
+export interface Values {
+  orderFreedom: number;
+  faithReason: number;
+  loyaltyAmbition: number;
+}
 
 /**
  * Body capacities in [0, 1]. Bodies/wounds are deferred (PLAN §7); V1 keeps these at 1 except
@@ -212,6 +235,9 @@ export interface Actor {
   mood: number;
   /** D79: live thoughts, which mood sums (owner: `core/thoughts.ts` adds, needs prunes). */
   thoughts: Thought[];
+  /** Slice 4: soft character state, from the crew def or generated at spawn. */
+  interests: Interests;
+  values: Values;
   /**
    * D82: dirt on the boots in [0, 1], loaded on dock floor and dirty tiles, shed on the deck as
    * they walk (owner: dirt, written from movement through `trackFootfall`).

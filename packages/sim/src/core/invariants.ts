@@ -3,6 +3,7 @@
  * message per violation; empty means healthy. Used by tests after every step and by `restore`.
  */
 import { parseInstanceId } from "./ids";
+import { INTEREST_TAGS } from "./types/content";
 import type { InstanceKind } from "./types/ids";
 import type { ReadonlyWorldState } from "./types/pipeline";
 
@@ -97,6 +98,7 @@ function idViolations(state: ReadonlyWorldState): string[] {
   check("work.claims", "claim", state.work.claims);
   check("decisions.records", "decision", state.decisions.records);
   check("money.transactions", "transaction", state.money.transactions);
+  check("social.sessions", "session", state.social.sessions);
   return out;
 }
 
@@ -207,6 +209,7 @@ function actorViolations(state: ReadonlyWorldState): string[] {
         out.push(`${where}.expiresAtTick is ${thought.expiresAtTick}`);
       }
     });
+    out.push(...characterViolations(actor));
     // D82: boots carry a share of dirt in [0, 1].
     if (!(actor.boots >= 0 && actor.boots <= 1)) {
       out.push(`actors.${actor.id}.boots is ${actor.boots}`);
@@ -218,6 +221,94 @@ function actorViolations(state: ReadonlyWorldState): string[] {
       (section.key.length === 0 || !Number.isInteger(section.index) || section.index < 0)
     ) {
       out.push(`actors.${actor.id}.schedule.section is ${JSON.stringify(section)}`);
+    }
+  }
+  return out;
+}
+
+const INTEREST_TAG_SET: ReadonlySet<string> = new Set(INTEREST_TAGS);
+
+/**
+ * Slice 4: interests are known tags, the strong one among the likes, none both liked and
+ * disliked; values are integers in [-2, 2]. (`needs.recreation` is in [0, 1] with the other
+ * needs.)
+ */
+function characterViolations(
+  actor: ReadonlyWorldState["actors"][keyof ReadonlyWorldState["actors"]],
+): string[] {
+  const out: string[] = [];
+  const where = `actors.${actor.id}`;
+  const { likes, strong, dislikes } = actor.interests;
+  for (const tag of [...likes, ...dislikes, ...(strong === undefined ? [] : [strong])]) {
+    if (!INTEREST_TAG_SET.has(tag)) out.push(`${where}.interests names unknown tag "${tag}"`);
+  }
+  if (strong !== undefined && !likes.includes(strong)) {
+    out.push(`${where}.interests.strong "${strong}" is not one of its likes`);
+  }
+  for (const tag of likes) {
+    if (dislikes.includes(tag)) out.push(`${where}.interests both likes and dislikes "${tag}"`);
+  }
+  for (const [axis, value] of Object.entries(actor.values)) {
+    if (!Number.isInteger(value) || value < -2 || value > 2) {
+      out.push(`${where}.values.${axis} is ${value}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Slice 4: social state names actors that exist. Relationship rows and their entries are keyed by
+ * actors and hold integer affinities (the `affinityRange` bound is config's, checked beside mood
+ * in `systems/needs/invariants.ts`); every session's host and members are actors on deck, its
+ * tick fields whole and `startedTick <= endsAtTick`; a private talk names two different actors.
+ */
+function socialViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  const social = state.social;
+  for (const [from, row] of Object.entries(social.relationships)) {
+    if (!(from in state.actors)) out.push(`social.relationships.${from} is not an actor`);
+    for (const [to, relationship] of Object.entries(row)) {
+      const where = `social.relationships.${from}.${to}`;
+      if (!(to in state.actors) || to === from) out.push(`${where} is not another actor`);
+      if (!Number.isInteger(relationship.affinity)) {
+        out.push(`${where}.affinity is ${relationship.affinity}`);
+      }
+    }
+  }
+  for (const session of Object.values(social.sessions)) {
+    const where = `social.sessions.${session.id}`;
+    for (const id of [session.hostId, ...session.members]) {
+      const actor = state.actors[id];
+      if (actor === undefined || actor.location.kind !== "onDeck") {
+        out.push(`${where} names ${id}, who is not an actor on deck`);
+      }
+    }
+    if (new Set(session.members).size !== session.members.length) {
+      out.push(`${where}.members repeat someone`);
+    }
+    const { openedTick, startedTick, endsAtTick } = session;
+    for (const [field, tick] of [
+      ["openedTick", openedTick],
+      ["startedTick", startedTick],
+      ["endsAtTick", endsAtTick],
+    ] as const) {
+      if (tick !== undefined && !Number.isInteger(tick)) out.push(`${where}.${field} is ${tick}`);
+    }
+    if ((startedTick === undefined) !== (endsAtTick === undefined)) {
+      out.push(`${where} has only one of startedTick and endsAtTick`);
+    } else if (startedTick !== undefined && endsAtTick !== undefined && startedTick > endsAtTick) {
+      out.push(`${where}.startedTick ${startedTick} is after endsAtTick ${endsAtTick}`);
+    }
+    if (!(session.venue.compartmentId in state.compartments)) {
+      out.push(`${where}.venue names unknown compartment ${session.venue.compartmentId}`);
+    }
+  }
+  const talk = social.privateTalk;
+  if (talk !== undefined) {
+    if (!(talk.captainId in state.actors) || !(talk.actorId in state.actors)) {
+      out.push("social.privateTalk names someone who is not an actor");
+    } else if (talk.captainId === talk.actorId) {
+      out.push("social.privateTalk names the same actor twice");
     }
   }
   return out;
@@ -370,6 +461,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...berthViolations(state),
     ...hazardViolations(state),
     ...dirtAndGalleyViolations(state),
+    ...socialViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

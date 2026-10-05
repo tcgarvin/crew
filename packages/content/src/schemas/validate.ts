@@ -9,6 +9,10 @@
  *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
  *   bands `min <= max`; config numbers finite. D77: every watch-bill member is in the scenario's
  *   crew, and dayworkers' watches exist in the day; D79: each thought sits under its own key.
+ *   Slice 4 (D84): an activity's topics and product resolve and its required item tag is carried
+ *   by some item def, by a `personal` one when it must be the actor's own; at most four take part
+ *   (one plate's worth); a group activity that is not a contest says how it is done alone
+ *   (`solo`); a thought label carries `{ref}` only for a key the sim gives a `refId`.
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
@@ -22,10 +26,13 @@
  *   (`validate-dock.ts`): rows against the legend, the berth box on the map and void, each deck's
  *   ramp landings on floor, posts and areas on floor and reachable from both landings, the quay
  *   row under the box walkable, the size cap; a scenario's ship fits every berth box and has beds
- *   for its crew + 1 (`checkScenarioBeds`).
+ *   for its crew + 1 (`checkScenarioBeds`). Activity venues (`validate-venues.ts`, D84): a present
+ *   venue fits `participants.max`, a product's zone exists, and a scenario's deck hosts every
+ *   activity; a deck no scenario sails may lack some, reported as notes (`activityVenueNotes`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
+  ActivityDef,
   ContentBundle,
   CrewDef,
   DeckDef,
@@ -57,8 +64,10 @@ import {
   checkScenarioBerths,
 } from "./validate-dock";
 import { checkHullContract, checkScenarioBeds, checkScenarioCrewSpawns } from "./validate-hull";
+import { checkActivityVenues } from "./validate-venues";
 
 export type { ValidationIssue, ValidationLevel };
+export { activityVenueNotes, hostedVenues } from "./validate-venues";
 
 export type ValidationResult =
   | { readonly ok: true; readonly bundle: ContentBundle }
@@ -90,6 +99,8 @@ const NAMESPACE_BY_TABLE: Record<string, string> = {
   ports: "port",
   scenarios: "scenario",
   docks: "dock",
+  activities: "activity",
+  topics: "topic",
 };
 
 function checkNamespaces(bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -432,12 +443,27 @@ function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[])
   });
 }
 
-/** D79: each thought def sits under its own key. */
+/**
+ * The thoughts the sim gives with a `refId` (the rival, the one argued with); the inspector and
+ * the digest fill `{ref}` from it. Any other key would show the placeholder itself.
+ */
+const THOUGHTS_WITH_REF: ReadonlySet<string> = new Set(["keepsBeatingMe", "argued"]);
+
+/** D79: each thought def sits under its own key; D85: `{ref}` only where a `refId` comes. */
 function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): void {
   for (const [key, def] of Object.entries(bundle.thoughts)) {
     if (def.key !== key) {
       issues.push(
         issue("referential", ["thoughts", key, "key"], `thought "${def.key}" is under "${key}"`),
+      );
+    }
+    if (def.label.includes("{ref}") && !THOUGHTS_WITH_REF.has(key)) {
+      issues.push(
+        issue(
+          "referential",
+          ["thoughts", key, "label"],
+          `"{ref}" in the label of "${key}", which the sim never gives a refId`,
+        ),
       );
     }
   }
@@ -472,6 +498,79 @@ function checkGalleyItems(bundle: ContentBundle, issues: ValidationIssue[]): voi
   }
   if (!items.some((item) => item.tags.includes("provisions"))) {
     issues.push(issue("referential", ["items"], 'expected at least one "provisions"-tagged item'));
+  }
+}
+
+/** One session renders as one plate of first names at the venue (D84): four fit. */
+const MAX_PARTICIPANTS = 4;
+
+/**
+ * Slice 4: an activity's references resolve: its `topics`, the item it `produces`, and the tag it
+ * `requires` is carried by some item def (a `personal` one when it must be the actor's own). Its
+ * thought keys and problem kinds are closed enums (L1). The venue rules against each deck are L3.
+ */
+function checkActivities(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const items = Object.values(bundle.items);
+  const itemTags = new Set(items.flatMap((item) => item.tags));
+  const personalTags = new Set(
+    items.filter((item) => item.tags.includes("personal")).flatMap((item) => item.tags),
+  );
+  for (const activity of Object.values(bundle.activities)) {
+    const path: Path = ["activities", activity.id];
+    checkActivityShape(activity, path, issues);
+    const owned = activity.requires;
+    if (owned?.own === true && itemTags.has(owned.itemTag) && !personalTags.has(owned.itemTag)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "requires", "own"],
+          `no "personal" item def carries the tag "${owned.itemTag}", so nobody owns one`,
+        ),
+      );
+    }
+    (activity.topics ?? []).forEach((topicId, i) => {
+      checkRef(bundle.topics, topicId, "topic", [...path, "topics", i], issues);
+    });
+    if (activity.produces !== undefined) {
+      const at: Path = [...path, "produces", "itemDefId"];
+      checkRef(bundle.items, activity.produces.itemDefId, "item", at, issues);
+    }
+    const required = activity.requires?.itemTag;
+    if (required !== undefined && !itemTags.has(required)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "requires", "itemTag"],
+          `no item def carries the tag "${required}"`,
+        ),
+      );
+    }
+  }
+}
+
+/**
+ * D84: at most `MAX_PARTICIPANTS` take part; a group activity that is not a contest has a `solo`
+ * variant, so a session nobody joined still restores something (a contest without one fails).
+ */
+function checkActivityShape(activity: ActivityDef, path: Path, issues: ValidationIssue[]): void {
+  const { min, max } = activity.participants;
+  if (max > MAX_PARTICIPANTS) {
+    issues.push(
+      issue(
+        "referential",
+        [...path, "participants", "max"],
+        `${max} participants; one session's plate names at most ${MAX_PARTICIPANTS}`,
+      ),
+    );
+  }
+  if (min >= 2 && activity.outcome !== "contest" && activity.solo === undefined) {
+    issues.push(
+      issue(
+        "referential",
+        [...path, "solo"],
+        `a ${activity.outcome} for ${min} or more needs a solo variant for when nobody joins`,
+      ),
+    );
   }
 }
 
@@ -549,6 +648,7 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   checkDayworkerWatches(bundle, issues);
   checkThoughtKeys(bundle, issues);
   checkGalleyItems(bundle, issues);
+  checkActivities(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;
@@ -962,6 +1062,7 @@ export function validatePhysical(bundle: ContentBundle): readonly ValidationIssu
     checkDeckConnectivity(deck, index, issues);
     checkDeckZonesAndSpawns(deck, index, issues);
     checkHullContract(deck, bundle.machines, issues);
+    checkActivityVenues(deck, bundle, issues);
   }
   for (const dock of Object.values(bundle.docks ?? {})) checkDockPhysical(dock, bundle, issues);
   for (const scenario of Object.values(bundle.scenarios)) {

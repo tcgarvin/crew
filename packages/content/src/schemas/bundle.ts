@@ -1,6 +1,7 @@
 /** `ContentBundle` schema: every table keyed by definition ID. */
 import type { ContentBundle } from "@crew/sim";
 import { z } from "zod";
+import { activityDefSchema } from "./activity";
 import { configDefSchema } from "./config";
 import { crewDefSchema, traitDefSchema } from "./crew";
 import { deckDefSchema } from "./deck";
@@ -10,6 +11,7 @@ import { machineDefSchema } from "./machine";
 import { peopleTableDefSchema } from "./people";
 import { portDefSchema } from "./port";
 import {
+  activityDefIdSchema,
   crewDefIdSchema,
   deckDefIdSchema,
   dockDefIdSchema,
@@ -17,10 +19,12 @@ import {
   machineDefIdSchema,
   portDefIdSchema,
   scenarioDefIdSchema,
+  topicDefIdSchema,
   traitDefIdSchema,
 } from "./primitives";
 import { scenarioDefSchema } from "./scenario";
 import { thoughtDefSchema } from "./thought";
+import { topicDefSchema } from "./topic";
 
 export const contentBundleSchema = z.strictObject({
   decks: z.record(deckDefIdSchema, deckDefSchema),
@@ -45,7 +49,27 @@ export const contentBundleSchema = z.strictObject({
     ateRationPack: thoughtDefSchema,
     ateInDirtyMess: thoughtDefSchema,
     ateInFilthyMess: thoughtDefSchema,
+    wonContest: thoughtDefSchema,
+    lostContest: thoughtDefSchema,
+    keepsBeatingMe: thoughtDefSchema,
+    goodCompany: thoughtDefSchema,
+    spiritedTalk: thoughtDefSchema,
+    argued: thoughtDefSchema,
+    gotLectured: thoughtDefSchema,
+    enjoyedMusic: thoughtDefSchema,
+    hatedTheNoise: thoughtDefSchema,
+    sparringBruise: thoughtDefSchema,
+    ownCabin: thoughtDefSchema,
+    noisyBunkroom: thoughtDefSchema,
+    noBunkOfMyOwn: thoughtDefSchema,
+    satWithTheCaptain: thoughtDefSchema,
+    heardOut: thoughtDefSchema,
+    dressedDown: thoughtDefSchema,
+    ateATreat: thoughtDefSchema,
   }),
+  /** Slice 4: the off-watch activities and the debate topics, keyed by id. */
+  activities: z.record(activityDefIdSchema, activityDefSchema),
+  topics: z.record(topicDefIdSchema, topicDefSchema),
   config: configDefSchema,
   /** Cache-busting fingerprint of the canonical bundle, filled in by `loader.ts` (D4/D13). */
   hash: z.string(),

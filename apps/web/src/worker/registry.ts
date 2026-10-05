@@ -3,8 +3,8 @@
  * both run exactly the same systems in the same order (W4a's order):
  *
  * spatial → power + equipment → dirt (D82) → travel + commerce → needs → watch (D77: the bell) →
- * galley (D81: the meal) → work (execution, perception, chat, derivation with every system's
- * rules, AgentView builder) → planner.
+ * galley (D81: the meal) → recreation, social, cabins (slice 4: off watch) → work (execution,
+ * perception, chat, derivation with every system's rules, AgentView builder) → planner.
  */
 import {
   type KernelRegistry,
@@ -14,12 +14,15 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  registerCabins,
   registerCommerce,
   registerDirt,
   registerEquipmentSystems,
   registerGalley,
   registerNeeds,
   registerPlannerDefaults,
+  registerRecreation,
+  registerSocial,
   registerSpatial,
   registerTravel,
   registerWatch,
@@ -37,6 +40,9 @@ export function createFullRegistry(): KernelRegistry {
   registerNeeds(registry);
   registerWatch(registry);
   registerGalley(registry);
+  registerRecreation(registry);
+  registerSocial(registry);
+  registerCabins(registry);
   // `registerWork` also installs the AgentView builder (the inspector reads it).
   registerWork(registry, {
     derivations: {

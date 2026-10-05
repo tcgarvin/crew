@@ -1,5 +1,8 @@
 import type {
+  ActorId,
   AgentViewSnapshot,
+  EntityId,
+  InterestTag,
   LocalKey,
   RoleTag,
   Thought,
@@ -11,10 +14,13 @@ import type {
 import { describe, expect, it } from "vitest";
 import {
   actorSubtitle,
+  fillRef,
   helmLine,
+  interestsLine,
   moodWord,
   personWords,
   problemLines,
+  relationshipsLines,
   rosterRole,
   thoughtText,
   topThoughts,
@@ -198,12 +204,137 @@ const DEFS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.5,
     stacks: false,
   },
+  wonContest: {
+    key: "wonContest",
+    label: "won a game",
+    value: 0.1,
+    durationDays: 0.3,
+    stacks: true,
+  },
+  lostContest: {
+    key: "lostContest",
+    label: "lost a game",
+    value: -0.05,
+    durationDays: 0.3,
+    stacks: true,
+  },
+  keepsBeatingMe: {
+    key: "keepsBeatingMe",
+    label: "{ref} keeps beating me",
+    value: -0.15,
+    durationDays: 1,
+    stacks: false,
+  },
+  goodCompany: {
+    key: "goodCompany",
+    label: "good company",
+    value: 0.05,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  spiritedTalk: {
+    key: "spiritedTalk",
+    label: "had a spirited talk",
+    value: 0.1,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  argued: {
+    key: "argued",
+    label: "argued with {ref}",
+    value: -0.15,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  gotLectured: {
+    key: "gotLectured",
+    label: "got lectured",
+    value: -0.05,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  enjoyedMusic: {
+    key: "enjoyedMusic",
+    label: "enjoyed the music",
+    value: 0.1,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  hatedTheNoise: {
+    key: "hatedTheNoise",
+    label: "hated the noise",
+    value: -0.1,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  sparringBruise: {
+    key: "sparringBruise",
+    label: "bruised from sparring",
+    value: -0.1,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  ownCabin: {
+    key: "ownCabin",
+    label: "a cabin of my own",
+    value: 0.1,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  noisyBunkroom: {
+    key: "noisyBunkroom",
+    label: "a noisy bunkroom",
+    value: -0.1,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  noBunkOfMyOwn: {
+    key: "noBunkOfMyOwn",
+    label: "no bunk of my own",
+    value: -0.1,
+    durationDays: 1,
+    stacks: false,
+  },
+  satWithTheCaptain: {
+    key: "satWithTheCaptain",
+    label: "sat with the captain",
+    value: 0.05,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  heardOut: {
+    key: "heardOut",
+    label: "the captain heard me out",
+    value: 0.1,
+    durationDays: 1,
+    stacks: false,
+  },
+  dressedDown: {
+    key: "dressedDown",
+    label: "dressed down by the captain",
+    value: -0.15,
+    durationDays: 1,
+    stacks: false,
+  },
+  ateATreat: {
+    key: "ateATreat",
+    label: "ate a treat",
+    value: 0.1,
+    durationDays: 0.3,
+    stacks: false,
+  },
 };
 
-const thought = (key: ThoughtKey, value: number, expiresAtTick: number): Thought => ({
+const thought = (
+  key: ThoughtKey,
+  value: number,
+  expiresAtTick: number,
+  refId?: string,
+): Thought => ({
   key,
   value,
   expiresAtTick: expiresAtTick as Tick,
+  ...(refId === undefined ? {} : { refId: refId as EntityId }),
 });
 
 describe("topThoughts (D79)", () => {
@@ -240,6 +371,93 @@ describe("topThoughts (D79)", () => {
   it("is empty for someone with nothing on their mind", () => {
     expect(topThoughts([], 0 as Tick, DEFS)).toEqual([]);
   });
+
+  it("names the person a thought is about, one line per person (slice 4)", () => {
+    const names = new Map([
+      ["jax", "Jax Okonkwo"],
+      ["priya", "Priya Kessler"],
+    ]);
+    const lines = topThoughts(
+      [
+        thought("keepsBeatingMe", -0.15, 500, "jax"),
+        thought("argued", -0.15, 500, "priya"),
+        thought("argued", -0.15, 500, "jax"),
+      ],
+      100 as Tick,
+      DEFS,
+      3,
+      names,
+    );
+    expect(lines.map(thoughtText).sort()).toEqual([
+      "Jax Okonkwo keeps beating me",
+      "argued with Jax Okonkwo",
+      "argued with Priya Kessler",
+    ]);
+  });
+});
+
+describe("fillRef (slice 4)", () => {
+  it("fills the placeholder with the name", () => {
+    expect(fillRef("{ref} keeps beating me", "Jax Okonkwo")).toBe("Jax Okonkwo keeps beating me");
+  });
+
+  it("says someone for a person the roster no longer has", () => {
+    expect(fillRef("argued with {ref}", undefined)).toBe("argued with someone");
+  });
+
+  it("leaves a label with no placeholder alone", () => {
+    expect(fillRef("ate a treat", "Jax Okonkwo")).toBe("ate a treat");
+  });
+});
+
+describe("interestsLine (slice 4)", () => {
+  const i = (...t: string[]) => t as InterestTag[];
+
+  it("leads with the strong like, marked keen, then the dislikes", () => {
+    expect(
+      interestsLine({ likes: i("vids", "cards"), strong: "cards", dislikes: i("reading") }),
+    ).toBe("likes cards (keen), vids; dislikes reading");
+  });
+
+  it("says the tags in words", () => {
+    expect(interestsLine({ likes: i("boardgames"), dislikes: [] })).toBe("likes board games");
+  });
+
+  it("gives only the dislikes for someone with no likes, and says when there is nothing", () => {
+    expect(interestsLine({ likes: [], dislikes: i("exercise") })).toBe("dislikes exercise");
+    expect(interestsLine({ likes: [], dislikes: [] })).toBe("nothing in particular");
+  });
+});
+
+describe("relationshipsLines (slice 4)", () => {
+  const roster = [
+    { actorId: "jax" as ActorId, name: "Jax Okonkwo" },
+    { actorId: "tomas" as ActorId, name: "Tomas Ruiz" },
+    { actorId: "dane" as ActorId, name: "Dane Whitcross" },
+    { actorId: "priya" as ActorId, name: "Priya Kessler" },
+    { actorId: "noor" as ActorId, name: "Noor Haddad" },
+    { actorId: "mara" as ActorId, name: "Mara Osei" },
+  ];
+  const affinity = (entries: Record<string, number>) =>
+    entries as Readonly<Record<ActorId, number>>;
+
+  it("names the two closest and the two most at odds, strongest first", () => {
+    expect(
+      relationshipsLines(
+        affinity({ jax: 4, tomas: 6, dane: 3, priya: -3, noor: -7, mara: -5 }),
+        roster,
+      ),
+    ).toEqual([
+      "close to Tomas Ruiz (+6)",
+      "close to Jax Okonkwo (+4)",
+      "at odds with Noor Haddad (−7)",
+      "at odds with Mara Osei (−5)",
+    ]);
+  });
+
+  it("leaves out passing acquaintance, and anyone no longer aboard", () => {
+    expect(relationshipsLines(affinity({ jax: 2, priya: -2, gone: 9 }), roster)).toEqual([]);
+  });
 });
 
 describe("personWords (D77, D79)", () => {
@@ -251,13 +469,18 @@ describe("personWords (D77, D79)", () => {
         onDuty: true,
         watch: watch({ section: "blue" as LocalKey, onWatch: true, helmRole: "stander" }),
         thoughts: [thought("doubleWatch", -0.25, 1000)],
+        interests: { likes: ["cards"], strong: "cards", dislikes: [] },
+        affinity: { jax: 4 },
       },
+      roster: [{ actorId: "jax", name: "Jax Okonkwo" }],
     } as unknown as AgentViewSnapshot;
     expect(personWords(view, DEFS, { lowBelow: -0.4, highAbove: 0.4 })).toEqual({
       watch: "Blue section, on watch",
       helm: "stands this watch's helm",
       mood: "low",
       thoughts: [{ key: "doubleWatch", label: "double watch", value: -0.25, count: 1 }],
+      interests: "likes cards (keen)",
+      relationships: ["close to Jax Okonkwo (+4)"],
     });
   });
 });

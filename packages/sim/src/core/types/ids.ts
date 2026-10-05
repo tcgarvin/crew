@@ -34,6 +34,10 @@ export type TraitDefId = Brand<string, "TraitDefId">;
 export type ScenarioDefId = Brand<string, "ScenarioDefId">;
 /** A port's dock map (`DockDef`, Dockside §3). */
 export type DockDefId = Brand<string, "DockDefId">;
+/** Slice 4: an off-watch activity (`ActivityDef`, `activity.cards`). */
+export type ActivityDefId = Brand<string, "ActivityDefId">;
+/** Slice 4: something people argue about (`TopicDef`, `topic.the_guild`). */
+export type TopicDefId = Brand<string, "TopicDefId">;
 
 /**
  * Pattern every definition ID must match: two or more lowercase dot-separated segments of
@@ -70,6 +74,8 @@ export type EventId = Brand<string, "EventId">;
 export type LocalId = Brand<string, "LocalId">;
 /** D78: a navigation hazard scheduled on the leg under way (`state.hazards`). */
 export type HazardId = Brand<string, "HazardId">;
+/** Slice 4: a group recreation session (`state.social.sessions`). */
+export type SessionId = Brand<string, "SessionId">;
 
 /**
  * Prefix per instance kind. The kernel's ID allocator (W2) is the only writer; it formats
@@ -94,6 +100,8 @@ export const ID_PREFIX = {
   local: "o",
   // D78: navigation hazards.
   hazard: "h",
+  // Slice 4: group recreation sessions.
+  session: "s",
 } as const;
 
 export type InstanceKind = keyof typeof ID_PREFIX;
@@ -115,6 +123,7 @@ export interface InstanceIdOf {
   event: EventId;
   local: LocalId;
   hazard: HazardId;
+  session: SessionId;
 }
 
 /** Any kernel-allocated instance ID. */

@@ -29,6 +29,7 @@ import {
   type TempRef,
   basePriceFor,
   configTicks,
+  isOnDock,
   jobBlockingAcceptance,
 } from "@crew/sim";
 import {
@@ -492,6 +493,50 @@ function endPassageSide(env: Env, label: string, which: string): Outcome<SideCom
   return playerSide(label, { kind: "endPassage", payload: { jobId: job.id } }, which);
 }
 
+/**
+ * D86: `privateTalk` calls a crew member to the captain's cabin for a word, warm or stern. The
+ * name must be crew aboard (not a passenger, not ashore or on the dock), never the captain, and
+ * no talk may be pending; the kernel checks the same again (and the cabin) when it is chosen.
+ */
+function privateTalkSide(
+  env: Env,
+  side: Side,
+  label: string,
+  which: string,
+): Outcome<SideCommands> {
+  const state = env.snapshot.state;
+  const wanted = side.talkWith.trim();
+  if (wanted === "") return no(`${which}: privateTalk needs talkWith (a crew member's name)`);
+  if (side.tone === "") return no(`${which}: privateTalk needs tone warm or stern`);
+  const actor = Object.values(state.actors).find(
+    (a) => a.name.toLowerCase() === wanted.toLowerCase(),
+  );
+  if (actor === undefined) {
+    return no(`${which}: talkWith "${wanted}" is nobody aboard; use a name listed under Crew`);
+  }
+  if (!actor.crew || actor.passenger === true) {
+    return no(`${which}: ${actor.name} is not crew; only crew are called in for a word`);
+  }
+  if (actor.roleTags.includes("captain")) {
+    return no(`${which}: ${actor.name} is the captain, who does the calling in`);
+  }
+  if (
+    actor.availability !== "available" ||
+    actor.location.kind !== "onDeck" ||
+    isOnDock(env.content, state, actor.location)
+  ) {
+    return no(`${which}: ${actor.name} is not aboard to be called in`);
+  }
+  if (state.social.privateTalk !== undefined) {
+    return no(`${which}: a private word is already pending; wait for it to be held or missed`);
+  }
+  return playerSide(
+    label,
+    { kind: "privateTalk", payload: { actorId: actor.id, tone: side.tone } },
+    which,
+  );
+}
+
 function translateSide(env: Env, side: Side, which: string): Outcome<SideCommands> {
   const label = clipChars(side.label, LABEL_MAX_CHARS);
   const problem = textProblem(label, env.secrets);
@@ -503,6 +548,8 @@ function translateSide(env: Env, side: Side, which: string): Outcome<SideCommand
       return setCourseSide(env, side, label, which);
     case "endPassage":
       return endPassageSide(env, label, which);
+    case "privateTalk":
+      return privateTalkSide(env, side, label, which);
   }
 }
 

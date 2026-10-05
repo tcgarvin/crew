@@ -96,6 +96,7 @@ describe("the meal problem (D81)", () => {
     expect(tick).toBeLessThan(secondsOf(world, GALLEY_WATCH));
   });
 
+  // About a second alone, but past vitest's 5 s default under the whole suite's parallel load.
   it("the cook cooks the off-watch meal off duty; the bell's meal after is cooked again", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -106,10 +107,11 @@ describe("the meal problem (D81)", () => {
     const second = served[1]?.tick ?? 0;
     expect(second).toBeGreaterThan(secondsOf(world, GALLEY_WATCH));
     expect(ofType(events, "mealMissed")).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe("the substitute (D81 call 3)", () => {
+  // About a second alone, but past vitest's 5 s default under the whole suite's parallel load.
   it("with the cook asleep, Tomas (on duty, cooking 1) cooks after substituteAfterDays: poor", () => {
     const base = galleyConfig();
     const config = {
@@ -134,7 +136,7 @@ describe("the substitute (D81 call 3)", () => {
     const served = ofType(events, "mealServed").filter((e) => e.tick > raised.createdTick);
     expect(served.map((e) => e.payload)).toEqual([{ cookId: TOMAS, servings: 6, quality: "poor" }]);
     expect(ofType(events, "wokeUp").filter((e) => e.subjectIds[0] === BETTINA)).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe("the mess call (D81 call 1)", () => {

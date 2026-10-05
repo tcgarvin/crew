@@ -164,7 +164,8 @@ function plateAtHelm(ctx: StepCtx, at: HelmSeat): Item | undefined {
  */
 function mealToBring(ctx: StepCtx, at: HelmSeat): boolean {
   return Object.values(ctx.state.items).some((item) => {
-    if (item.meal === undefined) return false;
+    // Slice 4: a treat carries `meal` too (it spoils like a serving) but is nobody's plate.
+    if (item.meal === undefined || !isMeal(ctx.content, item)) return false;
     const location = item.location;
     if (location.kind === "carriedBy") return location.actorId !== at.actor.id;
     return location.kind === "onDeck" && location.deckId === at.deckId;

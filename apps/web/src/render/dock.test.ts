@@ -99,6 +99,7 @@ function frameWith(actors: RenderActor[], items: RenderItem[], t: RenderTravel):
     headline: "",
     locals: [],
     dockProps: [],
+    sessions: [],
   };
 }
 

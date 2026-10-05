@@ -19,6 +19,7 @@ import { runStep } from "./pipeline";
 import type { KernelRegistry } from "./registry";
 import { isTickerEvent } from "./render";
 import { createRngApi, seedAllStreams } from "./rng";
+import { emptySocial } from "./social";
 import type { Command, ScenarioSpawn } from "./types/commands";
 import type { PhysicalLocation, TileCoord } from "./types/common";
 import {
@@ -67,6 +68,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     hazards: [],
     dirt: { cells: {}, tiers: {}, dustThisVisit: 0 },
     galley: { lastMealWatch: 0 },
+    social: emptySocial(),
     jobs: {},
     money: { balance: 0, transactions: {} },
     markets: {},
@@ -291,13 +293,17 @@ function seedInitialNeeds(
   rng: RngApi,
 ): void {
   const keys = ["hunger", "fatigue", "comfort", "social"] as const;
-  for (const actor of Object.values(state.actors)) {
-    if (!actor.crew) continue;
-    for (const key of keys) {
-      const { min, max } = ranges[key];
-      actor.needs[key] = max > min ? min + (max - min) * rng.float("setup") : min;
-    }
+  const crew = Object.values(state.actors).filter((actor) => actor.crew);
+  const draw = (key: keyof typeof ranges): number => {
+    const { min, max } = ranges[key];
+    return max > min ? min + (max - min) * rng.float("setup") : min;
+  };
+  for (const actor of crew) {
+    for (const key of keys) actor.needs[key] = draw(key);
   }
+  // Slice 4: recreation is drawn in a pass of its own after the first four, so the draws those
+  // took before it existed are unchanged.
+  for (const actor of crew) actor.needs.recreation = draw("recreation");
 }
 
 /** D47: every port's market opens at its content position; purchases and `stockMarket` move it. */

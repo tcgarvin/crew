@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.book",
+  "name": "Book",
+  "stacking": "stackable",
+  "maxStack": 6,
+  "tags": ["book"],
+  "toolKinds": [],
+  "mass": 0.3
+}

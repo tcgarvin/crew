@@ -13,6 +13,7 @@ export function toAgentViewSnapshot(view: AgentView): AgentViewSnapshot {
     problems: view.knownProblems(),
     tasks: view.knownTasks(),
     roster: view.roster(),
+    sessions: view.sessions(),
   };
   return JSON.parse(JSON.stringify(snapshot)) as AgentViewSnapshot;
 }
