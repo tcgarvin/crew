@@ -32,6 +32,7 @@ import type { SimEvent } from "../../core/types/events";
 import type { CommandId, CrewDefId, ItemDefId, JobId, PortDefId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
+import { dirtViolations } from "../dirt/invariants";
 import { registerEquipmentSystems } from "../equipment/register";
 import { registerNeeds } from "../needs/index";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
@@ -317,6 +318,7 @@ export function run(
     const violations = [
       ...checkInvariants(world.state),
       ...spatialViolations(world),
+      ...dirtViolations(world),
       ...workViolations(world),
       ...travelViolations(world),
       ...commerceViolations(world),
