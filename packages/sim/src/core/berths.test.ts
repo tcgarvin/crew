@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { needsViolations } from "../systems/needs/invariants";
-import { assignBerths } from "./berths";
+import { assignBerths, lockerTileOf } from "./berths";
 import { newActor } from "./command-handlers";
 import {
   BERTH,
@@ -215,6 +215,13 @@ describe("personal belongings (D74)", () => {
         y: (locker?.tiles[0]?.y ?? -1) + 0.5,
       },
     });
+  });
+
+  it("lockerTileOf names the first tile of a bed's locker, and nothing for a bed without one", () => {
+    const deck = deckOf(berthWorld());
+    expect(lockerTileOf(deck, CAPTAIN_BED)).toEqual({ x: 9, y: 1 });
+    expect(lockerTileOf(deck, BUNKS[2] as string)).toEqual({ x: 2, y: 0 });
+    expect(lockerTileOf(deck, "medbay_bed")).toBeUndefined();
   });
 
   it("puts the captain's photograph in the cabin locker and leaves her rations in hand", () => {
