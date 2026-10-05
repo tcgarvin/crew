@@ -229,6 +229,16 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; you never buy, deliver, repair or pay. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
+  // D81: the galley's stores are bought like parts; name them by id so the model can stock them.
+  const provisions = Object.values(content.items)
+    .filter((def) => def.tags.includes("provisions"))
+    .map((def) => def.id)
+    .sort();
+  if (provisions.length > 0) {
+    lines.push(
+      `- Provisions are an item like any other (${provisions.join(", ")}): stock them where the galley should restock, or withdraw them to make a port go hungry; the crew buy them themselves when the galley runs low.`,
+    );
+  }
   lines.push("");
   lines.push(...hazardLever(config));
   return lines.join("\n");

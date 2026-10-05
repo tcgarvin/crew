@@ -828,7 +828,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.21");
+    expect(PROMPT_VERSION).toBe("v0.22");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -908,6 +908,16 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("never while another fault is unrepaired");
     expect(STATIC_RULES).toContain("you never decide who that is or how it goes");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleHazard on a long leg");
+  });
+
+  it("tells the model about the galley and dirt, and never to invent food (D81-D83, v0.22)", () => {
+    expect(STATIC_RULES).toContain("The ship eats from her galley.");
+    expect(STATIC_RULES).toContain("these are the crew's story to tell");
+    expect(STATIC_RULES).toContain("Provisions run out and are bought at ports like parts");
+    expect(STATIC_RULES).toContain("stockMarket may put provisions on sale");
+    expect(STATIC_RULES).toContain("Never invent food the sim has not cooked");
+    expect(STATIC_RULES).toContain("A filthy room is the ship's own failing");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("a meal can be that beat");
   });
 });
 
