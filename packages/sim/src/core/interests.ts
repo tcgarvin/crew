@@ -84,24 +84,9 @@ function counted(at: (counter: number) => number): Draw {
 /**
  * Interests and values for actor `id`, drawn on `stream` with keyed draws (the stream does not
  * advance; see the module comment).
- *
- * TRANSITIONAL (W3 → lead): the gate's spawn handler still calls the two-argument form, which
- * has no id to key on and returns the gate stub's neutral character, drawing nothing. Once
- * `core/command-handlers.ts` passes the new actor's id, the two-argument overload goes.
  */
-export function generateInterests(rng: RngApi, stream: RngStreamName): Character;
-export function generateInterests(rng: RngApi, stream: RngStreamName, id: ActorId): Character;
-export function generateInterests(rng: RngApi, stream: RngStreamName, id?: ActorId): Character {
-  if (id === undefined) return neutralCharacter();
+export function generateInterests(rng: RngApi, stream: RngStreamName, id: ActorId): Character {
   return characterFrom(counted((counter) => rng.keyedFloat(stream, `interests:${id}`, counter)));
-}
-
-/** The gate stub's character: no likes or dislikes, every value 0 (transitional, above). */
-function neutralCharacter(): Character {
-  return {
-    interests: { likes: [], dislikes: [] },
-    values: { orderFreedom: 0, faithReason: 0, loyaltyAmbition: 0 },
-  };
 }
 
 /** MurmurHash3's 32-bit finaliser: FNV alone leaves consecutive counters' high bits alike. */

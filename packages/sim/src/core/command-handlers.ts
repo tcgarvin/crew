@@ -259,7 +259,7 @@ const scenarioSpawn: CommandHandler<"scenarioSpawn", null> = {
         const def = ctx.defs.crew(spawn.crewDefId);
         // Slice 4 (call 8): an unauthored person's interests are drawn on the `setup` stream.
         const authored = def.interests !== undefined && def.values !== undefined;
-        const character = defCharacter(def, () => generateInterests(ctx.rng, "setup"));
+        const character = defCharacter(def, () => generateInterests(ctx.rng, "setup", id));
         state.actors[id] = newActor(id, def, location, spawn.section, character);
         if (!authored) {
           ctx.emit({

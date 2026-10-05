@@ -69,16 +69,6 @@ describe("generateInterests (slice 4, call 8)", () => {
     const values = new Set(characters.flatMap((c) => Object.values(c.values)));
     expect([...values].sort()).toEqual([-1, -2, 0, 1, 2]);
   });
-
-  it("the gate's two-argument call (no id yet) is the neutral character and draws nothing", () => {
-    const h = host(5);
-    const before = [...h.rng.setup];
-    expect(generateInterests(createRngApi(h), "setup")).toEqual({
-      interests: { likes: [], dislikes: [] },
-      values: { orderFreedom: 0, faithReason: 0, loyaltyAmbition: 0 },
-    });
-    expect(h.rng.setup).toEqual(before);
-  });
 });
 
 describe("interestsFromSeed (slice 4, call 8: the 9 → 10 migration)", () => {
