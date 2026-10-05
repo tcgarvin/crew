@@ -137,11 +137,26 @@ describe("privateTalk: the talk (slice 4, call 15)", () => {
     expect(hasThought(world, ada, "heardOut")).toBe(false);
   });
 
-  // W2's `moveAffinity` is a gate stub in this tree: the affinity outcome lands with W2.
-  it.todo("warm moves Ada's affinity for the captain +2 and the captain's for Ada +1 (after W2)");
-  it.todo(
-    "stern moves Ada's affinity for the captain -2 and the captain's for Ada not at all (after W2)",
-  );
+  // The talk's own moves land on the tick it is held; ambient chat on the walk may move affinity
+  // too, so the deltas are read from that tick's `affinityChanged` events.
+  const heldDeltas = (tone: "warm" | "stern") => {
+    const { captain, ada, events } = holdTalkWithAda(tone);
+    const [held] = ofType(events, "privateTalkHeld");
+    const moves = ofType(events, "affinityChanged").filter((e) => e.tick === held?.tick);
+    const delta = (from: ActorId, to: ActorId) =>
+      moves
+        .filter((e) => e.payload.fromActorId === from && e.payload.toActorId === to)
+        .reduce((sum, e) => sum + e.payload.delta, 0);
+    return { adaToCaptain: delta(ada, captain), captainToAda: delta(captain, ada) };
+  };
+
+  it("warm moves Ada's affinity for the captain +2 and the captain's for Ada +1", () => {
+    expect(heldDeltas("warm")).toEqual({ adaToCaptain: 2, captainToAda: 1 });
+  });
+
+  it("stern moves Ada's affinity for the captain -2 and the captain's for Ada not at all", () => {
+    expect(heldDeltas("stern")).toEqual({ adaToCaptain: -2, captainToAda: 0 });
+  });
 
   it("with the captain asleep the first officer holds it, in the officers' cabin", () => {
     const tw = cabinsWorld();

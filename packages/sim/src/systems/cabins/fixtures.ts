@@ -26,6 +26,7 @@ import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
 import { registerNeeds } from "../needs/index";
 import { needsViolations } from "../needs/invariants";
+import { registerSocial } from "../social/index";
 import { registerSpatial } from "../spatial/index";
 import { spatialViolations } from "../spatial/invariants";
 import { registerWork } from "../work/index";
@@ -87,6 +88,7 @@ export function cabinsWorld(
   const registry = createRegistry();
   registerSpatial(registry);
   registerNeeds(registry);
+  registerSocial(registry);
   registerCabins(registry);
   registerWork(registry, { derivations: {} });
   registerPlannerDefaults(registry);
