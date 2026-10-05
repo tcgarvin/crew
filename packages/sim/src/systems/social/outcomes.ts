@@ -16,7 +16,8 @@
  * - *perform*: everyone awake in the compartment but the performer (the host): likers of the
  *   def's interest `listened` (`enjoyedMusic`) and +1 toward the performer, dislikers
  *   `listenedDislike` (`hatedTheNoise`), the neutral nothing.
- * - *bond*: with two or more members, `joined` (`goodCompany`) and `participants` (+1) all round.
+ * - *bond*: with two or more members, `joined` (`goodCompany`) all round, and `participants` (+1)
+ *   from each member who likes the def's interest toward each other member (D85 tuning).
  * - *none*: nothing.
  *
  * Then for every outcome: `skillGain` (`perDay × durationDays`, capped at 10) per member, `dirt`
@@ -258,7 +259,14 @@ function resolveBond(ctx: StepCtx, def: ActivityDef, members: Actor[]): void {
   const joined: ThoughtKey = def.thoughts?.joined ?? "goodCompany";
   for (const member of members) addThought(ctx, member, joined);
   const delta = def.affinity?.participants ?? 1;
-  for (const [a, b] of pairsOf(members)) moveBoth(ctx, a.id, b.id, delta);
+  // D85 tuning: only someone who likes the activity warms to the company (a neutral who sat
+  // through the vids does not), so affinity is directed: a liker toward each other member.
+  for (const member of members) {
+    if (interestScore(member.interests, def.interest) < LIKES_FROM) continue;
+    for (const other of members) {
+      if (other.id !== member.id) moveAffinity(ctx, member.id, other.id, delta);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

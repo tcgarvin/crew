@@ -265,7 +265,7 @@
       "{a} wondered aloud what the next job pays"
     ],
     "chatAffinity": 1,
-    "chatAffinityEveryDays": 1,
+    "chatAffinityEveryDays": 2,
     "affinityRange": 10,
     "avoidBelow": -3,
     "preferAbove": 0,

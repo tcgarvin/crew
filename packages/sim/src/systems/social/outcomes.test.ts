@@ -280,10 +280,11 @@ describe("perform and bond (call 5)", () => {
     expect(thoughtKeys(world, NOOR)).toEqual([]);
   });
 
-  it("a vid is a bond: goodCompany and +1 all round, never an argument", () => {
+  it("a vid is a bond: goodCompany all round, +1 from its likers, never an argument", () => {
     const { world } = socialWorld();
-    setCharacter(world, JAX, { values: [2, 2, 2] });
-    setCharacter(world, NOOR, { values: [-2, -2, -2] });
+    setCharacter(world, JAX, { likes: ["vids"], values: [2, 2, 2] });
+    setCharacter(world, NOOR, { strong: "vids", values: [-2, -2, -2] });
+    setCharacter(world, TOMAS, {});
     inTheMess(world, [JAX, NOOR, TOMAS]);
     const { ctx, drafts } = galleyStepCtx(world);
     const summary = resolveOutcome(
@@ -297,10 +298,13 @@ describe("perform and bond (call 5)", () => {
       [JAX, NOOR],
       [NOOR, JAX],
       [JAX, TOMAS],
-      [TOMAS, NOOR],
+      [NOOR, TOMAS],
     ] as const) {
       expect(feel(world, a, b)).toBe(1);
     }
+    // D85 tuning: Tomas, neutral on vids, sat through it and does not warm to anyone.
+    expect(feel(world, TOMAS, JAX)).toBe(0);
+    expect(feel(world, TOMAS, NOOR)).toBe(0);
     expect(ofType(drafts, "argument")).toEqual([]);
   });
 

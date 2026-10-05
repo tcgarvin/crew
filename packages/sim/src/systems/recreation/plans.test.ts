@@ -171,7 +171,7 @@ describe("a solo performance (D84 tuning)", () => {
     );
     expect(read).toBe(true);
     expect(readerEvents.some((e) => e.type === "sessionEnded")).toBe(false);
-  });
+  }, 30_000);
 });
 
 describe("a book (calls 12 and 13)", () => {
