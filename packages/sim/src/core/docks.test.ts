@@ -87,6 +87,8 @@ describe("berthDock and the frames", () => {
     props: [],
     foreground: [],
     ambience: "A test quay.",
+    grime: 0,
+    airborneDust: 0,
     rows: [
       "#".repeat(40),
       ...Array.from({ length: 20 }, () => `..${" ".repeat(36)}..`),

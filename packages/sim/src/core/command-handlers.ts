@@ -189,6 +189,7 @@ export function newActor(
     traits: [...(def.traits ?? [])],
     mood: 0,
     thoughts: [],
+    boots: 0,
     schedule: section === undefined ? {} : { section: { ...section } },
     activity: { kind: "idle" },
     lastPlannedTick: 0,

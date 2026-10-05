@@ -2,6 +2,7 @@ import type {
   AdvanceResult,
   Command,
   ContentBundle,
+  DeckDefId,
   EffectiveConfig,
   EnqueueResult,
   FromWorker,
@@ -81,6 +82,17 @@ function makeFakeKernel(hookAtTick: number) {
     },
     getAgentView: () => {
       throw new Error("not used in this test");
+    },
+    getDirtFrame(world) {
+      const state = world.state as unknown as { tick: number };
+      return {
+        tick: state.tick,
+        deckId: "deck.test" as DeckDefId,
+        width: 2,
+        height: 1,
+        cells: Uint8Array.from([0, 0]),
+        tiers: {},
+      };
     },
     getRenderFrame(world) {
       const state = world.state as unknown as { tick: number };
@@ -323,6 +335,26 @@ function makePolicyKernel(hookAtTick: number): Kernel {
     },
   };
 }
+
+describe("createHost dirt channel (D82)", () => {
+  it("posts a dirt frame on load and whenever a burst crosses a multiple of the cadence", () => {
+    const { kernel } = makeFakeKernel(10_000);
+    // 40 ticks a loop, 2 s of sim; the cadence is 3 s (60 ticks), so frames at 0, 60, 120, …
+    const { messages, advance } = startHost(kernel, {
+      burstTicksPerLoop: 40,
+      runAheadCapSeconds: 60,
+      dirtFrameEverySeconds: 3,
+    });
+    expect(ofType(messages, "dirt").map((m) => m.frame.tick)).toEqual([0]);
+    advance(50);
+    advance(50);
+    advance(50);
+    expect(ofType(messages, "dirt").map((m) => m.frame.tick)).toEqual([0, 60, 120]);
+    const last = ofType(messages, "dirt").at(-1)?.frame;
+    expect(last?.cells).toBeInstanceOf(Uint8Array);
+    expect(last?.width).toBe(2);
+  });
+});
 
 describe("createHost policy decision (D37)", () => {
   it("posts hookRaised for the policy hook, then decisionPending only once it is acknowledged", () => {

@@ -112,6 +112,8 @@ export const itemTagSchema = z.enum([
   "medical",
   "container",
   "personal",
+  "provisions",
+  "meal",
 ]);
 export const toolKindSchema = z.enum([
   "wrench",
@@ -119,6 +121,7 @@ export const toolKindSchema = z.enum([
   "welder",
   "diagnosticScanner",
   "handTruck",
+  "mop",
 ]);
 export const cargoClassSchema = z.enum(["general", "fragile", "perishable", "hazardous"]);
 export const machineTagSchema = z.enum([
@@ -160,12 +163,17 @@ export const recipeActionSchema = z.enum([
 ]);
 /** D72: hull size classes (sim `HULL_SIZE_CLASSES`). */
 export const hullSizeClassSchema = z.enum(["S", "M", "L"]);
-/** D79: the thoughts the sim raises (sim `THOUGHT_KEYS`). */
+/** D79, D81, D82: the thoughts the sim raises (sim `THOUGHT_KEYS`). */
 export const thoughtKeySchema = z.enum([
   "stoodLongWatch",
   "doubleWatch",
   "helmCleanPass",
   "helmScrape",
+  "ateWell",
+  "burntDinner",
+  "ateRationPack",
+  "ateInDirtyMess",
+  "ateInFilthyMess",
 ]);
 export const traitModifierSchema = z.enum([
   "hungerRate",

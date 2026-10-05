@@ -8,6 +8,8 @@
  * workstreams share.
  */
 import {
+  FIXTURE_DIRT,
+  FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
   FIXTURE_MOOD,
   FIXTURE_THOUGHTS,
@@ -196,11 +198,14 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
       slowDownOnEvents: [],
+      dirtFrameEverySeconds: 5,
     },
     // D77: everyone is a dayworker on every watch: always on duty, as before watches.
     watches: fixtureWatches([0, 1, 2]),
     mood: FIXTURE_MOOD,
     hazards: FIXTURE_HAZARDS,
+    galley: FIXTURE_GALLEY,
+    dirt: FIXTURE_DIRT,
     social: {
       chatRadiusTiles: 2,
       chatCooldownSeconds: 45,

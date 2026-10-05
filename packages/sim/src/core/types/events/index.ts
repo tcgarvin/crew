@@ -12,7 +12,9 @@ import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";
 import { DECISION_EVENT_SIGNIFICANCE, type DecisionEventPayloads } from "./decisions";
+import { DIRT_EVENT_SIGNIFICANCE, type DirtEventPayloads } from "./dirt";
 import { EQUIPMENT_EVENT_SIGNIFICANCE, type EquipmentEventPayloads } from "./equipment";
+import { GALLEY_EVENT_SIGNIFICANCE, type GalleyEventPayloads } from "./galley";
 import { KERNEL_EVENT_SIGNIFICANCE, type KernelEventPayloads } from "./kernel";
 import { NEEDS_EVENT_SIGNIFICANCE, type NeedsEventPayloads } from "./needs";
 import { PERCEPTION_EVENT_SIGNIFICANCE, type PerceptionEventPayloads } from "./perception";
@@ -24,7 +26,9 @@ import { WORK_EVENT_SIGNIFICANCE, type WorkEventPayloads } from "./work";
 
 export type * from "./commerce";
 export type * from "./decisions";
+export type * from "./dirt";
 export type * from "./equipment";
+export type * from "./galley";
 export type * from "./kernel";
 export type * from "./needs";
 export type * from "./perception";
@@ -45,7 +49,9 @@ export interface EventPayloadMap
     TravelEventPayloads,
     CommerceEventPayloads,
     DecisionEventPayloads,
-    WatchEventPayloads {}
+    WatchEventPayloads,
+    GalleyEventPayloads,
+    DirtEventPayloads {}
 
 export type EventType = keyof EventPayloadMap;
 
@@ -61,6 +67,8 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...COMMERCE_EVENT_SIGNIFICANCE,
   ...DECISION_EVENT_SIGNIFICANCE,
   ...WATCH_EVENT_SIGNIFICANCE,
+  ...GALLEY_EVENT_SIGNIFICANCE,
+  ...DIRT_EVENT_SIGNIFICANCE,
 };
 
 /** `sim` for pipeline-originated events; otherwise the source of the command that caused it. */

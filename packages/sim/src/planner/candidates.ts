@@ -18,6 +18,9 @@ import {
  * - `courseToPlot` (D78) → essentialOperation;
  * - `partsNeeded` (D47) → the owner's base urgency (the repair it unblocks);
  * - `reserveLow` (D80) → the owner's base urgency (routine: restocking, nothing broken);
+ * - `mealToCook`, `mealToCarry` (D81) → routineObligation (who may take them is `galley.ts`'s);
+ * - `compartmentDirty` (D82) → the owner's base urgency (routine, essential for a filthy galley or
+ *   infirmary; who may take it is `cleaning.ts`'s);
  * - `cargoToLoad`/`cargoToUnload`, symptom inspection (`machineSymptom`) and `maintenanceDue`
  *   → routineObligation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
@@ -37,9 +40,21 @@ import type { MachineTag, ToolKind } from "../core/types/content";
 import type { ActorId, ItemId, MachineId } from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView, KnownItemView, ProblemView, TaskView } from "../core/types/view";
-import { backingOff, loungeTile, personal, sameTile } from "./common";
+import { cleanTaskAllowed, isCleaningTask } from "./cleaning";
+import {
+  backingOff,
+  inCompartmentTagged,
+  inMyHands,
+  loungeTile,
+  needUrgency,
+  personal,
+  sameTile,
+} from "./common";
+import { eatCandidate, galleyTaskAllowed, galleyTaskExempt, isGalleyTask } from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
 import { dutyIdleCandidate } from "./rounds";
+
+export { needUrgency } from "./common";
 
 /** What the selector ranks. `estimateTicks` is time to useful intervention (SD §15.3 step 5). */
 export interface Candidate {
@@ -72,9 +87,6 @@ export interface CandidateSet {
 }
 
 export const urgencyIndex = (u: UrgencyClass): number => URGENCY_CLASSES.indexOf(u);
-
-const inMyHands = (view: AgentView, item: KnownItemView): boolean =>
-  item.location.kind === "carriedBy" && item.location.actorId === view.self.id;
 
 // ---------------------------------------------------------------------------------------------
 // Tasks
@@ -131,6 +143,13 @@ export function taskUrgency(
       // D47: the part gates a repair the owner already rated; buying it is as pressing as fixing.
       return problem.baseUrgency;
     case "reserveLow":
+      return problem.baseUrgency;
+    case "mealToCook":
+    case "mealToCarry":
+      // D81: a meal is routine; the call threshold decides who comes, not the class.
+      return "routineObligation";
+    case "compartmentDirty":
+      // D82: routine, essential while a galley or infirmary is filthy; dirt says which.
       return problem.baseUrgency;
   }
 }
@@ -263,7 +282,14 @@ function taskCandidate(
   // also decides whether they skip deference and the off-duty rule.
   const helm = isHelmTask(task);
   if (helm && !helmTaskAllowed(view, task)) return reject("notMyHelm");
-  const exempt = helm && helmTaskExempt(view, task);
+  // D81, D82: the galley's and the dirt's tasks have their own rules (`galley.ts`, `cleaning.ts`).
+  if (isGalleyTask(task) && !galleyTaskAllowed(view, config, task, problem)) {
+    return reject("notMyMeal");
+  }
+  if (isCleaningTask(task) && !cleanTaskAllowed(view, config, task, problem)) {
+    return reject("notMyRoom");
+  }
+  const exempt = (helm && helmTaskExempt(view, task)) || galleyTaskExempt(view, task);
   const betterQualified = exempt ? undefined : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
@@ -294,72 +320,6 @@ function taskCandidate(
 // ---------------------------------------------------------------------------------------------
 // Personal needs
 // ---------------------------------------------------------------------------------------------
-
-export function needUrgency(value: number, config: PlannerConfig): UrgencyClass | undefined {
-  if (value > config.urgency.needSurvivalAbove) return "immediateSurvival";
-  if (value > config.urgency.needEssentialAbove) return "essentialOperation";
-  if (value > config.needs.seekThreshold) return "routineObligation";
-  return undefined;
-}
-
-function eatCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
-  const urgency = needUrgency(view.self.needs.hunger, config);
-  if (urgency === undefined) return undefined;
-  // `mealDays` in ticks, inline because the planner may not import `core/clock` (D76).
-  const mealTicks = Math.ceil(
-    config.needs.mealDays * config.time.daySeconds * config.time.tickRate,
-  );
-  const food = view.knownItems().filter((i) => i.tags.includes("food") && !i.absent);
-  const table = messTile(view);
-  const toTable = (from?: TileCoord): number => {
-    if (table === undefined) return 0;
-    return view.estimateTravelTicks(table, from) ?? 0;
-  };
-  const atTable = table === undefined ? {} : { tile: table };
-  const inHand = food.find((i) => inMyHands(view, i));
-  if (inHand !== undefined) {
-    return personal("eat", urgency, toTable() + mealTicks, view.tick, {
-      kind: "personal",
-      activity: "eat",
-      itemId: inHand.itemId,
-      ...atTable,
-    });
-  }
-  let best: { item: KnownItemView; ticks: number } | undefined;
-  for (const item of food) {
-    if (item.tile === undefined || backingOff(view, `eat:${item.itemId}`)) continue;
-    const ticks = view.estimateTravelTicks(item.tile);
-    if (ticks !== null && (best === undefined || ticks < best.ticks)) best = { item, ticks };
-  }
-  if (best === undefined) return { ref: "eat", reason: "noKnownFood" };
-  const fetch = best.ticks + toTable(best.item.tile);
-  return personal(`eat:${best.item.itemId}`, urgency, fetch + mealTicks, view.tick, {
-    kind: "personal",
-    activity: "eat",
-    itemId: best.item.itemId,
-    ...atTable,
-  });
-}
-
-/**
- * W4a decision: people carry their food to the mess to eat when the ship has one (and they are
- * not already in it); otherwise they eat where they picked it up.
- */
-function messTile(view: AgentView): TileCoord | undefined {
-  const here = view.self.tile;
-  if (
-    here !== undefined &&
-    (inCompartmentTagged(view, here, "mess") || inCompartmentTagged(view, here, "galley"))
-  ) {
-    return undefined;
-  }
-  return loungeTile(view, ["mess", "galley"]);
-}
-
-function inCompartmentTagged(view: AgentView, tile: TileCoord, tag: string): boolean {
-  const symbol = view.schematic.deck.tiles[tile.y]?.[tile.x];
-  return view.schematic.deck.compartments.some((c) => c.symbol === symbol && c.tags.includes(tag));
-}
 
 /** Berths the actor has seen someone asleep on (latest sighting). */
 function occupiedTiles(view: AgentView): TileCoord[] {

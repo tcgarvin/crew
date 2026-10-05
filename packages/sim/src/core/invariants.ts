@@ -144,6 +144,15 @@ function itemViolations(state: ReadonlyWorldState): string[] {
     } else if (!(item.condition >= 0 && item.condition <= 1)) {
       out.push(`${where}.condition ${item.condition} is outside [0, 1]`);
     }
+    // D81: a served meal spoils on a whole tick and names its cook.
+    if (item.meal !== undefined) {
+      if (!Number.isInteger(item.meal.spoilsAtTick)) {
+        out.push(`${where}.meal.spoilsAtTick is ${item.meal.spoilsAtTick}`);
+      }
+      if (!(item.meal.cookId in state.actors)) {
+        out.push(`${where}.meal.cookId ${item.meal.cookId} is not an actor`);
+      }
+    }
   }
   // Containment is acyclic: following inContainer links must terminate.
   for (const start of Object.values(state.items)) {
@@ -198,6 +207,10 @@ function actorViolations(state: ReadonlyWorldState): string[] {
         out.push(`${where}.expiresAtTick is ${thought.expiresAtTick}`);
       }
     });
+    // D82: boots carry a share of dirt in [0, 1].
+    if (!(actor.boots >= 0 && actor.boots <= 1)) {
+      out.push(`actors.${actor.id}.boots is ${actor.boots}`);
+    }
     // D77: a section has a key and a place in the bill.
     const section = actor.schedule.section;
     if (
@@ -238,6 +251,44 @@ export function berthViolations(state: ReadonlyWorldState): string[] {
     const other = holder.get(placementKey);
     if (other !== undefined) out.push(`berths: ${other} and ${actorId} share "${placementKey}"`);
     else holder.set(placementKey, actorId);
+  }
+  return out;
+}
+
+/**
+ * D82: every deck in `deck.tiles` has a dirt row of integers in [0, 255] (its length against the
+ * deck def is `systems/dirt`'s check: core has no content); every tier is a room of some deck (a
+ * key only, checked there too). D81: the helm meal names an actor and an item aboard.
+ */
+function dirtAndGalleyViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  for (const deckId of Object.keys(state.deck.tiles)) {
+    const cells = state.dirt.cells[deckId as keyof typeof state.dirt.cells];
+    if (cells === undefined) {
+      out.push(`dirt.cells has no row for deck ${deckId}`);
+      continue;
+    }
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i] as number;
+      if (!Number.isInteger(cell) || cell < 0 || cell > 255) {
+        out.push(`dirt.cells.${deckId}[${i}] is ${cell}`);
+        break;
+      }
+    }
+  }
+  if (!(state.dirt.dustThisVisit >= 0))
+    out.push(`dirt.dustThisVisit is ${state.dirt.dustThisVisit}`);
+  if (!Number.isInteger(state.galley.lastMealWatch)) {
+    out.push(`galley.lastMealWatch is ${state.galley.lastMealWatch}`);
+  }
+  const meal = state.galley.helmMeal;
+  if (meal !== undefined) {
+    if (!(meal.actorId in state.actors))
+      out.push(`galley.helmMeal.actorId ${meal.actorId} is not an actor`);
+    if (!(meal.itemId in state.items))
+      out.push(`galley.helmMeal.itemId ${meal.itemId} is not an item`);
+    if (!Number.isInteger(meal.startedTick))
+      out.push(`galley.helmMeal.startedTick is ${meal.startedTick}`);
   }
   return out;
 }
@@ -318,6 +369,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...marketViolations(state),
     ...berthViolations(state),
     ...hazardViolations(state),
+    ...dirtAndGalleyViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

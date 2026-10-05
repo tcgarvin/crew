@@ -104,6 +104,7 @@ export function exampleWorldState(): WorldState {
         traits: ["trait.steady" as TraitDefId],
         mood: 0.1,
         thoughts: [{ key: "helmCleanPass", value: 0.1, expiresAtTick: 7600 }],
+        boots: 0.2,
         schedule: { section: { key: "red", index: 0 } },
         activity: {
           kind: "task",
@@ -160,6 +161,7 @@ export function exampleWorldState(): WorldState {
         traits: [],
         mood: -0.2,
         thoughts: [],
+        boots: 0,
         schedule: {},
         activity: {
           kind: "personal",
@@ -322,6 +324,12 @@ export function exampleWorldState(): WorldState {
     },
     travel: { stage: "docked", portId: port, plannedDestinationId: port2 },
     watch: { lastBellWatch: 0, helm: {} },
+    dirt: {
+      cells: { [deck]: Array.from({ length: 96 }, (_, i) => (i === 30 ? 40 : 0)) },
+      tiers: { galley: "untidy" },
+      dustThisVisit: 0,
+    },
+    galley: { lastMealWatch: 0 },
     hazards: [
       {
         id: "h1" as HazardId,

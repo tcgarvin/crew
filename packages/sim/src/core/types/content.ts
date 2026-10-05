@@ -63,6 +63,10 @@ export const ITEM_TAGS = [
   "container",
   /** Ship life §7: someone's own belongings; `UniqueItem.ownerId` says whose. */
   "personal",
+  /** D81: a crate the galley cooks from (`galley.servingsPerCrate` servings each); not `food`. */
+  "provisions",
+  /** D81: a cooked serving (also `food`); carries `Item.meal` once served. */
+  "meal",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
 
@@ -73,6 +77,8 @@ export const TOOL_KINDS = [
   "welder",
   "diagnosticScanner",
   "handTruck",
+  /** D82: the mop a `cleanCompartment` task needs. */
+  "mop",
 ] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
@@ -144,8 +150,32 @@ export const THOUGHT_KEYS = [
   "doubleWatch",
   "helmCleanPass",
   "helmScrape",
+  /** D81: ate a `good` meal. */
+  "ateWell",
+  /** D81: ate a `poor` meal. */
+  "burntDinner",
+  /** D81: ate `food` with no `meal` on it (a ration pack). */
+  "ateRationPack",
+  /** D82: ate in a room at the `dirty` tier; `ateInFilthyMess` at `filthy` (two keys, D79). */
+  "ateInDirtyMess",
+  "ateInFilthyMess",
 ] as const;
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
+
+/**
+ * D82: how dirty a room is, from its cells (`systems/dirt/grid.ts` `tierOf`, with hysteresis on
+ * the way down). `WorldState.dirt.tiers` holds the last tier written per room.
+ */
+export const DIRT_TIERS = ["clean", "untidy", "dirty", "filthy"] as const;
+export type DirtTier = (typeof DIRT_TIERS)[number];
+
+/**
+ * D81: how good a served meal is: the cook's cooking skill against `galley.goodCookingAbove` /
+ * `poorCookingBelow`, dropped a step by a galley at `dirty` or worse. Fixed on the item at the
+ * serve (`Item.meal`).
+ */
+export const MEAL_QUALITIES = ["poor", "plain", "good"] as const;
+export type MealQuality = (typeof MEAL_QUALITIES)[number];
 
 /**
  * D78: kinds of navigation hazard the narrator's `scheduleHazard` may place on a leg. The kernel
@@ -404,6 +434,18 @@ export interface DockDef {
   readonly foreground: readonly DockForegroundDef[];
   /** One line the narrator sees about the place. */
   readonly ambience: string;
+  /**
+   * D82: how much a step on this dock's floor loads a crew member's boots (0 a clean deck plate,
+   * 1 a muddy field), scaled by `config.dirt.dockGrimePerStep`; the boots shed it on the ship's
+   * floor afterwards. In [0, 1].
+   */
+  readonly grime: number;
+  /**
+   * D82: whether the air here settles on the deck near an open ramp while docked (0 none, 1 a
+   * dust storm), scaled by `config.dirt.airborneDustPerDay` and capped per visit. In [0, 1]; a
+   * station (no sky) authors 0.
+   */
+  readonly airborneDust: number;
 }
 
 /** D72: a dock's berth box: `HULL_SIZE_BOX[sizeClass]` tiles from `origin`, all `void`. */
@@ -1093,6 +1135,8 @@ export interface ConfigDef {
      * host's fast-forward back to 1× when playback reaches them.
      */
     readonly slowDownOnEvents: readonly string[];
+    /** D82: how often (host real time, seconds) the worker posts a `DirtFrame` to the renderer. */
+    readonly dirtFrameEverySeconds: Seconds;
   };
   /**
    * D77: watches replace shifts. Which section is on watch comes from the scenario's bill against
@@ -1128,6 +1172,87 @@ export interface ConfigDef {
     readonly highAbove: number;
     readonly lowWorkSpeed: number;
     readonly highWorkSpeed: number;
+  };
+  /**
+   * D81: the galley. Meals are cooked before each bell from a crate of provisions and served on
+   * the `serving` zone; the oncoming watch eats first. Days (D76) for the rhythm, seconds for work
+   * at the stove.
+   */
+  readonly galley: {
+    /** How long before the bell `mealToCook` is raised for the coming watch. */
+    readonly mealLeadDays: Days;
+    /** How long after the bell an uncooked meal is given up (`mealMissed`). */
+    readonly mealGraceDays: Days;
+    /** Work at the stove, before the cook's skill rate (`workRate`). */
+    readonly cookSeconds: Seconds;
+    /** Age of `mealToCook` after which anyone with cooking ≥ 1 may take it from the cook. */
+    readonly substituteAfterDays: Days;
+    /** Servings cooked beyond the crew aboard (never more than `servingsPerCrate` in all). */
+    readonly spareServings: number;
+    /** Servings one crate of `provisions` makes. */
+    readonly servingsPerCrate: number;
+    /** How long a served meal lasts on the counter before the galley sweeps it. */
+    readonly mealSpoilDays: Days;
+    /** Hunger above which a known hot meal is a routine candidate (well under `seekThreshold`). */
+    readonly mealCallHungerAbove: number;
+    /**
+     * D80/D81: the provisions reserve, in days of meals (servings aboard over eaters ×
+     * `time.watchesPerDay`). Below `lowBelowDays`, docked at a port whose market sells
+     * provisions, the crew buy crates to bring it to `restockToDays` (`reserveLow`, bought like a
+     * part). 0 turns it off. Ration packs are `commerce.foodReserve`'s.
+     */
+    readonly lowBelowDays: Days;
+    readonly restockToDays: Days;
+    /** Cooking at or above this serves `good`; below `poorCookingBelow`, `poor`; else `plain`. */
+    readonly goodCookingAbove: number;
+    readonly poorCookingBelow: number;
+  };
+  /**
+   * D82: dirt. A cell is 0..255 (255 = 1.0 of dirt); footfall, boots and deposits are unitless
+   * amounts of that 1.0; tiers are thresholds on a room's weighted dirt.
+   */
+  readonly dirt: {
+    /** Dirt a step leaves on a deck tile. */
+    readonly footfallPerStep: number;
+    /** Share of a tile's dirt that sticks to boots per step. */
+    readonly bootsPickup: number;
+    /** Share of the boots' load shed on a tile per step. */
+    readonly bootsShed: number;
+    /** Boots load per step on dock floor, times the dock's `grime`. */
+    readonly dockGrimePerStep: number;
+    /** Dirt a day settles near an open ramp while docked, times the dock's `airborneDust`. */
+    readonly airborneDustPerDay: number;
+    /** How far from an open ramp door dust reaches (falling linearly with distance). */
+    readonly airborneDustRadiusTiles: number;
+    /** Dust settled per docked visit stops at this (`dirt.dustThisVisit`). */
+    readonly airborneDustVisitCap: number;
+    /** What each thing people do leaves behind, spread `depositRadiusTiles` round the tile. */
+    readonly deposits: {
+      readonly cooking: number;
+      readonly serving: number;
+      readonly eating: number;
+      readonly spoiledMeal: number;
+      readonly repair: number;
+      readonly cargo: number;
+    };
+    readonly depositRadiusTiles: number;
+    /** `roomDirt = (1 − roomMaxWeight) × mean + roomMaxWeight × max` over the room's cells. */
+    readonly roomMaxWeight: number;
+    /** Room dirt at which each tier begins. */
+    readonly tiers: { readonly untidy: number; readonly dirty: number; readonly filthy: number };
+    /** A room drops a tier only this far below its threshold. */
+    readonly tierHysteresis: number;
+    /** Dirt (of 1.0) a mopped tile loses per trip. */
+    readonly mopPerTile: number;
+    /** Work per tile, before the skill rate. */
+    readonly mopSecondsPerTile: Seconds;
+    /** Tiles one `cleanCompartment` trip covers (the dirtiest first). */
+    readonly mopTilesPerTrip: number;
+    /** Cadence of the dirt system's tier pass (a cadence of the sim, not of ship life). */
+    readonly updateEverySeconds: Seconds;
+    /** Renderer: alpha of the grime tint is `min(tintMaxAlpha, cell / 255 × tintScale)`. */
+    readonly tintScale: number;
+    readonly tintMaxAlpha: number;
   };
   /** D78: navigation hazards (the narrator's `scheduleHazard`). */
   readonly hazards: {

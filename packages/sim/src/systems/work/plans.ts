@@ -20,6 +20,9 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { cleanPlan } from "../dirt/clean";
+import { cookPlan } from "../galley/cook";
+import { carryMealPlan, eatPlan } from "../galley/eat";
 import { plotCoursePlan } from "../travel/course";
 import { gangwayPlan, helmPlan } from "../watch/helm";
 import { roundsPlan } from "../watch/rounds";
@@ -31,8 +34,11 @@ export type PlanResult =
 
 type Purpose = "operate" | "repair" | "use";
 
-const planOf = (steps: ActivityStep[]): PlanResult => ({ ok: true, plan: { steps, stepIndex: 0 } });
-const blocked = (reason: BlockageReason): PlanResult => ({ ok: false, reason });
+export const planOf = (steps: ActivityStep[]): PlanResult => ({
+  ok: true,
+  plan: { steps, stepIndex: 0 },
+});
+export const blocked = (reason: BlockageReason): PlanResult => ({ ok: false, reason });
 
 export const tileOf = (location: { x: number; y: number }): TileCoord => ({
   x: Math.floor(location.x),
@@ -77,7 +83,7 @@ function pickupTile(ctx: StepCtx, actor: Actor, location: PhysicalLocation): Til
   return undefined;
 }
 
-function acquireSteps(
+export function acquireSteps(
   ctx: StepCtx,
   actor: Actor,
   itemId: ItemId,
@@ -264,31 +270,11 @@ function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.type === "haul") return haulPlan(ctx, actor, task);
   if (task.type === "buyParts") return buyPlan(ctx, actor, task);
+  // D81: the galley's plans are its own (`systems/galley/`); D82: the mop's is dirt's.
+  if (task.type === "cookMeal") return cookPlan(ctx, actor, task);
+  if (task.type === "carryMeal") return carryMealPlan(ctx, actor, task);
+  if (task.type === "cleanCompartment") return cleanPlan(ctx, actor, task);
   return machineTaskPlan(ctx, actor, task);
-}
-
-/** Eat: get one unit (unless one is in hand), optionally carry it to `table`, eat, consume. */
-function eatPlan(
-  ctx: StepCtx,
-  actor: Actor,
-  itemId: ItemId | undefined,
-  table: TileCoord | undefined,
-): PlanResult {
-  const mealTicks = dayTicks(ctx.config, ctx.config.needs.mealDays);
-  const meal: ActivityStep[] = [
-    ...(table === undefined
-      ? []
-      : [{ kind: "moveTo", target: { x: table.x, y: table.y }, requested: false } as const]),
-    { kind: "work", stage: "eat", ticksDone: 0, ticksNeeded: mealTicks },
-  ];
-  const inHand = carriedItems(ctx, actor.id).find((item) =>
-    ctx.content.items[item.defId]?.tags.includes("food"),
-  );
-  if (inHand !== undefined) return planOf([...meal, { kind: "consume", itemId: inHand.id }]);
-  if (itemId === undefined) return blocked("inaccessibleSupply");
-  const acquire = acquireSteps(ctx, actor, itemId, true);
-  if (typeof acquire === "string") return blocked(acquire);
-  return planOf([...acquire, ...meal, { kind: "consume", itemId }]);
 }
 
 /** D74: is this bed someone else's berth? Nobody lies down in another's bed. */

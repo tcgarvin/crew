@@ -148,6 +148,7 @@ export const configDefSchema = z.strictObject({
     remoteSaveEverySeconds: positive,
     frameEveryTicks: positiveInt,
     slowDownOnEvents: z.array(z.string().min(1)),
+    dirtFrameEverySeconds: positive,
   }),
   watches: z.strictObject({
     dayworkerOnWatches: z.array(nonNegativeInt),
@@ -169,6 +170,58 @@ export const configDefSchema = z.strictObject({
       highWorkSpeed: positive,
     })
     .refine((m) => m.lowBelow < m.highAbove, { message: "lowBelow must be < highAbove" }),
+  galley: z
+    .strictObject({
+      mealLeadDays: positive,
+      mealGraceDays: nonNegative,
+      cookSeconds: nonNegative,
+      substituteAfterDays: nonNegative,
+      spareServings: nonNegativeInt,
+      servingsPerCrate: positiveInt,
+      mealSpoilDays: positive,
+      mealCallHungerAbove: unitInterval,
+      lowBelowDays: nonNegative,
+      restockToDays: nonNegative,
+      goodCookingAbove: z.number().min(0).max(10),
+      poorCookingBelow: z.number().min(0).max(10),
+    })
+    .refine((g) => g.lowBelowDays <= g.restockToDays, {
+      message: "lowBelowDays must be <= restockToDays",
+    })
+    .refine((g) => g.poorCookingBelow <= g.goodCookingAbove, {
+      message: "poorCookingBelow must be <= goodCookingAbove",
+    }),
+  dirt: z
+    .strictObject({
+      footfallPerStep: nonNegative,
+      bootsPickup: unitInterval,
+      bootsShed: unitInterval,
+      dockGrimePerStep: nonNegative,
+      airborneDustPerDay: nonNegative,
+      airborneDustRadiusTiles: nonNegative,
+      airborneDustVisitCap: nonNegative,
+      deposits: z.strictObject({
+        cooking: nonNegative,
+        serving: nonNegative,
+        eating: nonNegative,
+        spoiledMeal: nonNegative,
+        repair: nonNegative,
+        cargo: nonNegative,
+      }),
+      depositRadiusTiles: nonNegativeInt,
+      roomMaxWeight: unitInterval,
+      tiers: z.strictObject({ untidy: unitInterval, dirty: unitInterval, filthy: unitInterval }),
+      tierHysteresis: unitInterval,
+      mopPerTile: nonNegative,
+      mopSecondsPerTile: nonNegative,
+      mopTilesPerTrip: positiveInt,
+      updateEverySeconds: positive,
+      tintScale: nonNegative,
+      tintMaxAlpha: unitInterval,
+    })
+    .refine((d) => d.tiers.untidy <= d.tiers.dirty && d.tiers.dirty <= d.tiers.filthy, {
+      message: "tiers must rise: untidy <= dirty <= filthy",
+    }),
   hazards: z.strictObject({
     difficulty: z.strictObject({
       easy: z.number().int().min(1).max(10),

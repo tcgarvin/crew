@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "ateInDirtyMess",
+  "label": "ate in a dirty mess",
+  "value": -0.1,
+  "durationDays": 0.5,
+  "stacks": false
+}

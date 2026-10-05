@@ -65,6 +65,8 @@ export const QUAY: DockDef = {
   ],
   foreground: [],
   ambience: "A test quay.",
+  grime: 0,
+  airborneDust: 0,
   rows: [
     "################",
     "..            ##",

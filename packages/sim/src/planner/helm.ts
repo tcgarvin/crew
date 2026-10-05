@@ -18,6 +18,7 @@ import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView, TaskView } from "../core/types/view";
 import type { Candidate, Rejection } from "./candidates";
 import { backingOff, personal } from "./common";
+import { mealCallFor } from "./galley";
 
 /** Is `task` one whose eligibility this file decides (`staffStation`, `plotCourse`)? */
 export function isHelmTask(task: TaskView): boolean {
@@ -61,6 +62,8 @@ export function gangwayCandidate(
   if (self.watch.gangway !== true) return undefined;
   const activity = self.activity;
   if (activity.kind === "personal" && activity.activity === "standWatch") return undefined;
+  // D81: dinner first; the hold ends for the call (`gangwayHoldDone`) and the post waits.
+  if (mealCallFor(view, _config) !== undefined) return undefined;
   const tile = view.schematic.deck.zones.find((zone) => zone.tags.includes("gangway"))?.tiles[0];
   if (tile === undefined) return undefined;
   if (backingOff(view, "standWatch")) return { ref: "standWatch", reason: "backoff" };

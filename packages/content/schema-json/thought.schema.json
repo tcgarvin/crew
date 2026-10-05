@@ -4,7 +4,17 @@
   "properties": {
     "key": {
       "type": "string",
-      "enum": ["stoodLongWatch", "doubleWatch", "helmCleanPass", "helmScrape"]
+      "enum": [
+        "stoodLongWatch",
+        "doubleWatch",
+        "helmCleanPass",
+        "helmScrape",
+        "ateWell",
+        "burntDinner",
+        "ateRationPack",
+        "ateInDirtyMess",
+        "ateInFilthyMess"
+      ]
     },
     "label": {
       "type": "string",

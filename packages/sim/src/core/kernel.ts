@@ -3,7 +3,7 @@
  */
 import { enqueueCommand } from "./commands";
 import { type KernelRegistry, createRegistry, defaultRegistry } from "./registry";
-import { getRenderFrame } from "./render";
+import { getDirtFrame, getRenderFrame } from "./render";
 import { restore, serialize } from "./save";
 import type { Kernel } from "./types/kernel";
 import { advance, createWorld } from "./world";
@@ -16,6 +16,7 @@ export function createKernel(registry: KernelRegistry = createRegistry()): Kerne
     enqueueCommand: (world, command) => enqueueCommand(world, registry, command),
     getAgentView: (world, actorId) => registry.buildAgentView(world, actorId),
     getRenderFrame,
+    getDirtFrame,
     serialize,
     restore: (envelope, content) => restore(envelope, content, registry),
   };

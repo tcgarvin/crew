@@ -147,7 +147,7 @@ export function restore(
   const migrated = migrateState(
     deepCopy(envelope.state),
     envelope.schemaVersion,
-    { content, config: values },
+    { content, config: values, warn: (message) => warnings.push(message) },
     options.migrations ?? migrations,
   );
   if (typeof migrated !== "object" || migrated === null) {

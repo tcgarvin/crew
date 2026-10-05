@@ -31,6 +31,7 @@ import type {
   RenderTravel,
   TickerEntry,
 } from "./types/view";
+import type { DirtFrame } from "./types/view";
 import type { ActionKind, ProblemKind } from "./types/work";
 
 const ACTION_VERBS: Readonly<Record<ActionKind, string>> = {
@@ -227,6 +228,10 @@ type Names = {
   faultName(machineId: string, faultKey: string): string;
   symptomName(machineId: string, symptomKey: string): string;
   job(id: string): { issuer: string; name: string; to: string; passenger: boolean } | undefined;
+  /** D82: "the galley" for the room `key` of the ship's deck; "the room" if unknown. */
+  room(key: string): string;
+  /** "The galley": `room` capitalised to start a line. */
+  roomCap(key: string): string;
 };
 
 function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
@@ -235,7 +240,21 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     return machine === undefined ? undefined : content.machines[machine.defId];
   };
   const machine = (id: string) => machineDef(id)?.name;
+  const room = (key: string) => {
+    for (const deckId of Object.keys(state.deck.tiles)) {
+      const name = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
+        (c) => c.key === key,
+      )?.name;
+      if (name !== undefined) return `the ${name.toLowerCase()}`;
+    }
+    return "the room";
+  };
   return {
+    room,
+    roomCap: (key) => {
+      const text = room(key);
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    },
     actor: (id) => state.actors[id as Actor["id"]]?.name,
     machine,
     machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
@@ -405,6 +424,28 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "helmUnattended":
       return "Nobody at the helm";
+    case "mealServed": {
+      const { cookId, servings, quality } = event.payload;
+      const cook = n.actor(cookId) ?? "The cook";
+      const what = quality === "poor" ? "a poor dinner" : "dinner";
+      return `${cook} served ${what}: ${servings} hot meal${servings === 1 ? "" : "s"}`;
+    }
+    case "mealMissed":
+      return "No hot meal this watch";
+    case "provisionsLow": {
+      const days = event.payload.days;
+      const left =
+        days < 0.75
+          ? "less than a day left"
+          : `about ${days < 1.5 ? "a day" : `${Math.round(days)} days`} left`;
+      return `Provisions are running low: ${left}`;
+    }
+    case "roomDirty":
+      return `${n.roomCap(event.payload.key)} is dirty`;
+    case "roomFilthy":
+      return `${n.roomCap(event.payload.key)} is filthy`;
+    case "roomCleaned":
+      return `${n.actor(event.payload.byActorId) ?? "Someone"} mopped ${n.room(event.payload.key)}`;
     case "coursePlotted":
       return `Course plotted for ${n.port(event.payload.toPortId)}`;
     case "navHazard":
@@ -895,6 +936,33 @@ function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): Ren
       y: prop.tile.y + 0.5,
     };
   });
+}
+
+/**
+ * D82: the ship deck's dirt grid at the current tick (`WorldState.dirt.cells` as bytes), for the
+ * renderer's grime tint. Throws if the state has no ship deck or the deck no cells, which world
+ * creation and the migration rule out.
+ */
+export function getDirtFrame(world: World): DirtFrame {
+  const { state, content } = world;
+  const deckIds = Object.keys(state.deck.tiles);
+  const [deckId] = deckIds;
+  if (deckId === undefined || deckIds.length !== 1) {
+    throw new Error(`getDirtFrame: expected one ship deck, found ${deckIds.length}`);
+  }
+  const deck = content.decks[deckId as keyof ContentBundle["decks"]];
+  const cells = state.dirt.cells[deckId as keyof typeof state.dirt.cells];
+  if (deck === undefined || cells === undefined) {
+    throw new Error(`getDirtFrame: deck ${deckId} has no dirt cells`);
+  }
+  return {
+    tick: state.tick,
+    deckId: deck.id,
+    width: deck.width,
+    height: deck.height,
+    cells: Uint8Array.from(cells),
+    tiers: { ...state.dirt.tiers },
+  };
 }
 
 export function getRenderFrame(world: World): RenderFrame {

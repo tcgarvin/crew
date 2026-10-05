@@ -160,6 +160,27 @@ const item = {
   mass: 1.2,
 };
 
+// D81: the galley finds its crate and its plate by tag; L2 wants exactly one meal def.
+const provisions = {
+  id: "item.test.provisions",
+  name: "Provisions",
+  stacking: "stackable",
+  maxStack: 20,
+  tags: ["provisions"],
+  toolKinds: [],
+  mass: 2,
+};
+const meal = {
+  id: "item.test.meal",
+  name: "Hot Meal",
+  stacking: "stackable",
+  maxStack: 20,
+  tags: ["food", "consumable", "meal"],
+  toolKinds: [],
+  mass: 0.5,
+  nutrition: 0.4,
+};
+
 const crew = {
   id: "crew.test.mara",
   name: "Mara",
@@ -239,6 +260,11 @@ const thoughts = {
   doubleWatch: thought("doubleWatch", -0.25, false),
   helmCleanPass: thought("helmCleanPass", 0.1, true),
   helmScrape: thought("helmScrape", -0.1, true),
+  ateWell: thought("ateWell", 0.1, false),
+  burntDinner: thought("burntDinner", -0.1, false),
+  ateRationPack: thought("ateRationPack", -0.05, false),
+  ateInDirtyMess: thought("ateInDirtyMess", -0.1, false),
+  ateInFilthyMess: thought("ateInFilthyMess", -0.2, false),
 };
 
 const band = { min: 1, max: 3 };
@@ -365,6 +391,7 @@ const config = {
     remoteSaveEverySeconds: 60,
     frameEveryTicks: 2,
     slowDownOnEvents: [],
+    dirtFrameEverySeconds: 5,
   },
   watches: {
     dayworkerOnWatches: [0, 1],
@@ -379,6 +406,47 @@ const config = {
     plotCourseSeconds: 20,
   },
   mood: { lowBelow: -0.4, highAbove: 0.4, lowWorkSpeed: 0.9, highWorkSpeed: 1.05 },
+  galley: {
+    mealLeadDays: 0.08,
+    mealGraceDays: 0.1,
+    cookSeconds: 30,
+    substituteAfterDays: 0.025,
+    spareServings: 1,
+    servingsPerCrate: 12,
+    mealSpoilDays: 0.25,
+    mealCallHungerAbove: 0.2,
+    lowBelowDays: 1,
+    restockToDays: 4,
+    goodCookingAbove: 6,
+    poorCookingBelow: 3,
+  },
+  dirt: {
+    footfallPerStep: 0.004,
+    bootsPickup: 0.15,
+    bootsShed: 0.25,
+    dockGrimePerStep: 0.08,
+    airborneDustPerDay: 0.5,
+    airborneDustRadiusTiles: 6,
+    airborneDustVisitCap: 0.3,
+    deposits: {
+      cooking: 0.04,
+      serving: 0.03,
+      eating: 0.02,
+      spoiledMeal: 0.08,
+      repair: 0.05,
+      cargo: 0.03,
+    },
+    depositRadiusTiles: 1,
+    roomMaxWeight: 0.3,
+    tiers: { untidy: 0.12, dirty: 0.3, filthy: 0.55 },
+    tierHysteresis: 0.05,
+    mopPerTile: 1,
+    mopSecondsPerTile: 2,
+    mopTilesPerTrip: 12,
+    updateEverySeconds: 1,
+    tintScale: 1.2,
+    tintMaxAlpha: 0.35,
+  },
   hazards: { difficulty: { easy: 3, hard: 5, brutal: 7 }, delaySeconds: 60 },
   social: { chatRadiusTiles: 2, chatCooldownSeconds: 45, templateLines: ["{a} joked"] },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
@@ -494,7 +562,7 @@ describe("bundle validation", () => {
   const bundle = {
     decks: { [deck.id]: deck },
     machines: Object.fromEntries([machine, ...furniture].map((m) => [m.id, m])),
-    items: { [item.id]: item },
+    items: { [item.id]: item, [provisions.id]: provisions, [meal.id]: meal },
     crew: { [crew.id]: crew },
     traits: { [trait.id]: trait },
     ports: { [port.id]: port, [portB.id]: portB },
@@ -659,9 +727,10 @@ describe("bundle validation", () => {
 
     it("holds capacityUnits to hand trucks, and every hand truck to a load of two or more (D65)", () => {
       const issuesFor = (bad: Record<string, unknown>) =>
-        referenceIssues({ ...bundle, items: { [item.id]: { ...item, ...bad } } }).map(
-          (i) => i.message,
-        );
+        referenceIssues({
+          ...bundle,
+          items: { [item.id]: { ...item, ...bad }, [provisions.id]: provisions, [meal.id]: meal },
+        }).map((i) => i.message);
       const truck = { toolKinds: ["handTruck"] };
       expect(issuesFor({ ...truck, capacityUnits: 4 })).toEqual([]);
       expect(issuesFor(truck).some((m) => m.includes("capacityUnits of at least 2"))).toBe(true);

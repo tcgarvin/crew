@@ -81,6 +81,7 @@ describe("rosterRole", () => {
 
 const watch = (over: Partial<WatchView> = {}): WatchView => ({
   onWatch: false,
+  nextOnWatch: false,
   dayworker: false,
   helmRole: "none",
   officerOfTheWatch: false,
@@ -167,6 +168,35 @@ const DEFS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     value: -0.1,
     durationDays: 0.5,
     stacks: true,
+  },
+  ateWell: { key: "ateWell", label: "ate well", value: 0.1, durationDays: 0.3, stacks: false },
+  burntDinner: {
+    key: "burntDinner",
+    label: "burnt dinner",
+    value: -0.1,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  ateRationPack: {
+    key: "ateRationPack",
+    label: "ate a ration pack",
+    value: -0.05,
+    durationDays: 0.3,
+    stacks: false,
+  },
+  ateInDirtyMess: {
+    key: "ateInDirtyMess",
+    label: "ate in a dirty mess",
+    value: -0.1,
+    durationDays: 0.5,
+    stacks: false,
+  },
+  ateInFilthyMess: {
+    key: "ateInFilthyMess",
+    label: "ate in a filthy mess",
+    value: -0.2,
+    durationDays: 0.5,
+    stacks: false,
   },
 };
 

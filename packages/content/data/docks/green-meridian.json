@@ -191,5 +191,7 @@
       }
     }
   ],
-  "ambience": "Warm wind off the fields, a sprinkler line ticking somewhere past the shed, and the smell of cut stalks over the pad."
+  "ambience": "Warm wind off the fields, a sprinkler line ticking somewhere past the shed, and the smell of cut stalks over the pad.",
+  "grime": 0.8,
+  "airborneDust": 0.2
 }

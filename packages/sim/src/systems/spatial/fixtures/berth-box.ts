@@ -158,6 +158,8 @@ export const BERTH_BOX_DOCK: DockDef = {
   props: [],
   foreground: [],
   ambience: "A test quay with room for two footprints.",
+  grime: 0,
+  airborneDust: 0,
   rows: [
     "#".repeat(40),
     ...Array.from({ length: 20 }, () => `..${" ".repeat(36)}..`),

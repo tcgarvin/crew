@@ -35,6 +35,7 @@ import type { DeckGeometry } from "../../core/types/nav";
 import type { DerivedCaches, StepCtx, System } from "../../core/types/pipeline";
 import type { Door } from "../../core/types/ship";
 import type { WorldState } from "../../core/types/state";
+import { trackFootfall } from "../dirt/footfall";
 import { doorWillOpen } from "./doors";
 import {
   compartmentAt,
@@ -504,6 +505,9 @@ function advanceActor(
     const completed = movement.segmentDistanceTravelled >= length - EPS;
     if (completed) {
       if (geometry.dock !== undefined) crossedRamp(ctx, actor, geometry, a, b);
+      // D82: the step leaves footfall and boots' dirt (`systems/dirt/footfall.ts`), the one
+      // documented cross-system write from movement into the dirt grid.
+      trackFootfall(ctx, actor, geometry, a, b);
       movement.segmentIndex += 1;
       movement.segmentDistanceTravelled = 0;
       // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).

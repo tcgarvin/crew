@@ -184,5 +184,7 @@
       }
     }
   ],
-  "ambience": "Low light, no announcements, and a bell from the long gallery each time a ship comes in."
+  "ambience": "Low light, no announcements, and a bell from the long gallery each time a ship comes in.",
+  "grime": 0.2,
+  "airborneDust": 0
 }

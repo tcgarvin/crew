@@ -443,6 +443,38 @@ function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): voi
   }
 }
 
+/**
+ * D81: the galley finds what it cooks from and what it serves by tag, so no item id lives in
+ * config: exactly one `meal`-tagged item def (with a `nutrition`), at least one `provisions`.
+ */
+function checkGalleyItems(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const items = Object.values(bundle.items);
+  const meals = items.filter((item) => item.tags.includes("meal"));
+  if (meals.length !== 1) {
+    issues.push(
+      issue(
+        "referential",
+        ["items"],
+        `expected exactly one "meal"-tagged item, found ${meals.length}`,
+      ),
+    );
+  }
+  for (const meal of meals) {
+    if (!meal.tags.includes("food") || meal.nutrition === undefined) {
+      issues.push(
+        issue(
+          "referential",
+          ["items", meal.id, "tags"],
+          `meal "${meal.id}" must be food with a nutrition`,
+        ),
+      );
+    }
+  }
+  if (!items.some((item) => item.tags.includes("provisions"))) {
+    issues.push(issue("referential", ["items"], 'expected at least one "provisions"-tagged item'));
+  }
+}
+
 function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void {
   for (const [cls, band] of Object.entries(bundle.config.commerce.priceBands)) {
     if (band.min > band.max) {
@@ -516,6 +548,7 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   checkPeople(bundle, issues);
   checkDayworkerWatches(bundle, issues);
   checkThoughtKeys(bundle, issues);
+  checkGalleyItems(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;

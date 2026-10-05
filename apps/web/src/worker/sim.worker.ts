@@ -20,6 +20,7 @@ const host = createHost({
   kernel,
   content: bundle,
   config,
+  dirtFrameEverySeconds: config.values.host.dirtFrameEverySeconds,
   postMessage: (message) => self.postMessage(message),
 });
 

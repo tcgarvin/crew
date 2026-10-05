@@ -305,6 +305,16 @@
     "ambience": {
       "type": "string",
       "minLength": 1
+    },
+    "grime": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "airborneDust": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
     }
   },
   "required": [
@@ -321,7 +331,9 @@
     "areas",
     "props",
     "foreground",
-    "ambience"
+    "ambience",
+    "grime",
+    "airborneDust"
   ],
   "additionalProperties": false
 }
