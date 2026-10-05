@@ -1,7 +1,8 @@
-import type { SimEvent } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {
+  type BeatEvent,
   BeatsTally,
+  MESS_FULL_EATERS,
   type PersonSample,
   type ShipSample,
   activityClass,
@@ -11,7 +12,8 @@ import {
 } from "./beats";
 import { crew } from "./index";
 
-const ev = (type: string, tick: number) => ({ type, tick }) as Pick<SimEvent, "type" | "tick">;
+const ev = (type: string, tick: number, payload: object = {}) =>
+  ({ type, tick, payload }) as BeatEvent;
 const mara = (label: string): PersonSample => ({ id: "actor:mara", name: "Mara Osei", label });
 
 describe("activity classes from canvas labels", () => {
@@ -37,6 +39,14 @@ describe("activity classes from canvas labels", () => {
     ["leaving the helm", "walking"],
     ["going ashore to look for work", "ashore"],
     ["talking with Fenwick Adair", "ashore"],
+    ["fetching provisions", "cooking"],
+    ["cooking", "cooking"],
+    ["serving dinner", "cooking"],
+    ["taking a plate to the helm", "cooking"],
+    ["at the helm, eating", "helm"],
+    ["fetching the mop", "mopping"],
+    ["mopping the Galley", "mopping"],
+    ["putting the mop away", "mopping"],
     ["on station", "other"],
   ])("%s → %s", (label, cls) => {
     expect(activityClass(label)).toBe(cls);
@@ -45,13 +55,15 @@ describe("activity classes from canvas labels", () => {
 
 describe("the beats tally", () => {
   // Three watches of 100 ticks at 20 Hz, a day of three watches.
-  const tally = () => new BeatsTally(3, 100, 20, 3);
+  // A meal's mess window of 40 ticks.
+  const tally = () => new BeatsTally(3, 100, 20, 3, 40);
   const underway: ShipSample = {
     tick: 0,
     docked: false,
     helmEmpty: false,
     helmWatchOpen: true,
     cargoOpen: false,
+    rooms: { dirty: 0, filthy: 0 },
   };
 
   it("counts each beat in the watch whose step produced it, the closing bell included", () => {
@@ -72,6 +84,63 @@ describe("the beats tally", () => {
     expect(beats.hazards).toMatchObject({ total: 1, perWatchMax: 1 });
     expect(beats.conversations.total).toBe(1);
     expect(beats.faults.total).toBe(0);
+  });
+
+  it("counts the galley and dirt beats: hot and ration meals apart, spoiled servings by count (D83)", () => {
+    const t = tally();
+    t.events([
+      ev("mealServed", 50, { servings: 10, quality: "good" }),
+      ev("ateMeal", 55, { nutrition: 0.4, quality: "good", ration: false }),
+      ev("ateMeal", 60, { nutrition: 0.4, quality: "good", ration: false }),
+      ev("ateMeal", 120, { nutrition: 0.25, ration: true }),
+      ev("mealMissed", 210, { watchIndex: 2 }),
+      ev("mealSpoiled", 250, { count: 2 }),
+      ev("roomFilthy", 130, {}),
+      ev("roomCleaned", 180, {}),
+      ev("roomDirty", 131, {}),
+    ]);
+    const { beats } = t.result();
+    expect(beats.mealsServed).toMatchObject({ total: 1, perWatchMax: 1 });
+    expect(beats.eatenHot.total).toBe(2);
+    expect(beats.eatenRation.total).toBe(1);
+    expect(beats.mealsMissed.total).toBe(1);
+    expect(beats.servingsSpoiled).toMatchObject({ total: 2, perWatchMax: 2 });
+    expect(beats.roomsFilthy.total).toBe(1);
+    expect(beats.roomsCleaned.total).toBe(1);
+  });
+
+  it("counts the rooms dirty and filthy at each watch's last sample", () => {
+    const t = tally();
+    t.sample(50, [mara("idle")], { ...underway, tick: 50, rooms: { dirty: 3, filthy: 1 } });
+    t.sample(50, [mara("idle")], { ...underway, tick: 100, rooms: { dirty: 1, filthy: 0 } });
+    t.sample(100, [mara("idle")], { ...underway, tick: 200, rooms: { dirty: 2, filthy: 1 } });
+    const { roomsAtWatchEnd } = t.result();
+    expect(roomsAtWatchEnd.dirty).toEqual({
+      total: 3,
+      perWatchMean: 1,
+      perWatchMin: 0,
+      perWatchMax: 2,
+    });
+    expect(roomsAtWatchEnd.filthy).toMatchObject({ total: 1, perWatchMax: 1 });
+  });
+
+  it("measures how full the mess gets after each serve, within the window", () => {
+    const t = tally();
+    const hot = (tick: number) => ev("ateMeal", tick, { nutrition: 0.4, ration: false });
+    t.events([
+      ev("mealServed", 10, {}),
+      ...Array.from({ length: MESS_FULL_EATERS }, (_, i) => hot(12 + i)),
+      hot(60), // past the 40-tick window
+      ev("mealServed", 110, {}),
+      hot(115),
+      ev("ateMeal", 116, { nutrition: 0.25, ration: true }),
+    ]);
+    expect(t.result().messFill).toEqual({
+      serves: 2,
+      meanEaters: (MESS_FULL_EATERS + 1) / 2,
+      fewestEaters: 1,
+      fullServes: 1,
+    });
   });
 
   it("refuses an event past the run's last watch rather than dropping it", () => {
@@ -181,6 +250,15 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     const report = formatBeatsReport([result]);
     expect(report).toContain("# Beats: 1 day, 3 watches of 400 s");
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
+    // D83: the galley and dirt columns are in the report (their numbers are the tuning's).
+    for (const row of ["mealsServed", "eatenHot", "eatenRation", "mealsMissed", "roomsCleaned"]) {
+      expect(report).toContain(`| ${row} | `);
+    }
+    expect(report).toContain("| filthy rooms at watch end | ");
+    expect(report).toMatch(/Mess: \d+ meals? served/);
+    expect(report).toMatch(/Provisions at the end: \d+ crates, [\d.]+ days\./);
+    expect(report).toContain("| cooking | mopping |");
+    expect(Number.isFinite(result.provisionsDaysAtEnd)).toBe(true);
   }, 90_000);
 
   it("reports at least one handover at the helm in a one-day run (D77)", () => {
