@@ -472,12 +472,29 @@ function checkLandings(
   }
 }
 
+/**
+ * D61, D82: a station has no sky, so a dock whose port is a `station` carries no airborne dust.
+ * Grime and dust in [0, 1] are L1's (`dockDefSchema`).
+ */
+function checkStationDust(dock: DockDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const port = bundle.ports[dock.portId];
+  if (port?.setting !== "station" || dock.airborneDust === 0) return;
+  issues.push(
+    issue(
+      "physical",
+      [...dockPath(dock), "airborneDust"],
+      `"${dock.id}" is a station dock but has airborneDust ${dock.airborneDust}; a station has no sky (D61)`,
+    ),
+  );
+}
+
 /** L3 for one dock, against every deck in the bundle. */
 export function checkDockPhysical(
   dock: DockDef,
   bundle: ContentBundle,
   issues: ValidationIssue[],
 ): void {
+  checkStationDust(dock, bundle, issues);
   if (!checkGrid(dock, issues)) return;
   checkPlacements(dock, issues);
   const mask = dockWalkableMask(dock);

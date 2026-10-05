@@ -66,14 +66,22 @@ const deck = {
     placed("engine1", "machine.test.engine", 0),
     placed("pump1", "machine.test.pump", 1),
     placed("stove1", "machine.test.stove", 2),
-    placed("table1", "machine.test.table", 3),
+    // two tables of two seats each, in the middle row where every side is floor (D81)
+    { key: "table1", machineDefId: "machine.test.table", origin: { x: 3, y: 1 }, rotation: 0 },
+    { key: "table2", machineDefId: "machine.test.table", origin: { x: 6, y: 1 }, rotation: 0 },
     placed("bunk1", "machine.test.bunk", 4),
     placed("bunk2", "machine.test.bunk", 5),
     placed("helm1", "machine.test.helm", 6),
     placed("nav1", "machine.test.nav", 7),
   ],
   powerDomains: [{ key: "main", name: "Main bus" }],
-  zones: [{ key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 2, y: 2 }] }],
+  zones: [
+    { key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 2, y: 2 }] },
+    { key: "pantry", name: "Pantry", tags: ["pantry"], tiles: [{ x: 0, y: 2 }] },
+    // the stove's use tile is (2,1), so (1,1) is beside it
+    { key: "serving", name: "Serving", tags: ["serving"], tiles: [{ x: 1, y: 1 }] },
+    { key: "mops", name: "Mops", tags: ["cleaningLocker"], tiles: [{ x: 4, y: 2 }] },
+  ],
   docking: {
     cargoRampDoorKey: "ramp",
     personnelRampDoorKey: "personnel_ramp",
@@ -141,10 +149,24 @@ const helm = {
   ],
   operation: { requiresOperator: true, operatorSkill: { skill: "piloting", min: 3 } },
 };
+/** A stove with a `use` position for the cook, and tables seating two each (D81). */
+const SIDES = [
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+];
+const withUse = (name: string, tag: string, seats: number) => ({
+  ...inertMachine(name, tag),
+  interactionPositions: SIDES.slice(0, seats).map((offset, i) => ({
+    key: `use_${i}`,
+    offset,
+    purposes: ["use"],
+    capacity: 1,
+  })),
+});
 const furniture = [
   inertMachine("engine", "engine"),
-  inertMachine("stove", "stove"),
-  inertMachine("table", "messTable"),
+  withUse("stove", "stove", 1),
+  withUse("table", "messTable", 2),
   inertMachine("bunk", "bed"),
   helm,
   inertMachine("nav", "navStation"),
@@ -697,7 +719,7 @@ describe("bundle validation", () => {
       const badDeck = { ...deck, zones: [...deck.zones, locker] };
       const issues = referenceIssues({ ...bundle, decks: { [badDeck.id]: badDeck } });
       expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toEqual([
-        'decks.deck.test.main.zones.1.machineKey: zone "locker_1" names unknown machine placement "bunk9"',
+        'decks.deck.test.main.zones.4.machineKey: zone "locker_1" names unknown machine placement "bunk9"',
       ]);
     });
 

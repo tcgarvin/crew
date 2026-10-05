@@ -56,6 +56,11 @@
       "itemDefId": "item.ration_pack",
       "count": 60,
       "price": 10
+    },
+    {
+      "itemDefId": "item.provisions",
+      "count": 6,
+      "price": 55
     }
   ],
   "jobTemplates": [

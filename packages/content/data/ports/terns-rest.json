@@ -48,6 +48,11 @@
       "price": 12
     },
     {
+      "itemDefId": "item.provisions",
+      "count": 4,
+      "price": 70
+    },
+    {
       "itemDefId": "item.coolant_canister",
       "count": 1,
       "price": 95

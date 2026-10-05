@@ -53,6 +53,11 @@
       "price": 9
     },
     {
+      "itemDefId": "item.provisions",
+      "count": 6,
+      "price": 50
+    },
+    {
       "itemDefId": "item.spare_parts_stack",
       "count": 0,
       "price": 240
