@@ -20,9 +20,9 @@ the door). Every bunk has a one-tile `locker` zone whose `machineKey` names it. 
 points, none on a machine or an interaction tile; the relief pilot's is in the bunkroom.
 
 Reserved: bridge tiles (29,1) and (29,4) are floor with nothing on them, held for the later
-stations (ship life §6). The furniture other than the helm, stove, bunks and the machines
-carried over from Mk1 is inert in slice 1 (nothing uses it yet); the nav terminal, ops terminal,
-vid screen and engineering console draw a little `domestic` power.
+stations (ship life §6). The nav terminal, ops terminal, vid screen and engineering console draw
+a little `domestic` power. The off-watch furniture placed in slice 1 is used from slice 4 (D84):
+see "Off watch" below the map.
 
 ```
 Freighter Mk2 (deck.freighter_mk2)
@@ -123,3 +123,23 @@ Machines (33):
   exercise_rig_1: machine.exercise_rig @ (25,15) rot=0
   cargo_crane_1: machine.cargo_crane @ (15,18) rot=0
 ```
+
+## Off watch
+
+Where each activity in `data/activities/` is held on this deck (D84): the venue alternatives the
+deck has, in each activity's order (the sim takes the first present; ship life plan, slice 4 call
+12). The validator (`validate-venues.ts`) checks that a scenario's deck hosts every activity and
+that each venue seats the activity's `participants.max`; regenerate this list after a layout or
+activity change.
+
+- **Lounge**: cards (`games_table_1`, four seats; the lounge floor if the table is gone), board
+  game (games table), vids and video game (`vid_screen_1`, four places), debate, music, reading
+  (for anyone without a desk of their own), stargazing (`viewport`, two tiles; in transit only).
+- **Mess**: debate and music, when the lounge is not on the deck.
+- **Gym**: working out (`exercise_rig_1`), sparring (`sparring_mat`, four tiles).
+- **Captain's Cabin**, **First Officer's Cabin**: reading at one's own desk.
+- **Engineering**: tinkering (`workbench_1`, two places).
+- **Galley**: baking (`galley_stove_1`); the treats go on the `serving` zone.
+
+Books (`item.book` × 3) start on the `book_shelf` zone in the lounge and go back there after
+reading; the harmonica lives in Bettina's locker beside her bunk.

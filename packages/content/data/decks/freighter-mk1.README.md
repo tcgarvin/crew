@@ -20,6 +20,13 @@ The old `galley_counter` zone is now only the stove's own tiles, so it no longer
 Both ramps open in the south hull (`personnel_ramp` from the airlock, `cargo_ramp` from the
 cargo hold), so a dock map can treat the ship's south flank as the quay (Dockside §3.2).
 
+Off watch (D84), Mk1 hosts three activities, all in the galley and mess: debate, music and
+baking. It has no lounge, gym, games table, vid screen, exercise rig, workbench, desk, book
+shelf, sparring mat or viewport, so cards, board game, vids, video game, working out, sparring,
+reading, tinkering and stargazing are never offered aboard. `crew content validate` lists these
+as notes, not failures, because no scenario sails Mk1; a scenario on this deck would make each
+one an error until the deck gains a venue for it.
+
 ```
 Freighter Mk1 (deck.freighter_mk1)
 32 x 18 tiles

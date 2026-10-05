@@ -5,6 +5,6 @@
   "weights": {
     "orderFreedom": -1,
     "faithReason": 0,
-    "loyaltyAmbition": 0.5
+    "loyaltyAmbition": -0.5
   }
 }
