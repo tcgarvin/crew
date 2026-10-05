@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { cmd, tinyTestWorld } from "./fixtures/test-world";
-import { tinyContent } from "./fixtures/tiny-content";
+import { TINY, tinyConfig, tinyContent, tinyEffectiveConfig } from "./fixtures/tiny-content";
+import { createKernel } from "./kernel";
+import { createRegistry } from "./registry";
 import { SaveCompatibilityError, migrateState, restore, serialize } from "./save";
+import type { ContentBundle } from "./types/content";
+import type { ItemDefId } from "./types/ids";
 import { SIM_VERSION } from "./types/save";
 import { SCHEMA_VERSION } from "./types/state";
 
@@ -150,6 +154,125 @@ describe("serialize / restore", () => {
       owner: "watch",
       payload: { machineId: "m1", post: "watch" },
     });
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(60);
+  });
+
+  it("migrates a schema-8 save to 9: dirt zeroed, boots, the galley's bookkeeping, and the scenario's provisions and mop stowed (D81-D83)", () => {
+    const PROVISIONS = "item.tiny.provisions" as ItemDefId;
+    const MOP = "item.tiny.mop" as ItemDefId;
+    // The tiny content with a pantry and a cleaning locker stocked by the scenario.
+    const galleyContent = (): ContentBundle => {
+      const base = tinyContent(tinyConfig());
+      const deck = base.decks[TINY.deck];
+      const scenario = base.scenarios[TINY.scenario];
+      if (deck === undefined || scenario === undefined) throw new Error("tiny content");
+      return {
+        ...base,
+        decks: {
+          [TINY.deck]: {
+            ...deck,
+            zones: [
+              ...deck.zones,
+              { key: "pantry", name: "Pantry", tags: ["pantry"], tiles: [{ x: 2, y: 3 }] },
+              {
+                key: "cleaning_locker",
+                name: "Cleaning Locker",
+                tags: ["cleaningLocker"],
+                tiles: [{ x: 1, y: 3 }],
+              },
+            ],
+          },
+        },
+        items: {
+          ...base.items,
+          [PROVISIONS]: {
+            id: PROVISIONS,
+            name: "Provisions",
+            stacking: "stackable",
+            maxStack: 2,
+            tags: ["provisions"],
+            toolKinds: [],
+            mass: 2,
+          },
+          [MOP]: {
+            id: MOP,
+            name: "Mop",
+            stacking: "unique",
+            maxStack: 1,
+            tags: ["tool"],
+            toolKinds: ["mop"],
+            mass: 1,
+          },
+        },
+        scenarios: {
+          [TINY.scenario]: {
+            ...scenario,
+            startingItems: [
+              ...scenario.startingItems,
+              { itemDefId: PROVISIONS, count: 3, zoneKey: "pantry" },
+              { itemDefId: MOP, count: 1, zoneKey: "cleaning_locker" },
+            ],
+          },
+        },
+      };
+    };
+    const registry = createRegistry();
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(TINY.scenario, 42, galleyContent(), tinyEffectiveConfig());
+    kernel.advance(world, 40);
+    const envelope = serialize(world);
+    type Json = Record<string, unknown>;
+    const at = (value: unknown, key: string) => (value as Json)[key] as Json;
+    const strip = (value: Json, key: string) => {
+      const { [key]: _gone, ...rest } = value;
+      return rest;
+    };
+    // Schema 8's shape: no dirt or galley slice, no boots, and no galley stores aboard.
+    const raw = JSON.parse(JSON.stringify(envelope.state)) as Json;
+    raw.schemaVersion = 8;
+    const stripped = strip(strip(raw, "dirt"), "galley");
+    stripped.actors = Object.fromEntries(
+      Object.entries(at(raw, "actors")).map(([id, actor]) => [id, strip(actor as Json, "boots")]),
+    );
+    const items = at(raw, "items");
+    stripped.items = Object.fromEntries(
+      Object.entries(items).filter(([, item]) => {
+        const defId = (item as Json).defId;
+        return defId !== PROVISIONS && defId !== MOP;
+      }),
+    );
+    const old = { ...envelope, schemaVersion: 8, state: stripped } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const state = restored.state;
+    const deck = world.content.decks[TINY.deck];
+    if (deck === undefined) throw new Error("no deck");
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.dirt.cells[TINY.deck]).toEqual(new Array(deck.width * deck.height).fill(0));
+    expect(state.dirt.tiers).toEqual({});
+    expect(state.dirt.dustThisVisit).toBe(0);
+    expect(state.galley).toEqual({ lastMealWatch: 0 });
+    for (const actor of Object.values(state.actors)) expect(actor.boots).toBe(0);
+    // The stores came back in their zones, as fresh items below the moved counter.
+    const stores = Object.values(state.items).filter(
+      (item) => item.defId === PROVISIONS || item.defId === MOP,
+    );
+    const pantry = deck.zones.find((z) => z.key === "pantry")?.tiles ?? [];
+    const locker = deck.zones.find((z) => z.key === "cleaning_locker")?.tiles ?? [];
+    const crates = stores.filter((i) => i.defId === PROVISIONS);
+    expect(crates.reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0)).toBe(3);
+    for (const crate of crates) {
+      const at = crate.location;
+      if (at.kind !== "onDeck") throw new Error("crate not on deck");
+      expect(pantry).toContainEqual({ x: Math.floor(at.x), y: Math.floor(at.y) });
+    }
+    const mop = stores.find((i) => i.defId === MOP);
+    if (mop?.location.kind !== "onDeck") throw new Error("no mop on deck");
+    expect(locker).toContainEqual({ x: Math.floor(mop.location.x), y: Math.floor(mop.location.y) });
+    // Two crate stacks and the mop took three fresh ids off the save's own counter.
+    expect(state.nextId.item).toBe(envelope.state.nextId.item + 3);
+    expect(restored.warnings.some((w) => /predates the galley/.test(w))).toBe(true);
     kernel.advance(restored, 20);
     expect(restored.state.tick).toBe(60);
   });

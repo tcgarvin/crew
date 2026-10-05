@@ -1,12 +1,13 @@
 /**
  * Tap-to-select (D68): what a tap at a deck-frame point selects in the picture as drawn. People
  * first, crew and the dock's locals alike, the nearest within reach; then the ship's items, the
- * staging call's props, machines, and last a dock post or bare dock floor. A person standing at a
- * post is what a tap there means, so the post never takes the tap from them.
+ * staging call's props, machines, bare deck floor (its room, D82), and last a dock post or bare
+ * dock floor. A person standing at a post is what a tap there means, so the post never takes the
+ * tap from them.
  */
 import type { DockDef, RenderFrame } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
-import { berthInView } from "./dock";
+import { berthInView, isShipTile } from "./dock";
 import { dockTargetAt } from "./dockHit";
 import { type DrawSelection, deckPiles } from "./draw";
 import { dockPropKey } from "./locals";
@@ -72,6 +73,18 @@ function machineAt(
   return undefined;
 }
 
+/** D82: the room whose floor tile (x, y) is on, or `undefined` off the ship or on void. */
+export function roomAt(
+  layout: Pick<DeckLayout, "width" | "height" | "tiles">,
+  x: number,
+  y: number,
+): DrawSelection | undefined {
+  // Bounds first: indexing by y * width + x would wrap an off-ship point into another row.
+  if (!isShipTile(layout, x, y)) return undefined;
+  const key = layout.tiles[Math.floor(y) * layout.width + Math.floor(x)]?.compartmentKey;
+  return key === undefined ? undefined : { kind: "room", id: key };
+}
+
 /**
  * What a tap at deck-frame (x, y) selects. `shown` is the frame as drawn (`withDockSlide`), so
  * people and things on a sliding dock are hit where they appear; `slide` is that slide, removed
@@ -98,6 +111,8 @@ export function pickAt(
   if (prop !== undefined) return { kind: "dockProp", id: prop.key };
   const machine = machineAt(shown, layout, x, y);
   if (machine !== undefined) return machine;
+  const room = roomAt(layout, x, y);
+  if (room !== undefined) return room;
   return dock === undefined
     ? undefined
     : dockTargetAt(berthInView(dock, layout), layout, x - slide, y);

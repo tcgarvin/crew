@@ -30,6 +30,7 @@ import type { EventDraft } from "../../core/types/events";
 import type { ActorId, MachineId, TaskId } from "../../core/types/ids";
 import type { WorldState } from "../../core/types/state";
 import type { Task } from "../../core/types/work";
+import { depositDirt } from "../dirt/deposit";
 import { DIAGNOSE_SECONDS, REPAIR_CONDITION_RESTORE } from "./equipment";
 import { raiseProblem, resolveProblem } from "./problems";
 import { clamp, machineEvent } from "./util";
@@ -145,6 +146,20 @@ function advanceRepair(ctx: RecipeCtx, task: Task, actorId: ActorId, ticks: numb
         1,
       );
       events.push(machineEvent("faultRepaired", machineId, { machineId, faultKey }));
+      // D82: a repair leaves its mess round the machine (its placement's origin tile).
+      const origin = ctx.content.decks[machine.deckId]?.machines.find(
+        (p) => p.key === machine.placementKey,
+      )?.origin;
+      if (origin !== undefined) {
+        depositDirt(
+          ctx.state,
+          ctx.content,
+          ctx.config,
+          machine.deckId,
+          origin,
+          ctx.config.dirt.deposits.repair,
+        );
+      }
       const resolved = resolveProblem(ctx.state, `machineFault:${machineId}:${faultKey}`);
       if (resolved !== undefined) events.push(resolved);
       return { status: "recipeComplete", events };

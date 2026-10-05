@@ -36,8 +36,8 @@
     "bedtimeAbove": 0.3,
     "initialRange": {
       "hunger": {
-        "min": 0.2,
-        "max": 0.6
+        "min": 0,
+        "max": 0.2
       },
       "fatigue": {
         "min": 0.1,
@@ -67,7 +67,8 @@
     "needSurvivalAbove": 0.9,
     "heatContainmentAbove": 0.7,
     "heatSurvivalAbove": 0.9,
-    "routineAgingDays": 0.075
+    "routineAgingDays": 0.075,
+    "cleaningAgingDays": 0.25
   },
   "equipment": {
     "hazardScale": 1,
@@ -131,8 +132,8 @@
     },
     "sparesReserve": 3,
     "foodReserve": {
-      "lowBelowDays": 2,
-      "restockToDays": 5
+      "lowBelowDays": 1,
+      "restockToDays": 2
     },
     "market": {
       "priceTiers": {
@@ -171,7 +172,14 @@
     "localSaveEverySeconds": 10,
     "remoteSaveEverySeconds": 60,
     "frameEveryTicks": 2,
-    "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
+    "slowDownOnEvents": [
+      "navHazard",
+      "helmUnattended",
+      "driftingChanged",
+      "shipLimping",
+      "roomFilthy"
+    ],
+    "dirtFrameEverySeconds": 5
   },
   "watches": {
     "dayworkerOnWatches": [0, 1],
@@ -190,6 +198,47 @@
     "highAbove": 0.4,
     "lowWorkSpeed": 0.9,
     "highWorkSpeed": 1.05
+  },
+  "galley": {
+    "mealLeadDays": 0.08,
+    "mealGraceDays": 0.1,
+    "cookSeconds": 30,
+    "substituteAfterDays": 0.025,
+    "spareServings": 1,
+    "servingsPerCrate": 12,
+    "mealSpoilDays": 0.25,
+    "mealCallHungerAbove": 0.1,
+    "lowBelowDays": 2,
+    "restockToDays": 5,
+    "goodCookingAbove": 6,
+    "poorCookingBelow": 3
+  },
+  "dirt": {
+    "footfallPerStep": 0.01,
+    "bootsPickup": 0.15,
+    "bootsShed": 0.25,
+    "dockGrimePerStep": 0.08,
+    "airborneDustPerDay": 0.5,
+    "airborneDustRadiusTiles": 6,
+    "airborneDustVisitCap": 0.3,
+    "deposits": {
+      "cooking": 0.04,
+      "serving": 0.03,
+      "eating": 0.02,
+      "spoiledMeal": 0.08,
+      "repair": 0.05,
+      "cargo": 0.03
+    },
+    "depositRadiusTiles": 1,
+    "roomMaxWeight": 0.3,
+    "tiers": { "untidy": 0.12, "dirty": 0.3, "filthy": 0.55 },
+    "tierHysteresis": 0.05,
+    "mopPerTile": 1,
+    "mopSecondsPerTile": 2,
+    "mopTilesPerTrip": 12,
+    "updateEverySeconds": 1,
+    "tintScale": 1.2,
+    "tintMaxAlpha": 0.35
   },
   "hazards": {
     "difficulty": { "easy": 3, "hard": 5, "brutal": 7 },

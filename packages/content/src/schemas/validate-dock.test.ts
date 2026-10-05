@@ -308,6 +308,38 @@ describe("quay row (D72)", () => {
   });
 });
 
+describe("dock grime and dust (D61, D82)", () => {
+  const TERNS = "dock.terns_rest";
+  const dust = (dockId: string, value: number): string[] =>
+    messagesAfter((_, raw) => {
+      (raw.docks?.[dockId] as MutableDock).airborneDust = value;
+    });
+
+  it("rejects airborne dust on a station's dock", () => {
+    expect(dust(HUB, 0.1)).toEqual([
+      `docks.${HUB}.airborneDust: "${HUB}" is a station dock but has airborneDust 0.1; a station has no sky (D61)`,
+    ]);
+  });
+
+  it("allows airborne dust on a planet's dock", () => {
+    expect(dust(TERNS, 0.9)).toEqual([]);
+  });
+
+  it("allows grime on a station's dock", () => {
+    const messages = messagesAfter((dock) => {
+      dock.grime = 0.9;
+    });
+    expect(messages).toEqual([]);
+  });
+
+  it.each(["grime", "airborneDust"] as const)("rejects %s outside [0, 1]", (field) => {
+    const messages = messagesAfter((dock) => {
+      dock[field] = 1.5;
+    });
+    expect(messages.some((m) => m.includes(field))).toBe(true);
+  });
+});
+
 describe("dockWalkableMask", () => {
   it("is floor under no blocking prop", () => {
     const dock = {

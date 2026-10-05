@@ -23,14 +23,25 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["tool", "consumable", "food", "spare", "cargo", "medical", "container", "personal"]
+        "enum": [
+          "tool",
+          "consumable",
+          "food",
+          "spare",
+          "cargo",
+          "medical",
+          "container",
+          "personal",
+          "provisions",
+          "meal"
+        ]
       }
     },
     "toolKinds": {
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+        "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck", "mop"]
       }
     },
     "mass": {

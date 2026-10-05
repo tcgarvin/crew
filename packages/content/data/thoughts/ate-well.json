@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "ateWell",
+  "label": "ate well",
+  "value": 0.1,
+  "durationDays": 0.3,
+  "stacks": false
+}

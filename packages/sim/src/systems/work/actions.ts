@@ -42,6 +42,7 @@ export function actionFor(ctx: StepCtx, task: Task | undefined, step: ActivitySt
     case "buy":
       return makeAction("pickUp", "reaching", tick);
     case "stowBought":
+    case "serve":
       return makeAction("putDown", "placing", tick);
     case "parkTruck":
       return makeAction("putDown", "placing", tick, step.truckId);

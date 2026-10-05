@@ -43,6 +43,13 @@ describe("buildCapabilities", () => {
     expect(text).toContain("One offer per call.");
   });
 
+  it("says under stockMarket that provisions are an item it may stock, by id (D81)", () => {
+    const stock = text.split("## 5. stockMarket")[1]?.split("## 6.")[0] ?? "";
+    expect(stock).toContain(
+      "- Provisions are an item like any other (item.provisions): stock them where the galley should restock",
+    );
+  });
+
   it("derives fault windows and spawn limits from config", () => {
     const max = req.snapshot.config.narrator.maxFaultWindowSeconds;
     expect(text).toContain(`muchLater (${Math.round((2 * max) / 3)}s-${Math.round(max)}s)`);

@@ -30,6 +30,13 @@ import {
 } from "@crew/sim";
 import { onDockLines, personLine, stagingDockLines } from "./dockside-digest";
 import {
+  compartmentDirtyDetail,
+  dirtLine,
+  galleyLine,
+  isProvisions,
+  provisionsReserveDetail,
+} from "./galley-digest";
+import {
   type Snapshot,
   type State,
   faultDiscovery,
@@ -216,6 +223,11 @@ function shipSection(
   lines.push(watchLine(state, content, snapshot.config));
   lines.push(...helmEventLines(recentEvents, state, content, snapshot.config));
   lines.push(`money: ${state.money.balance} credits`);
+  // D81-D83: the galley (counter, next meal, provisions) and any room at dirty or worse.
+  const galley = galleyLine(state, content, snapshot.config);
+  if (galley !== undefined) lines.push(galley);
+  const dirt = dirtLine(state, content);
+  if (dirt !== undefined) lines.push(dirt);
   if (t.stage === "docked") {
     // D47: what is on sale here, with prices (this is private to the model; cards carry no numbers).
     lines.push(`market here: ${marketHereLine(state, content, t.portId)}`);
@@ -470,11 +482,21 @@ function machineSection(state: State, content: ContentBundle, tickRate: number):
   return section("Machines", lines, 8);
 }
 
-function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBundle): string {
+function problemLine(p: DeepReadonly<Problem>, snapshot: Snapshot, content: ContentBundle): string {
+  const state = snapshot.state;
   const base = `- ${p.kind} (${p.visibility}) since tick ${p.createdTick}`;
   if (p.kind === "reserveLow") {
+    const reason = partsReason(state, content, p.payload.itemDefId);
+    // D81: provisions are the galley's stores, counted in days of meals.
+    if (isProvisions(content, p.payload.itemDefId)) {
+      return `${base}: ${provisionsReserveDetail(state, content, snapshot.config, p.payload.count, reason)}`;
+    }
     // D80: routine restocking at a port that sells it; nothing is broken.
-    return `${base}: the ship's stores are low; ${p.payload.count}x ${itemName(content, p.payload.itemDefId)} would restock them; ${partsReason(state, content, p.payload.itemDefId)}`;
+    return `${base}: the ship's stores are low; ${p.payload.count}x ${itemName(content, p.payload.itemDefId)} would restock them; ${reason}`;
+  }
+  if (p.kind === "compartmentDirty") {
+    // D82: the ship's own failing, and who is mopping it, if anyone.
+    return `${base}: ${compartmentDirtyDetail(state, content, p)}`;
   }
   if (p.kind !== "partsNeeded") return base;
   // D47: the stalled repair and what would unstick it, so the model can stock a market or tell
@@ -484,11 +506,11 @@ function problemLine(p: DeepReadonly<Problem>, state: State, content: ContentBun
   return `${base}: ${who} needs ${p.payload.count}x ${itemName(content, p.payload.itemDefId)}; ${partsReason(state, content, p.payload.itemDefId)}`;
 }
 
-function problemSection(state: State, content: ContentBundle): Section {
-  const lines = Object.values(state.work.problems)
+function problemSection(snapshot: Snapshot, content: ContentBundle): Section {
+  const lines = Object.values(snapshot.state.work.problems)
     .filter((p) => p.status === "open")
     .sort((a, b) => a.createdTick - b.createdTick || a.id.localeCompare(b.id))
-    .map((p) => problemLine(p, state, content));
+    .map((p) => problemLine(p, snapshot, content));
   return section("Open problems", lines, 4);
 }
 
@@ -739,7 +761,7 @@ export function buildDigest(
     cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),
     ...dockSections(state, content),
-    problemSection(state, content),
+    problemSection(snapshot, content),
     eventSection(recentEvents, state, content),
   ];
 

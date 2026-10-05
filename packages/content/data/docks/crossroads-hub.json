@@ -251,5 +251,7 @@
       }
     }
   ],
-  "ambience": "Announcements every ninety seconds, the queue board flickering amber over the ramps, and somebody else's freight stacked wherever it fits."
+  "ambience": "Announcements every ninety seconds, the queue board flickering amber over the ramps, and somebody else's freight stacked wherever it fits.",
+  "grime": 0.2,
+  "airborneDust": 0
 }

@@ -22,6 +22,7 @@ import {
   positiveInt,
   rotationSchema,
   tileCoordSchema,
+  unitInterval,
 } from "./primitives";
 
 export const dockTileKindSchema = z.enum(["floor", "wall", "void"]);
@@ -115,6 +116,9 @@ export const dockDefSchema = z.strictObject({
     }),
   ),
   ambience: z.string().min(1),
+  /** D82: how much the floor loads boots, and whether the air settles on the deck (L3: a station's is 0). */
+  grime: unitInterval,
+  airborneDust: unitInterval,
 }) satisfies z.ZodType<DockDef>;
 
 // Drift guards against the sim vocabularies: each must resolve to `true`.

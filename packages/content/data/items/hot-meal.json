@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.hot_meal",
+  "name": "Hot Meal",
+  "stacking": "stackable",
+  "maxStack": 20,
+  "tags": ["food", "consumable", "meal"],
+  "toolKinds": [],
+  "mass": 0.5,
+  "nutrition": 0.4
+}

@@ -37,6 +37,7 @@ import type { DeepReadonly, LocationRef, Seconds, Tick, TileCoord } from "./comm
 import type {
   ConfigDef,
   ContentBundle,
+  DirtTier,
   DockAreaKind,
   ItemCount,
   RecipeActionKind,
@@ -46,6 +47,7 @@ import type {
 import type {
   ActorId,
   ClaimId,
+  CompartmentId,
   DecisionId,
   DockDefId,
   DoorId,
@@ -82,9 +84,10 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
 
 /**
  * Which system created a problem and is responsible for resolving it. D77: the watch owns
- * `stationToStaff` (the helm's watch and relief posts).
+ * `stationToStaff` (the helm's watch and relief posts); D81: the galley owns `mealToCook` and
+ * `mealToCarry`; D82: dirt owns `compartmentDirty`.
  */
-export type ProblemOwner = "equipment" | "travel" | "commerce" | "watch";
+export type ProblemOwner = "equipment" | "travel" | "commerce" | "watch" | "galley" | "dirt";
 
 /**
  * Who can see a problem in their AgentView.
@@ -133,6 +136,24 @@ export interface ProblemPayloads {
    * derives the same `buyParts` task `partsNeeded` does. Routine: nothing is broken yet.
    */
   reserveLow: { itemDefId: ItemDefId; count: number };
+  /**
+   * D81: the meal for watch `watchIndex` (`watchIndexAt`) is to be cooked and served before its
+   * bell. Owner: galley (dedupe `meal:<watchIndex>`, public, routine); derives one `cookMeal`
+   * task at the stove; resolved at the serve, cancelled with `mealMissed` at the grace.
+   */
+  mealToCook: { watchIndex: number };
+  /**
+   * D81: a serving is to be carried to `toActorId`, who holds the helm `machineId` and cannot
+   * leave the seat. Owner: galley; derives one `carryMeal` task to the helm's standby tile.
+   */
+  mealToCarry: { toActorId: ActorId; machineId: MachineId };
+  /**
+   * D82: the room `key` (`CompartmentDef.key`, instance `compartmentId`) is at `tier` (`dirty` or
+   * `filthy`). Owner: dirt (dedupe `dirty:<key>`, public); `baseUrgency` routine, essential
+   * while `filthy` and the room is a galley or infirmary; revised on each tier change. Derives one
+   * `cleanCompartment` task over the room's dirtiest tiles; resolved below `untidy`.
+   */
+  compartmentDirty: { compartmentId: CompartmentId; key: LocalKey; tier: DirtTier };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -171,6 +192,12 @@ export const TASK_TYPES = [
   "buyParts",
   /** D78: plot the planned course at the `navStation` machine (`courseToPlot`). */
   "plotCourse",
+  /** D81: cook and serve the watch's meal at the stove (`mealToCook`). */
+  "cookMeal",
+  /** D81: carry a serving to the helm-stander's standby tile (`mealToCarry`). */
+  "carryMeal",
+  /** D82: mop a room's dirtiest tiles with the mop (`compartmentDirty`). */
+  "cleanCompartment",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -182,7 +209,9 @@ export type TaskTarget =
   | { kind: "item"; itemId: ItemId }
   | { kind: "door"; doorId: DoorId }
   /** D80: a purchase for the ship's stores, at this port's market (no machine waits on it). */
-  | { kind: "market"; portId: PortDefId };
+  | { kind: "market"; portId: PortDefId }
+  /** D82: a room to be cleaned (`cleanCompartment`); its tiles are the task's `interactionTiles`. */
+  | { kind: "compartment"; compartmentId: CompartmentId };
 
 /**
  * Where the task's physical progress lives (SD §14.4). The task holds a reference, never the
@@ -195,7 +224,11 @@ export type ProgressRef =
   /** Staffing has no accumulated progress; it is satisfied while occupied. */
   | { kind: "occupancy"; machineId: MachineId }
   /** D47: a purchase has no accumulated progress; the units land aboard at the commit point. */
-  | { kind: "market"; portId: PortDefId; itemDefId: ItemDefId; count: number };
+  | { kind: "market"; portId: PortDefId; itemDefId: ItemDefId; count: number }
+  /** D81: a meal is served or not; the servings on the counter are the progress. */
+  | { kind: "meal"; watchIndex: number }
+  /** D82: a room's dirt is its own progress (`WorldState.dirt.cells`). */
+  | { kind: "room"; compartmentId: CompartmentId };
 
 /** SD §14.7 structured blockage reasons. */
 export const BLOCKAGE_REASONS = [
@@ -410,7 +443,11 @@ export type WorkStageKey =
   /** D78: plotting a course at the nav terminal. */
   | "plot"
   /** D77: a stop on a round. */
-  | "rounds";
+  | "rounds"
+  /** D81: cooking at the stove (`galley/cook.ts` `runCook`). */
+  | "cook"
+  /** D82: mopping one tile (`dirt/clean.ts` `runMop`). */
+  | "mop";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
 export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway";
@@ -429,6 +466,12 @@ export type ActivityStep =
   | { kind: "consume"; itemId: ItemId }
   /** Put a carried item down here (deck floor, or a port store across the cargo ramp). */
   | { kind: "putDown"; itemId: ItemId }
+  /**
+   * D81 commit point: the carried crate of provisions is consumed and the watch's servings spawn
+   * at the cook's feet (on the `serving` zone), each with `Item.meal`, and every crew member
+   * aboard is told where they are (the mess call); `mealToCook` resolves.
+   */
+  | { kind: "serve" }
   /**
    * D47 commit point: buy up to `count` of `itemDefId` from the market of `portId` (the ship must
    * be docked there and the actor at the counter: a cargo transfer tile, or since D63 the dock's

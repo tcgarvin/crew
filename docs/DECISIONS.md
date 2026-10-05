@@ -1412,3 +1412,112 @@ at 390 px a crowded handover label can cover the BRIDGE plate; rounds sometimes 
 through the airlock and along the dock; the narrator's hourly cap (30) still stalls 8× play after
 about six minutes (D69); dayworkers are idle about half the time until slice 3 gives the cook and
 medic work.
+
+**D81. Mess call: the galley cooks before each bell.** Before each bell the galley raises
+`mealToCook` for the coming watch (`bell − mealLeadDays`, 0.08). Its one `cookMeal` task is the
+cook's at any hour, off duty included, and anyone with cooking ≥ 1 may take it once it is
+`substituteAfterDays` (0.025) old. The cook splits one crate of provisions off the nearest known
+stack, cooks at the stove at her skill rate, and serves `eaters + spareServings` plates, never
+more than a crate makes, on the serving counter; the crate is used up whatever it served. Quality
+comes from the cook's skill (good ≥ 6, poor < 3), one step lower in a dirty galley, and is fixed
+on the plate; the crew are told where it is. A meal not served by `mealGraceDays` is missed and
+the ticker says so. The mess call is a routine eat candidate above `mealCallHungerAbove` (0.1) for
+anyone not on watch and for the gangway stander, whose post waits until they have eaten; the
+section on watch eats after the bell; bedtime waits while the call stands, so the off-going
+section eats before it turns in and nobody wakes to a spoiled plate; pressing tiredness still
+sleeps. Nobody is pulled off routine work or a sleep. Eating takes a free mess seat (the counter
+is in the galley), a ration in hand does not answer the call, and the plan carries `meal` across a
+split. Thoughts: "ate well" (good), "burnt dinner" (poor), "ate a ration pack", plus one for a
+dirty or filthy room. While someone holds the helm hungry with no plate in reach, `mealToCarry`
+sends the cook or a dayworker (anyone once `routineAgingDays` old) to set one at the standby; the
+stander eats it in the seat, so hold, relief and vacancy never notice. Plates spoil after
+`mealSpoilDays` (0.25) and dirty the counter. *Provisions* (the gate's reconciliation with D80):
+slice 3 adds no `provisionsLow` problem; D80's `reserveLow` is the ship's one way of restocking,
+so provisions are a second reserve in `commerce/reserve.ts`, bought only while docked where a
+market stocks them, and every port market lists them. They are counted a crate a meal
+(`provisionsDays` = crates over `watchesPerDay`, plus the counter as a fraction of a meal): a
+servings count read eight days for a six-day pantry and the ship ran dry without ever asking a
+market. They are bought under `galley.lowBelowDays` (2) up to `restockToDays` (5); `provisionsLow`
+is a narrative event said at the serve that takes the crates under the mark. Rations (any `food`
+without a `meal`) keep D80's hunger-days rule as the fallback: counting both in one number would
+let a hold of rations hide an empty pantry. The scenario stows 18 crates and 60 ration packs (from
+220) with `commerce.foodReserve` at 1/2 days, so provisions are the food the ship buys; the crew
+start fed (`initialRange.hunger` 0–0.2). *Found at tuning:* a toolkit seen on Kessler's dock
+stayed "on the dock" in every belief after sailing, the repair plan fetched it as the nearest
+wrench by distance and retried for two days while a toolkit lay beside the generator, and the ship
+drifted; `supplySteps` now ranks tools and stock by the schematic walk and skips what it cannot
+route to, as the planner already did. Measured over three days (seed 1, both scenarios): 9 meals,
+none missed, none spoiled, 87 eaten hot and 2–3 rations (from 81–82 and 21–23, with 3 spoiled),
+6.7–7.0 at the counter within 0.05 day of the serve and 8–9 of 9 serves filling the mess (from
+4.7–5.0 and 3–5), nobody above essential hunger; over eight days the plain ship buys provisions
+twice and makes seven voyages.
+
+**D82. Dirt: one grid per deck, rooms as the unit, a mop by role.** One quantised grid per deck in
+state (0–255 per authored tile; dock floor and machine footprints take none). Movement tracks
+footfall and boots: a dock tile loads the boots by its `grime`; a deck tile gains
+`footfallPerStep` (0.01) plus a share of the boots' load, then the boots take a share of the
+tile's dirt, a transfer, so walking carries dirt in a fading trail from the ramp and never
+multiplies it. Everything else deposits through `depositDirt`, shared over the floor round a tile
+within its room (cooking, serving, eating, a spoiled plate, a repair, a crate set down). Dust
+settles near an open ramp while docked, falling with distance, up to a per-visit cap reset on
+undocking; a station's dock has none (D61). Rooms are the unit: `roomDirt` is the mean weighted
+toward the worst tile; tiers clean/untidy/dirty/filthy (0.12/0.3/0.55) rise at the thresholds and
+fall with hysteresis (0.05), one event per transition; `roomFilthy` slows fast-forward.
+`compartmentDirty` opens at dirty (routine; essential while a galley or infirmary is filthy) and
+derives one mop task over the room's twelve dirtiest tiles, walked nearest first from the cleaning
+locker: dirtiest first zigzagged a sixty-tile corridor and spent most of the trip walking. A trip
+fetches the mop, mops, puts the mop back, then settles: clean resolves with `roomCleaned`,
+otherwise the next trip re-derives; it never resolves mid-trip, so the mop always goes home, and
+the mopper's boots are wiped after each tile. Who mops: rooms by role (`cleaningRolesFor`: cook →
+galley and mess; deckhand → hold, corridor, gym, airlock; engineer → engineering; medic →
+infirmary; the bridge its officers), anyone on duty once the problem is
+`urgency.cleaningAgingDays` (0.25) old, a knob of its own because `routineAgingDays` (90 s) made
+every room everyone's within a trip, and anyone when essential. Routine class, so on-duty crew
+with nothing to do mop before rounds and off-duty crew never start. The renderer's tint rides its
+own tick-keyed channel (`dirt` messages every `host.dirtFrameEverySeconds`, applied at the view
+tick, never ahead of it, D14); a tap on bare floor inspects the room's tier, mean, worst tile and
+mopper. Measured over six days (seed 1): a room goes dirty 0.8–1.0 times a day (corridor,
+cross-passage, mess, airlock), filthy never, cleaned 0.5 a day, mopping 4.3–5.6 % of on-duty time,
+with the deckhands on the corridor and the cook on the mess; at the plan's 0.004 footfall nothing
+went dirty in six days.
+
+**D83. Schema 9, the digest's galley and dirt, and `crew beats` as the instrument.** Save schema 9
+migrates 8: dirt zeroed per deck, boots, the galley's bookkeeping, and the scenario's provisions
+and mop spawned into their zones so an old save cooks tonight, said in `warnings`
+(`MigrationContext.warn`). The Ship section gains a `galley:` line (plates on the counter with
+quality and cook; the next meal at the bell and who is cooking while `mealToCook` is open;
+provisions in crates and days) and a `dirt:` line only while some room is dirty or worse, filthy
+first; a provisions `reserveLow` reads "provisions are low (about N days of meals left); K crates
+would restock the galley"; `compartmentDirty` reads "<Room> is <tier>; <who> mopping" or "nobody
+is mopping it yet, the deckhand's to mop" through D82's one table. Prompt v0.22 adds galley and
+dirt paragraphs, `quietTooLong` may make a meal the beat, and `stockMarket` names the provisions
+item. `crew beats` counts per watch meals served, eaten hot and as rations, missed, spoiled, rooms
+filthy and mopped, dirty and filthy rooms at the watch's end, the mess fill (hot eaters within
+0.05 day of each serve, serves reaching six), cooking and mopping shares, and provisions at the
+end; it is what the tuning commit answered to, with its one-day pin at three meals served and none
+missed. The integration found the fullSim departure-prep failure was not a departure regression:
+the helm's post opens at the plot (D78), so the stander's walk from the gangway shows whenever the
+plot ends within a walk of the last crate, and the pin now says the stander claims the post within
+5 s of the plot and prep ends within the fixed time of the later of its start and that walk.
+Narrator fixtures are regenerated, never hand-edited.
+
+*Slice 3 ships with these known issues (QA, not fixed):* the helm-stander's plate can be eaten
+from the counter before the carrier takes it up, and the stander is relieved hungry instead of fed
+(reserving the carried plate at the serve would fix it); items seen on a dock stay believed there
+after sailing (plans now route around them, but the inspector can still show a tool "on the dock";
+a perception rule that the dock is gone once undocked is the cleaner fix); the plain pacing
+scenario earns nothing and goes negative buying provisions and spares by day 8.
+
+*D82 addendum (slice-3 QA).* A mop trip's tiles come from the grid when the plan is built
+(`cleanPlan` calls the derivation's own `tilesToMop`), not from the task: settling a trip bumps
+the problem's revision, but the task's `interactionTiles` refresh only at the next derivation pass
+(every 10 ticks), and a hand who claimed in that gap re-mopped the tiles just cleaned (4 of 9
+traced trips; the cargo hold never came clean in port). After: a QA corridor came clean in 4
+trips, not 5; six days measure dirty 0.67–1.0 a day, cleaned 0.5–0.67, mopping 4.2–6.1 %. Between
+tiles the mopper reads "mopping the <room>", not "walking to" it. Not closed: any task can be
+claimed while its revision lags its problem's; plans that read a count or target off the task
+could see the same lag, and none was audited.
+
+*Slice 3 also ships with (QA, minor):* instant steps never show their own labels ("fetching the
+mop", "serving dinner": the walk reads "walking to stores"); at 390 px the new labels always
+truncate; a trip over a room's twelve dirtiest tiles can jump between clusters.

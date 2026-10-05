@@ -40,6 +40,11 @@ export const contentBundleSchema = z.strictObject({
     doubleWatch: thoughtDefSchema,
     helmCleanPass: thoughtDefSchema,
     helmScrape: thoughtDefSchema,
+    ateWell: thoughtDefSchema,
+    burntDinner: thoughtDefSchema,
+    ateRationPack: thoughtDefSchema,
+    ateInDirtyMess: thoughtDefSchema,
+    ateInFilthyMess: thoughtDefSchema,
   }),
   config: configDefSchema,
   /** Cache-busting fingerprint of the canonical bundle, filled in by `loader.ts` (D4/D13). */

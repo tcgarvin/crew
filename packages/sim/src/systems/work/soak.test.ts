@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkInvariants, jsonSafetyViolations } from "../../core/invariants";
 import { actionLabel } from "../../core/render";
 import type { SimEvent } from "../../core/types/events";
+import { dirtViolations } from "../dirt/invariants";
 import { registerEquipmentSystems } from "../equipment/register";
 import { spatialViolations } from "../spatial/invariants";
 import type { CrewWorldOptions } from "./fixtures/crew-deck";
@@ -20,6 +21,7 @@ function soak(options: CrewWorldOptions) {
     const violations = [
       ...checkInvariants(world.state),
       ...spatialViolations(world),
+      ...dirtViolations(world),
       ...workViolations(world),
     ];
     if (violations.length > 0)

@@ -34,7 +34,7 @@
     },
     {
       "itemDefId": "item.ration_pack",
-      "count": 220,
+      "count": 60,
       "zoneKey": "cargo_stow"
     },
     {
@@ -51,6 +51,16 @@
       "itemDefId": "item.hand_truck",
       "count": 1,
       "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.provisions",
+      "count": 18,
+      "zoneKey": "pantry"
+    },
+    {
+      "itemDefId": "item.mop",
+      "count": 1,
+      "zoneKey": "cleaning_locker"
     }
   ],
   "initialFaults": [],

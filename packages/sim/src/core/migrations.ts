@@ -4,10 +4,11 @@
  * for the invariants to judge.
  */
 import { watchIndexAt } from "./clock";
+import { emptyCells } from "./dirt-grid";
 import { berthDock, dockAreaTiles } from "./docks";
 import { SaveCompatibilityError } from "./save-error";
 import type { TileCoord } from "./types/common";
-import type { DeckDefId, DockDefId } from "./types/ids";
+import type { DeckDefId, DockDefId, ScenarioDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -358,6 +359,94 @@ function watchesAndThoughts(raw: unknown, { content, config }: MigrationContext)
   return raw;
 }
 
+/**
+ * 8 → 9 (D81-D83): the galley and dirt.
+ * - `dirt`: a zeroed cell row for each deck in `deck.tiles` the content knows, no tiers, no dust
+ *   this visit; `boots: 0` on every actor; `galley.lastMealWatch` the save's watch, so the first
+ *   meal raised after load is the coming watch's.
+ * - A schema-8 save has no provisions and no mop. The scenario's `startingItems` lines for a
+ *   `provisions`-tagged item and for a `mop` tool are spawned into their zones as fresh items
+ *   (ids from `nextId.item`, chunks of `maxStack`, zone tiles round-robin, exactly as
+ *   `scenarioSetupCommands` does), unless the save already holds one of that def; the owner is
+ *   told through `warn`. Crew learn where they are by looking.
+ */
+function galleyAndDirt(raw: unknown, { content, config, warn }: MigrationContext): unknown {
+  if (!isRecord(raw)) return raw;
+  const tick =
+    typeof raw.tick === "number" && Number.isInteger(raw.tick) && raw.tick >= 0 ? raw.tick : 0;
+  const deckIds = isRecord(raw.deck) && isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  if (!isRecord(raw.dirt)) {
+    const cells: Record<string, number[]> = {};
+    for (const id of deckIds) {
+      const deck = content.decks[id as DeckDefId];
+      if (deck !== undefined) cells[id] = emptyCells(deck);
+    }
+    raw.dirt = { cells, tiers: {}, dustThisVisit: 0 };
+  }
+  if (isRecord(raw.actors)) {
+    for (const actor of Object.values(raw.actors)) {
+      if (isRecord(actor) && typeof actor.boots !== "number") actor.boots = 0;
+    }
+  }
+  if (!isRecord(raw.galley)) raw.galley = { lastMealWatch: watchIndexAt(config, tick) };
+  spawnGalleyStoresOnLoad(raw, content, deckIds, warn);
+  return raw;
+}
+
+/** The 8 → 9 spawn of the scenario's provisions and mop (see `galleyAndDirt`). */
+function spawnGalleyStoresOnLoad(
+  raw: Record<string, unknown>,
+  content: MigrationContext["content"],
+  deckIds: readonly string[],
+  warn: MigrationContext["warn"],
+): void {
+  if (!isRecord(raw.items) || !isRecord(raw.nextId)) return;
+  const scenario =
+    typeof raw.scenarioId === "string"
+      ? content.scenarios[raw.scenarioId as ScenarioDefId]
+      : undefined;
+  const deck = deckIds.map((id) => content.decks[id as DeckDefId]).find((d) => d !== undefined);
+  if (scenario === undefined || deck === undefined || deck.id !== scenario.deckId) return;
+  const items = raw.items;
+  const spawned: string[] = [];
+  for (const line of scenario.startingItems) {
+    const def = content.items[line.itemDefId];
+    if (def === undefined) continue;
+    const galleyStore = def.tags.includes("provisions") || def.toolKinds.includes("mop");
+    if (!galleyStore) continue;
+    if (Object.values(items).some((item) => isRecord(item) && item.defId === def.id)) continue;
+    const zone = deck.zones.find((z) => z.key === line.zoneKey);
+    if (zone === undefined || zone.tiles.length === 0) continue;
+    const chunk = def.stacking === "unique" ? 1 : def.maxStack;
+    let placed = 0;
+    for (let left = line.count, index = 0; left > 0; left -= chunk, index++) {
+      const counter: unknown = raw.nextId.item;
+      if (typeof counter !== "number" || !Number.isInteger(counter) || counter < 1) return;
+      const tile = zone.tiles[index % zone.tiles.length] as TileCoord;
+      const location = { kind: "onDeck", deckId: deck.id, x: tile.x + 0.5, y: tile.y + 0.5 };
+      const id = `i${counter}`;
+      raw.nextId.item = counter + 1;
+      items[id] =
+        def.stacking === "unique"
+          ? { id, defId: def.id, stacking: "unique", condition: 1, location }
+          : {
+              id,
+              defId: def.id,
+              stacking: "stack",
+              count: Math.min(chunk, left),
+              reserved: 0,
+              location,
+            };
+      placed += 1;
+    }
+    if (placed > 0)
+      spawned.push(`${line.count}× ${def.name.toLowerCase()} in ${zone.name.toLowerCase()}`);
+  }
+  if (spawned.length > 0) {
+    warn?.(`Save predates the galley (schema 8); stowed the scenario's ${spawned.join(" and ")}`);
+  }
+}
+
 export const migrations: MigrationRegistry = {
   1: migrateJobsToPeople,
   2: addMarkets,
@@ -366,4 +455,5 @@ export const migrations: MigrationRegistry = {
   5: captainAshore,
   6: refuseBeforeShipLife,
   7: watchesAndThoughts,
+  8: galleyAndDirt,
 };

@@ -377,7 +377,14 @@
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+                        "enum": [
+                          "wrench",
+                          "multimeter",
+                          "welder",
+                          "diagnosticScanner",
+                          "handTruck",
+                          "mop"
+                        ]
                       }
                     },
                     "consumes": {
@@ -484,7 +491,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck"]
+                "enum": ["wrench", "multimeter", "welder", "diagnosticScanner", "handTruck", "mop"]
               }
             },
             "consumes": {

@@ -32,11 +32,15 @@ export const SIM_VERSION = "0.1.0";
  * which dock map belongs to the port a save is docked at; D65: which item is the hand truck;
  * D77: the scenario's watch bill), and the config the restored world will run with (the save's
  * own, missing keys filled from that content: `fillConfig`), for D77's watch arithmetic and
- * D78's hazard budget.
+ * D78's hazard budget. D83: `warn` reports a note the restored world's owner should see (an old
+ * save given stores it never had); `restore` collects them into `RestoredWorld.warnings`. A
+ * caller with nobody to tell (the narrator's snapshot upgrade, the narrator-log rebuild) omits it
+ * and the notes are dropped.
  */
 export interface MigrationContext {
   readonly content: Pick<ContentBundle, "decks" | "docks" | "items" | "scenarios">;
   readonly config: ConfigDef;
+  readonly warn?: (message: string) => void;
 }
 
 /**

@@ -12,7 +12,9 @@
  * the watch (D77): "going to the helm", "relieving <name> at the helm" (or "taking the helm"),
  * "leaving the helm" (the step off the seat), "on the gangway", "doing rounds", and "plotting a course to <port>" (D78); and the captain
  * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
- * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>". Names are
+ * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>"; the galley
+ * (D81): "fetching provisions", "cooking", "serving dinner", "taking a plate to the helm", "at the
+ * helm, eating"; dirt (D82): "fetching the mop", "mopping <room>", "putting the mop away". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
  */
@@ -110,6 +112,44 @@ const RECIPE_VERB: Readonly<Record<string, string>> = {
   repair: "fixing",
 };
 
+/** D81: is the actor carrying a served meal (a `meal`-tagged item)? */
+function carryingMeal(ctx: LabelCtx, actor: DeepReadonly<Actor>): boolean {
+  return Object.values(ctx.state.items).some(
+    (item) =>
+      item.location.kind === "carriedBy" &&
+      item.location.actorId === actor.id &&
+      ctx.content.items[item.defId]?.tags.includes("meal") === true,
+  );
+}
+
+/** D82: "mopping the galley", from the task's room. */
+function mopLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
+  if (task?.target.kind !== "compartment") return "mopping";
+  return `mopping the ${compartmentName(ctx, task.target.compartmentId)}`;
+}
+
+/**
+ * D82: a mopper's step between tiles of the room they are mopping reads as mopping it, not
+ * "walking to the cargo hold" from inside the hold.
+ */
+function mopWalkWithin(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  task: DeepReadonly<Task> | undefined,
+  target: StepTarget,
+): boolean {
+  if (task?.type !== "cleanCompartment" || task.target.kind !== "compartment") return false;
+  const location = actor.location;
+  if (location.kind !== "onDeck" || "machineId" in target) return false;
+  const geometry = ctx.caches.nav.decks[location.deckId];
+  if (geometry === undefined) return false;
+  const room = task.target.compartmentId;
+  return (
+    compartmentAt(geometry, location.x, location.y) === room &&
+    compartmentAt(geometry, target.x + 0.5, target.y + 0.5) === room
+  );
+}
+
 /** Is `task` a watch at the helm (a `staffStation` on a `pilotStation` machine)? */
 function isHelmTask(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): boolean {
   if (task?.type !== "staffStation" || task.target.kind !== "machine") return false;
@@ -148,13 +188,24 @@ function taskStepLabel(
       ? `stowing ${itemName(ctx, task.target.itemId)}`
       : `hauling ${itemName(ctx, task.target.itemId)}`;
   }
+  // D81: a plate on its way up to the helm.
+  if (task?.type === "carryMeal" && step.kind === "moveTo" && carryingMeal(ctx, actor)) {
+    return "taking a plate to the helm";
+  }
   switch (step.kind) {
     case "moveTo":
-      return isHelmTask(ctx, task) ? "going to the helm" : placeLabel(ctx, actor, step.target);
+      if (isHelmTask(ctx, task)) return "going to the helm";
+      if (mopWalkWithin(ctx, actor, task, step.target)) return mopLabel(ctx, task);
+      return placeLabel(ctx, actor, step.target);
     case "pickUp":
+      if (task?.type === "cookMeal") return "fetching provisions";
+      if (task?.type === "cleanCompartment") return "fetching the mop";
       return `picking up ${itemName(ctx, step.itemId)}`;
     case "putDown":
+      if (task?.type === "cleanCompartment") return "putting the mop away";
       return `stowing ${itemName(ctx, step.itemId)}`;
+    case "serve":
+      return "serving dinner";
     case "buy":
       return `buying ${itemDefName(ctx, step.itemDefId)}`;
     case "throughGate":
@@ -172,6 +223,8 @@ function taskStepLabel(
       if (step.stage === "handover") return handoverLabel(ctx);
       if (step.stage === "plot") return plotLabel(ctx, task);
       if (step.stage === "rounds") return "doing rounds";
+      if (step.stage === "cook") return "cooking";
+      if (step.stage === "mop") return mopLabel(ctx, task);
       if (task === undefined || task.target.kind !== "machine") return "working";
       const verb = RECIPE_VERB[task.derivationKey] ?? RECIPE_VERB[task.type] ?? "working on";
       return `${verb} ${machineName(ctx, task.target.machineId)}`;
@@ -180,9 +233,13 @@ function taskStepLabel(
       if (task === undefined || task.target.kind !== "machine") return "on station";
       const machine = ctx.state.machines[task.target.machineId];
       const tags = machine === undefined ? [] : (ctx.content.machines[machine.defId]?.tags ?? []);
-      return tags.includes("pilotStation")
-        ? "at the helm"
-        : `manning ${machineName(ctx, task.target.machineId)}`;
+      if (tags.includes("pilotStation")) {
+        // D81: the stander's plate, eaten in the seat (`galley.helmMeal`).
+        return ctx.state.galley.helmMeal?.actorId === actor.id
+          ? "at the helm, eating"
+          : "at the helm";
+      }
+      return `manning ${machineName(ctx, task.target.machineId)}`;
     }
     case "consume":
     case "awaitWord":
@@ -216,6 +273,8 @@ function personalStepLabel(
       return step.stage === "rounds" ? "doing rounds" : "eating";
     case "consume":
       return "eating";
+    case "serve":
+      return "serving dinner";
     case "buy":
     case "throughGate":
       return "buying";

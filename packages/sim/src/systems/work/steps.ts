@@ -9,7 +9,8 @@
  *   first skill requirement)` ticks of recipe progress.
  * - Eating takes one unit off the believed stack at pickup (split into a carried unit of 1) and
  *   consumes it at the end of `mealDays`: the stack on the floor drops by exactly one. Hunger
- *   falls by the item's `nutrition` (food without one fully satisfies).
+ *   falls by the item's `nutrition` (food without one fully satisfies). D81: the consume step and
+ *   the galley's `cook`/`serve` are `systems/galley/`'s; D82: the `mop` stage is `systems/dirt/`'s.
  * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
  *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
  *   fully met while on duty; off duty they last until the planner finds something more urgent.
@@ -32,8 +33,12 @@ import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { ActivityStep, BlockageReason, StepTarget, Task } from "../../core/types/work";
 import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
+import { runMop } from "../dirt/clean";
+import { depositDirt } from "../dirt/deposit";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
+import { runCook, runServe } from "../galley/cook";
+import { runConsume } from "../galley/eat";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
@@ -248,6 +253,9 @@ function takeItem(ctx: StepCtx, actor: Actor, item: Item, split: boolean): ItemI
       // key off `job.cargoItemIds`, which already names this new id, not `jobId` on the item, but
       // other freight-aware code — inspection, the crate renderer — reads `item.jobId`).
       ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
+      // A serving split off a served stack is the same dinner (D81): the plate keeps its quality
+      // and spoils when the stack does.
+      ...(item.meal === undefined ? {} : { meal: { ...item.meal } }),
     };
     return id;
   }
@@ -269,30 +277,17 @@ function runPickUp(ctx: StepCtx, actor: Actor, step: StepOf<"pickUp">): StepResu
   }
   const takenId = takeItem(ctx, actor, item, step.split);
   if (takenId !== item.id) {
-    // Later steps (the meal's consume) refer to the unit actually in hand.
+    // Later steps (the meal's consume, the carried plate's putDown) refer to the unit in hand.
     const activity = actor.activity;
     for (const later of activity.kind === "idle" ? [] : (activity.plan?.steps ?? [])) {
-      if (later.kind === "consume" && later.itemId === item.id) later.itemId = takenId;
+      if ((later.kind === "consume" || later.kind === "putDown") && later.itemId === item.id) {
+        later.itemId = takenId;
+      }
     }
     seeItem(actor, item.id, item.location, ctx.tick);
   }
   seeItem(actor, takenId, { kind: "carriedBy", actorId: actor.id }, ctx.tick);
   touchInventory(ctx);
-  return "done";
-}
-
-function runConsume(ctx: StepCtx, actor: Actor, step: StepOf<"consume">): StepResult {
-  const carried = carriedItems(ctx, actor.id);
-  const item =
-    carried.find((i) => i.id === step.itemId) ??
-    carried.find((i) => ctx.content.items[i.defId]?.tags.includes("food"));
-  if (item === undefined) return { fail: "inaccessibleSupply" };
-  const nutrition = ctx.content.items[item.defId]?.nutrition ?? 1;
-  actor.needs.hunger = Math.max(0, actor.needs.hunger - nutrition);
-  if (item.stacking === "stack" && item.count > 1) item.count -= 1;
-  else delete ctx.state.items[item.id];
-  touchInventory(ctx);
-  emitSim(ctx, "ateMeal", [actor.id, item.id], { nutrition });
   return "done";
 }
 
@@ -317,6 +312,17 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
   } else {
     const tile = tileOf(location);
     item.location = { kind: "onDeck", deckId: location.deckId, x: tile.x + 0.5, y: tile.y + 0.5 };
+    // D82: a crate set down leaves its mark on the deck.
+    if (ctx.content.items[item.defId]?.tags.includes("cargo") === true) {
+      depositDirt(
+        ctx.state,
+        ctx.content,
+        ctx.config,
+        location.deckId,
+        tile,
+        ctx.config.dirt.deposits.cargo,
+      );
+    }
   }
   seeItem(actor, item.id, item.location, ctx.tick);
   touchInventory(ctx);
@@ -572,6 +578,10 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
       return runHandover(ctx, actor, step);
     case "plot":
       return runPlot(ctx, actor, step);
+    case "cook":
+      return runCook(ctx, actor, step);
+    case "mop":
+      return runMop(ctx, actor, step);
     case "eat":
     case "buy":
     case "rounds":
@@ -596,6 +606,8 @@ export function runStep(
       return runConsume(ctx, actor, step);
     case "putDown":
       return runPutDown(ctx, actor, step);
+    case "serve":
+      return runServe(ctx, actor, step);
     case "buy":
       return runBuy(ctx, actor, step);
     case "throughGate":

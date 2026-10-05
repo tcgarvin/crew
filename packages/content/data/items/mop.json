@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.mop",
+  "name": "Mop",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": ["tool"],
+  "toolKinds": ["mop"],
+  "mass": 1.5
+}

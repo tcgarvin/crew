@@ -212,5 +212,7 @@
       }
     }
   ],
-  "ambience": "Wind straight off the edge, gulls working the updraft, and the pier boards creaking under every step."
+  "ambience": "Wind straight off the edge, gulls working the updraft, and the pier boards creaking under every step.",
+  "grime": 0.5,
+  "airborneDust": 0.8
 }

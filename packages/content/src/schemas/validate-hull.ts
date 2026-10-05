@@ -12,12 +12,22 @@
  *   standby tile where the oncoming watch waits to take the helm (D77).
  * - **Zones and spawns**: a `cargoStowage` zone; a `crew` and a `passenger` spawn point; every
  *   `locker` zone serves a bed (`machineKey`) and no bed has two lockers.
+ * - **The galley loop (D81, D82)**: `pantry`, `serving` and `cleaningLocker` zones; some `serving`
+ *   tile beside a stove's `use` position, so the cook sets plates down within reach; the mess
+ *   tables seat (`use` positions) at least four.
  * - **Per scenario**: enough `crew` spawn points for the crew, and beds (`bed`, never `medBed`)
  *   for the crew plus one.
  *
  * Unknown machine defs, door keys and placement keys are L2's to report; these checks skip them.
  */
-import type { DeckDef, MachineDef, MachineTag, ScenarioDef, TileCoord } from "@crew/sim";
+import type {
+  DeckDef,
+  MachineDef,
+  MachinePlacementDef,
+  MachineTag,
+  ScenarioDef,
+  TileCoord,
+} from "@crew/sim";
 import { HULL_CLASS_BOX, at } from "./geometry";
 import { type Path, type ValidationIssue, issue } from "./issues";
 
@@ -47,6 +57,12 @@ const REQUIRED_MACHINES: readonly { readonly tag: MachineTag; readonly exactlyOn
 ];
 
 const REQUIRED_SPAWN_TAGS = ["crew", "passenger"] as const;
+
+/** Zones the galley and dirt loops find by tag (D81, D82); each needs one or more tiles. */
+const REQUIRED_ZONE_TAGS: readonly string[] = ["pantry", "serving", "cleaningLocker"];
+
+/** The seats a deck must offer the mess: `use` positions of its `messTable` machines. */
+const MIN_MESS_SEATS = 4;
 
 function deckPath(deck: DeckDef): Path {
   return ["decks", deck.id];
@@ -223,6 +239,74 @@ function checkZonesAndSpawns(deck: DeckDef, issues: ValidationIssue[]): void {
   }
 }
 
+/** A placement's machine-frame offset in deck coordinates (rotation is clockwise, y grows south). */
+function placedTile(placement: MachinePlacementDef, offset: TileCoord): TileCoord {
+  const { x, y } = offset;
+  const rotated =
+    placement.rotation === 0
+      ? { x, y }
+      : placement.rotation === 90
+        ? { x: -y, y: x }
+        : placement.rotation === 180
+          ? { x: -x, y: -y }
+          : { x: y, y: -x };
+  return { x: placement.origin.x + rotated.x, y: placement.origin.y + rotated.y };
+}
+
+/** Deck tiles of the `use` positions of every placement whose machine def carries `tag`. */
+function usePositionsOf(deck: DeckDef, machines: MachineTagTable, tag: MachineTag): TileCoord[] {
+  return deck.machines.flatMap((placement) => {
+    const def = machines[placement.machineDefId];
+    if (def?.tags.includes(tag) !== true) return [];
+    return def.interactionPositions
+      .filter((p) => p.purposes.includes("use"))
+      .map((p) => placedTile(placement, p.offset));
+  });
+}
+
+/**
+ * D81/D82: the pantry, serving counter and cleaning locker exist; a serving tile is beside a
+ * stove's `use` tile (the cook plates up without walking); the mess seats at least four. Stoves
+ * and tables themselves are `checkMachineTags`'s.
+ */
+function checkGalleyLoop(
+  deck: DeckDef,
+  machines: MachineTagTable,
+  issues: ValidationIssue[],
+): void {
+  const path = deckPath(deck);
+  for (const tag of REQUIRED_ZONE_TAGS) {
+    if (!deck.zones.some((z) => z.tags.includes(tag))) {
+      issues.push(issue("physical", [...path, "zones"], `no zone tagged "${tag}"`));
+    }
+  }
+  const servingTiles = deck.zones.filter((z) => z.tags.includes("serving")).flatMap((z) => z.tiles);
+  const stoveTiles = usePositionsOf(deck, machines, "stove");
+  if (
+    servingTiles.length > 0 &&
+    stoveTiles.length > 0 &&
+    !servingTiles.some((tile) => stoveTiles.some((stove) => isAdjacent(tile, stove)))
+  ) {
+    issues.push(
+      issue(
+        "physical",
+        [...path, "zones"],
+        `no "serving" tile is beside a stove's use position: ${stoveTiles.map(at).join(", ")}`,
+      ),
+    );
+  }
+  const seats = usePositionsOf(deck, machines, "messTable").length;
+  if (seats < MIN_MESS_SEATS && placementsTagged(deck, machines, "messTable").length > 0) {
+    issues.push(
+      issue(
+        "physical",
+        [...path, "machines"],
+        `the mess tables seat ${seats}; at least ${MIN_MESS_SEATS} use positions are needed`,
+      ),
+    );
+  }
+}
+
 /** Every `locker` zone serves one bed by `machineKey`, and no bed has two (ship life plan call 8). */
 function checkLockers(deck: DeckDef, machines: MachineTagTable, issues: ValidationIssue[]): void {
   const placements = new Map(deck.machines.map((p) => [p.key, p]));
@@ -269,6 +353,7 @@ export function checkHullContract(
   checkPilotStandby(deck, machines, issues);
   checkZonesAndSpawns(deck, issues);
   checkLockers(deck, machines, issues);
+  checkGalleyLoop(deck, machines, issues);
 }
 
 /**

@@ -14,7 +14,14 @@ import type {
   ScenarioDefId,
 } from "../types/ids";
 import type { EffectiveConfig } from "../types/kernel";
-import { FIXTURE_HAZARDS, FIXTURE_MOOD, FIXTURE_THOUGHTS, fixtureWatches } from "./ship-life";
+import {
+  FIXTURE_DIRT,
+  FIXTURE_GALLEY,
+  FIXTURE_HAZARDS,
+  FIXTURE_MOOD,
+  FIXTURE_THOUGHTS,
+  fixtureWatches,
+} from "./ship-life";
 
 export const TINY = {
   deck: "deck.tiny.main" as DeckDefId,
@@ -104,6 +111,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       heatContainmentAbove: 0.8,
       heatSurvivalAbove: 0.95,
       routineAgingDays: 60 / day,
+      cleaningAgingDays: 60 / day,
     },
     equipment: {
       hazardScale: 1,
@@ -178,9 +186,12 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       remoteSaveEverySeconds: 120,
       frameEveryTicks: 2,
       slowDownOnEvents: [],
+      dirtFrameEverySeconds: 5,
     },
     watches: fixtureWatches([0]),
     mood: FIXTURE_MOOD,
+    galley: FIXTURE_GALLEY,
+    dirt: FIXTURE_DIRT,
     hazards: FIXTURE_HAZARDS,
     social: {
       chatRadiusTiles: 2,

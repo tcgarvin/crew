@@ -20,6 +20,7 @@ import { berthInView, dockOrigin, dockSlide, shipInDock, withDockSlide } from ".
 import { type DockPaint, drawDock, drawDockForeground } from "./dockArt";
 import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
+import { type GrimePaint, drawGrime } from "./grime";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
 import {
   type Box,
@@ -856,14 +857,21 @@ export interface Scenery {
   readonly dock: DockDef | undefined;
   /** Docking clamps, 0 retracted to 1 engaged (`clampEngagement`). */
   readonly clamps: number;
+  /**
+   * D82: the deck's grime tint, from the dirt frame playback has reached; absent until the first
+   * frame arrives, which draws the deck clean.
+   */
+  readonly grime?: GrimePaint;
 }
 
 /**
  * What a tap can select: the frame's people, items and machines, the dock's own people (`local`,
- * by id) and staged props (`dockProp`, by `dockPropKey`), or a dock post or the dock.
+ * by id) and staged props (`dockProp`, by `dockPropKey`), a room (D82: bare deck floor, by
+ * compartment key), or a dock post or the dock.
  */
 export type DrawSelection =
   | { readonly kind: "actor" | "machine" | "item"; readonly id: string }
+  | { readonly kind: "room"; readonly id: string }
   | { readonly kind: "local"; readonly id: string }
   | { readonly kind: "dockProp"; readonly id: string }
   | DockTarget;
@@ -978,6 +986,8 @@ export function drawFrame(
     drawRamps(ctx, layout, frame, sceneryFrame.px);
   });
   drawCompartments(ctx, t, layout);
+  const { grime } = scenery;
+  if (grime !== undefined) inTileSpace(ctx, t, () => drawGrime(ctx, layout, grime));
   drawWalls(ctx, t, layout);
   drawDoors(ctx, t, layout, frame);
   drawMachines(ctx, t, layout, frame, selectedIdOf(selected, "machine"));

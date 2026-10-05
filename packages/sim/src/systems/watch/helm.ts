@@ -43,6 +43,7 @@ import type { Machine } from "../../core/types/ship";
 import type { HelmRole } from "../../core/types/view";
 import { type ActivityStep, type Task, URGENCY_CLASSES } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
+import { mealCallStandsFor } from "../galley/eat";
 import { isStaticWalkable } from "../spatial/geometry";
 import { interactionsAt } from "../spatial/reservations";
 import { operateTiles } from "../travel/tasks";
@@ -610,7 +611,8 @@ export function gangwayPlan(ctx: StepCtx, actor: Actor): PlanResult {
 
 /**
  * Does a `gangway` hold end? When they are no longer the gangway stander (the ship has left, the
- * helm watch has opened, or the bell has gone). Its first tick says so in the trace
+ * helm watch has opened, or the bell has gone), or the mess call stands for them (D81: dinner is
+ * served and they are hungry enough to go; the post waits). Its first tick says so in the trace
  * (`gangwayWatchSet`).
  */
 export function gangwayHoldDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
@@ -623,5 +625,5 @@ export function gangwayHoldDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">
       payload: { actorId: actor.id },
     });
   }
-  return gangwayStanderOf(ctx) !== actor.id;
+  return gangwayStanderOf(ctx) !== actor.id || mealCallStandsFor(ctx, actor);
 }

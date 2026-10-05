@@ -239,5 +239,7 @@
       }
     }
   ],
-  "ambience": "Cutting torches flare somewhere aft, and the deck plates ring every time a section drops."
+  "ambience": "Cutting torches flare somewhere aft, and the deck plates ring every time a section drops.",
+  "grime": 0.3,
+  "airborneDust": 0
 }

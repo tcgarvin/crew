@@ -40,7 +40,9 @@ import type { World } from "../../../core/types/kernel";
 import type { Problem } from "../../../core/types/work";
 import { registerPlannerDefaults } from "../../../planner/index";
 import { commerceTaskDerivations } from "../../commerce/tasks";
+import { dirtTaskDerivations } from "../../dirt/tasks";
 import { equipmentTaskDerivation } from "../../equipment/tasks";
+import { galleyTaskDerivations } from "../../galley/tasks";
 import { registerNeeds } from "../../needs/index";
 import { DECK12, deck12Content } from "../../spatial/fixtures/deck-12x8";
 import { registerSpatial } from "../../spatial/index";
@@ -242,6 +244,8 @@ export const ALL_DERIVATIONS = {
   ...equipmentTaskDerivation,
   ...commerceTaskDerivations,
   ...travelTaskDerivations,
+  ...galleyTaskDerivations,
+  ...dirtTaskDerivations,
 };
 
 export interface CrewWorldOptions {

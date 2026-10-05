@@ -9,6 +9,7 @@
  * travel/commerce for boundary custody).
  */
 import type { PhysicalLocation, Tick, TileKey } from "./common";
+import type { MealQuality } from "./content";
 import type {
   ActorId,
   CommandId,
@@ -166,6 +167,17 @@ export interface Machine {
 // Items (SD §8.1)
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * D81: what the galley wrote on a served meal: its quality (from the cook and the galley's tier
+ * at the serve), when it spoils, and who cooked it. Fixed at the serve, so a later retune never
+ * rewrites a plate on the counter.
+ */
+export interface MealInfo {
+  quality: MealQuality;
+  spoilsAtTick: Tick;
+  cookId: ActorId;
+}
+
 interface ItemBase {
   id: ItemId;
   defId: ItemDefId;
@@ -173,6 +185,8 @@ interface ItemBase {
   location: PhysicalLocation;
   /** Present on freight belonging to a contract. */
   jobId?: JobId;
+  /** D81: present on a served `meal`-tagged item; food without it is a ration. */
+  meal?: MealInfo;
 }
 
 export interface UniqueItem extends ItemBase {

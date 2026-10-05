@@ -6,9 +6,26 @@
 import type { TileCoord } from "../core/types/common";
 import type { DeepReadonly } from "../core/types/common";
 import type { CompartmentDef } from "../core/types/content";
-import type { AgentView } from "../core/types/view";
+import type { PlannerConfig } from "../core/types/pipeline";
+import type { AgentView, KnownItemView } from "../core/types/view";
 import type { UrgencyClass } from "../core/types/work";
 import type { Candidate } from "./candidates";
+
+export function needUrgency(value: number, config: PlannerConfig): UrgencyClass | undefined {
+  if (value > config.urgency.needSurvivalAbove) return "immediateSurvival";
+  if (value > config.urgency.needEssentialAbove) return "essentialOperation";
+  if (value > config.needs.seekThreshold) return "routineObligation";
+  return undefined;
+}
+
+export const inMyHands = (view: AgentView, item: KnownItemView): boolean =>
+  item.location.kind === "carriedBy" && item.location.actorId === view.self.id;
+
+/** Is `tile` in a compartment carrying `tag`? */
+export function inCompartmentTagged(view: AgentView, tile: TileCoord, tag: string): boolean {
+  const symbol = view.schematic.deck.tiles[tile.y]?.[tile.x];
+  return view.schematic.deck.compartments.some((c) => c.symbol === symbol && c.tags.includes(tag));
+}
 
 export const backingOff = (view: AgentView, ref: string): boolean => {
   const until = view.self.backoff?.[ref];

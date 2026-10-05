@@ -9,7 +9,7 @@ import type { ActorId, ScenarioDefId } from "./ids";
 import type { DerivedCaches } from "./pipeline";
 import type { SaveEnvelope } from "./save";
 import type { WorldState } from "./state";
-import type { AgentView, RenderFrame } from "./view";
+import type { AgentView, DirtFrame, RenderFrame } from "./view";
 
 /**
  * Config plus the hash computed at content build time. W0 decision: the kernel has no hashing
@@ -78,6 +78,8 @@ export interface Kernel {
   /** Planner-boundary view for one actor, e.g. for tests and the inspector. */
   getAgentView(world: World, actorId: ActorId): AgentView;
   getRenderFrame(world: World): RenderFrame;
+  /** D82: the ship deck's dirt grid for the grime tint; posted by the host at its own cadence. */
+  getDirtFrame(world: World): DirtFrame;
   serialize(world: World): SaveEnvelope;
   /**
    * Migrate, validate and rebuild caches. Throws on an unsupported schema version or invalid

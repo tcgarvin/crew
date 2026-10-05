@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { TINY } from "../../core/fixtures/tiny-content";
+import { allocateId } from "../../core/ids";
+import type { ItemId } from "../../core/types/ids";
 import type { StackItem } from "../../core/types/ship";
 import { requestMove } from "../spatial/movement";
+import { directSight, writeFact } from "./facts";
 import {
   JON,
   MARA,
   STOWAGE_TILES,
+  WRENCH_TILE,
   addCrateToLoad,
   addEngineFault,
+  addProblem,
   addPumpSymptom,
   crewWorld,
   itemAt,
+  machineByPlacement,
   place,
   withoutRounds,
 } from "./fixtures/crew-deck";
@@ -166,6 +172,81 @@ describe("interruption", () => {
 });
 
 describe("discrepancies", () => {
+  it("fetches the tool the schematic can reach, not a nearer one believed where no route goes", () => {
+    // Slice-3 tuning: a toolkit seen on the dock at the last port stays "on the dock" in everyone's
+    // beliefs after the ship sails; the plan took it as the nearest wrench by distance, walked
+    // into nothing, backed off and tried again for days while a toolkit lay beside the machine.
+    // Supplies are ranked by the schematic walk now, so an unroutable belief is passed over.
+    const tw = crewWorld();
+    const { world } = tw;
+    withoutRounds(world);
+    const mara = world.state.actors[MARA];
+    const jon = world.state.actors[JON];
+    if (mara === undefined || jon === undefined) throw new Error("no crew");
+    jon.availability = "incapacitated";
+    place(world, MARA, { x: 9, y: 5 });
+    const here = mara.location;
+    if (here.kind !== "onDeck") throw new Error("off deck");
+    // A second wrench, really in the engineering stores with the first, that Mara believes lies
+    // two tiles from her on row 7, which is void: nearer as the crow flies, no route at all.
+    // Her first look's familiarity brief tells her where the stores' wrench is; a fact written
+    // before it would stop that brief (as `callTheMess` notes), so let it run first.
+    run(tw, 40);
+    const wrenchId = itemAt(world, TINY.wrench);
+    const wrench = world.state.items[wrenchId];
+    if (wrench === undefined) throw new Error("no wrench");
+    const ghostId = allocateId(world.state, "item") as ItemId;
+    world.state.items[ghostId] = { ...wrench, id: ghostId };
+    world.caches.dirty.inventory = true;
+    writeFact(
+      mara,
+      ghostId,
+      "itemLocation",
+      { location: { kind: "onDeck", deckId: here.deckId, x: 9.5, y: 7.5 } },
+      directSight(mara, world.state.tick),
+    );
+    // A diagnosed worn bearing on the pump: its one repair step needs a wrench.
+    const machineId = machineByPlacement(world, "pump1");
+    const pump = world.state.machines[machineId];
+    if (pump === undefined) throw new Error("no pump");
+    pump.faults.push({
+      faultKey: "wornBearing",
+      sinceTick: world.state.tick,
+      diagnosed: true,
+      repairStepIndex: 0,
+      repairStepProgress: 0,
+    });
+    const problemId = addProblem(world, {
+      kind: "machineFault",
+      payload: { machineId, faultKey: "wornBearing" },
+      owner: "equipment",
+      visibility: "public",
+      dedupeKey: `machineFault:${machineId}:wornBearing`,
+      status: "open",
+      createdTick: world.state.tick,
+      revision: 0,
+      baseUrgency: "essentialOperation",
+      location: { kind: "machine", machineId },
+    });
+    const log = run(tw, 20 * 90, (w) => w.state.work.problems[problemId]?.status === "resolved");
+    expect(world.state.work.problems[problemId]?.status).toBe("resolved");
+    expect(pump.faults).toHaveLength(0);
+    expect(eventsOf(log, "actionFailed").map((e) => e.payload.reason)).toEqual([]);
+    expect(eventsOf(log, "taskBlocked")).toHaveLength(0);
+    // The wrench she fetched is the one with a route to it: the other never left the stores.
+    expect(world.state.items[ghostId]?.location).toMatchObject({
+      kind: "onDeck",
+      x: WRENCH_TILE.x + 0.5,
+      y: WRENCH_TILE.y + 0.5,
+    });
+    const used = world.state.items[wrenchId]?.location;
+    expect(
+      used?.kind === "carriedBy" ||
+        (used?.kind === "onDeck" &&
+          (used.x !== WRENCH_TILE.x + 0.5 || used.y !== WRENCH_TILE.y + 0.5)),
+    ).toBe(true);
+  });
+
   it("a moved ration stack is noted absent, the meal fails with a reason, backoff is honoured, and eating resumes once found", () => {
     const tw = crewWorld();
     const { world } = tw;

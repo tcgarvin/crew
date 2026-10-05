@@ -58,6 +58,11 @@
       "price": 8
     },
     {
+      "itemDefId": "item.provisions",
+      "count": 8,
+      "price": 50
+    },
+    {
       "itemDefId": "item.med_kit",
       "count": 2,
       "price": 90

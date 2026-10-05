@@ -21,7 +21,7 @@ import type { SimEvent } from "./events";
 import type { ActorId, ScenarioDefId } from "./ids";
 import type { SaveEnvelope } from "./save";
 import type { WorldState } from "./state";
-import type { AgentViewSnapshot, RenderFrame } from "./view";
+import type { AgentViewSnapshot, DirtFrame, RenderFrame } from "./view";
 
 /**
  * What to load. W0 decision: the worker imports the static content bundle itself, so `load`
@@ -54,6 +54,11 @@ export type ToWorker =
 export type FromWorker =
   /** Frames are produced ahead of the viewer; the main thread buffers and plays them by tick. */
   | { readonly type: "frame"; readonly frame: RenderFrame }
+  /**
+   * D82: the dirt grid, on load and every `host.dirtFrameEverySeconds`; the main thread queues
+   * these by tick and applies the newest with `tick <= viewTick` in the playback step (D14).
+   */
+  | { readonly type: "dirt"; readonly frame: DirtFrame }
   | { readonly type: "events"; readonly events: readonly SimEvent[] }
   /** The worker stopped at a hook at `tick`; the main thread shows the narrator loading state when playback reaches it. */
   | { readonly type: "hookRaised"; readonly hook: NarratorHook; readonly tick: Tick }

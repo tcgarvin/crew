@@ -645,14 +645,28 @@
           "y": 2
         },
         {
-          "x": 17,
-          "y": 3
-        },
-        {
           "x": 16,
           "y": 3
         }
       ]
+    },
+    {
+      "key": "pantry",
+      "name": "Pantry",
+      "tags": ["pantry"],
+      "tiles": [{ "x": 12, "y": 0 }, { "x": 13, "y": 0 }, { "x": 12, "y": 1 }, { "x": 13, "y": 1 }]
+    },
+    {
+      "key": "serving",
+      "name": "Serving Counter",
+      "tags": ["serving"],
+      "tiles": [{ "x": 17, "y": 3 }, { "x": 17, "y": 4 }]
+    },
+    {
+      "key": "cleaning_locker",
+      "name": "Cleaning Locker",
+      "tags": ["cleaningLocker"],
+      "tiles": [{ "x": 17, "y": 7 }]
     }
   ],
   "docking": {

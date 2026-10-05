@@ -12,6 +12,11 @@ Engineering is reachable two ways — via the central corridor (`engineering_cor
 the cargo hold (`engineering_cargo`) — so a single jammed door cannot isolate it. The bridge has
 exactly one door (`bridge_corridor`).
 
+The galley loop's zones (D81, D82) sit in the galley and mess: `pantry` (12,0)-(13,1), `serving`
+(17,3) and (17,4) beside the stove's `use` tile (16,3), and `cleaning_locker` (17,7). The hull
+contract requires all three, a serving tile beside a stove `use` position, and four mess seats.
+The old `galley_counter` zone is now only the stove's own tiles, so it no longer overlaps `serving`.
+
 Both ramps open in the south hull (`personnel_ramp` from the airlock, `cargo_ramp` from the
 cargo hold), so a dock map can treat the ship's south flank as the quay (Dockside §3.2).
 

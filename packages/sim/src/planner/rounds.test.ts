@@ -93,6 +93,7 @@ function stubView(stub: Stub): AgentView {
     watch: {
       section: "red",
       onWatch: stub.onDuty ?? true,
+      nextOnWatch: false,
       dayworker: false,
       helmRole: "none",
       officerOfTheWatch: stub.officer ?? false,

@@ -77,8 +77,10 @@ The one way a system asks the crew to do something (details in `core/types/work.
 1. The owning system creates or revises a `Problem` in `state.work.problems`, deduped by
    `dedupeKey`. Equipment owns `machineSymptom`, `machineFault`, `maintenanceDue`,
    `partsNeeded`; travel owns `courseToPlot` (D78) and, with commerce, `cargoToLoad` and
-   `cargoToUnload`; commerce owns `reserveLow` (D80: the ship's stores, bought like a part); the
-   watch owns `stationToStaff` (D77: the helm's `watch` and `relief` posts).
+   `cargoToUnload`; commerce owns `reserveLow` (D80: the ship's stores, bought like a part; D81:
+   provisions are one of them, counted in days of meals); the watch owns `stationToStaff` (D77:
+   the helm's `watch` and `relief` posts); the galley owns `mealToCook` and `mealToCarry` (D81);
+   dirt owns `compartmentDirty` (D82).
 2. The work system derives `Task`s through the `TaskDerivationTable`, one rule per problem kind.
    Each owning system exports its rules from `systems/<system>/tasks.ts`; `systems/work/`
    merges them.

@@ -4,10 +4,15 @@
  * trip until N ship's days have passed, with an instant narrator (every hook answered at once with
  * no commands) and every card answered by its left side, and reports:
  *
- * - beats per watch by kind (bells, handovers, meals, faults, hazards, cards, conversations):
- *   the total and the mean, least and most over the run's watches;
+ * - beats per watch by kind (bells, handovers, meals served, servings eaten hot and as rations,
+ *   meals missed, servings spoiled, rooms turned filthy and mopped clean, faults, hazards, cards,
+ *   conversations): the total and the mean, least and most over the run's watches;
+ * - rooms at `dirty` and at `filthy` at the end of each watch (D82);
+ * - how full the mess gets: for each meal served, how many ate it hot within
+ *   `MESS_WINDOW_DAYS` (D83's target: at least `MESS_FULL_EATERS`, three times a day);
  * - per person, the share of sim time in each activity class (read from the canvas label, which
- *   is what the player sees) and the longest idle stretch;
+ *   is what the player sees), cooking and mopping among them, and the longest idle stretch;
+ * - the provisions aboard at the end, in crates and days of meals (D81);
  * - how long the helm stood empty while the ship was not docked;
  * - port calls by watch of the day: time docked, with cargo to move, with cargo to move and
  *   nobody hauling (a stall), and with someone on the gangway;
@@ -27,6 +32,9 @@ import {
   type World,
   actionLabel,
   createKernel,
+  dayTicks,
+  provisionsCratesAboard,
+  provisionsDays,
   watchTicks,
 } from "@crew/sim";
 import {
@@ -40,21 +48,62 @@ import {
 // What is counted
 // ---------------------------------------------------------------------------------------------
 
-/** The beats per watch, by the event that marks each. */
+/** An event as the tally reads it: its type, tick and payload (still discriminated by type). */
+export type BeatEvent = SimEvent extends infer E
+  ? E extends SimEvent
+    ? Pick<E, "type" | "tick" | "payload">
+    : never
+  : never;
+
+/**
+ * The beats per watch: the event that marks each, and how much one event counts (1 unless
+ * said). Eating splits on the `ateMeal` payload's `ration` (D81: a hot meal or a ration pack);
+ * a spoiled sweep counts its servings.
+ */
 export const BEAT_EVENTS = {
-  bells: "bell",
-  handovers: "helmRelieved",
-  meals: "ateMeal",
-  faults: "faultOccurred",
-  hazards: "navHazard",
-  cards: "decisionPending",
-  conversations: "conversation",
-} as const satisfies Record<string, EventType>;
+  bells: { type: "bell" },
+  handovers: { type: "helmRelieved" },
+  mealsServed: { type: "mealServed" },
+  eatenHot: { type: "ateMeal", ration: false },
+  eatenRation: { type: "ateMeal", ration: true },
+  mealsMissed: { type: "mealMissed" },
+  servingsSpoiled: { type: "mealSpoiled" },
+  roomsFilthy: { type: "roomFilthy" },
+  roomsCleaned: { type: "roomCleaned" },
+  faults: { type: "faultOccurred" },
+  hazards: { type: "navHazard" },
+  cards: { type: "decisionPending" },
+  conversations: { type: "conversation" },
+} as const satisfies Record<string, { readonly type: EventType; readonly ration?: boolean }>;
 export type BeatKind = keyof typeof BEAT_EVENTS;
 const BEAT_KINDS = Object.keys(BEAT_EVENTS) as BeatKind[];
 
+/** The beat an event marks and how much it counts, or undefined for an event not counted. */
+export function beatOf(event: BeatEvent): { kind: BeatKind; count: number } | undefined {
+  switch (event.type) {
+    case "ateMeal":
+      return { kind: event.payload.ration ? "eatenRation" : "eatenHot", count: 1 };
+    case "mealSpoiled":
+      return { kind: "servingsSpoiled", count: event.payload.count };
+    default: {
+      const kind = EVENT_TO_BEAT.get(event.type);
+      return kind === undefined ? undefined : { kind, count: 1 };
+    }
+  }
+}
+
+/** Rooms counted at the end of each watch, by tier (D82). */
+export const ROOM_TIERS_COUNTED = ["dirty", "filthy"] as const;
+export type CountedTier = (typeof ROOM_TIERS_COUNTED)[number];
+
+/** D83: a meal "fills the mess" when this many eat it hot within `MESS_WINDOW_DAYS` of the serve. */
+export const MESS_FULL_EATERS = 6;
+export const MESS_WINDOW_DAYS = 0.05;
+
 export const ACTIVITY_CLASSES = [
   "helm",
+  "cooking",
+  "mopping",
   "gangway",
   "rounds",
   "hauling",
@@ -73,9 +122,14 @@ export type ActivityClass = (typeof ACTIVITY_CLASSES)[number];
  * Canvas labels (`systems/work/labels.ts`, `core/render.ts` `actionLabel`) to classes, first
  * match wins. "helm" is the bridge: the helm and plotting a course. "ashore" is the captain's
  * business on the dock and in the port (D70) and buying at the market (D47). Anything unmatched
- * is "other", and the report lists those labels so a new one is noticed.
+ * is "other", and the report lists those labels so a new one is noticed. "cooking" is the galley's
+ * work (D81: fetching provisions, at the stove, serving, a plate to the helm); "mopping" is a
+ * cleaning trip (D82: the mop fetched, the rooms mopped, the mop put away). The stander eating in
+ * the seat ("at the helm, eating") is still at the helm.
  */
 const LABEL_CLASSES: readonly (readonly [RegExp, ActivityClass])[] = [
+  [/^(fetching provisions|cooking|serving dinner|taking a plate to the helm)/, "cooking"],
+  [/^(fetching the mop|mopping|putting the mop away)/, "mopping"],
   [
     /^(at the helm|going to the helm|taking the helm|relieving .+ at the helm|plotting a course)/,
     "helm",
@@ -145,6 +199,16 @@ export interface PortWatchBeats {
   readonly gangwaySeconds: number;
 }
 
+/** How full the mess got at each meal served (D83). */
+export interface MessFill {
+  readonly serves: number;
+  /** Hot servings eaten within `MESS_WINDOW_DAYS` of a serve, averaged over the serves. */
+  readonly meanEaters: number;
+  readonly fewestEaters: number;
+  /** Serves eaten hot by at least `MESS_FULL_EATERS` within the window. */
+  readonly fullServes: number;
+}
+
 /** The ship at the end of a sample. */
 export interface ShipSample {
   readonly tick: number;
@@ -155,11 +219,16 @@ export interface ShipSample {
   readonly helmWatchOpen: boolean;
   /** A `cargoToLoad` or `cargoToUnload` problem is open. */
   readonly cargoOpen: boolean;
+  /** Rooms at each counted tier now (`state.dirt.tiers`). */
+  readonly rooms: Readonly<Record<CountedTier, number>>;
 }
 
 export interface BeatsTallyResult {
   readonly watches: number;
   readonly beats: Readonly<Record<BeatKind, BeatStats>>;
+  /** Rooms at each counted tier at the end of each watch (its last sample). */
+  readonly roomsAtWatchEnd: Readonly<Record<CountedTier, BeatStats>>;
+  readonly messFill: MessFill;
   readonly people: readonly PersonBeats[];
   readonly helmUnattendedSeconds: number;
   /** Port calls by watch of the day (index = watch of the day). */
@@ -195,11 +264,26 @@ interface PortWatchTally {
 }
 
 const EVENT_TO_BEAT: ReadonlyMap<string, BeatKind> = new Map(
-  BEAT_KINDS.map((kind) => [BEAT_EVENTS[kind], kind] as const),
+  BEAT_KINDS.filter((kind) => kind !== "eatenHot" && kind !== "eatenRation").map(
+    (kind) => [BEAT_EVENTS[kind].type, kind] as const,
+  ),
 );
+
+function statsOf(counts: readonly number[], watches: number): BeatStats {
+  const total = counts.reduce((sum, n) => sum + n, 0);
+  return {
+    total,
+    perWatchMean: total / watches,
+    perWatchMin: Math.min(...counts),
+    perWatchMax: Math.max(...counts),
+  };
+}
 
 export class BeatsTally {
   private readonly perWatch: Record<BeatKind, number[]>;
+  private readonly roomsAtEnd: Record<CountedTier, number[]>;
+  private readonly serveTicks: number[] = [];
+  private readonly hotEatTicks: number[] = [];
   private readonly people = new Map<string, PersonTally>();
   private readonly other = new Map<string, number>();
   private readonly port: PortWatchTally[];
@@ -210,12 +294,15 @@ export class BeatsTally {
    *   end of its last watch) are an error.
    * @param ticksPerWatch from the config (`watchTicks`).
    * @param watchesPerDay from the config (`time.watchesPerDay`), for the port calls by watch.
+   * @param messWindowTicks `MESS_WINDOW_DAYS` in ticks: how soon after a serve a hot meal
+   *   eaten counts toward that serve's mess.
    */
   constructor(
     private readonly watches: number,
     private readonly ticksPerWatch: number,
     private readonly tickRate: number,
     private readonly watchesPerDay: number,
+    private readonly messWindowTicks: number,
   ) {
     if (!Number.isInteger(watches) || watches <= 0) {
       throw new RangeError(`BeatsTally: watches must be a positive integer, got ${watches}`);
@@ -237,6 +324,9 @@ export class BeatsTally {
     this.perWatch = Object.fromEntries(
       BEAT_KINDS.map((kind) => [kind, new Array<number>(watches).fill(0)]),
     ) as Record<BeatKind, number[]>;
+    this.roomsAtEnd = Object.fromEntries(
+      ROOM_TIERS_COUNTED.map((tier) => [tier, new Array<number>(watches).fill(0)]),
+    ) as Record<CountedTier, number[]>;
   }
 
   /** The watch an event at `tick` is counted in (the step ending at `tick`). */
@@ -244,16 +334,18 @@ export class BeatsTally {
     return Math.floor(Math.max(0, tick - 1) / this.ticksPerWatch);
   }
 
-  events(events: readonly Pick<SimEvent, "type" | "tick">[]): void {
+  events(events: readonly BeatEvent[]): void {
     for (const event of events) {
-      const kind = EVENT_TO_BEAT.get(event.type);
-      if (kind === undefined) continue;
+      const beat = beatOf(event);
+      if (beat === undefined) continue;
       const watch = this.watchOf(event.tick);
-      const counts = this.perWatch[kind];
+      const counts = this.perWatch[beat.kind];
       if (watch >= this.watches) {
         throw new RangeError(`${event.type} at tick ${event.tick} is past the run's last watch`);
       }
-      counts[watch] = (counts[watch] ?? 0) + 1;
+      counts[watch] = (counts[watch] ?? 0) + beat.count;
+      if (beat.kind === "mealsServed") this.serveTicks.push(event.tick);
+      if (beat.kind === "eatenHot") this.hotEatTicks.push(event.tick);
     }
   }
 
@@ -263,6 +355,11 @@ export class BeatsTally {
    */
   sample(ticks: number, people: readonly PersonSample[], ship: ShipSample): void {
     if (ship.helmEmpty) this.unattendedTicks += ticks;
+    // The watch's last sample stands for its end: each sample overwrites the one before.
+    const watch = this.watchOf(ship.tick);
+    if (watch < this.watches) {
+      for (const tier of ROOM_TIERS_COUNTED) this.roomsAtEnd[tier][watch] = ship.rooms[tier];
+    }
     let hauling = false;
     let gangway = false;
     for (const person of people) {
@@ -320,22 +417,29 @@ export class BeatsTally {
     return fresh;
   }
 
+  /** For each serve, the hot meals eaten in `[serve, serve + messWindowTicks)`. */
+  private messFill(): MessFill {
+    const eaters = this.serveTicks.map(
+      (serve) =>
+        this.hotEatTicks.filter((tick) => tick >= serve && tick < serve + this.messWindowTicks)
+          .length,
+    );
+    const serves = eaters.length;
+    return {
+      serves,
+      meanEaters: serves === 0 ? 0 : eaters.reduce((sum, n) => sum + n, 0) / serves,
+      fewestEaters: serves === 0 ? 0 : Math.min(...eaters),
+      fullServes: eaters.filter((n) => n >= MESS_FULL_EATERS).length,
+    };
+  }
+
   result(): BeatsTallyResult {
     const beats = Object.fromEntries(
-      BEAT_KINDS.map((kind) => {
-        const counts = this.perWatch[kind];
-        const total = counts.reduce((sum, n) => sum + n, 0);
-        return [
-          kind,
-          {
-            total,
-            perWatchMean: total / this.watches,
-            perWatchMin: Math.min(...counts),
-            perWatchMax: Math.max(...counts),
-          },
-        ];
-      }),
+      BEAT_KINDS.map((kind) => [kind, statsOf(this.perWatch[kind], this.watches)]),
     ) as Record<BeatKind, BeatStats>;
+    const roomsAtWatchEnd = Object.fromEntries(
+      ROOM_TIERS_COUNTED.map((tier) => [tier, statsOf(this.roomsAtEnd[tier], this.watches)]),
+    ) as Record<CountedTier, BeatStats>;
     const people = [...this.people.values()].map((p): PersonBeats => {
       const sampled = ACTIVITY_CLASSES.reduce((sum, c) => sum + p.ticks[c], 0);
       const shares = Object.fromEntries(
@@ -367,6 +471,8 @@ export class BeatsTally {
     return {
       watches: this.watches,
       beats,
+      roomsAtWatchEnd,
+      messFill: this.messFill(),
       people,
       helmUnattendedSeconds: this.unattendedTicks / this.tickRate,
       port,
@@ -397,6 +503,18 @@ export interface BeatsResult extends BeatsTallyResult {
   /** Voyages hub → Ossory → hub completed in the run. */
   readonly roundTrips: number;
   readonly hooksByKind: Readonly<Partial<Record<NarratorHook["kind"], number>>>;
+  /** D81: provisions aboard at the end of the run. */
+  readonly provisionsCratesAtEnd: number;
+  readonly provisionsDaysAtEnd: number;
+}
+
+/** Rooms at each counted tier now. */
+function roomCounts(world: World): Record<CountedTier, number> {
+  const tiers = Object.values(world.state.dirt.tiers);
+  return {
+    dirty: tiers.filter((t) => t === "dirty").length,
+    filthy: tiers.filter((t) => t === "filthy").length,
+  };
 }
 
 function crewSamples(world: World): PersonSample[] {
@@ -422,7 +540,13 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
   const watches = options.days * values.time.watchesPerDay;
   const ticksPerWatch = watchTicks(values);
   const endTick = watches * ticksPerWatch;
-  const tally = new BeatsTally(watches, ticksPerWatch, tickRate, values.time.watchesPerDay);
+  const tally = new BeatsTally(
+    watches,
+    ticksPerWatch,
+    tickRate,
+    values.time.watchesPerDay,
+    dayTicks(values, MESS_WINDOW_DAYS),
+  );
   const hooksByKind: Partial<Record<NarratorHook["kind"], number>> = {};
 
   let commandCount = 0;
@@ -463,6 +587,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
         helmEmpty,
         helmWatchOpen,
         cargoOpen,
+        rooms: roomCounts(world),
       });
     }
     script.step(world, result.events);
@@ -498,6 +623,8 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     simSeconds: world.state.tick / tickRate,
     roundTrips,
     hooksByKind,
+    provisionsCratesAtEnd: provisionsCratesAboard(world.state, world.content),
+    provisionsDaysAtEnd: provisionsDays(world.state, world.content, values),
   };
 }
 
@@ -568,13 +695,16 @@ function scenarioSection(r: BeatsResult): string[] {
     "| Beat | Total | Per watch (mean) | Least | Most |",
     "|---|---|---|---|---|",
   ];
-  for (const kind of BEAT_KINDS) {
-    const b = r.beats[kind];
-    lines.push(
-      `| ${kind} | ${b.total} | ${fmt(b.perWatchMean, 2)} | ${b.perWatchMin} | ${b.perWatchMax} |`,
-    );
+  const row = (name: string, b: BeatStats) =>
+    `| ${name} | ${b.total} | ${fmt(b.perWatchMean, 2)} | ${b.perWatchMin} | ${b.perWatchMax} |`;
+  for (const kind of BEAT_KINDS) lines.push(row(kind, r.beats[kind]));
+  for (const tier of ROOM_TIERS_COUNTED) {
+    lines.push(row(`${tier} rooms at watch end`, r.roomsAtWatchEnd[tier]));
   }
+  const mess = r.messFill;
   lines.push(
+    "",
+    `Mess: ${mess.serves} meal${mess.serves === 1 ? "" : "s"} served; eaten hot within ${MESS_WINDOW_DAYS} day of the serve by ${fmt(mess.meanEaters)} on average (fewest ${mess.fewestEaters}); ${mess.fullServes} filled the mess (${MESS_FULL_EATERS}+). Provisions at the end: ${r.provisionsCratesAtEnd} crates, ${fmt(r.provisionsDaysAtEnd)} days.`,
     "",
     `Helm empty while not docked: ${fmt(r.helmUnattendedSeconds)} s. Narrator hooks: ${
       Object.entries(r.hooksByKind)

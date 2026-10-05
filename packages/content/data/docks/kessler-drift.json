@@ -203,5 +203,7 @@
       }
     }
   ],
-  "ambience": "The rock hums with the ore conveyor, and every voice on the dock is pitched to carry over it."
+  "ambience": "The rock hums with the ore conveyor, and every voice on the dock is pitched to carry over it.",
+  "grime": 0.3,
+  "airborneDust": 0
 }

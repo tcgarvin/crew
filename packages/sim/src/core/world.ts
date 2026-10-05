@@ -9,6 +9,7 @@ import { configTicks } from "./clock";
 import { type ApplyCtx, applyCommandNow } from "./commands";
 import { headNeedingNarration } from "./decisions";
 import { createDefLookup } from "./defs";
+import { emptyCells } from "./dirt-grid";
 import { dockForPort } from "./docks";
 import { createEventBuffer } from "./events";
 import { allocateId, initialIdCounters } from "./ids";
@@ -64,6 +65,8 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     travel: { stage: "docked", portId: scenario.startPortId },
     watch: { lastBellWatch: 0, helm: {} },
     hazards: [],
+    dirt: { cells: {}, tiers: {}, dustThisVisit: 0 },
+    galley: { lastMealWatch: 0 },
     jobs: {},
     money: { balance: 0, transactions: {} },
     markets: {},
@@ -105,6 +108,8 @@ export function shipDeckId(state: { readonly deck: Pick<WorldState["deck"], "til
  */
 function instantiateDeck(state: WorldState, deck: DeckDef, content: ContentBundle, rng: RngApi) {
   state.deck.tiles[deck.id] = {};
+  // D82: a clean deck; the dirt system writes the cells from here on.
+  state.dirt.cells[deck.id] = emptyCells(deck);
   for (const def of deck.compartments) {
     const id = allocateId(state, "compartment");
     state.compartments[id] = { id, deckId: deck.id, key: def.key };

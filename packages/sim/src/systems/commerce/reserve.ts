@@ -1,12 +1,20 @@
 /**
  * D80: the stores the ship keeps aboard, bought at port like a part (D47) when they run low.
  *
- * Food is reckoned in days: the nutrition of the food aboard over the people aboard who eat
- * (crew and passengers) times `needs.hungerPerDay`. Under `commerce.foodReserve.lowBelowDays`,
- * while docked at a port whose market sells food, the shortfall to `restockToDays` is a
- * `reserveLow` problem (owner commerce, public, routine) for that food, and commerce derives the
- * same `buyParts` task it derives for `partsNeeded` (`tasks.ts`). Ship-life slice 3's
- * `provisionsLow` has the same shape and replaces the food rule when the galley cooks.
+ * Provisions (D81) are reckoned in days of meals (`systems/galley/provisions.ts`
+ * `provisionsDays`: a crate a meal, a meal a watch, so crates over `time.watchesPerDay`). Under
+ * `galley.lowBelowDays`, while docked at a port whose market sells a `provisions`-tagged item,
+ * the crates that bring it to `galley.restockToDays` are a `reserveLow` problem for that item.
+ * `galley.lowBelowDays` 0 turns it off.
+ *
+ * Food is reckoned in days of hunger: the nutrition of the `food` aboard over the people aboard
+ * who eat (crew and passengers) times `needs.hungerPerDay`. Under
+ * `commerce.foodReserve.lowBelowDays`, while docked at a port whose market sells food, the
+ * shortfall to `restockToDays` is a `reserveLow` problem (owner commerce, public, routine) for
+ * that food, and commerce derives the same `buyParts` task it derives for `partsNeeded`
+ * (`tasks.ts`). Provisions are not `food` (nobody eats a crate) and a served meal is, so once the
+ * galley cooks this rule keeps the ration packs, the fallback, stocked; the tuning commit sets how
+ * many.
  *
  * Spares are reckoned in units: each `spare`-tagged item the market sells is kept at
  * `commerce.sparesReserve` units aboard, so a fault far from port finds its part in the hold.
@@ -24,6 +32,7 @@ import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { ProblemOfKind } from "../../core/types/work";
 import { resolveProblem } from "../equipment/problems";
 import { unitsAboard } from "../equipment/supplies";
+import { cratesPerDay, provisionsDays, provisionsDefs } from "../galley/provisions";
 
 type ReserveCtx = Pick<StepCtx, "content" | "config"> & {
   readonly state: Pick<ReadonlyWorldState, "items" | "jobs" | "actors" | "markets">;
@@ -89,6 +98,23 @@ function foodShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveSho
   return units > 0 ? [{ itemDefId: food.id, count: units }] : [];
 }
 
+/**
+ * D81: the provisions to buy here, if the galley's days of meals are low and the market sells a
+ * `provisions` item (the first by id): the crates that bring the days to `restockToDays`, a
+ * crate a meal (`galley/provisions.ts`).
+ */
+function provisionsShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
+  const { lowBelowDays, restockToDays } = ctx.config.galley;
+  if (lowBelowDays <= 0) return [];
+  const days = provisionsDays(ctx.state, ctx.content, ctx.config);
+  if (days >= lowBelowDays) return [];
+  const sold = new Set(stock);
+  const def = provisionsDefs(ctx.content).find((d) => sold.has(d.id));
+  if (def === undefined) return [];
+  const crates = wholeUnits((restockToDays - days) * cratesPerDay(ctx.config));
+  return crates > 0 ? [{ itemDefId: def.id, count: crates }] : [];
+}
+
 /** Each `spare`-tagged item sold here that the ship holds fewer than the reserve of. */
 function spareShortfalls(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
   const reserve = ctx.config.commerce.sparesReserve;
@@ -109,7 +135,11 @@ function spareShortfalls(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveS
  */
 export function reserveShortfalls(ctx: ReserveCtx, portId: PortDefId): ReserveShortfall[] {
   const stock = inStock(ctx, portId);
-  return [...foodShortfall(ctx, stock), ...spareShortfalls(ctx, stock)];
+  return [
+    ...provisionsShortfall(ctx, stock),
+    ...foodShortfall(ctx, stock),
+    ...spareShortfalls(ctx, stock),
+  ];
 }
 
 const dedupeKeyOf = (itemDefId: ItemDefId): string => `reserveLow:${itemDefId}`;

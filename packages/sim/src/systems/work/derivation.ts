@@ -47,6 +47,9 @@ const PROBLEM_KIND_SET = {
   partsNeeded: true,
   courseToPlot: true,
   reserveLow: true,
+  mealToCook: true,
+  mealToCarry: true,
+  compartmentDirty: true,
 } as const satisfies Record<ProblemKind, true>;
 
 export const PROBLEM_KINDS = Object.keys(PROBLEM_KIND_SET) as ProblemKind[];

@@ -212,6 +212,11 @@ export interface Actor {
   mood: number;
   /** D79: live thoughts, which mood sums (owner: `core/thoughts.ts` adds, needs prunes). */
   thoughts: Thought[];
+  /**
+   * D82: dirt on the boots in [0, 1], loaded on dock floor and dirty tiles, shed on the deck as
+   * they walk (owner: dirt, written from movement through `trackFootfall`).
+   */
+  boots: number;
   schedule: Schedule;
   activity: Activity;
   /**

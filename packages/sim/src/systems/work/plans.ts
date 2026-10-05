@@ -20,6 +20,10 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { cleanPlan } from "../dirt/clean";
+import { cookPlan } from "../galley/cook";
+import { carryMealPlan, eatPlan } from "../galley/eat";
+import { estimateTravelTicks } from "../spatial/estimates";
 import { plotCoursePlan } from "../travel/course";
 import { gangwayPlan, helmPlan } from "../watch/helm";
 import { roundsPlan } from "../watch/rounds";
@@ -31,8 +35,11 @@ export type PlanResult =
 
 type Purpose = "operate" | "repair" | "use";
 
-const planOf = (steps: ActivityStep[]): PlanResult => ({ ok: true, plan: { steps, stepIndex: 0 } });
-const blocked = (reason: BlockageReason): PlanResult => ({ ok: false, reason });
+export const planOf = (steps: ActivityStep[]): PlanResult => ({
+  ok: true,
+  plan: { steps, stepIndex: 0 },
+});
+export const blocked = (reason: BlockageReason): PlanResult => ({ ok: false, reason });
 
 export const tileOf = (location: { x: number; y: number }): TileCoord => ({
   x: Math.floor(location.x),
@@ -77,7 +84,7 @@ function pickupTile(ctx: StepCtx, actor: Actor, location: PhysicalLocation): Til
   return undefined;
 }
 
-function acquireSteps(
+export function acquireSteps(
   ctx: StepCtx,
   actor: Actor,
   itemId: ItemId,
@@ -111,13 +118,25 @@ function distance(a: TileCoord, b: TileCoord): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-/** Known, not-absent items matching `predicate`, nearest first by believed tile. */
+/**
+ * Known, not-absent items matching `predicate`, nearest first by the schematic walk from where
+ * the actor stands (`estimateTravelTicks`, the planner's own measure), leaving out any the
+ * schematic has no route to. Measured by the walk and not as the crow flies because beliefs go
+ * stale: a toolkit seen on the dock at the last port is still "on the dock" once the ship has
+ * sailed, and a plan that fetched the nearest believed tool by distance sent the engineer to
+ * that dock tile from the mess, failed, backed off and tried again, while a toolkit lay beside
+ * the machine (the slice-3 tuning run: the ship drifted two days on a generator fault). The
+ * planner (`taskTravel`) already skips tools it cannot route to; now the plan agrees with it.
+ * Off the deck (ashore), by distance as before.
+ */
 function knownItemsNearest(
   ctx: StepCtx,
   actor: Actor,
   predicate: (defId: ItemId) => boolean,
 ): ItemId[] {
-  const here = actor.location.kind === "onDeck" ? tileOf(actor.location) : { x: 0, y: 0 };
+  const onDeck = actor.location.kind === "onDeck" ? actor.location : undefined;
+  const here = onDeck === undefined ? { x: 0, y: 0 } : tileOf(onDeck);
+  const geometry = onDeck === undefined ? undefined : ctx.caches.nav.decks[onDeck.deckId];
   const candidates: { itemId: ItemId; d: number }[] = [];
   for (const fact of Object.values(actor.knowledge)) {
     if (fact.factType !== "itemLocation" || fact.value.absent === true) continue;
@@ -125,7 +144,12 @@ function knownItemsNearest(
     if (!predicate(itemId)) continue;
     const tile = pickupTile(ctx, actor, fact.value.location);
     if (tile === undefined) continue;
-    candidates.push({ itemId, d: distance(here, tile) });
+    const d =
+      geometry === undefined
+        ? distance(here, tile)
+        : estimateTravelTicks(geometry, here, tile, ctx.config, 1, ctx.caches);
+    if (d === null) continue;
+    candidates.push({ itemId, d });
   }
   candidates.sort((a, b) => a.d - b.d || (a.itemId < b.itemId ? -1 : 1));
   return candidates.map((c) => c.itemId);
@@ -264,31 +288,11 @@ function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.type === "haul") return haulPlan(ctx, actor, task);
   if (task.type === "buyParts") return buyPlan(ctx, actor, task);
+  // D81: the galley's plans are its own (`systems/galley/`); D82: the mop's is dirt's.
+  if (task.type === "cookMeal") return cookPlan(ctx, actor, task);
+  if (task.type === "carryMeal") return carryMealPlan(ctx, actor, task);
+  if (task.type === "cleanCompartment") return cleanPlan(ctx, actor, task);
   return machineTaskPlan(ctx, actor, task);
-}
-
-/** Eat: get one unit (unless one is in hand), optionally carry it to `table`, eat, consume. */
-function eatPlan(
-  ctx: StepCtx,
-  actor: Actor,
-  itemId: ItemId | undefined,
-  table: TileCoord | undefined,
-): PlanResult {
-  const mealTicks = dayTicks(ctx.config, ctx.config.needs.mealDays);
-  const meal: ActivityStep[] = [
-    ...(table === undefined
-      ? []
-      : [{ kind: "moveTo", target: { x: table.x, y: table.y }, requested: false } as const]),
-    { kind: "work", stage: "eat", ticksDone: 0, ticksNeeded: mealTicks },
-  ];
-  const inHand = carriedItems(ctx, actor.id).find((item) =>
-    ctx.content.items[item.defId]?.tags.includes("food"),
-  );
-  if (inHand !== undefined) return planOf([...meal, { kind: "consume", itemId: inHand.id }]);
-  if (itemId === undefined) return blocked("inaccessibleSupply");
-  const acquire = acquireSteps(ctx, actor, itemId, true);
-  if (typeof acquire === "string") return blocked(acquire);
-  return planOf([...acquire, ...meal, { kind: "consume", itemId }]);
 }
 
 /** D74: is this bed someone else's berth? Nobody lies down in another's bed. */

@@ -1,5 +1,6 @@
 /** Needs and bodies events (W4a; body events are declared now, emitted once bodies exist). */
 import type { NeedKey } from "../actor";
+import type { MealQuality } from "../content";
 import type { SignificanceCatalog } from "./significance";
 
 export interface NeedsEventPayloads {
@@ -10,7 +11,11 @@ export interface NeedsEventPayloads {
   };
   fellAsleep: Record<string, never>;
   wokeUp: Record<string, never>;
-  ateMeal: { readonly nutrition: number };
+  /**
+   * Someone ate one unit. D81: `quality` is the served meal's (absent for food without a
+   * `meal`); `ration` says it was that fallback.
+   */
+  ateMeal: { readonly nutrition: number; readonly quality?: MealQuality; readonly ration: boolean };
   /**
    * W4a addition: ambient chat between two nearby off-duty/idle crew (subjects: speaker,
    * listener). `line` is the rendered ticker text. No relationship effects in V1.

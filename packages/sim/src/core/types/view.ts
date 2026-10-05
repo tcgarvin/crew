@@ -13,6 +13,7 @@ import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "
 import type {
   CargoClass,
   DeckDef,
+  DirtTier,
   ItemTag,
   MachineTag,
   RoleTag,
@@ -64,6 +65,8 @@ export interface WatchView {
   readonly section?: LocalKey;
   /** Their section has the watch now (always false for a dayworker). */
   readonly onWatch: boolean;
+  /** D81: their section stands the next watch of the day (always false for a dayworker). */
+  readonly nextOnWatch: boolean;
   readonly dayworker: boolean;
   readonly helmRole: HelmRole;
   /** Captain or first officer in the section on watch, and not its helm-stander. */
@@ -407,6 +410,22 @@ export interface RenderDockProp {
   readonly deckId: DeckDefId;
   readonly x: number;
   readonly y: number;
+}
+
+/**
+ * D82: the dirt grid for the renderer's grime tint, on its own channel at its own cadence
+ * (`host.dirtFrameEverySeconds`), keyed by tick so playback applies it at `viewTick`. One byte per
+ * authored deck tile, row-major (`y × width + x`), 255 = 1.0 of dirt. Structured-clone safe but
+ * not JSON: it never enters state (`WorldState.dirt.cells` holds plain integers).
+ */
+export interface DirtFrame {
+  readonly tick: Tick;
+  readonly deckId: DeckDefId;
+  readonly width: number;
+  readonly height: number;
+  readonly cells: Uint8Array;
+  /** The rooms' tiers at `tick` (`WorldState.dirt.tiers`), for the inspector's subtitle. */
+  readonly tiers: Readonly<Record<LocalKey, DirtTier>>;
 }
 
 /**

@@ -39,8 +39,11 @@ import itemCrateHazardous from "../data/items/crate-hazardous.json";
 import itemCratePerishable from "../data/items/crate-perishable.json";
 import itemHandTruck from "../data/items/hand-truck.json";
 import itemHarmonica from "../data/items/harmonica.json";
+import itemHotMeal from "../data/items/hot-meal.json";
 import itemMedKit from "../data/items/med-kit.json";
+import itemMop from "../data/items/mop.json";
 import itemOldPhotograph from "../data/items/old-photograph.json";
+import itemProvisions from "../data/items/provisions.json";
 import itemRationPack from "../data/items/ration-pack.json";
 import itemSparePartsStack from "../data/items/spare-parts-stack.json";
 import itemToolkit from "../data/items/toolkit.json";
@@ -85,7 +88,12 @@ import dockVesperGate from "../data/docks/vesper-gate.json";
 
 import scenarioDefault from "../data/scenarios/default.json";
 
-// Thoughts (D79)
+// Thoughts (D79, D81, D82)
+import thoughtAteInDirtyMess from "../data/thoughts/ate-in-dirty-mess.json";
+import thoughtAteInFilthyMess from "../data/thoughts/ate-in-filthy-mess.json";
+import thoughtAteRationPack from "../data/thoughts/ate-ration-pack.json";
+import thoughtAteWell from "../data/thoughts/ate-well.json";
+import thoughtBurntDinner from "../data/thoughts/burnt-dinner.json";
 import thoughtDoubleWatch from "../data/thoughts/double-watch.json";
 import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
 import thoughtHelmScrape from "../data/thoughts/helm-scrape.json";
@@ -134,6 +142,9 @@ const ITEMS = [
   itemCrateHazardous,
   itemHarmonica,
   itemOldPhotograph,
+  itemProvisions,
+  itemHotMeal,
+  itemMop,
 ];
 const CREW = [
   crewMaraOsei,
@@ -181,6 +192,11 @@ const THOUGHTS = [
   thoughtDoubleWatch,
   thoughtHelmCleanPass,
   thoughtHelmScrape,
+  thoughtAteWell,
+  thoughtBurntDinner,
+  thoughtAteRationPack,
+  thoughtAteInDirtyMess,
+  thoughtAteInFilthyMess,
 ];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */

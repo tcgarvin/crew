@@ -18,7 +18,7 @@
 import type { Actor } from "./actor";
 import type { CommandsState } from "./commands";
 import type { RngStreamName, Sfc32State, Tick } from "./common";
-import type { CrewDef, HazardKind, ItemDef } from "./content";
+import type { CrewDef, DirtTier, HazardKind, ItemDef } from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
 import type { DocksideState } from "./dockside";
 import type {
@@ -27,6 +27,7 @@ import type {
   CommandId,
   CompartmentId,
   CrewDefId,
+  DeckDefId,
   DoorId,
   HazardId,
   ItemDefId,
@@ -61,8 +62,33 @@ import type { Claim, Problem, Task } from "./work";
  * 8 (2026-10-04): ship life slice 2 (D77-D79): watches replace shifts (`Actor.schedule.section`
  * from the scenario's watch bill), `Actor.thoughts`, `watch`, `hazards` and `nextId.hazard`, the
  * narrator budget's hazard line and refill tick, `post` on `stationToStaff`. Migrated.
+ * 9 (2026-10-04): ship life slice 3 (D81-D83): `dirt` (a cell grid per deck and room tiers),
+ * `galley` (the meal's bookkeeping), `Actor.boots`, `Item.meal`. Migrated; an old save also gets
+ * the scenario's provisions and mop spawned so it cooks tonight.
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
+
+/**
+ * D82: dirt. Owner: dirt (`systems/dirt/`). `cells[deckId]` is one row-major integer per authored
+ * deck tile (`y × width + x`, `core/dirt-grid.ts`), 0..255 with 255 = 1.0 of dirt; dock floor has
+ * no cell. `tiers` is the last tier written per room (`CompartmentDef.key`), so a transition is
+ * seen once; `dustThisVisit` is the airborne dust settled since the ship last docked.
+ */
+export interface DirtState {
+  cells: Record<DeckDefId, number[]>;
+  tiers: Record<LocalKey, DirtTier>;
+  dustThisVisit: number;
+}
+
+/**
+ * D81: the galley's bookkeeping. Owner: galley (`systems/galley/`). `lastMealWatch` is the
+ * `watchIndexAt` of the last watch a `mealToCook` was raised for; `helmMeal` is the stander's
+ * plate being eaten in the seat (a meal run on the spot rather than planned).
+ */
+export interface GalleyState {
+  lastMealWatch: number;
+  helmMeal?: { actorId: ActorId; itemId: ItemId; startedTick: Tick };
+}
 
 /**
  * D77: the watch's bookkeeping. Owner: watch (`systems/watch/`).
@@ -157,6 +183,10 @@ export interface WorldState {
   watch: WatchState;
   /** Owner: travel (D78). Navigation hazards waiting to fire, in scheduling order. */
   hazards: ScheduledHazard[];
+  /** Owner: dirt (D82). */
+  dirt: DirtState;
+  /** Owner: galley (D81). */
+  galley: GalleyState;
   /** Owner: commerce (W6). */
   jobs: Record<JobId, Job>;
   /** Owner: commerce (W6). Integer credits. */

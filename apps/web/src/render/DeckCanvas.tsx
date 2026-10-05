@@ -1,4 +1,4 @@
-import type { PortDef, PortDefId, RenderFrame } from "@crew/sim";
+import type { DirtFrame, PortDef, PortDefId, RenderFrame } from "@crew/sim";
 /**
  * Canvas host component (PLAN §6 W7). Fits the ship to the viewport (devicePixelRatio-aware),
  * draws on animation frames, and turns taps/clicks into entity selection for the inspector.
@@ -34,6 +34,7 @@ import {
   screenToWorld,
   shouldRotate,
 } from "./draw";
+import type { GrimeTint } from "./grime";
 import { engineOutput, hullGeometry } from "./hull";
 import { pickAt } from "./pick";
 import { sceneAt, withDockSky } from "./scene";
@@ -49,6 +50,10 @@ export interface DeckCanvasProps {
   /** The content's dock maps (empty when it has none: every port draws the stand-in berth). */
   readonly docks: DockTable;
   readonly frame: RenderFrame | undefined;
+  /** D82: the dirt frame playback has reached, for the grime tint; none yet draws a clean deck. */
+  readonly dirt: DirtFrame | undefined;
+  /** D82: the tint's knobs (`config.dirt`). */
+  readonly grimeTint: GrimeTint;
   /** The game is paused: the stars and plume hold still with it. */
   readonly paused: boolean;
   readonly selected: Selection | undefined;
@@ -78,6 +83,8 @@ export function DeckCanvas({
   ports,
   docks,
   frame,
+  dirt,
+  grimeTint,
   paused,
   selected,
   onSelect,
@@ -92,12 +99,12 @@ export function DeckCanvas({
   const scrollRef = useRef(new StarScroll());
   /** Bumped whenever the picture must be redrawn even if nothing is animating. */
   const dirtyRef = useRef(true);
-  const latest = useRef({ frame, selected, paused });
+  const latest = useRef({ frame, dirt, selected, paused });
 
   useEffect(() => {
-    latest.current = { frame, selected, paused };
+    latest.current = { frame, dirt, selected, paused };
     dirtyRef.current = true;
-  }, [frame, selected, paused]);
+  }, [frame, dirt, selected, paused]);
 
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -146,7 +153,7 @@ export function DeckCanvas({
     const tick = (now: number) => {
       const delta = now - last;
       last = now;
-      const { frame: current, selected: chosen, paused: still } = latest.current;
+      const { frame: current, dirt: grime, selected: chosen, paused: still } = latest.current;
       if (current !== undefined) {
         const dock = dockInView(current, docks);
         const scene = withDockSky(sceneAt(current.travel, ports, { reducedMotion }), dock);
@@ -188,6 +195,7 @@ export function DeckCanvas({
               flicker: flickering ? plumeFlicker(now) : 0,
               dock,
               clamps: clampEngagement(current.travel),
+              ...(grime === undefined ? {} : { grime: { dirt: grime, tint: grimeTint } }),
             },
             chosen,
           );
@@ -200,7 +208,7 @@ export function DeckCanvas({
       cancelAnimationFrame(raf);
       media.removeEventListener("change", onMotionChange);
     };
-  }, [layout, ports, docks, hull, stars]);
+  }, [layout, ports, docks, hull, stars, grimeTint]);
 
   const handlePointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {

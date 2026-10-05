@@ -63,6 +63,11 @@ export interface HostDeps {
   readonly frameEveryTicks?: number;
   /** How often to snapshot into the view-time ring, in sim-seconds. Default 2. */
   readonly snapshotIntervalSeconds?: number;
+  /**
+   * D82: how often, in sim-seconds, the dirt grid is posted (`host.dirtFrameEverySeconds`): on
+   * load, and whenever a burst's tick crosses a multiple of it. Default 5.
+   */
+  readonly dirtFrameEverySeconds?: number;
   readonly clock?: HostClock;
 }
 
@@ -83,6 +88,7 @@ export function createHost(deps: HostDeps): Host {
   const burstTicksPerLoop = Math.max(1, deps.burstTicksPerLoop ?? 40);
   const frameEveryTicks = Math.max(1, deps.frameEveryTicks ?? 2);
   const snapshotIntervalSeconds = deps.snapshotIntervalSeconds ?? 2;
+  const dirtFrameEverySeconds = deps.dirtFrameEverySeconds ?? 5;
 
   let world: World | undefined;
   let tickRate = 20;
@@ -132,6 +138,18 @@ export function createHost(deps: HostDeps): Host {
   function emitFrame(): void {
     if (!world) return;
     deps.postMessage({ type: "frame", frame: deps.kernel.getRenderFrame(world) });
+  }
+
+  /** D82: the grime tint's data, keyed by tick; the main thread applies it at `viewTick`. */
+  function emitDirtFrame(): void {
+    if (!world) return;
+    deps.postMessage({ type: "dirt", frame: deps.kernel.getDirtFrame(world) });
+  }
+
+  /** Did the ticks `from` (exclusive) to `to` cross a multiple of the dirt cadence? */
+  function dirtFrameDue(from: Tick, to: Tick): boolean {
+    const every = Math.max(1, Math.round(tickRate * dirtFrameEverySeconds));
+    return Math.floor(to / every) > Math.floor(from / every);
   }
 
   function emitRunAheadStatus(): void {
@@ -236,6 +254,7 @@ export function createHost(deps: HostDeps): Host {
     let remaining = ticks;
     while (remaining > 0) {
       const chunk = Math.min(frameEveryTicks, remaining);
+      const before = world.state.tick;
       const result = deps.kernel.advance(world, chunk);
       remaining -= chunk;
       if (result.events.length > 0) {
@@ -244,6 +263,7 @@ export function createHost(deps: HostDeps): Host {
       if (result.ticksAdvanced > 0) {
         pushSnapshotIfDue();
         emitFrame();
+        if (dirtFrameDue(before, world.state.tick)) emitDirtFrame();
       }
       if (result.halt.kind !== "completed") {
         handleHalt(result.halt.kind);
@@ -307,6 +327,7 @@ export function createHost(deps: HostDeps): Host {
         lastSnapshotTick = world.state.tick;
         pushSnapshotIfDue();
         emitFrame();
+        emitDirtFrame();
         emitRunAheadStatus();
         return;
       }

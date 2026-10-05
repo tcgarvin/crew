@@ -26,6 +26,13 @@ export {
 export { travelViolations } from "./systems/travel/invariants";
 export { registerNeeds } from "./systems/needs/index";
 export {
+  galleyTaskDerivations,
+  provisionsCratesAboard,
+  provisionsDays,
+  registerGalley,
+} from "./systems/galley/index";
+export { dirtTaskDerivations, dirtViolations, registerDirt } from "./systems/dirt/index";
+export {
   gangwayStanderOf,
   helmWatchOf,
   isOnDuty,
@@ -34,5 +41,6 @@ export {
 } from "./systems/watch/index";
 export { equipmentStages, registerWork } from "./systems/work/index";
 export { workViolations } from "./systems/work/invariants";
+export { cleaningRolesFor } from "./planner/cleaning";
 export { registerPlannerDefaults } from "./planner/index";
 export { toAgentViewSnapshot } from "./view/index";

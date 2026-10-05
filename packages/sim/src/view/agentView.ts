@@ -19,6 +19,7 @@
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
  * of the following tick. Backoff and blockage `retryAfterTick`s compare against this tick.
  */
+import { watchOfDay } from "../core/clock";
 import { isOnDock } from "../core/docks";
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
@@ -161,6 +162,10 @@ function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["wa
   return {
     ...(section === undefined ? {} : { section: section.key }),
     onWatch: isOnWatch(actor.schedule, tick, config),
+    // D81: the section that stands the next watch eats first at the mess call.
+    nextOnWatch:
+      section !== undefined &&
+      section.index === (watchOfDay(config, tick) + 1) % config.time.watchesPerDay,
     dayworker: section === undefined,
     helmRole: helmRoleOf(helm, actor.id),
     officerOfTheWatch: isOfficerOfTheWatch(helm, actor.id),

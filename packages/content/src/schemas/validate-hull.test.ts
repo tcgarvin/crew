@@ -12,15 +12,18 @@ import {
 
 type Position = MachineTagTable[string]["interactionPositions"][number];
 
-const position = (key: string, purposes: Position["purposes"]): Position => ({
+const position = (key: string, purposes: Position["purposes"], y = 0): Position => ({
   key,
-  offset: { x: -1, y: 0 },
+  offset: { x: -1, y },
   purposes,
   capacity: 1,
 });
 
 /** The helm's seat and, apart from it, the standby tile the oncoming waits on (D77). */
 const HELM_POSITIONS = [position("seat", ["operate", "repair"]), position("standby", ["use"])];
+
+/** Four seats at one table (D81). */
+const TABLE_SEATS = [0, 1, 2, 3].map((y) => position(`seat_${y}`, ["use"], y));
 
 const tagged = (tag: MachineTag, interactionPositions = [position("front", ["use"])]) => ({
   tags: [tag],
@@ -31,7 +34,7 @@ const MACHINES: MachineTagTable = {
   "machine.engine": tagged("engine"),
   "machine.pump": tagged("cooling"),
   "machine.stove": tagged("stove"),
-  "machine.table": tagged("messTable"),
+  "machine.table": tagged("messTable", TABLE_SEATS),
   "machine.bunk": tagged("bed"),
   "machine.medbed": tagged("medBed"),
   "machine.helm": tagged("pilotStation", HELM_POSITIONS),
@@ -96,7 +99,13 @@ const RAW_DECK = {
     placed("nav_1", "machine.nav", 7),
   ],
   powerDomains: [],
-  zones: [{ key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 2, y: 2 }] }],
+  zones: [
+    { key: "stow", name: "Stowage", tags: ["cargoStowage"], tiles: [{ x: 2, y: 2 }] },
+    { key: "pantry", name: "Pantry", tags: ["pantry"], tiles: [{ x: 0, y: 2 }] },
+    // the stove's use tile is (2,1), so (1,1) is beside it
+    { key: "serving", name: "Serving", tags: ["serving"], tiles: [{ x: 1, y: 1 }] },
+    { key: "mops", name: "Mops", tags: ["cleaningLocker"], tiles: [{ x: 4, y: 2 }] },
+  ],
   docking: {
     cargoRampDoorKey: "cargo_ramp",
     personnelRampDoorKey: "personnel_ramp",
@@ -266,7 +275,7 @@ describe("hull contract (D72)", () => {
 
   it("requires a cargoStowage zone", () => {
     const messages = hullMessages((deck) => {
-      deck.zones = [];
+      deck.zones = deck.zones.filter((z) => z.key !== "stow");
     });
     expect(messages).toEqual([`${AT}.zones: no zone tagged "cargoStowage"`]);
   });
@@ -276,6 +285,55 @@ describe("hull contract (D72)", () => {
       deck.spawnPoints = deck.spawnPoints.filter((s) => !s.tags.includes(tag));
     });
     expect(messages).toEqual([`${AT}.spawnPoints: no spawn point tagged "${tag}"`]);
+  });
+
+  describe("the galley loop (D81, D82)", () => {
+    it.each(["pantry", "serving", "cleaningLocker"])("requires a %s zone", (tag) => {
+      const messages = hullMessages((deck) => {
+        deck.zones = deck.zones.filter((z) => !z.tags.includes(tag));
+      });
+      expect(messages).toContain(`${AT}.zones: no zone tagged "${tag}"`);
+    });
+
+    it("requires a serving tile beside the stove's use position", () => {
+      const messages = hullMessages((deck) => {
+        deck.zones = deck.zones.map((z) =>
+          z.key === "serving" ? { ...z, tiles: [{ x: 6, y: 2 }] } : z,
+        );
+      });
+      expect(messages).toEqual([
+        `${AT}.zones: no "serving" tile is beside a stove's use position: (2,1)`,
+      ]);
+    });
+
+    it("does not take the stove's own use tile as beside it", () => {
+      const messages = hullMessages((deck) => {
+        deck.zones = deck.zones.map((z) =>
+          z.key === "serving" ? { ...z, tiles: [{ x: 2, y: 1 }] } : z,
+        );
+      });
+      expect(messages).toHaveLength(1);
+    });
+
+    it("requires the mess tables to seat four", () => {
+      const messages = hullMessages(undefined, {
+        ...MACHINES,
+        "machine.table": tagged("messTable", TABLE_SEATS.slice(0, 3)),
+      });
+      expect(messages).toEqual([
+        `${AT}.machines: the mess tables seat 3; at least 4 use positions are needed`,
+      ]);
+    });
+
+    it("counts seats across tables", () => {
+      const messages = hullMessages(
+        (deck) => {
+          deck.machines.push(placed("table_2", "machine.table", 7));
+        },
+        { ...MACHINES, "machine.table": tagged("messTable", TABLE_SEATS.slice(0, 2)) },
+      );
+      expect(messages).toEqual([]);
+    });
   });
 
   describe("lockers", () => {
@@ -297,13 +355,13 @@ describe("hull contract (D72)", () => {
 
     it("rejects a locker that names no bed", () => {
       expect(withLockers(locker("locker_1"))).toEqual([
-        `${AT}.zones.1.machineKey: locker "locker_1" names no bed (machineKey)`,
+        `${AT}.zones.4.machineKey: locker "locker_1" names no bed (machineKey)`,
       ]);
     });
 
     it("rejects a locker serving a placement that is not a bed", () => {
       expect(withLockers(locker("locker_1", "helm_1"))).toEqual([
-        `${AT}.zones.1.machineKey: locker "locker_1" serves "helm_1", which is not a bed`,
+        `${AT}.zones.4.machineKey: locker "locker_1" serves "helm_1", which is not a bed`,
       ]);
     });
 
@@ -315,13 +373,13 @@ describe("hull contract (D72)", () => {
         deck.zones = [...deck.zones, locker("locker_1", "bunk_2")] as RawDeck["zones"];
       });
       expect(messages).toEqual([
-        `${AT}.zones.1.machineKey: locker "locker_1" serves "bunk_2", which is not a bed`,
+        `${AT}.zones.4.machineKey: locker "locker_1" serves "bunk_2", which is not a bed`,
       ]);
     });
 
     it("rejects two lockers serving one bed", () => {
       expect(withLockers(locker("locker_1", "bunk_1"), locker("locker_2", "bunk_1"))).toEqual([
-        `${AT}.zones.2.machineKey: lockers "locker_1" and "locker_2" both serve bed "bunk_1"`,
+        `${AT}.zones.5.machineKey: lockers "locker_1" and "locker_2" both serve bed "bunk_1"`,
       ]);
     });
   });

@@ -59,10 +59,14 @@ import {
   createKernel,
   createRegistry,
   daysToSeconds,
+  dirtTaskDerivations,
   equipmentStages,
   equipmentTaskDerivation,
+  galleyTaskDerivations,
   registerCommerce,
+  registerDirt,
   registerEquipmentSystems,
+  registerGalley,
   registerNeeds,
   registerPlannerDefaults,
   registerSpatial,
@@ -184,15 +188,19 @@ export function createPacingRegistry(): KernelRegistry {
   const registry = createRegistry();
   registerSpatial(registry);
   registerEquipmentSystems(registry);
+  registerDirt(registry);
   registerTravel(registry);
   registerCommerce(registry);
   registerNeeds(registry);
   registerWatch(registry);
+  registerGalley(registry);
   registerWork(registry, {
     derivations: {
       ...equipmentTaskDerivation,
       ...travelTaskDerivations,
       ...commerceTaskDerivations,
+      ...galleyTaskDerivations,
+      ...dirtTaskDerivations,
     },
     stages: equipmentStages,
   });
