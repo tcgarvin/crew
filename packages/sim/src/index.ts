@@ -41,5 +41,6 @@ export {
 } from "./systems/watch/index";
 export { equipmentStages, registerWork } from "./systems/work/index";
 export { workViolations } from "./systems/work/invariants";
+export { cleaningRolesFor } from "./planner/cleaning";
 export { registerPlannerDefaults } from "./planner/index";
 export { toAgentViewSnapshot } from "./view/index";

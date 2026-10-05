@@ -4,6 +4,7 @@ import { checkInvariants } from "../../../core/invariants";
 import { actionLabel } from "../../../core/render";
 import type { SimEvent } from "../../../core/types/events";
 import type { ActorId } from "../../../core/types/ids";
+import { dirtViolations } from "../../dirt/invariants";
 import { spatialViolations } from "../../spatial/invariants";
 
 export interface RunLog {
@@ -21,7 +22,11 @@ export function run(
   const labels: Record<ActorId, string[]> = {};
   for (let i = 0; i < ticks; i++) {
     const result = kernel.advance(world, 1);
-    const violations = [...checkInvariants(world.state), ...spatialViolations(world)];
+    const violations = [
+      ...checkInvariants(world.state),
+      ...spatialViolations(world),
+      ...dirtViolations(world),
+    ];
     if (violations.length > 0)
       throw new Error(`tick ${world.state.tick}: ${violations.join("; ")}`);
     events.push(...result.events);

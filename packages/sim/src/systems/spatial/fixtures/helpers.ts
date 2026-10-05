@@ -2,6 +2,7 @@ import type { TestWorld } from "../../../core/fixtures/test-world";
 /** Test helpers shared by the spatial tests. */
 import { checkInvariants } from "../../../core/invariants";
 import type { SimEvent } from "../../../core/types/events";
+import { dirtViolations } from "../../dirt/invariants";
 import { spatialViolations } from "../invariants";
 
 /**
@@ -16,7 +17,11 @@ export function stepChecked(
   const all: SimEvent[] = [];
   for (let i = 0; i < ticks; i++) {
     const { events } = kernel.advance(world, 1);
-    const problems = [...checkInvariants(world.state), ...spatialViolations(world)];
+    const problems = [
+      ...checkInvariants(world.state),
+      ...spatialViolations(world),
+      ...dirtViolations(world),
+    ];
     if (problems.length > 0) {
       throw new Error(`tick ${world.state.tick}: ${problems.join("; ")}`);
     }

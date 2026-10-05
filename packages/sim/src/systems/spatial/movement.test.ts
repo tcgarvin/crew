@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { configTicks } from "../../core/clock";
 import { getRenderFrame } from "../../core/render";
 import { compartmentByKey } from "../../core/world";
-import { JON, MARA, deck12World, place, tinySpatialWorld } from "./fixtures/deck-12x8";
+import { DECK12, JON, MARA, deck12World, place, tinySpatialWorld } from "./fixtures/deck-12x8";
 import { stepChecked } from "./fixtures/helpers";
 import { requestMove } from "./movement";
 
@@ -142,5 +142,25 @@ describe("movement", () => {
     stepChecked(test, 200);
     expect(actor(world, MARA).location).toMatchObject({ x: 5.5, y: 1.5 });
     expect(getRenderFrame(world).doors[0]?.physicalState).toBe("open");
+  });
+});
+
+describe("footfall (D82)", () => {
+  it("a walk across a clean corridor leaves footfallPerStep on each tile stepped onto", () => {
+    const test = deck12World();
+    const { world } = test;
+    const config = world.config.values;
+    const start = actor(world, JON).location as { x: number; y: number };
+    expect({ x: Math.floor(start.x), y: Math.floor(start.y) }).toEqual({ x: 0, y: 6 });
+    expect(requestMove(world.state, JON, { x: 11, y: 6 }, world.caches, config)).toBe(true);
+    stepChecked(test, configTicks(config, 11 / config.movement.walkSpeed) + 5);
+    const cells = world.state.dirt.cells[DECK12.deck] ?? [];
+    const step = Math.round(config.dirt.footfallPerStep * 255);
+    expect(step).toBeGreaterThan(0);
+    for (let x = 1; x <= 11; x++) expect(cells[6 * 12 + x]).toBe(step);
+    // The tile walked from, and every tile not walked on, stay clean.
+    expect(cells[6 * 12]).toBe(0);
+    expect(cells.reduce((a, b) => a + b, 0)).toBe(11 * step);
+    expect(actor(world, JON).boots).toBeLessThan(0.01);
   });
 });
