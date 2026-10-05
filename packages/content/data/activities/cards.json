@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.cards",
+  "label": "playing cards",
+  "waitingLabel": "waiting for a game of cards",
+  "interest": "cards",
+  "venue": [
+    {
+      "machineTag": "gamesTable"
+    },
+    {
+      "compartmentTag": "lounge"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 4
+  },
+  "durationDays": 0.1,
+  "restores": {
+    "recreation": 0.4,
+    "social": 0.3
+  },
+  "solo": {
+    "label": "playing solitaire",
+    "durationDays": 0.06,
+    "restores": {
+      "recreation": 0.3
+    }
+  },
+  "outcome": "contest",
+  "thoughts": {
+    "win": "wonContest",
+    "lose": "lostContest"
+  },
+  "affinity": {
+    "participants": 1,
+    "winnerToLoser": 0,
+    "loserToWinner": -1
+  }
+}

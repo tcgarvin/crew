@@ -4,6 +4,7 @@
  * to content that does not exist in any bundle.
  */
 import type {
+  ActivityDefId,
   ActorId,
   ClaimId,
   CommandId,
@@ -22,6 +23,7 @@ import type {
   PortDefId,
   ProblemId,
   ScenarioDefId,
+  SessionId,
   TaskId,
   TraitDefId,
   TransactionId,
@@ -46,6 +48,7 @@ const j1 = "j1" as JobId;
 const x1 = "x1" as DecisionId;
 const k1 = "k1" as HookId;
 const n1 = "n1" as TransactionId;
+const s1 = "s1" as SessionId;
 
 export function exampleWorldState(): WorldState {
   return {
@@ -77,6 +80,7 @@ export function exampleWorldState(): WorldState {
       event: 57,
       local: 1,
       hazard: 2,
+      session: 2,
     },
     actors: {
       [a1]: {
@@ -98,12 +102,14 @@ export function exampleWorldState(): WorldState {
           doorId: d1,
         },
         facing: 0,
-        needs: { hunger: 0.2, fatigue: 0.1, comfort: 0, social: 0.3 },
+        needs: { hunger: 0.2, fatigue: 0.1, comfort: 0, social: 0.3, recreation: 0.4 },
         capacities: { movement: 1, manipulation: 1, consciousness: 1 },
         skills: { piloting: 6, cargo: 2 },
         traits: ["trait.steady" as TraitDefId],
         mood: 0.1,
         thoughts: [{ key: "helmCleanPass", value: 0.1, expiresAtTick: 7600 }],
+        interests: { likes: ["cards", "stargazing"], strong: "cards", dislikes: ["sparring"] },
+        values: { orderFreedom: -1, faithReason: 0, loyaltyAmbition: 2 },
         boots: 0.2,
         schedule: { section: { key: "red", index: 0 } },
         activity: {
@@ -155,12 +161,14 @@ export function exampleWorldState(): WorldState {
         location: { kind: "onDeck", deckId: deck, x: 8.5, y: 3.5 },
         movement: { kind: "stationary" },
         facing: 3,
-        needs: { hunger: 0.6, fatigue: 0.7, comfort: 0.2, social: 0.1 },
+        needs: { hunger: 0.6, fatigue: 0.7, comfort: 0.2, social: 0.1, recreation: 0.2 },
         capacities: { movement: 1, manipulation: 1, consciousness: 1 },
         skills: { engineering: 7, electrical: 4 },
         traits: [],
         mood: -0.2,
         thoughts: [],
+        interests: { likes: ["tinkering"], dislikes: [] },
+        values: { orderFreedom: 1, faithReason: 1, loyaltyAmbition: -1 },
         boots: 0,
         schedule: {},
         activity: {
@@ -330,6 +338,21 @@ export function exampleWorldState(): WorldState {
       dustThisVisit: 0,
     },
     galley: { lastMealWatch: 0 },
+    social: {
+      relationships: { [a1]: { [a2]: { affinity: 2, lastChatTick: 300 } } },
+      rivalries: { "a1|a2|activity.cards": { wins: 1, losses: 2, streak: -1 } },
+      sessions: {
+        [s1]: {
+          id: s1,
+          activityId: "activity.cards" as ActivityDefId,
+          venue: { compartmentId: c1, machineId: m1 },
+          hostId: a1,
+          members: [a1],
+          openedTick: 390,
+        },
+      },
+      captainsTableDay: -1,
+    },
     hazards: [
       {
         id: "h1" as HazardId,

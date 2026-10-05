@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.video_game",
+  "label": "playing a video game",
+  "waitingLabel": "waiting for a second player",
+  "interest": "vids",
+  "venue": [
+    {
+      "machineTag": "vidScreen"
+    }
+  ],
+  "participants": {
+    "min": 1,
+    "max": 2
+  },
+  "durationDays": 0.06,
+  "restores": {
+    "recreation": 0.4
+  },
+  "outcome": "contest",
+  "thoughts": {
+    "win": "wonContest",
+    "lose": "lostContest"
+  }
+}

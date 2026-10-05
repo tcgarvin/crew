@@ -1035,7 +1035,10 @@
                 "container",
                 "personal",
                 "provisions",
-                "meal"
+                "meal",
+                "book",
+                "instrument",
+                "treat"
               ]
             }
           },
@@ -1136,6 +1139,95 @@
           "voice": {
             "type": "string",
             "minLength": 1
+          },
+          "interests": {
+            "type": "object",
+            "properties": {
+              "likes": {
+                "minItems": 1,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "cards",
+                    "boardgames",
+                    "vids",
+                    "debate",
+                    "music",
+                    "exercise",
+                    "sparring",
+                    "reading",
+                    "tinkering",
+                    "cooking",
+                    "stargazing",
+                    "gossip"
+                  ]
+                }
+              },
+              "strong": {
+                "type": "string",
+                "enum": [
+                  "cards",
+                  "boardgames",
+                  "vids",
+                  "debate",
+                  "music",
+                  "exercise",
+                  "sparring",
+                  "reading",
+                  "tinkering",
+                  "cooking",
+                  "stargazing",
+                  "gossip"
+                ]
+              },
+              "dislikes": {
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "cards",
+                    "boardgames",
+                    "vids",
+                    "debate",
+                    "music",
+                    "exercise",
+                    "sparring",
+                    "reading",
+                    "tinkering",
+                    "cooking",
+                    "stargazing",
+                    "gossip"
+                  ]
+                }
+              }
+            },
+            "required": ["likes", "dislikes"],
+            "additionalProperties": false
+          },
+          "values": {
+            "type": "object",
+            "properties": {
+              "orderFreedom": {
+                "type": "integer",
+                "minimum": -2,
+                "maximum": 2
+              },
+              "faithReason": {
+                "type": "integer",
+                "minimum": -2,
+                "maximum": 2
+              },
+              "loyaltyAmbition": {
+                "type": "integer",
+                "minimum": -2,
+                "maximum": 2
+              }
+            },
+            "required": ["orderFreedom", "faithReason", "loyaltyAmbition"],
+            "additionalProperties": false
           }
         },
         "required": ["id", "name", "roleTags", "skills", "startingInventory", "bio", "voice"],
@@ -1169,7 +1261,8 @@
                 "comfortRate",
                 "socialRate",
                 "workSpeed",
-                "walkSpeed"
+                "walkSpeed",
+                "recreationRate"
               ]
             },
             "additionalProperties": {
@@ -1949,7 +2042,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -1986,7 +2096,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2023,7 +2150,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2060,7 +2204,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2097,7 +2258,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2134,7 +2312,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2171,7 +2366,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2208,7 +2420,24 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2245,7 +2474,942 @@
                 "burntDinner",
                 "ateRationPack",
                 "ateInDirtyMess",
-                "ateInFilthyMess"
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "wonContest": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "lostContest": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "keepsBeatingMe": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "goodCompany": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "spiritedTalk": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "argued": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "gotLectured": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "enjoyedMusic": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "hatedTheNoise": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "sparringBruise": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "ownCabin": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "noisyBunkroom": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "noBunkOfMyOwn": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "satWithTheCaptain": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "heardOut": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "dressedDown": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "ateATreat": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat"
               ]
             },
             "label": {
@@ -2278,9 +3442,553 @@
         "burntDinner",
         "ateRationPack",
         "ateInDirtyMess",
-        "ateInFilthyMess"
+        "ateInFilthyMess",
+        "wonContest",
+        "lostContest",
+        "keepsBeatingMe",
+        "goodCompany",
+        "spiritedTalk",
+        "argued",
+        "gotLectured",
+        "enjoyedMusic",
+        "hatedTheNoise",
+        "sparringBruise",
+        "ownCabin",
+        "noisyBunkroom",
+        "noBunkOfMyOwn",
+        "satWithTheCaptain",
+        "heardOut",
+        "dressedDown",
+        "ateATreat"
       ],
       "additionalProperties": false
+    },
+    "activities": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "waitingLabel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interest": {
+            "type": "string",
+            "enum": [
+              "cards",
+              "boardgames",
+              "vids",
+              "debate",
+              "music",
+              "exercise",
+              "sparring",
+              "reading",
+              "tinkering",
+              "cooking",
+              "stargazing",
+              "gossip"
+            ]
+          },
+          "venue": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "machineTag": {
+                  "type": "string",
+                  "enum": [
+                    "bed",
+                    "medBed",
+                    "stove",
+                    "messTable",
+                    "pilotStation",
+                    "navStation",
+                    "opsStation",
+                    "chair",
+                    "desk",
+                    "gamesTable",
+                    "vidScreen",
+                    "exerciseRig",
+                    "workbench",
+                    "console",
+                    "engine",
+                    "generator",
+                    "battery",
+                    "lifeSupport",
+                    "cooling",
+                    "rampControl"
+                  ]
+                },
+                "zoneTag": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "compartmentTag": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "own": {
+                  "type": "boolean",
+                  "const": true
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "participants": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["min", "max"],
+            "additionalProperties": false
+          },
+          "durationDays": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "restores": {
+            "type": "object",
+            "properties": {
+              "recreation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "social": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "comfort": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "fatigueCost": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "solo": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "durationDays": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "restores": {
+                "type": "object",
+                "properties": {
+                  "recreation": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "social": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "comfort": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["label", "durationDays", "restores"],
+            "additionalProperties": false
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["contest", "bond", "debate", "perform", "none"]
+          },
+          "thoughts": {
+            "type": "object",
+            "properties": {
+              "win": {
+                "type": "string",
+                "enum": [
+                  "stoodLongWatch",
+                  "doubleWatch",
+                  "helmCleanPass",
+                  "helmScrape",
+                  "ateWell",
+                  "burntDinner",
+                  "ateRationPack",
+                  "ateInDirtyMess",
+                  "ateInFilthyMess",
+                  "wonContest",
+                  "lostContest",
+                  "keepsBeatingMe",
+                  "goodCompany",
+                  "spiritedTalk",
+                  "argued",
+                  "gotLectured",
+                  "enjoyedMusic",
+                  "hatedTheNoise",
+                  "sparringBruise",
+                  "ownCabin",
+                  "noisyBunkroom",
+                  "noBunkOfMyOwn",
+                  "satWithTheCaptain",
+                  "heardOut",
+                  "dressedDown",
+                  "ateATreat"
+                ]
+              },
+              "lose": {
+                "type": "string",
+                "enum": [
+                  "stoodLongWatch",
+                  "doubleWatch",
+                  "helmCleanPass",
+                  "helmScrape",
+                  "ateWell",
+                  "burntDinner",
+                  "ateRationPack",
+                  "ateInDirtyMess",
+                  "ateInFilthyMess",
+                  "wonContest",
+                  "lostContest",
+                  "keepsBeatingMe",
+                  "goodCompany",
+                  "spiritedTalk",
+                  "argued",
+                  "gotLectured",
+                  "enjoyedMusic",
+                  "hatedTheNoise",
+                  "sparringBruise",
+                  "ownCabin",
+                  "noisyBunkroom",
+                  "noBunkOfMyOwn",
+                  "satWithTheCaptain",
+                  "heardOut",
+                  "dressedDown",
+                  "ateATreat"
+                ]
+              },
+              "joined": {
+                "type": "string",
+                "enum": [
+                  "stoodLongWatch",
+                  "doubleWatch",
+                  "helmCleanPass",
+                  "helmScrape",
+                  "ateWell",
+                  "burntDinner",
+                  "ateRationPack",
+                  "ateInDirtyMess",
+                  "ateInFilthyMess",
+                  "wonContest",
+                  "lostContest",
+                  "keepsBeatingMe",
+                  "goodCompany",
+                  "spiritedTalk",
+                  "argued",
+                  "gotLectured",
+                  "enjoyedMusic",
+                  "hatedTheNoise",
+                  "sparringBruise",
+                  "ownCabin",
+                  "noisyBunkroom",
+                  "noBunkOfMyOwn",
+                  "satWithTheCaptain",
+                  "heardOut",
+                  "dressedDown",
+                  "ateATreat"
+                ]
+              },
+              "listened": {
+                "type": "string",
+                "enum": [
+                  "stoodLongWatch",
+                  "doubleWatch",
+                  "helmCleanPass",
+                  "helmScrape",
+                  "ateWell",
+                  "burntDinner",
+                  "ateRationPack",
+                  "ateInDirtyMess",
+                  "ateInFilthyMess",
+                  "wonContest",
+                  "lostContest",
+                  "keepsBeatingMe",
+                  "goodCompany",
+                  "spiritedTalk",
+                  "argued",
+                  "gotLectured",
+                  "enjoyedMusic",
+                  "hatedTheNoise",
+                  "sparringBruise",
+                  "ownCabin",
+                  "noisyBunkroom",
+                  "noBunkOfMyOwn",
+                  "satWithTheCaptain",
+                  "heardOut",
+                  "dressedDown",
+                  "ateATreat"
+                ]
+              },
+              "listenedDislike": {
+                "type": "string",
+                "enum": [
+                  "stoodLongWatch",
+                  "doubleWatch",
+                  "helmCleanPass",
+                  "helmScrape",
+                  "ateWell",
+                  "burntDinner",
+                  "ateRationPack",
+                  "ateInDirtyMess",
+                  "ateInFilthyMess",
+                  "wonContest",
+                  "lostContest",
+                  "keepsBeatingMe",
+                  "goodCompany",
+                  "spiritedTalk",
+                  "argued",
+                  "gotLectured",
+                  "enjoyedMusic",
+                  "hatedTheNoise",
+                  "sparringBruise",
+                  "ownCabin",
+                  "noisyBunkroom",
+                  "noBunkOfMyOwn",
+                  "satWithTheCaptain",
+                  "heardOut",
+                  "dressedDown",
+                  "ateATreat"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "affinity": {
+            "type": "object",
+            "properties": {
+              "participants": {
+                "type": "integer",
+                "minimum": -3,
+                "maximum": 3
+              },
+              "winnerToLoser": {
+                "type": "integer",
+                "minimum": -3,
+                "maximum": 3
+              },
+              "loserToWinner": {
+                "type": "integer",
+                "minimum": -3,
+                "maximum": 3
+              }
+            },
+            "required": ["participants", "winnerToLoser", "loserToWinner"],
+            "additionalProperties": false
+          },
+          "topics": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+            }
+          },
+          "skillGain": {
+            "type": "object",
+            "properties": {
+              "skill": {
+                "type": "string",
+                "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+              },
+              "perDay": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": ["skill", "perDay"],
+            "additionalProperties": false
+          },
+          "risk": {
+            "type": "object",
+            "properties": {
+              "injuryChance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": ["injuryChance"],
+            "additionalProperties": false
+          },
+          "dirt": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "requires": {
+            "type": "object",
+            "properties": {
+              "itemTag": {
+                "type": "string",
+                "enum": [
+                  "tool",
+                  "consumable",
+                  "food",
+                  "spare",
+                  "cargo",
+                  "medical",
+                  "container",
+                  "personal",
+                  "provisions",
+                  "meal",
+                  "book",
+                  "instrument",
+                  "treat"
+                ]
+              },
+              "own": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": ["itemTag"],
+            "additionalProperties": false
+          },
+          "produces": {
+            "type": "object",
+            "properties": {
+              "itemDefId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "zoneTag": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["itemDefId", "count", "zoneTag"],
+            "additionalProperties": false
+          },
+          "transitOnly": {
+            "type": "boolean",
+            "const": true
+          },
+          "blockedByProblems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "machineSymptom",
+                "machineFault",
+                "maintenanceDue",
+                "cargoToLoad",
+                "cargoToUnload",
+                "stationToStaff",
+                "courseToPlot",
+                "partsNeeded",
+                "reserveLow",
+                "mealToCook",
+                "mealToCarry",
+                "compartmentDirty"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "waitingLabel",
+          "interest",
+          "venue",
+          "participants",
+          "durationDays",
+          "restores",
+          "outcome"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "topics": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "weights": {
+            "type": "object",
+            "properties": {
+              "orderFreedom": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              },
+              "faithReason": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              },
+              "loyaltyAmbition": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
+            },
+            "required": ["orderFreedom", "faithReason", "loyaltyAmbition"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "label", "weights"],
+        "additionalProperties": false
+      }
     },
     "config": {
       "type": "object",
@@ -2414,6 +4122,10 @@
               "type": "number",
               "minimum": 0
             },
+            "recreationPerDay": {
+              "type": "number",
+              "minimum": 0
+            },
             "seekThreshold": {
               "type": "number",
               "minimum": 0,
@@ -2507,9 +4219,26 @@
                   },
                   "required": ["min", "max"],
                   "additionalProperties": false
+                },
+                "recreation": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["min", "max"],
+                  "additionalProperties": false
                 }
               },
-              "required": ["hunger", "fatigue", "comfort", "social"],
+              "required": ["hunger", "fatigue", "comfort", "social", "recreation"],
               "additionalProperties": false
             }
           },
@@ -2522,6 +4251,7 @@
             "comfortRecoveryPerDayResting",
             "socialPerDay",
             "socialRecoveryPerDayChatting",
+            "recreationPerDay",
             "seekThreshold",
             "mealDays",
             "sleepDays",
@@ -3208,6 +4938,11 @@
               "type": "number",
               "minimum": 0,
               "maximum": 10
+            },
+            "treatHungerAbove": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "required": [
@@ -3222,7 +4957,8 @@
             "lowBelowDays",
             "restockToDays",
             "goodCookingAbove",
-            "poorCookingBelow"
+            "poorCookingBelow",
+            "treatHungerAbove"
           ],
           "additionalProperties": false
         },
@@ -3427,9 +5163,123 @@
                 "type": "string",
                 "minLength": 1
               }
+            },
+            "chatAffinity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "chatAffinityEveryDays": {
+              "type": "number",
+              "minimum": 0
+            },
+            "affinityRange": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "avoidBelow": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "preferAbove": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "rivalry": {
+              "type": "object",
+              "properties": {
+                "streakFor": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["streakFor"],
+              "additionalProperties": false
+            },
+            "debate": {
+              "type": "object",
+              "properties": {
+                "agreeWithin": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "argueBeyond": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["agreeWithin", "argueBeyond"],
+              "additionalProperties": false
             }
           },
-          "required": ["chatRadiusTiles", "chatCooldownSeconds", "templateLines"],
+          "required": [
+            "chatRadiusTiles",
+            "chatCooldownSeconds",
+            "templateLines",
+            "chatAffinity",
+            "chatAffinityEveryDays",
+            "affinityRange",
+            "avoidBelow",
+            "preferAbove",
+            "rivalry",
+            "debate"
+          ],
+          "additionalProperties": false
+        },
+        "recreation": {
+          "type": "object",
+          "properties": {
+            "joinAbove": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "gatherSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "lateJoinSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "collapseBackoffDays": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["joinAbove", "gatherSeconds", "lateJoinSeconds", "collapseBackoffDays"],
+          "additionalProperties": false
+        },
+        "cabins": {
+          "type": "object",
+          "properties": {
+            "noisySeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "checkEverySeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "privateTalkSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "privateTalkWaitSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "noisySeconds",
+            "checkEverySeconds",
+            "privateTalkSeconds",
+            "privateTalkWaitSeconds"
+          ],
           "additionalProperties": false
         },
         "events": {
@@ -3469,6 +5319,8 @@
         "dirt",
         "hazards",
         "social",
+        "recreation",
+        "cabins",
         "events"
       ],
       "additionalProperties": false
@@ -3488,6 +5340,8 @@
     "people",
     "docks",
     "thoughts",
+    "activities",
+    "topics",
     "config",
     "hash"
   ],

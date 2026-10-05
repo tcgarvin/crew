@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "keepsBeatingMe",
+  "label": "{ref} keeps beating me",
+  "value": -0.15,
+  "durationDays": 1,
+  "stacks": false
+}

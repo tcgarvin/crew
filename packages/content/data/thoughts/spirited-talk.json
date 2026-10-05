@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "spiritedTalk",
+  "label": "had a spirited talk",
+  "value": 0.1,
+  "durationDays": 0.5,
+  "stacks": false
+}

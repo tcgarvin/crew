@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "enjoyedMusic",
+  "label": "enjoyed the music",
+  "value": 0.1,
+  "durationDays": 0.3,
+  "stacks": false
+}

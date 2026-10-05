@@ -14,7 +14,15 @@
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "enum": ["hungerRate", "fatigueRate", "comfortRate", "socialRate", "workSpeed", "walkSpeed"]
+        "enum": [
+          "hungerRate",
+          "fatigueRate",
+          "comfortRate",
+          "socialRate",
+          "workSpeed",
+          "walkSpeed",
+          "recreationRate"
+        ]
       },
       "additionalProperties": {
         "type": "number",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityDefSchema,
   configDefSchema,
   contentBundleSchema,
   crewDefSchema,
@@ -9,6 +10,7 @@ import {
   peopleTableDefSchema,
   portDefSchema,
   scenarioDefSchema,
+  topicDefSchema,
   traitDefSchema,
   validateBundle,
   validatePhysical,
@@ -287,6 +289,23 @@ const thoughts = {
   ateRationPack: thought("ateRationPack", -0.05, false),
   ateInDirtyMess: thought("ateInDirtyMess", -0.1, false),
   ateInFilthyMess: thought("ateInFilthyMess", -0.2, false),
+  wonContest: thought("wonContest", 0.1, true),
+  lostContest: thought("lostContest", -0.05, true),
+  keepsBeatingMe: thought("keepsBeatingMe", -0.15, false),
+  goodCompany: thought("goodCompany", 0.05, false),
+  spiritedTalk: thought("spiritedTalk", 0.1, false),
+  argued: thought("argued", -0.15, false),
+  gotLectured: thought("gotLectured", -0.05, false),
+  enjoyedMusic: thought("enjoyedMusic", 0.1, false),
+  hatedTheNoise: thought("hatedTheNoise", -0.1, false),
+  sparringBruise: thought("sparringBruise", -0.1, false),
+  ownCabin: thought("ownCabin", 0.1, false),
+  noisyBunkroom: thought("noisyBunkroom", -0.1, false),
+  noBunkOfMyOwn: thought("noBunkOfMyOwn", -0.1, false),
+  satWithTheCaptain: thought("satWithTheCaptain", 0.05, false),
+  heardOut: thought("heardOut", 0.1, false),
+  dressedDown: thought("dressedDown", -0.15, false),
+  ateATreat: thought("ateATreat", 0.1, false),
 };
 
 const band = { min: 1, max: 3 };
@@ -316,6 +335,7 @@ const config = {
     comfortRecoveryPerDayResting: 3.6,
     socialPerDay: 0.6,
     socialRecoveryPerDayChatting: 12,
+    recreationPerDay: 0.6,
     seekThreshold: 0.5,
     mealDays: 0.0125,
     sleepDays: 0.05,
@@ -326,6 +346,7 @@ const config = {
       fatigue: { min: 0.1, max: 0.5 },
       comfort: { min: 0, max: 0.3 },
       social: { min: 0.1, max: 0.5 },
+      recreation: { min: 0.2, max: 0.5 },
     },
   },
   work: {
@@ -442,6 +463,7 @@ const config = {
     restockToDays: 4,
     goodCookingAbove: 6,
     poorCookingBelow: 3,
+    treatHungerAbove: 0.1,
   },
   dirt: {
     footfallPerStep: 0.004,
@@ -471,8 +493,46 @@ const config = {
     tintMaxAlpha: 0.35,
   },
   hazards: { difficulty: { easy: 3, hard: 5, brutal: 7 }, delaySeconds: 60 },
-  social: { chatRadiusTiles: 2, chatCooldownSeconds: 45, templateLines: ["{a} joked"] },
+  social: {
+    chatRadiusTiles: 2,
+    chatCooldownSeconds: 45,
+    templateLines: ["{a} joked"],
+    chatAffinity: 1,
+    chatAffinityEveryDays: 1,
+    affinityRange: 10,
+    avoidBelow: -3,
+    preferAbove: 0,
+    rivalry: { streakFor: 3 },
+    debate: { agreeWithin: 2, argueBeyond: 4 },
+  },
+  recreation: { joinAbove: 0.25, gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 },
+  cabins: {
+    noisySeconds: 60,
+    checkEverySeconds: 60,
+    privateTalkSeconds: 20,
+    privateTalkWaitSeconds: 120,
+  },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
+};
+
+// Slice 4: an off-watch activity and a debate topic.
+const activity = {
+  id: "activity.test.cards",
+  label: "playing cards",
+  waitingLabel: "waiting for a game of cards",
+  interest: "cards",
+  venue: [{ machineTag: "gamesTable" }, { compartmentTag: "lounge" }],
+  participants: { min: 2, max: 4 },
+  durationDays: 0.1,
+  restores: { recreation: 0.4, social: 0.3 },
+  solo: { label: "playing solitaire", durationDays: 0.06, restores: { recreation: 0.3 } },
+  outcome: "contest",
+  thoughts: { win: "wonContest", lose: "lostContest" },
+};
+const topic = {
+  id: "topic.test.the_guild",
+  label: "the Guild",
+  weights: { orderFreedom: -1, faithReason: 0, loyaltyAmbition: 0.5 },
 };
 
 const cases = [
@@ -509,6 +569,18 @@ const cases = [
     valid: config,
     invalid: { ...config, time: { ...config.time, tickRate: 0 } },
   },
+  {
+    name: "activity",
+    schema: activityDefSchema,
+    valid: activity,
+    invalid: { ...activity, venue: [{ machineTag: "gamesTable", zoneTag: "viewport" }] },
+  },
+  {
+    name: "topic",
+    schema: topicDefSchema,
+    valid: topic,
+    invalid: { ...topic, weights: { ...topic.weights, faithReason: 2 } },
+  },
 ] as const;
 
 describe("content def schemas", () => {
@@ -527,6 +599,25 @@ describe("content def schemas", () => {
 
   it("rejects an explicit undefined for an optional key", () => {
     expect(itemDefSchema.safeParse({ ...item, cargoClass: undefined }).success).toBe(false);
+  });
+
+  it("holds interests to a strong like among the likes, and none both liked and disliked (slice 4)", () => {
+    const keen = { likes: ["cards", "vids"], strong: "cards", dislikes: ["reading"] };
+    const values = { orderFreedom: 2, faithReason: 1, loyaltyAmbition: 2 };
+    expect(crewDefSchema.safeParse({ ...crew, interests: keen, values }).success).toBe(true);
+    const stray = { ...keen, strong: "music" };
+    expect(crewDefSchema.safeParse({ ...crew, interests: stray }).success).toBe(false);
+    const torn = { ...keen, dislikes: ["vids"] };
+    expect(crewDefSchema.safeParse({ ...crew, interests: torn }).success).toBe(false);
+    const extreme = { ...values, faithReason: 3 };
+    expect(crewDefSchema.safeParse({ ...crew, values: extreme }).success).toBe(false);
+  });
+
+  it("forbids a solo variant on an activity played alone anyway (slice 4)", () => {
+    const alone = { ...activity, participants: { min: 1, max: 1 } };
+    expect(activityDefSchema.safeParse(alone).success).toBe(false);
+    const { solo: _solo, ...sololess } = alone;
+    expect(activityDefSchema.safeParse(sololess).success).toBe(true);
   });
 
   it("requires a voice on every crew member (D38)", () => {
@@ -593,6 +684,8 @@ describe("bundle validation", () => {
     people,
     docks: {},
     thoughts,
+    activities: {},
+    topics: {},
     config,
     hash: "test",
   };
@@ -670,6 +763,31 @@ describe("bundle validation", () => {
       const issues = referenceIssues({ ...bundle, config: bad });
       expect(issues.some((i) => i.message.includes("watch 3 is not one of the 3"))).toBe(true);
       expect(issues.some((i) => i.message.includes("watch 1 is listed twice"))).toBe(true);
+    });
+
+    it("rejects an activity naming an unknown topic or product, or a tag no item carries (slice 4)", () => {
+      const bad = {
+        ...activity,
+        topics: ["topic.test.nowhere"],
+        requires: { itemTag: "book" },
+        produces: { itemDefId: "item.test.nothing", count: 4, zoneTag: "serving" },
+      };
+      const issues = referenceIssues({
+        ...bundle,
+        activities: { [activity.id]: bad },
+        topics: { [topic.id]: topic },
+      });
+      const paths = issues.map((i) => i.path.join("."));
+      expect(paths).toContain(`activities.${activity.id}.topics.0`);
+      expect(paths).toContain(`activities.${activity.id}.requires.itemTag`);
+      expect(paths).toContain(`activities.${activity.id}.produces.itemDefId`);
+      const good = { ...activity, topics: [topic.id] };
+      const clean = referenceIssues({
+        ...bundle,
+        activities: { [activity.id]: good },
+        topics: { [topic.id]: topic },
+      });
+      expect(clean.filter((i) => i.path[0] === "activities")).toEqual([]);
     });
 
     it("rejects a thought filed under another thought's key (D79)", () => {

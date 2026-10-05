@@ -12,14 +12,14 @@ import {
 
 /** Starting needs per actor index: a mix of hungry, tired, bored and fine. */
 const START_NEEDS: readonly Needs[] = [
-  { hunger: 0.55, fatigue: 0.2, comfort: 0.1, social: 0.1 },
-  { hunger: 0.1, fatigue: 0.1, comfort: 0.1, social: 0.2 },
-  { hunger: 0.2, fatigue: 0.62, comfort: 0.3, social: 0.1 },
-  { hunger: 0.6, fatigue: 0.3, comfort: 0.6, social: 0.4 },
-  { hunger: 0.1, fatigue: 0.1, comfort: 0.1, social: 0.6 },
-  { hunger: 0.3, fatigue: 0.58, comfort: 0.2, social: 0.2 },
-  { hunger: 0.52, fatigue: 0.1, comfort: 0.55, social: 0.1 },
-  { hunger: 0.1, fatigue: 0.2, comfort: 0.2, social: 0.55 },
+  { hunger: 0.55, fatigue: 0.2, comfort: 0.1, social: 0.1, recreation: 0 },
+  { hunger: 0.1, fatigue: 0.1, comfort: 0.1, social: 0.2, recreation: 0 },
+  { hunger: 0.2, fatigue: 0.62, comfort: 0.3, social: 0.1, recreation: 0 },
+  { hunger: 0.6, fatigue: 0.3, comfort: 0.6, social: 0.4, recreation: 0 },
+  { hunger: 0.1, fatigue: 0.1, comfort: 0.1, social: 0.6, recreation: 0 },
+  { hunger: 0.3, fatigue: 0.58, comfort: 0.2, social: 0.2, recreation: 0 },
+  { hunger: 0.52, fatigue: 0.1, comfort: 0.55, social: 0.1, recreation: 0 },
+  { hunger: 0.1, fatigue: 0.2, comfort: 0.2, social: 0.55, recreation: 0 },
 ];
 
 const START_TILES = [

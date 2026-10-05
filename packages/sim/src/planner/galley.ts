@@ -10,7 +10,9 @@
  *   gangway candidate waits until they have eaten (`helm.ts`). Same-class commitment does the
  *   rest: nobody is pulled off a crate, a plot or a sleep for dinner; they eat when it is done.
  * - `eatCandidate`: need-driven eating as before (past `needs.seekThreshold`, by need urgency),
- *   now preferring a served meal to a ration, plus the mess call at routine class.
+ *   now preferring a served meal to a ration, plus the mess call at routine class. Slice 4 (call
+ *   7): with neither, hunger above `galley.treatHungerAbove` and a known `treat` make a voluntary
+ *   eat candidate, eaten where found (no table); a treat is never a hungry person's ration.
  * - `galleyTaskAllowed`: `cookMeal` is the cook's, and anyone's with cooking ≥ 1 once the problem
  *   is `galley.substituteAfterDays` old; `carryMeal` is the cook's or a dayworker's, anyone's after
  *   `urgency.routineAgingDays`, and never the stander's own. `galleyTaskExempt`: the cook on
@@ -125,7 +127,7 @@ export function eatCandidate(
 ): Candidate | Rejection | undefined {
   const need = needUrgency(view.self.needs.hunger, config);
   const call = mealCallFor(view, config);
-  if (need === undefined && call === undefined) return undefined;
+  if (need === undefined && call === undefined) return treatCandidate(view, config);
   const urgency: UrgencyClass = need ?? "routineObligation";
   const mealTicks = dayTicksOf(config, config.needs.mealDays);
   const food = view.knownItems().filter((i) => i.tags.includes("food") && !i.absent);
@@ -169,12 +171,37 @@ function nearestRation(
 ): { item: KnownItemView; ticks: number } | undefined {
   let best: { item: KnownItemView; ticks: number } | undefined;
   for (const item of food) {
-    if (item.tags.includes("meal")) continue;
+    if (item.tags.includes("meal") || item.tags.includes("treat")) continue;
     if (item.tile === undefined || backingOff(view, `eat:${item.itemId}`)) continue;
     const ticks = view.estimateTravelTicks(item.tile);
     if (ticks !== null && (best === undefined || ticks < best.ticks)) best = { item, ticks };
   }
   return best;
+}
+
+/** Slice 4: the nearest known treat, eaten where found, at voluntary class (call 7). */
+function treatCandidate(view: AgentView, config: PlannerConfig): Candidate | undefined {
+  if (view.self.needs.hunger <= galleyKnobs(config).treatHungerAbove) return undefined;
+  let best: { item: KnownItemView; ticks: number } | undefined;
+  for (const item of view.knownItems()) {
+    if (item.absent || !item.tags.includes("treat") || item.tile === undefined) continue;
+    if (backingOff(view, `eat:${item.itemId}`)) continue;
+    const ticks = view.estimateTravelTicks(item.tile);
+    if (ticks !== null && (best === undefined || ticks < best.ticks)) best = { item, ticks };
+  }
+  if (best === undefined) return undefined;
+  const mealTicks = dayTicksOf(config, config.needs.mealDays);
+  return personal(
+    `eat:${best.item.itemId}`,
+    "voluntaryActivity",
+    best.ticks + mealTicks,
+    view.tick,
+    {
+      kind: "personal",
+      activity: "eat",
+      itemId: best.item.itemId,
+    },
+  );
 }
 
 /**

@@ -32,6 +32,7 @@ import type { ActorId, ItemId, PortDefId, TaskId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type { ActivityStep, BlockageReason, StepTarget, Task } from "../../core/types/work";
+import { runConfer } from "../cabins/private-talk";
 import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
 import { runMop } from "../dirt/clean";
 import { depositDirt } from "../dirt/deposit";
@@ -39,6 +40,7 @@ import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
+import { runRecreate } from "../recreation/steps";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
@@ -631,5 +633,10 @@ export function runStep(
       return "wait";
     case "hold":
       return holdDone(ctx, actor, step) ? "done" : "wait";
+    // Slice 4: recreation's and the cabins' steps.
+    case "recreate":
+      return runRecreate(ctx, actor, step);
+    case "confer":
+      return runConfer(ctx, actor, step);
   }
 }

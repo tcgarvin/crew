@@ -13,5 +13,15 @@
   },
   "startingInventory": [],
   "bio": "Ship's medic; trained in a border-station trauma ward before signing on.",
-  "voice": "Calm, slow, exact, with a trauma ward's courtesy: \"please\", \"I would advise\", and a question back before an answer. Never uses a name or title for the captain, just a steady \"you\". Bad news is told straight, with no softening and no drama, followed by what should happen and by when."
+  "voice": "Calm, slow, exact, with a trauma ward's courtesy: \"please\", \"I would advise\", and a question back before an answer. Never uses a name or title for the captain, just a steady \"you\". Bad news is told straight, with no softening and no drama, followed by what should happen and by when.",
+  "interests": {
+    "likes": ["reading", "debate"],
+    "strong": "reading",
+    "dislikes": ["sparring"]
+  },
+  "values": {
+    "orderFreedom": -1,
+    "faithReason": 1,
+    "loyaltyAmbition": -1
+  }
 }

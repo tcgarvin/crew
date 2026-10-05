@@ -88,28 +88,49 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 16 items and 9 thoughts", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 18 items, 26 thoughts, 12 activities and 7 topics", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
       scenarios: Record<string, unknown>;
       thoughts: Record<string, unknown>;
       items: Record<string, unknown>;
+      activities: Record<string, unknown>;
+      topics: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
-    expect(Object.keys(bundle.items)).toHaveLength(16);
+    expect(Object.keys(bundle.items)).toHaveLength(18);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
+    expect(Object.keys(bundle.activities)).toHaveLength(12);
+    expect(Object.keys(bundle.topics)).toHaveLength(7);
     expect(Object.keys(bundle.thoughts).sort()).toEqual([
+      "argued",
+      "ateATreat",
       "ateInDirtyMess",
       "ateInFilthyMess",
       "ateRationPack",
       "ateWell",
       "burntDinner",
       "doubleWatch",
+      "dressedDown",
+      "enjoyedMusic",
+      "goodCompany",
+      "gotLectured",
+      "hatedTheNoise",
+      "heardOut",
       "helmCleanPass",
       "helmScrape",
+      "keepsBeatingMe",
+      "lostContest",
+      "noBunkOfMyOwn",
+      "noisyBunkroom",
+      "ownCabin",
+      "satWithTheCaptain",
+      "sparringBruise",
+      "spiritedTalk",
       "stoodLongWatch",
+      "wonContest",
     ]);
   });
 

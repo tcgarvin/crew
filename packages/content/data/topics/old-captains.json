@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.old_captains",
+  "label": "the old captains",
+  "weights": {
+    "orderFreedom": -0.5,
+    "faithReason": 0,
+    "loyaltyAmbition": -0.5
+  }
+}

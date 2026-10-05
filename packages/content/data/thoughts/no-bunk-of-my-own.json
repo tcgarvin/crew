@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "noBunkOfMyOwn",
+  "label": "no bunk of my own",
+  "value": -0.1,
+  "durationDays": 1,
+  "stacks": false
+}

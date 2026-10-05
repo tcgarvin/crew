@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.exercise",
+  "label": "working out",
+  "waitingLabel": "working out",
+  "interest": "exercise",
+  "venue": [
+    {
+      "machineTag": "exerciseRig"
+    }
+  ],
+  "participants": {
+    "min": 1,
+    "max": 1
+  },
+  "durationDays": 0.05,
+  "restores": {
+    "recreation": 0.3
+  },
+  "fatigueCost": 0.1,
+  "outcome": "none",
+  "dirt": 0.03
+}

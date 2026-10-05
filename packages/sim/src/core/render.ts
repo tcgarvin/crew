@@ -9,13 +9,14 @@ import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
 import type { Actor } from "./types/actor";
-import type { DeepReadonly, PhysicalLocation } from "./types/common";
+import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
 import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
 import type { Door, Item, Machine } from "./types/ship";
+import type { SessionVenue } from "./types/state";
 import type { PassageEndReason, TravelState } from "./types/travel";
 import type {
   RenderActor,
@@ -28,6 +29,7 @@ import type {
   RenderLocal,
   RenderMachine,
   RenderMachineState,
+  RenderSession,
   RenderTravel,
   TickerEntry,
 } from "./types/view";
@@ -50,6 +52,8 @@ const ACTION_VERBS: Readonly<Record<ActionKind, string>> = {
   operateStation: "operating",
   chat: "chatting",
   wait: "waiting",
+  recreate: "taking it easy",
+  confer: "having a word",
 };
 
 /** Short present-tense label for an actor: "repairing coolant pump", "sleeping", "walking". */
@@ -232,6 +236,18 @@ type Names = {
   room(key: string): string;
   /** "The galley": `room` capitalised to start a line. */
   roomCap(key: string): string;
+  /** Slice 4: "the lounge" for a compartment instance; "the room" if unknown. */
+  compartment(id: string): string;
+  /** Slice 4: the activity's running label ("playing cards"). */
+  activityLabel(id: string): string;
+  /** Slice 4: what one plays, from the label without a leading "playing " ("cards"). */
+  activityNoun(id: string): string;
+  /** Slice 4: "the Guild": a topic's label. */
+  topic(id: string): string;
+  /** Slice 4: "the captain's cabin" (or "the first officer's cabin"), by the caller's rank. */
+  cabinOf(actorId: string): string;
+  /** Slice 4: "played the harmonica in the lounge": a performance, said from where they are. */
+  performed(actorId: string, activityId: string): string;
 };
 
 function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
@@ -249,8 +265,27 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     }
     return "the room";
   };
+  const compartment = (id: string) => {
+    const instance = state.compartments[id as keyof ReadonlyWorldState["compartments"]];
+    return instance === undefined ? "the room" : room(instance.key);
+  };
+  const activityLabel = (id: string) =>
+    content.activities[id as keyof ContentBundle["activities"]]?.label ?? "taking it easy";
   return {
     room,
+    compartment,
+    activityLabel,
+    activityNoun: (id) => activityLabel(id).replace(/^playing /, ""),
+    topic: (id) => content.topics[id as keyof ContentBundle["topics"]]?.label ?? "this and that",
+    cabinOf: (actorId) =>
+      state.actors[actorId as Actor["id"]]?.roleTags.includes("captain") === true
+        ? "the captain's cabin"
+        : "the first officer's cabin",
+    performed: (actorId, activityId) => {
+      const played = activityLabel(activityId).replace(/^playing /, "played ");
+      const where = roomOfActor(state, content, actorId as Actor["id"]);
+      return where === undefined ? played : `${played} in ${room(where)}`;
+    },
     roomCap: (key) => {
       const text = room(key);
       return text.charAt(0).toUpperCase() + text.slice(1);
@@ -284,6 +319,19 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       };
     },
   };
+}
+
+/** The key of the room `actorId` stands in on the ship's deck, if any. */
+function roomOfActor(
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+  actorId: Actor["id"],
+): string | undefined {
+  const location = state.actors[actorId]?.location;
+  if (location?.kind !== "onDeck") return undefined;
+  const deck = content.decks[location.deckId];
+  const symbol = deck?.tiles[Math.floor(location.y)]?.[Math.floor(location.x)];
+  return deck?.compartments.find((c) => c.symbol === symbol)?.key;
 }
 
 function subjectNames(event: SimEvent, n: Names): string[] {
@@ -450,8 +498,82 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `Course plotted for ${n.port(event.payload.toPortId)}`;
     case "navHazard":
       return navHazardLine(event, n);
+    // Slice 4 (call 18): the ticker says who won and little else.
+    case "sessionStarted": {
+      const { memberIds, activityId, compartmentId } = event.payload;
+      const who = nameList(memberIds.map((id) => n.actor(id) ?? "someone"));
+      const verb = memberIds.length === 1 ? "is" : "are";
+      return `${who} ${verb} ${n.activityLabel(activityId)} in ${n.compartment(compartmentId)}`;
+    }
+    case "sessionEnded":
+      return sessionEndedLine(event, n);
+    case "rivalryStreak": {
+      const { winnerId, loserId, activityId, streak } = event.payload;
+      return `${n.actor(winnerId) ?? "Someone"} has beaten ${n.actor(loserId) ?? "someone"} ${timesRunning(streak)} at ${n.activityNoun(activityId)}`;
+    }
+    case "tookAKnock":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} took a knock ${n.activityLabel(event.payload.activityId)}`;
+    case "treatsBaked":
+      return `${n.actor(event.payload.cookId) ?? "Someone"} baked a tray of treats`;
+    case "argument":
+      // The `sessionEnded` line carries it.
+      return null;
+    case "privateTalkCalled": {
+      const { captainId, actorId } = event.payload;
+      return `${n.actor(captainId) ?? "The captain"} asked ${n.actor(actorId) ?? "someone"} for a word in ${n.cabinOf(captainId)}`;
+    }
+    case "privateTalkHeld":
+      return `${n.actor(event.payload.captainId) ?? "The captain"} had a word with ${n.actor(event.payload.actorId) ?? "someone"}`;
+    case "privateTalkMissed":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} never made it to ${n.cabinOf(event.payload.captainId)}`;
     default:
       return undefined;
+  }
+}
+
+/** "Jax", "Jax and Tomas", "Jax, Tomas and Dane". */
+function nameList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "Nobody";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+const TIMES_WORDS = ["", "once", "twice", "three times", "four times", "five times", "six times"];
+
+/** "three times running", for a rivalry's streak. */
+function timesRunning(streak: number): string {
+  const runs = Math.abs(streak);
+  return `${TIMES_WORDS[runs] ?? `${runs} times`} running`;
+}
+
+/**
+ * Slice 4: a session's end. A contest says who won, a debate whether it was an argument or a
+ * spirited talk and about what, a performance who played; a bond, nothing, or an abandoned game
+ * makes no line.
+ */
+function sessionEndedLine(
+  event: Extract<SimEvent, { type: "sessionEnded" }>,
+  n: Names,
+): string | null {
+  const { outcome, activityId, memberIds, winnerId, topicId, argued } = event.payload;
+  switch (outcome) {
+    case "contest":
+      return winnerId === undefined
+        ? null
+        : `${n.actor(winnerId) ?? "Someone"} won at ${n.activityNoun(activityId)}`;
+    case "debate": {
+      const who = nameList(memberIds.map((id) => n.actor(id) ?? "someone"));
+      const about = topicId === undefined ? "" : ` about ${n.topic(topicId)}`;
+      return argued === true ? `${who} argued${about}` : `${who} had a spirited talk${about}`;
+    }
+    case "perform": {
+      const [performerId] = memberIds;
+      if (performerId === undefined) return null;
+      return `${n.actor(performerId) ?? "Someone"} ${n.performed(performerId, activityId)}`;
+    }
+    case "bond":
+    case "none":
+    case "abandoned":
+      return null;
   }
 }
 
@@ -965,6 +1087,88 @@ export function getDirtFrame(world: World): DirtFrame {
   };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Group sessions (slice 4, call 17)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A placement offset rotated clockwise by `rotation` (the spatial system's `rotateOffset`, which
+ * core may not import).
+ */
+function rotated(offset: TileCoord, rotation: 0 | 90 | 180 | 270): TileCoord {
+  switch (rotation) {
+    case 0:
+      return offset;
+    case 90:
+      return { x: -offset.y + 0, y: offset.x + 0 };
+    case 180:
+      return { x: -offset.x + 0, y: -offset.y + 0 };
+    case 270:
+      return { x: offset.y + 0, y: -offset.x + 0 };
+  }
+}
+
+/** The centre (tile units) of a set of tiles, or undefined for none. */
+function centreOf(tiles: readonly TileCoord[]): { x: number; y: number } | undefined {
+  if (tiles.length === 0) return undefined;
+  const sum = tiles.reduce((acc, t) => ({ x: acc.x + t.x + 0.5, y: acc.y + t.y + 0.5 }), {
+    x: 0,
+    y: 0,
+  });
+  return { x: sum.x / tiles.length, y: sum.y / tiles.length };
+}
+
+/** The tiles a session's venue covers: the machine's footprint, the zone, or the room. */
+function venueTiles(
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+  venue: DeepReadonly<SessionVenue>,
+): TileCoord[] {
+  const compartment = state.compartments[venue.compartmentId];
+  const deck = compartment === undefined ? undefined : content.decks[compartment.deckId];
+  if (compartment === undefined || deck === undefined) return [];
+  if ("machineId" in venue) {
+    const machine = state.machines[venue.machineId];
+    const placement = deck.machines.find((p) => p.key === machine?.placementKey);
+    const def = machine === undefined ? undefined : content.machines[machine.defId];
+    if (placement === undefined || def === undefined) return [];
+    return def.footprint.map((offset) => {
+      const r = rotated(offset, placement.rotation);
+      return { x: placement.origin.x + r.x, y: placement.origin.y + r.y };
+    });
+  }
+  if ("zoneKey" in venue) {
+    return [...(deck.zones.find((z) => z.key === venue.zoneKey)?.tiles ?? [])];
+  }
+  const symbol = deck.compartments.find((c) => c.key === compartment.key)?.symbol;
+  const tiles: TileCoord[] = [];
+  deck.tiles.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) if (row[x] === symbol) tiles.push({ x, y });
+  });
+  return tiles;
+}
+
+/** One plate per open or running session, at its venue's centre. */
+export function renderSessions(state: ReadonlyWorldState, content: ContentBundle): RenderSession[] {
+  const out: RenderSession[] = [];
+  for (const session of Object.values(state.social.sessions)) {
+    const def = content.activities[session.activityId];
+    const at = centreOf(venueTiles(state, content, session.venue));
+    if (def === undefined || at === undefined) continue;
+    const running = session.startedTick !== undefined;
+    out.push({
+      id: session.id,
+      activityId: session.activityId,
+      label: running ? def.label : def.waitingLabel,
+      x: at.x,
+      y: at.y,
+      memberIds: [...session.members],
+      running,
+    });
+  }
+  return out;
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors = Object.values(state.actors).flatMap(
@@ -1006,5 +1210,6 @@ export function getRenderFrame(world: World): RenderFrame {
     locals: renderLocals(state),
     dockProps: renderDockProps(state, content),
     headline: shipHeadline(state, content, world.config.values.travel),
+    sessions: renderSessions(state, content),
   };
 }

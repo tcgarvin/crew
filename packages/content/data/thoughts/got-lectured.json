@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "gotLectured",
+  "label": "got lectured",
+  "value": -0.05,
+  "durationDays": 0.3,
+  "stacks": false
+}

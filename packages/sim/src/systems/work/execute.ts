@@ -26,7 +26,10 @@ import type {
   Intent,
   Task,
 } from "../../core/types/work";
+import { onWoke } from "../cabins/cabins";
+import { leaveTalk } from "../cabins/private-talk";
 import { setDownBought } from "../commerce/market";
+import { leaveRecreation } from "../recreation/sessions";
 import { stopMovement } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
 import { actionFor, refreshPresentation } from "./actions";
@@ -123,8 +126,15 @@ function tellCrew(ctx: StepCtx, teller: Actor, item: Item): void {
   }
 }
 
-function leaveHold(ctx: StepCtx, actor: Actor): void {
-  if (currentHold(actor.activity) === "sleep") emitSim(ctx, "wokeUp", [actor.id], {});
+/**
+ * Leaving the hold the actor is on. `completed`: the hold ended on its own condition (a sleep
+ * slept out), not because the activity was taken off them; only then do the cabins' waking
+ * thoughts come (slice 4, `onWoke`, with the hold still the current step).
+ */
+function leaveHold(ctx: StepCtx, actor: Actor, completed: boolean): void {
+  if (currentHold(actor.activity) !== "sleep") return;
+  if (completed) onWoke(ctx, actor);
+  emitSim(ctx, "wokeUp", [actor.id], {});
 }
 
 /** Stop whatever the actor is doing, releasing its claim. Safe to call when idle. */
@@ -135,7 +145,11 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
   endGateErrand(ctx, actor);
   if (actor.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, actor.id);
   else releaseReservations(ctx.caches, actor.id);
-  leaveHold(ctx, actor);
+  leaveHold(ctx, actor, false);
+  // Slice 4: out of any session (setting down a book or instrument) and off any talk, while the
+  // activity is still theirs to read.
+  leaveRecreation(ctx, actor);
+  leaveTalk(ctx, actor);
   if (activity.kind === "task" && activity.haul !== undefined) {
     // D65: the truck and its load go down here; each held task is settled on where its crate is.
     if (dropTruckLoad(ctx, actor, activity.haul.truckId)) touchInventory(ctx);
@@ -248,7 +262,7 @@ function advanceActivity(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
       failActivity(ctx, actor, result.fail);
       return;
     }
-    if (step.kind === "hold") leaveHold(ctx, actor);
+    if (step.kind === "hold") leaveHold(ctx, actor, true);
     completedStepEvent(ctx, actor);
     plan.stepIndex += 1;
     if (plan.stepIndex >= plan.steps.length) {

@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "goodCompany",
+  "label": "good company",
+  "value": 0.05,
+  "durationDays": 0.3,
+  "stacks": false
+}

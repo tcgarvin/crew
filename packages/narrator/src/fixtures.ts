@@ -111,6 +111,7 @@ function tireCrew(world: World): void {
       fatigue: (i * 0.21) % 0.95,
       comfort: 0.1,
       social: (i * 0.17) % 0.8,
+      recreation: 0.3,
     };
   });
 }

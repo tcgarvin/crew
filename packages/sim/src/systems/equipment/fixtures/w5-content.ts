@@ -4,7 +4,11 @@
  * life-support consumer, all on one power domain. Independent of `core/fixtures/tiny-content.ts`
  * so these tests do not depend on — or risk perturbing — the shared kernel fixture.
  */
-import { FIXTURE_THOUGHTS } from "../../../core/fixtures/ship-life";
+import {
+  FIXTURE_ACTIVITIES,
+  FIXTURE_THOUGHTS,
+  FIXTURE_TOPICS,
+} from "../../../core/fixtures/ship-life";
 import { tinyConfig, tinyEffectiveConfig } from "../../../core/fixtures/tiny-content";
 import type { ConfigDef, ContentBundle, MachineFailureDef } from "../../../core/types/content";
 import type {
@@ -280,6 +284,8 @@ export function w5Content(
       },
     },
     thoughts: FIXTURE_THOUGHTS,
+    activities: FIXTURE_ACTIVITIES,
+    topics: FIXTURE_TOPICS,
     config,
     hash: "w5-content-v1",
   };

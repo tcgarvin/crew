@@ -13,7 +13,12 @@
  *   `systems/work/claims.ts`): `knownClaimantId` is another actor holding a claim;
  * - items: `itemLocation` beliefs joined with the item's static definition;
  * - schematic + roster: static layout and who is aboard with trained skills;
- * - berths (D74): the actor's own bed (`self.berth`) and every assigned bed (`assignedBeds`).
+ * - berths (D74): the actor's own bed (`self.berth`) and every assigned bed (`assignedBeds`);
+ * - slice 4: their interests, values and what they feel about others (`self.affinity`, their own
+ *   side only), a pending `privateTalk` they are part of (`self.summons`), every group session
+ *   (`sessions()`, the intercom: common knowledge like the roster), the travel stage
+ *   (`travel()`), the activity defs (`activities()`), and whose a personal item is
+ *   (`KnownItemView.ownerId`).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
@@ -37,8 +42,10 @@ import type {
   RosterEntry,
   SchematicView,
   SelfView,
+  SessionView,
   TaskView,
 } from "../core/types/view";
+import { talkCabin } from "../systems/cabins/private-talk";
 import { estimateTravelTicks } from "../systems/spatial/estimates";
 import {
   compartmentAt,
@@ -205,7 +212,45 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     ...(actor.disembarking === true ? { disembarking: true as const } : {}),
     ...(isOnDock(world.content, state, location) ? { onDock: true as const } : {}),
     ...(berth === undefined ? {} : { berth }),
+    interests: actor.interests,
+    values: actor.values,
+    affinity: affinityFrom(state, actor.id),
+    ...summonsOf(world, actor.id),
   };
+}
+
+/** Slice 4: what `actorId` feels about others (`social.relationships[actorId]`), by actor. */
+function affinityFrom(state: ReadonlyWorldState, actorId: ActorId): Record<ActorId, number> {
+  const out: Record<ActorId, number> = {};
+  const row = state.social.relationships[actorId];
+  if (row === undefined) return out;
+  for (const [other, relationship] of Object.entries(row)) {
+    out[other as ActorId] = relationship.affinity;
+  }
+  return out;
+}
+
+/** Slice 4: the pending `privateTalk` `actorId` is part of, as `SelfView.summons`. */
+function summonsOf(world: World, actorId: ActorId): Pick<SelfView, "summons"> {
+  const talk = world.state.social.privateTalk;
+  if (talk === undefined) return {};
+  const captain = talk.captainId === actorId;
+  if (!captain && talk.actorId !== actorId) return {};
+  const compartmentId = talkCabin(world.state, world.content, talk.captainId);
+  if (compartmentId === undefined) return {};
+  return {
+    summons: { withActorId: captain ? talk.actorId : talk.captainId, compartmentId, captain },
+  };
+}
+
+/** Slice 4: every open or running session, with its activity's label. */
+function sessionsOf(world: World): SessionView[] {
+  const out: SessionView[] = [];
+  for (const session of Object.values(world.state.social.sessions)) {
+    const label = world.content.activities[session.activityId]?.label ?? "taking it easy";
+    out.push({ ...session, label });
+  }
+  return out;
 }
 
 function buildSchematic(world: World, geometry: DeckGeometry): SchematicView {
@@ -308,6 +353,9 @@ function knownItems(world: World, actor: ReadonlyActor): KnownItemView[] {
       ...(location.kind === "onDeck" ? { tile: tileOf(location) } : {}),
       absent,
       observedTick,
+      ...(item.stacking === "unique" && item.ownerId !== undefined
+        ? { ownerId: item.ownerId }
+        : {}),
     });
   };
   // Own hands first: always known, whatever the table says.
@@ -378,6 +426,9 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
     roster: () => roster(state),
     assignedBeds: () => assignedBeds(state, geometry.deckId),
     knownItems: () => knownItems(world, actor),
+    sessions: () => sessionsOf(world),
+    travel: () => ({ stage: state.travel.stage }),
+    activities: () => Object.values(world.content.activities),
     estimateTravelTicks: (to: TileCoord, from?: TileCoord) => {
       const start = from ?? self.tile;
       if (start === undefined) return null;

@@ -32,6 +32,7 @@ import machineOpsTerminal from "../data/machines/ops-terminal.json";
 import machineVidScreen from "../data/machines/vid-screen.json";
 import machineWorkbench from "../data/machines/workbench.json";
 
+import itemBook from "../data/items/book.json";
 import itemCoolantCanister from "../data/items/coolant-canister.json";
 import itemCrateFragile from "../data/items/crate-fragile.json";
 import itemCrateGeneral from "../data/items/crate-general.json";
@@ -47,6 +48,7 @@ import itemProvisions from "../data/items/provisions.json";
 import itemRationPack from "../data/items/ration-pack.json";
 import itemSparePartsStack from "../data/items/spare-parts-stack.json";
 import itemToolkit from "../data/items/toolkit.json";
+import itemTreat from "../data/items/treat.json";
 import itemWelderTorch from "../data/items/welder-torch.json";
 
 import crewBettinaSolheim from "../data/crew/bettina-solheim.json";
@@ -88,16 +90,54 @@ import dockVesperGate from "../data/docks/vesper-gate.json";
 
 import scenarioDefault from "../data/scenarios/default.json";
 
-// Thoughts (D79, D81, D82)
+// Thoughts (D79, D81, D82, slice 4)
+import thoughtArgued from "../data/thoughts/argued.json";
+import thoughtAteATreat from "../data/thoughts/ate-a-treat.json";
 import thoughtAteInDirtyMess from "../data/thoughts/ate-in-dirty-mess.json";
 import thoughtAteInFilthyMess from "../data/thoughts/ate-in-filthy-mess.json";
 import thoughtAteRationPack from "../data/thoughts/ate-ration-pack.json";
 import thoughtAteWell from "../data/thoughts/ate-well.json";
 import thoughtBurntDinner from "../data/thoughts/burnt-dinner.json";
 import thoughtDoubleWatch from "../data/thoughts/double-watch.json";
+import thoughtDressedDown from "../data/thoughts/dressed-down.json";
+import thoughtEnjoyedMusic from "../data/thoughts/enjoyed-music.json";
+import thoughtGoodCompany from "../data/thoughts/good-company.json";
+import thoughtGotLectured from "../data/thoughts/got-lectured.json";
+import thoughtHatedTheNoise from "../data/thoughts/hated-the-noise.json";
+import thoughtHeardOut from "../data/thoughts/heard-out.json";
 import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
 import thoughtHelmScrape from "../data/thoughts/helm-scrape.json";
+import thoughtKeepsBeatingMe from "../data/thoughts/keeps-beating-me.json";
+import thoughtLostContest from "../data/thoughts/lost-contest.json";
+import thoughtNoBunkOfMyOwn from "../data/thoughts/no-bunk-of-my-own.json";
+import thoughtNoisyBunkroom from "../data/thoughts/noisy-bunkroom.json";
+import thoughtOwnCabin from "../data/thoughts/own-cabin.json";
+import thoughtSatWithTheCaptain from "../data/thoughts/sat-with-the-captain.json";
+import thoughtSparringBruise from "../data/thoughts/sparring-bruise.json";
+import thoughtSpiritedTalk from "../data/thoughts/spirited-talk.json";
 import thoughtStoodLongWatch from "../data/thoughts/stood-long-watch.json";
+import thoughtWonContest from "../data/thoughts/won-contest.json";
+
+// Off watch (slice 4)
+import activityBaking from "../data/activities/baking.json";
+import activityBoardGame from "../data/activities/board-game.json";
+import activityCards from "../data/activities/cards.json";
+import activityDebate from "../data/activities/debate.json";
+import activityExercise from "../data/activities/exercise.json";
+import activityMusic from "../data/activities/music.json";
+import activityReading from "../data/activities/reading.json";
+import activitySparring from "../data/activities/sparring.json";
+import activityStargazing from "../data/activities/stargazing.json";
+import activityTinkering from "../data/activities/tinkering.json";
+import activityVideoGame from "../data/activities/video-game.json";
+import activityVids from "../data/activities/vids.json";
+import topicFaith from "../data/topics/faith.json";
+import topicOldCaptains from "../data/topics/old-captains.json";
+import topicPhilosophy from "../data/topics/philosophy.json";
+import topicPolitics from "../data/topics/politics.json";
+import topicTheGuild from "../data/topics/the-guild.json";
+import topicTheLeague from "../data/topics/the-league.json";
+import topicTheVid from "../data/topics/the-vid.json";
 
 // People (D25)
 import peopleNameTable from "../data/people/name-table.json";
@@ -145,6 +185,8 @@ const ITEMS = [
   itemProvisions,
   itemHotMeal,
   itemMop,
+  itemBook,
+  itemTreat,
 ];
 const CREW = [
   crewMaraOsei,
@@ -197,6 +239,46 @@ const THOUGHTS = [
   thoughtAteRationPack,
   thoughtAteInDirtyMess,
   thoughtAteInFilthyMess,
+  thoughtWonContest,
+  thoughtLostContest,
+  thoughtKeepsBeatingMe,
+  thoughtGoodCompany,
+  thoughtSpiritedTalk,
+  thoughtArgued,
+  thoughtGotLectured,
+  thoughtEnjoyedMusic,
+  thoughtHatedTheNoise,
+  thoughtSparringBruise,
+  thoughtOwnCabin,
+  thoughtNoisyBunkroom,
+  thoughtNoBunkOfMyOwn,
+  thoughtSatWithTheCaptain,
+  thoughtHeardOut,
+  thoughtDressedDown,
+  thoughtAteATreat,
+];
+const ACTIVITIES = [
+  activityCards,
+  activityBoardGame,
+  activityVids,
+  activityVideoGame,
+  activityDebate,
+  activityExercise,
+  activitySparring,
+  activityReading,
+  activityMusic,
+  activityTinkering,
+  activityStargazing,
+  activityBaking,
+];
+const TOPICS = [
+  topicTheGuild,
+  topicPolitics,
+  topicFaith,
+  topicPhilosophy,
+  topicTheLeague,
+  topicOldCaptains,
+  topicTheVid,
 ];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */
@@ -280,6 +362,8 @@ export function rawBundle(): Record<string, unknown> {
     people: stripSchemaKey(peopleNameTable),
     docks: keyById(DOCKS),
     thoughts: keyByKey(THOUGHTS),
+    activities: keyById(ACTIVITIES),
+    topics: keyById(TOPICS),
     config: stripSchemaKey(configDefault),
   };
   return { ...withoutHash, hash: hashOf(withoutHash) };

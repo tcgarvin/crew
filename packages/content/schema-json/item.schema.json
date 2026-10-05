@@ -33,7 +33,10 @@
           "container",
           "personal",
           "provisions",
-          "meal"
+          "meal",
+          "book",
+          "instrument",
+          "treat"
         ]
       }
     },

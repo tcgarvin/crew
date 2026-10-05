@@ -20,10 +20,12 @@ import {
 import { findCrewDef, findItemDef } from "./defs";
 import { cardSpeaker, queueOrHold } from "./delivery";
 import { allocateId } from "./ids";
+import { type Character, generateInterests, interestsFromSeed } from "./interests";
 import type { KernelRegistry } from "./registry";
 import type { Actor, Needs, WatchSection } from "./types/actor";
 import type {
   Command,
+  CommandDraft,
   CommandKind,
   CommandOfKind,
   DecisionCardSide,
@@ -168,12 +170,17 @@ function validateSpawn(
  *
  * D77: `section` is their watch section from the scenario's bill; without one they are a
  * dayworker (as is anyone spawned after world creation).
+ *
+ * Slice 4: `character` is their interests and values; absent, the def's, else a keyed hash of
+ * the id (`interestsFromSeed`). The spawn handler passes one drawn on the `setup` stream for a def
+ * without them (`characterFor`).
  */
 export function newActor(
   id: ActorId,
   def: CrewDef,
   location: PhysicalLocation,
   section?: WatchSection,
+  character: Character = defCharacter(def, () => interestsFromSeed(id)),
 ): Actor {
   return {
     id,
@@ -183,12 +190,18 @@ export function newActor(
     location,
     movement: { kind: "stationary" },
     facing: 0,
-    needs: { hunger: 0, fatigue: 0, comfort: 0, social: 0 },
+    needs: { hunger: 0, fatigue: 0, comfort: 0, social: 0, recreation: 0 },
     capacities: { movement: 1, manipulation: 1, consciousness: 1 },
     skills: { ...def.skills },
     traits: [...(def.traits ?? [])],
     mood: 0,
     thoughts: [],
+    interests: {
+      likes: [...character.interests.likes],
+      ...(character.interests.strong === undefined ? {} : { strong: character.interests.strong }),
+      dislikes: [...character.interests.dislikes],
+    },
+    values: { ...character.values },
     boots: 0,
     schedule: section === undefined ? {} : { section: { ...section } },
     activity: { kind: "idle" },
@@ -197,6 +210,21 @@ export function newActor(
     navigationKnowledgeRevision: 0,
     availability: "available",
     crew: location.kind !== "inExternalStore",
+  };
+}
+
+/**
+ * Slice 4: the def's interests and values where it has them; what `generate` returns for the
+ * rest (called only when the def lacks one of them).
+ */
+function defCharacter(def: CrewDef, generate: () => Character): Character {
+  if (def.interests !== undefined && def.values !== undefined) {
+    return { interests: def.interests, values: def.values };
+  }
+  const generated = generate();
+  return {
+    interests: def.interests ?? generated.interests,
+    values: def.values ?? generated.values,
   };
 }
 
@@ -228,7 +256,19 @@ const scenarioSpawn: CommandHandler<"scenarioSpawn", null> = {
       let defId: string;
       if (spawn.kind === "actor") {
         const id = allocateId(state, "actor");
-        state.actors[id] = newActor(id, ctx.defs.crew(spawn.crewDefId), location, spawn.section);
+        const def = ctx.defs.crew(spawn.crewDefId);
+        // Slice 4 (call 8): an unauthored person's interests are drawn on the `setup` stream.
+        const authored = def.interests !== undefined && def.values !== undefined;
+        const character = defCharacter(def, () => generateInterests(ctx.rng, "setup"));
+        state.actors[id] = newActor(id, def, location, spawn.section, character);
+        if (!authored) {
+          ctx.emit({
+            ...causedBy(command),
+            type: "interestsAssigned",
+            subjectIds: [id],
+            payload: { actorId: id },
+          });
+        }
         entityId = id;
         defId = spawn.crewDefId;
       } else {
@@ -520,7 +560,9 @@ function resolveDecisionHandler(
       }
       const subCommands: { command: Command; plan: unknown }[] = [];
       for (const [index, draft] of option.commands.entries()) {
-        const sub = asPlayerCommand(`${command.id}#${index}`, draft);
+        // The card's drafts are its own `CommandDraft`s read through `DeepReadonly`, which the
+        // checker no longer unfolds over the whole union (slice 4 made it one kind longer).
+        const sub = asPlayerCommand(`${command.id}#${index}`, draft as CommandDraft);
         if (sub === undefined) {
           return reject("unauthorized", `option command "${draft.kind}" is not a player command`);
         }

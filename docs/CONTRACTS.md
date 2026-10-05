@@ -59,7 +59,10 @@ These are the kernel rules from PLAN §5, made concrete.
    same tick. Cross-system communication goes through state (problems, queues, dirty flags).
    Every event carries `significance` and `causeIds`.
 7. **Planner sees `AgentView` only.** No truth tables, no `StepCtx`, no RNG. Claims by others
-   are known only through facts.
+   are known only through facts. A few things are common knowledge aboard and read as truth
+   without facts: the roster (`roster()`), assigned beds (`assignedBeds()`, D74), and since slice 4
+   the open and running group sessions (`sessions()`: the intercom, `social.sessions`), the
+   travel stage (`travel()`) and the activity defs (`activities()`).
 8. **Validate, then apply.** A command is validated when enqueued and again when applied;
    validation is pure and produces a plan; applying cannot fail, so a rejection never leaves a
    partial mutation. `AUTHORITY[source]` is checked first.

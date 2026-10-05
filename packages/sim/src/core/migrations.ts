@@ -6,9 +6,11 @@
 import { watchIndexAt } from "./clock";
 import { emptyCells } from "./dirt-grid";
 import { berthDock, dockAreaTiles } from "./docks";
+import { interestsFromSeed } from "./interests";
 import { SaveCompatibilityError } from "./save-error";
 import type { TileCoord } from "./types/common";
-import type { DeckDefId, DockDefId, ScenarioDefId } from "./types/ids";
+import type { ItemDef } from "./types/content";
+import type { ActorId, CrewDefId, DeckDefId, DockDefId, ScenarioDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -400,20 +402,41 @@ function spawnGalleyStoresOnLoad(
   deckIds: readonly string[],
   warn: MigrationContext["warn"],
 ): void {
-  if (!isRecord(raw.items) || !isRecord(raw.nextId)) return;
+  const spawned = spawnScenarioStores(
+    raw,
+    content,
+    deckIds,
+    (def) => def.tags.includes("provisions") || def.toolKinds.includes("mop"),
+  );
+  if (spawned.length > 0) {
+    warn?.(`Save predates the galley (schema 8); stowed the scenario's ${spawned.join(" and ")}`);
+  }
+}
+
+/**
+ * The scenario's `startingItems` lines whose def passes `wanted`, spawned into their zones as
+ * fresh items (ids from `nextId.item`, chunks of `maxStack`, zone tiles round-robin, exactly as
+ * `scenarioSetupCommands` does) unless the save already holds one of that def. Returns what was
+ * stowed ("3× provisions in pantry"), for the owner's warning. Shared by 8 → 9 and 9 → 10.
+ */
+function spawnScenarioStores(
+  raw: Record<string, unknown>,
+  content: MigrationContext["content"],
+  deckIds: readonly string[],
+  wanted: (def: ItemDef) => boolean,
+): string[] {
+  if (!isRecord(raw.items) || !isRecord(raw.nextId)) return [];
   const scenario =
     typeof raw.scenarioId === "string"
       ? content.scenarios[raw.scenarioId as ScenarioDefId]
       : undefined;
   const deck = deckIds.map((id) => content.decks[id as DeckDefId]).find((d) => d !== undefined);
-  if (scenario === undefined || deck === undefined || deck.id !== scenario.deckId) return;
+  if (scenario === undefined || deck === undefined || deck.id !== scenario.deckId) return [];
   const items = raw.items;
   const spawned: string[] = [];
   for (const line of scenario.startingItems) {
     const def = content.items[line.itemDefId];
-    if (def === undefined) continue;
-    const galleyStore = def.tags.includes("provisions") || def.toolKinds.includes("mop");
-    if (!galleyStore) continue;
+    if (def === undefined || !wanted(def)) continue;
     if (Object.values(items).some((item) => isRecord(item) && item.defId === def.id)) continue;
     const zone = deck.zones.find((z) => z.key === line.zoneKey);
     if (zone === undefined || zone.tiles.length === 0) continue;
@@ -421,7 +444,7 @@ function spawnGalleyStoresOnLoad(
     let placed = 0;
     for (let left = line.count, index = 0; left > 0; left -= chunk, index++) {
       const counter: unknown = raw.nextId.item;
-      if (typeof counter !== "number" || !Number.isInteger(counter) || counter < 1) return;
+      if (typeof counter !== "number" || !Number.isInteger(counter) || counter < 1) return spawned;
       const tile = zone.tiles[index % zone.tiles.length] as TileCoord;
       const location = { kind: "onDeck", deckId: deck.id, x: tile.x + 0.5, y: tile.y + 0.5 };
       const id = `i${counter}`;
@@ -442,9 +465,59 @@ function spawnGalleyStoresOnLoad(
     if (placed > 0)
       spawned.push(`${line.count}× ${def.name.toLowerCase()} in ${zone.name.toLowerCase()}`);
   }
-  if (spawned.length > 0) {
-    warn?.(`Save predates the galley (schema 8); stowed the scenario's ${spawned.join(" and ")}`);
+  return spawned;
+}
+
+/**
+ * 9 → 10 (slice 4): off watch.
+ * - `needs.recreation: 0.3` for everyone; `interests` and `values` from the actor's crew def
+ *   (content, else the save's generated defs), else `interestsFromSeed(actorId)` (a keyed hash, no
+ *   rng);
+ * - `social`: the empty slice (no relationships, rivalries or sessions, no captain's table yet);
+ *   `nextId.session: 1`;
+ * - a sleep hold's `disturbedTicks` absent means 0, so held steps need nothing;
+ * - the scenario's `book`-tagged `startingItems` (the shelf) spawned as 8 → 9 spawns provisions,
+ *   unless the save holds one; the owner is told through `warn`. The harmonica already lies in
+ *   Bettina's locker (D74).
+ */
+function offWatch(raw: unknown, { content, warn }: MigrationContext): unknown {
+  if (!isRecord(raw)) return raw;
+  const dynamicCrew =
+    isRecord(raw.defs) && isRecord(raw.defs.dynamic) && isRecord(raw.defs.dynamic.crew)
+      ? raw.defs.dynamic.crew
+      : {};
+  if (isRecord(raw.actors)) {
+    for (const [id, actor] of Object.entries(raw.actors)) {
+      if (!isRecord(actor)) continue;
+      if (isRecord(actor.needs) && typeof actor.needs.recreation !== "number") {
+        actor.needs.recreation = 0.3;
+      }
+      if (isRecord(actor.interests) && isRecord(actor.values)) continue;
+      const defId = typeof actor.defId === "string" ? actor.defId : "";
+      const def = content.crew[defId as CrewDefId] ?? dynamicCrew[defId];
+      const seeded = interestsFromSeed(id as ActorId);
+      const authored = isRecord(def) ? def : {};
+      if (!isRecord(actor.interests)) {
+        actor.interests = structuredJson(authored.interests ?? seeded.interests);
+      }
+      if (!isRecord(actor.values)) actor.values = structuredJson(authored.values ?? seeded.values);
+    }
   }
+  if (!isRecord(raw.social)) {
+    raw.social = { relationships: {}, rivalries: {}, sessions: {}, captainsTableDay: -1 };
+  }
+  if (isRecord(raw.nextId) && typeof raw.nextId.session !== "number") raw.nextId.session = 1;
+  const deckIds = isRecord(raw.deck) && isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  const spawned = spawnScenarioStores(raw, content, deckIds, (def) => def.tags.includes("book"));
+  if (spawned.length > 0) {
+    warn?.(`Save predates off watch (schema 9); shelved the scenario's ${spawned.join(" and ")}`);
+  }
+  return raw;
+}
+
+/** A detached plain-JSON copy, so a migrated actor never aliases content. */
+function structuredJson(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }
 
 export const migrations: MigrationRegistry = {
@@ -456,4 +529,5 @@ export const migrations: MigrationRegistry = {
   6: refuseBeforeShipLife,
   7: watchesAndThoughts,
   8: galleyAndDirt,
+  9: offWatch,
 };

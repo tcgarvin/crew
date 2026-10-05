@@ -132,6 +132,7 @@ function frameAt(dock: DockDef, travel: RenderTravel, withDockside: boolean): Re
     money: 0,
     items: [],
     headline: "",
+    sessions: [],
     ...(withDockside ? dockside(dock) : { locals: [], dockProps: [] }),
     ...(travel.state === "departing" ? {} : { dock: { dockId: dock.id, deckId: layout.deckId } }),
   };

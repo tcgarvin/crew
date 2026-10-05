@@ -13,5 +13,15 @@
   },
   "startingInventory": [],
   "bio": "Cargo hand; knows exactly how to stack a hold so nothing shifts in transit.",
-  "voice": "Few words, most of them nouns. Calls the captain \"Boss\". Lists what is where and what is loose, and distrusts anything that is not tied down, people included. Bad news gets a grunt, one sentence, and the strap she has already thrown over it."
+  "voice": "Few words, most of them nouns. Calls the captain \"Boss\". Lists what is where and what is loose, and distrusts anything that is not tied down, people included. Bad news gets a grunt, one sentence, and the strap she has already thrown over it.",
+  "interests": {
+    "likes": ["exercise", "gossip"],
+    "strong": "exercise",
+    "dislikes": ["music"]
+  },
+  "values": {
+    "orderFreedom": 1,
+    "faithReason": 0,
+    "loyaltyAmbition": 1
+  }
 }

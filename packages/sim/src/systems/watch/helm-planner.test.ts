@@ -18,8 +18,9 @@ import { DERIVATION_EVERY_TICKS } from "../work/work";
 import { JAX, MARA, NOOR, bridgeWorld, placeOnBridgeDeck } from "./fixtures/bridge-deck";
 
 function plannerConfig(fixture: TestWorld): PlannerConfig {
-  const { work, urgency, needs, time, galley } = fixture.world.config.values;
-  return { work, urgency, needs, time, galley };
+  const { work, urgency, needs, time, galley, recreation, social, mood } =
+    fixture.world.config.values;
+  return { work, urgency, needs, time, galley, recreation, social, mood };
 }
 
 function candidatesOf(fixture: TestWorld, actorId: ActorId): CandidateSet & { tasks: TaskView[] } {

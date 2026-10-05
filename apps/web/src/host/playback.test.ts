@@ -33,6 +33,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     headline: "",
     locals: [],
     dockProps: [],
+    sessions: [],
   };
 }
 

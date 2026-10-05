@@ -20,9 +20,11 @@ import type {
   StepTarget,
   Task,
 } from "../../core/types/work";
+import { privateTalkPlan } from "../cabins/private-talk";
 import { cleanPlan } from "../dirt/clean";
 import { cookPlan } from "../galley/cook";
 import { carryMealPlan, eatPlan } from "../galley/eat";
+import { recreatePlan } from "../recreation/plans";
 import { estimateTravelTicks } from "../spatial/estimates";
 import { plotCoursePlan } from "../travel/course";
 import { gangwayPlan, helmPlan } from "../watch/helm";
@@ -328,6 +330,11 @@ export function buildPersonalPlan(
       return roundsPlan(ctx, actor);
     case "standWatch":
       return gangwayPlan(ctx, actor);
+    // Slice 4: off-watch activities are recreation's, the word in the cabin the cabins'.
+    case "recreate":
+      return recreatePlan(ctx, actor, intent);
+    case "privateTalk":
+      return privateTalkPlan(ctx, actor);
     case "rest":
     case "socialize":
     case "wander":

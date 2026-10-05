@@ -9,6 +9,8 @@
  *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
  *   bands `min <= max`; config numbers finite. D77: every watch-bill member is in the scenario's
  *   crew, and dayworkers' watches exist in the day; D79: each thought sits under its own key.
+ *   Slice 4: an activity's topics and product resolve and its required item tag is carried by
+ *   some item def (`checkActivities`).
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
@@ -90,6 +92,8 @@ const NAMESPACE_BY_TABLE: Record<string, string> = {
   ports: "port",
   scenarios: "scenario",
   docks: "dock",
+  activities: "activity",
+  topics: "topic",
 };
 
 function checkNamespaces(bundle: ContentBundle, issues: ValidationIssue[]): void {
@@ -475,6 +479,35 @@ function checkGalleyItems(bundle: ContentBundle, issues: ValidationIssue[]): voi
   }
 }
 
+/**
+ * Slice 4: an activity's references resolve: its `topics`, the item it `produces`, and the tag it
+ * `requires` is carried by some item def. Its thought keys and problem kinds are closed enums
+ * (L1). The venue rules against each deck are L3.
+ */
+function checkActivities(bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const itemTags = new Set(Object.values(bundle.items).flatMap((item) => item.tags));
+  for (const activity of Object.values(bundle.activities)) {
+    const path: Path = ["activities", activity.id];
+    (activity.topics ?? []).forEach((topicId, i) => {
+      checkRef(bundle.topics, topicId, "topic", [...path, "topics", i], issues);
+    });
+    if (activity.produces !== undefined) {
+      const at: Path = [...path, "produces", "itemDefId"];
+      checkRef(bundle.items, activity.produces.itemDefId, "item", at, issues);
+    }
+    const required = activity.requires?.itemTag;
+    if (required !== undefined && !itemTags.has(required)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "requires", "itemTag"],
+          `no item def carries the tag "${required}"`,
+        ),
+      );
+    }
+  }
+}
+
 function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void {
   for (const [cls, band] of Object.entries(bundle.config.commerce.priceBands)) {
     if (band.min > band.max) {
@@ -549,6 +582,7 @@ export function validateReferences(bundle: ContentBundle): readonly ValidationIs
   checkDayworkerWatches(bundle, issues);
   checkThoughtKeys(bundle, issues);
   checkGalleyItems(bundle, issues);
+  checkActivities(bundle, issues);
   checkFiniteNumbers(bundle.config, ["config"], issues);
 
   return issues;

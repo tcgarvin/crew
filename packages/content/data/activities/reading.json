@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.reading",
+  "label": "reading",
+  "waitingLabel": "reading",
+  "interest": "reading",
+  "venue": [
+    {
+      "machineTag": "desk",
+      "own": true
+    },
+    {
+      "compartmentTag": "lounge"
+    }
+  ],
+  "participants": {
+    "min": 1,
+    "max": 1
+  },
+  "durationDays": 0.08,
+  "restores": {
+    "recreation": 0.35,
+    "comfort": 0.1
+  },
+  "outcome": "none",
+  "requires": {
+    "itemTag": "book"
+  }
+}

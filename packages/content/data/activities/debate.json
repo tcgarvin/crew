@@ -1,0 +1,40 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.debate",
+  "label": "debating",
+  "waitingLabel": "looking for an argument",
+  "interest": "debate",
+  "venue": [
+    {
+      "compartmentTag": "lounge"
+    },
+    {
+      "compartmentTag": "mess"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 3
+  },
+  "durationDays": 0.06,
+  "restores": {
+    "recreation": 0.3,
+    "social": 0.4
+  },
+  "solo": {
+    "label": "reading the news",
+    "durationDays": 0.04,
+    "restores": {
+      "recreation": 0.2
+    }
+  },
+  "outcome": "debate",
+  "topics": [
+    "topic.the_guild",
+    "topic.politics",
+    "topic.faith",
+    "topic.philosophy",
+    "topic.the_league",
+    "topic.old_captains"
+  ]
+}

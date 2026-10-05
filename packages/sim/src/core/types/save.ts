@@ -38,7 +38,7 @@ export const SIM_VERSION = "0.1.0";
  * and the notes are dropped.
  */
 export interface MigrationContext {
-  readonly content: Pick<ContentBundle, "decks" | "docks" | "items" | "scenarios">;
+  readonly content: Pick<ContentBundle, "decks" | "docks" | "items" | "scenarios" | "crew">;
   readonly config: ConfigDef;
   readonly warn?: (message: string) => void;
 }

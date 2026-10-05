@@ -131,6 +131,10 @@
           "type": "number",
           "minimum": 0
         },
+        "recreationPerDay": {
+          "type": "number",
+          "minimum": 0
+        },
         "seekThreshold": {
           "type": "number",
           "minimum": 0,
@@ -224,9 +228,26 @@
               },
               "required": ["min", "max"],
               "additionalProperties": false
+            },
+            "recreation": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["min", "max"],
+              "additionalProperties": false
             }
           },
-          "required": ["hunger", "fatigue", "comfort", "social"],
+          "required": ["hunger", "fatigue", "comfort", "social", "recreation"],
           "additionalProperties": false
         }
       },
@@ -239,6 +260,7 @@
         "comfortRecoveryPerDayResting",
         "socialPerDay",
         "socialRecoveryPerDayChatting",
+        "recreationPerDay",
         "seekThreshold",
         "mealDays",
         "sleepDays",
@@ -925,6 +947,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 10
+        },
+        "treatHungerAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "required": [
@@ -939,7 +966,8 @@
         "lowBelowDays",
         "restockToDays",
         "goodCookingAbove",
-        "poorCookingBelow"
+        "poorCookingBelow",
+        "treatHungerAbove"
       ],
       "additionalProperties": false
     },
@@ -1144,9 +1172,123 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "chatAffinity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "chatAffinityEveryDays": {
+          "type": "number",
+          "minimum": 0
+        },
+        "affinityRange": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "avoidBelow": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "preferAbove": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "rivalry": {
+          "type": "object",
+          "properties": {
+            "streakFor": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["streakFor"],
+          "additionalProperties": false
+        },
+        "debate": {
+          "type": "object",
+          "properties": {
+            "agreeWithin": {
+              "type": "number",
+              "minimum": 0
+            },
+            "argueBeyond": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["agreeWithin", "argueBeyond"],
+          "additionalProperties": false
         }
       },
-      "required": ["chatRadiusTiles", "chatCooldownSeconds", "templateLines"],
+      "required": [
+        "chatRadiusTiles",
+        "chatCooldownSeconds",
+        "templateLines",
+        "chatAffinity",
+        "chatAffinityEveryDays",
+        "affinityRange",
+        "avoidBelow",
+        "preferAbove",
+        "rivalry",
+        "debate"
+      ],
+      "additionalProperties": false
+    },
+    "recreation": {
+      "type": "object",
+      "properties": {
+        "joinAbove": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "gatherSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lateJoinSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "collapseBackoffDays": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["joinAbove", "gatherSeconds", "lateJoinSeconds", "collapseBackoffDays"],
+      "additionalProperties": false
+    },
+    "cabins": {
+      "type": "object",
+      "properties": {
+        "noisySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "checkEverySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "privateTalkSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "privateTalkWaitSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "noisySeconds",
+        "checkEverySeconds",
+        "privateTalkSeconds",
+        "privateTalkWaitSeconds"
+      ],
       "additionalProperties": false
     },
     "events": {
@@ -1186,6 +1328,8 @@
     "dirt",
     "hazards",
     "social",
+    "recreation",
+    "cabins",
     "events"
   ],
   "additionalProperties": false

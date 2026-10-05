@@ -43,5 +43,10 @@ export function activityRef(activity: Activity): string {
       move?.kind === "moveTo" && "machineId" in move.target ? move.target.machineId : undefined;
     return backoffRef.personal("sleep", bed);
   }
+  if (activity.activity === "recreate") {
+    // Slice 4: a failed game is backed off for that activity alone (`recreate:<activityId>`).
+    const step = steps.find((s) => s.kind === "recreate");
+    return backoffRef.personal("recreate", step?.kind === "recreate" ? step.activityId : undefined);
+  }
   return backoffRef.personal(activity.activity);
 }

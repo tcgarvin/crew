@@ -20,8 +20,8 @@ function actorOf(tw: ReturnType<typeof crewWorld>, id: typeof MARA) {
 }
 
 function plannerConfig(tw: ReturnType<typeof crewWorld>): PlannerConfig {
-  const { work, urgency, needs, time, galley } = tw.world.config.values;
-  return { work, urgency, needs, time, galley };
+  const { work, urgency, needs, time, galley, recreation, social, mood } = tw.world.config.values;
+  return { work, urgency, needs, time, galley, recreation, social, mood };
 }
 
 describe("selectIntent", () => {

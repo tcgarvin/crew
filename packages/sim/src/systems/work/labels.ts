@@ -14,7 +14,12 @@
  * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
  * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>"; the galley
  * (D81): "fetching provisions", "cooking", "serving dinner", "taking a plate to the helm", "at the
- * helm, eating"; dirt (D82): "fetching the mop", "mopping <room>", "putting the mop away". Names are
+ * helm, eating"; dirt (D82): "fetching the mop", "mopping <room>", "putting the mop away"; off watch
+ * (slice 4, `recreationLabel`): the activity's `label` while playing ("playing cards"), its
+ * `waitingLabel` while the session gathers, its `solo.label` after a collapse ("playing
+ * solitaire"), "fetching the harmonica" / "fetching a book", "putting the harmonica away" /
+ * "putting the book back"; a word in the cabin (`talkLabel`): "going to the captain's cabin" (or
+ * "the first officer's cabin"), "having a word with <name>", "having a word with the captain". Names are
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
  */
@@ -245,6 +250,8 @@ function taskStepLabel(
     case "awaitWord":
     case "talk":
     case "deliverCard":
+    case "recreate":
+    case "confer":
       return "working";
   }
 }
@@ -292,7 +299,105 @@ function personalStepLabel(
       return `talking with ${step.withName}`;
     case "deliverCard":
       return "talking";
+    case "recreate":
+      return recreateLabel(ctx, step);
+    case "confer":
+      return conferLabel(ctx, actor);
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Off watch (slice 4)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The `recreate` step: the def's `label` while playing (solo, or the session started), its
+ * `waitingLabel` while the session gathers, its `solo.label` once a group game is played alone.
+ */
+export function recreateLabel(
+  ctx: LabelCtx,
+  step: DeepReadonly<Extract<ActivityStep, { kind: "recreate" }>>,
+): string {
+  const def = ctx.content.activities[step.activityId];
+  if (def === undefined) return "taking it easy";
+  if (step.role === "solo") {
+    return def.participants.min >= 2 && def.solo !== undefined ? def.solo.label : def.label;
+  }
+  const session =
+    step.sessionId === undefined ? undefined : ctx.state.social.sessions[step.sessionId];
+  return session?.startedTick === undefined ? def.waitingLabel : def.label;
+}
+
+/** "a book" for a `book`, else "the harmonica": what is fetched for, or put back after, a game. */
+function recreationItem(ctx: LabelCtx, itemId: ItemId): { book: boolean; name: string } {
+  const item = ctx.state.items[itemId];
+  const def = item === undefined ? undefined : ctx.content.items[item.defId];
+  return { book: def?.tags.includes("book") === true, name: itemName(ctx, itemId) };
+}
+
+/** A `recreate` activity's label: the fetch, the walk, the game, putting it back. */
+function recreationLabel(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  rest: readonly DeepReadonly<ActivityStep>[],
+  step: DeepReadonly<ActivityStep>,
+): string {
+  const fetching = (itemId: ItemId): string => {
+    const item = recreationItem(ctx, itemId);
+    return item.book ? "fetching a book" : `fetching the ${item.name}`;
+  };
+  switch (step.kind) {
+    case "moveTo": {
+      const next = rest.find((s) => s.kind !== "moveTo");
+      if (next?.kind === "pickUp") return fetching(next.itemId);
+      return placeLabel(ctx, actor, step.target);
+    }
+    case "pickUp":
+      return fetching(step.itemId);
+    case "putDown": {
+      const item = recreationItem(ctx, step.itemId);
+      return item.book ? "putting the book back" : `putting the ${item.name} away`;
+    }
+    default:
+      return personalStepLabel(ctx, actor, step);
+  }
+}
+
+/** Whose cabin a pending talk is in, said from the caller's rank: "the captain's cabin". */
+function talkCabinName(ctx: LabelCtx): string | undefined {
+  const talk = ctx.state.social.privateTalk;
+  if (talk === undefined) return undefined;
+  const caller = ctx.state.actors[talk.captainId];
+  return caller?.roleTags.includes("captain") === true
+    ? "the captain's cabin"
+    : "the first officer's cabin";
+}
+
+/** The `confer` step: "having a word with Priya Kessler" (the caller), "with the captain". */
+function conferLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
+  const talk = ctx.state.social.privateTalk;
+  if (talk === undefined) return "having a word";
+  if (talk.captainId === actor.id) {
+    const other = ctx.state.actors[talk.actorId]?.name;
+    return other === undefined ? "having a word" : `having a word with ${other}`;
+  }
+  const caller = ctx.state.actors[talk.captainId];
+  return caller?.roleTags.includes("captain") === true
+    ? "having a word with the captain"
+    : "having a word with the first officer";
+}
+
+/** A `privateTalk` activity's label: the walk to the cabin, then the word. */
+function talkLabel(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  step: DeepReadonly<ActivityStep>,
+): string {
+  if (step.kind === "moveTo") {
+    const cabin = talkCabinName(ctx);
+    return cabin === undefined ? placeLabel(ctx, actor, step.target) : `going to ${cabin}`;
+  }
+  return personalStepLabel(ctx, actor, step);
 }
 
 /**
@@ -361,6 +466,15 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   }
   // D77: a round reads as one activity, its walks between stops included.
   if (activity.activity === "rounds") return "doing rounds";
+  if (activity.activity === "recreate") {
+    return recreationLabel(
+      ctx,
+      actor,
+      activity.plan?.steps.slice(activity.plan.stepIndex) ?? [],
+      step,
+    );
+  }
+  if (activity.activity === "privateTalk") return talkLabel(ctx, actor, step);
   return personalStepLabel(ctx, actor, step);
 }
 

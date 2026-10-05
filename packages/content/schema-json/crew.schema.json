@@ -61,6 +61,95 @@
     "voice": {
       "type": "string",
       "minLength": 1
+    },
+    "interests": {
+      "type": "object",
+      "properties": {
+        "likes": {
+          "minItems": 1,
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cards",
+              "boardgames",
+              "vids",
+              "debate",
+              "music",
+              "exercise",
+              "sparring",
+              "reading",
+              "tinkering",
+              "cooking",
+              "stargazing",
+              "gossip"
+            ]
+          }
+        },
+        "strong": {
+          "type": "string",
+          "enum": [
+            "cards",
+            "boardgames",
+            "vids",
+            "debate",
+            "music",
+            "exercise",
+            "sparring",
+            "reading",
+            "tinkering",
+            "cooking",
+            "stargazing",
+            "gossip"
+          ]
+        },
+        "dislikes": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cards",
+              "boardgames",
+              "vids",
+              "debate",
+              "music",
+              "exercise",
+              "sparring",
+              "reading",
+              "tinkering",
+              "cooking",
+              "stargazing",
+              "gossip"
+            ]
+          }
+        }
+      },
+      "required": ["likes", "dislikes"],
+      "additionalProperties": false
+    },
+    "values": {
+      "type": "object",
+      "properties": {
+        "orderFreedom": {
+          "type": "integer",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "faithReason": {
+          "type": "integer",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "loyaltyAmbition": {
+          "type": "integer",
+          "minimum": -2,
+          "maximum": 2
+        }
+      },
+      "required": ["orderFreedom", "faithReason", "loyaltyAmbition"],
+      "additionalProperties": false
     }
   },
   "required": ["id", "name", "roleTags", "skills", "startingInventory", "bio", "voice"],

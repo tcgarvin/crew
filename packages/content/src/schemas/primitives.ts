@@ -6,17 +6,21 @@
  * any drift between the two into a compile error.
  */
 import type {
+  ActivityDefId,
+  ActivityOutcome,
   CargoClass,
   CrewDefId,
   DeckDefId,
   DockDefId,
   HullSizeClass,
+  InterestTag,
   ItemDefId,
   ItemTag,
   MachineDefId,
   MachineTag,
   PortDefId,
   PowerPriority,
+  ProblemKind,
   RecipeActionKind,
   RoleTag,
   ScenarioDefId,
@@ -26,6 +30,7 @@ import type {
   TileCoord,
   TileEdge,
   ToolKind,
+  TopicDefId,
   TraitDefId,
   TraitModifierKey,
 } from "@crew/sim";
@@ -54,6 +59,8 @@ export const portDefIdSchema = defId<PortDefId>();
 export const traitDefIdSchema = defId<TraitDefId>();
 export const scenarioDefIdSchema = defId<ScenarioDefId>();
 export const dockDefIdSchema = defId<DockDefId>();
+export const activityDefIdSchema = defId<ActivityDefId>();
+export const topicDefIdSchema = defId<TopicDefId>();
 
 /** Keys local to one def (compartment, fault, zone keys). */
 export const localKeySchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/);
@@ -114,6 +121,9 @@ export const itemTagSchema = z.enum([
   "personal",
   "provisions",
   "meal",
+  "book",
+  "instrument",
+  "treat",
 ]);
 export const toolKindSchema = z.enum([
   "wrench",
@@ -174,6 +184,23 @@ export const thoughtKeySchema = z.enum([
   "ateRationPack",
   "ateInDirtyMess",
   "ateInFilthyMess",
+  "wonContest",
+  "lostContest",
+  "keepsBeatingMe",
+  "goodCompany",
+  "spiritedTalk",
+  "argued",
+  "gotLectured",
+  "enjoyedMusic",
+  "hatedTheNoise",
+  "sparringBruise",
+  "ownCabin",
+  "noisyBunkroom",
+  "noBunkOfMyOwn",
+  "satWithTheCaptain",
+  "heardOut",
+  "dressedDown",
+  "ateATreat",
 ]);
 export const traitModifierSchema = z.enum([
   "hungerRate",
@@ -182,6 +209,39 @@ export const traitModifierSchema = z.enum([
   "socialRate",
   "workSpeed",
   "walkSpeed",
+  "recreationRate",
+]);
+/** Slice 4: what people like doing off watch (sim `INTEREST_TAGS`). */
+export const interestTagSchema = z.enum([
+  "cards",
+  "boardgames",
+  "vids",
+  "debate",
+  "music",
+  "exercise",
+  "sparring",
+  "reading",
+  "tinkering",
+  "cooking",
+  "stargazing",
+  "gossip",
+]);
+/** Slice 4: how an activity ends (sim `ACTIVITY_OUTCOMES`). */
+export const activityOutcomeSchema = z.enum(["contest", "bond", "debate", "perform", "none"]);
+/** Slice 4: problem kinds an activity may be blocked by (sim `ProblemKind`). */
+export const problemKindSchema = z.enum([
+  "machineSymptom",
+  "machineFault",
+  "maintenanceDue",
+  "cargoToLoad",
+  "cargoToUnload",
+  "stationToStaff",
+  "courseToPlot",
+  "partsNeeded",
+  "reserveLow",
+  "mealToCook",
+  "mealToCarry",
+  "compartmentDirty",
 ]);
 
 export const skillLevelsSchema = z.partialRecord(
@@ -212,4 +272,7 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof traitModifierSchema>, TraitModifierKey>,
   AssertEqual<z.infer<typeof hullSizeClassSchema>, HullSizeClass>,
   AssertEqual<z.infer<typeof thoughtKeySchema>, ThoughtKey>,
-] = [true, true, true, true, true, true, true, true, true, true, true];
+  AssertEqual<z.infer<typeof interestTagSchema>, InterestTag>,
+  AssertEqual<z.infer<typeof activityOutcomeSchema>, ActivityOutcome>,
+  AssertEqual<z.infer<typeof problemKindSchema>, ProblemKind>,
+] = [true, true, true, true, true, true, true, true, true, true, true, true, true, true];
