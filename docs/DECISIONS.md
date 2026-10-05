@@ -1521,3 +1521,81 @@ could see the same lag, and none was audited.
 *Slice 3 also ships with (QA, minor):* instant steps never show their own labels ("fetching the
 mop", "serving dinner": the walk reads "walking to stores"); at 390 px the new labels always
 truncate; a trip over a room's twelve dirtiest tiles can jump between clusters.
+
+## 2026-10-05 — Ship life, slice 4: off watch
+
+**D84. Off watch: recreation, activities and group sessions.** A fifth need, `recreation`, rises
+at `needs.recreationPerDay` (0.6) and is met by activities from a content table (`ActivityDef`:
+venue tags, participants, duration, restores, outcome, thoughts, affinity, topics, skill gain,
+risk, dirt, a required item, a product); twelve are authored. Each person has interests (likes, a
+strong like, dislikes) and three value axes, authored for the nine and drawn for anyone else with
+keyed draws on their id, so no existing stream moves. The planner offers one recreation candidate
+per person, the best-scored activity: interest 3/2/1/0 (a dislike never), +2 for an open session
+with room, +1 to host a group activity (company is worth something), mood and company adjusting;
+ties go to the bigger table, then join over host over solo. Every recreation candidate is
+routine, not voluntary as planned: voluntary joins never interrupted the off watch's rest holds,
+so nobody joined a table. On duty, recreation above the seek threshold is offered at voluntary, so
+any task still wins but an idle cook bakes or plays. Rest and chat now take `needUrgency` as the
+planner's header always said, and a rest or chat taken because the need pressed ends when the need
+is met: before that, routine games beat voluntary chat every time and the helm standers came on
+watch lonely enough to be relieved every fifty seconds (handovers 46 → 19, helm empty in transit
+290 s → 76 s, seed 1). Sessions are common knowledge (`AgentView.sessions()`, with
+`activities()` and `travel()`, CONTRACTS rule 7), opened by a host at the venue, joined by whoever
+is there, started at max or at `gatherSeconds` (45) with min, collapsed to the solo variant (the
+host backs off), abandoned when a contest or debate falls under min, and resolved once through
+`resolveOutcome`; a solo play resolves through a one-member row never stored, and a solo
+performance still says `sessionEnded`. One game to a table or mat, one game of a kind at a time.
+Personal items are fetched and put back (the harmonica from Bettina's locker; books from the
+shelf to one's own desk, or the lounge without a cabin). Content is validated per deck: a present
+venue seats `participants.max` (at most four, one plate), a non-contest group activity says how it
+is done alone, `{ref}` appears only in the labels of thoughts that carry a `refId`, and a deck no
+scenario sails gets notes, not failures (Mk1 lacks nine activities). On the canvas a session is one
+plate at its venue ("cards — Jax, Tomas"), its members' own labels hidden; the inspector shows
+recreation, likes, and who someone is close to or at odds with; tapping the venue shows the game.
+
+**D85. Relationships: directed affinity, outcomes, rivalries and seats.** `WorldState.social`
+holds sparse whole-number affinities in ±10, moved by ambient chat (once every two days a pair),
+by outcomes (a contest weighted by interest, where the loser cools toward the winner: −1 net for
+cards and board games, −1 for sparring and the video game; a bond warms only from members who
+like the activity; a debate on a topic by the dot product of values and weights, an argument at
+Δ ≥ 4 with −2 each way and `argued`, else a spirited talk; a performance warms the awake likers in
+the room), by seats (friends beside, never beside someone at or below −3; the captain's table once
+a ship's day, highest affinity then lowest), and by `privateTalk`. A per-pair per-activity tally
+makes a rivalry at a run of two (`rivalry.streakFor`, tuned from three: three straight between one
+pair never happened in three days), with `keepsBeatingMe`, −1 and a ticker line once per run. A
+sparring knock is a thought and a line; the medic waits for slice 5. Baking puts a tray of treats
+on the counter (tag `treat`, never `meal`, so a treat never answers the mess call) eaten as a snack
+below the meal call's hunger. The social system prunes departed people every tick.
+
+**D86. Cabins and the private talk.** A slept-out sleep gives `ownCabin` in one's own cabin or
+`noisyBunkroom` after a minute's company in the bunkroom; an interrupted sleep gives neither;
+anyone without a bunk carries `noBunkOfMyOwn` until berthed. `privateTalk` is a card side effect
+the player chooses and a player-authority command: it summons a crew member through the planner
+(a summons the view carries, essential class, never `pendingIntent`) to the command actor's
+cabin, the captain at her desk or the first officer in the officers' cabin while she sleeps; the
+talk counts twenty seconds while both are there, and warm (+2/+1, `heardOut`) or stern (−2/0,
+`dressedDown`) moves affinity. It is refused for the captain, a passenger, someone ashore, or
+while a talk is pending, and missed after `privateTalkWaitSeconds`. A helm stander or oncoming is
+never offered the summons (the talk waits and is missed): both are essential, and at the
+departure hand-off a nearer cabin won the tie and left the helm. The lever count stays six.
+
+**D87. Schema 10, the digest's off watch, prompt v0.23, and the beats instrument.** Save schema 10
+migrates 9: recreation drawn, interests and values from the def or the id, an empty `social`, and
+the scenario's books spawned on the shelf. The digest's Ship section gains `off watch:` (sessions
+by venue and players, or still gathering, and solo play) and `rivalries:`; crew lines gain likes
+and dislikes, close to and at odds with (±3, two each), and berth, after `good at`; "bored" joins
+the needs past the seek threshold; `{ref}` is filled from `refId`. Prompt v0.23 describes the off
+watch and the private talk. `crew beats` counts sessions opened, started, collapsed and abandoned,
+contests, debates, arguments, performances, rivalry streaks, solo play, days recreated and boredom
+stretches per person, affinity extremes, and `offWatchLines`, the off-watch family's ticker lines
+per watch, which is what the design's twelve-a-watch means (about three after tuning); all ticker
+lines run 33–39 a watch, most of them ambient conversation and machine lines from before this
+slice. The beats count of helm time now includes eating at the helm.
+
+*Slice 4 ships with these known issues (not fixed):* affinities still reach +10 within a week on
+some seeds and on one seed nobody cools below zero (decay would be a design change, not made);
+collapses run 16–36 % (mean 29 %), and the next step is counting a joiner on the way as coming;
+the mess fills less than before (a running game holds its players past the serve; they eat hot,
+later; making the meal call interrupt games mostly abandoned them); dayworkers are idle about a
+third of the time, though rarely bored; long waiting labels truncate on the plate; the full
+suite's galley tests can pass vitest's 5 s timeout under machine load.
