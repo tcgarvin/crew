@@ -210,10 +210,14 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push("## 4. surfaceDecision: a binary card for the captain");
   lines.push(
-    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here); or endPassage. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice; you do not script outcomes.",
+    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here); endPassage; or privateTalk. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice; you do not script outcomes.",
   );
   lines.push(
     '- endPassage puts the current passenger off: valid only while a passenger is aboard or ashore on a live passage (see "Aboard" under Crew). They leave at the next docking (now, if docked) with no fare and stay at that port as someone in your cast. That is the real side of a crew-friction card ("Put him off at Kessler." / "He stays."); the sim does the rest.',
+  );
+  // D86: a side effect of a card, not a seventh lever.
+  lines.push(
+    '- privateTalk is a private word in the captain\'s cabin, warm or stern (tone warm | stern), with the crew member named in talkWith (their full name as "Crew" lists it): the crew member walks there and the talk moves how they feel about the captain, which shows next call ("close to" / "at odds with", their mood). Only crew aboard, never the captain herself, a passenger or someone ashore, and one talk at a time. It is the real side of a card about someone\'s conduct ("Send Jax up." / "Let it go."); the crew carry it out, and whether it lands is the sim\'s.',
   );
   lines.push(
     "- At most one card per call (a surfaced job counts). No new cards on a policyDecision hook: dress the existing one instead.",

@@ -62,8 +62,8 @@ const stranger = {
   speaker: "Dane Whitcross",
   situation:
     "Dane stands at the top of the ramp, arms folded. “There's a woman down there asking for passage. Says she can pay. Won't say where to.”",
-  left: { label: "Bring her up.", effect: "none", coursePort: "" },
-  right: { label: "Not this run.", effect: "none", coursePort: "" },
+  left: { label: "Bring her up.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+  right: { label: "Not this run.", effect: "none", coursePort: "", talkWith: "", tone: "" },
   leftAftermath: "Dane waves her aboard.",
   rightAftermath: "Dane sends her back down the ramp.",
   beatOfThread: "",
@@ -828,7 +828,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.22");
+    expect(PROMPT_VERSION).toBe("v0.23");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -918,6 +918,26 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("Never invent food the sim has not cooked");
     expect(STATIC_RULES).toContain("A filthy room is the ship's own failing");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("a meal can be that beat");
+  });
+
+  it("tells the model off-watch life and rivalries are the crew's, and how privateTalk works (D84-D87, v0.23)", () => {
+    expect(STATIC_RULES).toContain("The crew have lives off watch.");
+    expect(STATIC_RULES).toContain(
+      "These are the sim's and the crew's story to tell, never yours to invent",
+    );
+    expect(STATIC_RULES).toContain(
+      "An argument or a rivalry is the kind of thing a card is made of",
+    );
+    expect(STATIC_RULES).toContain("Write to who people are");
+    expect(STATIC_RULES).toContain(
+      "effect privateTalk, talkWith their full name, tone warm or stern",
+    );
+    expect(STATIC_RULES).toContain(
+      "how it went shows next call in what they feel about the captain",
+    );
+    expect(STATIC_RULES).toContain("Only use the six levers");
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("so can a rivalry or an argument");
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
   });
 });
 

@@ -60,6 +60,18 @@ describe("crew content validate", () => {
     expect(result.exitCode).toBe(0);
   });
 
+  it("lists the activities Mk1 has no venue for as notes, still OK (D84)", () => {
+    const result = runContentValidate();
+    expect(result.exitCode).toBe(0);
+    const notes = result.output.split("\n").filter((line) => line.startsWith("  [note] "));
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.every((line) => line.startsWith("  [note] decks.deck.freighter_mk1: "))).toBe(
+      true,
+    );
+    expect(result.output).toContain('no venue for "activity.cards"');
+    expect(result.output).not.toContain("decks.deck.freighter_mk2");
+  });
+
   it("is reachable through the crew() dispatcher", () => {
     const result = crew(["content", "validate"]);
     expect(result.exitCode).toBe(0);

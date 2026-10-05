@@ -5,6 +5,7 @@
 export * from "./contract";
 export { buildCapabilities } from "./capabilities";
 export { buildDigest, DIGEST_MAX_CHARS, type NarratorDigest } from "./digest";
+export { rivalryPhrase } from "./offwatch-digest";
 export { applyDecisionEvents, recordCardsFromCall } from "./history";
 export { EMPTY_NOTES, boundNotes, mergeThreads, parseNotes } from "./notes";
 export { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";

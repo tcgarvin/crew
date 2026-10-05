@@ -7,7 +7,12 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ValidationIssue, contentJsonSchemas, loadBundle } from "@crew/content";
+import {
+  type ValidationIssue,
+  activityVenueNotes,
+  contentJsonSchemas,
+  loadBundle,
+} from "@crew/content";
 import { type ContentBundle, type DeckDefId, type DockDefId, checkDockFitsDeck } from "@crew/sim";
 import { runBeatsCli } from "./beats";
 import { runPacingCli } from "./pacing";
@@ -79,7 +84,10 @@ export function runContentValidate(): CliResult {
       `${Object.keys(b.scenarios).length} scenario(s)`,
       `${Object.keys(b.docks ?? {}).length} dock(s)`,
     ].join(", ");
-    return ok(`content validate: OK — ${counts} (hash ${b.hash})`);
+    // D84: activities a deck no scenario sails cannot host (Mk1's missing lounge and gym) are
+    // notes, not failures.
+    const notes = activityVenueNotes(b).map((n) => `  [note] ${n.path.join(".")}: ${n.message}`);
+    return ok([`content validate: OK — ${counts} (hash ${b.hash})`, ...notes].join("\n"));
   }
   const header = `content validate: FAILED — ${result.issues.length} issue(s)`;
   return fail([header, ...result.issues.map(formatIssue)].join("\n"));
