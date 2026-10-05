@@ -15,7 +15,7 @@
  */
 import type { Actor } from "../../core/types/actor";
 import type { TaskReleaseReason } from "../../core/types/events";
-import type { MachineId } from "../../core/types/ids";
+import type { ActivityDefId, MachineId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
 import type {
@@ -350,7 +350,15 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
 function samePersonal(activity: Activity, intent: Extract<Intent, { kind: "personal" }>): boolean {
   if (activity.kind !== "personal" || activity.activity !== intent.activity) return false;
   // D70: a meeting for another card (this one's delivered, they are walking back) is not the same.
+  if (intent.activity === "recreate") return recreateActivityOf(activity) === intent.activityId;
   return intent.activity !== "meetSpeaker" || meetingAhead({ activity }) === intent.decisionId;
+}
+
+/** The activity def a running `recreate` plays, read from its plan's `recreate` step. */
+function recreateActivityOf(activity: Activity): ActivityDefId | undefined {
+  if (activity.kind !== "personal") return undefined;
+  const step = activity.plan?.steps.find((s) => s.kind === "recreate");
+  return step?.kind === "recreate" ? step.activityId : undefined;
 }
 
 function startPersonal(
@@ -359,10 +367,14 @@ function startPersonal(
   intent: Extract<Intent, { kind: "personal" }>,
 ): void {
   if (samePersonal(actor.activity, intent)) return;
-  const ref = backoffRef.personal(
-    intent.activity,
-    intent.itemId ?? (intent.targetId as MachineId | undefined),
-  );
+  // A recreate intent backs off its own activity only, as `activityRef` names a running one.
+  const ref =
+    intent.activity === "recreate"
+      ? backoffRef.personal("recreate", intent.activityId)
+      : backoffRef.personal(
+          intent.activity,
+          intent.itemId ?? (intent.targetId as MachineId | undefined),
+        );
   // As for tasks: an activity that cannot be carried out leaves the current one alone.
   if (!buildPersonalPlan(ctx, actor, intent).ok) {
     setBackoff(ctx, actor, ref);
