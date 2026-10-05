@@ -1391,3 +1391,24 @@ stall from 322 s to 4 s, the helm empty 54–81 s while not docked (from 85–96
 within about ten seconds of the same time of day for everyone from day 2, and 2.6–3.0
 handovers a watch (one at the bell, the rest meal reliefs). Not changed: with a course plotted,
 the stander sits at the helm through a docked repair hold.
+
+*D70 addendum (slice-2 QA): the ask is never spaced.* At a destination the captain can step onto
+the dock a few ticks after another story call (in QA, 29 ticks after the delivery's
+`notableEvent` at Kessler Drift); the server refused that `captainAshore` under the 100-tick
+spacing rule, the client acknowledged it unanswered (D43), the docking's one ask was spent on
+nothing, and the ship was "looking for work" for the rest of the session. `captainAshore` joins
+`policyDecision` in `SPACING_EXEMPT_HOOK_KINDS`. The rule: the server spaces only hooks the sim
+raises again on its own (`quietTooLong`, `notableEvent`), where a refusal costs one check-in; a
+hook raised once is never spaced. The hourly cap still applies (D69), and the ask still counts as
+the last call for spacing the next. A client retry after the window cannot work (the world is
+halted on the hook, so its tick never passes the window), and a sim re-ask timer was withdrawn by
+the D46 amendment. Found, not changed: offline, passing on a port's only offer leaves nothing to
+ask for until the player acts.
+
+*Slice 2 shipped with these known issues (QA, not fixed):* Jax, White's stander, sometimes goes
+to bed from the helm on his own watch after a relief (pressing tiredness); "takes the helm" lines
+repeat around port calls as the stander walks to the helm at docking and leaves for the gangway;
+at 390 px a crowded handover label can cover the BRIDGE plate; rounds sometimes route briefly out
+through the airlock and along the dock; the narrator's hourly cap (30) still stalls 8× play after
+about six minutes (D69); dayworkers are idle about half the time until slice 3 gives the cook and
+medic work.
