@@ -2,7 +2,10 @@
  * Needs invariants for tests (SD §19.4 style). D74: every berth is a bed on the ship's deck: a
  * placement there whose machine carries `bed` and not `medBed`. Keys being actors and no shared
  * beds are content-free and live in `core/invariants.ts` (`berthViolations`). D79: every mood is
- * in [-1, 1] and is the clamped sum of the live thoughts (`moodOf`).
+ * in [-1, 1] and is the clamped sum of the live thoughts (`moodOf`). Slice 4 (D85): every affinity
+ * is within `±social.affinityRange` (whole numbers and actor keys are `core/invariants.ts`'s), every
+ * rivalry row is a well-formed tally under a well-formed key, and the captain's table day is a
+ * whole day or -1.
  */
 import { isBerthPlacement } from "../../core/berths";
 import { moodOf } from "../../core/thoughts";
@@ -12,8 +15,8 @@ import { shipDeckId } from "../../core/world";
 /** Rounding slack between a mood summed now and one summed when it was written. */
 const MOOD_EPSILON = 1e-9;
 
-export function needsViolations(world: Pick<World, "state" | "content">): string[] {
-  return [...moodViolations(world), ...berthViolations(world)];
+export function needsViolations(world: Pick<World, "state" | "content" | "config">): string[] {
+  return [...moodViolations(world), ...berthViolations(world), ...socialViolations(world)];
 }
 
 function moodViolations({ state }: Pick<World, "state">): string[] {
@@ -46,6 +49,49 @@ function berthViolations(world: Pick<World, "state" | "content">): string[] {
     } else if (!isBerthPlacement(content, placement)) {
       out.push(`berths.${actorId} "${key}" is not a bed`);
     }
+  }
+  return out;
+}
+
+function socialViolations({ state, config }: Pick<World, "state" | "config">): string[] {
+  const out: string[] = [];
+  const range = config.values.social.affinityRange;
+  for (const [from, row] of Object.entries(state.social.relationships)) {
+    for (const [to, relationship] of Object.entries(row)) {
+      if (!(Math.abs(relationship.affinity) <= range)) {
+        out.push(
+          `social.relationships.${from}.${to}.affinity ${relationship.affinity} is outside ±${range}`,
+        );
+      }
+    }
+  }
+  for (const [key, rivalry] of Object.entries(state.social.rivalries)) {
+    out.push(...rivalryViolations(key, rivalry));
+  }
+  const day = state.social.captainsTableDay;
+  if (!Number.isInteger(day) || day < -1) out.push(`social.captainsTableDay is ${day}`);
+  return out;
+}
+
+/**
+ * A rivalry key is `<a>|<b>|<activityId>` with `a < b`; wins and losses are whole and not
+ * negative, and the streak is a run no longer than that side's count.
+ */
+function rivalryViolations(
+  key: string,
+  rivalry: World["state"]["social"]["rivalries"][string],
+): string[] {
+  const out: string[] = [];
+  const where = `social.rivalries.${key}`;
+  const [a, b, activityId] = key.split("|");
+  if (a === undefined || b === undefined || activityId === undefined || !(a < b)) {
+    out.push(`${where} is not "<a>|<b>|<activity>" with a < b`);
+  }
+  const { wins, losses, streak } = rivalry;
+  if (!Number.isInteger(wins) || wins < 0) out.push(`${where}.wins is ${wins}`);
+  if (!Number.isInteger(losses) || losses < 0) out.push(`${where}.losses is ${losses}`);
+  if (!Number.isInteger(streak) || streak > wins || -streak > losses) {
+    out.push(`${where}.streak ${streak} does not fit ${wins}–${losses}`);
   }
   return out;
 }
