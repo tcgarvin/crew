@@ -20,7 +20,7 @@
  * - off watch (D84-D87, slice 4 call 22): group sessions opened, started, collapsed and
  *   abandoned per watch and by activity, contests, arguments, spirited talks, performances and
  *   rivalry streaks, solo activities started (by kind), and the ticker's notable-or-better lines
- *   per watch; per person, the share of time recreating, the days they recreated and the
+ *   per watch, all and the off-watch family's; per person, the share of time recreating, the days they recreated and the
  *   longest stretch bored (recreation above `seekThreshold`, and above `RECREATION_HIGH`); at the
  *   end, the affinity extremes and every rivalry.
  *
@@ -36,14 +36,15 @@ import {
   type EventType,
   type Kernel,
   type NarratorHook,
+  OFF_WATCH_EVENT_TYPES,
   type SimEvent,
   type World,
   actionLabel,
   createKernel,
   dayTicks,
-  getRenderFrame,
   provisionsCratesAboard,
   provisionsDays,
+  tickerLine,
   watchTicks,
 } from "@crew/sim";
 import {
@@ -105,9 +106,12 @@ export const BEAT_EVENTS = {
 
 /**
  * Beats counted from samples rather than events: a solo activity begun (no event marks one,
- * call 18), and a notable-or-better line on the ticker (what the player reads, call 22's twelve).
+ * call 18), a notable-or-better line on the ticker (what the player reads), and such a line from
+ * the off-watch family (`OFF_WATCH_EVENT_TYPES`: recreation, social, cabins), whose count per
+ * watch is call 22's twelve (D84 tuning: the twelve was meant for the slice's own lines, not the
+ * whole ticker's).
  */
-export const SAMPLED_BEATS = ["soloActivities", "tickerLines"] as const;
+export const SAMPLED_BEATS = ["soloActivities", "tickerLines", "offWatchLines"] as const;
 export type BeatKind = keyof typeof BEAT_EVENTS | (typeof SAMPLED_BEATS)[number];
 const BEAT_KINDS: readonly BeatKind[] = [
   ...(Object.keys(BEAT_EVENTS) as (keyof typeof BEAT_EVENTS)[]),
@@ -485,9 +489,12 @@ export class BeatsTally {
     }
   }
 
-  /** Lines that reached the ticker at `ticks`, notable or better (D84, call 22). */
-  tickerLines(ticks: readonly number[]): void {
-    for (const tick of ticks) this.count("tickerLines", tick, 1, "ticker line");
+  /** Lines that reached the ticker, notable or better, and which were off watch's (D84, call 22). */
+  tickerLines(lines: readonly TickerSample[]): void {
+    for (const line of lines) {
+      this.count("tickerLines", line.tick, 1, "ticker line");
+      if (line.offWatch) this.count("offWatchLines", line.tick, 1, "off-watch ticker line");
+    }
   }
 
   private count(kind: BeatKind, tick: number, n: number, what: string): void {
@@ -766,13 +773,27 @@ function crewSamples(world: World): PersonSample[] {
     }));
 }
 
-/** Ticks of the notable-or-better lines the last advance put on the ticker. */
-function tickerTicks(world: World): number[] {
-  const events = world.caches.diagnostics.lastEvents;
-  if (!events.some((e) => e.significance !== "trace")) return [];
-  return getRenderFrame(world)
-    .tickerEvents.filter((e) => e.significance !== "trace")
-    .map((e) => e.tick);
+/**
+ * Is anyone at the helm, by the canvas labels? "at the helm, eating" is still at the helm (a plate
+ * carried to the stander, D81; D84 tuning: it was counted as an empty helm).
+ */
+export function helmStood(labels: readonly string[]): boolean {
+  return labels.some((label) => label.startsWith("at the helm"));
+}
+
+/** A notable-or-better line on the ticker: when, and whether the off-watch family's. */
+export interface TickerSample {
+  readonly tick: number;
+  readonly offWatch: boolean;
+}
+
+/** The notable-or-better lines the last advance put on the ticker (as `getRenderFrame` does). */
+function tickerSamples(world: World): TickerSample[] {
+  return world.caches.diagnostics.lastEvents.flatMap((event) =>
+    event.significance === "trace" || tickerLine(event, world.state, world.content) === null
+      ? []
+      : [{ tick: event.tick, offWatch: OFF_WATCH_EVENT_TYPES.has(event.type) }],
+  );
 }
 
 /** D85: the warmest and coldest feelings aboard at the end, "Jax Okonkwo → Tomas Ruiz +4". */
@@ -852,12 +873,12 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
     tally.events(result.events);
-    tally.tickerLines(tickerTicks(world));
+    tally.tickerLines(tickerSamples(world));
     if (advanced > 0) {
       stuckAdvances = 0;
       const people = crewSamples(world);
       const underway = world.state.travel.stage !== "docked";
-      const helmEmpty = underway && !people.some((p) => p.label === "at the helm");
+      const helmEmpty = underway && !helmStood(people.map((p) => p.label));
       const problems = Object.values(world.state.work.problems).filter((p) => p.status === "open");
       const cargoOpen = problems.some(
         (p) => p.kind === "cargoToLoad" || p.kind === "cargoToUnload",

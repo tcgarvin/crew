@@ -8,6 +8,7 @@ import {
   type ShipSample,
   activityClass,
   formatBeatsReport,
+  helmStood,
   parseBeatsArgs,
   recreationLabels,
   runBeats,
@@ -79,6 +80,19 @@ describe("activity classes from canvas labels", () => {
     ["putting the harmonica away", "recreating"],
   ])("%s → %s", (label, cls) => {
     expect(activityClass(label, RECREATION_LABELS)).toBe(cls);
+  });
+});
+
+describe("the helm stood", () => {
+  it("counts the stander eating in the seat as at the helm (D84 tuning)", () => {
+    expect(helmStood(["idle", "at the helm, eating"])).toBe(true);
+    expect(helmStood(["at the helm"])).toBe(true);
+  });
+
+  it("does not count walking to or from the helm", () => {
+    expect(helmStood(["going to the helm", "leaving the helm", "taking a plate to the helm"])).toBe(
+      false,
+    );
   });
 });
 
@@ -268,9 +282,24 @@ describe("the beats tally", () => {
 
   it("counts ticker lines in their watch, and refuses one past the last watch", () => {
     const t = tally();
-    t.tickerLines([5, 50, 150]);
+    t.tickerLines([5, 50, 150].map((tick) => ({ tick, offWatch: false })));
     expect(t.result().beats.tickerLines).toMatchObject({ total: 3, perWatchMax: 2 });
-    expect(() => t.tickerLines([301])).toThrow(/past the run's last watch/);
+    expect(() => t.tickerLines([{ tick: 301, offWatch: false }])).toThrow(
+      /past the run's last watch/,
+    );
+  });
+
+  it("counts the off-watch family's ticker lines apart, and among all lines (D84 tuning)", () => {
+    const t = tally();
+    t.tickerLines([
+      { tick: 5, offWatch: true },
+      { tick: 50, offWatch: false },
+      { tick: 150, offWatch: true },
+      { tick: 160, offWatch: true },
+    ]);
+    const { beats } = t.result();
+    expect(beats.tickerLines).toMatchObject({ total: 4, perWatchMax: 2 });
+    expect(beats.offWatchLines).toMatchObject({ total: 3, perWatchMin: 0, perWatchMax: 2 });
   });
 
   it("counts a solo activity once when it begins, by kind, and the days someone recreated", () => {
@@ -381,6 +410,7 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
       "arguments",
       "soloActivities",
       "tickerLines",
+      "offWatchLines",
     ]) {
       expect(report).toContain(`| ${row} | `);
     }
@@ -394,6 +424,10 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(result.beats.tickerLines.total).toBeGreaterThan(0);
   }, 90_000);
 
-  // Needs W1's recreation system (the gate's stubs never open a session).
-  it.todo("reports at least one session started in a one-day run (slice 4 W1)");
+  it("reports at least one session started in a one-day run (slice 4 W1)", () => {
+    const result = oneDay();
+    expect(result.beats.sessionsStarted.total).toBeGreaterThanOrEqual(1);
+    // Every started session ends in the off-watch family's lines (call 18).
+    expect(result.beats.offWatchLines.total).toBeGreaterThanOrEqual(1);
+  }, 90_000);
 });

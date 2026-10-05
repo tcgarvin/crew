@@ -83,6 +83,16 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...CABINS_EVENT_SIGNIFICANCE,
 };
 
+/**
+ * The off-watch family (slice 4, D84-D87): recreation, social and cabin events. The beats report
+ * counts their ticker lines per watch against call 22's twelve.
+ */
+export const OFF_WATCH_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  ...(Object.keys(RECREATION_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(SOCIAL_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(CABINS_EVENT_SIGNIFICANCE) as EventType[]),
+]);
+
 /** `sim` for pipeline-originated events; otherwise the source of the command that caused it. */
 export type EventSource = CommandSource | "sim";
 
