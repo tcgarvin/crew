@@ -1,4 +1,4 @@
-import type { AgentViewSnapshot } from "@crew/sim";
+import type { AgentViewSnapshot, Machine } from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Inspector } from "./Inspector";
@@ -12,7 +12,7 @@ function snapshot(
   const self = {
     id: "actor:halla",
     name: "Halla Thorne",
-    needs: { hunger: 0.2, fatigue: 0.1, comfort: 0.9, social: 0.5 },
+    needs: { hunger: 0.2, fatigue: 0.1, comfort: 0.9, social: 0.5, recreation: 0.65 },
     mood: 0.25,
     activity: { kind: "idle" },
     onDuty: false,
@@ -33,7 +33,13 @@ function snapshot(
   } as unknown as AgentViewSnapshot;
 }
 
-const steady: PersonWords = { watch: "Dayworker, off duty", mood: "steady", thoughts: [] };
+const steady: PersonWords = {
+  watch: "Dayworker, off duty",
+  mood: "steady",
+  thoughts: [],
+  interests: "likes reading",
+  relationships: [],
+};
 
 describe("Inspector actor sheet", () => {
   it("says roles and known problems in words, each kind once", () => {
@@ -98,6 +104,8 @@ describe("Inspector actor sheet", () => {
         { key: "doubleWatch", label: "double watch", value: -0.25, count: 1 },
         { key: "helmCleanPass", label: "brought the ship through clean", value: 0.2, count: 2 },
       ],
+      interests: "likes reading",
+      relationships: [],
     };
     const html = renderToStaticMarkup(
       <Inspector
@@ -123,6 +131,77 @@ describe("Inspector actor sheet", () => {
     expect(html).not.toContain("<dt>Duty</dt>");
     expect(html).toContain('<dd class="inspector-mood inspector-mood-steady">steady</dd>');
     expect(html).toContain("nothing in particular");
+  });
+
+  it("shows recreation, what they like off watch and who they are close to (slice 4)", () => {
+    const person: PersonWords = {
+      ...steady,
+      thoughts: [
+        { key: "keepsBeatingMe", label: "Jax Okonkwo keeps beating me", value: -0.15, count: 1 },
+      ],
+      interests: "likes cards (keen), vids; dislikes reading",
+      relationships: ["close to Jax Okonkwo (+4)", "at odds with Priya Kessler (−3)"],
+    };
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{ kind: "actor", view: snapshot({ roleTags: ["deckhand"] }), person }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<dt>Recreation</dt><dd>65%</dd>");
+    expect(html).toContain("<dt>Off watch</dt><dd>likes cards (keen), vids; dislikes reading</dd>");
+    expect(html).toContain("<dt>People</dt>");
+    expect(html).toContain("<li>close to Jax Okonkwo (+4)</li>");
+    expect(html).toContain("<li>at odds with Priya Kessler (−3)</li>");
+    expect(html).toContain('<li class="thought-down">Jax Okonkwo keeps beating me</li>');
+  });
+
+  it("leaves out the people row when nobody stands out", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{ kind: "actor", view: snapshot({ roleTags: ["deckhand"] }), person: steady }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).not.toContain("<dt>People</dt>");
+  });
+});
+
+describe("Inspector machine sheet", () => {
+  const table = {
+    id: "machine:table",
+    defId: "machine.games_table",
+    actualMode: "off",
+    integrity: 1,
+    condition: 1,
+    temperature: 0,
+    faults: [],
+  } as unknown as Machine;
+
+  it("shows the game gathered at the machine (slice 4)", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "machine",
+          machine: table,
+          name: "Games table",
+          gathering: "cards: Jax, Tomas, Dane, 40 s in",
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<dt>Gathering</dt><dd>cards: Jax, Tomas, Dane, 40 s in</dd>");
+  });
+
+  it("has no gathering line with no session there", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{ kind: "machine", machine: table, name: "Games table" }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<h2>Games table</h2>");
+    expect(html).not.toContain("Gathering");
   });
 });
 

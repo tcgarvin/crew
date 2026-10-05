@@ -128,8 +128,8 @@ describe("person labels (D72)", () => {
     label: "waiting for a delivery",
     carrying: 0,
   };
-  const frameWith = (actors: object[], locals: object[]) =>
-    ({ actors, locals, items: [] }) as unknown as RenderFrame;
+  const frameWith = (actors: object[], locals: object[], sessions: object[] = []) =>
+    ({ actors, locals, items: [], sessions }) as unknown as RenderFrame;
 
   it("labels only the people whose dots are on the canvas", () => {
     const { ctx, texts } = mockCanvas();
@@ -150,6 +150,53 @@ describe("person labels (D72)", () => {
     const { ctx, texts } = mockCanvas();
     drawActorLabels(ctx, t, frameWith([{ ...mara, y: 0.2 }], []), false, 400, 300);
     expect(texts[0]?.y).toBeGreaterThan(0);
+  });
+
+  describe("group sessions (slice 4, call 17)", () => {
+    const jax = { ...mara, id: "jax", name: "Jax Okonkwo", x: 6.5, y: 4.5 };
+    const tomas = { ...mara, id: "tomas", name: "Tomas Ruiz", x: 7.5, y: 4.5 };
+    const cards = {
+      id: "session:1",
+      activityId: "activity.cards",
+      label: "playing cards",
+      x: 7,
+      y: 5,
+      memberIds: ["jax", "tomas"],
+      running: true,
+    };
+
+    it("draws one plate for the game and no name labels for its players", () => {
+      const { ctx, texts } = mockCanvas();
+      drawActorLabels(ctx, t, frameWith([jax, tomas, mara], [], [cards]), false, 400, 300);
+      expect(texts.map((x) => x.text).sort()).toEqual(["Mara Osei — idle", "cards — Jax, Tomas"]);
+    });
+
+    it("puts the plate over the venue, clear of the other labels", () => {
+      const { ctx, texts } = mockCanvas();
+      const near = { ...mara, x: 7, y: 5.2 };
+      drawActorLabels(ctx, t, frameWith([jax, tomas, near], [], [cards]), false, 400, 300);
+      const plate = texts.find((x) => x.text.startsWith("cards"));
+      const other = texts.find((x) => x.text.startsWith("Mara"));
+      // The session plate is placed first, in its preferred spot just above the venue centre.
+      expect(plate?.x).toBeCloseTo(7 * 12);
+      expect(plate?.y).toBeLessThan(5 * 12);
+      expect(other?.y).not.toBeCloseTo(plate?.y ?? Number.NaN);
+    });
+
+    it("labels a gathering game with its waiting label", () => {
+      const { ctx, texts } = mockCanvas();
+      const waiting = {
+        ...cards,
+        label: "waiting for a game of cards",
+        memberIds: ["jax"],
+        running: false,
+      };
+      drawActorLabels(ctx, t, frameWith([jax, tomas], [], [waiting]), false, 400, 300);
+      expect(texts.map((x) => x.text).sort()).toEqual([
+        "Tomas Ruiz — idle",
+        "waiting for a game of cards — Jax",
+      ]);
+    });
   });
 });
 

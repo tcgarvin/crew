@@ -486,6 +486,12 @@ body {
 .inspector-thoughts li.thought-up::before {
   content: "+";
 }
+/* Slice 4: who someone is close to and at odds with, one per line. */
+.inspector-people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
 /* Passengers §3.2: a small tag beside a roster name that is not crew. */
 .inspector-tag {
