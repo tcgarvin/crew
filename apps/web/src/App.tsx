@@ -5,6 +5,7 @@ import type {
   Command,
   CommandId,
   Decision,
+  DirtFrame,
   FromWorker,
   ItemId,
   Machine,
@@ -20,6 +21,7 @@ import { decisionShownTick, describeEvent } from "@crew/sim";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
+import { DirtQueue } from "./host/dirtQueue";
 import {
   type NarratorFailure,
   type NarratorOutcome,
@@ -74,6 +76,7 @@ import {
 } from "./ui/log";
 import { portraitCssVars } from "./ui/portraitLayout";
 import { rejectionMessage } from "./ui/rejectionMessage";
+import { inspectRoom } from "./ui/roomInspection";
 import { loadWebContent } from "./worker/content";
 
 /** Wall-clock cadence of routine server saves (PLAN §3: "Neon every ~60 s"). */
@@ -153,9 +156,13 @@ export function App() {
   const slowdownRef = useRef(
     new SlowdownQueue(config.values.host.slowDownOnEvents, SLOWDOWN_COOLDOWN_SECONDS * tickRate),
   );
+  /** D82: dirt frames from the worker, queued by tick until playback reaches them (D14). */
+  const dirtQueueRef = useRef(new DirtQueue());
   const sections = useMemo(() => clockSections(bundle, scenarioId), [bundle, scenarioId]);
 
   const [frame, setFrame] = useState<RenderFrame>();
+  /** D82: the newest dirt frame playback has reached, for the grime tint. */
+  const [dirt, setDirt] = useState<DirtFrame>();
   const [speed, setSpeedState] = useState(1);
   const [paused, setPausedState] = useState(false);
   const [runAhead, setRunAhead] = useState({ simTick: 0, viewTick: 0, buffered: 0 });
@@ -377,6 +384,9 @@ export function App() {
           else if (message.events.some((e) => e.type === "decisionResolved")) save("routine");
           return;
         }
+        case "dirt":
+          dirtQueueRef.current.add(message.frame);
+          return;
         case "runAheadStatus":
           setRunAhead({
             simTick: message.simTick,
@@ -455,6 +465,8 @@ export function App() {
       playback,
       (step) => {
         setFrame(step.frame);
+        const dirtDue = dirtQueueRef.current.takeDue(step.viewTick);
+        if (dirtDue !== undefined) setDirt(dirtDue);
         const due = slowdownRef.current.takeDue(step.viewTick);
         if (
           slowdownRef.current.shouldSlowDown(
@@ -590,6 +602,11 @@ export function App() {
             setInspectorData(item === undefined ? undefined : { kind: "item", item });
             return;
           }
+          if (next.kind === "room") {
+            const place = inspectRoom(msg.state, bundle, layout, next.id);
+            setInspectorData({ kind: "place", place });
+            return;
+          }
           const machine = msg.state.machines[next.id as MachineId] as Machine | undefined;
           if (machine === undefined) {
             setInspectorData(undefined);
@@ -686,6 +703,8 @@ export function App() {
           ports={bundle.ports}
           docks={docks}
           frame={frame}
+          dirt={dirt}
+          grimeTint={config.values.dirt}
           paused={paused}
           selected={selection}
           onSelect={onSelect}

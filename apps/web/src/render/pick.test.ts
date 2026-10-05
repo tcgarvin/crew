@@ -1,4 +1,7 @@
-/** D68: a tap picks people first, crew and locals alike, then things, then the dock's places. */
+/**
+ * D68: a tap picks people first, crew and locals alike, then things, then the ship's rooms (D82),
+ * then the dock's places.
+ */
 import type {
   ActorId,
   DockDef,
@@ -15,7 +18,7 @@ import { loadWebContent } from "../worker/content";
 import { buildDeckLayout } from "./deckLayout";
 import { berthInView, withDockSlide } from "./dock";
 import { dockPropKey } from "./locals";
-import { pickAt } from "./pick";
+import { pickAt, roomAt } from "./pick";
 
 const { bundle, scenarioId } = loadWebContent();
 const scenario = bundle.scenarios[scenarioId];
@@ -61,7 +64,23 @@ function crew(x: number, y: number): RenderActor {
   };
 }
 
-function frame(parts: Partial<Pick<RenderFrame, "actors" | "locals" | "items" | "dockProps">>) {
+/** The centre of a tile of room `key` farthest from every machine, so only the floor is there. */
+function bareFloor(key: string): { x: number; y: number } {
+  let best: { x: number; y: number; d: number } | undefined;
+  for (const tile of layout.tiles) {
+    if (tile.compartmentKey !== key) continue;
+    const x = tile.x + 0.5;
+    const y = tile.y + 0.5;
+    const d = Math.min(...layout.machines.map((m) => Math.hypot(m.center.x - x, m.center.y - y)));
+    if (best === undefined || d > best.d) best = { x, y, d };
+  }
+  if (best === undefined) throw new Error(`room ${key} has no floor`);
+  return best;
+}
+
+function frame(
+  parts: Partial<Pick<RenderFrame, "actors" | "locals" | "items" | "dockProps" | "machines">>,
+) {
   return {
     actors: [],
     locals: [],
@@ -144,6 +163,42 @@ describe("pickAt", () => {
       kind: "dockProp",
       id: dockPropKey(first, 0),
     });
+  });
+
+  it("picks the room on bare deck floor (D82)", () => {
+    const galley = deck.compartments.find((c) => c.tags.includes("galley"));
+    if (galley === undefined) throw new Error("the deck has a galley");
+    const floor = bareFloor(galley.key);
+    expect(pickAt(frame({}), layout, dock, 0, floor.x, floor.y)).toEqual({
+      kind: "room",
+      id: galley.key,
+    });
+    // Nothing else is there, with or without a dock alongside.
+    expect(pickAt(frame({}), layout, undefined, 0, floor.x, floor.y)?.kind).toBe("room");
+  });
+
+  it("picks a machine over the floor it stands on, and a person over either", () => {
+    const placement = layout.machines[0];
+    if (placement === undefined) throw new Error("the deck has machines");
+    const machines = [
+      { id: "m1", deckId: layout.deckId, placementKey: placement.placementKey },
+    ] as unknown as RenderFrame["machines"];
+    const { x, y } = placement.center;
+    expect(pickAt(frame({ machines }), layout, dock, 0, x, y)).toEqual({
+      kind: "machine",
+      id: "m1",
+    });
+    const shown = frame({ machines, actors: [crew(x, y)] });
+    expect(pickAt(shown, layout, dock, 0, x, y)?.kind).toBe("actor");
+  });
+
+  it("selects no room off the ship or on void", () => {
+    expect(roomAt(layout, -0.5, 2.5)).toBeUndefined();
+    expect(roomAt(layout, layout.width + 0.5, 2.5)).toBeUndefined();
+    const voidTile = layout.tiles.find((t) => t.compartmentKey === undefined);
+    if (voidTile !== undefined) {
+      expect(roomAt(layout, voidTile.x + 0.5, voidTile.y + 0.5)).toBeUndefined();
+    }
   });
 
   it("hits a local where the sliding dock drew them", () => {
