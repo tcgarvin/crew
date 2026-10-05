@@ -38,7 +38,7 @@ function looked(): TestWorld {
 const viewOf = (fixture: TestWorld, id: ActorId): AgentView =>
   fixture.registry.buildAgentView(fixture.world, id);
 
-/** The world's config: a `PlannerConfig` that carries the galley block (as the pipeline will). */
+/** The world's config: a `PlannerConfig` that carries the galley block (as the pipeline does). */
 const configOf = (fixture: TestWorld): PlannerConfig => fixture.world.config.values;
 
 function setHunger(fixture: TestWorld, hunger: number): void {
@@ -75,16 +75,6 @@ describe("the mess call (D81 call 1)", () => {
     addServing(fixture.world, onGalleyDeck(COUNTER), "good", 6);
     setHunger(fixture, 0.15);
     expect(mealCallFor(viewOf(fixture, JAX), configOf(fixture))).toBeUndefined();
-  });
-
-  // Transitional: until the pipeline passes the galley block to the planner, there is no call.
-  it("is silent while the planner's config carries no galley block", () => {
-    const fixture = looked();
-    setHunger(fixture, 0.3);
-    addServing(fixture.world, onGalleyDeck(COUNTER), "good", 6);
-    const { work, urgency, needs, time } = fixture.world.config.values;
-    const bare = { work, urgency, needs, time } as PlannerConfig;
-    expect(mealCallFor(viewOf(fixture, JAX), bare)).toBeUndefined();
   });
 });
 

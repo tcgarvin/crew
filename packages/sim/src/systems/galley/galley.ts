@@ -2,21 +2,18 @@
  * The galley system (D81), phase `needs`, every tick, registered after the watch (the bell
  * first, then the meal that follows it). In order:
  *
- * 1. Split servings keep their meal: a unit split off a served stack (`pickUp` with `split`)
- *    gets the stack's `Item.meal`, and a `carryMeal` plan's `putDown` is renamed to the unit in
- *    hand (`followSplitServings`). The split itself is generic work code that copies neither.
- * 2. The meal problem: `mealToCook { watchIndex }` is raised `galley.mealLeadDays` before the
+ * 1. The meal problem: `mealToCook { watchIndex }` is raised `galley.mealLeadDays` before the
  *    coming watch's bell (once per watch: `state.galley.lastMealWatch`), only on a ship with a
  *    stove and someone aboard to feed; one not served by `mealGraceDays` after its bell is
  *    cancelled with `mealMissed`. The serve resolves it (`cook.ts`).
- * 3. Spoilage: a serving on deck past its `meal.spoilsAtTick` is swept (`mealSpoiled`, a
+ * 2. Spoilage: a serving on deck past its `meal.spoilsAtTick` is swept (`mealSpoiled`, a
  *    `spoiledMeal` deposit on its tile). One in someone's hands is theirs to eat.
- * 4. The helm-stander's plate (call 5): while someone holds the helm hungry past
+ * 3. The helm-stander's plate (call 5): while someone holds the helm hungry past
  *    `mealCallHungerAbove`, a meal is on deck and no serving lies within reach of the seat,
  *    `mealToCarry` is open (dedupe per helm, revised when the holder changes); it resolves once a
  *    plate is within reach (`mealCarried`, by whoever stands beside it), or when there is no
  *    longer anyone hungry at the helm or anything to carry.
- * 5. The helm meal: the holder with a serving within reach and hunger past the call threshold
+ * 4. The helm meal: the holder with a serving within reach and hunger past the call threshold
  *    eats in the seat (`state.galley.helmMeal`, `needs.mealDays`, then `consumeServing`); the hold
  *    goes on throughout, so `whoHasTheHelm` never changes and no relief is called. A plate taken
  *    meanwhile, or the helm handed over, ends it with no effect.
@@ -50,38 +47,7 @@ import {
 import { eatersAboard } from "./provisions";
 
 // ---------------------------------------------------------------------------------------------
-// 1. Split servings
-// ---------------------------------------------------------------------------------------------
-
-/**
- * A served meal split in someone's hands keeps the stack's `meal`, and a carry plan sets down the
- * unit actually in hand. The split is `systems/work/steps.ts`'s (`takeItem`), which copies neither
- * the meal nor renames a later `putDown`; the plan's `pickUp` step still names the stack.
- */
-function followSplitServings(ctx: StepCtx): void {
-  for (const item of Object.values(ctx.state.items)) {
-    const location = item.location;
-    if (location.kind !== "carriedBy" || item.meal !== undefined || !isMeal(ctx.content, item)) {
-      continue;
-    }
-    const carrier = ctx.state.actors[location.actorId];
-    const activity = carrier?.activity;
-    if (activity === undefined || activity.kind === "idle" || activity.plan === undefined) continue;
-    const steps = activity.plan.steps;
-    const source = steps
-      .filter((s) => s.kind === "pickUp")
-      .map((s) => ctx.state.items[s.itemId])
-      .find((stack) => stack?.defId === item.defId && stack.meal !== undefined);
-    if (source?.meal === undefined) continue;
-    item.meal = { ...source.meal };
-    for (const step of steps) {
-      if (step.kind === "putDown" && step.itemId === source.id) step.itemId = item.id;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------------------------
-// 2. The meal problem
+// 1. The meal problem
 // ---------------------------------------------------------------------------------------------
 
 function openMeals(ctx: StepCtx): ProblemOfKind<"mealToCook">[] {
@@ -127,7 +93,7 @@ function mealRhythm(ctx: StepCtx): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 3. Spoilage
+// 2. Spoilage
 // ---------------------------------------------------------------------------------------------
 
 function sweepSpoiled(ctx: StepCtx): void {
@@ -153,7 +119,7 @@ function sweepSpoiled(ctx: StepCtx): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 4. and 5. The helm's plate
+// 3. and 4. The helm's plate
 // ---------------------------------------------------------------------------------------------
 
 /** The one holding the helm, where they sit, and the helm. */
@@ -313,7 +279,6 @@ export const galleySystem: System = {
   name: "galley",
   phase: "needs",
   run(ctx) {
-    followSplitServings(ctx);
     mealRhythm(ctx);
     sweepSpoiled(ctx);
     const at = helmSeat(ctx);

@@ -19,10 +19,6 @@ import { createDefLookup } from "../../../core/defs";
  * Red = Noor, Mara (watch 0); White = Jax, Tomas (watch 1); Bettina a dayworker on watch 0, so
  * her sleep watch is watch 1. A 600 s day of two 300 s watches; hunger rises a unit a day and
  * nothing else moves unless a test sets it. Travel and ports are the freight fixture's.
- *
- * Until `PlannerConfig` carries the `galley` block (`core/types/pipeline.ts`, `core/pipeline.ts`)
- * the fixture's planner passes it along itself, so the mess call and the substitute cook run here
- * exactly as they will through the pipeline.
  */
 import { FIXTURE_GALLEY } from "../../../core/fixtures/ship-life";
 import { type TestWorld, cmd } from "../../../core/fixtures/test-world";
@@ -51,12 +47,12 @@ import type {
   ScenarioDefId,
 } from "../../../core/types/ids";
 import type { World } from "../../../core/types/kernel";
-import type { PlannerConfig, StepCtx } from "../../../core/types/pipeline";
+import type { StepCtx } from "../../../core/types/pipeline";
 import type { StackItem } from "../../../core/types/ship";
-import type { AgentView } from "../../../core/types/view";
-import { selectIntent } from "../../../planner/index";
+import { registerPlannerDefaults } from "../../../planner/index";
 import { registerCommerce } from "../../commerce/index";
 import { commerceTaskDerivations } from "../../commerce/tasks";
+import { dirtViolations } from "../../dirt/invariants";
 import { registerNeeds } from "../../needs/index";
 import { needsViolations } from "../../needs/invariants";
 import { registerSpatial } from "../../spatial/index";
@@ -410,17 +406,6 @@ export interface GalleyWorldOptions extends GalleyContentOptions {
   readonly commerce?: boolean;
 }
 
-/**
- * The V1 planner with the galley's knobs passed along (see the module comment). Same behaviour
- * as `registerPlannerDefaults` once the pipeline passes them itself.
- */
-function galleyPlanner(galley: ConfigDef["galley"]) {
-  return (view: AgentView, config: PlannerConfig) => {
-    const withGalley: PlannerConfig & Pick<ConfigDef, "galley"> = { ...config, galley };
-    return selectIntent(view, withGalley);
-  };
-}
-
 /** Spatial, travel, (commerce,) needs, the watch, the galley, work and the planner. */
 export function galleyWorld(options: GalleyWorldOptions = {}): TestWorld {
   const config = options.config ?? galleyConfig();
@@ -438,7 +423,7 @@ export function galleyWorld(options: GalleyWorldOptions = {}): TestWorld {
       ...galleyTaskDerivations,
     },
   });
-  registry.registerPlanner(galleyPlanner(config.galley));
+  registerPlannerDefaults(registry);
   const kernel = createKernel(registry);
   const world = kernel.createWorld(
     GALLEY.scenario,
@@ -474,6 +459,7 @@ function violations(world: World): string[] {
   return [
     ...checkInvariants(world.state),
     ...spatialViolations(world),
+    ...dirtViolations(world),
     ...workViolations(world),
     ...needsViolations(world),
   ];

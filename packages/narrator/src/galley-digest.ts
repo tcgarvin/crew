@@ -15,6 +15,8 @@ import {
   type MealQuality,
   type Problem,
   type ProblemId,
+  type RoleTag,
+  cleaningRolesFor,
   dayTicks,
   provisionsCratesAboard,
   provisionsDays,
@@ -154,12 +156,35 @@ export function galleyLine(
 
 /** A room's name from its compartment key on the ship's deck, or the key itself. */
 export function roomName(state: State, content: ContentBundle, key: LocalKey): string {
+  return roomDef(state, content, key)?.name ?? key;
+}
+
+function roomDef(state: State, content: ContentBundle, key: LocalKey) {
   for (const deckId of Object.keys(state.deck.tiles)) {
-    const deck = content.decks[deckId as keyof ContentBundle["decks"]];
-    const name = deck?.compartments.find((c) => c.key === key)?.name;
-    if (name !== undefined) return name;
+    const room = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
+      (c) => c.key === key,
+    );
+    if (room !== undefined) return room;
   }
-  return key;
+  return undefined;
+}
+
+/** Role tags as the digest says them ("firstOfficer" reads "first officer"). */
+const ROLE_WORDS: Readonly<Record<RoleTag, string>> = {
+  captain: "captain",
+  firstOfficer: "first officer",
+  engineer: "engineer",
+  pilot: "pilot",
+  deckhand: "deckhand",
+  cook: "cook",
+  medic: "medic",
+};
+
+/** Whose mop the room waits on (D82 `cleaningRolesFor`): "the deckhand's to mop", "anyone's to mop". */
+function whoseToMop(state: State, content: ContentBundle, key: LocalKey): string {
+  const roles = cleaningRolesFor(roomDef(state, content, key)?.tags ?? []);
+  if (roles.length === 0) return "anyone's to mop";
+  return `the ${roles.map((r) => ROLE_WORDS[r]).join(" or ")}'s to mop`;
 }
 
 /**
@@ -207,6 +232,9 @@ export function compartmentDirtyDetail(
 ): string {
   const name = roomName(state, content, problem.payload.key);
   const moppers = taskHolders(state, problem.id);
-  const who = moppers.length === 0 ? "nobody is mopping it yet" : `${moppers.join(", ")} mopping`;
+  const who =
+    moppers.length === 0
+      ? `nobody is mopping it yet, ${whoseToMop(state, content, problem.payload.key)}`
+      : `${moppers.join(", ")} mopping`;
   return `${name} is ${problem.payload.tier}; ${who}`;
 }

@@ -9,10 +9,10 @@
     "tick": 4000
   },
   "snapshot": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "simVersion": "0.1.0",
-    "contentHash": "2b5ba8ae6e43463e",
-    "configHash": "2b5ba8ae6e43463e",
+    "contentHash": "6dbcf98207ff8e4b",
+    "configHash": "6dbcf98207ff8e4b",
     "savedAtTick": 4000,
     "config": {
       "time": {
@@ -186,7 +186,14 @@
         "localSaveEverySeconds": 10,
         "remoteSaveEverySeconds": 60,
         "frameEveryTicks": 2,
-        "slowDownOnEvents": ["navHazard", "helmUnattended", "driftingChanged", "shipLimping"]
+        "slowDownOnEvents": [
+          "navHazard",
+          "helmUnattended",
+          "driftingChanged",
+          "shipLimping",
+          "roomFilthy"
+        ],
+        "dirtFrameEverySeconds": 5
       },
       "watches": {
         "dayworkerOnWatches": [0, 1],
@@ -205,6 +212,51 @@
         "highAbove": 0.4,
         "lowWorkSpeed": 0.9,
         "highWorkSpeed": 1.05
+      },
+      "galley": {
+        "mealLeadDays": 0.08,
+        "mealGraceDays": 0.1,
+        "cookSeconds": 30,
+        "substituteAfterDays": 0.025,
+        "spareServings": 1,
+        "servingsPerCrate": 12,
+        "mealSpoilDays": 0.25,
+        "mealCallHungerAbove": 0.2,
+        "lowBelowDays": 1,
+        "restockToDays": 4,
+        "goodCookingAbove": 6,
+        "poorCookingBelow": 3
+      },
+      "dirt": {
+        "footfallPerStep": 0.004,
+        "bootsPickup": 0.15,
+        "bootsShed": 0.25,
+        "dockGrimePerStep": 0.08,
+        "airborneDustPerDay": 0.5,
+        "airborneDustRadiusTiles": 6,
+        "airborneDustVisitCap": 0.3,
+        "deposits": {
+          "cooking": 0.04,
+          "serving": 0.03,
+          "eating": 0.02,
+          "spoiledMeal": 0.08,
+          "repair": 0.05,
+          "cargo": 0.03
+        },
+        "depositRadiusTiles": 1,
+        "roomMaxWeight": 0.3,
+        "tiers": {
+          "untidy": 0.12,
+          "dirty": 0.3,
+          "filthy": 0.55
+        },
+        "tierHysteresis": 0.05,
+        "mopPerTile": 1,
+        "mopSecondsPerTile": 2,
+        "mopTilesPerTrip": 12,
+        "updateEverySeconds": 1,
+        "tintScale": 1.2,
+        "tintMaxAlpha": 0.35
       },
       "hazards": {
         "difficulty": {
@@ -234,7 +286,7 @@
       }
     },
     "state": {
-      "schemaVersion": 8,
+      "schemaVersion": 9,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 23,
       "tick": 4000,
@@ -249,7 +301,7 @@
       "nextId": {
         "actor": 10,
         "machine": 34,
-        "item": 22,
+        "item": 24,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -301,6 +353,7 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "red",
@@ -353,6 +406,7 @@
           "traits": ["trait.steady", "trait.methodical"],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "blue",
@@ -405,6 +459,7 @@
           "traits": ["trait.night_owl"],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "red",
@@ -457,6 +512,7 @@
           "traits": ["trait.brisk_walker"],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "white",
@@ -509,6 +565,7 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "white",
@@ -561,6 +618,7 @@
           "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {},
           "activity": {
             "kind": "idle"
@@ -608,6 +666,7 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {},
           "activity": {
             "kind": "idle"
@@ -655,6 +714,7 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "blue",
@@ -707,6 +767,7 @@
           "traits": [],
           "mood": 0,
           "thoughts": [],
+          "boots": 0,
           "schedule": {
             "section": {
               "key": "red",
@@ -2159,6 +2220,31 @@
             "y": 10.5
           },
           "condition": 1
+        },
+        "i22": {
+          "id": "i22",
+          "defId": "item.provisions",
+          "stacking": "stack",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 20.5,
+            "y": 12.5
+          },
+          "count": 18,
+          "reserved": 0
+        },
+        "i23": {
+          "id": "i23",
+          "defId": "item.mop",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 20.5,
+            "y": 18.5
+          },
+          "condition": 1
         }
       },
       "berths": {
@@ -2193,6 +2279,42 @@
         "helm": {}
       },
       "hazards": [],
+      "dirt": {
+        "cells": {
+          "deck.freighter_mk2": [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+          ]
+        },
+        "tiers": {},
+        "dustThisVisit": 0
+      },
+      "galley": {
+        "lastMealWatch": 0
+      },
       "jobs": {
         "j1": {
           "id": "j1",
@@ -2256,6 +2378,10 @@
             "count": 160,
             "price": 8
           },
+          "item.provisions": {
+            "count": 8,
+            "price": 50
+          },
           "item.med_kit": {
             "count": 2,
             "price": 90
@@ -2273,6 +2399,10 @@
           "item.ration_pack": {
             "count": 60,
             "price": 10
+          },
+          "item.provisions": {
+            "count": 6,
+            "price": 55
           }
         },
         "port.green_meridian": {
@@ -2283,6 +2413,10 @@
           "item.ration_pack": {
             "count": 200,
             "price": 6
+          },
+          "item.provisions": {
+            "count": 12,
+            "price": 35
           }
         },
         "port.ossory_station": {
@@ -2301,6 +2435,10 @@
           "item.ration_pack": {
             "count": 40,
             "price": 14
+          },
+          "item.provisions": {
+            "count": 6,
+            "price": 60
           }
         },
         "port.vesper_gate": {
@@ -2312,6 +2450,10 @@
             "count": 80,
             "price": 9
           },
+          "item.provisions": {
+            "count": 6,
+            "price": 50
+          },
           "item.spare_parts_stack": {
             "count": 0,
             "price": 240
@@ -2321,6 +2463,10 @@
           "item.ration_pack": {
             "count": 60,
             "price": 12
+          },
+          "item.provisions": {
+            "count": 4,
+            "price": 70
           },
           "item.coolant_canister": {
             "count": 1,

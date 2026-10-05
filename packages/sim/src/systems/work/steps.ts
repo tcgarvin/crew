@@ -253,6 +253,9 @@ function takeItem(ctx: StepCtx, actor: Actor, item: Item, split: boolean): ItemI
       // key off `job.cargoItemIds`, which already names this new id, not `jobId` on the item, but
       // other freight-aware code — inspection, the crate renderer — reads `item.jobId`).
       ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
+      // A serving split off a served stack is the same dinner (D81): the plate keeps its quality
+      // and spoils when the stack does.
+      ...(item.meal === undefined ? {} : { meal: { ...item.meal } }),
     };
     return id;
   }
@@ -274,10 +277,12 @@ function runPickUp(ctx: StepCtx, actor: Actor, step: StepOf<"pickUp">): StepResu
   }
   const takenId = takeItem(ctx, actor, item, step.split);
   if (takenId !== item.id) {
-    // Later steps (the meal's consume) refer to the unit actually in hand.
+    // Later steps (the meal's consume, the carried plate's putDown) refer to the unit in hand.
     const activity = actor.activity;
     for (const later of activity.kind === "idle" ? [] : (activity.plan?.steps ?? [])) {
-      if (later.kind === "consume" && later.itemId === item.id) later.itemId = takenId;
+      if ((later.kind === "consume" || later.kind === "putDown") && later.itemId === item.id) {
+        later.itemId = takenId;
+      }
     }
     seeItem(actor, item.id, item.location, ctx.tick);
   }

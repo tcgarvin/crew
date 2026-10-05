@@ -12,6 +12,7 @@ import { getRenderFrame } from "../../core/render";
 import type { TileCoord } from "../../core/types/common";
 import type { ActorId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
+import type { PlannerConfig } from "../../core/types/pipeline";
 import { enumerateCandidates } from "../../planner/candidates";
 import { selectIntent } from "../../planner/select";
 import { DECK12 } from "../spatial/fixtures/deck-12x8";
@@ -37,9 +38,9 @@ function addPassenger(world: World, name: string, tile: TileCoord): ActorId {
   return id;
 }
 
-function plannerConfig(world: World) {
-  const c = world.config.values;
-  return { work: c.work, urgency: c.urgency, needs: c.needs, time: c.time };
+function plannerConfig(world: World): PlannerConfig {
+  const { work, urgency, needs, time, galley } = world.config.values;
+  return { work, urgency, needs, time, galley };
 }
 
 describe("a passenger aboard", () => {

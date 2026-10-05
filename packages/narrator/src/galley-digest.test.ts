@@ -269,7 +269,7 @@ describe("galley and dirt problem lines (D80-D83)", () => {
     const nobody = structuredClone(snap);
     openProblemWithTask(nobody.state, dirty, 902);
     expect(digest(nobody)).toContain(
-      "- compartmentDirty (public) since tick 20: Cargo Hold is filthy; nobody is mopping it yet",
+      "- compartmentDirty (public) since tick 20: Cargo Hold is filthy; nobody is mopping it yet, the deckhand's to mop",
     );
     openProblemWithTask(state, dirty, 902, actorNamed(state, "Dane Whitcross"));
     expect(digest(snap)).toContain(

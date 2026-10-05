@@ -39,13 +39,9 @@ export function isGalleyTask(task: TaskView): boolean {
   return task.type === "cookMeal" || task.type === "carryMeal";
 }
 
-/**
- * The galley's knobs, when the planner's config carries them. `PlannerConfig` does not name the
- * `galley` block yet (`core/types/pipeline.ts`, `core/pipeline.ts`); without it there is no mess
- * call and only the cook cooks, which is today's behaviour, not a silent wrong answer.
- */
-function galleyKnobs(config: PlannerConfig): ConfigDef["galley"] | undefined {
-  return (config as PlannerConfig & Partial<Pick<ConfigDef, "galley">>).galley;
+/** The galley's knobs: `PlannerConfig` carries the `galley` block (`core/pipeline.ts`). */
+function galleyKnobs(config: PlannerConfig): ConfigDef["galley"] {
+  return config.galley;
 }
 
 /** A `Days` duration in ticks, inline because the planner may not import `core/clock` (D76). */

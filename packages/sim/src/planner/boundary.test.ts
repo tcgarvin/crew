@@ -38,6 +38,21 @@ const deck: DeckDef = {
 
 const config: PlannerConfig = {
   time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
+  // The planner may not import fixtures (depcruise `planner-boundary`): the galley block by hand.
+  galley: {
+    mealLeadDays: 0.08,
+    mealGraceDays: 0.1,
+    cookSeconds: 30,
+    substituteAfterDays: 0.025,
+    spareServings: 1,
+    servingsPerCrate: 12,
+    mealSpoilDays: 0.25,
+    mealCallHungerAbove: 0.2,
+    lowBelowDays: 0,
+    restockToDays: 0,
+    goodCookingAbove: 6,
+    poorCookingBelow: 3,
+  },
   work: {
     reconsiderEveryTicks: 10,
     switchCooldownSeconds: 2,

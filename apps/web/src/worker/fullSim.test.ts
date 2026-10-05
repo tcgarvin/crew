@@ -88,6 +88,8 @@ interface RunLog {
    * walking back from the delivery bay), which holds prep but is not the pilot's walk.
    */
   readonly prepAshoreTicks: Set<number>;
+  /** Ticks at which a `staffStation` task was claimed (the helm stander setting off, D77). */
+  readonly staffClaimTicks: Set<number>;
 }
 
 function runFullSim(seed: number, ticks: number, policy: Policy): { world: World; log: RunLog } {
@@ -100,6 +102,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     stages: new Set([world.state.travel.stage]),
     loadClaims: [],
     prepAshoreTicks: new Set(),
+    staffClaimTicks: new Set(),
   };
   let n = 0;
   const send = (command: Omit<Command, "id">) => {
@@ -143,6 +146,7 @@ function runFullSim(seed: number, ticks: number, policy: Policy): { world: World
     for (const e of result.events) {
       if (e.type !== "taskClaimed") continue;
       const task = world.state.work.tasks[e.payload.taskId];
+      if (task?.type === "staffStation") log.staffClaimTicks.add(e.tick);
       if (task?.type !== "haul") continue;
       const problem = world.state.work.problems[task.problemId];
       if (problem?.kind !== "cargoToLoad") continue;
@@ -285,35 +289,51 @@ describe(
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
       // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
       // began, so the pilot did not start walking to the console until every crate was aboard —
-      // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. `travel.ts`
-      // now raises `stationToStaff` as soon as a course is planned, so the pilot (idle, with
-      // nothing else essential to do) walks there while the crew is still loading; by the time
-      // `preparingDeparture` starts the console should already be staffed. D77: the helm
-      // stander now walks up from the gangway, two rooms away, but the watch problem still opens
-      // when the course is planned, so the walk is still hidden inside the loading.
-      const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
+      // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. The helm's
+      // post now opens the moment the course is plotted (D77, D78: it cannot open earlier, since
+      // a pilot in the seat could not plot it, and prep itself waits for the plot), so the
+      // stander leaves the gangway then, and the walk hides inside the loading whenever loading
+      // is the long pole. When the plot finishes within a walk of the last crate (this seed's
+      // second call: plotted at 291.6 s, loaded at 294.3 s) the walk shows, and that is the rule
+      // at work, not a stall: so the pin is that the stander claims the post within seconds of
+      // the plot, and that prep ends within the fixed time of the later of its start and that
+      // walk. The run goes past five minutes so the second call's prep ends inside it.
+      const { world, log } = runFullSim(20260930, TICK_RATE * 320, autoAccept);
       const stageChanges = log.events.filter(
         (e): e is Extract<SimEvent, { type: "travelStageChanged" }> =>
           e.type === "travelStageChanged",
       );
       const prepStarts = stageChanges.filter((e) => e.payload.to === "preparingDeparture");
-      expect(prepStarts.length).toBeGreaterThanOrEqual(1);
-      const prepSeconds = world.config.values.travel.prepareDepartureSeconds;
+      expect(prepStarts.length).toBeGreaterThanOrEqual(2);
       const tickRate = world.config.values.time.tickRate;
+      const prepSeconds = world.config.values.travel.prepareDepartureSeconds;
+      const plotted = log.events.filter((e) => e.type === "coursePlotted").map((e) => e.tick);
+      const claims = log.events
+        .filter((e) => e.type === "taskClaimed" && log.staffClaimTicks.has(e.tick))
+        .map((e) => e.tick);
+      // The gangway is two rooms from the helm on Mk2 (D77): the walk up, with the planner's lag.
+      const WALK_UP_SECONDS = 20;
+      const CLAIM_LAG_SECONDS = 5;
       for (const start of prepStarts) {
         const next = stageChanges.find(
           (e) => e.tick > start.tick && e.payload.from === "preparingDeparture",
         );
         expect(next).toBeDefined();
         const end = next?.tick ?? start.tick;
+        const plot = Math.max(...plotted.filter((t) => t <= start.tick));
+        const claim = claims.find((t) => t >= plot);
+        expect(claim).toBeDefined();
+        // The post opened at the plot, not at prep: the stander set off within seconds of it.
+        expect(((claim ?? start.tick) - plot) / tickRate).toBeLessThanOrEqual(CLAIM_LAG_SECONDS);
         let ashore = 0;
         for (const tick of log.prepAshoreTicks) if (tick > start.tick && tick <= end) ashore += 1;
-        const elapsedSeconds = (end - start.tick - ashore) / tickRate;
-        // The fixed prep time plus a small (≤ 2 s) allowance, not the extra walk the bug added.
+        const walkEnds = (claim ?? start.tick) + WALK_UP_SECONDS * tickRate;
+        const elapsedSeconds = (end - Math.max(start.tick, walkEnds) - ashore) / tickRate;
+        // The fixed prep time plus a small (≤ 2 s) allowance beyond the walk the plot left showing.
         // D61's call aboard (someone still on the dock as prep begins) is not counted here.
         expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
       }
-    });
+    }, 60_000);
 
     // D77, W1's "done when": a 400 s spur leg is a whole watch long, so the bell rings at sea
     // and the oncoming stander relieves the helm in transit.

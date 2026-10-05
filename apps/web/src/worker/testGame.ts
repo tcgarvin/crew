@@ -7,6 +7,7 @@ import {
   checkInvariants,
   commerceViolations,
   createKernel,
+  dirtViolations,
   spatialViolations,
   travelViolations,
   workViolations,
@@ -27,6 +28,7 @@ export function assertInvariants(world: World): void {
   const violations = [
     ...checkInvariants(world.state),
     ...spatialViolations(world),
+    ...dirtViolations(world),
     ...workViolations(world),
     ...travelViolations(world),
     ...commerceViolations(world),

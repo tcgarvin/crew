@@ -242,8 +242,8 @@ export function mealCallStandsFor(ctx: StepCtx, actor: Actor): boolean {
 /**
  * The `carryMeal` plan: a served meal in hand, else one split off the nearest counter stack the
  * carrier believes in (never the stander's own plate); to the helm's standby tile; set it down.
- * The split-off unit is renamed in the plan's `putDown` by the galley (`galley.ts`
- * `followSplitServings`), the tick it is picked up.
+ * The split-off unit keeps the stack's `meal` and the plan's `putDown` is renamed to it by the
+ * pick-up itself (`systems/work/steps.ts` `takeItem`/`runPickUp`).
  */
 export function carryMealPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const standby = task.interactionTiles[0];
