@@ -51,6 +51,7 @@ import {
   voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
+import { crewOffWatchClauses, offWatchLine, rivalriesLine } from "./offwatch-digest";
 import { dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
 /**
@@ -228,6 +229,11 @@ function shipSection(
   if (galley !== undefined) lines.push(galley);
   const dirt = dirtLine(state, content);
   if (dirt !== undefined) lines.push(dirt);
+  // D87: off-watch life now (sessions, solo recreation) and the rivalries worth a story.
+  const offWatch = offWatchLine(state, content);
+  if (offWatch !== undefined) lines.push(offWatch);
+  const rivalries = rivalriesLine(state, content);
+  if (rivalries !== undefined) lines.push(rivalries);
   if (t.stage === "docked") {
     // D47: what is on sale here, with prices (this is private to the model; cards carry no numbers).
     lines.push(`market here: ${marketHereLine(state, content, t.portId)}`);
@@ -386,25 +392,31 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([skill, level]) => `${skill} ${level}`)
       .join(", ");
-    const needs = (["hunger", "fatigue", "comfort", "social"] as const)
-      .map((key) => {
+    const needs = [
+      ...(["hunger", "fatigue", "comfort", "social"] as const).map((key) => {
         const word = needWord(actor.needs[key]);
         return word === undefined ? undefined : `${key} ${word}`;
-      })
+      }),
+      // Slice 4: recreation is never urgent; past the seek threshold they are simply bored.
+      actor.needs.recreation >= snapshot.config.needs.seekThreshold ? "bored" : undefined,
+    ]
       .filter((n) => n !== undefined)
       .join(", ");
     const where = placePhrase(content, state, actor.location);
     const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
     // D77: their section and whether they are on now; D79: mood and what weighs on them.
     const duty = ` ${dutyTag(actor, state.tick, snapshot.config)}`;
-    const mood = moodPhrase(actor, state.tick, content, snapshot.config);
+    const mood = moodPhrase(actor, state, content, snapshot.config);
     const def = content.crew[actor.defId];
     const bio = def?.bio;
     // D38: the voice line is how this person sounds on every card. D41: the captain's voice is
     // how they come across, for how others react to them.
     const voice = def?.voice;
     const captain = isCaptain(actor) ? "this is the captain, the player; never a speaker. " : "";
-    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}; good at: ${skills || "nothing in particular"}`;
+    // D87: who they are off watch (likes, the people they feel strongly about, their berth)
+    // follows `good at`.
+    const offWatch = crewOffWatchClauses(state, content, actor);
+    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}; good at: ${skills || "nothing in particular"}${offWatch}`;
     return `- ${actor.name}${roles}${duty}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
   // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.

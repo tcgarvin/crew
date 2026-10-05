@@ -16,15 +16,23 @@
  * - how long the helm stood empty while the ship was not docked;
  * - port calls by watch of the day: time docked, with cargo to move, with cargo to move and
  *   nobody hauling (a stall), and with someone on the gangway;
- * - each person's sleep starts, as seconds into each day (the rhythm's anchor, D77).
+ * - each person's sleep starts, as seconds into each day (the rhythm's anchor, D77);
+ * - off watch (D84-D87, slice 4 call 22): group sessions opened, started, collapsed and
+ *   abandoned per watch and by activity, contests, arguments, spirited talks, performances and
+ *   rivalry streaks, solo activities started (by kind), and the ticker's notable-or-better lines
+ *   per watch; per person, the share of time recreating, the days they recreated and the
+ *   longest stretch bored (recreation above `seekThreshold`, and above `RECREATION_HIGH`); at the
+ *   end, the affinity extremes and every rivalry.
  *
  * Unlike `crew pacing` there is no wall clock: the sim simply advances, so the numbers are sim
  * time and independent of playback speed. An event at tick T happened in the step ending at T,
  * so it is counted in the watch holding tick T − 1: the bell that ends a watch counts in it.
  */
+import { rivalryPhrase } from "@crew/narrator";
 import {
   type Command,
   type CommandId,
+  type ContentBundle,
   type EventType,
   type Kernel,
   type NarratorHook,
@@ -33,6 +41,7 @@ import {
   actionLabel,
   createKernel,
   dayTicks,
+  getRenderFrame,
   provisionsCratesAboard,
   provisionsDays,
   watchTicks,
@@ -74,21 +83,76 @@ export const BEAT_EVENTS = {
   hazards: { type: "navHazard" },
   cards: { type: "decisionPending" },
   conversations: { type: "conversation" },
-} as const satisfies Record<string, { readonly type: EventType; readonly ration?: boolean }>;
-export type BeatKind = keyof typeof BEAT_EVENTS;
-const BEAT_KINDS = Object.keys(BEAT_EVENTS) as BeatKind[];
+  // Slice 4 (call 22): off watch. `sessionEnded` splits on its outcome.
+  sessionsOpened: { type: "sessionOpened" },
+  sessionsStarted: { type: "sessionStarted" },
+  sessionsCollapsed: { type: "sessionCollapsed" },
+  sessionsAbandoned: { type: "sessionEnded", outcome: "abandoned" },
+  contests: { type: "sessionEnded", outcome: "contest" },
+  arguments: { type: "sessionEnded", outcome: "debate", argued: true },
+  spiritedTalks: { type: "sessionEnded", outcome: "debate", argued: false },
+  performances: { type: "sessionEnded", outcome: "perform" },
+  rivalryStreaks: { type: "rivalryStreak" },
+} as const satisfies Record<
+  string,
+  {
+    readonly type: EventType;
+    readonly ration?: boolean;
+    readonly outcome?: string;
+    readonly argued?: boolean;
+  }
+>;
 
-/** The beat an event marks and how much it counts, or undefined for an event not counted. */
-export function beatOf(event: BeatEvent): { kind: BeatKind; count: number } | undefined {
+/**
+ * Beats counted from samples rather than events: a solo activity begun (no event marks one,
+ * call 18), and a notable-or-better line on the ticker (what the player reads, call 22's twelve).
+ */
+export const SAMPLED_BEATS = ["soloActivities", "tickerLines"] as const;
+export type BeatKind = keyof typeof BEAT_EVENTS | (typeof SAMPLED_BEATS)[number];
+const BEAT_KINDS: readonly BeatKind[] = [
+  ...(Object.keys(BEAT_EVENTS) as (keyof typeof BEAT_EVENTS)[]),
+  ...SAMPLED_BEATS,
+];
+
+/** Event types whose beat depends on the payload (`beatsOf` splits them). */
+const SPLIT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  "ateMeal",
+  "mealSpoiled",
+  "sessionEnded",
+]);
+
+/** The beats an event marks and how much each counts; empty for an event not counted. */
+export function beatsOf(event: BeatEvent): readonly { kind: BeatKind; count: number }[] {
   switch (event.type) {
     case "ateMeal":
-      return { kind: event.payload.ration ? "eatenRation" : "eatenHot", count: 1 };
+      return [{ kind: event.payload.ration ? "eatenRation" : "eatenHot", count: 1 }];
     case "mealSpoiled":
-      return { kind: "servingsSpoiled", count: event.payload.count };
+      return [{ kind: "servingsSpoiled", count: event.payload.count }];
+    case "sessionEnded":
+      return sessionEndedBeats(event.payload);
     default: {
       const kind = EVENT_TO_BEAT.get(event.type);
-      return kind === undefined ? undefined : { kind, count: 1 };
+      return kind === undefined ? [] : [{ kind, count: 1 }];
     }
+  }
+}
+
+/** A session's end: abandoned, a contest with a winner, an argument or a talk, a performance. */
+function sessionEndedBeats(
+  payload: Extract<BeatEvent, { type: "sessionEnded" }>["payload"],
+): readonly { kind: BeatKind; count: number }[] {
+  switch (payload.outcome) {
+    case "abandoned":
+      return [{ kind: "sessionsAbandoned", count: 1 }];
+    case "contest":
+      return payload.winnerId === undefined ? [] : [{ kind: "contests", count: 1 }];
+    case "debate":
+      return [{ kind: payload.argued === true ? "arguments" : "spiritedTalks", count: 1 }];
+    case "perform":
+      return [{ kind: "performances", count: 1 }];
+    case "bond":
+    case "none":
+      return [];
   }
 }
 
@@ -100,7 +164,11 @@ export type CountedTier = (typeof ROOM_TIERS_COUNTED)[number];
 export const MESS_FULL_EATERS = 6;
 export const MESS_WINDOW_DAYS = 0.05;
 
+/** D84: recreation at or above this is "very bored" (call 22: nobody above it for a day). */
+export const RECREATION_HIGH = 0.8;
+
 export const ACTIVITY_CLASSES = [
+  "recreating",
   "helm",
   "cooking",
   "mopping",
@@ -125,7 +193,9 @@ export type ActivityClass = (typeof ACTIVITY_CLASSES)[number];
  * is "other", and the report lists those labels so a new one is noticed. "cooking" is the galley's
  * work (D81: fetching provisions, at the stove, serving, a plate to the helm); "mopping" is a
  * cleaning trip (D82: the mop fetched, the rooms mopped, the mop put away). The stander eating in
- * the seat ("at the helm, eating") is still at the helm.
+ * the seat ("at the helm, eating") is still at the helm. "recreating" (D84) is any label in
+ * `recreationLabels` (the activities' own, from content), checked first, or fetching and
+ * putting back a book.
  */
 const LABEL_CLASSES: readonly (readonly [RegExp, ActivityClass])[] = [
   [/^(fetching provisions|cooking|serving dinner|taking a plate to the helm)/, "cooking"],
@@ -153,11 +223,34 @@ const LABEL_CLASSES: readonly (readonly [RegExp, ActivityClass])[] = [
     "ashore",
   ],
   [/^(walking|going ashore|coming aboard|leaving the helm)/, "walking"],
+  [/^(fetching a book|putting the book back)/, "recreating"],
 ];
 
-export function activityClass(label: string): ActivityClass {
+export function activityClass(label: string, recreationLabels: ReadonlySet<string>): ActivityClass {
+  if (recreationLabels.has(label)) return "recreating";
   for (const [pattern, cls] of LABEL_CLASSES) if (pattern.test(label)) return cls;
   return "other";
+}
+
+/**
+ * Every label a person recreating shows (`systems/work/labels.ts` `recreateLabel` and the fetch
+ * of an owned instrument): each activity's label, waiting label and solo label, and "fetching
+ * the harmonica" / "putting the harmonica away" for each `instrument` item.
+ */
+export function recreationLabels(content: ContentBundle): ReadonlySet<string> {
+  const labels = new Set<string>();
+  for (const def of Object.values(content.activities)) {
+    labels.add(def.label);
+    labels.add(def.waitingLabel);
+    if (def.solo !== undefined) labels.add(def.solo.label);
+  }
+  for (const item of Object.values(content.items)) {
+    if (!item.tags.includes("instrument")) continue;
+    const name = item.name.toLowerCase();
+    labels.add(`fetching the ${name}`);
+    labels.add(`putting the ${name} away`);
+  }
+  return labels;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -178,6 +271,22 @@ export interface PersonBeats {
   readonly longestIdleSeconds: number;
   /** When they fell asleep, in sim time: the day (from 1) and the second of that day. */
   readonly sleepStarts: readonly SleepStart[];
+  /** D84: days (of the run's) with any time recreating. */
+  readonly daysRecreated: number;
+  /** D84: the longest stretch with recreation above `seekThreshold`. */
+  readonly longestBoredSeconds: number;
+  /** D84: the longest stretch with recreation at or above `RECREATION_HIGH`. */
+  readonly longestVeryBoredSeconds: number;
+}
+
+/** D84: sessions by activity over the run. */
+export interface ActivitySessions {
+  readonly opened: number;
+  readonly started: number;
+  readonly collapsed: number;
+  readonly abandoned: number;
+  /** Solo stretches begun (a solo plan, or a game collapsed to its solo variant). */
+  readonly solo: number;
 }
 
 export interface SleepStart {
@@ -235,6 +344,16 @@ export interface BeatsTallyResult {
   readonly port: readonly PortWatchBeats[];
   /** Labels that matched no class, with the sim-seconds spent in each. */
   readonly otherLabels: Readonly<Record<string, number>>;
+  /** D84: sessions and solo stretches by activity id. */
+  readonly byActivity: Readonly<Record<string, ActivitySessions>>;
+}
+
+/** D84: what the tally needs to know about recreation. */
+export interface RecreationTallyConfig {
+  /** `config.needs.seekThreshold`: above it someone is bored. */
+  readonly seekThreshold: number;
+  /** `recreationLabels(content)`. */
+  readonly labels: ReadonlySet<string>;
 }
 
 /** One person's label at a sample. */
@@ -242,6 +361,10 @@ export interface PersonSample {
   readonly id: string;
   readonly name: string;
   readonly label: string;
+  /** `needs.recreation` now. */
+  readonly recreation: number;
+  /** The activity they are playing on their own now (a solo `recreate` step), or null. */
+  readonly soloActivityId: string | null;
 }
 
 interface PersonTally {
@@ -251,6 +374,20 @@ interface PersonTally {
   longestIdle: number;
   asleep: boolean;
   readonly sleepStartTicks: number[];
+  readonly recreatedDays: Set<number>;
+  boredRun: number;
+  longestBored: number;
+  veryBoredRun: number;
+  longestVeryBored: number;
+  soloActivityId: string | null;
+}
+
+interface ActivityTally {
+  opened: number;
+  started: number;
+  collapsed: number;
+  abandoned: number;
+  solo: number;
 }
 
 interface PortWatchTally {
@@ -264,9 +401,9 @@ interface PortWatchTally {
 }
 
 const EVENT_TO_BEAT: ReadonlyMap<string, BeatKind> = new Map(
-  BEAT_KINDS.filter((kind) => kind !== "eatenHot" && kind !== "eatenRation").map(
-    (kind) => [BEAT_EVENTS[kind].type, kind] as const,
-  ),
+  (Object.keys(BEAT_EVENTS) as (keyof typeof BEAT_EVENTS)[])
+    .filter((kind) => !SPLIT_TYPES.has(BEAT_EVENTS[kind].type))
+    .map((kind) => [BEAT_EVENTS[kind].type, kind] as const),
 );
 
 function statsOf(counts: readonly number[], watches: number): BeatStats {
@@ -287,6 +424,7 @@ export class BeatsTally {
   private readonly people = new Map<string, PersonTally>();
   private readonly other = new Map<string, number>();
   private readonly port: PortWatchTally[];
+  private readonly activities = new Map<string, ActivityTally>();
   private unattendedTicks = 0;
 
   /**
@@ -296,6 +434,7 @@ export class BeatsTally {
    * @param watchesPerDay from the config (`time.watchesPerDay`), for the port calls by watch.
    * @param messWindowTicks `MESS_WINDOW_DAYS` in ticks: how soon after a serve a hot meal
    *   eaten counts toward that serve's mess.
+   * @param recreation the boredom threshold and the recreation labels (D84).
    */
   constructor(
     private readonly watches: number,
@@ -303,6 +442,7 @@ export class BeatsTally {
     private readonly tickRate: number,
     private readonly watchesPerDay: number,
     private readonly messWindowTicks: number,
+    private readonly recreation: RecreationTallyConfig,
   ) {
     if (!Number.isInteger(watches) || watches <= 0) {
       throw new RangeError(`BeatsTally: watches must be a positive integer, got ${watches}`);
@@ -336,17 +476,57 @@ export class BeatsTally {
 
   events(events: readonly BeatEvent[]): void {
     for (const event of events) {
-      const beat = beatOf(event);
-      if (beat === undefined) continue;
-      const watch = this.watchOf(event.tick);
-      const counts = this.perWatch[beat.kind];
-      if (watch >= this.watches) {
-        throw new RangeError(`${event.type} at tick ${event.tick} is past the run's last watch`);
+      for (const beat of beatsOf(event)) {
+        this.count(beat.kind, event.tick, beat.count, event.type);
+        if (beat.kind === "mealsServed") this.serveTicks.push(event.tick);
+        if (beat.kind === "eatenHot") this.hotEatTicks.push(event.tick);
       }
-      counts[watch] = (counts[watch] ?? 0) + beat.count;
-      if (beat.kind === "mealsServed") this.serveTicks.push(event.tick);
-      if (beat.kind === "eatenHot") this.hotEatTicks.push(event.tick);
+      this.activityEvent(event);
     }
+  }
+
+  /** Lines that reached the ticker at `ticks`, notable or better (D84, call 22). */
+  tickerLines(ticks: readonly number[]): void {
+    for (const tick of ticks) this.count("tickerLines", tick, 1, "ticker line");
+  }
+
+  private count(kind: BeatKind, tick: number, n: number, what: string): void {
+    const watch = this.watchOf(tick);
+    if (watch >= this.watches) {
+      throw new RangeError(`${what} at tick ${tick} is past the run's last watch`);
+    }
+    const counts = this.perWatch[kind];
+    counts[watch] = (counts[watch] ?? 0) + n;
+  }
+
+  /** D84: sessions by activity. */
+  private activityEvent(event: BeatEvent): void {
+    switch (event.type) {
+      case "sessionOpened":
+        this.activityTally(event.payload.activityId).opened += 1;
+        return;
+      case "sessionStarted":
+        this.activityTally(event.payload.activityId).started += 1;
+        return;
+      case "sessionCollapsed":
+        this.activityTally(event.payload.activityId).collapsed += 1;
+        return;
+      case "sessionEnded":
+        if (event.payload.outcome === "abandoned") {
+          this.activityTally(event.payload.activityId).abandoned += 1;
+        }
+        return;
+      default:
+        return;
+    }
+  }
+
+  private activityTally(activityId: string): ActivityTally {
+    const known = this.activities.get(activityId);
+    if (known !== undefined) return known;
+    const fresh = { opened: 0, started: 0, collapsed: 0, abandoned: 0, solo: 0 };
+    this.activities.set(activityId, fresh);
+    return fresh;
   }
 
   /**
@@ -364,8 +544,9 @@ export class BeatsTally {
     let gangway = false;
     for (const person of people) {
       const tally = this.personTally(person);
-      const cls = activityClass(person.label);
+      const cls = activityClass(person.label, this.recreation.labels);
       tally.ticks[cls] += ticks;
+      this.sampleRecreation(tally, person, ticks, ship.tick, cls === "recreating");
       if (cls === "hauling") hauling = true;
       if (cls === "gangway") gangway = true;
       if (cls === "other")
@@ -399,6 +580,28 @@ export class BeatsTally {
     }
   }
 
+  /** D84: days recreated, bored stretches, solo activities begun. */
+  private sampleRecreation(
+    tally: PersonTally,
+    person: PersonSample,
+    ticks: number,
+    tick: number,
+    recreating: boolean,
+  ): void {
+    const dayTicks = this.ticksPerWatch * this.watchesPerDay;
+    if (recreating) tally.recreatedDays.add(Math.floor(Math.max(0, tick - 1) / dayTicks));
+    tally.boredRun = person.recreation > this.recreation.seekThreshold ? tally.boredRun + ticks : 0;
+    tally.longestBored = Math.max(tally.longestBored, tally.boredRun);
+    tally.veryBoredRun = person.recreation >= RECREATION_HIGH ? tally.veryBoredRun + ticks : 0;
+    tally.longestVeryBored = Math.max(tally.longestVeryBored, tally.veryBoredRun);
+    const solo = person.soloActivityId;
+    if (solo !== null && solo !== tally.soloActivityId) {
+      this.count("soloActivities", tick, 1, "solo activity");
+      this.activityTally(solo).solo += 1;
+    }
+    tally.soloActivityId = solo;
+  }
+
   private personTally(person: PersonSample): PersonTally {
     const known = this.people.get(person.id);
     if (known !== undefined) return known;
@@ -412,6 +615,12 @@ export class BeatsTally {
       longestIdle: 0,
       asleep: false,
       sleepStartTicks: [],
+      recreatedDays: new Set(),
+      boredRun: 0,
+      longestBored: 0,
+      veryBoredRun: 0,
+      longestVeryBored: 0,
+      soloActivityId: null,
     };
     this.people.set(person.id, fresh);
     return fresh;
@@ -455,6 +664,9 @@ export class BeatsTally {
         shares,
         longestIdleSeconds: p.longestIdle / this.tickRate,
         sleepStarts,
+        daysRecreated: p.recreatedDays.size,
+        longestBoredSeconds: p.longestBored / this.tickRate,
+        longestVeryBoredSeconds: p.longestVeryBored / this.tickRate,
       };
     });
     const port = this.port.map((w) => ({
@@ -477,6 +689,11 @@ export class BeatsTally {
       helmUnattendedSeconds: this.unattendedTicks / this.tickRate,
       port,
       otherLabels,
+      byActivity: Object.fromEntries(
+        [...this.activities]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([id, t]) => [id, { ...t }]),
+      ),
     };
   }
 }
@@ -506,7 +723,17 @@ export interface BeatsResult extends BeatsTallyResult {
   /** D81: provisions aboard at the end of the run. */
   readonly provisionsCratesAtEnd: number;
   readonly provisionsDaysAtEnd: number;
+  /** D85: the warmest and coldest directed affinities at the end, "A → B +4". */
+  readonly affinityExtremes: {
+    readonly highest: readonly string[];
+    readonly lowest: readonly string[];
+  };
+  /** D85: every rivalry at the end, as the digest says it. */
+  readonly rivalries: readonly string[];
 }
+
+/** How many affinities each end of the extremes lists. */
+const AFFINITY_EXTREMES_SHOWN = 3;
 
 /** Rooms at each counted tier now. */
 function roomCounts(world: World): Record<CountedTier, number> {
@@ -517,6 +744,16 @@ function roomCounts(world: World): Record<CountedTier, number> {
   };
 }
 
+/** The activity of a solo `recreate` step the actor is on now, or null. */
+function soloActivityOf(
+  actor: World["state"]["actors"][keyof World["state"]["actors"]],
+): string | null {
+  const activity = actor.activity;
+  if (activity.kind === "idle") return null;
+  const step = activity.plan?.steps[activity.plan.stepIndex];
+  return step?.kind === "recreate" && step.role === "solo" ? step.activityId : null;
+}
+
 function crewSamples(world: World): PersonSample[] {
   return Object.values(world.state.actors)
     .filter((actor) => actor.crew && actor.passenger !== true)
@@ -524,7 +761,52 @@ function crewSamples(world: World): PersonSample[] {
       id: actor.id,
       name: actor.name,
       label: actionLabel(actor, world.state, world.content),
+      recreation: actor.needs.recreation,
+      soloActivityId: soloActivityOf(actor),
     }));
+}
+
+/** Ticks of the notable-or-better lines the last advance put on the ticker. */
+function tickerTicks(world: World): number[] {
+  const events = world.caches.diagnostics.lastEvents;
+  if (!events.some((e) => e.significance !== "trace")) return [];
+  return getRenderFrame(world)
+    .tickerEvents.filter((e) => e.significance !== "trace")
+    .map((e) => e.tick);
+}
+
+/** D85: the warmest and coldest feelings aboard at the end, "Jax Okonkwo → Tomas Ruiz +4". */
+function affinityExtremes(world: World): BeatsResult["affinityExtremes"] {
+  const { actors, social } = world.state;
+  const name = (id: string) => actors[id as keyof typeof actors]?.name ?? id;
+  const all = Object.entries(social.relationships).flatMap(([from, row]) =>
+    Object.entries(row).map(([to, r]) => ({
+      text: `${name(from)} → ${name(to)}`,
+      affinity: r.affinity,
+    })),
+  );
+  const said = (a: { text: string; affinity: number }) =>
+    `${a.text} ${a.affinity > 0 ? "+" : ""}${a.affinity}`;
+  const byAffinity = [...all].sort(
+    (a, b) => b.affinity - a.affinity || a.text.localeCompare(b.text),
+  );
+  return {
+    highest: byAffinity
+      .filter((a) => a.affinity > 0)
+      .slice(0, AFFINITY_EXTREMES_SHOWN)
+      .map(said),
+    lowest: byAffinity
+      .filter((a) => a.affinity < 0)
+      .reverse()
+      .slice(0, AFFINITY_EXTREMES_SHOWN)
+      .map(said),
+  };
+}
+
+function rivalriesAtEnd(world: World): string[] {
+  return Object.entries(world.state.social.rivalries)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([key, r]) => rivalryPhrase(world.state, world.content, key, r) ?? []);
 }
 
 /** Run `days` ship's days of the pacing voyage and tally its beats. Deterministic per seed. */
@@ -546,6 +828,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     tickRate,
     values.time.watchesPerDay,
     dayTicks(values, MESS_WINDOW_DAYS),
+    { seekThreshold: values.needs.seekThreshold, labels: recreationLabels(world.content) },
   );
   const hooksByKind: Partial<Record<NarratorHook["kind"], number>> = {};
 
@@ -569,6 +852,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
     tally.events(result.events);
+    tally.tickerLines(tickerTicks(world));
     if (advanced > 0) {
       stuckAdvances = 0;
       const people = crewSamples(world);
@@ -625,6 +909,8 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     hooksByKind,
     provisionsCratesAtEnd: provisionsCratesAboard(world.state, world.content),
     provisionsDaysAtEnd: provisionsDays(world.state, world.content, values),
+    affinityExtremes: affinityExtremes(world),
+    rivalries: rivalriesAtEnd(world),
   };
 }
 
@@ -728,16 +1014,17 @@ function scenarioSection(r: BeatsResult): string[] {
   });
   lines.push(
     "",
-    `| Person | ${ACTIVITY_CLASSES.join(" | ")} | Longest idle s | Sleep starts (s of day) |`,
-    `|---|${ACTIVITY_CLASSES.map(() => "---").join("|")}|---|---|`,
+    `| Person | ${ACTIVITY_CLASSES.join(" | ")} | Longest idle s | Days recreated | Longest bored s | Longest > ${RECREATION_HIGH} s | Sleep starts (s of day) |`,
+    `|---|${ACTIVITY_CLASSES.map(() => "---").join("|")}|---|---|---|---|---|`,
   );
   for (const p of r.people) {
     const shares = ACTIVITY_CLASSES.map((c) => (p.shares[c] === 0 ? "" : pct(p.shares[c])));
     const sleeps = p.sleepStarts.map((s) => `d${s.day} ${s.secondOfDay}`).join(", ");
     lines.push(
-      `| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} | ${sleeps} |`,
+      `| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} | ${p.daysRecreated}/${r.days} | ${fmt(p.longestBoredSeconds, 0)} | ${fmt(p.longestVeryBoredSeconds, 0)} | ${sleeps} |`,
     );
   }
+  lines.push(...offWatchLines(r));
   const other = Object.entries(r.otherLabels);
   if (other.length > 0) {
     lines.push(
@@ -745,6 +1032,32 @@ function scenarioSection(r: BeatsResult): string[] {
       `Unclassified labels: ${other.map(([label, s]) => `"${label}" ${fmt(s, 0)} s`).join(", ")}.`,
     );
   }
+  return lines;
+}
+
+/** D84-D85: sessions by activity, then the affinity extremes and the rivalries at the end. */
+function offWatchLines(r: BeatsResult): string[] {
+  const lines = [
+    "",
+    "| Activity | Opened | Started | Collapsed | Abandoned | Solo |",
+    "|---|---|---|---|---|---|",
+  ];
+  const activities = Object.entries(r.byActivity);
+  for (const [id, a] of activities) {
+    lines.push(
+      `| ${id} | ${a.opened} | ${a.started} | ${a.collapsed} | ${a.abandoned} | ${a.solo} |`,
+    );
+  }
+  if (activities.length === 0) lines.push("| (none) | | | | | |");
+  const opened = activities.reduce((n, [, a]) => n + a.opened, 0);
+  const collapsed = activities.reduce((n, [, a]) => n + a.collapsed, 0);
+  const share = opened === 0 ? "n/a" : pct(collapsed / opened);
+  lines.push(
+    "",
+    `Sessions collapsed: ${share} of ${opened} opened.`,
+    `Warmest at the end: ${r.affinityExtremes.highest.join("; ") || "none"}. Coldest: ${r.affinityExtremes.lowest.join("; ") || "none"}.`,
+    `Rivalries at the end: ${r.rivalries.join("; ") || "none"}.`,
+  );
   return lines;
 }
 

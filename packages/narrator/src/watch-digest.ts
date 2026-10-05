@@ -17,6 +17,7 @@ import {
   whoHasTheHelm,
 } from "@crew/sim";
 import { type State, machineName } from "./lookups";
+import { thoughtLabel } from "./offwatch-digest";
 
 type Actor = State["actors"][keyof State["actors"]];
 
@@ -182,29 +183,30 @@ export const MOOD_THOUGHTS_SHOWN = 3;
  */
 export function moodPhrase(
   actor: Actor,
-  tick: number,
+  state: State,
   content: ContentBundle,
   config: ConfigDef,
 ): string {
+  const tick = state.tick;
   const word =
     actor.mood < config.mood.lowBelow
       ? "low"
       : actor.mood > config.mood.highAbove
         ? "high"
         : "steady";
-  const byKey = new Map<string, { total: number; count: number }>();
+  // Slice 4: a `{ref}` label is filled per person ("Jax Okonkwo keeps beating me"), so two
+  // thoughts of one key about different people are two entries.
+  const byLabel = new Map<string, { total: number; count: number }>();
   for (const thought of actor.thoughts) {
     if (thought.expiresAtTick <= tick) continue;
-    const entry = byKey.get(thought.key) ?? { total: 0, count: 0 };
-    byKey.set(thought.key, { total: entry.total + thought.value, count: entry.count + 1 });
+    const label = thoughtLabel(state, content, thought);
+    const entry = byLabel.get(label) ?? { total: 0, count: 0 };
+    byLabel.set(label, { total: entry.total + thought.value, count: entry.count + 1 });
   }
-  const top = [...byKey]
+  const top = [...byLabel]
     .sort(([a, x], [b, y]) => Math.abs(y.total) - Math.abs(x.total) || a.localeCompare(b))
     .slice(0, MOOD_THOUGHTS_SHOWN)
-    .map(([key, { count }]) => {
-      const label = content.thoughts[key as keyof ContentBundle["thoughts"]]?.label ?? key;
-      return count > 1 ? `${label} x${count}` : label;
-    });
+    .map(([label, { count }]) => (count > 1 ? `${label} x${count}` : label));
   return top.length === 0 ? `mood: ${word}` : `mood: ${word} (${top.join(", ")})`;
 }
 

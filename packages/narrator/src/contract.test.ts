@@ -79,8 +79,14 @@ describe("NarratorPlan structured-output schema", () => {
           title: "A stranger at the ramp",
           speaker: "",
           situation: "A stranger asks for passage.",
-          left: { label: "Take her aboard", effect: "setCourse", coursePort: "port.b" },
-          right: { label: "Refuse", effect: "none", coursePort: "" },
+          left: {
+            label: "Take her aboard",
+            effect: "setCourse",
+            coursePort: "port.b",
+            talkWith: "",
+            tone: "",
+          },
+          right: { label: "Refuse", effect: "none", coursePort: "", talkWith: "", tone: "" },
           leftAftermath: "She comes aboard and we plot for Port B.",
           rightAftermath: "She walks back into the crowd.",
           beatOfThread: "",
@@ -137,8 +143,8 @@ describe("NarratorPlan structured-output schema", () => {
       title: "About our passenger",
       speaker: "Dane Whitcross",
       situation: "Dane has a word about the passenger.",
-      left: { label: "Put her off", effect: "endPassage", coursePort: "" },
-      right: { label: "She stays", effect: "none", coursePort: "" },
+      left: { label: "Put her off", effect: "endPassage", coursePort: "", talkWith: "", tone: "" },
+      right: { label: "She stays", effect: "none", coursePort: "", talkWith: "", tone: "" },
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
@@ -156,6 +162,42 @@ describe("NarratorPlan structured-output schema", () => {
         intents: [{ ...putOff, left: { ...putOff.left, effect: "abandon" } }],
       }).success,
     ).toBe(false);
+  });
+
+  it("parses a privateTalk side with talkWith and a tone, empty for none, and requires both (D86)", () => {
+    const base = {
+      rationale: "",
+      intents: [],
+      card: null,
+      notes: { summary: "", threads: [], cast: [] },
+    };
+    const word = {
+      kind: "surfaceDecision",
+      title: "Words at the card table",
+      speaker: "Dane Whitcross",
+      situation: "Dane has a word about Jax.",
+      left: {
+        label: "My cabin. Now.",
+        effect: "privateTalk",
+        coursePort: "",
+        talkWith: "Jax Okonkwo",
+        tone: "stern",
+      },
+      right: { label: "Let them be.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+      leftAftermath: "",
+      rightAftermath: "",
+      beatOfThread: "",
+      closesThread: "",
+    };
+    const plan = { ...base, intents: [word] };
+    expect(schema.parse(plan)).toEqual(plan);
+    const withLeft = (left: Record<string, unknown>) =>
+      schema.safeParse({ ...base, intents: [{ ...word, left }] }).success;
+    expect(withLeft({ ...word.left, tone: "kind" })).toBe(false);
+    const { tone: _t, ...noTone } = word.left;
+    expect(withLeft(noTone)).toBe(false);
+    const { talkWith: _w, ...noTalkWith } = word.left;
+    expect(withLeft(noTalkWith)).toBe(false);
   });
 
   it("does not embed the vocabulary: ids are strings the translator checks (D45)", () => {
