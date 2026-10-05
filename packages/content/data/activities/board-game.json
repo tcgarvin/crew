@@ -26,6 +26,6 @@
   "affinity": {
     "participants": 1,
     "winnerToLoser": 0,
-    "loserToWinner": -1
+    "loserToWinner": -2
   }
 }

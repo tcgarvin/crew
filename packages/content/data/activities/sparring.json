@@ -20,6 +20,7 @@
   },
   "fatigueCost": 0.1,
   "outcome": "contest",
+  "affinity": { "participants": 0, "winnerToLoser": 0, "loserToWinner": -1 },
   "thoughts": {
     "win": "wonContest",
     "lose": "lostContest"
