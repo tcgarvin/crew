@@ -83,7 +83,8 @@ export interface ApiError {
     readonly message: string;
     /**
      * `budgetExceeded`: `"hourly"` (the per-game cap; retry later) or `"spacing"` (too soon
-     * after the last call; a rate rule, not a failure). `narratorUnavailable` (D43): the
+     * after the last call; a rate rule, not a failure, and only for hooks the sim raises again:
+     * never `stageDock`, `policyDecision` or `captainAshore`). `narratorUnavailable` (D43): the
      * narrator's `FallbackReason` (`notConfigured`, `apiError`, `timeout`, `refusal`,
      * `truncated`, `schemaInvalid`).
      */

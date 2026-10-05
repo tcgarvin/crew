@@ -51,7 +51,8 @@ export interface NarratorCallDeps {
  * - `retryable`: a model or transport failure; retry with backoff, then the error panel.
  * - `fatal`: no point retrying (no narrator configured, a rejected request); the error panel.
  * - `budget`: the hourly call cap; wait it out in 30 s steps for a while, then the error panel.
- * - `spacing`: the min-tick spacing rule; acknowledge the hook with no answer, silently.
+ * - `spacing`: the min-tick spacing rule; acknowledge the hook with no answer, silently. The
+ *   server applies it only to hooks the sim raises again (`quietTooLong`, `notableEvent`).
  */
 export type NarratorFailureKind = "retryable" | "fatal" | "budget" | "spacing";
 

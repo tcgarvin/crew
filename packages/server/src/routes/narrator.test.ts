@@ -225,6 +225,39 @@ describe("narrator", () => {
     expect((await postOther(narratorBody(other.id, 500, "policyDecision"))).status).toBe(429);
   });
 
+  it("answers a captainAshore ask however soon after the last call, since it is never asked twice (D70)", async () => {
+    // Browser QA: delivered at Kessler Drift (t20003, a `notableEvent` the model answered), the
+    // captain stepped onto the dock 29 ticks later; the ask was refused as too soon, the client
+    // acknowledged it unanswered, and the sim (one ask per docking) never asked again.
+    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const post = (body: unknown) =>
+      sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, body);
+
+    expect((await post(narratorBody(game.id, 20_003, "notableEvent"))).status).toBe(200);
+    const ask = await post(narratorBody(game.id, 20_032, "captainAshore"));
+    expect(ask.status).toBe(200);
+    expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("captainAshore");
+    // It still spaces the story calls after it, which the sim raises again on its own.
+    const quiet = await post(narratorBody(game.id, 20_060));
+    expect(quiet.status).toBe(429);
+    expect((await readJson(quiet)).error).toMatchObject({ reason: "spacing" });
+
+    // The hourly cap still applies (D69: waited out, then the error panel, never unanswered).
+    const capped = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" });
+    const second = buildTestApp({ env: capped, runNarrator: echoNarrator });
+    const user = await mintUser(second.app);
+    const { game: other } = await createGame(second.app, user.token);
+    const postOther = (body: unknown) =>
+      sendJson(second.app, user.token, "POST", `/api/games/${other.id}/narrator`, body);
+    expect((await postOther(narratorBody(other.id, 0))).status).toBe(200);
+    const over = await postOther(narratorBody(other.id, 500, "captainAshore"));
+    expect(over.status).toBe(429);
+    expect((await readJson(over)).error).toMatchObject({ reason: "hourly" });
+  });
+
   it("marks the hourly cap and the spacing rule apart in the 429 body (D43)", async () => {
     const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "2" });
     const { app } = buildTestApp({ env, runNarrator: echoNarrator });
