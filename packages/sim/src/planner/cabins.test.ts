@@ -74,6 +74,7 @@ interface Stub {
   readonly machines?: readonly MachinePlacementView[];
   readonly backoff?: Record<string, number>;
   readonly reachable?: boolean;
+  readonly helmRole?: SelfView["watch"]["helmRole"];
 }
 
 function stubView(stub: Stub): AgentView {
@@ -98,7 +99,7 @@ function stubView(stub: Stub): AgentView {
       onWatch: false,
       nextOnWatch: false,
       dayworker: false,
-      helmRole: "none",
+      helmRole: stub.helmRole ?? "none",
       officerOfTheWatch: false,
     },
     thoughts: [],
@@ -181,5 +182,16 @@ describe("summonsCandidate (slice 4, call 15)", () => {
       ref: "privateTalk",
       reason: "unreachableTarget",
     });
+  });
+
+  it("is rejected atTheHelm for the helm's stander and oncoming, not for a relief (D77)", () => {
+    for (const helmRole of ["stander", "oncoming"] as const) {
+      expect(summonsCandidate(stubView({ summons: SUMMONED, helmRole }), config)).toEqual({
+        ref: "privateTalk",
+        reason: "atTheHelm",
+      });
+    }
+    const relief = stubView({ summons: SUMMONED, helmRole: "relief" });
+    expect(summonsCandidate(relief, config)).toMatchObject({ urgency: "essentialOperation" });
   });
 });

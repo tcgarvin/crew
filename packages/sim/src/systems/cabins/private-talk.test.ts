@@ -260,8 +260,15 @@ describe("privateTalk: a talk not held (slice 4, call 15)", () => {
  *   x 0123456789ABCD
  *   0 LLLMMMMMBNBKKK
  *   1 LLLMMMMMBBBBsH    the helm (13,1), its seat (12,1)
+ *
+ * With `cabin: "aft"` the cabin is the airlock's north row instead, reached through an opening
+ * south of (1,0), two steps from the gangway post (1,1) and the length of the ship from the helm:
+ *
+ *   x 0123456789ABCD
+ *   0 KKKMMMMMBNBBBB
+ *   1 LgLMMMMMBBBBsH    the gangway post (1,1)
  */
-function helmWorld(): TestWorld {
+function helmWorld(cabin: "overBridge" | "aft" = "overBridge"): TestWorld {
   const base = bridgeConfig();
   const config = {
     ...base,
@@ -271,9 +278,11 @@ function helmWorld(): TestWorld {
   const content = bridgeContent(config);
   const deck = content.decks[BRIDGE.deck];
   if (deck === undefined) throw new Error("bridge content lost its deck");
+  const aft = cabin === "aft";
+  const cabinRow = (row: string) => (aft ? `KKK${row.slice(3)}` : `${row.slice(0, 11)}KKK`);
   const cabinDeck = {
     ...deck,
-    tiles: deck.tiles.map((row, y) => (y === 0 ? `${row.slice(0, 11)}KKK` : row)),
+    tiles: deck.tiles.map((row, y) => (y === 0 ? cabinRow(row) : row)),
     compartments: [
       ...deck.compartments,
       {
@@ -283,7 +292,7 @@ function helmWorld(): TestWorld {
         tags: ["cabin", "captainsCabin"],
       },
     ],
-    openings: [...deck.openings, { x: 11, y: 0, side: "s" as const }],
+    openings: [...deck.openings, { x: aft ? 1 : 11, y: 0, side: "s" as const }],
   };
   const registry = createRegistry();
   registerSpatial(registry);
@@ -345,5 +354,52 @@ describe("privateTalk: the helm is not interrupted (slice 4, call 15)", () => {
     // The captain answered her own summons: she went to her cabin and waited there.
     const location = actorOf(world, MARA).location;
     expect(location.kind === "onDeck" && location.y < 1 && location.x >= 11).toBe(true);
+  });
+
+  it("a talk called as the departure opens the helm watch: the stander takes the helm, not the cabin", () => {
+    const tw = helmWorld("aft");
+    const { world, kernel } = tw;
+    const standingGangway = () => {
+      const activity = actorOf(world, NOOR).activity;
+      return activity.kind === "personal" && activity.activity === "standWatch";
+    };
+    // Docked with no course: Noor stands gangway watch, two steps from the cabin.
+    runTicks(tw, seconds(world, 30), standingGangway);
+    expect(standingGangway()).toBe(true);
+    kernel.enqueueCommand(
+      world,
+      cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
+    );
+    runTicks(tw, 1);
+    const travel = world.state.travel;
+    if (travel.stage !== "docked") throw new Error("not docked");
+    // The course is plotted and the talk called on one tick: the helm watch opens with Noor its
+    // stander as the summons reaches her, and both are essential.
+    travel.coursePlotted = true;
+    expect(callIn(tw, NOOR, "warm").status).toBe("accepted");
+    const atHelm = () => whoHasTheHelm(world.state, world.content);
+    let tookHelm: number | undefined;
+    let left = false;
+    let wentToTalk = false;
+    const events = runTicks(
+      tw,
+      seconds(world, 125),
+      (so) => ofType(so, "privateTalkMissed").length > 0,
+      () => {
+        const activity = actorOf(world, NOOR).activity;
+        if (activity.kind === "personal" && activity.activity === "privateTalk") wentToTalk = true;
+        if (atHelm() === NOOR) tookHelm ??= world.state.tick;
+        else if (tookHelm !== undefined) left = true;
+      },
+    );
+    expect(wentToTalk).toBe(false);
+    expect(tookHelm).toBeDefined();
+    expect(left).toBe(false);
+    expect(ofType(events, "privateTalkHeld")).toHaveLength(0);
+    expect(ofType(events, "privateTalkMissed")[0]?.payload).toEqual({
+      captainId: MARA,
+      actorId: NOOR,
+    });
+    expect(world.state.travel.stage).not.toBe("docked");
   });
 });
