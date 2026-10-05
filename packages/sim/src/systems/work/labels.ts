@@ -128,6 +128,28 @@ function mopLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
   return `mopping the ${compartmentName(ctx, task.target.compartmentId)}`;
 }
 
+/**
+ * D82: a mopper's step between tiles of the room they are mopping reads as mopping it, not
+ * "walking to the cargo hold" from inside the hold.
+ */
+function mopWalkWithin(
+  ctx: LabelCtx,
+  actor: DeepReadonly<Actor>,
+  task: DeepReadonly<Task> | undefined,
+  target: StepTarget,
+): boolean {
+  if (task?.type !== "cleanCompartment" || task.target.kind !== "compartment") return false;
+  const location = actor.location;
+  if (location.kind !== "onDeck" || "machineId" in target) return false;
+  const geometry = ctx.caches.nav.decks[location.deckId];
+  if (geometry === undefined) return false;
+  const room = task.target.compartmentId;
+  return (
+    compartmentAt(geometry, location.x, location.y) === room &&
+    compartmentAt(geometry, target.x + 0.5, target.y + 0.5) === room
+  );
+}
+
 /** Is `task` a watch at the helm (a `staffStation` on a `pilotStation` machine)? */
 function isHelmTask(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): boolean {
   if (task?.type !== "staffStation" || task.target.kind !== "machine") return false;
@@ -172,7 +194,9 @@ function taskStepLabel(
   }
   switch (step.kind) {
     case "moveTo":
-      return isHelmTask(ctx, task) ? "going to the helm" : placeLabel(ctx, actor, step.target);
+      if (isHelmTask(ctx, task)) return "going to the helm";
+      if (mopWalkWithin(ctx, actor, task, step.target)) return mopLabel(ctx, task);
+      return placeLabel(ctx, actor, step.target);
     case "pickUp":
       if (task?.type === "cookMeal") return "fetching provisions";
       if (task?.type === "cleanCompartment") return "fetching the mop";
