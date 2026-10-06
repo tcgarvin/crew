@@ -22,7 +22,9 @@
  *   rivalry streaks, solo activities started (by kind), and the ticker's notable-or-better lines
  *   per watch, all and the off-watch family's; per person, the share of time recreating, the days they recreated and the
  *   longest stretch bored (recreation above `seekThreshold`, and above `RECREATION_HIGH`); at the
- *   end, the affinity extremes and every rivalry.
+ *   end, the affinity extremes and every rivalry;
+ * - machine wear (D90): each wearing machine's condition at the end of each ship's day, the
+ *   lowest it fell to, and how often it was serviced.
  *
  * Unlike `crew pacing` there is no wall clock: the sim simply advances, so the numbers are sim
  * time and independent of playback speed. An event at tick T happened in the step ending at T,
@@ -36,6 +38,7 @@ import {
   type ContentBundle,
   type EventType,
   type Kernel,
+  type MachineId,
   type NarratorHook,
   OFF_WATCH_EVENT_TYPES,
   type SimEvent,
@@ -741,6 +744,63 @@ export interface BeatsResult extends BeatsTallyResult {
   readonly rivalries: readonly string[];
   /** D88: the spread of directed affinities between crew at the end of each ship's day. */
   readonly affinityByDay: readonly AffinitySpread[];
+  /** D90: every machine that wears, in deck order. */
+  readonly machineWear: readonly MachineWear[];
+}
+
+/** D90: how a wearing machine held up over the run. */
+export interface MachineWear {
+  readonly name: string;
+  /** Condition at the end of each ship's day. */
+  readonly byDay: readonly number[];
+  /** The lowest condition sampled. */
+  readonly lowest: number;
+  /** Maintenance services completed (`maintenanceDue` resolved). */
+  readonly services: number;
+}
+
+/** D90: wear tracking over a run, sampled with everything else. */
+class WearTally {
+  private readonly machines: { id: MachineId; name: string; byDay: number[]; lowest: number }[];
+  private readonly services = new Map<string, number>();
+
+  constructor(world: World) {
+    this.machines = Object.values(world.state.machines).flatMap((machine) => {
+      const def = world.content.machines[machine.defId];
+      if (def === undefined || def.failure.wearPerSecond <= 0) return [];
+      return [{ id: machine.id, name: def.name, byDay: [], lowest: machine.condition }];
+    });
+  }
+
+  sample(world: World): void {
+    for (const m of this.machines) {
+      const condition = world.state.machines[m.id]?.condition ?? 0;
+      m.lowest = Math.min(m.lowest, condition);
+    }
+  }
+
+  endOfDay(world: World): void {
+    for (const m of this.machines) m.byDay.push(world.state.machines[m.id]?.condition ?? 0);
+  }
+
+  events(events: readonly SimEvent[], world: World): void {
+    for (const event of events) {
+      if (event.type !== "problemResolved") continue;
+      const problem = world.state.work.problems[event.payload.problemId];
+      if (problem?.kind !== "maintenanceDue") continue;
+      const id = problem.payload.machineId;
+      this.services.set(id, (this.services.get(id) ?? 0) + 1);
+    }
+  }
+
+  result(): MachineWear[] {
+    return this.machines.map((m) => ({
+      name: m.name,
+      byDay: m.byDay,
+      lowest: m.lowest,
+      services: this.services.get(m.id) ?? 0,
+    }));
+  }
 }
 
 /** D88: one day's directed crew affinities: the extremes and how many pairs stand out. */
@@ -909,12 +969,15 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
   let stuckAdvances = 0;
   const ticksPerDay = dayTicks(values, 1);
   const affinityByDay: AffinitySpread[] = [];
+  const wear = new WearTally(world);
 
   while (world.state.tick < endTick) {
     const before = world.state.tick;
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
     tally.events(result.events);
+    wear.events(result.events, world);
+    wear.sample(world);
     tally.tickerLines(tickerSamples(world));
     if (advanced > 0) {
       stuckAdvances = 0;
@@ -939,6 +1002,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     }
     if (world.state.tick >= (affinityByDay.length + 1) * ticksPerDay) {
       affinityByDay.push(affinitySpread(world, affinityByDay.length + 1));
+      wear.endOfDay(world);
     }
     script.step(world, result.events);
     if (script.done) {
@@ -978,6 +1042,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     affinityExtremes: affinityExtremes(world),
     rivalries: rivalriesAtEnd(world),
     affinityByDay,
+    machineWear: wear.result(),
   };
 }
 
@@ -1091,7 +1156,7 @@ function scenarioSection(r: BeatsResult): string[] {
       `| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} | ${p.daysRecreated}/${r.days} | ${fmt(p.longestBoredSeconds, 0)} | ${fmt(p.longestVeryBoredSeconds, 0)} | ${sleeps} |`,
     );
   }
-  lines.push(...offWatchLines(r));
+  lines.push(...offWatchLines(r), ...wearLines(r));
   const other = Object.entries(r.otherLabels);
   if (other.length > 0) {
     lines.push(
@@ -1100,6 +1165,21 @@ function scenarioSection(r: BeatsResult): string[] {
     );
   }
   return lines;
+}
+
+/** D90: each wearing machine's condition by day, its lowest and its services. */
+function wearLines(r: BeatsResult): string[] {
+  const days = r.machineWear[0]?.byDay.length ?? 0;
+  const dayCols = Array.from({ length: days }, (_, i) => `Day ${i + 1}`);
+  return [
+    "",
+    `| Machine | ${dayCols.join(" | ")} | Lowest | Services |`,
+    `|---|${dayCols.map(() => "---").join("|")}|---|---|`,
+    ...r.machineWear.map(
+      (m) =>
+        `| ${m.name} | ${m.byDay.map((c) => pct(c)).join(" | ")} | ${pct(m.lowest)} | ${m.services} |`,
+    ),
+  ];
 }
 
 /** D84-D85: sessions by activity, then the affinity extremes and the rivalries at the end. */

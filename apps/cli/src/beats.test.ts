@@ -430,4 +430,17 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     // Every started session ends in the off-watch family's lines (call 18).
     expect(result.beats.offWatchLines.total).toBeGreaterThanOrEqual(1);
   }, 90_000);
+
+  it("reports each wearing machine's condition by day, its lowest and its services (D90)", () => {
+    const result = oneDay();
+    const names = result.machineWear.map((m) => m.name);
+    expect(names).toContain("Coolant Pump");
+    expect(names).toContain("Life Support Unit");
+    expect(names).not.toContain("Bunk");
+    for (const machine of result.machineWear) {
+      expect(machine.byDay).toHaveLength(1);
+      expect(machine.lowest).toBeLessThanOrEqual(machine.byDay[0] ?? 1);
+    }
+    expect(formatBeatsReport([result])).toContain("| Machine | Day 1 | Lowest | Services |");
+  }, 90_000);
 });

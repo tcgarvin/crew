@@ -21,8 +21,8 @@ import {
  * - `mealToCook`, `mealToCarry` (D81) → routineObligation (who may take them is `galley.ts`'s);
  * - `compartmentDirty` (D82) → the owner's base urgency (routine, essential for a filthy galley or
  *   infirmary; who may take it is `cleaning.ts`'s);
- * - `cargoToLoad`/`cargoToUnload`, symptom inspection (`machineSymptom`) and `maintenanceDue`
- *   → routineObligation;
+ * - `cargoToLoad`/`cargoToUnload` and symptom inspection (`machineSymptom`) → routineObligation;
+ * - `maintenanceDue` (D90) → the owner's base urgency (routine, essential once badly worn);
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
  * - rest/socialize → the need's urgency as above, `voluntaryActivity` below the seek threshold
@@ -150,6 +150,8 @@ export function taskUrgency(
     case "machineSymptom":
       return higher("routineObligation", heatUrgency(view, problem.payload.machineId, config));
     case "maintenanceDue":
+      // D90: routine, essential once the machine is badly worn; equipment says which.
+      return problem.baseUrgency;
     case "cargoToLoad":
     case "cargoToUnload":
       return "routineObligation";

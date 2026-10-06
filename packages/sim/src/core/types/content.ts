@@ -1180,6 +1180,12 @@ export interface ConfigDef {
     /** Condition below which a `maintenanceDue` problem is raised regardless of interval. */
     readonly maintenanceConditionBelow: number;
     /**
+     * D90: condition below which the `maintenanceDue` problem is essential rather than routine,
+     * so the watch's engineer services a machine before it wears out instead of after the
+     * nearer chores. Below `maintenanceConditionBelow`.
+     */
+    readonly maintenanceEssentialBelow: number;
+    /**
      * D35: integrity below this derates output linearly (factor 1 here, 0 at
      * `integrityInoperableBelow`). Above it integrity does not affect output.
      */

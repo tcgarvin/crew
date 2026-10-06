@@ -413,21 +413,32 @@ function updateHazard(ctx: StepCtx, machine: Machine, def: MachineDef, dtSeconds
   machine.failure.threshold = -Math.log(1 - ctx.rng.float("failures"));
 }
 
+/**
+ * D90: maintenance is due below `maintenanceConditionBelow` (routine) and pressing below
+ * `maintenanceEssentialBelow` (essential); an open problem is raised to essential as the machine
+ * wears on, never lowered, since only the service itself resolves it.
+ */
 function updateMaintenanceDue(ctx: StepCtx, machine: Machine, def: MachineDef): void {
   if (def.maintenance === undefined) return;
   const dedupeKey = `maintenanceDue:${machine.id}`;
-  const event =
-    machine.condition < ctx.config.equipment.maintenanceConditionBelow
-      ? raiseProblem(ctx.state, ctx.tick, {
-          kind: "maintenanceDue",
-          payload: { machineId: machine.id },
-          dedupeKey,
-          visibility: "public",
-          baseUrgency: "routineObligation",
-          location: { kind: "machine", machineId: machine.id },
-        }).event
-      : resolveProblem(ctx.state, dedupeKey);
-  if (event !== undefined) ctx.emit(event);
+  const { maintenanceConditionBelow, maintenanceEssentialBelow } = ctx.config.equipment;
+  if (machine.condition >= maintenanceConditionBelow) {
+    const event = resolveProblem(ctx.state, dedupeKey);
+    if (event !== undefined) ctx.emit(event);
+    return;
+  }
+  const pressing = machine.condition < maintenanceEssentialBelow;
+  const raised = raiseProblem(ctx.state, ctx.tick, {
+    kind: "maintenanceDue",
+    payload: { machineId: machine.id },
+    dedupeKey,
+    visibility: "public",
+    baseUrgency: pressing ? "essentialOperation" : "routineObligation",
+    location: { kind: "machine", machineId: machine.id },
+  });
+  if (raised.event !== undefined) ctx.emit(raised.event);
+  const problem = ctx.state.work.problems[raised.problemId];
+  if (pressing && problem !== undefined) problem.baseUrgency = "essentialOperation";
 }
 
 function tickMachine(

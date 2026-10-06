@@ -44,5 +44,21 @@
     "wearPerSecond": 0.0003
   },
   "faults": [],
-  "components": []
+  "components": [],
+  "maintenance": {
+    "intervalSeconds": 600,
+    "inspect": {
+      "key": "routine_inspect",
+      "action": "inspect",
+      "workSeconds": 10,
+      "tools": ["multimeter"],
+      "consumes": [],
+      "at": "repair",
+      "skill": {
+        "skill": "electrical",
+        "min": 1
+      }
+    },
+    "conditionRestored": 1
+  }
 }

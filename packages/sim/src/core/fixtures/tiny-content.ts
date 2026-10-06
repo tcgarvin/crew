@@ -124,6 +124,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       hazardScale: 1,
       overheatDamagePerSecond: 0.01,
       maintenanceConditionBelow: 0.3,
+      maintenanceEssentialBelow: 0.15,
       integrityDerateBelow: 0.5,
       integrityInoperableBelow: 0.15,
     },

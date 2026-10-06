@@ -187,6 +187,27 @@ describe("maintenance", () => {
       "resolved",
     );
   });
+
+  it("raises the open problem to essential once condition falls below the essential threshold (D90)", () => {
+    const { kernel, world } = w5TestWorld({
+      overrides: { engineFailure: { baseHazardPerSecond: 0, heatFactor: 1, wearPerSecond: 0 } },
+    });
+    const { maintenanceConditionBelow, maintenanceEssentialBelow } = world.config.values.equipment;
+    const engine = byDef(world, W5.engine);
+    const due = () =>
+      Object.values(world.state.work.problems).find(
+        (p) =>
+          p.kind === "maintenanceDue" && p.payload.machineId === engine.id && p.status === "open",
+      );
+    engine.condition = (maintenanceConditionBelow + maintenanceEssentialBelow) / 2;
+    kernel.advance(world, 1);
+    expect(due()?.baseUrgency).toBe("routineObligation");
+    const id = due()?.id;
+    engine.condition = maintenanceEssentialBelow / 2;
+    kernel.advance(world, 1);
+    expect(due()?.id).toBe(id);
+    expect(due()?.baseUrgency).toBe("essentialOperation");
+  });
 });
 
 describe("integrity (D35)", () => {
