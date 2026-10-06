@@ -8,6 +8,7 @@ import { selectIntent } from "./select";
 export { compareCandidates, selectIntent } from "./select";
 export { enumerateCandidates, needUrgency, taskUrgency } from "./candidates";
 export type { Candidate, CandidateSet, Rejection } from "./candidates";
+export { type Weighing, weighOptions } from "./weigh";
 
 /** The V1 planner. */
 export const defaultPlanner: Planner = selectIntent;

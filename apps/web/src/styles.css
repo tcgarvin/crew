@@ -503,6 +503,45 @@ body {
   color: var(--text-dim);
 }
 
+/* D90: what someone is weighing, best first; their current and next choice stand out. */
+.weighing-verdict {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.inspector-weighing {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  font-size: 13px;
+}
+.inspector-weighing li {
+  color: var(--text-dim);
+}
+.inspector-weighing li.weighing-marked {
+  color: inherit;
+}
+.weighing-seconds,
+.weighing-mark {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.inspector-tag.urgency-immediateSurvival,
+.inspector-tag.urgency-containment {
+  color: #e8846f;
+  border-color: #e8846f;
+}
+.inspector-tag.urgency-essentialOperation {
+  color: #f2c787;
+  border-color: #f2c787;
+}
+.inspector-ruled-out {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.inspector-ruled-out summary {
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
   .inspector-backdrop {
     align-items: flex-end;

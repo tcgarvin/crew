@@ -5,10 +5,20 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DeckDef } from "../core/types/content";
-import type { ActorId, DeckDefId, ItemDefId, ItemId } from "../core/types/ids";
+import type {
+  ActorId,
+  DeckDefId,
+  ItemDefId,
+  ItemId,
+  MachineId,
+  ProblemId,
+  TaskId,
+} from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
-import type { AgentView, KnownItemView, SelfView } from "../core/types/view";
+import type { AgentView, KnownItemView, ProblemView, SelfView, TaskView } from "../core/types/view";
+import type { UrgencyClass } from "../core/types/work";
 import { selectIntent } from "./select";
+import { weighOptions } from "./weigh";
 
 const ME = "a1" as ActorId;
 const DECK = "deck.stub" as DeckDefId;
@@ -128,7 +138,14 @@ const config: PlannerConfig = {
   },
 };
 
-function stubView(hunger: number, items: KnownItemView[]): AgentView {
+interface StubWork {
+  readonly activity?: SelfView["activity"];
+  readonly onDuty?: boolean;
+  readonly problems?: readonly ProblemView[];
+  readonly tasks?: readonly TaskView[];
+}
+
+function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): AgentView {
   const self: SelfView = {
     id: ME,
     name: "Stub",
@@ -140,9 +157,9 @@ function stubView(hunger: number, items: KnownItemView[]): AgentView {
     mood: 0,
     location: { kind: "onDeck", deckId: DECK, x: 0.5, y: 0.5 },
     tile: { x: 0, y: 0 },
-    activity: { kind: "idle" },
+    activity: work.activity ?? { kind: "idle" },
     inventory: [],
-    onDuty: true,
+    onDuty: work.onDuty ?? true,
     watch: {
       onWatch: false,
       nextOnWatch: false,
@@ -170,8 +187,8 @@ function stubView(hunger: number, items: KnownItemView[]): AgentView {
     },
     fact: () => undefined,
     facts: () => [],
-    knownProblems: () => [],
-    knownTasks: () => [],
+    knownProblems: () => work.problems ?? [],
+    knownTasks: () => work.tasks ?? [],
     roster: () => [],
     assignedBeds: () => [],
     sessions: () => [],
@@ -212,5 +229,99 @@ describe("planner boundary", () => {
     expect(selectIntent(stubView(0.6, [{ ...ration, absent: true }]), config)).toEqual({
       kind: "idle",
     });
+  });
+});
+
+const PUMP = "m1" as MachineId;
+
+/** A machine's `maintenanceDue` (D90) at `urgency`, and its service task two tiles away. */
+function service(urgency: UrgencyClass): { problems: ProblemView[]; tasks: TaskView[] } {
+  const problem = {
+    id: "p1" as ProblemId,
+    kind: "maintenanceDue",
+    payload: { machineId: PUMP },
+    owner: "equipment",
+    visibility: "public",
+    dedupeKey: "maintenanceDue:m1",
+    status: "open",
+    createdTick: 0,
+    revision: 0,
+    baseUrgency: urgency,
+    location: { kind: "machine", machineId: PUMP },
+  } as ProblemView;
+  const task = {
+    id: "t1" as TaskId,
+    problemId: problem.id,
+    derivationKey: "maintain",
+    type: "inspect",
+    target: { kind: "machine", machineId: PUMP },
+    createdTick: 0,
+    revision: 0,
+    status: "pending",
+    baseUrgency: urgency,
+    requiredSkills: [],
+    requiredTools: [],
+    consumables: [],
+    workerSlots: 1,
+    interactionTiles: [{ x: 2, y: 0 }],
+    dependencyIds: [],
+    progressRef: { kind: "maintenance", machineId: PUMP },
+    completion: { kind: "problemResolved" },
+    estimatedWorkSeconds: 10,
+  } as TaskView;
+  return { problems: [problem], tasks: [task] };
+}
+
+/** A game of cards begun off watch, long enough ago that the switch cooldown has passed. */
+const cards: SelfView["activity"] = {
+  kind: "personal",
+  activity: "recreate",
+  urgency: "routineObligation",
+  action: { kind: "idle" },
+  sinceTick: 0,
+} as unknown as SelfView["activity"];
+
+describe("maintenance and the watch (D90)", () => {
+  it("rates a service by its problem: routine, or essential once the machine is badly worn", () => {
+    expect(selectIntent(stubView(0, [], service("routineObligation")), config)).toMatchObject({
+      kind: "task",
+      taskId: "t1",
+      urgency: "routineObligation",
+    });
+    expect(selectIntent(stubView(0, [], service("essentialOperation")), config)).toMatchObject({
+      kind: "task",
+      urgency: "essentialOperation",
+    });
+  });
+
+  it("lets a game run on for routine work, and ends it for a badly worn machine", () => {
+    // Ending games for routine work at the bell doubled abandoned games in `crew beats` and kept
+    // no machine in better repair, so only the essential service interrupts.
+    const routine = stubView(0, [], { ...service("routineObligation"), activity: cards });
+    expect(selectIntent(routine, config)).toEqual({ kind: "continue" });
+    const pressing = stubView(0, [], { ...service("essentialOperation"), activity: cards });
+    expect(selectIntent(pressing, config)).toMatchObject({ kind: "task", taskId: "t1" });
+  });
+
+  it("keeps a game off watch, where the routine service is not theirs", () => {
+    const offWatch = stubView(0, [], {
+      ...service("routineObligation"),
+      activity: cards,
+      onDuty: false,
+    });
+    expect(selectIntent(offWatch, config)).toEqual({ kind: "continue" });
+    expect(weighOptions(offWatch, config).rejected).toContainEqual({
+      ref: "task:t1",
+      reason: "offDuty",
+    });
+  });
+
+  it("weighs the same ranking the selector acts on", () => {
+    const view = stubView(0.6, [ration], service("routineObligation"));
+    const weighing = weighOptions(view, config);
+    expect(weighing.intent).toEqual(selectIntent(view, config));
+    // Both routine: the service (a short walk and ten seconds) is quicker than the ration.
+    expect(weighing.ranked.map((c) => c.ref)).toEqual(["task:t1", "eat:i1"]);
+    expect(weighing.intent).toMatchObject({ kind: "task", taskId: "t1" });
   });
 });

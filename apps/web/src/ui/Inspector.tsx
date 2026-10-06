@@ -1,4 +1,4 @@
-import type { AgentViewSnapshot, Machine } from "@crew/sim";
+import type { AgentViewSnapshot, Machine, UrgencyClass, WeighingWords } from "@crew/sim";
 import {
   type PersonWords,
   actorSubtitle,
@@ -16,6 +16,8 @@ export type InspectorData =
       readonly label?: string;
       /** D77/D79: their watch, mood and thoughts in words (`personWords`). */
       readonly person: PersonWords;
+      /** D90: what they are weighing and what they will do next. */
+      readonly weighing: WeighingWords;
     }
   | {
       readonly kind: "machine";
@@ -74,7 +76,12 @@ export function Inspector({ data, onClose }: InspectorProps) {
         </button>
         {data.kind === "loading" && <p>Loading…</p>}
         {data.kind === "actor" && (
-          <ActorInspector view={data.view} label={data.label} person={data.person} />
+          <ActorInspector
+            view={data.view}
+            label={data.label}
+            person={data.person}
+            weighing={data.weighing}
+          />
         )}
         {data.kind === "machine" && (
           <MachineInspector machine={data.machine} name={data.name} gathering={data.gathering} />
@@ -91,10 +98,12 @@ function ActorInspector({
   view,
   label,
   person,
+  weighing,
 }: {
   view: AgentViewSnapshot;
   label?: string | undefined;
   person: PersonWords;
+  weighing: WeighingWords;
 }) {
   const self = view.self;
   // Passengers stand no watch (passengers §3.2): the bill and the helm are the crew's.
@@ -159,6 +168,7 @@ function ActorInspector({
           </>
         )}
       </dl>
+      {crew && <WeighingSection weighing={weighing} />}
       <h3>Known problems</h3>
       {view.problems.length === 0 && <p className="inspector-empty">None known.</p>}
       <ul>
@@ -180,6 +190,57 @@ function ActorInspector({
         ))}
       </ul>
     </div>
+  );
+}
+
+/** D90: urgency classes in the inspector's words, most pressing first. */
+const URGENCY_WORDS: Readonly<Record<UrgencyClass, string>> = {
+  immediateSurvival: "emergency",
+  containment: "urgent",
+  essentialOperation: "essential",
+  routineObligation: "routine",
+  voluntaryActivity: "if nothing else",
+};
+
+/**
+ * D90: the options the planner is weighing, best first. It takes the most pressing class, then
+ * the quickest within it; a current activity is kept against anything of the same class or lower.
+ */
+function WeighingSection({ weighing }: { weighing: WeighingWords }) {
+  return (
+    <>
+      <h3>Weighing</h3>
+      <p className="weighing-verdict">{weighing.verdict}</p>
+      {weighing.options.length === 0 ? (
+        <p className="inspector-empty">Nothing else in view.</p>
+      ) : (
+        <ol className="inspector-weighing">
+          {weighing.options.map((option, i) => (
+            <li key={`${i}:${option.text}`} className={option.mark ? "weighing-marked" : undefined}>
+              {option.text}{" "}
+              <span className={`inspector-tag urgency-${option.urgency}`}>
+                {URGENCY_WORDS[option.urgency]}
+              </span>{" "}
+              <span className="weighing-seconds">~{option.seconds}s</span>
+              {option.mark === "doing" && <span className="weighing-mark"> · doing</span>}
+              {option.mark === "next" && <span className="weighing-mark"> · next</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+      {weighing.ruledOut.length > 0 && (
+        <details className="inspector-ruled-out">
+          <summary>Ruled out ({weighing.ruledOut.length})</summary>
+          <ul>
+            {weighing.ruledOut.map((r, i) => (
+              <li key={`${i}:${r.text}`}>
+                {r.text}: <span className="inspector-empty">{r.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }
 

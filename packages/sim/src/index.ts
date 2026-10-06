@@ -47,5 +47,11 @@ export {
 export { equipmentStages, registerWork } from "./systems/work/index";
 export { workViolations } from "./systems/work/invariants";
 export { cleaningRolesFor } from "./planner/cleaning";
-export { registerPlannerDefaults } from "./planner/index";
+export {
+  type Candidate,
+  type Rejection,
+  type Weighing,
+  registerPlannerDefaults,
+  weighOptions,
+} from "./planner/index";
 export { toAgentViewSnapshot } from "./view/index";

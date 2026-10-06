@@ -22,6 +22,26 @@ import type { ActorId, ScenarioDefId } from "./ids";
 import type { SaveEnvelope } from "./save";
 import type { WorldState } from "./state";
 import type { AgentViewSnapshot, DirtFrame, RenderFrame } from "./view";
+import type { UrgencyClass } from "./work";
+
+/** D90: one option an actor is weighing, in words, for the inspector. */
+export interface WeighedOptionWords {
+  readonly text: string;
+  readonly urgency: UrgencyClass;
+  /** Walk, tool fetch and work, whole seconds. */
+  readonly seconds: number;
+  /** What they are doing now; what the selector picks next. */
+  readonly mark?: "doing" | "next";
+}
+
+/** D90: what an actor is weighing (`weighOptions`), worded by the host. */
+export interface WeighingWords {
+  /** One line: what they will do and why, e.g. "keeps playing cards: nothing outranks it". */
+  readonly verdict: string;
+  /** Best first. */
+  readonly options: readonly WeighedOptionWords[];
+  readonly ruledOut: readonly { readonly text: string; readonly reason: string }[];
+}
 
 /**
  * What to load. W0 decision: the worker imports the static content bundle itself, so `load`
@@ -77,6 +97,8 @@ export type FromWorker =
       readonly actorId: ActorId;
       readonly tick: Tick;
       readonly view: AgentViewSnapshot;
+      /** D90: what they are weighing and what they will do next. */
+      readonly weighing: WeighingWords;
     }
   | {
       readonly type: "runAheadStatus";

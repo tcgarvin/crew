@@ -162,7 +162,10 @@ function makeFakeClock(): { clock: HostClock; advance: (ms: number) => void } {
 
 const CONFIG: EffectiveConfig = { values: { time: { tickRate: 20 } } as never, hash: "test" };
 
-type HostOptions = Omit<HostDeps, "kernel" | "content" | "config" | "postMessage" | "clock">;
+type HostOptions = Omit<
+  HostDeps,
+  "kernel" | "content" | "config" | "postMessage" | "clock" | "weigh"
+>;
 
 /**
  * A host on `kernel` with a fake clock and a 50 ms loop, a scenario already loaded, and every
@@ -176,6 +179,7 @@ function startHost(kernel: Kernel, options: HostOptions) {
     content: {} as ContentBundle,
     config: CONFIG,
     postMessage: (m) => messages.push(m),
+    weigh: () => ({ verdict: "nothing to do", options: [], ruledOut: [] }),
     clock,
     loopIntervalMs: 50,
     ...options,

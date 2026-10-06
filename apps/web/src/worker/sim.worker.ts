@@ -10,6 +10,7 @@ import { createKernel } from "@crew/sim";
 import { loadWebContent } from "./content";
 import { createHost } from "./host";
 import { createFullRegistry } from "./registry";
+import { weighAgent } from "./weighing";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -22,6 +23,7 @@ const host = createHost({
   config,
   dirtFrameEverySeconds: config.values.host.dirtFrameEverySeconds,
   postMessage: (message) => self.postMessage(message),
+  weigh: weighAgent,
 });
 
 self.onmessage = (event: MessageEvent<ToWorker>) => {
