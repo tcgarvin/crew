@@ -9,6 +9,7 @@ import type {
   ActorId,
   CompartmentId,
   MachineId,
+  MemoryKey,
   SaveEnvelope,
   SessionId,
   ThoughtKey,
@@ -227,15 +228,19 @@ describe("the crew line's off-watch clauses (D87)", () => {
     const state = snap.state;
     const jax = actorNamed(state, "Jax Okonkwo").id;
     const id = (name: string) => actorNamed(state, name).id;
+    // D88: compatibility from the authored crew (Jax with Noor and Tomas +1, Dane −2, Priya 0),
+    // plus the memories each side holds.
+    const remembers = (...keys: MemoryKey[]) => ({
+      memories: keys.map((key) => ({ key, expiresAtTick: state.tick + 1000 })),
+    });
     state.social.relationships[jax] = {
-      [id("Tomas Ruiz")]: { affinity: 4 },
-      [id("Noor Haddad")]: { affinity: 6 },
-      [id("Dane Whitcross")]: { affinity: 3 },
-      [id("Bettina Solheim")]: { affinity: 2 },
-      [id("Priya Kessler")]: { affinity: -3 },
+      [id("Tomas Ruiz")]: remembers("goodTalk", "chatted"),
+      [id("Noor Haddad")]: remembers("goodTalk", "heardMeOut"),
+      [id("Dane Whitcross")]: remembers("goodTalk", "chatted", "chatted", "goodTime"),
+      [id("Priya Kessler")]: remembers("argued", "rubbedWrong"),
     };
     // Priya's side does not show on Jax's line.
-    state.social.relationships[id("Priya Kessler")] = { [jax]: { affinity: 9 } };
+    state.social.relationships[id("Priya Kessler")] = { [jax]: remembers("goodTalk", "chatted") };
     const text = digest(snap);
     expect(crewLine(text, "Jax Okonkwo")).toContain(
       "; dislikes: reading; close to: Noor Haddad, Tomas Ruiz; at odds with: Priya Kessler; berth: bunkroom.",

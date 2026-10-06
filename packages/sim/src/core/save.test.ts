@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cmd, tinyTestWorld } from "./fixtures/test-world";
 import { TINY, tinyConfig, tinyContent, tinyEffectiveConfig } from "./fixtures/tiny-content";
 import { createKernel } from "./kernel";
+import { migrations } from "./migrations";
 import { createRegistry } from "./registry";
 import { SaveCompatibilityError, migrateState, restore, serialize } from "./save";
 import type { ContentBundle } from "./types/content";
@@ -391,6 +392,56 @@ describe("serialize / restore", () => {
     expect(restored.warnings.some((w) => /predates off watch/.test(w))).toBe(true);
     kernel.advance(restored, 20);
     expect(restored.state.tick).toBe(60);
+  });
+
+  it("migrates a schema-10 save to 11: affinities dropped for memories, chat times kept (D88)", () => {
+    const raw = {
+      social: {
+        relationships: {
+          a1: { a2: { affinity: 7, lastChatTick: 3 } },
+          a2: { a1: { affinity: -2 } },
+        },
+      },
+    };
+    const migrate = migrations[10];
+    if (migrate === undefined) throw new Error("no 10 → 11 migration");
+    expect(migrate(raw, { content: tinyContent(tinyConfig()), config: tinyConfig() })).toEqual({
+      social: {
+        relationships: {
+          a1: { a2: { memories: [], lastChatTick: 3 } },
+          a2: { a1: { memories: [] } },
+        },
+      },
+    });
+  });
+
+  it("restores a schema-10 save's config with the memory table from content (D88)", () => {
+    const { world, kernel, registry } = tinyTestWorld();
+    kernel.advance(world, 20);
+    const envelope = serialize(world);
+    const raw = { ...envelope.state, schemaVersion: 10 };
+    // Schema 10's config: the chat moved affinity itself, and there was no memory table.
+    const {
+      chatMemoryEveryDays: _every,
+      chatSour: _sour,
+      compatibility: _compatibility,
+      memories: _memories,
+      ...social
+    } = envelope.config.social;
+    const old = {
+      ...envelope,
+      schemaVersion: 10,
+      state: raw,
+      config: { ...envelope.config, social: { ...social, chatAffinity: 1 } },
+    } as unknown as typeof envelope;
+    const restored = restore(old, world.content, registry);
+    expect(restored.state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(restored.config.values.social.memories).toEqual(world.content.config.social.memories);
+    expect(restored.config.values.social.compatibility).toEqual(
+      world.content.config.social.compatibility,
+    );
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(40);
   });
 
   it("restores a save whose config has the pre-D76 seconds names: new names from content, old ones unread", () => {

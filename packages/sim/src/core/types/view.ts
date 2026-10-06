@@ -125,8 +125,8 @@ export interface SelfView {
   /** Slice 4: where they stand on the value axes (`Actor.values`). */
   readonly values: Readonly<Values>;
   /**
-   * Slice 4: what they feel about others (`social.relationships[self]`), by actor; absent = 0.
-   * Nobody reads the other direction.
+   * Slice 4: what they feel about every other actor (D88: `affinityOf`, compatibility plus
+   * their memories), by actor. Nobody reads the other direction.
    */
   readonly affinity: Readonly<Record<ActorId, number>>;
   /**

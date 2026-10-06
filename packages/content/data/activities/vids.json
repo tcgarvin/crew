@@ -23,9 +23,7 @@
     "joined": "goodCompany"
   },
   "topics": ["topic.the_vid"],
-  "affinity": {
-    "participants": 1,
-    "winnerToLoser": 0,
-    "loserToWinner": 0
+  "memories": {
+    "together": "goodTime"
   }
 }

@@ -7,7 +7,8 @@
  * - `rivalries:` under "Ship": tallies from `social.rivalries` with three games or more, or a
  *   run of two or more, names in the key's order;
  * - the crew line's off-watch clauses after `good at`: likes and dislikes, who they are close to
- *   and at odds with (`social.relationships`, their own side), and their berth;
+ *   and at odds with (`affinitiesFrom`: compatibility and their own memories, D88), and their
+ *   berth;
  * - a thought label's `{ref}` filled with the name of the thought's `refId`.
  */
 import {
@@ -17,6 +18,7 @@ import {
   type InterestTag,
   type Thought,
   actionLabel,
+  affinitiesFrom,
 } from "@crew/sim";
 import { type State, placePhrase } from "./lookups";
 
@@ -167,11 +169,11 @@ function interestsClause(actor: Actor): string {
 }
 
 /** "close to: Jax Okonkwo; at odds with: Priya Kessler", from the actor's own side; "" for none. */
-function relationsClause(state: State, actor: Actor): string {
-  const felt = Object.entries(state.social.relationships[actor.id] ?? {})
-    .flatMap(([id, r]) => {
+function relationsClause(state: State, content: ContentBundle, actor: Actor): string {
+  const felt = Object.entries(affinitiesFrom(state, content.config.social, actor.id))
+    .flatMap(([id, affinity]) => {
       const name = nameOf(state, id);
-      return name === undefined ? [] : [{ name, affinity: r.affinity }];
+      return name === undefined ? [] : [{ name, affinity }];
     })
     .sort((a, b) => b.affinity - a.affinity || a.name.localeCompare(b.name));
   const close = felt.filter((f) => f.affinity >= CLOSE_TO_AT_LEAST).slice(0, RELATIONS_SHOWN);
@@ -206,7 +208,7 @@ export function berthWord(state: State, content: ContentBundle, actor: Actor): s
  * starts with "; " so the line reads `good at: …; likes: …`.
  */
 export function crewOffWatchClauses(state: State, content: ContentBundle, actor: Actor): string {
-  const relations = relationsClause(state, actor);
+  const relations = relationsClause(state, content, actor);
   return `; ${interestsClause(actor)}${relations === "" ? "" : `; ${relations}`}; berth: ${berthWord(state, content, actor)}`;
 }
 

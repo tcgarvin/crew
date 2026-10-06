@@ -2,7 +2,7 @@
  * Ambient chat (PLAN §6 W4a item 5), phase 6, every 20 ticks: two awake crew who are not working
  * a task, within `social.chatRadiusTiles` of each other and both past their chat cooldown, have
  * a one-line conversation that shows in the ticker (`conversation`, notable). Slice 4: the social
- * system's `onConversation` moves the pair's affinity; the `socialize` hold is what actually
+ * system's `onConversation` leaves the pair memories (D88); the `socialize` hold is what actually
  * meets the social need.
  *
  * Tunables come from `config.social` (Integration 2 made it required). `AMBIENT_FALLBACK` is
@@ -32,8 +32,23 @@ export const AMBIENT_FALLBACK: ConfigDef["social"] = {
     "{b} laughed at {a}'s joke about the engine",
     "{a} wondered aloud what the next job pays",
   ],
-  chatAffinity: 1,
-  chatAffinityEveryDays: 1,
+  chatMemoryEveryDays: 2,
+  chatSour: { atZero: 0.25, perPoint: 0.1 },
+  compatibility: { base: 2, perValuePoint: 0.5, perSharedLike: 1, perClash: 1, range: 2 },
+  memories: {
+    chatted: { label: "a good chat", opinion: 1, durationDays: 5, stackLimit: 2 },
+    rubbedWrong: { label: "got on my nerves", opinion: -1, durationDays: 5, stackLimit: 2 },
+    goodTime: { label: "a good time together", opinion: 1, durationDays: 3, stackLimit: 2 },
+    beatMe: { label: "beat me", opinion: -1, durationDays: 3, stackLimit: 2 },
+    keepsBeatingMe: { label: "keeps beating me", opinion: -1, durationDays: 3, stackLimit: 1 },
+    goodTalk: { label: "a good talk", opinion: 2, durationDays: 5, stackLimit: 1 },
+    argued: { label: "an argument", opinion: -2, durationDays: 5, stackLimit: 2 },
+    playedForMe: { label: "played for me", opinion: 1, durationDays: 3, stackLimit: 1 },
+    sharedATable: { label: "shared a table", opinion: 1, durationDays: 5, stackLimit: 1 },
+    heardMeOut: { label: "heard me out", opinion: 2, durationDays: 7, stackLimit: 1 },
+    dressedMeDown: { label: "dressed me down", opinion: -2, durationDays: 7, stackLimit: 1 },
+    talkedItThrough: { label: "talked it through", opinion: 1, durationDays: 7, stackLimit: 1 },
+  },
   affinityRange: 10,
   avoidBelow: -3,
   preferAbove: 0,
@@ -78,7 +93,7 @@ export const ambientChatSystem: System = {
         const template = ctx.rng.pick("social", social.templateLines);
         const line = template.replaceAll("{a}", a.name).replaceAll("{b}", b.name);
         emitSim(ctx, "conversation", [a.id, b.id], { line });
-        // Slice 4 (call 10): a chat moves how the pair feel about each other.
+        // Slice 4 (call 10; D88): a chat leaves each side a memory of the other.
         onConversation(ctx, a, b);
         a.lastConversationTick = ctx.tick;
         b.lastConversationTick = ctx.tick;

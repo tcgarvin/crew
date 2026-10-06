@@ -291,7 +291,7 @@ export const LOUNGE_ACTIVITIES: readonly ActivityDef[] = [
     restores: { recreation: 0.4, social: 0.2 },
     outcome: "bond",
     thoughts: { joined: "goodCompany" },
-    affinity: { participants: 1, winnerToLoser: 0, loserToWinner: 0 },
+    memories: { together: "goodTime" },
     topics: ["topic.the_vid" as TopicDefId],
   },
   {
@@ -305,7 +305,7 @@ export const LOUNGE_ACTIVITIES: readonly ActivityDef[] = [
     restores: { recreation: 0.35, comfort: 0.1 },
     outcome: "bond",
     thoughts: { joined: "goodCompany" },
-    affinity: { participants: 1, winnerToLoser: 0, loserToWinner: 0 },
+    memories: { together: "goodTime" },
     transitOnly: true,
   },
   {

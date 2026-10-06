@@ -1,7 +1,8 @@
 /** `ConfigDef` schema: every tunable. Bounds are sanity limits, not balance. */
-import type { ConfigDef } from "@crew/sim";
+import type { ConfigDef, MemoryKey } from "@crew/sim";
 import { z } from "zod";
 import {
+  memoryKeySchema,
   nonNegative,
   nonNegativeInt,
   positive,
@@ -9,6 +10,19 @@ import {
   powerPrioritySchema,
   unitInterval,
 } from "./primitives";
+
+/** D88: one memory kind's opinion (a whole number, never 0), duration and stack limit. */
+const memoryDefSchema = z.strictObject({
+  label: z.string().min(1),
+  opinion: z
+    .number()
+    .int()
+    .min(-5)
+    .max(5)
+    .refine((n) => n !== 0, { message: "a memory that moves nothing is not a memory" }),
+  durationDays: positive,
+  stackLimit: positiveInt,
+});
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
 const unitRange = z
@@ -238,8 +252,21 @@ export const configDefSchema = z.strictObject({
     chatRadiusTiles: positive,
     chatCooldownSeconds: nonNegative,
     templateLines: z.array(z.string().min(1)).min(1),
-    chatAffinity: z.number().int().min(0).max(3),
-    chatAffinityEveryDays: nonNegative,
+    chatMemoryEveryDays: nonNegative,
+    chatSour: z.strictObject({ atZero: unitInterval, perPoint: nonNegative }),
+    compatibility: z.strictObject({
+      base: z.number(),
+      perValuePoint: nonNegative,
+      perSharedLike: nonNegative,
+      perClash: nonNegative,
+      range: positiveInt,
+    }),
+    memories: z.strictObject(
+      Object.fromEntries(memoryKeySchema.options.map((key) => [key, memoryDefSchema])) as Record<
+        MemoryKey,
+        typeof memoryDefSchema
+      >,
+    ),
     affinityRange: positiveInt,
     avoidBelow: z.number().int(),
     preferAbove: z.number().int(),

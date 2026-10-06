@@ -258,8 +258,9 @@ function characterViolations(
 
 /**
  * Slice 4: social state names actors that exist. Relationship rows and their entries are keyed by
- * actors and hold integer affinities (the `affinityRange` bound is config's, checked beside mood
- * in `systems/needs/invariants.ts`); every session's host and members are actors on deck, its
+ * actors, and every memory's expiry is a whole tick after the last (D88: the social system drops
+ * them as they expire; keys and stack limits are config's, checked beside mood in
+ * `systems/needs/invariants.ts`); every session's host and members are actors on deck, its
  * tick fields whole and `startedTick <= endsAtTick`; a private talk names two different actors.
  */
 function socialViolations(state: ReadonlyWorldState): string[] {
@@ -270,8 +271,10 @@ function socialViolations(state: ReadonlyWorldState): string[] {
     for (const [to, relationship] of Object.entries(row)) {
       const where = `social.relationships.${from}.${to}`;
       if (!(to in state.actors) || to === from) out.push(`${where} is not another actor`);
-      if (!Number.isInteger(relationship.affinity)) {
-        out.push(`${where}.affinity is ${relationship.affinity}`);
+      for (const memory of relationship.memories) {
+        if (!Number.isInteger(memory.expiresAtTick) || memory.expiresAtTick <= state.tick) {
+          out.push(`${where} holds ${memory.key} expiring at ${memory.expiresAtTick}`);
+        }
       }
     }
   }

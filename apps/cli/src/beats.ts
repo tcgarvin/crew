@@ -30,6 +30,7 @@
  */
 import { rivalryPhrase } from "@crew/narrator";
 import {
+  type ActorId,
   type Command,
   type CommandId,
   type ContentBundle,
@@ -40,6 +41,7 @@ import {
   type SimEvent,
   type World,
   actionLabel,
+  affinitiesFrom,
   createKernel,
   dayTicks,
   provisionsCratesAboard,
@@ -737,7 +739,24 @@ export interface BeatsResult extends BeatsTallyResult {
   };
   /** D85: every rivalry at the end, as the digest says it. */
   readonly rivalries: readonly string[];
+  /** D88: the spread of directed affinities between crew at the end of each ship's day. */
+  readonly affinityByDay: readonly AffinitySpread[];
 }
+
+/** D88: one day's directed crew affinities: the extremes and how many pairs stand out. */
+export interface AffinitySpread {
+  readonly day: number;
+  readonly highest: number;
+  readonly lowest: number;
+  readonly mean: number;
+  /** Directed pairs at or above `WARM_AT_LEAST`, and at or below `COLD_AT_MOST`. */
+  readonly warm: number;
+  readonly cold: number;
+}
+
+/** D88: the bands `AffinitySpread` counts: well past "close to", and "at odds with". */
+const WARM_AT_LEAST = 6;
+const COLD_AT_MOST = -3;
 
 /** How many affinities each end of the extremes lists. */
 const AFFINITY_EXTREMES_SHOWN = 3;
@@ -796,16 +815,37 @@ function tickerSamples(world: World): TickerSample[] {
   );
 }
 
+/** D88: every directed affinity between crew members (passengers come and go), by name. */
+function crewAffinities(world: World): { text: string; affinity: number }[] {
+  const { actors } = world.state;
+  const crew = Object.values(actors).filter((a) => a.crew && a.passenger !== true);
+  const ids = new Set(crew.map((a) => a.id));
+  return crew.flatMap((from) =>
+    Object.entries(affinitiesFrom(world.state, world.config.values.social, from.id))
+      .filter(([to]) => ids.has(to as ActorId))
+      .map(([to, affinity]) => ({
+        text: `${from.name} → ${actors[to as ActorId]?.name ?? to}`,
+        affinity,
+      })),
+  );
+}
+
+/** D88: today's spread of crew affinities. */
+function affinitySpread(world: World, day: number): AffinitySpread {
+  const values = crewAffinities(world).map((a) => a.affinity);
+  return {
+    day,
+    highest: Math.max(...values),
+    lowest: Math.min(...values),
+    mean: values.reduce((sum, v) => sum + v, 0) / values.length,
+    warm: values.filter((v) => v >= WARM_AT_LEAST).length,
+    cold: values.filter((v) => v <= COLD_AT_MOST).length,
+  };
+}
+
 /** D85: the warmest and coldest feelings aboard at the end, "Jax Okonkwo → Tomas Ruiz +4". */
 function affinityExtremes(world: World): BeatsResult["affinityExtremes"] {
-  const { actors, social } = world.state;
-  const name = (id: string) => actors[id as keyof typeof actors]?.name ?? id;
-  const all = Object.entries(social.relationships).flatMap(([from, row]) =>
-    Object.entries(row).map(([to, r]) => ({
-      text: `${name(from)} → ${name(to)}`,
-      affinity: r.affinity,
-    })),
-  );
+  const all = crewAffinities(world);
   const said = (a: { text: string; affinity: number }) =>
     `${a.text} ${a.affinity > 0 ? "+" : ""}${a.affinity}`;
   const byAffinity = [...all].sort(
@@ -867,6 +907,8 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
   let script = new VoyageScript(options.scenario, send);
   let roundTrips = 0;
   let stuckAdvances = 0;
+  const ticksPerDay = dayTicks(values, 1);
+  const affinityByDay: AffinitySpread[] = [];
 
   while (world.state.tick < endTick) {
     const before = world.state.tick;
@@ -894,6 +936,9 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
         cargoOpen,
         rooms: roomCounts(world),
       });
+    }
+    if (world.state.tick >= (affinityByDay.length + 1) * ticksPerDay) {
+      affinityByDay.push(affinitySpread(world, affinityByDay.length + 1));
     }
     script.step(world, result.events);
     if (script.done) {
@@ -932,6 +977,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     provisionsDaysAtEnd: provisionsDays(world.state, world.content, values),
     affinityExtremes: affinityExtremes(world),
     rivalries: rivalriesAtEnd(world),
+    affinityByDay,
   };
 }
 
@@ -1078,6 +1124,13 @@ function offWatchLines(r: BeatsResult): string[] {
     `Sessions collapsed: ${share} of ${opened} opened.`,
     `Warmest at the end: ${r.affinityExtremes.highest.join("; ") || "none"}. Coldest: ${r.affinityExtremes.lowest.join("; ") || "none"}.`,
     `Rivalries at the end: ${r.rivalries.join("; ") || "none"}.`,
+    "",
+    `| Day | Highest | Lowest | Mean | Pairs ≥ +${WARM_AT_LEAST} | Pairs ≤ ${COLD_AT_MOST} |`,
+    "|---|---|---|---|---|---|",
+    ...r.affinityByDay.map(
+      (d) =>
+        `| ${d.day} | ${d.highest} | ${d.lowest} | ${fmt(d.mean, 1)} | ${d.warm} | ${d.cold} |`,
+    ),
   );
   return lines;
 }

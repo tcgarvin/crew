@@ -203,6 +203,46 @@ export const THOUGHT_KEYS = [
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
 
 /**
+ * D88: what one person remembers about another, each a closed key raised by sim code (a chat, a
+ * game, an argument, a private talk). Config gives each its opinion, duration and stack limit
+ * (`social.memories`, every key required); affinity is compatibility plus the live memories.
+ */
+export const MEMORY_KEYS = [
+  /** An ambient chat that went well / that rubbed the wrong way (`social.chatSour`). */
+  "chatted",
+  "rubbedWrong",
+  /** A contest or bond played together (`ActivityDef.memories.together`). */
+  "goodTime",
+  /** A contest lost to them (`ActivityDef.memories.loserToWinner`). */
+  "beatMe",
+  /** A losing run at `social.rivalry.streakFor` or more against them. */
+  "keepsBeatingMe",
+  /** A debate within `social.debate.agreeWithin` / beyond `argueBeyond`. */
+  "goodTalk",
+  "argued",
+  /** Heard them perform, liking the activity. */
+  "playedForMe",
+  /** The captain's table, both ways. */
+  "sharedATable",
+  /** A `privateTalk`: the crew member's warm / stern memory, and the captain's warm one. */
+  "heardMeOut",
+  "dressedMeDown",
+  "talkedItThrough",
+] as const;
+export type MemoryKey = (typeof MEMORY_KEYS)[number];
+
+/** D88: one kind of memory (`ConfigDef.social.memories`). */
+export interface MemoryDef {
+  /** Lower-case phrase from the rememberer's side: "a good chat", "an argument". */
+  readonly label: string;
+  /** Whole-number contribution to affinity while it lasts; never 0. */
+  readonly opinion: number;
+  readonly durationDays: Days;
+  /** At most this many held about one person; one more refreshes the oldest instead. */
+  readonly stackLimit: number;
+}
+
+/**
  * D82: how dirty a room is, from its cells (`systems/dirt/grid.ts` `tierOf`, with hysteresis on
  * the way down). `WorldState.dirt.tiers` holds the last tier written per room.
  */
@@ -817,11 +857,13 @@ export interface ActivityDef {
   readonly thoughts?: Readonly<
     Partial<Record<"win" | "lose" | "joined" | "listened" | "listenedDislike", ThoughtKey>>
   >;
-  /** Integer affinity moves at the end: all members pairwise, winner to loser, loser to winner. */
-  readonly affinity?: {
-    readonly participants: number;
-    readonly winnerToLoser: number;
-    readonly loserToWinner: number;
+  /**
+   * D88: memories at the end. `together`: a contest's members pairwise, both ways; a bond's
+   * members who like the activity, toward each other member. `loserToWinner`: each loser.
+   */
+  readonly memories?: {
+    readonly together?: MemoryKey;
+    readonly loserToWinner?: MemoryKey;
   };
   /** A debate's (or a vid's) topics, one picked per session. */
   readonly topics?: readonly TopicDefId[];
@@ -1457,11 +1499,28 @@ export interface ConfigDef {
     readonly chatCooldownSeconds: Seconds;
     /** Templates with `{a}` (speaker) and `{b}` (listener) placeholders. */
     readonly templateLines: readonly string[];
-    /** Slice 4: affinity an ambient chat moves, both ways (`systems/social/chat.ts`). */
-    readonly chatAffinity: number;
-    /** Slice 4: a pair's chat moves affinity at most once in this many days. */
-    readonly chatAffinityEveryDays: Days;
-    /** Slice 4: affinity is an integer in [-affinityRange, affinityRange]. */
+    /** D88: a pair's chat leaves a memory at most once in this many days. */
+    readonly chatMemoryEveryDays: Days;
+    /**
+     * D88: the chance, per side, that a chat leaves `rubbedWrong` rather than `chatted`:
+     * `atZero − perPoint × compatibility`, clamped to [0, 1].
+     */
+    readonly chatSour: { readonly atZero: number; readonly perPoint: number };
+    /**
+     * D88: a pair's compatibility, an integer in ±`range`, symmetric and fixed by who they are:
+     * `base − perValuePoint × (summed value-axis gaps) + perSharedLike × (likes in common)
+     * − perClash × (one's likes the other dislikes, both ways)`, rounded.
+     */
+    readonly compatibility: {
+      readonly base: number;
+      readonly perValuePoint: number;
+      readonly perSharedLike: number;
+      readonly perClash: number;
+      readonly range: number;
+    };
+    /** D88: every memory's opinion, duration and stack limit. */
+    readonly memories: Readonly<Record<MemoryKey, MemoryDef>>;
+    /** Slice 4: affinity is an integer in [-affinityRange, affinityRange] (D88: derived, clamped). */
     readonly affinityRange: number;
     /** Slice 4: at or below this, someone is avoided (seats, sessions). */
     readonly avoidBelow: number;

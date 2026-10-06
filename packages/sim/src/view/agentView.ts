@@ -26,6 +26,7 @@
  */
 import { watchOfDay } from "../core/clock";
 import { isOnDock } from "../core/docks";
+import { affinitiesFrom } from "../core/social";
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
 import type { DeckDef, MachinePlacementDef } from "../core/types/content";
@@ -214,20 +215,9 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     ...(berth === undefined ? {} : { berth }),
     interests: actor.interests,
     values: actor.values,
-    affinity: affinityFrom(state, actor.id),
+    affinity: affinitiesFrom(state, config.social, actor.id),
     ...summonsOf(world, actor.id),
   };
-}
-
-/** Slice 4: what `actorId` feels about others (`social.relationships[actorId]`), by actor. */
-function affinityFrom(state: ReadonlyWorldState, actorId: ActorId): Record<ActorId, number> {
-  const out: Record<ActorId, number> = {};
-  const row = state.social.relationships[actorId];
-  if (row === undefined) return out;
-  for (const [other, relationship] of Object.entries(row)) {
-    out[other as ActorId] = relationship.affinity;
-  }
-  return out;
 }
 
 /** Slice 4: the pending `privateTalk` `actorId` is part of, as `SelfView.summons`. */

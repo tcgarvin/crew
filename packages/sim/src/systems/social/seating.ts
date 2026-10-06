@@ -9,7 +9,8 @@
  * 1. a held seat stays;
  * 2. the captain, once a ship's day (`social.captainsTableDay` older than today), takes the free
  *    seat beside the crew member at the tables she has the highest affinity with (even days) or
- *    the lowest (odd days; the captain mends fences, so the avoid rule does not apply): both +1,
+ *    the lowest (odd days; the captain mends fences, so the avoid rule does not apply): both
+ *    remember `sharedATable`,
  *    the crew member `satWithTheCaptain`, `captainsTable` (trace), the day recorded;
  * 3. else, among seats beside nobody at or below `social.avoidBelow`, the nearest beside someone
  *    the actor has affinity above `social.preferAbove` with;
@@ -30,7 +31,7 @@ import type { ActorId, DeckDefId, LocalKey, MachineId } from "../../core/types/i
 import type { StepCtx } from "../../core/types/pipeline";
 import { tileAt, withinArm } from "../galley/kitchen";
 import { emitSim } from "../work/events";
-import { moveAffinity } from "./relationships";
+import { addMemory } from "./relationships";
 
 /** A free mess seat: the `use` position to walk to, and its tile. */
 export interface SeatOption {
@@ -60,7 +61,8 @@ export function seatPreference(
   const captains = captainsSeat(ctx, actor, seats, others);
   if (captains !== undefined) return captains;
   const { avoidBelow, preferAbove } = ctx.config.social;
-  const feel = (other: Placed) => affinityOf(ctx.state.social, actor.id, other.actor.id);
+  const feel = (other: Placed) =>
+    affinityOf(ctx.state, ctx.config.social, actor.id, other.actor.id);
   const beside = (seat: SeatOption) => others.filter((other) => isBeside(seat.tile, other.tile));
   const allowed = seats.filter((seat) => beside(seat).every((other) => feel(other) > avoidBelow));
   return (
@@ -138,7 +140,7 @@ function captainsSeat(
   const today = dayIndexAt(ctx);
   if (ctx.state.social.captainsTableDay >= today) return undefined;
   const highest = today % 2 === 0;
-  const feel = (id: ActorId) => affinityOf(ctx.state.social, captain.id, id);
+  const feel = (id: ActorId) => affinityOf(ctx.state, ctx.config.social, captain.id, id);
   const candidates = others
     .filter((other) => other.atTable && other.actor.crew && other.actor.passenger !== true)
     .sort((a, b) => {
@@ -151,8 +153,8 @@ function captainsSeat(
     const seat = seats.find((option) => isBeside(option.tile, other.tile));
     if (seat === undefined) continue;
     ctx.state.social.captainsTableDay = today;
-    moveAffinity(ctx, captain.id, other.actor.id, 1);
-    moveAffinity(ctx, other.actor.id, captain.id, 1);
+    addMemory(ctx, captain.id, other.actor.id, "sharedATable");
+    addMemory(ctx, other.actor.id, captain.id, "sharedATable");
     addThought(ctx, other.actor, "satWithTheCaptain");
     emitSim(ctx, "captainsTable", [captain.id, other.actor.id], {
       captainId: captain.id,

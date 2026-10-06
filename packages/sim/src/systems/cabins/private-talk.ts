@@ -13,9 +13,9 @@ import { configTicks } from "../../core/clock";
  *   cabin floor tile nearest the desk, then a `confer` step of `cabins.privateTalkSeconds`. A
  *   cabin without a desk: both to the free floor tiles nearest its first floor tile.
  * - `runConfer`: counts only while both are in the cabin on their `confer` steps (a walk through
- *   the cabin to the desk is not the talk); the caller's step applies the outcome (`warm`: +2
- *   crew → caller, +1 caller → crew, `heardOut`; `stern`: −2 and 0, `dressedDown`) through
- *   `moveAffinity`, emits `privateTalkHeld`, clears the talk and marks the other's step done.
+ *   the cabin to the desk is not the talk); the caller's step applies the outcome (`warm`: the
+ *   crew member remembers `heardMeOut` and the caller `talkedItThrough`, thought `heardOut`;
+ *   `stern`: `dressedMeDown` and nothing, thought `dressedDown`) through `addMemory`, emits `privateTalkHeld`, clears the talk and marks the other's step done.
  *   The other's step never finishes on its own count: it is done once the caller has held the
  *   talk, and fails `dependencyPending` when the talk went away unheld (the cabins system's
  *   timeout, `privateTalkMissed`).
@@ -45,7 +45,7 @@ import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { PrivateTalk } from "../../core/types/state";
 import type { ActivityStep, StepTarget } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
-import { moveAffinity } from "../social/relationships";
+import { addMemory } from "../social/relationships";
 import { estimateTravelTicks } from "../spatial/estimates";
 import { compartmentAt, isWalkable } from "../spatial/geometry";
 import { currentStep } from "../work/activity";
@@ -260,10 +260,10 @@ export function bothConferring(
   });
 }
 
-/** The outcome of call 15: affinity both ways, a thought for the one called in. */
+/** The outcome of call 15 (D88): memories (the caller's only when warm), the crew member's thought. */
 const OUTCOME = {
-  warm: { toCaller: 2, toCrew: 1, thought: "heardOut" },
-  stern: { toCaller: -2, toCrew: 0, thought: "dressedDown" },
+  warm: { toCaller: "heardMeOut", toCrew: "talkedItThrough", thought: "heardOut" },
+  stern: { toCaller: "dressedMeDown", toCrew: undefined, thought: "dressedDown" },
 } as const;
 
 /** The caller's `confer` step has run its course: the talk is held (module comment). */
@@ -272,8 +272,8 @@ function holdTalk(ctx: StepCtx, talk: PrivateTalk): void {
   const outcome = OUTCOME[tone];
   const crew = ctx.state.actors[actorId];
   if (crew === undefined) throw new Error(`privateTalk: ${actorId} vanished mid-talk`);
-  moveAffinity(ctx, actorId, captainId, outcome.toCaller);
-  if (outcome.toCrew !== 0) moveAffinity(ctx, captainId, actorId, outcome.toCrew);
+  addMemory(ctx, actorId, captainId, outcome.toCaller);
+  if (outcome.toCrew !== undefined) addMemory(ctx, captainId, actorId, outcome.toCrew);
   addThought(ctx, crew, outcome.thought);
   // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).
   delete ctx.state.social.privateTalk;

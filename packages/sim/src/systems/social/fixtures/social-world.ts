@@ -3,13 +3,14 @@
  * table, bunkroom, bridge; Bettina, Noor, Mara the captain, Jax, Tomas) with the social system
  * registered and the activities the outcome tests need beside the fixture three: a debate, a vid
  * (bond), music (perform), sparring (contest with risk and dirt), tinkering (skill), baking
- * (a product) and a sharp contest (affinity only from loser to winner). `the_guild` is
+ * (a product) and a sharp contest (a memory only from loser to winner). `the_guild` is
  * re-weighted so (2, 1, 2) against (−2, 0, −1) argues (W4 tunes the authored weights).
  *
  * Sessions are built by hand (W1's lounge fixture and session lifecycle live in another stream):
  * `handSession` makes a row that is never stored, as `resolveOutcome` reads only its argument.
  */
 import { rebuildActorIndex } from "../../../core/caches";
+import { dayTicks } from "../../../core/clock";
 import type { TestWorld } from "../../../core/fixtures/test-world";
 import { createKernel } from "../../../core/kernel";
 import { createRegistry } from "../../../core/registry";
@@ -20,6 +21,7 @@ import type {
   ContentBundle,
   InterestTag,
   ItemDef,
+  MemoryKey,
   TopicDef,
 } from "../../../core/types/content";
 import type {
@@ -32,7 +34,7 @@ import type {
 } from "../../../core/types/ids";
 import type { World } from "../../../core/types/kernel";
 import type { RngApi, StepCtx } from "../../../core/types/pipeline";
-import type { GroupSession, SessionVenue } from "../../../core/types/state";
+import type { GroupSession, SessionVenue, SocialMemory } from "../../../core/types/state";
 import type { Activity } from "../../../core/types/work";
 import { registerPlannerDefaults } from "../../../planner/index";
 import {
@@ -100,7 +102,7 @@ const EXTRA_ACTIVITIES: readonly ActivityDef[] = [
     venue: [{ machineTag: "messTable" }],
     outcome: "contest",
     thoughts: { win: "wonContest", lose: "lostContest" },
-    affinity: { participants: 0, winnerToLoser: 0, loserToWinner: -1 },
+    memories: { loserToWinner: "beatMe" },
   },
   {
     ...base,
@@ -125,6 +127,7 @@ const EXTRA_ACTIVITIES: readonly ActivityDef[] = [
     outcome: "bond",
     topics: [TOPIC.vid],
     thoughts: { joined: "goodCompany" },
+    memories: { together: "goodTime" },
   },
   {
     ...base,
@@ -345,3 +348,29 @@ export function asleep(world: World, id: ActorId): void {
 }
 
 export { galleyStepCtx };
+
+/**
+ * D88: `from` feels `affinity` about `to` (compatibility is 0 in this fixture's config) by a set
+ * of memories within their stack limits, larger opinions first, written straight into state with
+ * a day to run. Throws when the memory table cannot make `affinity` exactly.
+ */
+export function feels(world: World, from: ActorId, to: ActorId, affinity: number): void {
+  const { memories } = world.config.values.social;
+  const expiresAtTick = world.state.tick + dayTicks(world.config.values, 1);
+  const held: SocialMemory[] = [];
+  let left = affinity;
+  const keys = (Object.keys(memories) as MemoryKey[])
+    .filter((key) => Math.sign(memories[key].opinion) === Math.sign(affinity))
+    .sort((a, b) => Math.abs(memories[b].opinion) - Math.abs(memories[a].opinion));
+  for (const key of keys) {
+    const { opinion, stackLimit } = memories[key];
+    for (let i = 0; i < stackLimit && Math.abs(left) >= Math.abs(opinion); i++) {
+      held.push({ key, expiresAtTick });
+      left -= opinion;
+    }
+  }
+  if (left !== 0) throw new Error(`feels: no set of memories makes ${affinity}`);
+  const row = world.state.social.relationships[from] ?? {};
+  world.state.social.relationships[from] = row;
+  row[to] = { ...row[to], memories: held };
+}

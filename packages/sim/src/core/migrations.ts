@@ -515,6 +515,24 @@ function offWatch(raw: unknown, { content, warn }: MigrationContext): unknown {
   return raw;
 }
 
+/**
+ * 10 → 11 (D88): affinity from memories. Every relationship entry loses its `affinity` and gains
+ * an empty `memories`; `lastChatTick` is kept. Nobody remembers anything yet, so everyone stands
+ * at their compatibility: a running total from before cannot be split into memories.
+ */
+function affinityFromMemories(raw: unknown): unknown {
+  if (!isRecord(raw) || !isRecord(raw.social) || !isRecord(raw.social.relationships)) return raw;
+  for (const row of Object.values(raw.social.relationships)) {
+    if (!isRecord(row)) continue;
+    for (const [to, entry] of Object.entries(row)) {
+      const lastChatTick = isRecord(entry) ? entry.lastChatTick : undefined;
+      row[to] =
+        typeof lastChatTick === "number" ? { memories: [], lastChatTick } : { memories: [] };
+    }
+  }
+  return raw;
+}
+
 /** A detached plain-JSON copy, so a migrated actor never aliases content. */
 function structuredJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
@@ -530,4 +548,5 @@ export const migrations: MigrationRegistry = {
   7: watchesAndThoughts,
   8: galleyAndDirt,
   9: offWatch,
+  10: affinityFromMemories,
 };
