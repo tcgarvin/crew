@@ -28,10 +28,10 @@
     "tick": 1600
   },
   "snapshot": {
-    "schemaVersion": 10,
+    "schemaVersion": 11,
     "simVersion": "0.1.0",
-    "contentHash": "91ef2ca8e122579d",
-    "configHash": "91ef2ca8e122579d",
+    "contentHash": "915ca7589e4b5402",
+    "configHash": "915ca7589e4b5402",
     "savedAtTick": 1600,
     "config": {
       "time": {
@@ -306,8 +306,92 @@
           "{b} laughed at {a}'s joke about the engine",
           "{a} wondered aloud what the next job pays"
         ],
-        "chatAffinity": 1,
-        "chatAffinityEveryDays": 2,
+        "chatMemoryEveryDays": 2,
+        "chatSour": {
+          "atZero": 0.25,
+          "perPoint": 0.1
+        },
+        "compatibility": {
+          "base": 2,
+          "perValuePoint": 0.5,
+          "perSharedLike": 1,
+          "perClash": 1,
+          "range": 2
+        },
+        "memories": {
+          "chatted": {
+            "label": "a good chat",
+            "opinion": 1,
+            "durationDays": 5,
+            "stackLimit": 2
+          },
+          "rubbedWrong": {
+            "label": "got on my nerves",
+            "opinion": -1,
+            "durationDays": 5,
+            "stackLimit": 2
+          },
+          "goodTime": {
+            "label": "a good time together",
+            "opinion": 1,
+            "durationDays": 3,
+            "stackLimit": 2
+          },
+          "beatMe": {
+            "label": "beat me",
+            "opinion": -1,
+            "durationDays": 3,
+            "stackLimit": 2
+          },
+          "keepsBeatingMe": {
+            "label": "keeps beating me",
+            "opinion": -1,
+            "durationDays": 3,
+            "stackLimit": 1
+          },
+          "goodTalk": {
+            "label": "a good talk",
+            "opinion": 2,
+            "durationDays": 5,
+            "stackLimit": 1
+          },
+          "argued": {
+            "label": "an argument",
+            "opinion": -2,
+            "durationDays": 5,
+            "stackLimit": 2
+          },
+          "playedForMe": {
+            "label": "played for me",
+            "opinion": 1,
+            "durationDays": 3,
+            "stackLimit": 1
+          },
+          "sharedATable": {
+            "label": "shared a table",
+            "opinion": 1,
+            "durationDays": 5,
+            "stackLimit": 1
+          },
+          "heardMeOut": {
+            "label": "heard me out",
+            "opinion": 2,
+            "durationDays": 7,
+            "stackLimit": 1
+          },
+          "dressedMeDown": {
+            "label": "dressed me down",
+            "opinion": -2,
+            "durationDays": 7,
+            "stackLimit": 1
+          },
+          "talkedItThrough": {
+            "label": "talked it through",
+            "opinion": 1,
+            "durationDays": 7,
+            "stackLimit": 1
+          }
+        },
         "affinityRange": 10,
         "avoidBelow": -3,
         "preferAbove": 0,
@@ -337,7 +421,7 @@
       }
     },
     "state": {
-      "schemaVersion": 10,
+      "schemaVersion": 11,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 1600,
