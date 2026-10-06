@@ -90,6 +90,7 @@ export const configDefSchema = z.strictObject({
     hazardScale: nonNegative,
     overheatDamagePerSecond: nonNegative,
     maintenanceConditionBelow: unitInterval,
+    maintenanceEssentialBelow: unitInterval,
     integrityDerateBelow: unitInterval,
     integrityInoperableBelow: unitInterval,
   }),

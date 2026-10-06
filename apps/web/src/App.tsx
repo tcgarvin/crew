@@ -584,6 +584,7 @@ export function App() {
                 view,
                 ...(label === undefined ? {} : { label }),
                 person: personWords(view, bundle.thoughts, config.values.mood),
+                weighing: msg.weighing,
               });
             } else if (msg.type === "error") {
               setInspectorData(undefined);

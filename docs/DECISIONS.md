@@ -1648,3 +1648,32 @@ hand (`jobBlockingAcceptance`); the Jobs line now says "being finished here, not
 can be offered and taken now" on any job past offering whenever nothing blocks acceptance.
 Rejected: a second `captainAshore` ask after an idle spell, which D46 removed on purpose; the
 model's answer was wrong because its input was misleading, not because it had too few asks.
+
+**D90. Every machine that wears is serviced, a badly worn one first, and the inspector shows
+what someone is weighing.** The slice-4 playtest saw the engines fixed fast and everything else
+left in poor repair. Only the engine and generator had a `maintenance` def, so the coolant pump,
+life support, battery bank, cargo crane, galley stove and helm wore only downward until a fault;
+life support and the battery have no faults, so they sat at 0 % for good. Each now has the
+engine's ten-second service (wrench, multimeter or diagnostic scanner; engineering, or electrical
+for the battery and the helm; the stove from its front and the helm from its standby, so neither
+cook nor stander is moved off). `maintenanceDue` stays routine from
+`equipment.maintenanceConditionBelow` (0.3) and is raised to essential below the new
+`equipment.maintenanceEssentialBelow` (0.15): equipment raises the open problem's `baseUrgency`
+(never lowers it), and the planner takes the problem's urgency rather than a fixed routine one.
+Essential still respects the watch (D77): it puts the service ahead of the on-duty engineer's
+chores and ends their game, but does not call anyone off watch. Every section has someone who can
+do it (the services need skill 1), so off-duty engineers stay off. `crew beats` gains machine
+wear (each wearing machine's condition at the end of each day, the lowest and the services).
+Over 5 days, seed 1, both scenarios: four machines sat at 0 % from day 2 or 3 before; now none
+falls below 20 % (the coolant pump, the fastest to wear, is serviced four or five times), and the
+freight scenario made four round trips instead of one. Rejected: letting the watch's routine work
+end a game at the bell (rate an on-duty game voluntary against tasks). Over seeds 1–3 it doubled
+abandoned games (47 against 23) and left every machine's lowest condition where it was.
+
+The inspector's person sheet gains "Weighing": every option the planner is ranking, best first,
+with its urgency class and estimated seconds, which one they are doing and which comes next, a
+one-line verdict, and a collapsed list of what was ruled out and why ("off watch: routine work
+waits for their watch", "leaving it to Priya Kessler, who is better at it"). `weighOptions`
+(planner, pure over the `AgentView`) returns the ranking and the selector's intent; the worker
+words it (`apps/web/src/worker/weighing.ts`, where the names are) and ships it with the agent view.
+It is computed on the tap, never stored, so saves and the pipeline are unchanged.

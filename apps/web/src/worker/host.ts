@@ -25,6 +25,7 @@ import type {
   World,
 } from "@crew/sim";
 import { toAgentViewSnapshot } from "@crew/sim";
+import type { weighAgent } from "./weighing";
 
 export interface HostClock {
   now(): number;
@@ -43,6 +44,8 @@ export interface HostDeps {
   readonly content: ContentBundle;
   readonly config: EffectiveConfig;
   readonly postMessage: (message: FromWorker) => void;
+  /** D90: what an inspected actor is weighing, in words (`weighAgent`). */
+  readonly weigh: typeof weighAgent;
   /** Real-time loop tick, ms. Default 50 (20 Hz), matching `tickRate`. */
   readonly loopIntervalMs?: number;
   /** Sim-seconds of run-ahead allowed beyond the viewer (D14). Default 60. */
@@ -385,6 +388,7 @@ export function createHost(deps: HostDeps): Host {
             actorId: message.actorId,
             tick: snapshotWorld.state.tick,
             view: toAgentViewSnapshot(view),
+            weighing: deps.weigh(view, snapshotWorld, deps.content),
           });
         } catch (error) {
           // Caught so a failed view (e.g. an actor that did not exist at that tick) clears the

@@ -11,8 +11,8 @@
   "snapshot": {
     "schemaVersion": 11,
     "simVersion": "0.1.0",
-    "contentHash": "915ca7589e4b5402",
-    "configHash": "915ca7589e4b5402",
+    "contentHash": "b037a7feaed161a2",
+    "configHash": "b037a7feaed161a2",
     "savedAtTick": 1800,
     "config": {
       "time": {
@@ -94,6 +94,7 @@
         "hazardScale": 1,
         "overheatDamagePerSecond": 0.02,
         "maintenanceConditionBelow": 0.3,
+        "maintenanceEssentialBelow": 0.15,
         "integrityDerateBelow": 0.5,
         "integrityInoperableBelow": 0.15
       },

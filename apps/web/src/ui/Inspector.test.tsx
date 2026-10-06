@@ -1,4 +1,4 @@
-import type { AgentViewSnapshot, Machine } from "@crew/sim";
+import type { AgentViewSnapshot, Machine, WeighingWords } from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Inspector } from "./Inspector";
@@ -41,7 +41,57 @@ const steady: PersonWords = {
   relationships: [],
 };
 
+const NOTHING: WeighingWords = { verdict: "nothing to do", options: [], ruledOut: [] };
+
 describe("Inspector actor sheet", () => {
+  it("lists what a crew member is weighing, marks the current and next choice, and why others are out (D90)", () => {
+    const weighing: WeighingWords = {
+      verdict: "keeps at what they're doing: nothing else outranks it yet",
+      options: [
+        { text: "playing cards", urgency: "routineObligation", seconds: 3, mark: "doing" },
+        { text: "servicing the coolant pump", urgency: "routineObligation", seconds: 21 },
+      ],
+      ruledOut: [
+        {
+          text: "repairing the generator",
+          reason: "off watch: routine work waits for their watch",
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "actor",
+          weighing,
+          view: snapshot({ roleTags: ["engineer"] }),
+          person: steady,
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<h3>Weighing</h3>");
+    expect(html).toContain("nothing else outranks it yet");
+    expect(html).toMatch(/<li class="weighing-marked">playing cards .*routine.*~3s.* · doing/);
+    expect(html).toContain("servicing the coolant pump");
+    expect(html).toContain("Ruled out (1)");
+    expect(html).toContain("repairing the generator: ");
+  });
+
+  it("shows no weighing for a passenger, who plans no work", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({ roleTags: [], passenger: true }),
+          person: steady,
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).not.toContain("Weighing");
+  });
+
   it("says roles and known problems in words, each kind once", () => {
     const problems = [
       { id: "p1", kind: "cargoToLoad" },
@@ -52,6 +102,7 @@ describe("Inspector actor sheet", () => {
       <Inspector
         data={{
           kind: "actor",
+          weighing: NOTHING,
           view: snapshot({ roleTags: ["firstOfficer"] }, problems),
           person: steady,
         }}
@@ -70,6 +121,7 @@ describe("Inspector actor sheet", () => {
       <Inspector
         data={{
           kind: "actor",
+          weighing: NOTHING,
           view: snapshot({ roleTags: [], passenger: true }),
           person: steady,
         }}
@@ -87,7 +139,12 @@ describe("Inspector actor sheet", () => {
   it("shows crew by their role tags with no tag", () => {
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["pilot"] }), person: steady }}
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({ roleTags: ["pilot"] }),
+          person: steady,
+        }}
         onClose={() => {}}
       />,
     );
@@ -109,7 +166,7 @@ describe("Inspector actor sheet", () => {
     };
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["pilot"] }), person }}
+        data={{ kind: "actor", weighing: NOTHING, view: snapshot({ roleTags: ["pilot"] }), person }}
         onClose={() => {}}
       />,
     );
@@ -123,7 +180,12 @@ describe("Inspector actor sheet", () => {
   it("leaves out the helm line when the sim has no helm role for them, and says when nothing is on their mind", () => {
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["cook"] }), person: steady }}
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({ roleTags: ["cook"] }),
+          person: steady,
+        }}
         onClose={() => {}}
       />,
     );
@@ -144,7 +206,12 @@ describe("Inspector actor sheet", () => {
     };
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["deckhand"] }), person }}
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({ roleTags: ["deckhand"] }),
+          person,
+        }}
         onClose={() => {}}
       />,
     );
@@ -159,7 +226,12 @@ describe("Inspector actor sheet", () => {
   it("leaves out the people row when nobody stands out", () => {
     const html = renderToStaticMarkup(
       <Inspector
-        data={{ kind: "actor", view: snapshot({ roleTags: ["deckhand"] }), person: steady }}
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({ roleTags: ["deckhand"] }),
+          person: steady,
+        }}
         onClose={() => {}}
       />,
     );

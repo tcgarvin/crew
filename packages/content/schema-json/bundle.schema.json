@@ -4381,6 +4381,11 @@
               "minimum": 0,
               "maximum": 1
             },
+            "maintenanceEssentialBelow": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
             "integrityDerateBelow": {
               "type": "number",
               "minimum": 0,
@@ -4396,6 +4401,7 @@
             "hazardScale",
             "overheatDamagePerSecond",
             "maintenanceConditionBelow",
+            "maintenanceEssentialBelow",
             "integrityDerateBelow",
             "integrityInoperableBelow"
           ],
