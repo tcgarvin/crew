@@ -45,7 +45,7 @@ import {
   drawSky,
 } from "./scenery";
 import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
-import { sessionMemberIds, sessionPlateText } from "./sessions";
+import { firstName, sessionMemberIds, sessionPlateText } from "./sessions";
 import { disc } from "./shapes";
 import { type StarLayer, drawStars } from "./stars";
 
@@ -639,54 +639,13 @@ export function drawCarriedItems(
 
 const MIN_LABEL_FONT_PX = 11;
 
-function truncateLabel(label: string, maxChars: number): string {
-  return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
-}
-
 /**
- * D70: the captain ashore meeting someone; D77: the oncoming watch relieving the helm. The label
- * names the other person by first name.
+ * The text over a crew member's or passenger's dot: their first name and nothing else (slice-4
+ * playtest). Name and action together crowded the phone view, and the action mostly reads from
+ * where the dot is; the inspector says it in full.
  */
-const NAMED_LABEL = /^(talking with|going to see|ashore to see|relieving) (\S+)/;
-/** D78: "plotting a course to Kessler Drift" says where in the inspector; the dot says enough. */
-const PLOTTING_LABEL = /^plotting a course\b/;
-/** D77: the watch's own labels, short and the point of the bridge, are never cut. */
-const WATCH_LABEL = /^(at the helm|taking the helm|leaving the helm|on the gangway|doing rounds)$/;
-
-/** The action in as few words as still say it: "relieving Noor", "plotting a course". */
-function compactAction(actionLabel: string): string | undefined {
-  const named = NAMED_LABEL.exec(actionLabel);
-  if (named !== null) return `${named[1]} ${named[2]}`;
-  if (PLOTTING_LABEL.test(actionLabel)) return "plotting a course";
-  if (WATCH_LABEL.test(actionLabel)) return actionLabel;
-  return undefined;
-}
-
-/**
- * The text over a crew member's dot: name and what they are doing, cut to 26 characters. D70: a
- * label that names someone ("talking with Fenwick Adair", "relieving Noor Haddad at the helm")
- * keeps the verb and that person's first name, plotting keeps "plotting a course", and the
- * watch's labels ("at the helm") stay whole, up to a local's 34 (D68), so the action reads
- * rather than an ellipsis.
- */
-export function crewLabelText(actor: Pick<RenderActor, "name" | "actionLabel">): string {
-  const compact = compactAction(actor.actionLabel);
-  if (compact !== undefined) return truncateLabel(`${actor.name} — ${compact}`, 34);
-  return truncateLabel(`${actor.name} — ${actor.actionLabel}`, 26);
-}
-
-/**
- * The texts to try over a crew member's dot, preferred first: `crewLabelText`, then for a crowd
- * the first name and the compact action ("Jax — relieving Noor"), when that is shorter.
- */
-export function crewLabelTexts(actor: Pick<RenderActor, "name" | "actionLabel">): string[] {
-  const full = crewLabelText(actor);
-  const first = actor.name.split(/\s+/)[0] ?? actor.name;
-  const short = truncateLabel(
-    `${first} — ${compactAction(actor.actionLabel) ?? actor.actionLabel}`,
-    26,
-  );
-  return short.length < full.length ? [full, short] : [full];
+export function crewLabelText(actor: Pick<RenderActor, "name">): string {
+  return firstName(actor.name);
 }
 
 /**
@@ -699,7 +658,7 @@ const LABEL_RANK = { session: 0, crew: 1, local: 2 } as const;
 interface PersonLabel {
   readonly x: number;
   readonly y: number;
-  /** Preferred first (`crewLabelTexts`). */
+  /** Preferred first. */
   readonly texts: readonly string[];
   readonly rank: (typeof LABEL_RANK)[keyof typeof LABEL_RANK];
   /** The dock's own people (D68) are labelled in a dimmer colour, so the crew read first. */
@@ -743,7 +702,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
     labels.push({
       x: actor.x,
       y: actor.y,
-      texts: crewLabelTexts(actor),
+      texts: [crewLabelText(actor)],
       rank: LABEL_RANK.crew,
       local: false,
       pushing: pushers.has(actor.id),
@@ -755,7 +714,7 @@ function personLabels(frame: RenderFrame): PersonLabel[] {
       labels.push({
         x: local.x,
         y: local.y,
-        texts: [truncateLabel(text, 34)],
+        texts: [text],
         rank: LABEL_RANK.local,
         local: true,
         pushing: local.carrying > 0,

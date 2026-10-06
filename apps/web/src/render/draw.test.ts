@@ -4,7 +4,6 @@ import type { DeckLayout } from "./deckLayout";
 import {
   actorDotColor,
   crewLabelText,
-  crewLabelTexts,
   deckPiles,
   drawActorLabels,
   drawCompartmentLabels,
@@ -13,40 +12,10 @@ import {
 import type { ViewTransform } from "./screen";
 import { mockCanvas } from "./testCanvas";
 
-describe("crewLabelText (D70)", () => {
-  it("keeps a meeting readable: the verb and the other person's first name", () => {
-    expect(crewLabelText({ name: "Mara Osei", actionLabel: "talking with Fenwick Adair" })).toBe(
-      "Mara Osei — talking with Fenwick",
-    );
-    expect(crewLabelText({ name: "Mara Osei", actionLabel: "ashore to see Ilse Brandt" })).toBe(
-      "Mara Osei — ashore to see Ilse",
-    );
-  });
-
-  it("names the watch being relieved by first name, and plotting without the port (slice-2 QA)", () => {
-    const jax = { name: "Jax Okonkwo", actionLabel: "relieving Noor Haddad at the helm" };
-    expect(crewLabelText(jax)).toBe("Jax Okonkwo — relieving Noor");
-    expect(crewLabelTexts(jax)).toEqual(["Jax Okonkwo — relieving Noor", "Jax — relieving Noor"]);
-    expect(
-      crewLabelText({ name: "Dane Whitcross", actionLabel: "plotting a course to Kessler Drift" }),
-    ).toBe("Dane Whitcross — plotting a course");
-    expect(crewLabelText({ name: "Dane Whitcross", actionLabel: "at the helm" })).toBe(
-      "Dane Whitcross — at the helm",
-    );
-  });
-
-  it("offers a first-name label for a crowd only when it is shorter", () => {
-    expect(crewLabelTexts({ name: "Mara Osei", actionLabel: "idle" })).toEqual([
-      "Mara Osei — idle",
-      "Mara — idle",
-    ]);
-    expect(crewLabelTexts({ name: "Halla", actionLabel: "idle" })).toEqual(["Halla — idle"]);
-  });
-
-  it("cuts any other label at 26 characters as before", () => {
-    expect(crewLabelText({ name: "Mara Osei", actionLabel: "looking round the dock" })).toBe(
-      "Mara Osei — looking round…",
-    );
+describe("crewLabelText", () => {
+  it("is the first name alone, whatever they are doing (slice-4 playtest)", () => {
+    expect(crewLabelText({ name: "Mara Osei" })).toBe("Mara");
+    expect(crewLabelText({ name: "Halla" })).toBe("Halla");
   });
 });
 
@@ -134,16 +103,13 @@ describe("person labels (D72)", () => {
   it("labels only the people whose dots are on the canvas", () => {
     const { ctx, texts } = mockCanvas();
     drawActorLabels(ctx, t, frameWith([mara], [greta]), false, 400, 300);
-    expect(texts.map((x) => x.text)).toEqual(["Mara Osei — idle"]);
+    expect(texts.map((x) => x.text)).toEqual(["Mara"]);
   });
 
   it("labels a local once the dock has brought them onto the canvas", () => {
     const { ctx, texts } = mockCanvas();
     drawActorLabels(ctx, t, frameWith([mara], [greta]), false, 2600, 300);
-    expect(texts.map((x) => x.text).sort()).toEqual([
-      "Greta — waiting for a delivery",
-      "Mara Osei — idle",
-    ]);
+    expect(texts.map((x) => x.text).sort()).toEqual(["Greta", "Mara"]);
   });
 
   it("keeps a label for someone at the top edge on the canvas", () => {
@@ -168,7 +134,7 @@ describe("person labels (D72)", () => {
     it("draws one plate for the game and no name labels for its players", () => {
       const { ctx, texts } = mockCanvas();
       drawActorLabels(ctx, t, frameWith([jax, tomas, mara], [], [cards]), false, 400, 300);
-      expect(texts.map((x) => x.text).sort()).toEqual(["Mara Osei — idle", "cards — Jax, Tomas"]);
+      expect(texts.map((x) => x.text).sort()).toEqual(["Mara", "cards — Jax, Tomas"]);
     });
 
     it("puts the plate over the venue, clear of the other labels", () => {
@@ -193,7 +159,7 @@ describe("person labels (D72)", () => {
       };
       drawActorLabels(ctx, t, frameWith([jax, tomas], [], [waiting]), false, 400, 300);
       expect(texts.map((x) => x.text).sort()).toEqual([
-        "Tomas Ruiz — idle",
+        "Tomas",
         "waiting for a game of cards — Jax",
       ]);
     });

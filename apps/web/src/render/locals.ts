@@ -13,6 +13,7 @@ import type { RenderDockProp, RenderLocal } from "@crew/sim";
 import { BLACK, mixHex } from "./color";
 import { CARGO_COLORS, drawCrate, drawLoadedTruck, itemColor } from "./crates";
 import { type ViewTransform, carriedSize, dotRadius, toScreenPx } from "./screen";
+import { firstName } from "./sessions";
 import { disc } from "./shapes";
 
 /**
@@ -93,12 +94,12 @@ export function drawLocalTrolleys(
 /**
  * The text over a local's dot, or `undefined` for none. A local is labelled only while doing
  * something (D68): the docked phone view is already crowded with the crew's labels, and a regular
- * standing at their post says nothing a tap does not.
+ * standing at their post says nothing a tap does not. Like the crew's, the label is the first
+ * name alone (slice-4 playtest); what they are doing is in the inspector.
  */
 export function localLabelText(local: Pick<RenderLocal, "name" | "label">): string | undefined {
   if (local.label === undefined) return undefined;
-  const first = local.name.split(/\s+/)[0] ?? local.name;
-  return `${first} — ${local.label}`;
+  return firstName(local.name);
 }
 
 /**
