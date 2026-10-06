@@ -1634,3 +1634,17 @@ warmest pair levels off at +6/+7 by day 3–5 and the mean stays at 0.8–1.5. E
 +9/+10 with the coldest at −1 or −3. Chat's draw on the `social` stream moved the lounge fixture's
 pinned card winner. Rejected: decaying a stored total toward 0, which would erase character along with the drift;
 and DF's limited close-friend slots, deferred until the narrator needs a lasting bond.
+
+**D89. Slice-4 playtest: first-name labels, and a job being finished is said to be free.** On a
+phone the overlay's "name — action" plates crowded each other even with D72's placement and
+D70's compact actions. A crew member's, passenger's or busy local's plate is now their first name
+alone; what they are doing is in the inspector, and mostly reads from where the dot is. Group
+session plates (slice 4) keep their activity, since one plate stands for several people. The
+playtest's long quiet after a delivery was the narrator, not the sim: freight unloading at its
+destination is still `inTransit`, the Jobs line said so, and on both `captainAshore` calls in the
+prod log the model wrote "the ship already has a job in hand" and offered nothing, so the ship sat
+until the next `quietTooLong` (a third of a day). The kernel already treats such a job as not in
+hand (`jobBlockingAcceptance`); the Jobs line now says "being finished here, not in hand: new work
+can be offered and taken now" on any job past offering whenever nothing blocks acceptance.
+Rejected: a second `captainAshore` ask after an idle spell, which D46 removed on purpose; the
+model's answer was wrong because its input was misleading, not because it had too few asks.
