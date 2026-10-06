@@ -2,13 +2,15 @@
  * Needs invariants for tests (SD §19.4 style). D74: every berth is a bed on the ship's deck: a
  * placement there whose machine carries `bed` and not `medBed`. Keys being actors and no shared
  * beds are content-free and live in `core/invariants.ts` (`berthViolations`). D79: every mood is
- * in [-1, 1] and is the clamped sum of the live thoughts (`moodOf`). Slice 4 (D85): every affinity
- * is within `±social.affinityRange` (whole numbers and actor keys are `core/invariants.ts`'s), every
+ * in [-1, 1] and is the clamped sum of the live thoughts (`moodOf`). D88: every memory's key is
+ * config's and none is held past its stack limit (expiries and actor keys are
+ * `core/invariants.ts`'s), every
  * rivalry row is a well-formed tally under a well-formed key, and the captain's table day is a
  * whole day or -1.
  */
 import { isBerthPlacement } from "../../core/berths";
 import { moodOf } from "../../core/thoughts";
+import type { MemoryKey } from "../../core/types/content";
 import type { World } from "../../core/types/kernel";
 import { shipDeckId } from "../../core/world";
 
@@ -55,13 +57,18 @@ function berthViolations(world: Pick<World, "state" | "content">): string[] {
 
 function socialViolations({ state, config }: Pick<World, "state" | "config">): string[] {
   const out: string[] = [];
-  const range = config.values.social.affinityRange;
+  const memories = config.values.social.memories;
   for (const [from, row] of Object.entries(state.social.relationships)) {
     for (const [to, relationship] of Object.entries(row)) {
-      if (!(Math.abs(relationship.affinity) <= range)) {
-        out.push(
-          `social.relationships.${from}.${to}.affinity ${relationship.affinity} is outside ±${range}`,
-        );
+      const counts = new Map<string, number>();
+      for (const memory of relationship.memories) {
+        counts.set(memory.key, (counts.get(memory.key) ?? 0) + 1);
+      }
+      for (const [key, count] of counts) {
+        const def = memories[key as MemoryKey];
+        if (def === undefined || count > def.stackLimit) {
+          out.push(`social.relationships.${from}.${to} holds ${count} of ${key}`);
+        }
       }
     }
   }

@@ -145,10 +145,16 @@ cards + vids; Tomas: sparring + cards; Priya: tinkering + debate; Oyelaran: read
 Sunniva: exercise + gossip; Dane: boardgames + music). Interests are soft state the narrator may
 nudge (GDD §17).
 
-**Relationships.** `relationships: Record<actorId, { affinity: -10..10 }>` plus coarse memories
-as thoughts with `refId`. Ambient chat gains an effect (+1 affinity per conversation, capped
-daily); activities move it more. Seat and partner choice prefer affinity > 0 and avoid < −3, so
-cliques appear on the canvas without any new system.
+**Relationships.** Affinity in −10..10, directed, and derived rather than stored (D88, after
+RimWorld's social memories and Dwarf Fortress's personality-driven bonds): a pair's
+*compatibility* (±2, fixed by how far apart their values sit and which likes they share or
+clash on) plus the *memories* one holds of the other (a good chat, a game, an argument, a private
+talk), each with an opinion, a duration in days and a stack limit. Repetition holds a memory's
+weight but never grows it, and memories expire, so affinity settles where a pair's company keeps
+it instead of climbing for as long as the game runs. Ambient chat leaves `chatted`, or
+`rubbedWrong` with a chance that falls with compatibility, so pairs who do not click cool by
+talking. Seat and partner choice prefer affinity > 0 and avoid ≤ −3, so cliques appear on the
+canvas without any new system. (Slice 4 shipped a running total; it reached +10 within a week.)
 
 **Activity definition (content, Zod).**
 

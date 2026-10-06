@@ -1,5 +1,5 @@
 /**
- * Social life (slice 4): relationships, outcomes and rivalries, ambient affinity, seats and the
+ * Social life (slice 4): relationships (memories, D88), outcomes and rivalries, ambient chat, seats and the
  * captain's table. Register after `registerRecreation` (same phase).
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
@@ -11,6 +11,6 @@ export function registerSocial(registry: KernelRegistry): Unregister {
 
 export { onConversation } from "./chat";
 export { resolveOutcome } from "./outcomes";
-export { moveAffinity, pruneSocial } from "./relationships";
+export { addMemory, pruneSocial } from "./relationships";
 export { type SeatOption, seatPreference } from "./seating";
 export { SOCIAL_EVERY_TICKS, socialSystem } from "./social";

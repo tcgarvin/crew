@@ -339,7 +339,9 @@ export function exampleWorldState(): WorldState {
     },
     galley: { lastMealWatch: 0 },
     social: {
-      relationships: { [a1]: { [a2]: { affinity: 2, lastChatTick: 300 } } },
+      relationships: {
+        [a1]: { [a2]: { memories: [{ key: "goodTime", expiresAtTick: 900 }], lastChatTick: 300 } },
+      },
       rivalries: { "a1|a2|activity.cards": { wins: 1, losses: 2, streak: -1 } },
       sessions: {
         [s1]: {

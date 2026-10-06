@@ -18,7 +18,9 @@
     "recreation": 0.4
   },
   "outcome": "contest",
-  "affinity": { "participants": 0, "winnerToLoser": 0, "loserToWinner": -1 },
+  "memories": {
+    "loserToWinner": "beatMe"
+  },
   "thoughts": {
     "win": "wonContest",
     "lose": "lostContest"

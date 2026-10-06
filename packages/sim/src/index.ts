@@ -36,7 +36,7 @@ export { registerRecreation } from "./systems/recreation/index";
 export { registerSocial } from "./systems/social/index";
 export { registerCabins } from "./systems/cabins/index";
 export { interestScore } from "./core/interests";
-export { affinityOf } from "./core/social";
+export { affinitiesFrom, affinityOf, compatibility } from "./core/social";
 export {
   gangwayStanderOf,
   helmWatchOf,

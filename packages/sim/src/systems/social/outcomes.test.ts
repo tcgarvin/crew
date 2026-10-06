@@ -29,7 +29,8 @@ import { resolveOutcome } from "./outcomes";
 const thoughtKeys = (world: World, id: ActorId) => actorOf(world, id).thoughts.map((t) => t.key);
 const ofType = (drafts: readonly EventDraft[], type: EventDraft["type"]) =>
   drafts.filter((d) => d.type === type);
-const feel = (world: World, from: ActorId, to: ActorId) => affinityOf(world.state.social, from, to);
+const feel = (world: World, from: ActorId, to: ActorId) =>
+  affinityOf(world.state, world.config.values.social, from, to);
 
 /** Everyone in the mess, out of the way of each other. */
 function inTheMess(world: World, ids: readonly ActorId[]): void {
@@ -78,7 +79,7 @@ describe("contest (call 5)", () => {
     expect(needsViolations(world)).toEqual([]);
   });
 
-  it("each loss is lostContest and −1 toward the winner; the third running is a rivalry", () => {
+  it("each loss is lostContest and beatMe toward the winner, held to its stack limit; the third running is a rivalry", () => {
     const { world } = socialWorld();
     inTheMess(world, [JAX, TOMAS]);
     const def = defOf(world, ACT.sharp);
@@ -101,8 +102,11 @@ describe("contest (call 5)", () => {
     ]);
     const beaten = actorOf(world, TOMAS).thoughts.filter((t) => t.key === "keepsBeatingMe");
     expect(beaten.map((t) => t.refId)).toEqual([JAX]);
-    // Three losses and the rivalry's extra −1.
-    expect(feel(world, TOMAS, JAX)).toBe(-4);
+    // D88: beatMe stacks to two, so the third loss holds it at −2; the rivalry adds its −1.
+    expect(feel(world, TOMAS, JAX)).toBe(-3);
+    expect(
+      world.state.social.relationships[TOMAS]?.[JAX]?.memories.map((m) => m.key).sort(),
+    ).toEqual(["beatMe", "beatMe", "keepsBeatingMe"]);
     // Tomas's side reads 0–3; the row is Jax's (the lower id comes first).
     expect(world.state.social.rivalries[rivalryKey(TOMAS, JAX, ACT.sharp)]).toEqual({
       wins: 3,
@@ -110,8 +114,9 @@ describe("contest (call 5)", () => {
       streak: 3,
     });
 
-    // A fourth loss refreshes the thought but is no second rivalry line.
+    // A fourth loss refreshes the thought and the memories but is no second rivalry line.
     expect(ofType(play(JAX), "rivalryStreak")).toEqual([]);
+    expect(feel(world, TOMAS, JAX)).toBe(-3);
     expect(actorOf(world, TOMAS).thoughts.filter((t) => t.key === "keepsBeatingMe")).toHaveLength(
       1,
     );
@@ -126,7 +131,7 @@ describe("contest (call 5)", () => {
     expect(needsViolations(world)).toEqual([]);
   });
 
-  it("the authored cards' affinity: +1 all round, loser to winner −1 (net 0 for the loser)", () => {
+  it("the authored cards' memories: goodTime all round, beatMe loser to winner (net 0 for the loser)", () => {
     const { world } = socialWorld();
     inTheMess(world, [JAX, TOMAS, NOOR]);
     const { ctx } = riggedCtx(world, JAX);
@@ -198,7 +203,7 @@ describe("debate (call 5)", () => {
     ]);
   });
 
-  it("(1, 2, 1) against (−1, 1, −1) on philosophy is a spirited talk: +2 each way", () => {
+  it("(1, 2, 1) against (−1, 1, −1) on philosophy is a spirited talk: goodTalk (+2) each way", () => {
     const { world } = socialWorld();
     setCharacter(world, NOOR, { values: [1, 2, 1] });
     setCharacter(world, BETTINA, { values: [-1, 1, -1] });
@@ -280,7 +285,7 @@ describe("perform and bond (call 5)", () => {
     expect(thoughtKeys(world, NOOR)).toEqual([]);
   });
 
-  it("a vid is a bond: goodCompany all round, +1 from its likers, never an argument", () => {
+  it("a vid is a bond: goodCompany all round, goodTime from its likers, never an argument", () => {
     const { world } = socialWorld();
     setCharacter(world, JAX, { likes: ["vids"], values: [2, 2, 2] });
     setCharacter(world, NOOR, { strong: "vids", values: [-2, -2, -2] });

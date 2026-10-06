@@ -18,6 +18,7 @@ import type {
   ItemTag,
   MachineDefId,
   MachineTag,
+  MemoryKey,
   PortDefId,
   PowerPriority,
   ProblemKind,
@@ -202,6 +203,21 @@ export const thoughtKeySchema = z.enum([
   "dressedDown",
   "ateATreat",
 ]);
+/** D88: what one person remembers about another (sim `MEMORY_KEYS`). */
+export const memoryKeySchema = z.enum([
+  "chatted",
+  "rubbedWrong",
+  "goodTime",
+  "beatMe",
+  "keepsBeatingMe",
+  "goodTalk",
+  "argued",
+  "playedForMe",
+  "sharedATable",
+  "heardMeOut",
+  "dressedMeDown",
+  "talkedItThrough",
+]);
 export const traitModifierSchema = z.enum([
   "hungerRate",
   "fatigueRate",
@@ -272,7 +288,8 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof traitModifierSchema>, TraitModifierKey>,
   AssertEqual<z.infer<typeof hullSizeClassSchema>, HullSizeClass>,
   AssertEqual<z.infer<typeof thoughtKeySchema>, ThoughtKey>,
+  AssertEqual<z.infer<typeof memoryKeySchema>, MemoryKey>,
   AssertEqual<z.infer<typeof interestTagSchema>, InterestTag>,
   AssertEqual<z.infer<typeof activityOutcomeSchema>, ActivityOutcome>,
   AssertEqual<z.infer<typeof problemKindSchema>, ProblemKind>,
-] = [true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+] = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];

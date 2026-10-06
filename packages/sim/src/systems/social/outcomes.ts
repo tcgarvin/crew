@@ -4,19 +4,19 @@
  *
  * - *contest*: a winner by `rng.weighted("social")` over the members with weight
  *   `1 + interestScore`; the tally and streak per loser (`social.rivalries`); `win`/`lose`
- *   thoughts; affinity by `def.affinity` (`participants` pairwise, `winnerToLoser`,
- *   `loserToWinner`); a losing run of `social.rivalry.streakFor` or more gives the loser
- *   `keepsBeatingMe` (refId the winner), and reaching it exactly also −1 toward the winner and
- *   `rivalryStreak` (one line per run, not one per further loss).
+ *   thoughts; memories by `def.memories` (`together` pairwise both ways, `loserToWinner`); a
+ *   losing run of `social.rivalry.streakFor` or more gives the loser the `keepsBeatingMe`
+ *   thought (refId the winner) and memory, and reaching it exactly also `rivalryStreak` (one
+ *   line per run, not one per further loss).
  * - *debate*: the session's topic (else one picked from `def.topics`); each member's stance by
- *   `stanceOn`; per pair, within `social.debate.agreeWithin` `spiritedTalk` and +2 both ways,
- *   at or beyond `argueBeyond` `argued` (refId the other) and −2 both ways, and the session's
+ *   `stanceOn`; per pair, within `social.debate.agreeWithin` `spiritedTalk` and `goodTalk` both
+ *   ways, at or beyond `argueBeyond` `argued` (thought refId the other, and memory) both ways, and the session's
  *   first arguing pair is its one `argument` event; anyone awake in the venue compartment who is
  *   not a member and does not like debate gets `gotLectured`.
  * - *perform*: everyone awake in the compartment but the performer (the host): likers of the
- *   def's interest `listened` (`enjoyedMusic`) and +1 toward the performer, dislikers
+ *   def's interest `listened` (`enjoyedMusic`) and `playedForMe` toward the performer, dislikers
  *   `listenedDislike` (`hatedTheNoise`), the neutral nothing.
- * - *bond*: with two or more members, `joined` (`goodCompany`) all round, and `participants` (+1)
+ * - *bond*: with two or more members, `joined` (`goodCompany`) all round, and `memories.together`
  *   from each member who likes the def's interest toward each other member (D85 tuning).
  * - *none*: nothing.
  *
@@ -38,7 +38,7 @@ import { rivalryKey } from "../../core/social";
 import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
-import type { ActivityDef, ThoughtKey, TopicDef } from "../../core/types/content";
+import type { ActivityDef, MemoryKey, ThoughtKey, TopicDef } from "../../core/types/content";
 import type { ActorId, DeckDefId, ItemId, TopicDefId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import type { Item } from "../../core/types/ship";
@@ -50,13 +50,8 @@ import { emitSim } from "../work/events";
 import { writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
 import { touchInventory } from "../work/steps";
-import { moveAffinity } from "./relationships";
+import { addMemory } from "./relationships";
 
-/** Debate affinity moves (call 5): a spirited talk +2 both ways, an argument −2 both ways. */
-export const DEBATE_AGREE_AFFINITY = 2;
-export const DEBATE_ARGUE_AFFINITY = -2;
-/** A losing run at `streakFor` costs the loser this much more toward the winner. */
-export const RIVALRY_AFFINITY = -1;
 /** Skill levels stop here (as piloting practice does at the helm). */
 const SKILL_CAP = 10;
 /** An interest score at or above this is a like (2 like, 3 strong). */
@@ -112,10 +107,10 @@ function pairsOf<T>(members: readonly T[]): [T, T][] {
   return members.flatMap((a, i) => members.slice(i + 1).map((b): [T, T] => [a, b]));
 }
 
-/** `delta` both ways between `a` and `b`. */
-function moveBoth(ctx: StepCtx, a: ActorId, b: ActorId, delta: number): void {
-  moveAffinity(ctx, a, b, delta);
-  moveAffinity(ctx, b, a, delta);
+/** `a` and `b` each remember `key` about the other. */
+function rememberBoth(ctx: StepCtx, a: ActorId, b: ActorId, key: MemoryKey): void {
+  addMemory(ctx, a, b, key);
+  addMemory(ctx, b, a, key);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -132,17 +127,15 @@ function resolveContest(ctx: StepCtx, def: ActivityDef, members: Actor[]): Outco
     })),
   );
   const losers = members.filter((actor) => actor.id !== winner.id);
-  const affinity = def.affinity;
-  if (affinity !== undefined) {
-    for (const [a, b] of pairsOf(members)) moveBoth(ctx, a.id, b.id, affinity.participants);
+  const together = def.memories?.together;
+  if (together !== undefined) {
+    for (const [a, b] of pairsOf(members)) rememberBoth(ctx, a.id, b.id, together);
   }
   if (def.thoughts?.win !== undefined) addThought(ctx, winner, def.thoughts.win);
+  const loserToWinner = def.memories?.loserToWinner;
   for (const loser of losers) {
     if (def.thoughts?.lose !== undefined) addThought(ctx, loser, def.thoughts.lose);
-    if (affinity !== undefined) {
-      moveAffinity(ctx, winner.id, loser.id, affinity.winnerToLoser);
-      moveAffinity(ctx, loser.id, winner.id, affinity.loserToWinner);
-    }
+    if (loserToWinner !== undefined) addMemory(ctx, loser.id, winner.id, loserToWinner);
     tally(ctx, def, winner, loser);
   }
   return { winnerId: winner.id };
@@ -168,8 +161,8 @@ function tally(ctx: StepCtx, def: ActivityDef, winner: Actor, loser: Actor): voi
   const { streakFor } = ctx.config.social.rivalry;
   if (run < streakFor) return;
   addThought(ctx, loser, "keepsBeatingMe", winner.id);
+  addMemory(ctx, loser.id, winner.id, "keepsBeatingMe");
   if (run !== streakFor) return;
-  moveAffinity(ctx, loser.id, winner.id, RIVALRY_AFFINITY);
   emitSim(ctx, "rivalryStreak", [winner.id, loser.id], {
     winnerId: winner.id,
     loserId: loser.id,
@@ -225,11 +218,11 @@ function resolveDebate(
     if (gap <= agreeWithin) {
       addThought(ctx, a, "spiritedTalk");
       addThought(ctx, b, "spiritedTalk");
-      moveBoth(ctx, a.id, b.id, DEBATE_AGREE_AFFINITY);
+      rememberBoth(ctx, a.id, b.id, "goodTalk");
     } else if (gap >= argueBeyond) {
       addThought(ctx, a, "argued", b.id);
       addThought(ctx, b, "argued", a.id);
-      moveBoth(ctx, a.id, b.id, DEBATE_ARGUE_AFFINITY);
+      rememberBoth(ctx, a.id, b.id, "argued");
       if (!argued)
         emitSim(ctx, "argument", [a.id, b.id], { aId: a.id, bId: b.id, topicId: topic.id });
       argued = true;
@@ -247,7 +240,7 @@ function resolvePerform(ctx: StepCtx, session: GroupSession, def: ActivityDef): 
     const score = interestScore(listener.interests, def.interest);
     if (score >= LIKES_FROM) {
       addThought(ctx, listener, liked);
-      moveAffinity(ctx, listener.id, performer.id, 1);
+      addMemory(ctx, listener.id, performer.id, "playedForMe");
     } else if (score === 0) {
       addThought(ctx, listener, disliked);
     }
@@ -258,13 +251,14 @@ function resolveBond(ctx: StepCtx, def: ActivityDef, members: Actor[]): void {
   if (members.length < 2) return;
   const joined: ThoughtKey = def.thoughts?.joined ?? "goodCompany";
   for (const member of members) addThought(ctx, member, joined);
-  const delta = def.affinity?.participants ?? 1;
+  const together = def.memories?.together;
+  if (together === undefined) return;
   // D85 tuning: only someone who likes the activity warms to the company (a neutral who sat
   // through the vids does not), so affinity is directed: a liker toward each other member.
   for (const member of members) {
     if (interestScore(member.interests, def.interest) < LIKES_FROM) continue;
     for (const other of members) {
-      if (other.id !== member.id) moveAffinity(ctx, member.id, other.id, delta);
+      if (other.id !== member.id) addMemory(ctx, member.id, other.id, together);
     }
   }
 }

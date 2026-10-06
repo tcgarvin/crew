@@ -18,6 +18,7 @@ import {
   validateStructure,
 } from "./index";
 import type { ValidationIssue } from "./issues";
+import { memoryKeySchema } from "./primitives";
 
 const door = (key: string, x: number, y: number, side: string, kind = "interior") => ({
   key,
@@ -309,6 +310,14 @@ const thoughts = {
 };
 
 const band = { min: 1, max: 3 };
+/** D88: every memory key, one row each. */
+const MEMORIES = Object.fromEntries(
+  memoryKeySchema.options.map((key) => [
+    key,
+    { label: key, opinion: key === "argued" ? -2 : 1, durationDays: 3, stackLimit: 2 },
+  ]),
+);
+
 const config = {
   time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
   movement: {
@@ -497,8 +506,10 @@ const config = {
     chatRadiusTiles: 2,
     chatCooldownSeconds: 45,
     templateLines: ["{a} joked"],
-    chatAffinity: 1,
-    chatAffinityEveryDays: 1,
+    chatMemoryEveryDays: 2,
+    chatSour: { atZero: 0.25, perPoint: 0.1 },
+    compatibility: { base: 2, perValuePoint: 0.5, perSharedLike: 1, perClash: 1, range: 2 },
+    memories: MEMORIES,
     affinityRange: 10,
     avoidBelow: -3,
     preferAbove: 0,
@@ -618,6 +629,27 @@ describe("content def schemas", () => {
     expect(activityDefSchema.safeParse(alone).success).toBe(false);
     const { solo: _solo, ...sololess } = alone;
     expect(activityDefSchema.safeParse(sololess).success).toBe(true);
+  });
+
+  it("holds every memory to a whole, non-zero opinion, and requires every key (D88)", () => {
+    const withMemories = (memories: Record<string, unknown>) => ({
+      ...config,
+      social: { ...config.social, memories },
+    });
+    expect(configDefSchema.safeParse(withMemories(MEMORIES)).success).toBe(true);
+    const idle = { ...MEMORIES, chatted: { ...MEMORIES.chatted, opinion: 0 } };
+    expect(configDefSchema.safeParse(withMemories(idle)).success).toBe(false);
+    const fractional = { ...MEMORIES, chatted: { ...MEMORIES.chatted, opinion: 0.5 } };
+    expect(configDefSchema.safeParse(withMemories(fractional)).success).toBe(false);
+    const { chatted: _chatted, ...missing } = MEMORIES;
+    expect(configDefSchema.safeParse(withMemories(missing)).success).toBe(false);
+  });
+
+  it("an activity's memories name memory keys (D88)", () => {
+    const remembered = { ...activity, memories: { together: "goodTime", loserToWinner: "beatMe" } };
+    expect(activityDefSchema.safeParse(remembered).success).toBe(true);
+    const unknown = { ...activity, memories: { together: "goodCompany" } };
+    expect(activityDefSchema.safeParse(unknown).success).toBe(false);
   });
 
   it("requires a voice on every crew member (D38)", () => {

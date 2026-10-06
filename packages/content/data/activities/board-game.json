@@ -23,9 +23,8 @@
     "win": "wonContest",
     "lose": "lostContest"
   },
-  "affinity": {
-    "participants": 1,
-    "winnerToLoser": 0,
-    "loserToWinner": -2
+  "memories": {
+    "together": "goodTime",
+    "loserToWinner": "beatMe"
   }
 }

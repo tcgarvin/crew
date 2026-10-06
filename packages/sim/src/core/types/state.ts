@@ -18,7 +18,7 @@
 import type { Actor } from "./actor";
 import type { CommandsState } from "./commands";
 import type { RngStreamName, Sfc32State, Tick } from "./common";
-import type { CrewDef, DirtTier, HazardKind, ItemDef } from "./content";
+import type { CrewDef, DirtTier, HazardKind, ItemDef, MemoryKey } from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
 import type { DocksideState } from "./dockside";
 import type {
@@ -71,14 +71,27 @@ import type { Claim, Problem, Task } from "./work";
  * 10 (2026-10-05): ship life slice 4 (D84-D87): `needs.recreation`, `Actor.interests` and
  * `values`, `social` (relationships, rivalries, group sessions, the captain's table, a private
  * talk) and `nextId.session`. Migrated; an old save also gets the scenario's books on the shelf.
+ * 11 (2026-10-05): D88, affinity from memories: `Relationship.affinity` is gone and
+ * `Relationship.memories` holds what one remembers of the other. Migrated: affinities are dropped
+ * (everyone starts at their compatibility), chat timing kept.
  */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
-/** Slice 4: what one person feels about another (directed). An entry exists once moved. */
+/** D88: one thing `from` remembers about `to`; its opinion is config's (`social.memories`). */
+export interface SocialMemory {
+  key: MemoryKey;
+  /** First tick the memory no longer counts; the social system drops it then. */
+  expiresAtTick: Tick;
+}
+
+/**
+ * Slice 4: what one person holds about another (directed). An entry exists once a chat or a
+ * memory names the pair. D88: affinity is not stored; it is compatibility plus the live memories
+ * (`affinityOf`).
+ */
 export interface Relationship {
-  /** Integer in [-social.affinityRange, social.affinityRange]. */
-  affinity: number;
-  /** Last ambient chat between the pair that moved affinity (`social.chatAffinityEveryDays`). */
+  memories: SocialMemory[];
+  /** Last ambient chat between the pair that left a memory (`social.chatMemoryEveryDays`). */
   lastChatTick?: Tick;
 }
 

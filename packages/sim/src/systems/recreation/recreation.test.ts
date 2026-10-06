@@ -65,8 +65,11 @@ const labelOf = (world: World, id: ActorId): string => {
   return activity === undefined || activity.kind === "idle" ? "idle" : (activity.label ?? "");
 };
 
-/** The seeded winner of the lounge's first game of cards (weights 1 + interest: Jax 4, Tomas 2). */
-const PINNED_WINNER: ActorId = TOMAS;
+/**
+ * The seeded winner of the lounge's first game of cards (weights 1 + interest: Jax 4, Tomas 2).
+ * D88: a chat's draw on the social stream comes before it, so the pin moved to Jax.
+ */
+const PINNED_WINNER: ActorId = JAX;
 
 /** A recreation candidate's personal choice, if it is one. */
 function chosen(result: ReturnType<typeof recreationCandidate>) {
@@ -213,7 +216,7 @@ describe("a game of cards (call 4)", () => {
     const ended = ofType(events, "sessionEnded")[0];
     expect(ended?.payload.outcome).toBe("contest");
     const winnerId = ended?.payload.winnerId;
-    // Seeded: the keen player usually wins (W2 tests that); this seed gives it to Tomas.
+    // Seeded: the keen player usually wins (W2 tests that); this seed gives it to Jax.
     expect(winnerId).toBe(PINNED_WINNER);
     const loserId = winnerId === JAX ? TOMAS : JAX;
     const keys = (id: ActorId) => world.state.actors[id]?.thoughts.map((t) => t.key) ?? [];

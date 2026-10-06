@@ -212,7 +212,7 @@ export const FIXTURE_ACTIVITIES: Readonly<Record<ActivityDefId, ActivityDef>> = 
     solo: { label: "playing solitaire", durationDays: 0.06, restores: { recreation: 0.3 } },
     outcome: "contest",
     thoughts: { win: "wonContest", lose: "lostContest" },
-    affinity: { participants: 1, winnerToLoser: 0, loserToWinner: -1 },
+    memories: { together: "goodTime", loserToWinner: "beatMe" },
   },
   {
     id: "activity.reading" as ActivityDefId,
@@ -271,13 +271,35 @@ export const FIXTURE_RECREATION: ConfigDef["recreation"] = {
   collapseBackoffDays: 0.1,
 };
 
-/** Slice 4: the default bundle's affinity keys of the `social` block (each fixture keeps its chat). */
+/** D88: the default bundle's memory table. */
+export const FIXTURE_MEMORIES: ConfigDef["social"]["memories"] = {
+  chatted: { label: "a good chat", opinion: 1, durationDays: 5, stackLimit: 2 },
+  rubbedWrong: { label: "got on my nerves", opinion: -1, durationDays: 5, stackLimit: 2 },
+  goodTime: { label: "a good time together", opinion: 1, durationDays: 3, stackLimit: 2 },
+  beatMe: { label: "beat me", opinion: -1, durationDays: 3, stackLimit: 2 },
+  keepsBeatingMe: { label: "keeps beating me", opinion: -1, durationDays: 3, stackLimit: 1 },
+  goodTalk: { label: "a good talk", opinion: 2, durationDays: 5, stackLimit: 1 },
+  argued: { label: "an argument", opinion: -2, durationDays: 5, stackLimit: 2 },
+  playedForMe: { label: "played for me", opinion: 1, durationDays: 3, stackLimit: 1 },
+  sharedATable: { label: "shared a table", opinion: 1, durationDays: 5, stackLimit: 1 },
+  heardMeOut: { label: "heard me out", opinion: 2, durationDays: 7, stackLimit: 1 },
+  dressedMeDown: { label: "dressed me down", opinion: -2, durationDays: 7, stackLimit: 1 },
+  talkedItThrough: { label: "talked it through", opinion: 1, durationDays: 7, stackLimit: 1 },
+};
+
+/**
+ * Slice 4: the default bundle's affinity keys of the `social` block (each fixture keeps its chat).
+ * D88: compatibility weighs nothing and no chat sours, so a fixture's pair starts at 0 and moves
+ * only by the memories its test gives; a test of compatibility sets its own.
+ */
 export const FIXTURE_SOCIAL: Omit<
   ConfigDef["social"],
   "chatRadiusTiles" | "chatCooldownSeconds" | "templateLines"
 > = {
-  chatAffinity: 1,
-  chatAffinityEveryDays: 1,
+  chatMemoryEveryDays: 1,
+  chatSour: { atZero: 0, perPoint: 0 },
+  compatibility: { base: 0, perValuePoint: 0, perSharedLike: 0, perClash: 0, range: 2 },
+  memories: FIXTURE_MEMORIES,
   affinityRange: 10,
   avoidBelow: -3,
   preferAbove: 0,

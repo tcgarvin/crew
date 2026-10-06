@@ -8,6 +8,7 @@ import {
   itemDefIdSchema,
   itemTagSchema,
   machineTagSchema,
+  memoryKeySchema,
   positive,
   positiveInt,
   problemKindSchema,
@@ -41,8 +42,6 @@ const restoresSchema = z.strictObject({
   comfort: unitInterval.exactOptional(),
 });
 
-const affinityDelta = z.number().int().min(-3).max(3);
-
 export const activityDefSchema = z
   .strictObject({
     id: activityDefIdSchema,
@@ -73,11 +72,10 @@ export const activityDefSchema = z
         listenedDislike: thoughtKeySchema.exactOptional(),
       })
       .exactOptional(),
-    affinity: z
+    memories: z
       .strictObject({
-        participants: affinityDelta,
-        winnerToLoser: affinityDelta,
-        loserToWinner: affinityDelta,
+        together: memoryKeySchema.exactOptional(),
+        loserToWinner: memoryKeySchema.exactOptional(),
       })
       .exactOptional(),
     topics: z.array(topicDefIdSchema).min(1).exactOptional(),

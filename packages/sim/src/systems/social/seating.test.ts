@@ -12,12 +12,12 @@ import {
   TOMAS,
   actorOf,
   addServing,
+  feels,
   galleyStepCtx,
   onGalleyDeck,
   placeAll,
   socialWorld,
 } from "./fixtures/social-world";
-import { moveAffinity } from "./relationships";
 import { type SeatOption, seatPreference } from "./seating";
 
 /** The table's four seats: 1 (7,0) and 2 (8,0) north, 3 (7,2) and 4 (8,2) south. */
@@ -40,10 +40,6 @@ function seat(world: World, n: 1 | 2 | 3 | 4, held = false): SeatOption {
     tile: { ...SEAT[n] },
     held,
   };
-}
-
-function feels(world: World, from: ActorId, to: ActorId, affinity: number): void {
-  moveAffinity(galleyStepCtx(world).ctx, from, to, affinity);
 }
 
 /** Who eats stands by the counter; the rest where the test says. */
@@ -150,8 +146,8 @@ describe("the captain's table (call 11)", () => {
     const first = galleyStepCtx(world);
     expect(seatPreference(first.ctx, mara, free())?.tile).toEqual(SEAT[2]);
     expect(actorOf(world, JAX).thoughts.map((t) => t.key)).toEqual(["satWithTheCaptain"]);
-    expect(affinityOf(world.state.social, MARA, JAX)).toBe(6);
-    expect(affinityOf(world.state.social, JAX, MARA)).toBe(1);
+    expect(affinityOf(world.state, world.config.values.social, MARA, JAX)).toBe(6);
+    expect(affinityOf(world.state, world.config.values.social, JAX, MARA)).toBe(1);
     expect(world.state.social.captainsTableDay).toBe(0);
     expect(first.drafts.filter((d) => d.type === "captainsTable").map((d) => d.payload)).toEqual([
       { captainId: MARA, withActorId: JAX },
@@ -167,8 +163,8 @@ describe("the captain's table (call 11)", () => {
     const next = galleyStepCtx(world);
     expect(seatPreference(next.ctx, mara, free())?.tile).toEqual(SEAT[3]);
     expect(actorOf(world, TOMAS).thoughts.map((t) => t.key)).toEqual(["satWithTheCaptain"]);
-    expect(affinityOf(world.state.social, MARA, TOMAS)).toBe(-3);
-    expect(affinityOf(world.state.social, TOMAS, MARA)).toBe(1);
+    expect(affinityOf(world.state, world.config.values.social, MARA, TOMAS)).toBe(-3);
+    expect(affinityOf(world.state, world.config.values.social, TOMAS, MARA)).toBe(1);
     expect(world.state.social.captainsTableDay).toBe(1);
   });
 

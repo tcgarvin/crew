@@ -22,10 +22,8 @@
   "thoughts": {
     "joined": "goodCompany"
   },
-  "affinity": {
-    "participants": 1,
-    "winnerToLoser": 0,
-    "loserToWinner": 0
+  "memories": {
+    "together": "goodTime"
   },
   "transitOnly": true
 }

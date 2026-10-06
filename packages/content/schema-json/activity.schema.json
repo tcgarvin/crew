@@ -326,26 +326,44 @@
       },
       "additionalProperties": false
     },
-    "affinity": {
+    "memories": {
       "type": "object",
       "properties": {
-        "participants": {
-          "type": "integer",
-          "minimum": -3,
-          "maximum": 3
-        },
-        "winnerToLoser": {
-          "type": "integer",
-          "minimum": -3,
-          "maximum": 3
+        "together": {
+          "type": "string",
+          "enum": [
+            "chatted",
+            "rubbedWrong",
+            "goodTime",
+            "beatMe",
+            "keepsBeatingMe",
+            "goodTalk",
+            "argued",
+            "playedForMe",
+            "sharedATable",
+            "heardMeOut",
+            "dressedMeDown",
+            "talkedItThrough"
+          ]
         },
         "loserToWinner": {
-          "type": "integer",
-          "minimum": -3,
-          "maximum": 3
+          "type": "string",
+          "enum": [
+            "chatted",
+            "rubbedWrong",
+            "goodTime",
+            "beatMe",
+            "keepsBeatingMe",
+            "goodTalk",
+            "argued",
+            "playedForMe",
+            "sharedATable",
+            "heardMeOut",
+            "dressedMeDown",
+            "talkedItThrough"
+          ]
         }
       },
-      "required": ["participants", "winnerToLoser", "loserToWinner"],
       "additionalProperties": false
     },
     "topics": {

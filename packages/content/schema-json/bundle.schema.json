@@ -3796,26 +3796,44 @@
             },
             "additionalProperties": false
           },
-          "affinity": {
+          "memories": {
             "type": "object",
             "properties": {
-              "participants": {
-                "type": "integer",
-                "minimum": -3,
-                "maximum": 3
-              },
-              "winnerToLoser": {
-                "type": "integer",
-                "minimum": -3,
-                "maximum": 3
+              "together": {
+                "type": "string",
+                "enum": [
+                  "chatted",
+                  "rubbedWrong",
+                  "goodTime",
+                  "beatMe",
+                  "keepsBeatingMe",
+                  "goodTalk",
+                  "argued",
+                  "playedForMe",
+                  "sharedATable",
+                  "heardMeOut",
+                  "dressedMeDown",
+                  "talkedItThrough"
+                ]
               },
               "loserToWinner": {
-                "type": "integer",
-                "minimum": -3,
-                "maximum": 3
+                "type": "string",
+                "enum": [
+                  "chatted",
+                  "rubbedWrong",
+                  "goodTime",
+                  "beatMe",
+                  "keepsBeatingMe",
+                  "goodTalk",
+                  "argued",
+                  "playedForMe",
+                  "sharedATable",
+                  "heardMeOut",
+                  "dressedMeDown",
+                  "talkedItThrough"
+                ]
               }
             },
-            "required": ["participants", "winnerToLoser", "loserToWinner"],
             "additionalProperties": false
           },
           "topics": {
@@ -5164,14 +5182,372 @@
                 "minLength": 1
               }
             },
-            "chatAffinity": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 3
-            },
-            "chatAffinityEveryDays": {
+            "chatMemoryEveryDays": {
               "type": "number",
               "minimum": 0
+            },
+            "chatSour": {
+              "type": "object",
+              "properties": {
+                "atZero": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "perPoint": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["atZero", "perPoint"],
+              "additionalProperties": false
+            },
+            "compatibility": {
+              "type": "object",
+              "properties": {
+                "base": {
+                  "type": "number"
+                },
+                "perValuePoint": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "perSharedLike": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "perClash": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "range": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["base", "perValuePoint", "perSharedLike", "perClash", "range"],
+              "additionalProperties": false
+            },
+            "memories": {
+              "type": "object",
+              "properties": {
+                "chatted": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "rubbedWrong": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "goodTime": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "beatMe": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "keepsBeatingMe": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "goodTalk": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "argued": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "playedForMe": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "sharedATable": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "heardMeOut": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "dressedMeDown": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "talkedItThrough": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "chatted",
+                "rubbedWrong",
+                "goodTime",
+                "beatMe",
+                "keepsBeatingMe",
+                "goodTalk",
+                "argued",
+                "playedForMe",
+                "sharedATable",
+                "heardMeOut",
+                "dressedMeDown",
+                "talkedItThrough"
+              ],
+              "additionalProperties": false
             },
             "affinityRange": {
               "type": "integer",
@@ -5220,8 +5596,10 @@
             "chatRadiusTiles",
             "chatCooldownSeconds",
             "templateLines",
-            "chatAffinity",
-            "chatAffinityEveryDays",
+            "chatMemoryEveryDays",
+            "chatSour",
+            "compatibility",
+            "memories",
             "affinityRange",
             "avoidBelow",
             "preferAbove",
