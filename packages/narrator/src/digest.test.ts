@@ -294,6 +294,45 @@ describe("buildDigest", () => {
     );
   });
 
+  it("says freight unloading at its destination is not in hand, so an offer can follow", () => {
+    const bundle = content();
+    const req = farCaptainAshoreRequest(bundle);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const state = snapshot.state;
+    if (state.travel.stage !== "docked") throw new Error("fixture: not docked");
+    const job = (id: string, status: Job["status"], fromPortId: string, toPortId: string) => {
+      state.jobs[id as JobId] = {
+        id: id as JobId,
+        origin: "narrator",
+        issuer: "Hal Petrosyan, queue clerk",
+        issuerPerson: { name: "Hal Petrosyan", role: "queue clerk" },
+        pitch: { key: "job.pitch.default", params: {} },
+        urgency: "relaxed",
+        description: { key: "test.job", params: {} },
+        fromPortId: fromPortId as PortDefId,
+        toPortId: toPortId as PortDefId,
+        cargo: [{ itemDefId: "item.crate_general" as ItemDefId, count: 1 }],
+        cargoClass: "general",
+        pay: 100,
+        status,
+        offeredTick: 0,
+        expiresAtTick: 99_999,
+        cargoItemIds: [],
+      };
+    };
+    const here = state.travel.portId;
+    job("j903", "inTransit", "port.green_meridian", here);
+    const jobLine = (text: string, id: string) =>
+      text.split("\n").find((l) => l.startsWith(`- ${id} `));
+    const unloading = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook).text;
+    expect(jobLine(unloading, "j903")).toMatch(/; being finished here, not in hand: .*$/);
+    // With another job really in hand, nothing is said to be free.
+    job("j902", "accepted", here, "port.green_meridian");
+    const held = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook).text;
+    expect(jobLine(held, "j903")).not.toContain("not in hand");
+    expect(jobLine(held, "j902")).not.toContain("not in hand");
+  });
+
   it("lists the captain first, as the player and never a speaker, with her voice (D41)", () => {
     const req = quietTooLongRequest(content());
     const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);

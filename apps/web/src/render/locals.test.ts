@@ -251,11 +251,9 @@ describe("a local's look", () => {
 });
 
 describe("local labels", () => {
-  it("label a local only while they are doing something, by first name", () => {
+  it("label a local only while they are doing something, by first name alone", () => {
     expect(localLabelText({ name: "Hal Petrosyan" })).toBeUndefined();
-    expect(localLabelText({ name: "Hal Petrosyan", label: "waiting by three crates" })).toBe(
-      "Hal — waiting by three crates",
-    );
+    expect(localLabelText({ name: "Hal Petrosyan", label: "waiting by three crates" })).toBe("Hal");
   });
 
   it("draws crew labels and busy locals' labels, not idle locals'", () => {

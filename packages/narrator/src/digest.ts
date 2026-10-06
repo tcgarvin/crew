@@ -25,6 +25,7 @@ import {
   dayTicks,
   describeEvent,
   effectiveMarket,
+  jobBlockingAcceptance,
   marketBlock,
   ticksToSeconds,
 } from "@crew/sim";
@@ -526,8 +527,16 @@ function problemSection(snapshot: Snapshot, content: ContentBundle): Section {
   return section("Open problems", lines, 4);
 }
 
+/**
+ * Slice-4 playtest: freight unloading at its destination still reads `inTransit`, and the model
+ * took that for a job in hand and offered nothing when the captain went ashore, so the ship sat
+ * idle until the next check-in. A job past offering that no longer blocks acceptance says so.
+ */
+const FINISHING_HERE = "; being finished here, not in hand: new work can be offered and taken now";
+
 function jobSection(state: State, content: ContentBundle): Section {
   const live = new Set(["offered", "accepted", "inTransit", "delivered"]);
+  const blocking = jobBlockingAcceptance(state);
   const lines = Object.values(state.jobs)
     .filter((j) => live.has(j.status))
     .sort((a, b) => a.offeredTick - b.offeredTick || a.id.localeCompare(b.id))
@@ -549,7 +558,8 @@ function jobSection(state: State, content: ContentBundle): Section {
         passage === undefined
           ? cargo
           : `${passage.roundTrip ? "round-trip passage" : "one-way passage"} (${passage.endReason ?? `leg ${passage.leg}`})${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
-      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}${far}, ${kind}`;
+      const finishing = j.status !== "offered" && blocking === undefined ? FINISHING_HERE : "";
+      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}${far}, ${kind}${finishing}`;
     });
   return section("Jobs", lines, 7);
 }
