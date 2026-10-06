@@ -1599,3 +1599,38 @@ the mess fills less than before (a running game holds its players past the serve
 later; making the meal call interrupt games mostly abandoned them); dayworkers are idle about a
 third of the time, though rarely bored; long waiting labels truncate on the plate; the full
 suite's galley tests can pass vitest's 5 s timeout under machine load.
+
+**D88. Affinity from compatibility and memories.** Slice 4's running total climbed to +10 within a
+week and on one seed nobody cooled below zero: nearly every event added to it, nothing took it
+back, and friends sat together and chatted more. Affinity is now derived, after RimWorld's social
+memories and Dwarf Fortress's personality-driven bonds. What `from` feels about `to`
+(`affinityOf`) is the pair's *compatibility* plus the opinions of the *memories* `from` holds of
+`to`, clamped to ±10. Compatibility is symmetric and fixed by who they are: `2 − ½ × (summed
+value-axis gaps) + (likes in common) − (likes one has that the other dislikes, both ways)`,
+rounded, clamped to ±2. Over the authored nine it runs from −2 to +2 and averages about 0.
+Memories are a closed set the sim raises (`MEMORY_KEYS`: chatted, rubbedWrong, goodTime, beatMe,
+keepsBeatingMe, goodTalk, argued, playedForMe, sharedATable, heardMeOut, dressedMeDown,
+talkedItThrough). Their opinion (a whole number, never 0), duration (3–7 days) and stack limit
+(1–2) are config (`social.memories`), because the code that raises them is fixed and only their
+weight is tuned. One more memory past the stack limit refreshes the one expiring soonest, so
+repetition holds a memory's weight but never grows it. Memories expire, so affinity settles where
+the pair's company keeps it. Between two crew members, positive memories reach +7 at most (+9
+with compatibility); only the captain's table and private talk go past that. Ambient chat leaves each side `chatted`, or
+`rubbedWrong` with chance `0.25 − 0.1 × compatibility` (5 % to 45 %); the sides roll apart, so
+one can enjoy a talk the other found grating, and a pair that does not click cools by talking. An
+activity's `affinity` deltas become `memories` (`together`, `loserToWinner`); `winnerToLoser` went
+because nothing used it. Contests now cost the loser nothing net per game (goodTime +1, beatMe
+−1), since bounded memories no longer need D85's net −1 to stop the climb; a run of two adds
+keepsBeatingMe. Readers (seats, the planner's `self.affinity`, now over every other actor, the
+digest, beats) call `affinityOf`/`affinitiesFrom`. Nothing stores affinity, so a retuned memory
+or compatibility weight changes every relationship at once. Within a save, though, it applies only
+to keys the save's config lacks (`fillConfig`). The social system drops expired memories every
+tick, and an entry left with neither memories nor a chat time is deleted. Schema 11 migrates 10:
+affinities are dropped (a total cannot be split into memories), so everyone starts at their
+compatibility, and chat times are kept. `crew beats` gains a per-day table of crew affinities
+(highest, lowest, mean, pairs ≥ +6 and ≤ −3). Over 7 days, seeds 1–3 and both scenarios, the
+warmest pair levels off at +6/+7 by day 3–5 and the mean stays at 0.8–1.5. Every run has pairs at
+−3/−4 (2–12 of 72 directed). Collapses stay at 24–34 % (mean 27 %). Before, seed 1 ended at
++9/+10 with the coldest at −1 or −3. Chat's draw on the `social` stream moved the lounge fixture's
+pinned card winner. Rejected: decaying a stored total toward 0, which would erase character along with the drift;
+and DF's limited close-friend slots, deferred until the narrator needs a lasting bond.
