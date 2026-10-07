@@ -1,10 +1,10 @@
 # Ship Life: Implementation Plan
 
 Status: plan, 2026-10-04. Design and rationale: `docs/design/ship-life.md` (section references
-below are to that file unless marked Dockside). Five slices, as §12. Each slice ends deployed,
+below are to that file unless marked Dockside). Eight slices, as §12 (re-sequenced 2026-10-06, D91). Each slice ends deployed,
 with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
-playtest, and a pause to take stock. Slices 1–4 are planned in full below; slice 5 is
-sequenced and will be refined after slice 4 lands. Each slice adds its own `D<n>` entries.
+playtest, and a pause to take stock. Slices 1–4 are planned in full below; slice 5 was
+re-planned around the asteroid field on 2026-10-06 (D91) and slices 6–8 are sequenced after it. Each slice adds its own `D<n>` entries.
 Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74); slices 3 and 4 were planned
 the same day against slice 2's gate and plan, before its workstreams merged, slice 4 also
 against slice 3's plan.
@@ -2438,16 +2438,206 @@ gathering, and a tap on Jax shows his likes and who he is close to.
   `crew beats` counts sessions, outcomes, solo recreation and ticker lines per watch and is
   the instrument the tuning commit answers to.
 
-## Slice 5: The bridge, later stations
+## Slice 5: The asteroid field
 
-1. Engineering console and workbench get their activities (tinkering is slice 4; diagnostics
-   here); drills at the gym muster zone every other day.
-2. `requiredWhen`/`alert` station framework: tactical and shields as content on the reserved
-   tiles, `stationToStaff` at essential class under an `alert` state (no alert source yet).
-3. `seedTopic` narrator command; the beats-per-watch report rerun to retune pacing (§9) and the
-   open question on target play speed settled.
+Re-planned 2026-10-06 with the owner, after slice 4 landed (D89, D90). The slice first sequenced
+here (engineering-console diagnostics, drills, a station framework with tactical and shields
+on an `alert` state nothing raised, `seedTopic`) built machinery with nothing to do. This slice
+builds the threat first: a narrator-scheduled **asteroid field** that the ship crosses in
+transit, taking random impacts on a tile grid, FTL-style. Stations, shields and the medic follow
+in later slices as answers to it (see "Later slices" below).
 
-Checkpoint: adding a station is a JSON file.
+Scope: the field as a narrator beat with the narrator in control of its shape and of chosen hits;
+detection by the helm and a ship `alert` state; impacts uniform over the deck with blast radius;
+machine effects (graze, damage, knockout, fault); a global hull bar, hull scars patched underway with kits
+for part of their cost and fully repaired at port; getting stuck when the engines are out; ship
+loss and game over; intercom panels and the reporting reflex; the officer of the watch holding
+the bridge and sending scouts; rocks, impact flashes, scars, the hull bar and alert on the phone.
+Nobody aboard is hurt this slice (bodies arrive in slice 6). Save schema 11 → 12 (migrated).
+Narrator prompt v0.24 (`pnpm test:live` once).
+
+Cut from the earlier slice 5: drills (owner: no muster drills); the medic, until injuries exist
+(slice 6); `seedTopic` (no deck motion; later); engineering-console diagnostics (later); the
+tactical/shields station and the station framework (slice 8).
+
+The gate and workstreams are planned in full, in the slice 1–4 format, when the slice starts;
+what follows is the design they implement.
+
+### Calls made
+
+1. **The field is a narrator beat, not a route property.** A new narrator command
+   `scheduleField` replaces the `asteroidBelt` hazard kind (removed from `HAZARD_KINDS`; the
+   instant nav hazards `debrisField` and `ionStorm` stay the helm's). The route says nothing; the
+   narrator decides where and when, so the same lane never plays the same twice. Budget: one
+   field per leg, in the same window rules as `scheduleFault`/`scheduleHazard`.
+2. **The narrator gets real control over the field** (owner: it must be able to tell a story,
+   including predetermining outcomes). `scheduleField` carries:
+   - `severity`: `light | heavy | brutal`, mapping in config to the mean impact rate, the share
+     of large rocks and the field's length (90–180 s at 1× to start);
+   - `detection`: `rolled` (the helm's check, call 4) or `unseen` (the field is noticed at the
+     first impact, whatever the helm does);
+   - `scripted`: up to three chosen impacts, each `{ atSeconds, target, rock?, effect? }` where
+     `target` is a machine, a compartment or a tile, `rock` is `small | large`, and `effect` is
+     one of the machine effects of call 7. A scripted impact replaces a random one at that
+     moment, so the rate holds.
+   - Targeting a person ("the hit injured Tomas") waits for bodies in slice 6, when `target`
+     gains an actor; the command shape is ready for it, the kernel rejects it until then.
+   - The kernel guard: scripted impacts alone may not take the hull to zero (validation drops
+     the field with a reason the narrator sees). Random impacts can, which is the danger.
+3. **Kernel field state.** `WorldState.field?: ActiveField { id; severity; startsAtTick;
+   noticedAtTick?; endsAtProgress; impacts; stuckImpacts; scripted }`, from schedule to exit.
+   The field occupies a stretch of the leg's route progress; the ship is in it while progress is
+   inside that stretch. It ends when progress leaves it, or after `field.stuckDriftImpacts`
+   impacts taken while not moving (call 9).
+4. **Detection and alert.** When a `rolled` field is `field.warningSeconds` (12 s) from its start,
+   the helm-stander rolls piloting against the severity, the same curve as nav hazards. Pass:
+   `fieldSighted` ("Jax: rocks ahead"), the ship goes on alert and the impacts begin after the
+   warning. Fail, an empty helm, or `unseen`: nothing, until the first impact sets alert. Alert
+   is `WorldState.alert?: { sinceTick; cause: "field" }`, cleared `field.alertClearSeconds` (60 s)
+   after the field ends. While on alert:
+   - recreation ends and is not offered (voluntary loses to the essential work below anyway; the
+     alert also closes open sessions);
+   - sleepers sleep unless an impact lands in their compartment (they wake and see it);
+   - the officer of the watch stays on the bridge (owner) and sends scouts (call 11);
+   - damage problems raised by impacts are essential class.
+5. **Impacts are uniform over the deck** (owner: every square the same chance; if the engines
+   are rarely hit, make them bigger in content, not weight the dice). An impact picks a tile
+   uniformly from the deck's hull footprint (walls included). Arrival is Poisson at the
+   severity's rate; helm skill lowers the rate (call 8).
+6. **Rocks have a size and a blast.** `small` hits one tile; `large` hits the tile and its eight
+   neighbours (radius 1), the start of area effects that later weapons reuse. Every impact costs
+   hull (`field.hullDamage.small`/`large`) once, however many tiles it covers, and leaves a scar
+   on its centre tile (call 10).
+7. **Machine effects are rolled, and one hit can take a system from whole to out** (owner: a
+   single shot can knock a system offline). Every machine with a footprint tile inside the blast
+   rolls once on `field.machineEffects`, a weighted table:
+   - `none`: the rock glanced off;
+   - `graze`: integrity −0.2;
+   - `damage`: integrity −0.5, so a whole machine is derated (D35: below 0.5);
+   - `knockout`: integrity to 0, inoperable from full in one hit;
+   - `fault`: one of the machine's fault defs, through the existing fault path.
+   Integrity damage is restored by the existing repair path (a damage repair raises the
+   `machineFault`-style problem the equipment system already uses for blocked machines; the gate
+   names it). Starting weights: none 25, graze 25, damage 25, knockout 10, fault 15. A machine
+   with no faults rerolls `fault` as `damage`.
+8. **The helm threads the field.** Rate × (1 − 0.4 × skill/10) with someone at the helm, ×1.5
+   with nobody; the helm never changes damage. The helm's check is on detection (call 4), not on
+   every rock.
+9. **Stuck is a clock, not a cliff.** With the engines inoperable the ship stops making progress
+   and stays in the field at ×0.7 the rate (tumbling with the rocks, not crossing them). After
+   `field.stuckDriftImpacts` impacts while stuck, the ship drifts clear and the field ends. A
+   stuck ship that fixes its engines resumes and leaves by progress. The question is how much
+   hull is lost before the engineers finish, never whether it is infinite. Stationary is never
+   safer than a manned helm underway, so cutting the engines is not the right play.
+10. **A global hull bar, FTL-style** (owner; supersedes simulation-design §10.6 "no mandatory
+    global hull-health bar"). `WorldState.hull { integrity; max; scars: HullScar[] }`, `max`
+    from the hull class (100 for `light_freighter`). Each impact's hull damage is recorded on its
+    scar. Underway, a scar is patched with a `patch_kit` from a locker: a `hullScar` problem
+    (discovered; seen in the room), a `patchHull` task (fetch a kit, walk to the scar, weld,
+    engineering ≥ 1) that restores `field.patchRecovers` (half) of that scar's damage and marks it
+    patched. At port the crew repair the rest themselves (owner): if the port sells
+    `hull_plating`, a `hullDamaged` problem buys it on the parts-buying pattern (D47, from ship's
+    money) and `plateHull` tasks install a plate at each scar, restoring the rest of its damage
+    and clearing it. Nothing gates departure on the hull: a conflict between repairs and something
+    else (a departure, short money, no plating at this port) is the narrator's hook, not a check.
+    Kits: two per locker zone across the ship (`patch_kit`, stackable), also bought at port.
+11. **The officer of the watch holds the bridge and sends scouts** (owner). Every impact is felt
+    by everyone aboard ("the ship shudders"): a `hullImpact` fact with no place, except that
+    whoever is in the compartment sees where. The officer of the watch, on alert, raises a
+    `compartmentToCheck` problem (public, essential) for each compartment nobody has reported
+    since the last impact; the nearest available on-watch crew member takes it, walks there, and
+    perception does the rest. The captain is the officer of the watch on their watch and is not
+    sent.
+12. **Intercom panels and the reporting reflex** (owner: comms in 5). A new machine,
+    `machine.intercom` (tag `comm`, one wall tile, `operate` position), one per compartment on
+    Mk2 and Mk1, placed in content. When someone learns of new damage (a scar, a damaged
+    machine, a fault symptom) during alert, their next step is the nearest working panel,
+    a 3 s `report`, which writes every damage fact they hold to everyone aboard as `report`
+    evidence with the original observation time (the `tellCrew` pattern) and resolves that
+    compartment's `compartmentToCheck`. Ticker: "Bettina on the intercom: galley's hit, stove's
+    out." It is a reflex in the planner (containment-class, above the work it reports), not a
+    weighed task, and it is not repeated for facts already public. A panel is a machine, so it can
+    be hit: a reporter walks to the next one. The bridge has no automatic hull sensors: the
+    player sees the hull bar fall; the crew learn where only by eyes and intercom.
+13. **Ship loss is game over** (owner). Hull at zero: `shipLost` event, the run ends, the save
+    is marked lost (`lostAtTick`), and the web shows an end screen with the ship's last day and a
+    new-game button. No partial survival, no escape pods.
+14. **No departure check on the hull** (owner). The digest tells the narrator the hull, the
+    repairs under way and whether the ship is leaving with them unfinished; the prompt asks it to
+    make that a story when it matters and not to schedule a field the hull cannot survive unless
+    the ship left damaged.
+15. **What the narrator sees.** Watch digest lines: field scheduled (severity, detection,
+    scripted targets; "[scheduled; nobody aboard knows]"), field in progress (impacts so far,
+    stuck or moving, who is at the helm), hull `integrity/max` with scars patched and unpatched
+    and repairs under way at port,
+    damage known to the crew against damage that exists ("the hold has a scar nobody has seen"),
+    and who reported on the intercom. `hookOnEvents` gains `fieldSighted`, `fieldEntered` (unseen),
+    `fieldCleared` and `shipStuck`.
+16. **On the phone.** In transit, a rock layer between the stars and the hull and a sparser one
+    over the ship (the foreground slot), both scrolling with the stars while a field is near or
+    active; an impact is a short flash on the hit tiles; scars are a per-tile overlay on the dirt
+    channel's pattern (a scar frame, applied at playback tick); the hull bar sits in the HUD
+    beside the ship's state; alert tints the HUD and labels the bell line "ALERT". Auto-slowdown
+    fires on `fieldSighted`, the first impact, `shipStuck` and any machine made inoperable.
+17. **People are not hurt this slice.** An impact on a tile with someone on it hits the tile; the
+    person gets a `nearMiss` thought (−) and a ticker line. Honest and visible, nothing pretended:
+    no fake injury state before bodies exist.
+
+### Build order (for the gate and workstreams)
+
+Field and impacts first with nobody responding, so every step after is playable: (1) gate: types,
+`field`/`alert`/`hull` state, schema 12 and its migration, `scheduleField` command and
+validation, content (intercom, patch kit, config blocks), ticker lines; (2) sim: the field,
+detection, impacts, effects, stuck, hull, ship loss; (3) sim/planner: alert behaviour,
+patching, port plating, scouts; (4) sim/planner: intercom reflex and broadcast; (5) web: rock layers, flash,
+scars, hull bar, alert, end screen; (6) narrator: command, digest,
+capabilities, prompt v0.24, fixtures regenerated; (7) tuning by the lead against `crew beats`
+(field lines per field, hull lost per severity, time stuck, time from impact to report, ships
+lost over seeds), and the target play speed ruled (open question 2 in the design).
+
+Checkpoint: a 1× phone run where a heavy field is sighted by the helm, the alert tints the HUD,
+rocks pass over the ship, a hit takes the galley stove out, the cook reports it on the intercom,
+an engineer repairs it, someone patches a scar in the hold, and the hull bar ends lower than it
+started; and a seeded run where the engines go out, the ship is stuck, and the crew get it moving
+before the hull fails.
+
+### D-entries for slice 5 (D91 onward, provisional)
+
+- **D91.** Ship Life is re-sequenced around the asteroid field: slice 5 is the field, damage
+  and comms; 6 atmosphere and breaches with bodies and the medic; 7 fire; 8 tactical, shields
+  and the station framework. Drills are cut; `seedTopic` and diagnostics move to later. PLAN §7's
+  deferral of atmosphere, fire, breaches and bodies is lifted in that order.
+- **D92.** The asteroid field: `scheduleField` with severity, detection and scripted impacts;
+  detection by the helm and the alert state; impacts uniform over the deck with a blast radius;
+  rolled machine effects up to a one-hit knockout; the helm threads the field; stuck is a clock.
+- **D93.** A global hull bar and ship loss, superseding simulation-design §10.6: scars patched
+  underway for half, plated by the crew at port in full when the port sells plating; no
+  departure check, conflicts are the narrator's; hull zero is game over.
+- **D94.** Intercom panels and reporting: impacts are felt everywhere and seen only in the room;
+  the officer of the watch holds the bridge and sends scouts; whoever finds damage reports at
+  the nearest panel, which tells everyone; the bridge has no hull sensors.
+- **D95.** Save schema 12, prompt v0.24, the beats report's field section and the play-speed
+  ruling.
+
+## Later slices
+
+Sequenced, not planned; each is planned in full when the one before it lands.
+
+- **Slice 6: Atmosphere and breaches.** Some hull hits open a breach; per-compartment oxygen and
+  pressure; life support does real work and can fail; doors seal (`sealQuality` read at last);
+  patch kits seal breaches; bodies, minimally: hypoxia, incapacitation, death; the narrator's
+  `target` gains a person; the medic, the medbay bed and first aid, now with patients.
+- **Slice 7: Fire.** Fire per tile, spread through oxygen, extinguishers in lockers, fire damage
+  to machines and people, venting a burning compartment (the GDD's canonical captain decision).
+- **Slice 8: Tactical and shields.** One tactical station (sensors and shields) on a reserved
+  bridge tile, the `requiredWhen`/`alert` station framework ("a station is a JSON file"), an
+  alert bill naming who stands each station, the first responder who holds a post until the
+  assigned person relieves them (and the same for repairs: a better engineer takes over),
+  shield power draw, and the shield system as a target. Weapons are operated at the weapon, not
+  the bridge, when combat comes.
+- **Later:** engineering-console diagnostics (the unread `maintenance.intervalSeconds` is
+  deleted or given that use), `seedTopic`, weapons, combat, short-handed rotation once injuries
+  exist.
 
 ## Risks across slices
 
