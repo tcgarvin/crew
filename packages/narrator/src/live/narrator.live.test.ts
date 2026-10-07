@@ -64,12 +64,17 @@ const skipReason =
     ? " (skipped: no OPENROUTER_API_KEY in the environment or packages/narrator/.env.local)"
     : "";
 
+/**
+ * One live call. D97: a story call the model answered is followed by its notes turn, as the
+ * server runs it; the notes it writes replace the response's, and both latencies are logged.
+ */
 async function liveRun(
   req: NarratorRequest,
   options: { readonly model?: string; readonly notes?: unknown } = {},
 ): Promise<NarratorRun> {
   if (apiKey === undefined) throw new Error("no API key");
-  return runNarratorWithTrace(req, {
+  const started = Date.now();
+  const run = await runNarratorWithTrace(req, {
     gameId: req.gameId,
     content: content(),
     transport: openRouterTransport({ apiKey, appTitle: "Crew live tests" }),
@@ -77,6 +82,18 @@ async function liveRun(
     notes: options.notes,
     ...(reasoningEffort ? { reasoningEffort } : {}),
   });
+  const planMs = Date.now() - started;
+  if (run.notesTurn === undefined) return run;
+  const notes = await run.notesTurn();
+  const notesMs = Date.now() - started - planMs;
+  expect(notes.ok, notes.ok ? "" : `notes turn failed (${notes.reason}): ${notes.error}`).toBe(
+    true,
+  );
+  if (!notes.ok) return run;
+  console.log(
+    `${req.hook.kind}: plan ${planMs} ms (${run.response.usage?.outputTokens} out), notes ${notesMs} ms (${notes.usage.outputTokens} out, ${notes.usage.cacheReadInputTokens}/${notes.usage.inputTokens} cached); summary: ${notes.notes.summary}`,
+  );
+  return { ...run, response: { ...run.response, notesUpdate: notes.notes } };
 }
 
 /**

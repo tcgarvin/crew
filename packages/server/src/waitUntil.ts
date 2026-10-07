@@ -1,45 +1,26 @@
 /**
- * `waitUntil` from `@vercel/functions`, used opportunistically. This package does not depend on
- * `@vercel/functions` (it isn't installed in this workspace and the narrator route must work
- * without it locally and in tests) — we probe for it at runtime via dynamic import and fall back
- * to just awaiting the work inline when it isn't present or there's no request context to extend.
+ * Work that may finish after the response is sent. On Vercel, `waitUntil` keeps the function
+ * alive for it; anywhere else (local dev, tests) it is awaited inline, so it has finished when the
+ * caller continues.
+ *
+ * D97: `@vercel/functions` was once probed for at runtime with a dynamic import it could never
+ * resolve (it was not installed and the bundle had no copy), so every "after response" job ran
+ * inline in production too. It is now a dependency, imported statically so the bundle has it.
  */
-
-type WaitUntilFn = (promise: Promise<unknown>) => void;
-
-/** `waitUntil`, or undefined when `@vercel/functions` is not installed. */
-async function probeWaitUntil(): Promise<WaitUntilFn | undefined> {
-  try {
-    // Dynamic + a non-literal-looking specifier so bundlers don't try to resolve this at build
-    // time when the package isn't installed.
-    const specifier = "@vercel/functions";
-    const mod = (await import(/* @vite-ignore */ specifier)) as { waitUntil?: WaitUntilFn };
-    return typeof mod.waitUntil === "function" ? mod.waitUntil : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** The probe runs once per process. */
-let waitUntilProbe: Promise<WaitUntilFn | undefined> | undefined;
+import { waitUntil } from "@vercel/functions";
 
 /**
- * Runs `work` so it can finish after the response is sent when a Vercel request context is
- * available (via `@vercel/functions`'s `waitUntil`), otherwise just awaits it inline. Errors are
- * swallowed here; callers that care should catch inside `work`.
+ * Runs `work` after the response when `onVercel` (`Env.onVercel`), otherwise awaits it inline.
+ * Errors are swallowed here; callers that care should catch inside `work`.
  */
-export async function runAfterResponse(work: () => Promise<void>): Promise<void> {
-  waitUntilProbe ??= probeWaitUntil();
-  const waitUntil = await waitUntilProbe;
-  // Started once: if `waitUntil` refuses it, the same run is awaited inline rather than repeated.
+export async function runAfterResponse(
+  work: () => Promise<void>,
+  onVercel: boolean,
+): Promise<void> {
   const pending = work().catch(() => {});
-  if (waitUntil) {
-    try {
-      waitUntil(pending);
-      return;
-    } catch {
-      // `waitUntil` throws outside a Vercel request context; fall through to inline execution.
-    }
+  if (onVercel) {
+    waitUntil(pending);
+    return;
   }
   await pending;
 }

@@ -1850,3 +1850,42 @@ as OpenRouter's `reasoning.effort`; `default` sends nothing, because on a model 
 reason by default (Sonnet, the preview model) any effort switches thinking on and makes the call
 slower. The live suite reads the same variable and passed eight of eight on luna at `low`
 (3.6-8 s a call). The 25 s timeout stays; at these latencies it is no longer the binding limit.
+
+**D97. The notes come after the plan, in a second turn the player does not wait for.** A story
+call used to return plan and notes in one reply; the notes (about 300 tokens, 1-3 s on luna at
+`low`, D96) sat on the player's path though only the next call reads them. Now the plan schema has
+no `notes`. Once the plan is translated, `runNarratorWithTrace` answers with the notes as they
+stand (the stored notes plus this call's server-kept changes: beats, cards, cast met, rejections)
+and hands back `notesTurn`, which continues the same conversation: the same system prefix (so it
+reads from the prompt cache: 96-98% of its input in the live run), the plan's user turn, the plan
+as the assistant turn with the model's `reasoning_details`, then a user turn with what became of
+the plan (each dropped intent and why, and a thread a beat card started) and the notes schema.
+The rules say the notes are written as they stand after the plan.
+
+*Reasoning handed back.* OpenRouter returns an OpenAI model's reasoning as an encrypted
+`reasoning_details` block; the transport sends it back on the assistant turn, with
+`reasoning.context: "all_turns"` when an effort is set. The provider bills it as input (prompt
+tokens rose by exactly the reasoning tokens), so it is delivered. Whether the model reads it was
+not shown: asked in a later turn for a number it chose only in its reasoning, luna answered
+"unknown" with and without the hand-back, at `auto` and at `all_turns`. It costs little, so it
+stays. Two calls rather than one streamed reply was the owner's choice: no stream parsing, and
+the notes turn could move to a cheaper model.
+
+*The route.* The story call's row, the notes as they stand, and a `notes` row with status
+`pending` (hook kind `notes`, its own `NarratorCallKind`, so it neither uses the story budget nor
+spaces story calls) are written before the response; the notes turn runs after it, through
+`waitUntil` (`@vercel/functions` is now a dependency: the old runtime probe could never resolve
+it, so "after the response" had always run inline), stores the model's notes and finishes the row
+`ok` or `error`. A call that arrives while a notes row is pending waits for it, polling every
+500 ms for up to the notes timeout (45 s) plus 5 s; an older pending row is a notes turn that was
+cut off and is ignored. A failed notes turn keeps the plan's notes: the model's summary, threads
+and cast stay as the previous call left them, the server-kept parts are current. A beat card may
+name a thread that is not stored yet: it starts that thread, and the notes turn is told to write
+it (the translator used to look for it in the same reply's notes). A hook of kind `notes` is
+refused. `crew narrator-log`'s digest rebuild reads the notes from the newest earlier notes turn
+as well, and `crew narrator eval` prints the notes turn.
+
+*Live run* (`pnpm test:live`, luna at `low`): every story case green with its notes turn; the plan
+took 2.4-5.3 s (157-429 output tokens) and the notes turn 1.3-4.0 s, against 4.8-7.0 s for both in
+one reply before (D96's run). The staging case once staged no post at `low` (a floor set in play) and passed three
+reruns. Prompt v0.25.

@@ -4,14 +4,16 @@
  * `./memory.ts` exactly (tests run against the memory fake; this file is exercised only by hand
  * against a real Neon database — see `docs/DEPLOYMENT.md`).
  */
-import { type SQL, and, desc, eq, gte, ne, sql } from "drizzle-orm";
+import { type SQL, and, desc, eq, gte, ne, notInArray, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { games, narratorCalls, saves, users } from "./schema";
 import {
   type Db,
+  type FinishNarratorCallInput,
   type GameNarratorSummary,
   type GameRow,
   type LogNarratorCallInput,
+  NOTES_HOOK_KIND,
   type NarratorCallFilter,
   type NarratorCallKind,
   type NarratorCallRow,
@@ -22,11 +24,11 @@ import {
   assertIdPrefix,
 } from "./types";
 
-/** D67: a staging call is a `stageDock` hook; every other hook kind is a story call. */
+/** D67: a staging call is a `stageDock` hook, D97 a notes turn `notes`; the rest are story. */
 function kindCondition(kind: NarratorCallKind): SQL {
-  return kind === "staging"
-    ? eq(narratorCalls.hookKind, STAGING_HOOK_KIND)
-    : ne(narratorCalls.hookKind, STAGING_HOOK_KIND);
+  if (kind === "staging") return eq(narratorCalls.hookKind, STAGING_HOOK_KIND);
+  if (kind === "notes") return eq(narratorCalls.hookKind, NOTES_HOOK_KIND);
+  return notInArray(narratorCalls.hookKind, [STAGING_HOOK_KIND, NOTES_HOOK_KIND]);
 }
 
 const ROLLING_SAVES_KEPT = 5;
@@ -178,6 +180,15 @@ export class DrizzleDb implements Db {
     const [row] = await this.db.insert(narratorCalls).values(input).returning();
     if (!row) throw new Error("logNarratorCall: insert returned no row");
     return toNarratorCallRow(row);
+  }
+
+  async finishNarratorCall(id: string, input: FinishNarratorCallInput): Promise<void> {
+    const rows = await this.db
+      .update(narratorCalls)
+      .set(input)
+      .where(eq(narratorCalls.id, id))
+      .returning({ id: narratorCalls.id });
+    if (rows.length === 0) throw new Error(`finishNarratorCall: no narrator call ${id}`);
   }
 
   async countNarratorCallsSince(

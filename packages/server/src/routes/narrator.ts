@@ -10,13 +10,23 @@
  * client then acknowledges with the floor set instead of pausing the game (D57's exception to
  * D43). In `null` mode the server answers with the floor set itself and logs
  * `[narrator] staging fallback <reason>`.
+ *
+ * D97: a story call the model answered is followed by its notes turn, after the response: a
+ * `notes` row is logged `pending` before the plan goes out and finished when the notes are
+ * stored. A call that arrives while that row is pending waits for it (up to `NOTES_WAIT_MS`), so
+ * it always reads the notes the previous call wrote.
  */
 import { gzipSync } from "node:zlib";
-import type { NarratorRequest, NarratorResponse } from "@crew/narrator";
+import {
+  NOTES_TIMEOUT_MS,
+  type NarratorRequest,
+  type NarratorResponse,
+  type NotesRun,
+} from "@crew/narrator";
 import type { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../auth";
-import { type Db, type LogNarratorCallInput, narratorCallKind } from "../db/types";
+import { type Db, type LogNarratorCallInput, NOTES_HOOK_KIND, narratorCallKind } from "../db/types";
 import type { Env } from "../env";
 import { apiError, loadOwnedGame, parseJsonBody } from "../http";
 import {
@@ -64,6 +74,99 @@ const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
  *   per docking.
  */
 const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision", "captainAshore"]);
+
+/**
+ * D97: how long a call waits for the previous call's notes turn: its timeout plus slack for the
+ * database writes. A pending row older than this is a notes turn that died (the function was cut
+ * off): it is ignored.
+ */
+const NOTES_WAIT_MS = NOTES_TIMEOUT_MS + 5_000;
+const NOTES_POLL_MS = 500;
+
+/**
+ * D97: the game's notes once no notes turn is pending, or, if one is still pending after
+ * `NOTES_WAIT_MS`, the notes as they stand (the plan's, without the model's rewrite).
+ */
+async function settledNotes(db: Db, gameId: string): Promise<unknown> {
+  const startedAt = Date.now();
+  for (;;) {
+    const [pending] = await db.listNarratorCalls({
+      gameId,
+      hookKind: NOTES_HOOK_KIND,
+      status: "pending",
+      limit: 1,
+    });
+    const now = Date.now();
+    if (pending === undefined || now - pending.createdAt.getTime() > NOTES_WAIT_MS) break;
+    if (now - startedAt > NOTES_WAIT_MS) {
+      console.warn("[narrator] notes turn still pending; reading the notes as they stand", {
+        gameId,
+        notesCallId: pending.id,
+      });
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, NOTES_POLL_MS));
+  }
+  const game = await db.getGame(gameId);
+  if (game === undefined) throw new Error(`settledNotes: game ${gameId} disappeared`);
+  return game.narrativeNotes;
+}
+
+/** D97: runs a notes turn and finishes its pending row; never throws (it runs after the response). */
+async function finishNotesTurn(
+  db: Db,
+  gameId: string,
+  rowId: string,
+  notesTurn: () => Promise<NotesRun>,
+): Promise<void> {
+  const startedAt = Date.now();
+  try {
+    const run = await notesTurn();
+    const latencyMs = Date.now() - startedAt;
+    if (run.ok) {
+      await db.updateNotes(gameId, run.notes);
+      await db.finishNarratorCall(rowId, {
+        model: run.model,
+        inputTokens: run.usage.inputTokens,
+        outputTokens: run.usage.outputTokens,
+        latencyMs,
+        status: "ok",
+        response: { notes: run.notes, usage: run.usage },
+        error: null,
+      });
+      return;
+    }
+    console.warn("[narrator] notes turn failed", { gameId, reason: run.reason, error: run.error });
+    await db.finishNarratorCall(rowId, {
+      model: MODEL_PLACEHOLDER,
+      inputTokens: null,
+      outputTokens: null,
+      latencyMs,
+      status: "error",
+      response: run.rawContent === undefined ? null : { rawContent: run.rawContent },
+      error: `${run.reason}: ${run.error}`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[narrator] notes turn threw", { gameId, error: message });
+    await db
+      .finishNarratorCall(rowId, {
+        model: MODEL_PLACEHOLDER,
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs: Date.now() - startedAt,
+        status: "error",
+        response: null,
+        error: message,
+      })
+      .catch((finishErr: unknown) =>
+        console.error("[narrator] could not finish the notes row", {
+          gameId,
+          error: finishErr instanceof Error ? finishErr.message : String(finishErr),
+        }),
+      );
+  }
+}
 
 const MODEL_PLACEHOLDER = "null-narrator";
 const PROMPT_VERSION_PLACEHOLDER = "v0";
@@ -156,6 +259,9 @@ export function registerNarratorRoutes(
     const reqBody = { ...parsed.data, gameId } as unknown as NarratorRequest;
 
     const kind = narratorCallKind(reqBody.hook.kind);
+    if (kind === "notes") {
+      return apiError(c, 400, "badRequest", "notes is not a hook kind.");
+    }
     const staging = kind === "staging";
 
     // Store the snapshot as a milestone save; it becomes this call's (and the next check's) basis.
@@ -211,12 +317,13 @@ export function registerNarratorRoutes(
       }
     }
 
+    const notes = await settledNotes(db, gameId);
     const startedAt = Date.now();
     try {
       const outcome = await runNarrator(reqBody, {
         openRouterApiKey: env.openRouterApiKey,
         gameId,
-        notes: game.narrativeNotes,
+        notes,
         model: staging ? env.stagingModel : env.narratorModel,
         reasoningEffort: staging ? env.stagingReasoningEffort : env.narratorReasoningEffort,
         ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
@@ -247,25 +354,46 @@ export function registerNarratorRoutes(
         });
       }
 
-      await runAfterResponse(async () => {
-        await logCall({
-          // W9: the response carries model, prompt version and usage; `fallback` (null path and
-          // why) is kept in the `response` jsonb.
+      // D97: written before the response, so the next call sees this one's notes or waits for
+      // them: the log row, the notes as they stand after the plan, and the pending notes row.
+      await logCall({
+        // W9: the response carries model, prompt version and usage; `fallback` (null path and
+        // why) is kept in the `response` jsonb.
+        model: response.model,
+        promptVersion: response.promptVersion,
+        inputTokens: response.usage?.inputTokens ?? null,
+        outputTokens: response.usage?.outputTokens ?? null,
+        latencyMs,
+        status: "ok",
+        response,
+        error: null,
+      });
+      // D67: the staging call never writes notes (the narrator sends none for it; the route does
+      // not take its word for that).
+      if (!staging && response.notesUpdate !== undefined) {
+        await db.updateNotes(gameId, response.notesUpdate);
+      }
+      const notesTurn = outcome.notesTurn;
+      if (!staging && notesTurn !== undefined) {
+        const pending = await db.logNarratorCall({
+          gameId,
+          hookKind: NOTES_HOOK_KIND,
+          basisSaveId: basisSave.id,
           model: response.model,
           promptVersion: response.promptVersion,
-          inputTokens: response.usage?.inputTokens ?? null,
-          outputTokens: response.usage?.outputTokens ?? null,
-          latencyMs,
-          status: "ok",
-          response,
+          inputTokens: null,
+          outputTokens: null,
+          latencyMs: null,
+          status: "pending",
+          request: { forHook: reqBody.hook.kind, callId: response.callId },
+          response: null,
           error: null,
         });
-        // D67: the staging call never writes notes (the narrator sends none for it; the
-        // route does not take its word for that).
-        if (!staging && response.notesUpdate !== undefined) {
-          await db.updateNotes(gameId, response.notesUpdate);
-        }
-      });
+        await runAfterResponse(
+          () => finishNotesTurn(db, gameId, pending.id, notesTurn),
+          env.onVercel,
+        );
+      }
 
       return c.json(response);
     } catch (err) {

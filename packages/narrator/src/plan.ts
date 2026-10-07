@@ -16,3 +16,15 @@ export function planJsonSchema(schema: z.ZodType): Record<string, unknown> {
   >;
   return rest;
 }
+
+/**
+ * The schema block. It depends only on the plan schema, never on the game state, so it stays in
+ * the cached static prefix.
+ */
+export function schemaInstruction(jsonSchema: Readonly<Record<string, unknown>>): string {
+  return [
+    "Answer with one JSON object and nothing else: no prose, no code fence.",
+    "It must validate against this JSON Schema (every property is required):",
+    JSON.stringify(jsonSchema),
+  ].join("\n");
+}

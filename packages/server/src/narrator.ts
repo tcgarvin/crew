@@ -9,6 +9,7 @@ import {
   type FallbackReason,
   type NarratorRequest,
   type NarratorResponse,
+  type NotesRun,
   type ReasoningEffort,
   defaultContent,
   nullNarratorResponse,
@@ -39,6 +40,8 @@ export interface NarratorCtx {
 export interface NarratorOutcome {
   readonly response: NarratorResponse;
   readonly error?: string;
+  /** D97: the model's notes turn, which the route runs after the response. */
+  readonly notesTurn?: () => Promise<NotesRun>;
 }
 
 /** D43: why a narrator call could not be answered by the model, as the route reports it. */
@@ -95,5 +98,9 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
     reasoningEffort: ctx.reasoningEffort,
   });
-  return { response: run.response, ...(run.error === undefined ? {} : { error: run.error }) };
+  return {
+    response: run.response,
+    ...(run.error === undefined ? {} : { error: run.error }),
+    ...(run.notesTurn === undefined ? {} : { notesTurn: run.notesTurn }),
+  };
 };

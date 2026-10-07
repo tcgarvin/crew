@@ -22,14 +22,18 @@ function content(): ContentBundle {
 }
 
 function planWith(intents: unknown[]): ModelTransport {
+  // D97: the plan turn, then the notes turn (the one with a continuation).
   return async (request) => ({
     model: request.model,
-    content: JSON.stringify({
-      rationale: "A long quiet leg and the junior at the helm: put something in her path.",
-      intents,
-      card: null,
-      notes: { summary: "Quiet run to Green Meridian.", threads: [], cast: [] },
-    }),
+    content: JSON.stringify(
+      request.continuation.length > 0
+        ? { summary: "Quiet run to Green Meridian.", threads: [], cast: [] }
+        : {
+            rationale: "A long quiet leg and the junior at the helm: put something in her path.",
+            intents,
+            card: null,
+          },
+    ),
     finish: "stop",
     usage: {
       inputTokens: 1000,
@@ -37,6 +41,7 @@ function planWith(intents: unknown[]): ModelTransport {
       cacheReadInputTokens: 0,
       cacheCreationInputTokens: 0,
     },
+    reasoningDetails: [],
   });
 }
 

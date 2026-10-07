@@ -188,7 +188,7 @@ interface Env {
   readonly content: ContentBundle;
   readonly hook: DeepReadonly<NarratorHook> | undefined;
   readonly secrets: readonly string[];
-  /** Stored threads first, then any the plan's notes introduce this call. */
+  /** The stored threads (D97: the notes for this call are written after the plan). */
   readonly threads: readonly KnownThread[];
   /** D41: the player's avatar; never a card speaker. Undefined when nobody is tagged captain. */
   readonly captainName: string | undefined;
@@ -725,25 +725,24 @@ function speakerName(env: Env, raw: string): Outcome<string | undefined> {
 }
 
 /**
- * D39: a beat card must name a thread the model has (stored, or written this call) that has not
- * had its beat card yet, and both sides must be effect none: the card records the captain's
- * attitude, it does not set a course.
+ * D39: a beat card must name a thread that has not had its beat card yet, and both sides must be
+ * effect none: the card records the captain's attitude, it does not set a course. D97: the notes
+ * are written after the plan, so a title that matches no stored thread starts a new one; the
+ * notes turn is told to write it.
  */
 function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
   const raw = intent.beatOfThread;
   if (raw.trim() === "") return ok(undefined);
   const wanted = raw.trim().toLowerCase();
   const thread = env.threads.find((t) => t.title.trim().toLowerCase() === wanted);
-  if (thread === undefined) {
-    return no(`beatOfThread "${raw.trim()}" matches no thread in your notes; name one exactly`);
+  if (intent.left.effect !== "none" || intent.right.effect !== "none") {
+    return no("a beat card's sides are the captain's attitude; both must be effect none");
   }
+  if (thread === undefined) return ok(raw.trim());
   if (thread.beatCardShown) {
     return no(
       `thread "${thread.title}" already had its beat card; its next card must pay it off (nextBeat)`,
     );
-  }
-  if (intent.left.effect !== "none" || intent.right.effect !== "none") {
-    return no("a beat card's sides are the captain's attitude; both must be effect none");
   }
   return ok(thread.title);
 }
@@ -974,24 +973,12 @@ export const translateIntents: TranslateIntents = (
   const snapshot = ctx.snapshot;
   const hook = ctx.hook ?? snapshot.state.narrator.pendingHook;
   const intentSchema = buildNarratorPlanSchema().shape.intents.element;
-  const written: readonly { readonly title?: unknown }[] = Array.isArray(plan.notes?.threads)
-    ? plan.notes.threads
-    : [];
   const env: Env = {
     snapshot,
     content: ctx.content,
     hook,
     secrets: secretPhrases(snapshot, ctx.content),
-    // D39: a thread the plan starts this call can be foreshadowed, but only stored threads can
-    // already have had their beat card.
-    threads: [
-      ...(ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
-      ...written.flatMap((t) =>
-        typeof t.title === "string"
-          ? [{ title: t.title, beatCardShown: false, stored: false }]
-          : [],
-      ),
-    ],
+    threads: (ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
     captainName: captainName(snapshot, ctx.content),
     tally: {
       spawns: 0,

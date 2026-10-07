@@ -1,8 +1,9 @@
 /**
  * `runNarrator`: one narrator call end to end (PLAN §3, D5). Loads content, builds the digest,
  * asks the model (through the injected `ModelTransport`) for a `NarratorPlan` with structured
- * output, Zod-validates and translates it, and returns commands, card prose and the rewritten
- * notes. Any failure (no transport, provider error, timeout, refusal, truncation, invalid
+ * output, Zod-validates and translates it, and returns commands and card prose. D97: the model
+ * writes its notes in a second turn after the plan (`NarratorRun.notesTurn`), which the server
+ * runs once the plan has been answered; the response carries the notes as they stand until then. Any failure (no transport, provider error, timeout, refusal, truncation, invalid
  * output) falls back to the deterministic null response with `fallback` set, so a hook never
  * blocks the game (review N3). D67: a `stageDock` hook goes to the staging call instead
  * (`staging/run.ts`), over the same digest, with its own prompt, schema and translator.
@@ -27,8 +28,11 @@ import {
   type NarratorPlanSchema,
   type NarratorRequest,
   type NarratorResponse,
+  type NarratorUsage,
   type TranslationResult,
+  type WrittenNotes,
   buildNarratorPlanSchema,
+  buildNotesSchema,
 } from "./contract";
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
@@ -44,12 +48,12 @@ import {
   parseNotes,
 } from "./notes";
 import { nullNarratorResponse } from "./null";
-import { planJsonSchema } from "./plan";
+import { planJsonSchema, schemaInstruction } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
 import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
 import { translateIntents } from "./translate";
-import type { ModelTransport, ReasoningEffort } from "./transport";
+import type { ModelTransport, ReasoningDetails, ReasoningEffort } from "./transport";
 
 /** Default model slug (owner); override with `CREW_NARRATOR_MODEL` via `ctx.model`. */
 export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
@@ -67,6 +71,13 @@ export const NARRATOR_TIMEOUT_MS = 25_000;
 export const STAGING_TIMEOUT_MS = 10_000;
 /** A plan is a few hundred tokens; the rest is headroom for the model's reasoning. */
 export const NARRATOR_MAX_TOKENS = 4_000;
+/**
+ * D97: the notes turn runs after the plan has been answered, so the player never waits on it,
+ * but the game's next call waits for it; it may take longer than a story call, not forever.
+ */
+export const NOTES_TIMEOUT_MS = 45_000;
+/** D97: notes are a few hundred tokens; the rest is headroom for reasoning. */
+export const NOTES_MAX_TOKENS = 4_000;
 
 export interface RunNarratorCtx {
   readonly gameId: string;
@@ -98,11 +109,32 @@ export interface NarratorTrace {
   readonly plan?: NarratorPlan | StagingEnvelope;
 }
 
+/** D97: the notes turn's result: the notes to store, or why the model wrote none. */
+export type NotesRun =
+  | {
+      readonly ok: true;
+      readonly notes: NarratorNotes;
+      readonly model: string;
+      readonly usage: NarratorUsage;
+      readonly rawContent: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: FallbackReason;
+      readonly error: string;
+      readonly rawContent?: string;
+    };
+
 export interface NarratorRun {
   readonly response: NarratorResponse;
   readonly trace: NarratorTrace;
   /** Why the fallback was taken, for logs. */
   readonly error?: string;
+  /**
+   * D97: present when the model answered a story call: asks it for its notes, continuing from the
+   * plan and its reasoning. `response.notesUpdate` holds the notes until this has run.
+   */
+  readonly notesTurn?: () => Promise<NotesRun>;
 }
 
 let cachedBundle: ContentBundle | undefined;
@@ -274,8 +306,8 @@ function textsShown(translated: TranslationResult): string[] {
  * D45: a cast entry's `portId` is a plain string in the plan; empty, or a port that does not
  * exist, means nowhere in particular.
  */
-function castWritten(plan: NarratorPlan, content: ContentBundle) {
-  return plan.notes.cast.map((entry) => ({
+function castWritten(written: WrittenNotes, content: ContentBundle) {
+  return written.cast.map((entry) => ({
     ...entry,
     portId: content.ports[entry.portId as PortDefId] === undefined ? null : entry.portId,
   }));
@@ -287,7 +319,7 @@ function castWritten(plan: NarratorPlan, content: ContentBundle) {
  * dropped).
  */
 function notesFrom(
-  plan: NarratorPlan,
+  written: WrittenNotes,
   previous: NarratorNotes,
   tick: number,
   translated: TranslationResult,
@@ -303,9 +335,9 @@ function notesFrom(
     translated.closedThread,
   );
   return boundNotes({
-    summary: plan.notes.summary,
+    summary: written.summary,
     threads: mergeThreads(
-      plan.notes.threads,
+      written.threads,
       previous.threads,
       tick,
       textsShown(translated),
@@ -314,7 +346,7 @@ function notesFrom(
     ),
     cardsShown,
     cast: placeEndedPassengers(
-      mergeCast(castWritten(plan, content), previous.cast, issuersMet(commands, content), tick),
+      mergeCast(castWritten(written, content), previous.cast, issuersMet(commands, content), tick),
       state,
       content,
     ),
@@ -322,6 +354,105 @@ function notesFrom(
     // D41: non-fatal corrections ride along with the drop reasons.
     lastRejections: [...dropped.map((d) => d.reason), ...translated.notes],
   });
+}
+
+/**
+ * D97: the stored notes as the model would write them, so the notes stored with the plan (before
+ * the notes turn) carry this call's server-kept changes over the model's previous notes.
+ */
+function writtenFrom(notes: NarratorNotes): WrittenNotes {
+  return {
+    summary: notes.summary,
+    threads: notes.threads.map(({ title, scale, people, stage, nextBeat }) => ({
+      title,
+      scale,
+      people: [...people],
+      stage,
+      nextBeat,
+    })),
+    cast: notes.cast.map(({ name, note, portId }) => ({ name, note, portId: portId ?? "" })),
+  };
+}
+
+/** D97: the notes turn's user message: what became of the plan, then the notes schema. */
+function notesRequest(translated: TranslationResult, stored: NarratorNotes): string {
+  const outcome =
+    translated.dropped.length === 0
+      ? ["Every intent in your plan was carried out."]
+      : translated.dropped.map((d) => `Dropped intent ${d.intentIndex} (${d.kind}): ${d.reason}`);
+  const beat = translated.beatCardThread;
+  const known = (title: string) =>
+    stored.threads.some((t) => t.title.trim().toLowerCase() === title.trim().toLowerCase());
+  const newThread =
+    beat !== undefined && !known(beat)
+      ? [
+          `Your beat card foreshadows a new thread, "${beat}": write it into threads with that title.`,
+        ]
+      : [];
+  return [
+    "# Now your notes",
+    "",
+    ...outcome,
+    ...translated.notes,
+    ...newThread,
+    "",
+    'Write your notes now (see "Your notes").',
+    schemaInstruction(planJsonSchema(buildNotesSchema())),
+  ].join("\n");
+}
+
+interface NotesTurnInputs {
+  readonly transport: ModelTransport;
+  readonly model: string;
+  readonly prompt: NarratorPrompt;
+  readonly planJsonSchema: Readonly<Record<string, unknown>>;
+  readonly planReply: string;
+  readonly reasoningDetails: ReasoningDetails;
+  readonly reasoningEffort: ReasoningEffort;
+  readonly request: string;
+  readonly merge: (written: WrittenNotes) => NarratorNotes;
+}
+
+/**
+ * D97: the notes turn. The same system prefix as the plan (so it reads from the prompt cache),
+ * the plan's user turn, the model's plan with its reasoning, then the request for notes.
+ */
+async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
+  let rawContent: string | undefined;
+  try {
+    const result = await callModel(turn.transport, {
+      model: turn.model,
+      system: turn.prompt.system,
+      user: turn.prompt.user,
+      continuation: [
+        { role: "assistant", content: turn.planReply, reasoningDetails: turn.reasoningDetails },
+        { role: "user", content: turn.request },
+      ],
+      schemaName: "narrator_plan",
+      jsonSchema: turn.planJsonSchema,
+      maxTokens: NOTES_MAX_TOKENS,
+      reasoningEffort: turn.reasoningEffort,
+      timeoutMs: NOTES_TIMEOUT_MS,
+    });
+    rawContent = contentOf(result);
+    const parsed = buildNotesSchema().safeParse(parseJsonReply(rawContent));
+    if (!parsed.success) throw schemaIssue("notes", parsed.error.issues);
+    return {
+      ok: true,
+      notes: turn.merge(parsed.data),
+      model: result.model,
+      usage: result.usage,
+      rawContent,
+    };
+  } catch (err) {
+    if (!(err instanceof FallbackError)) throw err;
+    return {
+      ok: false,
+      reason: err.reason,
+      error: err.message,
+      ...(rawContent === undefined ? {} : { rawContent }),
+    };
+  }
 }
 
 /**
@@ -398,15 +529,18 @@ export async function runNarratorWithTrace(
   if (ctx.transport === undefined) {
     return fallback("notConfigured", "no model transport configured");
   }
+  const transport = ctx.transport;
   const schema = buildNarratorPlanSchema();
+  const jsonSchema = planJsonSchema(schema);
   let rawContent: string | undefined;
   try {
-    const result = await callModel(ctx.transport, {
+    const result = await callModel(transport, {
       model,
       system: prompt.system,
       user: prompt.user,
+      continuation: [],
       schemaName: "narrator_plan",
-      jsonSchema: planJsonSchema(schema),
+      jsonSchema,
       maxTokens: NARRATOR_MAX_TOKENS,
       reasoningEffort,
       timeoutMs,
@@ -425,17 +559,32 @@ export async function runNarratorWithTrace(
       ...translatedIntents,
       notes: [...corrections, ...translatedIntents.notes],
     };
+    const merge = (written: WrittenNotes) =>
+      notesFrom(written, notes, req.hook.tick, translated, content, snapshot.state);
+    const planReply = rawContent;
+    const notesTurn = () =>
+      runNotesTurn({
+        transport,
+        model,
+        prompt,
+        planJsonSchema: jsonSchema,
+        planReply,
+        reasoningDetails: result.reasoningDetails,
+        reasoningEffort,
+        request: notesRequest(translated, notes),
+        merge,
+      });
     const response: NarratorResponse = {
       commands: translated.commands,
       ...(translated.card === undefined ? {} : { card: translated.card }),
-      notesUpdate: notesFrom(plan, notes, req.hook.tick, translated, content, snapshot.state),
+      notesUpdate: merge(writtenFrom(notes)),
       callId,
       model: result.model,
       promptVersion: PROMPT_VERSION,
       usage: result.usage,
       dropped: translated.dropped,
     };
-    return { response, trace: { ...baseTrace, rawContent, plan } };
+    return { response, trace: { ...baseTrace, rawContent, plan }, notesTurn };
   } catch (err) {
     if (!(err instanceof FallbackError)) throw err;
     const trace = rawContent === undefined ? baseTrace : { ...baseTrace, rawContent };

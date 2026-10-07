@@ -212,7 +212,6 @@ function nullOffer(
         rationale: "null narrator: templated offer",
         intents: [intent],
         card: null,
-        notes: { summary: "", threads: [], cast: [] },
       },
       { snapshot, content, hookTick: req.hook.tick, callId, hook: req.hook },
     );

@@ -1,3 +1,4 @@
+import { schemaInstruction } from "./plan";
 /**
  * OpenRouter implementation of `ModelTransport` (D15).
  *
@@ -34,7 +35,11 @@ export interface OpenRouterOptions {
 interface CompletionBody {
   readonly model?: string;
   readonly choices?: readonly {
-    readonly message?: { readonly content?: string | null; readonly refusal?: string | null };
+    readonly message?: {
+      readonly content?: string | null;
+      readonly refusal?: string | null;
+      readonly reasoning_details?: readonly unknown[];
+    };
     readonly finish_reason?: string | null;
   }[];
   readonly usage?: {
@@ -71,16 +76,43 @@ export function systemContentParts(system: readonly string[]) {
 }
 
 /**
- * The schema block. It depends only on the plan schema, never on the game state, so it stays in
- * the cached static prefix.
+ * D97: the turns after the first user turn. An earlier reply goes back with its
+ * `reasoning_details`, so a reasoning model continues from its own reasoning rather than
+ * re-deriving it.
  */
-export function schemaInstruction(jsonSchema: Readonly<Record<string, unknown>>): string {
-  return [
-    "Answer with one JSON object and nothing else: no prose, no code fence.",
-    "It must validate against this JSON Schema (every property is required):",
-    JSON.stringify(jsonSchema),
-  ].join("\n");
+function continuationMessages(request: ModelRequest) {
+  return request.continuation.map((message) =>
+    message.role === "assistant"
+      ? {
+          role: "assistant" as const,
+          content: message.content,
+          ...(message.reasoningDetails.length === 0
+            ? {}
+            : { reasoning_details: message.reasoningDetails }),
+        }
+      : message,
+  );
 }
+
+/**
+ * OpenRouter's `reasoning` object: absent at the default effort. D97: with reasoning handed back,
+ * `context: "all_turns"` asks an OpenAI model to read it (its default may drop earlier turns'
+ * reasoning); other providers ignore the field.
+ */
+function reasoningField(request: ModelRequest) {
+  if (request.reasoningEffort === "default") return {};
+  const handedBack = request.continuation.some(
+    (m) => m.role === "assistant" && m.reasoningDetails.length > 0,
+  );
+  return {
+    reasoning: {
+      effort: request.reasoningEffort,
+      ...(handedBack ? { context: "all_turns" } : {}),
+    },
+  };
+}
+
+export { schemaInstruction } from "./plan";
 
 export function openRouterTransport(options: OpenRouterOptions): ModelTransport {
   const doFetch = options.fetch ?? fetch;
@@ -95,10 +127,9 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
       messages: [
         { role: "system", content: systemParts },
         { role: "user", content: request.user },
+        ...continuationMessages(request),
       ],
-      ...(request.reasoningEffort === "default"
-        ? {}
-        : { reasoning: { effort: request.reasoningEffort } }),
+      ...reasoningField(request),
     };
 
     let response: Response;
@@ -155,6 +186,7 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
       content: choice?.message?.content ?? null,
       finish,
       ...(refusal === undefined ? {} : { refusal }),
+      reasoningDetails: choice?.message?.reasoning_details ?? [],
       usage: {
         inputTokens: usage.prompt_tokens ?? 0,
         outputTokens: usage.completion_tokens ?? 0,

@@ -366,37 +366,44 @@ export function buildNarratorPlanSchema() {
         rightAftermath: aftermath,
       })
       .nullable(),
-    /**
-     * The full replacement running notes (W9: structured, see `NarratorNotes`). D31: the card
-     * history is server-kept and not part of the plan; D32: threads are structured.
-     */
-    notes: z.strictObject({
-      summary: z.string(),
-      threads: z
-        .array(
-          z.strictObject({
-            title: z.string(),
-            scale: z.enum(THREAD_SCALES),
-            people: z.array(z.string()).describe("Full names."),
-            stage: z.string().describe("Where it is now."),
-            nextBeat: z
-              .string()
-              .describe("What must be true before it returns, and roughly what then."),
-          }),
-        )
-        .describe("Every open thread, rewritten in full; retire the moot ones."),
-      cast: z
-        .array(
-          z.strictObject({
-            name: z.string(),
-            note: z.string(),
-            portId: z.string().describe(`Port id where to find them; ${EMPTY_FOR_NONE}.`),
-          }),
-        )
-        .describe("Supporting characters, not crew; keep those the captain has met."),
-    }),
   });
 }
+
+/**
+ * D97: the running notes the model writes in its follow-up turn, after the plan (W9: the full
+ * replacement, structured, see `NarratorNotes`). D31: the card history is server-kept and not
+ * written by the model; D32: threads are structured.
+ */
+export function buildNotesSchema() {
+  return z.strictObject({
+    summary: z.string(),
+    threads: z
+      .array(
+        z.strictObject({
+          title: z.string(),
+          scale: z.enum(THREAD_SCALES),
+          people: z.array(z.string()).describe("Full names."),
+          stage: z.string().describe("Where it is now."),
+          nextBeat: z
+            .string()
+            .describe("What must be true before it returns, and roughly what then."),
+        }),
+      )
+      .describe("Every open thread, rewritten in full; retire the moot ones."),
+    cast: z
+      .array(
+        z.strictObject({
+          name: z.string(),
+          note: z.string(),
+          portId: z.string().describe(`Port id where to find them; ${EMPTY_FOR_NONE}.`),
+        }),
+      )
+      .describe("Supporting characters, not crew; keep those the captain has met."),
+  });
+}
+
+export type NotesSchema = ReturnType<typeof buildNotesSchema>;
+export type WrittenNotes = z.infer<NotesSchema>;
 
 export type NarratorPlanSchema = ReturnType<typeof buildNarratorPlanSchema>;
 export type NarratorPlan = z.infer<NarratorPlanSchema>;

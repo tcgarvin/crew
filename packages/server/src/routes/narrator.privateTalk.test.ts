@@ -35,14 +35,18 @@ function cardCallingIn(talkWith: string): ModelTransport {
     beatOfThread: "",
     closesThread: "",
   };
+  // D97: the plan turn, then the notes turn (the one with a continuation).
   return async (request) => ({
     model: request.model,
-    content: JSON.stringify({
-      rationale: "The rivalry at the card table is souring; give the captain the call.",
-      intents: [card],
-      card: null,
-      notes: { summary: "Jax keeps beating Tomas at cards.", threads: [], cast: [] },
-    }),
+    content: JSON.stringify(
+      request.continuation.length > 0
+        ? { summary: "Jax keeps beating Tomas at cards.", threads: [], cast: [] }
+        : {
+            rationale: "The rivalry at the card table is souring; give the captain the call.",
+            intents: [card],
+            card: null,
+          },
+    ),
     finish: "stop",
     usage: {
       inputTokens: 1000,
@@ -50,6 +54,7 @@ function cardCallingIn(talkWith: string): ModelTransport {
       cacheReadInputTokens: 0,
       cacheCreationInputTokens: 0,
     },
+    reasoningDetails: [],
   });
 }
 

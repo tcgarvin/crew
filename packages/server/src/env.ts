@@ -96,6 +96,11 @@ export interface Env {
   /** Narrator budget: max calls per game per rolling wall-clock hour. */
   readonly narratorMaxCallsPerHour: number;
   readonly nodeEnv: string;
+  /**
+   * D97: `VERCEL=1`, set by Vercel in its functions: work after the response goes to
+   * `waitUntil`; elsewhere it runs inline.
+   */
+  readonly onVercel: boolean;
 }
 
 /**
@@ -136,5 +141,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 30),
     nodeEnv,
+    onVercel: source.VERCEL === "1",
   };
 }

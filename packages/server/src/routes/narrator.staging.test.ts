@@ -108,6 +108,7 @@ const staged: ModelTransport = async (request) => ({
     cacheReadInputTokens: 0,
     cacheCreationInputTokens: 0,
   },
+  reasoningDetails: [],
 });
 
 describe("POST /api/games/:id/narrator, stageDock (D67)", () => {

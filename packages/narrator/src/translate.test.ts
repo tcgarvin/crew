@@ -434,26 +434,12 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(result.beatCardThread).toBe("The aft sensor");
   });
 
-  it("accepts a beat card for a thread the plan's notes start this call", () => {
-    const req = quietTooLongRequest(content());
-    const { lastBeatTick: _t, beatCardShown: _b, ...written } = sensorThread;
-    const withThread = emptyPlan({
-      intents: [beatCard] as never,
-      notes: { summary: "s", threads: [written], cast: [] },
-    });
-    const result = translateIntents(withThread, ctxOf(req));
-    expect(result.dropped).toEqual([]);
-    expect(result.beatCardThread).toBe("The aft sensor");
-  });
-
-  it("drops a beat card whose thread matches none in the notes", () => {
+  it("accepts a beat card that names no stored thread as starting one, for the notes turn (D97)", () => {
     const req = quietTooLongRequest(content());
     const result = translateIntents(plan([beatCard]), { ...ctxOf(req), threads: [] });
-    expect(result.commands).toEqual([]);
-    expect(result.beatCardThread).toBeUndefined();
-    expect(result.dropped[0]?.reason).toBe(
-      'surfaceDecision: beatOfThread "the aft sensor" matches no thread in your notes; name one exactly',
-    );
+    expect(result.dropped).toEqual([]);
+    expect(result.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(result.beatCardThread).toBe("the aft sensor");
   });
 
   it("drops a second beat card for a thread that already had one", () => {

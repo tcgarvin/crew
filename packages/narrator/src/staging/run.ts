@@ -72,6 +72,7 @@ export async function runStaging(inputs: StagingInputs): Promise<StagingRun> {
       model: inputs.model,
       system: prompt.system,
       user: prompt.user,
+      continuation: [],
       schemaName: "staging_plan",
       jsonSchema: planJsonSchema(buildStagingPlanSchema()),
       maxTokens: STAGING_MAX_TOKENS,

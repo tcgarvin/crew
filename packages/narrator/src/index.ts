@@ -30,6 +30,8 @@ export {
 export {
   DEFAULT_NARRATOR_MODEL,
   NARRATOR_TIMEOUT_MS,
+  NOTES_TIMEOUT_MS,
+  type NotesRun,
   STAGING_TIMEOUT_MS,
   type NarratorRun,
   type NarratorTrace,
@@ -44,6 +46,8 @@ export {
   type ModelRequest,
   type ModelResult,
   type ModelTransport,
+  type ContinuationMessage,
+  type ReasoningDetails,
   REASONING_EFFORTS,
   type ReasoningEffort,
   TransportError,

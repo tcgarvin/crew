@@ -36,17 +36,22 @@ export interface SaveRow {
   readonly seq: number;
 }
 
-export type NarratorCallStatus = "ok" | "error" | "budgetExceeded";
+/** D97: `pending` is a notes turn still running after its plan was answered. */
+export type NarratorCallStatus = "ok" | "error" | "budgetExceeded" | "pending";
 
 /**
- * D67: the two kinds of narrator call. A staging call is exactly a `stageDock` hook, so the kind
- * is read from `hook_kind` rather than stored twice: no column, no migration.
+ * D67: the kinds of narrator call. A staging call is exactly a `stageDock` hook, so the kind is
+ * read from `hook_kind` rather than stored twice: no column, no migration. D97: a notes turn is
+ * logged as its own row with hook kind `notes`; it is not a story call, so it neither uses the
+ * story budget nor spaces the next story call.
  */
-export type NarratorCallKind = "story" | "staging";
+export type NarratorCallKind = "story" | "staging" | "notes";
 export const STAGING_HOOK_KIND = "stageDock";
+export const NOTES_HOOK_KIND = "notes";
 
 export function narratorCallKind(hookKind: string): NarratorCallKind {
-  return hookKind === STAGING_HOOK_KIND ? "staging" : "story";
+  if (hookKind === STAGING_HOOK_KIND) return "staging";
+  return hookKind === NOTES_HOOK_KIND ? "notes" : "story";
 }
 
 export interface NarratorCallRow {
@@ -93,6 +98,17 @@ export interface LogNarratorCallInput {
   readonly error: string | null;
 }
 
+/** D97: what a finished notes turn writes over its `pending` row. */
+export interface FinishNarratorCallInput {
+  readonly model: string;
+  readonly inputTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly latencyMs: number;
+  readonly status: "ok" | "error";
+  readonly response: unknown;
+  readonly error: string | null;
+}
+
 /** Narrator-call filter for the read-only log tooling (`src/tools/narratorLog.ts`). */
 export interface NarratorCallFilter {
   readonly gameId?: string;
@@ -134,6 +150,8 @@ export interface Db {
   updateNotes(gameId: string, narrativeNotes: unknown): Promise<void>;
 
   logNarratorCall(input: LogNarratorCallInput): Promise<NarratorCallRow>;
+  /** D97: completes a `pending` notes-turn row; throws if there is no such row. */
+  finishNarratorCall(id: string, input: FinishNarratorCallInput): Promise<void>;
   /**
    * Narrator calls of one kind for a game within the last `sinceMs` milliseconds (wall clock),
    * for the hourly budget; rejections are not counted. D67: each kind has its own budget.

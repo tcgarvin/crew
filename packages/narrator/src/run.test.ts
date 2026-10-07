@@ -26,8 +26,8 @@ import { EMPTY_NOTES } from "./notes";
 import { NULL_NARRATOR_MODEL } from "./null";
 import { HOOK_INSTRUCTIONS, STATIC_RULES } from "./prompts/index";
 import { PROMPT_VERSION } from "./prompts/system";
-import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarrator, runNarratorWithTrace } from "./run";
-import { content, emptyPlan, fakeTransport, okResult } from "./test-support";
+import { NARRATOR_TIMEOUT_MS, STAGING_TIMEOUT_MS, runNarratorWithTrace } from "./run";
+import { content, emptyPlan, fakeTransport, okResult, runBothTurns } from "./test-support";
 import { TransportError } from "./transport";
 
 const offer = {
@@ -155,7 +155,7 @@ describe("runNarrator", () => {
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = captainAshoreRequest(content());
-    const res = await runNarrator(req, ctx(transport));
+    const res = await runBothTurns(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
     expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
     expect(res.model).toBe("anthropic/claude-opus-4.6");
@@ -206,7 +206,7 @@ describe("runNarrator", () => {
       notes: { summary: "A passenger at the Hub.", threads: [], cast: [] },
     });
     const req = farCaptainAshoreRequest(content());
-    const res = await runNarrator(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
+    const res = await runBothTurns(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
     expect(res.notesUpdate?.cast).toEqual([
@@ -281,7 +281,7 @@ describe("runNarrator", () => {
       ],
       ["declined", {}, "port.crossroads_hub", "offer declined, still at Crossroads Hub"],
     ] as const)("%s %o → at %s, note says %s", async (reason, opts, portId, phrase) => {
-      const res = await runNarrator(endedRequest(reason, opts), {
+      const res = await runBothTurns(endedRequest(reason, opts), {
         ...ctx(fakeTransport(okResult(JSON.stringify(rewrite)))),
         notes: stored(),
       });
@@ -297,7 +297,7 @@ describe("runNarrator", () => {
 
     it("leaves a passenger still aboard, or put off but not yet ashore, without a port", async () => {
       for (const req of [passengerAboardRequest(content()), endedRequest("putOff")]) {
-        const res = await runNarrator(req, {
+        const res = await runBothTurns(req, {
           ...ctx(fakeTransport(okResult(JSON.stringify(rewrite)))),
           notes: stored(),
         });
@@ -315,7 +315,7 @@ describe("runNarrator", () => {
           ],
         },
       });
-      const moved = await runNarrator(endedRequest("leftBehind", { ashore: true }), {
+      const moved = await runBothTurns(endedRequest("leftBehind", { ashore: true }), {
         ...ctx(fakeTransport(okResult(JSON.stringify(placed)))),
         notes: stored(),
       });
@@ -336,7 +336,7 @@ describe("runNarrator", () => {
           ],
         },
       });
-      const twice = await runNarrator(endedRequest("leftBehind", { ashore: true }), {
+      const twice = await runBothTurns(endedRequest("leftBehind", { ashore: true }), {
         ...ctx(fakeTransport(okResult(JSON.stringify(again)))),
         notes: stored("port.ossory_station"),
       });
@@ -352,7 +352,7 @@ describe("runNarrator", () => {
       cast: [],
       lastUpdatedTick: 10,
     };
-    await runNarrator(quietTooLongRequest(content()), { ...ctx(transport), notes });
+    await runBothTurns(quietTooLongRequest(content()), { ...ctx(transport), notes });
     expect(transport.calls[0]?.user).toContain("summary: They owe the Guild a favour.");
     expect(transport.calls[0]?.user).toContain("- [episode] The Guild's favour (nobody yet)");
   });
@@ -372,7 +372,7 @@ describe("runNarrator", () => {
     ],
   ])("falls back to the null narrator on %s", async (_name, result, reason) => {
     const transport = result === undefined ? undefined : fakeTransport(result);
-    const res = await runNarrator(quietTooLongRequest(content()), ctx(transport));
+    const res = await runBothTurns(quietTooLongRequest(content()), ctx(transport));
     expect(res).toEqual({
       commands: [],
       callId: "call1",
@@ -390,7 +390,7 @@ describe("runNarrator", () => {
         }),
       { calls: [] },
     );
-    const res = await runNarrator(quietTooLongRequest(content()), {
+    const res = await runBothTurns(quietTooLongRequest(content()), {
       ...ctx(hang as never),
       timeoutMs: 20,
     });
@@ -400,16 +400,16 @@ describe("runNarrator", () => {
   it("gives the staging call its own, shorter default timeout (D70)", async () => {
     const timeouts = vi.spyOn(AbortSignal, "timeout");
     const transport = fakeTransport(okResult(JSON.stringify({ rationale: "bare", intents: [] })));
-    await runNarrator(stageDockRequest(content()), ctx(transport));
+    await runBothTurns(stageDockRequest(content()), ctx(transport));
     expect(timeouts).toHaveBeenLastCalledWith(STAGING_TIMEOUT_MS);
-    await runNarrator(quietTooLongRequest(content()), ctx(transport));
+    await runBothTurns(quietTooLongRequest(content()), ctx(transport));
     expect(timeouts).toHaveBeenLastCalledWith(NARRATOR_TIMEOUT_MS);
     expect(STAGING_TIMEOUT_MS).toBeLessThan(NARRATOR_TIMEOUT_MS);
     timeouts.mockRestore();
   });
 
   it("answers a policy decision with a template card on the null path", async () => {
-    const res = await runNarrator(policyRequest(), ctx());
+    const res = await runBothTurns(policyRequest(), ctx());
     expect(res.card).toEqual({
       decisionId: "d1",
       title: "Noor Sadler, Hub Co-op",
@@ -435,7 +435,7 @@ describe("runNarrator", () => {
       rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
-    const res = await runNarrator(policyRequest(), ctx(transport));
+    const res = await runBothTurns(policyRequest(), ctx(transport));
     expect(res.card).toEqual({ decisionId: "d1", ...card });
   });
 
@@ -450,7 +450,7 @@ describe("runNarrator", () => {
       rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
     const plan = { ...emptyPlan(), card: { ...card, beatOfThread: "", closesThread: "" } };
-    const res = await runNarrator(
+    const res = await runBothTurns(
       policyRequest(),
       ctx(fakeTransport(okResult(JSON.stringify(plan)))),
     );
@@ -461,7 +461,7 @@ describe("runNarrator", () => {
     );
     // Anything else unknown on the card still fails the schema.
     const odd = { ...emptyPlan(), card: { ...card, mood: "tense" } };
-    const failed = await runNarrator(
+    const failed = await runBothTurns(
       policyRequest(),
       ctx(fakeTransport(okResult(JSON.stringify(odd)))),
     );
@@ -483,7 +483,7 @@ describe("policy decisions are narrated (D37)", () => {
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
     const req = departureGateRequest(content());
-    const res = await runNarrator(req, ctx(transport));
+    const res = await runBothTurns(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
     expect(res.card).toEqual({ decisionId: "d9", ...card });
     expect(res.card?.speaker).toBe("Priya Kessler");
@@ -506,7 +506,7 @@ describe("policy decisions are narrated (D37)", () => {
   });
 
   it("keeps the engineer as the template speaker when the narrator is unavailable", async () => {
-    const res = await runNarrator(departureGateRequest(content()), ctx());
+    const res = await runBothTurns(departureGateRequest(content()), ctx());
     expect(res.fallback).toBe("notConfigured");
     expect(res.card).toMatchObject({ decisionId: "d9", speaker: "Priya Kessler" });
     expect(res.card?.leftLabel).toBe("Hold for repairs");
@@ -525,7 +525,7 @@ describe("what the captain has seen (D31)", () => {
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
-    const res = await runNarrator(req, ctx(transport));
+    const res = await runBothTurns(req, ctx(transport));
     expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
     expect(res.notesUpdate?.cardsShown).toEqual([
       {
@@ -551,14 +551,14 @@ describe("what the captain has seen (D31)", () => {
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
-    const res = await runNarrator(req, ctx(transport));
+    const res = await runBothTurns(req, ctx(transport));
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
     expect(res.notesUpdate?.cardsShown[0]?.speaker).toBeNull();
     expect(res.notesUpdate?.lastRejections).toEqual([
       'speaker: "Mara Osei" is the captain and cannot bring a card; name the crew member who does',
     ]);
-    await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
     expect(transport.calls.at(-1)?.user).toContain(
       'rejected last time: speaker: "Mara Osei" is the captain and cannot bring a card',
     );
@@ -577,14 +577,14 @@ describe("what the captain has seen (D31)", () => {
       ...EMPTY_NOTES,
       threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
     };
-    const res = await runNarrator(req, { ...ctx(transport), notes: stored });
+    const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
     expect(res.notesUpdate?.threads).toEqual([
       { ...thread, lastBeatTick: req.hook.tick, beatCardShown: true },
     ]);
     // A second beat card for the same thread is refused next call, with the reason in the notes.
-    const again = await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
     expect(again.commands).toEqual([]);
     expect(again.notesUpdate?.lastRejections[0]).toMatch(/already had its beat card/);
     expect(again.notesUpdate?.threads[0]?.beatCardShown).toBe(true);
@@ -604,14 +604,14 @@ describe("what the captain has seen (D31)", () => {
       ...EMPTY_NOTES,
       threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
     };
-    const res = await runNarrator(req, { ...ctx(transport), notes: stored });
+    const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
     expect(res.notesUpdate?.threads).toEqual([]);
     expect(res.notesUpdate?.cardsShown[0]?.closedThread).toBe("The stranger");
     // Next call: the digest shows the card as closing it, a second closing card is refused, and
     // the thread stays retired even though the model writes it back again.
-    const again = await runNarrator(req, { ...ctx(transport), notes: res.notesUpdate });
+    const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
     expect(transport.calls.at(-1)?.user).toContain('(closed thread "The stranger")');
     expect(again.commands).toEqual([]);
     expect(again.notesUpdate?.lastRejections[0]).toMatch(/matches no open thread/);
@@ -630,7 +630,7 @@ describe("what the captain has seen (D31)", () => {
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
     const req = policyRequest();
-    const res = await runNarrator(req, ctx(transport));
+    const res = await runBothTurns(req, ctx(transport));
     expect(res.notesUpdate?.cardsShown).toEqual([
       {
         tick: req.hook.tick,
@@ -675,7 +675,7 @@ describe("what the captain has seen (D31)", () => {
       ],
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
-    const res = await runNarrator(
+    const res = await runBothTurns(
       { ...req, hook, recentEvents: [event(8, "decisionResolved", "d1", "right")] },
       { ...ctx(transport), notes },
     );
@@ -717,14 +717,17 @@ describe("what the captain has seen (D31)", () => {
       ],
     };
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
-    const res = await runNarrator({ ...req, hook, recentEvents: [] }, { ...ctx(transport), notes });
+    const res = await runBothTurns(
+      { ...req, hook, recentEvents: [] },
+      { ...ctx(transport), notes },
+    );
     expect(res.notesUpdate?.cardsShown.map((c) => [c.decisionId, c.chosen])).toEqual([
       ["d1", "left"],
       // Already claimed by the entry above, so the title match does not double up.
       [null, null],
       [null, null],
     ]);
-    const alone = await runNarrator(
+    const alone = await runBothTurns(
       { ...req, hook, recentEvents: [] },
       { ...ctx(transport), notes: { ...notes, cardsShown: notes.cardsShown.slice(1) } },
     );
@@ -737,7 +740,7 @@ describe("what the captain has seen (D31)", () => {
   it("records a card the kernel surfaced itself from its pending event", async () => {
     const req = policyRequest();
     const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
-    const res = await runNarrator(
+    const res = await runBothTurns(
       { ...req, recentEvents: [event(8, "decisionPending", "d1")] },
       ctx(transport),
     );
@@ -773,7 +776,7 @@ describe("what the captain has seen (D31)", () => {
       closedThread: null,
     }));
     const notes = { summary: "s", threads: [], cast: [], lastUpdatedTick: 11, cardsShown };
-    const res = await runNarrator(req, { ...ctx(transport), notes });
+    const res = await runBothTurns(req, { ...ctx(transport), notes });
     expect(res.notesUpdate?.cardsShown).toHaveLength(12);
     expect(res.notesUpdate?.cardsShown[0]?.title).toBe("Card 1");
     expect(res.notesUpdate?.cardsShown.at(-1)?.title).toBe("A stranger at the ramp");
@@ -828,7 +831,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.24");
+    expect(PROMPT_VERSION).toBe("v0.25");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -964,7 +967,7 @@ describe("prompt text (D29, D31, D32)", () => {
 describe("the null path hands out work (D40)", () => {
   it("still offers a job at the board after a provider error", async () => {
     const transport = fakeTransport(new TransportError("apiError", "HTTP 502"));
-    const res = await runNarrator(captainAshoreRequest(content()), ctx(transport));
+    const res = await runBothTurns(captainAshoreRequest(content()), ctx(transport));
     expect(res.fallback).toBe("apiError");
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
     expect(res.commands).toHaveLength(1);
@@ -1038,5 +1041,91 @@ describe("fixtures and kernel authority (N6)", () => {
     });
     expect(result.status).toBe("rejected");
     if (result.status === "rejected") expect(result.rejection.code).toBe("unauthorized");
+  });
+});
+
+describe("the notes turn (D97)", () => {
+  const storedNotes = {
+    summary: "Docked at the Drift.",
+    threads: [{ ...assayThread, lastBeatTick: null, beatCardShown: false }],
+    cardsShown: [],
+    cast: [],
+    lastUpdatedTick: 0,
+    lastRejections: [],
+  };
+
+  it("answers the plan with the stored notes plus this call's server-kept changes", async () => {
+    const plan = emptyPlan({ intents: [offer] as never });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = captainAshoreRequest(content());
+    const run = await runNarratorWithTrace(req, { ...ctx(transport), notes: storedNotes });
+    expect(transport.calls).toHaveLength(1);
+    expect(run.notesTurn).toBeDefined();
+    const notes = run.response.notesUpdate;
+    expect(notes?.summary).toBe("Docked at the Drift.");
+    // Halla's offer is a beat of her thread, and she joins the cast, before the model writes.
+    expect(notes?.threads[0]?.lastBeatTick).toBe(req.hook.tick);
+    expect(notes?.cast.map((c) => c.name)).toEqual(["Halla Iyer"]);
+  });
+
+  it("continues from the plan and its reasoning, over the same cached system prefix", async () => {
+    const plan = emptyPlan({
+      intents: [offer, { ...offer, fromPort: "port.green_meridian" }] as never,
+      notes: { summary: "Halla's cores are aboard.", threads: [assayThread], cast: [] },
+    });
+    const reasoningDetails = [{ type: "reasoning.encrypted", data: "opaque" }];
+    const transport = fakeTransport({ ...okResult(JSON.stringify(plan)), reasoningDetails });
+    const run = await runNarratorWithTrace(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      notes: storedNotes,
+      reasoningEffort: "low",
+    });
+    const notesRun = await run.notesTurn?.();
+    const [planCall, notesCall] = transport.calls;
+    expect(notesCall?.system).toEqual(planCall?.system);
+    expect(notesCall?.jsonSchema).toEqual(planCall?.jsonSchema);
+    expect(notesCall?.user).toBe(planCall?.user);
+    expect(notesCall?.reasoningEffort).toBe("low");
+    expect(notesCall?.continuation[0]).toEqual({
+      role: "assistant",
+      content: run.trace.rawContent,
+      reasoningDetails,
+    });
+    const request = notesCall?.continuation[1];
+    expect(request?.role).toBe("user");
+    expect(request?.content).toContain("# Now your notes");
+    // What became of the plan: the second offer was dropped, and why.
+    expect(request?.content).toContain("Dropped intent 1 (offerJob):");
+    expect(request?.content).toContain('"summary"');
+    if (notesRun?.ok !== true) throw new Error("expected the notes turn to succeed");
+    expect(notesRun.notes.summary).toBe("Halla's cores are aboard.");
+    expect(notesRun.notes.cast.map((c) => c.name)).toEqual(["Halla Iyer"]);
+  });
+
+  it("tells the notes turn to write a thread a beat card started", async () => {
+    const beat = {
+      ...stranger,
+      left: { ...stranger.left, label: "Keep an eye on her." },
+      right: { ...stranger.right, label: "Probably nothing." },
+      beatOfThread: "The woman at the ramp",
+    };
+    const transport = fakeTransport(
+      okResult(JSON.stringify(emptyPlan({ intents: [beat] as never }))),
+    );
+    const run = await runNarratorWithTrace(quietTooLongRequest(content()), ctx(transport));
+    expect(run.response.dropped).toEqual([]);
+    await run.notesTurn?.();
+    expect(transport.calls[1]?.continuation[1]?.content).toContain(
+      'Your beat card foreshadows a new thread, "The woman at the ramp"',
+    );
+  });
+
+  it("reports a notes reply that fails the notes schema, keeping the plan's answer", async () => {
+    // A plan without notes: the fake gives the notes turn the same reply, which is no notes.
+    const transport = fakeTransport(okResult('{"rationale": "", "intents": [], "card": null}'));
+    const run = await runNarratorWithTrace(captainAshoreRequest(content()), ctx(transport));
+    expect(run.response.fallback).toBeUndefined();
+    expect(run.response.notesUpdate).toBeDefined();
+    expect(await run.notesTurn?.()).toMatchObject({ ok: false, reason: "schemaInvalid" });
   });
 });

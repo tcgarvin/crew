@@ -164,3 +164,72 @@ describe("OpenRouter reasoning effort (D96)", () => {
     expect(bodies[0]).toHaveProperty("reasoning", { effort: "low" });
   });
 });
+
+describe("OpenRouter continuation (D97)", () => {
+  const base = {
+    model: "openai/gpt-6-luna",
+    system: ["rules"],
+    user: "the ship",
+    schemaName: "narrator_plan",
+    jsonSchema: { type: "object" },
+    maxTokens: 100,
+    signal: new AbortController().signal,
+  };
+  const reasoningDetails = [{ type: "reasoning.encrypted", data: "opaque" }];
+
+  function replyingFetch(details: readonly unknown[] | undefined) {
+    const bodies: Record<string, unknown>[] = [];
+    const fake = async (_url: unknown, init?: { body?: unknown }) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      const message = {
+        content: "{}",
+        ...(details === undefined ? {} : { reasoning_details: details }),
+      };
+      return new Response(
+        JSON.stringify({ model: base.model, choices: [{ message, finish_reason: "stop" }] }),
+        { status: 200 },
+      );
+    };
+    return { bodies, fetch: fake as unknown as typeof fetch };
+  }
+
+  it("returns the reply's reasoning_details, or none", async () => {
+    const withDetails = replyingFetch(reasoningDetails);
+    const transport = openRouterTransport({ apiKey: "k", fetch: withDetails.fetch });
+    const request = { ...base, continuation: [], reasoningEffort: "low" as const };
+    expect((await transport(request)).reasoningDetails).toEqual(reasoningDetails);
+    const without = openRouterTransport({ apiKey: "k", fetch: replyingFetch(undefined).fetch });
+    expect((await without(request)).reasoningDetails).toEqual([]);
+  });
+
+  it("hands the earlier reply back with its reasoning and asks the model to read it", async () => {
+    const { bodies, fetch } = replyingFetch(undefined);
+    await openRouterTransport({ apiKey: "k", fetch })({
+      ...base,
+      reasoningEffort: "low",
+      continuation: [
+        { role: "assistant", content: "the plan", reasoningDetails },
+        { role: "user", content: "now your notes" },
+      ],
+    });
+    expect((bodies[0]?.messages as unknown[]).slice(1)).toEqual([
+      { role: "user", content: "the ship" },
+      { role: "assistant", content: "the plan", reasoning_details: reasoningDetails },
+      { role: "user", content: "now your notes" },
+    ]);
+    expect(bodies[0]?.reasoning).toEqual({ effort: "low", context: "all_turns" });
+  });
+
+  it("sends no reasoning field at the default effort, even when handing reasoning back", async () => {
+    const { bodies, fetch } = replyingFetch(undefined);
+    await openRouterTransport({ apiKey: "k", fetch })({
+      ...base,
+      reasoningEffort: "default",
+      continuation: [
+        { role: "assistant", content: "the plan", reasoningDetails },
+        { role: "user", content: "now your notes" },
+      ],
+    });
+    expect(bodies[0]).not.toHaveProperty("reasoning");
+  });
+});

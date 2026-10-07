@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import {
   type Db,
+  type FinishNarratorCallInput,
   type GameNarratorSummary,
   type GameRow,
   type LogNarratorCallInput,
@@ -125,6 +126,12 @@ export class MemoryDb implements Db {
     };
     this.narratorCalls.set(row.id, row);
     return row;
+  }
+
+  async finishNarratorCall(id: string, input: FinishNarratorCallInput): Promise<void> {
+    const row = this.narratorCalls.get(id);
+    if (row === undefined) throw new Error(`finishNarratorCall: no narrator call ${id}`);
+    this.narratorCalls.set(id, { ...row, ...input });
   }
 
   async countNarratorCallsSince(

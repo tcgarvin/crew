@@ -77,6 +77,14 @@ export async function runNarratorEval(
     ...(transport === undefined ? {} : { transport }),
   });
   const { response, trace } = run;
+  // D97: the notes turn the server runs after the response.
+  const notesRun = run.notesTurn === undefined ? undefined : await run.notesTurn();
+  const notesTurn =
+    notesRun === undefined
+      ? "(none: the model did not answer a story call)"
+      : notesRun.ok
+        ? JSON.stringify({ notes: notesRun.notes, usage: notesRun.usage }, null, 2)
+        : `FAILED: ${notesRun.reason} (${notesRun.error})`;
   const out = [
     `fixture: ${file} (hook ${request.hook.kind} at tick ${request.hook.tick})`,
     `model: ${response.model}  prompt: ${response.promptVersion}${response.fallback ? `  FALLBACK: ${response.fallback} (${run.error ?? ""})` : ""}`,
@@ -87,7 +95,11 @@ export async function runNarratorEval(
     section("commands", JSON.stringify(response.commands, null, 2)),
     section("dropped", JSON.stringify(response.dropped ?? [], null, 2)),
     section("card", JSON.stringify(response.card ?? null, null, 2)),
-    section("notesUpdate", JSON.stringify(response.notesUpdate ?? null, null, 2)),
+    section(
+      "notesUpdate (before the notes turn)",
+      JSON.stringify(response.notesUpdate ?? null, null, 2),
+    ),
+    section("notes turn", notesTurn),
     section("usage", JSON.stringify(response.usage ?? null)),
   ];
   return { output: out.join("\n"), exitCode: 0 };

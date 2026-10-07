@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { buildNarratorPlanSchema } from "./contract";
+import { buildNarratorPlanSchema, buildNotesSchema } from "./contract";
 
 const schema = buildNarratorPlanSchema();
 
@@ -104,19 +104,6 @@ describe("NarratorPlan structured-output schema", () => {
         },
       ],
       card: null,
-      notes: {
-        summary: "The crew took on seals at Port A.",
-        threads: [
-          {
-            title: "Who is the stranger?",
-            scale: "episode",
-            people: ["Ines Varga"],
-            stage: "A stranger asked for passage at Port A.",
-            nextBeat: "Once underway, she lets slip why she left.",
-          },
-        ],
-        cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
-      },
     };
     expect(schema.parse(plan)).toEqual(plan);
     expect(schema.safeParse({ ...plan, intents: [{ kind: "setMoney", amount: 5 }] }).success).toBe(
@@ -124,12 +111,31 @@ describe("NarratorPlan structured-output schema", () => {
     );
   });
 
+  it("keeps notes out of the plan; the notes turn has its own schema (D97)", () => {
+    const notes = {
+      summary: "The crew took on seals at Port A.",
+      threads: [
+        {
+          title: "Who is the stranger?",
+          scale: "episode",
+          people: ["Ines Varga"],
+          stage: "A stranger asked for passage at Port A.",
+          nextBeat: "Once underway, she lets slip why she left.",
+        },
+      ],
+      cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
+    };
+    expect(buildNotesSchema().parse(notes)).toEqual(notes);
+    const plan = { rationale: "", intents: [], card: null };
+    expect(schema.safeParse(plan).success).toBe(true);
+    expect(schema.safeParse({ ...plan, notes }).success).toBe(false);
+  });
+
   it("parses passenger and roundTrip on offerJob and endPassage on a side, and requires the booleans (passengers §4)", () => {
     const base = {
       rationale: "",
       intents: [],
       card: null,
-      notes: { summary: "", threads: [], cast: [] },
     };
     const passage = {
       kind: "offerJob",
@@ -179,7 +185,6 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "",
       intents: [],
       card: null,
-      notes: { summary: "", threads: [], cast: [] },
     };
     const word = {
       kind: "surfaceDecision",
@@ -239,7 +244,6 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "r",
       intents: [],
       card,
-      notes: { summary: "", threads: [], cast: [] },
     };
     expect(schema.safeParse(plan).success).toBe(true);
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: "Mara Osei" } }).success).toBe(

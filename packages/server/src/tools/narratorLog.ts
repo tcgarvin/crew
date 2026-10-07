@@ -16,18 +16,19 @@ import {
   fillConfig,
   migrateState,
 } from "@crew/sim";
-import type {
-  Db,
-  GameRow,
-  NarratorCallFilter,
-  NarratorCallRow,
-  NarratorCallStatus,
+import {
+  type Db,
+  type GameRow,
+  NOTES_HOOK_KIND,
+  type NarratorCallFilter,
+  type NarratorCallRow,
+  type NarratorCallStatus,
 } from "../db/types";
 
 const DEFAULT_CALL_LIMIT = 10;
 /** Calls fetched per game when rebuilding the notes a call saw; a game never has this many. */
 const NOTES_HISTORY_LIMIT = 1000;
-const STATUSES: readonly NarratorCallStatus[] = ["ok", "error", "budgetExceeded"];
+const STATUSES: readonly NarratorCallStatus[] = ["ok", "error", "budgetExceeded", "pending"];
 const MISSING = "-";
 
 export const USAGE = `Usage: narrator-log <command> [options]
@@ -351,7 +352,8 @@ function isOlder(a: NarratorCallRow, b: NarratorCallRow): boolean {
 /**
  * The route reads `games.narrative_notes` before each call and writes `notesUpdate` after an ok
  * one, and the request row doesn't carry the notes it saw; so the notes a call saw are the
- * `notesUpdate` of the newest earlier ok call that had one (empty before the first).
+ * `notesUpdate` of the newest earlier ok call that had one (empty before the first). D97: or the
+ * `notes` of the newest earlier ok notes turn, which the route waits for before a call.
  */
 async function notesSeenBy(
   db: Db,
@@ -360,9 +362,11 @@ async function notesSeenBy(
   const history = await db.listNarratorCalls({ gameId: call.gameId, limit: NOTES_HISTORY_LIMIT });
   for (const earlier of history) {
     if (!isOlder(earlier, call) || earlier.status !== "ok") continue;
-    const update = field(earlier.response, "notesUpdate");
+    const notesTurn = earlier.hookKind === NOTES_HOOK_KIND;
+    const update = field(earlier.response, notesTurn ? "notes" : "notesUpdate");
     if (update !== undefined && update !== null) {
-      return { notes: update, source: `notesUpdate of call ${earlier.id}` };
+      const what = notesTurn ? "notes turn" : "notesUpdate of call";
+      return { notes: update, source: `${what} ${earlier.id}` };
     }
   }
   return { notes: {}, source: "no earlier call with a notes update; empty notes" };
