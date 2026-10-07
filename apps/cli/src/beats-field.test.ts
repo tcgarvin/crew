@@ -110,8 +110,12 @@ describe("crew beats with fields: one ship's day with a heavy field a leg (real 
     expect(result.field.fields.length).toBeGreaterThanOrEqual(1);
     for (const field of result.field.fields) expect(field.severity).toBe("heavy");
     expect(result.field.bySeverity.heavy.scheduled).toBe(result.field.fields.length);
+    // Slice-5 integration: the rocks actually land on real content, not only the schedule.
+    expect(result.field.bySeverity.heavy.impacts).toBeGreaterThan(0);
     const report = formatBeatsReport([result]);
-    expect(report).toContain("Fields (--fields heavy, one a leg as its transit begins");
+    expect(report).toContain(
+      "Fields (--fields heavy, one a leg that holds it, as its transit begins",
+    );
     expect(report).toContain(
       "| Severity | Scheduled | Entered | Missed | Rocks | Hull lost | Hull lost per field | Stuck s |",
     );

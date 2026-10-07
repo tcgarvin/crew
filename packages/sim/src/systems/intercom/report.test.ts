@@ -175,6 +175,45 @@ describe("the reporting reflex (D94)", () => {
     });
   });
 
+  it(
+    "takes the whole line as dead when a panel has no power, and stops walking to panels",
+    SLOW,
+    () => {
+      const fixture = intercomWorld();
+      const { world } = fixture;
+      stage(fixture);
+      soundAlert(world);
+      damageMachineByHand(world, machineByKey(world, "stove"));
+      runUntil(fixture, 30, (w) => {
+        const activity = w.state.actors[BETTINA]?.activity;
+        return activity?.kind === "personal" && activity.activity === "report";
+      });
+      // The bus goes dark as she sets off: every panel shed, wanted on but with no power.
+      const panels = Object.values(world.state.machines).filter((m) =>
+        world.content.machines[m.defId]?.tags.includes("comm"),
+      );
+      for (const panel of panels) {
+        panel.actualMode = "off";
+        panel.output = 0;
+      }
+      const events = runToSecond(
+        fixture,
+        world.state.tick / world.config.values.time.tickRate + 40,
+      );
+      expect(reports(events)).toEqual([]);
+      expect(
+        ofType(events, "actionFailed").filter((e) => e.subjectIds[0] === BETTINA),
+      ).toHaveLength(1);
+      // Slice-5 integration: one dead handset told her the line was down, so she did not tour them.
+      expect(startedReporting(events, BETTINA)).toBe(false);
+      for (const panel of panels) {
+        expect(
+          world.state.actors[BETTINA]?.knowledge[`${panel.id}/machineStatus`]?.value,
+        ).toMatchObject({ status: "off" });
+      }
+    },
+  );
+
   it("does not happen off alert", SLOW, () => {
     const fixture = intercomWorld();
     const { world } = fixture;

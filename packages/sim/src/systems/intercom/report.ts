@@ -23,6 +23,7 @@ import { isMachineBlocked } from "../equipment/equipment";
 import { emitSim } from "../work/events";
 import { directSight, writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
+import { isPanel } from "./plans";
 import type { StepResult } from "../work/steps";
 
 /** The problem kinds a report carries (the planner's `REPORTED_PROBLEM_KINDS`). */
@@ -48,6 +49,20 @@ function panelWorks(ctx: StepCtx, panel: Machine): boolean {
   return (
     panel.actualMode !== "off" &&
     panel.output > 0 &&
+    !isMachineBlocked(panel, def, ctx.config.equipment)
+  );
+}
+
+/**
+ * Whole, wanted on, and dark: the panel has no power (the line, not the handset). Power shedding
+ * leaves `desiredMode` on and turns `actualMode` off.
+ */
+function unpowered(ctx: StepCtx, panel: Machine): boolean {
+  const def = ctx.content.machines[panel.defId];
+  if (def === undefined) throw new Error(`intercom: panel ${panel.id} has no def ${panel.defId}`);
+  return (
+    panel.desiredMode !== "off" &&
+    panel.output <= 0 &&
     !isMachineBlocked(panel, def, ctx.config.equipment)
   );
 }
@@ -190,17 +205,25 @@ export function runReport(
   const panel = panelId === undefined ? undefined : ctx.state.machines[panelId];
   if (panelId === undefined || panel === undefined) return { fail: "unreachableTarget" };
   if (!panelWorks(ctx, panel)) {
-    // They see it is dead, so the planner's next look sends them to another panel.
-    writeFact(
-      actor,
-      panelId,
-      "machineStatus",
-      {
-        status: panel.actualMode === "off" ? "off" : "failed",
-        temperatureNorm: panel.temperature,
-      },
-      directSight(actor, ctx.tick),
-    );
+    // They see it is dead, so the planner's next look sends them to another panel. A panel with
+    // no power means the intercom line is down, not this one handset (slice-5 integration: with
+    // the generator out, reporters walked panel to panel for minutes, holding containment-class
+    // attention away from the repair): every unpowered panel is taken as dead with it.
+    const dead = unpowered(ctx, panel)
+      ? Object.values(ctx.state.machines).filter((m) => isPanel(ctx, m.id) && unpowered(ctx, m))
+      : [panel];
+    for (const machine of dead) {
+      writeFact(
+        actor,
+        machine.id,
+        "machineStatus",
+        {
+          status: machine.actualMode === "off" ? "off" : "failed",
+          temperatureNorm: machine.temperature,
+        },
+        directSight(actor, ctx.tick),
+      );
+    }
     return { fail: "unavailablePower" };
   }
   step.ticksDone += 1;

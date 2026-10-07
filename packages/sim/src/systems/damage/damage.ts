@@ -10,9 +10,14 @@
  * 4. Scouts (call 11). While the officer of the watch holds the bridge (a `bridge` hold),
  *    `compartmentToCheck` (public, essential, dedupe `check:<compartmentId>`) is raised for each
  *    compartment of the ship nobody has covered since the field's `lastImpactTick`: no intercom
- *    report (`alert.reports`), nobody on duty standing in it, nobody on duty who was in it when the
- *    rock hit (their `hullImpact` fact names it), and no check raised for it since. An open check
- *    resolves on a report, when someone on duty stands in the room and nobody holds its task (a
+ *    report (`alert.reports`), no crew member in it (awake on duty, or anyone of the crew at all:
+ *    an off-watch hand sees a hit in their room and a sleeper there wakes, so either reports it),
+ *    nobody of the crew who was in it when the rock hit (their `hullImpact` fact names it), and
+ *    no check raised for it since. While the rocks still fall a room is looked at once a field
+ *    (no check since the alert sounded); once the field has ended, every room not covered since
+ *    the last rock gets one more look (slice-5 integration: re-checking every room after every
+ *    rock sent ~35 scouts a heavy field, walking noise that drowned the ticker). An open check
+ *    resolves on a report, when one of the crew stands in the room and nobody holds its task (a
  *    scout who holds it resolves it at the end of the look round, `steps.ts` `runCheck`), and
  *    every open check resolves when the alert clears. `scoutSent` names the officer and the scout
  *    the tick a scout claims a check.
@@ -31,9 +36,8 @@ import type { StepCtx, System } from "../../core/types/pipeline";
 import type { ProblemOfKind } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
 import { unitsAboard } from "../equipment/supplies";
-import { isOnDuty } from "../watch/duty";
 import { isOfficerOfTheWatch } from "../watch/helm";
-import { currentHold, isAsleep } from "../work/activity";
+import { currentHold } from "../work/activity";
 import { isTerminal } from "../work/derivation";
 import { emitSim } from "../work/events";
 import { abortActivity } from "../work/execute";
@@ -99,22 +103,19 @@ function syncScars(ctx: StepCtx, open: readonly ProblemOfKind<"hullScar">[]): vo
 // Scouts
 // ---------------------------------------------------------------------------------------------
 
-/** Crew on duty, awake and available: eyes the officer can count on. */
-function onDutyEyes(ctx: StepCtx, actor: DeepReadonly<Actor>): boolean {
-  return (
-    actor.crew &&
-    actor.passenger !== true &&
-    actor.availability === "available" &&
-    !isAsleep(actor.activity) &&
-    isOnDuty(actor.schedule, ctx.tick, ctx.config)
-  );
+/**
+ * Any crew member aboard, on watch or off, awake or asleep: a rock in their room is seen (a
+ * sleeper there wakes, `onImpact`) and reported, so the room needs no scout.
+ */
+function crewAboard(actor: DeepReadonly<Actor>): boolean {
+  return actor.crew && actor.passenger !== true && actor.availability === "available";
 }
 
 function eyesIn(ctx: StepCtx, compartmentId: CompartmentId): boolean {
   const ids = ctx.caches.index.actorsByCompartment[compartmentId] ?? [];
   return ids.some((id) => {
     const actor = ctx.state.actors[id];
-    return actor !== undefined && onDutyEyes(ctx, actor);
+    return actor !== undefined && crewAboard(actor);
   });
 }
 
@@ -128,7 +129,7 @@ function sawTheHit(ctx: StepCtx, compartmentId: CompartmentId, since: Tick): boo
       fact?.factType === "hullImpact" &&
       fact.observedTick >= since &&
       fact.value.compartmentId === compartmentId &&
-      onDutyEyes(ctx, actor)
+      crewAboard(actor)
     );
   });
 }
@@ -199,9 +200,12 @@ function sweepChecks(ctx: StepCtx, checks: readonly ProblemOfKind<"compartmentTo
     else pending.add(compartmentId);
   }
   if (officerOnTheBridge(ctx) === undefined) return;
+  // While the rocks fall, one look a room a field; after, one more for rooms hit since.
+  const lookedSince =
+    ctx.state.field?.phase.kind === "active" ? Math.min(since, ctx.state.alert.sinceTick) : since;
   const checked = new Set<CompartmentId>();
   for (const problem of checks) {
-    if (problem.createdTick >= since) checked.add(problem.payload.compartmentId);
+    if (problem.createdTick >= lookedSince) checked.add(problem.payload.compartmentId);
   }
   const deckId = shipDeckId(ctx.state);
   for (const compartment of Object.values(ctx.state.compartments)) {

@@ -41,10 +41,14 @@ type FieldEvent = SimEvent extends infer E
  * Schedules one field on each leg of the run, as a scenario (D92's authority), when the leg's
  * transit begins: `light`, `heavy` or `brutal` every time, or the three in turn for `cycle`.
  * Detection is `rolled`, so the helm's check plays; no scripted hits, so the dice decide.
+ *
+ * Only a leg long enough to hold the whole field gets one (slice-5 integration): the kernel ends
+ * a field at the approach lead, so on the 25 s Hub–Kessler hop a field was a few seconds of
+ * rock and diluted the per-field numbers the tuning reads. `cycle` turns only on fields placed.
  */
 export class FieldScript {
   private lastStage: World["state"]["travel"]["stage"] | undefined;
-  private legs = 0;
+  private placed = 0;
 
   constructor(
     private readonly plan: FieldPlan,
@@ -57,9 +61,10 @@ export class FieldScript {
     const entered = stage === "transit" && this.lastStage !== "transit";
     this.lastStage = stage;
     if (!entered || this.plan === "none") return;
-    const severity = this.severityFor(this.legs);
-    this.legs += 1;
     if (world.state.field !== undefined || world.state.hull.lostAtTick !== undefined) return;
+    const severity = this.severityFor(this.placed);
+    if (!legHolds(world, severity)) return;
+    this.placed += 1;
     this.send({
       source: "scenario",
       kind: "scheduleField",
@@ -72,15 +77,27 @@ export class FieldScript {
     });
   }
 
-  private severityFor(leg: number): FieldSeverity {
+  private severityFor(placed: number): FieldSeverity {
     if (this.plan === "cycle") {
-      const severity = FIELD_SEVERITIES[leg % FIELD_SEVERITIES.length];
-      if (severity === undefined) throw new Error(`no severity for leg ${leg}`);
+      const severity = FIELD_SEVERITIES[placed % FIELD_SEVERITIES.length];
+      if (severity === undefined) throw new Error(`no severity for field ${placed}`);
       return severity;
     }
     if (this.plan === "none") throw new Error("FieldScript: no severity under plan none");
     return this.plan;
   }
+}
+
+/** Does the rest of this leg's transit hold a whole field of `severity`, window and lead? */
+function legHolds(world: World, severity: FieldSeverity): boolean {
+  const travel = world.state.travel;
+  if (travel.stage !== "transit") return false;
+  const values = world.config.values;
+  const seconds =
+    values.field.severities[severity].lengthSeconds +
+    FIELD_WINDOW_SECONDS +
+    values.narrator.approachHookLeadSeconds;
+  return travel.routeDistance - travel.routeProgress >= seconds * values.travel.nominalSpeed;
 }
 
 /** One field over the run. */
@@ -328,7 +345,7 @@ export function fieldSection(r: FieldTallyResult): string[] {
   if (r.plan === "none") return ["", "Fields: none scheduled (--fields none)."];
   const lines = [
     "",
-    `Fields (--fields ${r.plan}, one a leg as its transit begins, detection rolled):`,
+    `Fields (--fields ${r.plan}, one a leg that holds it, as its transit begins, detection rolled):`,
   ];
   lines.push(
     "",

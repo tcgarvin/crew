@@ -20,28 +20,38 @@ const LATENCY = 10;
 const kernel = createKernel(createPacingRegistry());
 
 /**
- * The first test to call `results()` pays for both runs (about 10 s of real work on a quiet
- * machine since D76 made Kessler–Ossory a 400 s spur, more under the full parallel `pnpm test`),
- * well past Vitest's 5 s default.
+ * The first test to need each run pays for it (about 10 s of real work on a quiet machine since
+ * D76 made Kessler–Ossory a 400 s spur, several times that under the full parallel `pnpm test`),
+ * well past Vitest's 5 s default. The two runs are paid in different tests (slice-5
+ * integration): one synchronous block of both passed a minute under load, and Vitest's worker
+ * RPC times out ("Timeout calling onTaskUpdate") when a test holds the thread that long.
  */
 const SLOW_TEST_TIMEOUT_MS = 90_000;
 
-let cached: { slow: PacingResult; fast: PacingResult } | undefined;
+const cached: { slow?: PacingResult; fast?: PacingResult } = {};
+function slowOnly(): { slow: PacingResult } {
+  cached.slow ??= runPacing(
+    { scenario: "plain", speed: 1, latencySeconds: LATENCY, seed: 1 },
+    kernel,
+  );
+  return { slow: cached.slow };
+}
 function results(): { slow: PacingResult; fast: PacingResult } {
-  if (cached === undefined) {
-    cached = {
-      slow: runPacing({ scenario: "plain", speed: 1, latencySeconds: LATENCY, seed: 1 }, kernel),
-      fast: runPacing({ scenario: "plain", speed: 8, latencySeconds: LATENCY, seed: 1 }, kernel),
-    };
-  }
-  return cached;
+  return { slow: slowOnly().slow, fast: fastRun() };
+}
+function fastRun(): PacingResult {
+  cached.fast ??= runPacing(
+    { scenario: "plain", speed: 8, latencySeconds: LATENCY, seed: 1 },
+    kernel,
+  );
+  return cached.fast;
 }
 
 describe("crew pacing: there-and-back voyage", () => {
   it(
     "returns the ship to the hub with the voyage cleared",
     () => {
-      const { slow } = results();
+      const { slow } = slowOnly();
       expect(slow.completed).toBe(true);
       expect(slow.legs.map((leg) => [leg.fromPortId, leg.toPortId])).toEqual([
         [HUB_PORT_ID, "port.kessler_drift"],
@@ -56,7 +66,7 @@ describe("crew pacing: there-and-back voyage", () => {
   it(
     "raises stageDock at every docking and captainAshore at the hub and the far port only",
     () => {
-      const { slow } = results();
+      const { slow } = slowOnly();
       // D66: the staging call is guaranteed, waypoints included.
       expect(slow.hooksByKind.stageDock).toBe(4);
       // Waypoint dockings do not send the captain ashore for work (§2.3).
@@ -69,7 +79,7 @@ describe("crew pacing: there-and-back voyage", () => {
   it(
     "raises quietTooLong only on the watch-long spur legs, at most once per quiet window (a watch, D76)",
     () => {
-      const { slow } = results();
+      const { slow } = slowOnly();
       // A spur leg is one watch of transit and the quiet window is one watch, with `stageDock`
       // raised 10 s before the approach: a leg flown at nominal speed with no fault to repair
       // ends a breath short of a quiet call, so whether one lands depends on the leg running

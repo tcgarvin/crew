@@ -188,6 +188,47 @@ describe("scouts (call 11)", () => {
   );
 });
 
+describe("scouts, once a room a field (slice-5 integration)", () => {
+  it(
+    "a room looked at is not sent a scout again while the rocks fall, and is once the field ends",
+    LONG,
+    () => {
+      const fixture = settled();
+      const { world } = fixture;
+      soundAlert(world);
+      runUntil(fixture, 30, (w) => holdingBridge(w, MARA));
+      strike(world, BENCH_SEAT);
+      runFor(fixture, 0.1);
+      const cabin = room(world, "captains_cabin");
+      const openFor = (id: string) =>
+        problems(world, "compartmentToCheck").filter(
+          (p) => p.status === "open" && p.payload.compartmentId === id,
+        );
+      expect(openFor(cabin)).toHaveLength(1);
+      const alert = world.state.alert;
+      if (alert === undefined) throw new Error("no alert");
+      alert.reports[cabin] = world.state.tick;
+      runFor(fixture, 0.1);
+      expect(openFor(cabin)).toEqual([]);
+      // A second rock while the field is active: the cabin was looked at this field.
+      strike(world, BENCH_SEAT);
+      runFor(fixture, 0.1);
+      expect(openFor(cabin)).toEqual([]);
+      // The field ends: every room not covered since the last rock gets one more look.
+      const field = world.state.field;
+      if (field?.phase.kind !== "active") throw new Error("no active field");
+      field.phase = {
+        kind: "ended",
+        enteredTick: field.phase.enteredTick,
+        endedTick: world.state.tick,
+        how: "crossed",
+      };
+      runFor(fixture, 0.1);
+      expect(openFor(cabin)).toHaveLength(1);
+    },
+  );
+});
+
 describe("plating at port (call 23)", () => {
   it(
     "docked where plating is sold, the ship buys a plate a scar and the crew plate them all",

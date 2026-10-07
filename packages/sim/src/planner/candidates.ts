@@ -138,6 +138,21 @@ function higher(a: UrgencyClass, b: UrgencyClass | undefined): UrgencyClass {
   return b !== undefined && urgencyIndex(b) < urgencyIndex(a) ? b : a;
 }
 
+/**
+ * A machine whose fault or damage is containment work: the engine and life support always; on
+ * alert also the generator (slice-5 integration: a generator shorted by a rock left the engine
+ * dark and the ship stuck while a dozen essential patches outranked its repair on travel time,
+ * and the electrician off watch slept on). Off alert a generator fault keeps its owner's class.
+ */
+function criticalMachine(view: AgentView, machineId: MachineId): boolean {
+  const tags = machineTags(view, machineId);
+  return (
+    tags.includes("engine") ||
+    tags.includes("lifeSupport") ||
+    (tags.includes("generator") && view.alert() !== undefined)
+  );
+}
+
 export function taskUrgency(
   view: AgentView,
   problem: ProblemView,
@@ -146,15 +161,21 @@ export function taskUrgency(
   switch (problem.kind) {
     case "machineFault": {
       const { machineId } = problem.payload;
-      const tags = machineTags(view, machineId);
-      const base: UrgencyClass =
-        tags.includes("engine") || tags.includes("lifeSupport")
-          ? "containment"
-          : problem.baseUrgency;
+      const base: UrgencyClass = criticalMachine(view, machineId)
+        ? "containment"
+        : problem.baseUrgency;
       return higher(base, heatUrgency(view, machineId, config));
     }
-    case "machineSymptom":
-      return higher("routineObligation", heatUrgency(view, problem.payload.machineId, config));
+    case "machineSymptom": {
+      // Slice-5 integration: on alert, a symptom on a critical machine (a rock's fault on the
+      // engine) is looked at as containment, or the stuck ship waits behind every patch.
+      const { machineId } = problem.payload;
+      const base: UrgencyClass =
+        view.alert() !== undefined && criticalMachine(view, machineId)
+          ? "containment"
+          : "routineObligation";
+      return higher(base, heatUrgency(view, machineId, config));
+    }
     case "maintenanceDue":
       // D90: routine, essential once the machine is badly worn; equipment says which.
       return problem.baseUrgency;
@@ -179,6 +200,9 @@ export function taskUrgency(
       // D82: routine, essential while a galley or infirmary is filthy; dirt says which.
       return problem.baseUrgency;
     case "machineDamaged":
+      // Slice-5 integration: impact damage to a critical machine is as pressing as a fault there
+      // (a knocked-out engine leaves the ship stuck in the rocks), above the scouts and patches.
+      return criticalMachine(view, problem.payload.machineId) ? "containment" : problem.baseUrgency;
     case "hullScar":
     case "hullDamaged":
     case "compartmentToCheck":

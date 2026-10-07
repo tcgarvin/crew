@@ -30,9 +30,17 @@ export interface DamageEventPayloads {
   machineMended: { readonly actorId: ActorId; readonly machineId: MachineId };
 }
 
+/**
+ * Slice-5 integration: `scoutSent` and `hullPatched` are trace. A field sends a scout to most
+ * rooms once and leaves a patch a rock, and those lines (a dozen and seven a brutal field) drowned
+ * the ticker's reports and knockouts; the scouts and patchers show on the deck ("checking the
+ * hold", "patching the hull in the hold"), the hull bar rises with each patch, and the beats
+ * report counts both. Plating at port and a machine mended stay notable: they are rarer, and
+ * each is a repair finished.
+ */
 export const DAMAGE_EVENT_SIGNIFICANCE = {
-  scoutSent: "notable",
-  hullPatched: "notable",
+  scoutSent: "trace",
+  hullPatched: "trace",
   hullPlated: "notable",
   machineMended: "notable",
 } as const satisfies SignificanceCatalog<DamageEventPayloads>;
