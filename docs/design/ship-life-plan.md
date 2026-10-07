@@ -2460,8 +2460,9 @@ Cut from the earlier slice 5: drills (owner: no muster drills); the medic, until
 (slice 6); `seedTopic` (no deck motion; later); engineering-console diagnostics (later); the
 tactical/shields station and the station framework (slice 8).
 
-The gate and workstreams are planned in full, in the slice 1–4 format, when the slice starts;
-what follows is the design they implement.
+Built as one serial gate commit, then five parallel workstreams, then a tuning commit by the
+lead. Calls 1–17 are the design; 18–28 are the gate's, made when the slice was planned against
+the code.
 
 ### Calls made
 
@@ -2582,26 +2583,525 @@ what follows is the design they implement.
 17. **People are not hurt this slice.** An impact on a tile with someone on it hits the tile; the
     person gets a `nearMiss` thought (−) and a ticker line. Honest and visible, nothing pretended:
     no fake injury state before bodies exist.
+18. **The hull footprint is every deck tile** (gate). Walls are edges in this deck model, not
+    tiles (`DeckDef` doc), so "walls included" means no tile is excluded: every non-space
+    character of `DeckDef.tiles`, machine footprints, doors' tiles and the tiles along the hull
+    alike; dock floor never. `core/hull.ts` `hullFootprint(deck)` is the one list both the pick
+    and the validator read; a large rock's blast is the centre and its eight neighbours clipped
+    to the footprint (`blastTiles`).
+19. **When and where a field lies** (gate). `scheduleField` carries `windowTicks`, bounded and
+    sampled exactly as `scheduleHazard`'s (`failures` stream, `narrator.maxFaultWindowSeconds`).
+    The sampled tick is the field's start (the first impacts may fall from then); the helm's
+    check (call 4) falls `field.warningSeconds` before it. A start that falls before transit
+    waits for the first `transit` tick, like a hazard; the field then occupies
+    `severities[s].lengthSeconds × travel.nominalSpeed` of route progress from where the ship
+    is, clamped to the leg's end. One field per leg: the command is rejected while
+    `state.field` is present, and an ended field stays (phase `ended`) until the leg ends, when
+    the field system drops it; a field whose leg ends before it starts is dropped with
+    `fieldMissed` (notable, no ticker line), never carried. The same preconditions as a hazard
+    (a course planned or under way, transit still ahead), and none while the hull is lost.
+20. **Scripted impacts, exactly** (gate). Each is `{ atSeconds, target, rock?, effect? }`:
+    `atSeconds` counts sim seconds from the field's start and must be below the severity's
+    `lengthSeconds`; at most `field.maxScripted` (3); `target` is `{ kind: "machine" }`,
+    `{ kind: "compartment" }` (a tile of it, uniformly), `{ kind: "tile" }` (in the footprint) or
+    `{ kind: "actor" }`, which the kernel rejects with "people are not targets until bodies
+    (slice 6)"; an absent `rock` is drawn by the severity's `largeShare`; an absent `effect` is
+    rolled. The guard prices an absent `rock` as `large`: if the scripted impacts' hull damage is
+    at or above `hull.integrity`, the command is rejected (`preconditionFailed`, "scripted impacts
+    alone would sink the ship"), at validation and again at apply. A scripted impact the field
+    never reaches (it drifted clear first, call 9) is dropped silently: the digest lists what
+    fired.
+21. **Integrity damage has its own repair** (gate). The design left "the `machineFault`-style
+    problem" to be named: it is `machineDamaged { machineId }` (owner `damage`, `discovered`,
+    essential, dedupe `machineDamaged:<id>`, seen in the room like any machine problem), deriving
+    one `repairDamage` task (engineering ≥ 1, a `welder`, `damage.repairSecondsPerIntegrity` ×
+    the integrity missing, standing at a `repair` position) that restores integrity to 1 and
+    resolves the problem. It is independent of faults: a `fault` effect takes the fault path
+    (D6) and its repair is the fault's recipe. Only impacts raise it (W2's `damageMachine`);
+    overheat keeps D35 (its fault repair restores integrity), so a game with no field is
+    unchanged.
+22. **Kits and plates by tag, welded** (gate). Two item tags, `patchKit` (`item.patch_kit`,
+    stackable 10, 2 kg) and `plating` (`item.hull_plating`, stackable 5, 12 kg); the sim finds them
+    by tag, never by def id. `patchHull` and `plateHull` both need engineering ≥ 1 and the
+    `welder` tool kind (the welder torch in stores) and consume one kit / one plate at the commit
+    point; `damage.patchSeconds` 20, `damage.plateSeconds` 40. "Two per locker zone" is every
+    `locker`-tagged zone (the twelve bunk lockers on Mk2: two kits each, 24 aboard); Mk1 has no
+    locker zone and no scenario, so it carries none. Kits are sold at Crossroads Hub and Ossory
+    Station; plating at all six ports, which all sell spare parts (Vesper Gate's line at count 0:
+    "out of plating" is the narrator's to use).
+23. **`hullDamaged` reuses the parts purchase** (gate). Owner `damage`; raised while docked at a
+    port whose market lists `plating` and some scar is unplated with fewer plates aboard than
+    unplated scars; payload `{ itemDefId, count }`; routine; derives commerce's `buyParts` task
+    through `buySpec` (exported from `systems/commerce/tasks.ts` at the gate), target the market,
+    so the purchase, the counter walk and the stowing are D47/D63's unchanged.
+24. **A lost ship halts the kernel** (gate). `WorldState.hull.lostAtTick` is set (with
+    `shipLost`) the tick integrity reaches 0; from then `advance` returns `{ kind: "lost" }`
+    without stepping (a new `AdvanceHalt`), the worker posts `shipLost { tick }` once, and the
+    CLI's pacing and beats runs stop. Nothing un-loses a ship; a save of a lost run restores lost.
+25. **Scars ride the render frame** (gate). Call 16's "scar frame on the dirt channel's pattern"
+    is taken as the drawing pattern (a per-tile overlay under the actors, tinted by config, read
+    at playback tick), not a second worker channel: scars are a handful of entries and
+    `RenderFrame` is already applied at playback tick, so `RenderFrame.hull.scars` carries them
+    and the overlay cannot lag the flash. Impacts reach the frame from the tick's ticker events
+    (`asteroidImpact` is notable), so no state holds them.
+26. **The alert record and who writes it** (gate). `WorldState.alert { sinceTick; cause:
+    "field"; clearsAtTick?; reports: Record<CompartmentId, Tick> }`: the field system (W1) raises
+    it and sets `clearsAtTick` when the field ends, the intercom (W3) writes `reports[c]` when a
+    report covers compartment `c`, and damage response (W2) reads `reports` against the field's
+    `lastImpactTick` to raise and resolve `compartmentToCheck`. Alert is common knowledge (the
+    klaxon): `AgentView.alert()`.
+27. **The event vocabulary** (gate). Field (W1): `fieldScheduled` (trace), `fieldMissed`
+    (notable, hidden), `fieldSighted` (narrative), `fieldEntered` (the first impact landed:
+    narrative when nobody had noticed the field, notable when the helm had), `asteroidImpact`
+    (notable), `machineKnockedOut` (notable), `nearMiss` (notable), `alertRaised` and
+    `alertCleared` (notable), `shipStuck` (narrative), `shipUnstuck` (notable), `fieldCleared`
+    (narrative), `shipLost` (narrative). Damage (W2): `scoutSent`, `hullPatched`, `hullPlated`,
+    `machineMended` (notable). Intercom (W3): `intercomReport` (notable). `host.slowDownOnEvents`
+    gains `fieldSighted`, `fieldEntered`, `shipStuck`, `machineKnockedOut`, `shipLost`;
+    `narrator.hookOnEvents` gains `fieldSighted`, `fieldEntered`, `fieldCleared`, `shipStuck`
+    (a hook fires only on a narrative occurrence, so a sighted field's `fieldEntered` does not
+    hook twice).
+28. **A pending `asteroidBelt` hazard becomes a `debrisField`** (gate). The kind leaves
+    `HAZARD_KINDS`; the 11 → 12 migration rewrites a waiting one to `debrisField` at the same
+    difficulty, so the narrator's spent budget still buys a check.
 
-### Build order (for the gate and workstreams)
+### Gate: contracts (one agent, serial)
 
-Field and impacts first with nobody responding, so every step after is playable: (1) gate: types,
-`field`/`alert`/`hull` state, schema 12 and its migration, `scheduleField` command and
-validation, content (intercom, patch kit, config blocks), ticker lines; (2) sim: the field,
-detection, impacts, effects, stuck, hull, ship loss; (3) sim/planner: alert behaviour,
-patching, port plating, scouts; (4) sim/planner: intercom reflex and broadcast; (5) web: rock layers, flash,
-scars, hull bar, alert, end screen; (6) narrator: command, digest,
-capabilities, prompt v0.24, fixtures regenerated; (7) tuning by the lead against `crew beats`
-(field lines per field, hull lost per severity, time stuck, time from impact to report, ships
-lost over seeds), and the target play speed ruled (open question 2 in the design).
+Everything below lands as one commit with all four checks green and `crew content validate`
+clean. Stubs are fine where behaviour is a stream's; types, schemas, generated schemas, the
+migration, the command and its validation, the ticker lines, the protocol and the content are
+not. Every stub is a named function in a file its stream owns, called from the shared file, so
+no stream edits `core/types/**`, `core/render.ts`, `core/world.ts`, `core/migrations.ts`,
+`core/invariants.ts`, `view/agentView.ts`, `planner/candidates.ts`, `systems/work/plans.ts`,
+`steps.ts`, `actions.ts`, `labels.ts`, `systems/commerce/tasks.ts`, `packages/sim/src/index.ts`,
+`apps/web/src/worker/registry.ts` or `apps/cli/src/pacing.ts`'s registry after the gate. With no
+field ever scheduled the game is unchanged: no system writes `field`, `alert` or a scar, and the
+intercoms are machines nobody uses.
 
-Checkpoint: a 1× phone run where a heavy field is sighted by the helm, the alert tints the HUD,
-rocks pass over the ship, a hit takes the galley stove out, the cook reports it on the intercom,
-an engineer repairs it, someone patches a scar in the hold, and the hull bar ends lower than it
-started; and a seeded run where the engines go out, the ship is stuck, and the crew get it moving
-before the hull fails.
+**Sim types.**
 
-### D-entries for slice 5 (D91 onward, provisional)
+- `core/types/content.ts`: `HAZARD_KINDS = ["debrisField", "ionStorm"]` (call 28);
+  `FIELD_SEVERITIES = ["light", "heavy", "brutal"]`, `FIELD_DETECTIONS = ["rolled", "unseen"]`,
+  `ROCK_SIZES = ["small", "large"]`, `MACHINE_EFFECTS = ["none", "graze", "damage", "knockout",
+  "fault"]` with their types; `MACHINE_TAGS` + `comm`; `ITEM_TAGS` + `patchKit`, `plating`;
+  `THOUGHT_KEYS` + `nearMiss`; `HullDef.max` (integer hull points); `ConfigDef.field {
+  warningSeconds; alertClearSeconds; severities: Record<FieldSeverity, { impactsPerMinute;
+  largeShare; lengthSeconds }>; helmThreading; unmannedRateFactor; stuckRateFactor;
+  stuckDriftImpacts; hullDamage: Record<RockSize, number>; machineEffects:
+  Record<MachineEffect, number>; effectIntegrity: { graze; damage }; patchRecovers; maxScripted
+  }`, `ConfigDef.damage { patchSeconds; plateSeconds; repairSecondsPerIntegrity; checkSeconds }`,
+  `ConfigDef.intercom { reportSeconds }`.
+- `core/types/ids.ts`: `FieldId` (prefix `f`), `ScarId` (prefix `r`), both in
+  `InstanceIdOf`/`NextIdCounters` (so both are `EntityId`s a fact may be about).
+- `core/types/state.ts`: `ImpactTarget = { kind: "machine"; machineId } | { kind:
+  "compartment"; compartmentId } | { kind: "tile"; x; y } | { kind: "actor"; actorId }`;
+  `ScriptedImpact { atSeconds; target; rock?; effect?; firedTick? }`; `FieldPhase = { kind:
+  "scheduled" } | { kind: "active"; enteredTick; endsAtProgress; stuckSinceTick? } | { kind:
+  "ended"; enteredTick; endedTick; how: "crossed" | "drifted" }`; `ActiveField { id; severity;
+  detection; startsAtTick; phase; noticedAtTick?; impacts; stuckImpacts; lastImpactTick?;
+  hullLost; scripted: ScriptedImpact[]; causeCommandId? }`; `AlertState` (call 26); `HullScar {
+  id: ScarId; tile; compartmentId; rock; damage; recovered; patched: boolean; tick; fieldId }`;
+  `HullState { integrity; max; scars: HullScar[]; lostAtTick? }`; `WorldState.field?`,
+  `alert?`, `hull`; `SCHEMA_VERSION = 12` and its history line.
+- `core/types/actor.ts`: `FactValues.hullImpact { fieldId: FieldId; compartmentId?:
+  CompartmentId }` (subject the field; `compartmentId` present only when they saw where).
+- `core/types/work.ts`: `ProblemOwner` + `damage`; `ProblemPayloads` + `machineDamaged {
+  machineId }`, `hullScar { scarId; compartmentId; tile }`, `hullDamaged { itemDefId; count }`,
+  `compartmentToCheck { compartmentId }`; `TASK_TYPES` + `repairDamage`, `patchHull`,
+  `plateHull`, `checkCompartment`; `TaskTarget` + `{ kind: "scar"; scarId }`; `ProgressRef` +
+  `{ kind: "scar"; scarId }`, `{ kind: "integrity"; machineId }`, `{ kind: "check";
+  compartmentId }`; `ActionStages` + `report: "talking"`; `PERSONAL_ACTIVITIES` + `report`,
+  `holdBridge`; `WorkStageKey` + `patch`, `plate`, `mend`, `check`, `report`; `HoldKind` +
+  `bridge`. `core/types/pipeline.ts`: `PlannerConfig` + `field`, `damage`, `intercom`.
+- `core/types/view.ts`: `AlertView { sinceTick; cause }` and `AgentView.alert(): AlertView |
+  undefined`; `AgentViewSnapshot.alert?`; `RenderHull { integrity; max; scars: RenderScar[];
+  lost: boolean }`, `RenderScar { id; x; y; patched; rock }`, `RenderImpact { tick; x; y; rock;
+  tiles }`, `RenderField { phase: "near" | "active" | "clearing"; severity; stuck: boolean }`;
+  `RenderFrame.hull`, `alert: boolean`, `field?`, `impacts`. `core/types/kernel.ts`:
+  `AdvanceHalt` + `{ kind: "lost" }`. `core/types/protocol.ts`: `FromWorker` + `{ type:
+  "shipLost"; tick }`.
+- Commands: `core/types/commands/field.ts` (new) with `scheduleField { severity; detection;
+  windowTicks; scripted: readonly ScriptedImpact[] }` (without `firedTick`);
+  `commands/index.ts` merges it; `authority.ts`: `NARRATOR_COMMAND_KINDS` and `scenario` +
+  `scheduleField`; `contracts.test.ts` follows. The handler is complete at the gate in
+  `systems/field/command.ts` (calls 19, 20, 24: payload, window, budget-free one-per-leg rule,
+  preconditions, targets on the ship's deck, the guard), registered by `registerField`.
+- Events: new `events/field.ts`, `events/damage.ts`, `events/intercom.ts` with call 27's types
+  (`asteroidImpact { fieldId; tile; tiles; rock; compartmentId; hullDamage; scarId; scripted;
+  hits: { machineId; effect }[] }`; `intercomReport { actorId; panelId; compartmentId; damage:
+  ({ kind: "scar"; compartmentId } | { kind: "machine"; machineId; out: boolean })[] }`; the
+  rest by name and subject); `events/index.ts` merges all three.
+- `core/hull.ts` (new, complete; owner W1): `hullFootprint(deck)`, `blastTiles(deck, centre,
+  rock)`, `scarDamageLeft(scar)`, `integrityFromScars(hull)`; `core/world.ts`: `emptyState`
+  gains `hull` (from the deck's `hull.max`), `createWorld` sets it from the scenario's deck;
+  `haltReason` returns `lost` while `hull.lostAtTick` is set. `core/migrations.ts` `11:` (hull at
+  full from the save's deck, no field, no alert, `nextId.field`/`scar`, pending `asteroidBelt`
+  hazards rewritten (call 28), the scenario's patch kits spawned into the lockers through
+  `spawnScenarioStores` with a `warn`); `save.test.ts` adds an 11 → 12 case. `core/invariants.ts`:
+  `hull.integrity` a number in [0, max] equal to `max` minus every scar's
+  `damage − recovered`; `recovered ≤ damage`; scar ids below `nextId.scar` and unique; a scar's
+  tile in the footprint; `field.id` below `nextId.field`; `alert.reports` keys are compartments.
+- `systems/field/` (new; owner W1): `field.ts` (`fieldSystem`, phase `equipment` after travel's
+  hazards; stub: drops a scheduled field whose leg is gone with `fieldMissed`, otherwise no-op),
+  `command.ts` (complete), `index.ts` with `registerField(registry)` (system + command).
+- `systems/damage/` (new; owner W2): `damage.ts` (`damageSystem`, phase `needs` after cabins;
+  stub no-op), `machines.ts` (`damageMachine(ctx, machine, integrityLoss)`: stub lowers
+  integrity, clamped, nothing else; `onImpact(ctx, impact)` no-op), `tasks.ts`
+  (`damageTaskDerivations`: every new kind returns `[]`), `plans.ts` (`repairDamagePlan`,
+  `patchPlan`, `platePlan`, `checkPlan`, `holdBridgePlan`: blocked `unreachableTarget`),
+  `steps.ts` (`runPatch`, `runPlate`, `runMend`, `runCheck` throw `NotImplementedError`;
+  `bridgeHoldDone` true), `labels.ts` (`damageTaskLabel`), `index.ts` with `registerDamage`.
+- `systems/intercom/` (new; owner W3): `report.ts` (`runReport` throws), `plans.ts`
+  (`reportPlan` blocked), `labels.ts` (`reportLabel` "on the intercom"), `index.ts` with
+  `registerIntercom` (nothing to register yet; the function exists so hosts never change).
+- `planner/alert.ts` (owner W2): `alertCandidate(view, config)` stub undefined (the officer of
+  the watch's bridge hold), `recreationOffered(view)` stub true, `isDamageTask(task)`,
+  `damageTaskAllowed(view, config, task, problem)` stub true; `planner/intercom.ts` (owner W3):
+  `reportCandidate(view, config)` stub undefined. `candidates.ts`: `taskUrgency` cases for the
+  four kinds (the owner's base urgency), the `isDamageTask` rule beside the galley's and the
+  dirt's, `reportCandidate` before the task loop (it ranks with its class), `alertCandidate`
+  after `dutyIdleCandidate`, `recreationCandidate` only while `recreationOffered`.
+- `systems/work/plans.ts`: `buildTaskPlan` routes the four task types to W2's plans,
+  `buildPersonalPlan` `report` → `reportPlan`, `holdBridge` → `holdBridgePlan`; `steps.ts`:
+  stages `patch`/`plate`/`mend`/`check` → W2's runners, `report` → `runReport`, hold `bridge` →
+  `bridgeHoldDone`; `actions.ts`: `report` → the `report` action, `check` → `inspect`, the rest
+  `repair`; `labels.ts`: the damage task types through `damageTaskLabel`, `report` through
+  `reportLabel`, `HOLD_LABEL.bridge` "holding the bridge". `systems/commerce/tasks.ts`: `buySpec`
+  exported (call 23).
+- `view/agentView.ts`: `alert()`; `toAgentViewSnapshot` carries it. `core/render.ts`: the frame
+  fields (scars from `hull.scars`, impacts from the tick's `asteroidImpact` events, `field`
+  phase `near` within `warningSeconds` of the start); ticker lines (streams write none):
+  `fieldSighted` → "Jax Okonkwo: rocks ahead", `fieldEntered` → "The ship shudders: we're in
+  rocks" (narrative) / null, `asteroidImpact` → "Rock strike in the galley; the galley stove took
+  it" (null when it hit nothing), `machineKnockedOut` → "The galley stove is out", `nearMiss` →
+  "A rock came through the hold a step from Tomas Ruiz", `alertRaised` → "General alert",
+  `alertCleared` → "Alert stood down", `shipStuck` → "Engines out: we're stuck in the rocks",
+  `shipUnstuck` → "Engines back: under way again", `fieldCleared` → "Clear of the rocks: hull at
+  71 of 100" / "Drifted clear of the rocks: hull at …", `shipLost` → "The hull gave way. The ship
+  is lost.", `scoutSent` → "Mara Osei sent Jax Okonkwo to check the hold", `hullPatched` → "Priya
+  Kessler patched the hull in the hold", `hullPlated` → "Priya Kessler plated the hull in the
+  hold", `machineMended` → "Priya Kessler repaired the galley stove", `intercomReport` →
+  "Bettina Solheim on the intercom: the galley's hit, the galley stove's out"; `fieldScheduled`
+  trace, `fieldMissed` hidden. `docs/CONTRACTS.md`: alert is common knowledge; the
+  `hullImpact` fact; the `damage` owner.
+- `packages/sim/src/index.ts` exports `registerField`, `registerDamage`, `registerIntercom`,
+  `damageTaskDerivations`, the four new enums, `hullFootprint`, `blastTiles`;
+  `apps/web/src/worker/registry.ts` and `apps/cli/src/pacing.ts` register field after travel,
+  damage and intercom after cabins, and merge `damageTaskDerivations`; the worker host posts
+  `shipLost` on the new halt and stops; pacing and beats stop their run on it.
+
+**Content and schemas (`packages/content`).**
+
+- `schemas/primitives.ts`: the enums for machine tags, item tags, thought keys and problem
+  kinds follow (`AssertEqual` guards); `schemas/deck.ts` `hull.max` (positive integer);
+  `schemas/config.ts` the three blocks (strict: weights non-negative with a positive sum,
+  shares and `patchRecovers` in [0, 1], rates positive, `stuckDriftImpacts` and `maxScripted`
+  positive integers); `crew content schemas` regenerated.
+- Data: `machines/intercom.json` (`machine.intercom`, tag `comm`, footprint one tile, one
+  `operate` position at (0, 1), 0.05 kW `domestic`, no heat, no wear, no faults); placed on
+  `freighter-mk2.json` one per compartment (sixteen: each on a free tile against a wall, its
+  `operate` tile on the room's floor, off every spawn point, zone and interaction tile) and on
+  `freighter-mk1.json` (eight); both decks `hull.max` 100. `items/patch-kit.json`,
+  `items/hull-plating.json` (call 22); `thoughts/near-miss.json` (−0.15, 0.5 day, no stack);
+  `scenarios/default.json` two `item.patch_kit` per `locker` zone; port markets gain
+  `item.hull_plating` (all six) and `item.patch_kit` (Crossroads Hub, Ossory Station);
+  `config/default.json`: `field { warningSeconds: 12, alertClearSeconds: 60, severities: {
+  light: { impactsPerMinute: 2, largeShare: 0.1, lengthSeconds: 90 }, heavy: { 4, 0.25, 135 },
+  brutal: { 6, 0.4, 180 } }, helmThreading: 0.4, unmannedRateFactor: 1.5, stuckRateFactor: 0.7,
+  stuckDriftImpacts: 6, hullDamage: { small: 3, large: 8 }, machineEffects: { none: 25, graze:
+  25, damage: 25, knockout: 10, fault: 15 }, effectIntegrity: { graze: 0.2, damage: 0.5 },
+  patchRecovers: 0.5, maxScripted: 3 }`, `damage { patchSeconds: 20, plateSeconds: 40,
+  repairSecondsPerIntegrity: 30, checkSeconds: 3 }`, `intercom { reportSeconds: 3 }`, and call
+  27's slowdown and hook lists; `loader.ts` imports; `loader.test.ts` counts (machines 21,
+  items 20, thoughts 27). Deck READMEs regenerated (`crew content render-deck`) with a line on
+  the intercoms.
+- Hand-built sim bundles: `core/fixtures/ship-life.ts` gains `nearMiss` in `FIXTURE_THOUGHTS`
+  and `FIXTURE_FIELD`, `FIXTURE_DAMAGE`, `FIXTURE_INTERCOM`; every fixture config spreads them
+  and every fixture deck's hull gains `max: 100`; `example-world.ts` state `hull`.
+
+**Tests the gate must fix to stay green** (literals and renames only): `loader.test.ts` and
+`schemas.test.ts` counts; `contracts.test.ts` narrator authority; `save.test.ts` 11 → 12;
+`hazards.test.ts`, the narrator's `translate.test.ts`, `contract.test.ts`,
+`watch-digest.test.ts` and the server's `narrator.hazard.test.ts` lose `asteroidBelt` (the
+narrator's `HAZARD_NAMES` and the capabilities line "All three" follow the two kinds); fixtures
+under `packages/narrator/fixtures/` load through the migration (regenerated at integration);
+`translate.test.ts`'s narrator-kinds assertion follows `scheduleField` (the plan schema does not
+offer it until W5).
+
+### Workstreams (parallel after the gate)
+
+No two streams edit the same file. `docs/DECISIONS.md`, `packages/content/schema-json/*`,
+`packages/content/data/**` (config, decks, items, scenarios, ports), the deck READMEs and
+`packages/narrator/fixtures/*` are the lead's at integration; a stream that needs a content or
+config change names it in its report. Each stream's report names the files it touched, the
+D-entry text it proposes, and what it saw in a headless run. The split is the brief's five, by
+the order a field plays out: the rocks (W1), what the crew do about the damage (W2), how word
+travels (W3), what the player sees (W4), what the narrator sees and says (W5). The hull's
+repair sits with W2 rather than W1 because patching and plating are crew work (problems, tasks,
+plans, steps) like the machine repair beside them, while W1 stays a system with no planner code.
+
+**W1 — Sim: the field.** Owns `packages/sim/src/systems/field/**` (+ tests and
+`fixtures/field-deck.ts`: the default content's Mk2 with four crew, a course plotted, a stander
+of known piloting, and helpers to schedule a field and run to its start), `core/hull.ts` (+
+test).
+- `field.ts` (`fieldSystem`, phase `equipment` after `travel.hazards`): the lifecycle of calls 3
+  and 19 (scheduled → active at the first transit tick at or after `startsAtTick`, with
+  `endsAtProgress` from the severity's length → ended when progress passes it or after
+  `stuckDriftImpacts` while stuck; dropped when the leg ends, `fieldMissed` if it never began);
+  `fieldScheduled` is the command's.
+- `detection.ts`: at `startsAtTick − warningSeconds` a `rolled` field rolls the stander's
+  piloting against the severity (`cleanPassChance` from `systems/travel/hazards.ts` at the
+  difficulty `hazards.difficulty[easy|hard|brutal]` for light/heavy/brutal); pass: `fieldSighted`,
+  `noticedAtTick`, alert raised; fail, an empty helm, or `unseen`: nothing until the first impact,
+  which sets `noticedAtTick`, raises alert and emits `fieldEntered` as narrative (notable when
+  already noticed). Alert cleared (`alertCleared`, `state.alert` deleted) at `clearsAtTick`.
+- `impacts.ts`: Poisson arrivals on the `failures` stream at `impactsPerMinute ×` the helm factor
+  (call 8: `1 − helmThreading × skill/10` manned, `unmannedRateFactor` empty) `×
+  stuckRateFactor` while stuck; scripted impacts at their second, each replacing the next random
+  one (call 2), with their rock and effect; the tile uniform over `hullFootprint`, a
+  compartment target uniform over its tiles, a machine target uniform over its footprint; the
+  blast (`blastTiles`); hull charged once (`hullDamage[rock]`, clamped so integrity never goes
+  below 0 and the scar records what was actually lost), a scar on the centre tile, `onImpact`
+  (W2's) once per impact after the hull and scar are written, `asteroidImpact`; people on a
+  blast tile get `nearMiss` (thought and event, call 17).
+- `effects.ts`: each machine with a footprint tile in the blast rolls once on `machineEffects`
+  (or takes the scripted effect); `graze`/`damage` → W2's `damageMachine` with
+  `effectIntegrity`, `knockout` → `damageMachine` with the machine's whole integrity, `fault` →
+  a weighted fault def through equipment's `applyFault` (a machine with none, or none left,
+  rerolls `damage`); `machineKnockedOut` when the machine went from running to blocked
+  (`isMachineBlocked`).
+- `stuck.ts`: no progress while every `engine`-tagged machine is blocked (travel's own drift
+  rule already halts progress; the field reads it, never writes travel), `shipStuck` /
+  `shipUnstuck`, `stuckImpacts`, drift clear at `stuckDriftImpacts` (`fieldCleared` with `how:
+  "drifted"`).
+- `hull.ts` (`systems/field/hull.ts`): `chargeHull`, the loss check (`hull.lostAtTick`,
+  `shipLost`), `fieldCleared` with the hull at the end.
+- Tests (`field.test.ts`, `detection.test.ts`, `impacts.test.ts`, `effects.test.ts`,
+  `stuck.test.ts`, `command.test.ts`, `core/hull.test.ts` on the field fixture): a field
+  scheduled docked waits for transit and becomes active at its tick; a `rolled` field with a
+  piloting-9 stander against `light` is sighted (`fieldSighted`, alert) twelve seconds early,
+  with the helm empty it is not and the first impact raises alert with a narrative
+  `fieldEntered`; `unseen` is never sighted; impacts over 200 seeded fields cover every footprint
+  tile and the hold's share of hits is its share of tiles within 3 points; a helm at skill 10
+  takes impacts at 60 % of the base rate and an empty helm at 150 %; a `large` rock covers nine
+  tiles (fewer at the hull's edge) and costs the hull once; the effect table's shares hold over
+  a thousand rolls; a machine with no faults rerolls `fault` as `damage`; a scripted `knockout`
+  on the engine at 30 s takes it from 1 to 0, `machineKnockedOut`, and the ship is stuck
+  (`shipStuck`), the rate drops to 70 %, and after six impacts it drifts clear (`fieldCleared`,
+  `drifted`); with the engine restored mid-field the ship resumes and leaves by progress; the
+  command is rejected for an `actor` target, a second field on the leg, a docked ship with no
+  course, four scripted impacts, and scripted damage at or above the hull; random impacts can
+  sink the ship (`shipLost`, `lostAtTick`, and `advance` halts `lost` thereafter).
+Done when the sim suite is green and the field fixture shows a heavy field sighted, crossed and
+cleared, and a stuck one drift clear, each in one headless run.
+
+**W2 — Sim and planner: damage response.** Owns `packages/sim/src/systems/damage/**` (+ tests
+and fixtures), `planner/alert.ts` (+ test).
+- `machines.ts`: `damageMachine` (integrity down, clamped; raise or revise `machineDamaged`,
+  discovered, essential, call 21) and `onImpact` (the `hullImpact` fact to everyone aboard and
+  awake or asleep, `compartmentId` only for those in the hit compartment; sleepers in that
+  compartment woken through `abortActivity`; the `hullScar` problem, discovered, essential while
+  on alert, routine otherwise, located at the compartment).
+- `damage.ts` (`damageSystem`): while on alert, abort every `recreate` activity (the session
+  closes through `leaveRecreation`); raise `compartmentToCheck` (public, essential, dedupe
+  `check:<compartmentId>`) for each compartment with no report and no on-watch eyes since
+  `field.lastImpactTick` while the officer of the watch holds the bridge, and resolve it on a
+  report (`alert.reports`) or a scout's arrival; `scoutSent` when a scout claims one; raise and
+  revise `hullDamaged` while docked (call 23); a scar's problem urgency drops to routine when
+  the alert clears.
+- `tasks.ts` (`damageTaskDerivations`): `machineDamaged` → `repairDamage`; `hullScar` →
+  `patchHull` while unpatched and a `patchKit` item is aboard, `plateHull` while docked and a
+  `plating` item is aboard (one each, dependency-free); `hullDamaged` → `buySpec`;
+  `compartmentToCheck` → `checkCompartment` (no skill, the compartment's floor tile nearest its
+  door as the interaction tile).
+- `plans.ts`, `steps.ts`: `repairDamagePlan`/`runMend` (fetch the welder, the `repair`
+  position, integrity up at `1 / repairSecondsPerIntegrity` per second, resolve at 1,
+  `machineMended`); `patchPlan`/`runPatch` (fetch the welder and a kit, walk beside the scar,
+  `patchSeconds`, consume the kit, `recovered = patchRecovers × damage`, `patched`, hull up,
+  `hullPatched`); `platePlan`/`runPlate` (the plate, `plateSeconds`, the scar removed, hull up
+  by what was left, problem resolved, `hullPlated`); `checkPlan`/`runCheck` (walk in,
+  `checkSeconds` looking round; perception does the seeing); `holdBridgePlan` and
+  `bridgeHoldDone` (to the captain's chair's position, or the bridge floor; done when the alert
+  clears).
+- `planner/alert.ts`: `alertCandidate` (the officer of the watch on alert: `holdBridge`,
+  essential); `recreationOffered` (false on alert); `damageTaskAllowed` (the captain or the
+  officer of the watch never takes `checkCompartment`; the scout is the nearest available
+  on-duty hand, by deference to the closer colleague the view can see; patch and plate need
+  only the skill); `isDamageTask`.
+- Labels (`labels.ts` `damageTaskLabel`): "patching the hull in the hold", "plating the hull in
+  the hold", "fetching a patch kit", "fetching hull plating", "repairing impact damage to the
+  galley stove", "checking the hold", "holding the bridge".
+- Tests (`machines.test.ts`, `damage.test.ts`, `tasks.test.ts`, `plans.test.ts`,
+  `planner/alert.test.ts` on W1's field fixture with impacts injected through `onImpact`, so W2
+  never waits on W1): an impact is felt by all (`hullImpact`) and placed only by those in the
+  room; a sleeper in the hit room wakes and one elsewhere sleeps on; a game of cards ends when the
+  alert sounds and none is offered until it clears; the officer of the watch walks to the bridge
+  and stays; an unreported compartment gets a `compartmentToCheck` and the nearest on-watch hand
+  (never the captain) walks there and sees the scar; a damaged stove is repaired to 1 by an
+  engineer with the welder; a scar is patched for half with a kit from a locker and the hull bar
+  rises by that; docked at a port selling plating, the ship buys a plate per unplated scar from
+  its money and the crew plate each, restoring the rest; at a port with none, nothing is bought
+  and the scars stay (the digest's to tell); a ship with no kits aboard patches nothing.
+Done when the sim suite is green and a headless heavy field (W1 merged, or `onImpact` driven by
+hand) ends with every scar patched and every damaged machine mended before the next port.
+
+**W3 — Sim and planner: intercom panels, the reporting reflex, the broadcast.** Owns
+`packages/sim/src/systems/intercom/**` (+ tests), `planner/intercom.ts` (+ test).
+- `planner/intercom.ts`: `reportCandidate` (call 12): on alert, holding a damage fact
+  (`machineDamaged`, `hullScar` or a `machineSymptom` problem fact, or a `machineStatus` of
+  `failed`/`degraded`) learned by direct sight since the last impact and not yet held by
+  everyone as `report` evidence, the nearest panel the actor believes working; containment
+  class; nothing off alert.
+- `plans.ts`: `reportPlan` (the panel's `operate` position, a `work` step `report` of
+  `reportSeconds`); a panel found broken on arrival fails the step and the planner picks the next.
+- `report.ts`: `runReport` at the step's end writes every damage fact the reporter holds to every
+  crew member aboard as `report` evidence with the original `observedTick` (the `tellCrew`
+  pattern in `systems/work/execute.ts`), sets `alert.reports[c]` for each compartment covered,
+  and emits `intercomReport` with the damage list.
+- Labels (`labels.ts`): "on the intercom", "going to the intercom".
+- Tests (`report.test.ts`, `plans.test.ts`, `planner/intercom.test.ts` on W1's fixture with
+  damage facts written by hand): the cook who sees the stove go out walks to the galley panel and
+  reports; afterwards the engineer in engineering knows the stove's problem as `report` with the
+  cook's observation tick; a second person seeing the same damage does not report it again; a
+  broken panel sends the reporter to the next one; off alert nobody reports; the report resolves
+  the compartment's check (with W2 merged).
+Done when the sim suite is green and a headless field shows a report line within thirty seconds
+of the first machine hit.
+
+**W4 — Web: the field on the phone.** Owns `apps/web/**` except `worker/registry.ts` (the
+gate's) and the gate's `shipLost` post in `worker/host.ts`.
+- `render/rocks.ts` (+ test): two rock layers from a seeded field like `stars.ts`, the far one
+  drawn after the stars and before the hull, the near one sparser after the deck in the
+  foreground slot; both scroll with the stars and fade in while `frame.field.phase` is `near`,
+  full while `active`, out while `clearing`; still while stuck. `render/impacts.ts` (+ test): a
+  short flash over `impact.tiles`, keyed by tick so it plays once at playback.
+  `render/scars.ts` (+ test): a per-tile overlay drawn with the grime layer (`grime.ts`'s
+  pattern: under actors, over the floor), patched scars dimmer.
+- HUD: a hull bar beside the ship's state in `TopBar.tsx` (integrity/max, red below a third);
+  on alert the top bar tints and the bell line reads "ALERT"; `Headline.tsx` unchanged.
+- End screen: `ui/ShipLost.tsx` on `shipLost`: the ship's last day (day, port it was bound for,
+  the last ticker lines) and a "New game" button through the existing new-game path.
+- Slowdown: nothing new in code (`host/slowdown.ts` reads config); the lead's config carries the
+  types.
+- Inspector: a scar is pickable ("hull scar, patched" / "unpatched") through `pick.ts`; the
+  room inspection lists its scars.
+- Test pins: `fullSim.test.ts`, `integration.test.ts` (register nothing new: the registry does),
+  `playback.test.ts` interpolation (`hull`, `alert`, `field` snap to `next`; `impacts`
+  accumulate).
+Done when the web suite is green and a browser run at 390×700 with a scheduled heavy field
+(the scenario fixture command in the dev console) shows the rocks, a flash, a scar, the hull bar
+falling and the alert tint, and a scripted loss shows the end screen.
+
+**W5 — Narrator and CLI: the lever, the digest, the beats.** Owns `packages/narrator/**`,
+`packages/server/src/routes/narrator*.test.ts`, `apps/cli/**` (except the gate's registry lines).
+- `contract.ts`: `scheduleField` in the plan schema (`severity`, `detection`, `window` in the
+  `scheduleHazard` words, `scripted` up to three with the target by name: a machine's name, a
+  room's name, or a crew member's name, which translate drops with "people are not targets
+  until bodies"); `translate.ts` (`fieldCommand`), `capabilities.ts` (the seventh lever:
+  severities, detection, what scripted impacts are for, the guard; "debrisField and ionStorm are
+  the same check").
+- `field-digest.ts` (+ test): call 15's lines (scheduled, in progress, hull with scars patched
+  and unpatched, repairs under way at port and whether the ship is leaving with them unfinished,
+  damage known against damage that exists, who reported on the intercom); `digest.ts` includes
+  it.
+- `prompts/system.ts` v0.24 (call 14's guidance), `prompts/hooks.ts` `notableEvent` texts for the
+  four hooked types.
+- `apps/cli/src/beats.ts`: a field section (fields, impacts and hull lost per severity, time
+  stuck, seconds from impact to first report, scars patched/plated, ships lost over seeds, field
+  ticker lines per field); `pacing.ts`'s halt handling for `lost`.
+- Tests: `translate.test.ts` field cases (unknown machine, a person, a fourth scripted impact,
+  the window), `capabilities.test.ts` (seven levers), `field-digest.test.ts`, `run.test.ts` and
+  `kernel-integration.test.ts` on regenerated fixtures, `beats.test.ts` (a run with a scenario
+  field reports its impacts).
+Done when the narrator, server and CLI suites are green, `crew beats --days 3` prints the field
+section, and the lead runs `pnpm test:live` once.
+
+### Integration order
+
+1. **Gate** on `ship-life-5`: the four checks; `crew content validate`; a browser smoke run (no
+   field is ever scheduled, so the game plays as slice 4 did, with sixteen intercom panels on the
+   walls and patch kits in the lockers).
+2. **W1** (the field) first: everything after reads its state. The four checks; a headless run
+   with a scenario `scheduleField` shows sighting, impacts, a scar and `fieldCleared`.
+3. **W2** (damage), then **W3** (intercom): the four checks after each; after W3 the headless
+   field shows reports, scouts and patching; `compartmentToCheck` resolves by report or arrival.
+4. **W4** (web): the four checks; browser at 390×700 and 1280×800 with a heavy field and with a
+   scripted loss.
+5. **W5**: regenerate `packages/narrator/fixtures/*` with `crew narrator fixtures` first (schema
+   11 → 12, kits in the lockers, hull at 100), then the four checks; `pnpm test:live` once;
+   `crew beats --days 3 --scenario both`, numbers recorded for the D-entries.
+6. **Tuning commit (lead):** against `crew beats` over seeds 1–5: hull lost per severity (light
+   under 15, heavy 25–45, brutal 50–80 with a manned helm), ships lost only when brutal meets an
+   empty helm or a stuck ship, time stuck under a field's length, impact to first report under
+   thirty seconds, field ticker lines per field under twenty (or `asteroidImpact` lines go
+   null for misses); the target play speed ruled (open question 2).
+7. D-entries D91–D95, `README.md` note ("in transit the ship can cross an asteroid field: the
+   helm threads it, rocks hit, the crew report and patch, and a lost hull ends the game"), deploy
+   via the `ops` agent, and the checkpoint: a 1× phone run where a heavy field is sighted by the
+   helm, the alert tints the HUD, rocks pass over the ship, a hit takes the galley stove out,
+   the cook reports it on the intercom, an engineer repairs it, someone patches a scar in the
+   hold, and the hull bar ends lower than it started; and a seeded run where the engines go out,
+   the ship is stuck, and the crew get it moving before the hull fails.
+
+### Risks and hidden coupling
+
+- **Hot files with one owner and gate stubs**: `planner/candidates.ts`,
+  `systems/work/plans.ts`, `steps.ts`, `actions.ts`, `labels.ts`, `core/render.ts`,
+  `view/agentView.ts`, `core/world.ts`, `core/migrations.ts`, `core/invariants.ts`,
+  `systems/commerce/tasks.ts`, `apps/web/src/worker/registry.ts`, `apps/cli/src/pacing.ts`. The
+  streams reach them only through their own files (`systems/field/*`, `systems/damage/*`,
+  `systems/intercom/*`, `planner/alert.ts`, `planner/intercom.ts`, `core/hull.ts`). A stream that
+  needs a line in another's file asks the lead.
+- **W1 calls into W2 at two points, and only there**: `damageMachine(ctx, machine, loss)` for
+  every graze, damage and knockout, and `onImpact(ctx, impact)` once per impact after the hull
+  and the scar are written. The gate's stubs lower integrity and do nothing, so W1's tests see
+  machines go dark with no problem raised until W2 merges; W2's tests drive `onImpact` by hand.
+  Neither stream emits the other's events.
+- **The hull's arithmetic has three writers** (W1 charges, W2 patches and plates), so the
+  invariant (`integrity = max − Σ(damage − recovered)`) is the contract: every write goes through
+  `core/hull.ts` helpers, a charge is clamped at zero and recorded as what was actually lost, and
+  plating removes the scar in the same step that raises the integrity.
+- **Alert has three readers and one writer.** W1 raises and clears it; W2's behaviour and W3's
+  reflex read `state.alert` (sim) or `view.alert()` (planner). `alert.reports` is W3's to write
+  and W2's to read. A field that ends while scouts are walking leaves `compartmentToCheck` open
+  until the alert clears; W2 resolves every open check when it does.
+- **Essential work on alert against the watch.** Damage problems are essential, which respects
+  the watch (D77): the off-watch sleep on unless the impact is in their room, which is the design
+  (call 4). If the beats show scars unpatched for a watch, the fix is the alert calling all hands
+  (rating patching containment while on alert), not lowering the off-duty rule.
+- **The report reflex is containment class**, above essential work, so a cook mid-repair walks to
+  the panel first. The reflex must end (the facts it carries become public at the broadcast);
+  W3's test that a second witness does not report again is the guard against a loop.
+- **Stuck and travel's drift.** Travel already stops progress when propulsion is lost
+  (`RenderTravel.drifting`); the field reads that and never writes travel. The approach hook
+  (`stageDock`) holds transit at the leg's end: a field clamped to the leg's end must end before
+  the hold, or the ship sits in rocks waiting for the narrator. W1 ends the field at the
+  approach lead (`narrator.approachHookLeadSeconds`) at the latest.
+- **`machineDamaged` and the departure gate.** D36's gate asks `isMachineBlocked`; a knocked-out
+  engine holds departure for repairs like a faulted one, which is wanted. A damaged (derated,
+  not blocked) machine does not.
+- **The intercom placements are content the validator checks** (floor, compartment, reachability,
+  off spawn points). Sixteen new machines on Mk2 shift machine instance ids (`m34`…): any test
+  that pins a machine id by number is a literal to fix, and the narrator fixtures are regenerated.
+- **Ship loss and the hosts.** `{ kind: "lost" }` is a new `AdvanceHalt`; every `switch` on
+  `halt.kind` must follow (the worker host, pacing, beats, test fixtures that loop on `advance`).
+  A lost save restores lost and halts at once: the web's load path must show the end screen,
+  not a frozen ship.
+- **Counts and literals pinned in tests**: machines 20 → 21, items 18 → 20, thoughts 26 → 27;
+  `contracts.test.ts` narrator authority; `capabilities.test.ts` "six levers" (W5 makes it
+  seven); the hazard kind lists in narrator tests.
+- **Narrator call volume**: four hooked types, at most one field per leg, so at most three hooks
+  a field (sighted or entered, stuck, cleared). `asteroidImpact` is notable and reaches the
+  ticker and the uploaded events; at a brutal field's eighteen impacts it is the loudest source,
+  which the tuning commit holds.
+- **Save size**: a scar is about 150 bytes; a brutal field leaves twenty, plated away at port.
+  `field` is one row; `alert.reports` at most sixteen keys.
+
+### D-entries for slice 5 (D91–D95, provisioned)
+
+Already numbered: the gate commit cites D92, the streams cite the entry their work falls under
+(W1 D92, W2 D93, W3 D94, W4 and W5 D95), and the lead writes all five into `docs/DECISIONS.md`
+at integration, with calls 18–28 folded into the entry each belongs to.
 
 - **D91.** Ship Life is re-sequenced around the asteroid field: slice 5 is the field, damage
   and comms; 6 atmosphere and breaches with bodies and the medic; 7 fire; 8 tactical, shields
