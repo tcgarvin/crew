@@ -2541,7 +2541,9 @@ the code.
     money) and `plateHull` tasks install a plate at each scar, restoring the rest of its damage
     and clearing it. Nothing gates departure on the hull: a conflict between repairs and something
     else (a departure, short money, no plating at this port) is the narrator's hook, not a check.
-    Kits: two per locker zone across the ship (`patch_kit`, stackable), also bought at port.
+    Kits: two per locker zone across the ship (`patch_kit`, stackable), also bought at port
+    (integration: D80's `reserveLow` buys back to the scenario's stocked count where a market sells
+    kits, and they come aboard at the top of the ramp like any purchase, not into the lockers).
 11. **The officer of the watch holds the bridge and sends scouts** (owner). Every impact is felt
     by everyone aboard ("the ship shudders"): a `hullImpact` fact with no place, except that
     whoever is in the compartment sees where. The officer of the watch, on alert, raises a
@@ -2626,9 +2628,9 @@ the code.
     `welder` tool kind (the welder torch in stores) and consume one kit / one plate at the commit
     point; `damage.patchSeconds` 20, `damage.plateSeconds` 40. "Two per locker zone" is every
     `locker`-tagged zone (the twelve bunk lockers on Mk2: two kits each, 24 aboard); Mk1 has no
-    locker zone and no scenario, so it carries none. Kits are sold at Crossroads Hub and Ossory
-    Station; plating at all six ports, which all sell spare parts (Vesper Gate's line at count 0:
-    "out of plating" is the narrator's to use).
+    locker zone and no scenario, so it carries none. Kits are sold at all six ports (integration;
+    the gate had them at Crossroads Hub and Ossory Station only); plating at all six ports, which
+    all sell spare parts (Vesper Gate's line at count 0: "out of plating" is the narrator's to use).
 23. **`hullDamaged` reuses the parts purchase** (gate). Owner `damage`; raised while docked at a
     port whose market lists `plating` and some scar is unplated with fewer plates aboard than
     unplated scars; payload `{ itemDefId, count }`; routine; derives commerce's `buyParts` task

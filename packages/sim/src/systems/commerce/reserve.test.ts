@@ -16,10 +16,12 @@ import type { SimEvent } from "../../core/types/events";
 import type { HookId, ItemDefId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
+import { DAMAGE, damageWorld } from "../damage/fixtures/damage-deck";
 import { registerEquipmentSystems } from "../equipment/register";
 import { registerNeeds } from "../needs/index";
 import { registerSpatial } from "../spatial/index";
 import { spatialViolations } from "../spatial/invariants";
+import { PORTS } from "../travel/fixtures";
 import {
   ALL_DERIVATIONS,
   CREW,
@@ -32,7 +34,7 @@ import {
 import { registerWork } from "../work/index";
 import { workViolations } from "../work/invariants";
 import { registerCommerce } from "./index";
-import { foodDaysAboard, reserveShortfalls } from "./reserve";
+import { foodDaysAboard, reserveShortfalls, stockedPatchKits } from "./reserve";
 
 const PORT = TINY.port;
 const RATION_PRICE = 2;
@@ -277,5 +279,39 @@ describe("spares reserve (D80): units of each spare kept aboard", () => {
     const tw = reserveWorld({ spareStock: 0, sparesReserve: 2 });
     run(tw, 20);
     expect(reserveProblems(tw.world)).toEqual([]);
+  });
+});
+
+describe("patch kits (D93): bought back to the scenario's stocked count", () => {
+  function kitWorld(options: Parameters<typeof damageWorld>[0]) {
+    const { world } = damageWorld(options);
+    const ctx = { state: world.state, content: world.content, config: world.config.values };
+    return { world, ctx };
+  }
+
+  it("stocks two a locker, and wants nothing while they are all aboard", () => {
+    const { ctx } = kitWorld({ kitStock: { count: 20, price: 15 } });
+    expect(stockedPatchKits(ctx)).toBe(10);
+    expect(reserveShortfalls(ctx, PORTS.a)).toEqual([]);
+  });
+
+  it("wants the kits spent, from a market that sells them, and none where none are sold", () => {
+    const { world, ctx } = kitWorld({ kitStock: { count: 20, price: 15 } });
+    const [spent] = Object.values(world.state.items).filter((i) => i.defId === DAMAGE.kit);
+    if (spent === undefined) throw new Error("no kits aboard");
+    delete world.state.items[spent.id];
+    expect(reserveShortfalls(ctx, PORTS.a)).toEqual([{ itemDefId: DAMAGE.kit, count: 2 }]);
+
+    const bare = kitWorld({});
+    const [gone] = Object.values(bare.world.state.items).filter((i) => i.defId === DAMAGE.kit);
+    if (gone === undefined) throw new Error("no kits aboard");
+    delete bare.world.state.items[gone.id];
+    expect(reserveShortfalls(bare.ctx, PORTS.a)).toEqual([]);
+  });
+
+  it("wants none on a ship the scenario stocked with none", () => {
+    const { ctx } = kitWorld({ kits: false, kitStock: { count: 20, price: 15 } });
+    expect(stockedPatchKits(ctx)).toBe(0);
+    expect(reserveShortfalls(ctx, PORTS.a)).toEqual([]);
   });
 });

@@ -17,6 +17,7 @@ import {
   configTicks,
   hopCount,
   isOnDock,
+  roomPhrase,
   shortestPath,
 } from "@crew/sim";
 
@@ -86,6 +87,15 @@ export function compartmentName(content: ContentBundle, state: State, id: string
   if (compartment === undefined) return id;
   const deck = Object.values(content.decks).find((d) => d.id === compartment.deckId);
   return deck?.compartments.find((c) => c.key === compartment.key)?.name ?? id;
+}
+
+/** D94: a compartment as a sentence names it ("the cargo hold", "engineering"), or the id. */
+export function compartmentPhrase(content: ContentBundle, state: State, id: string): string {
+  const compartment = state.compartments[id as keyof State["compartments"]];
+  if (compartment === undefined) return id;
+  const deck = Object.values(content.decks).find((d) => d.id === compartment.deckId);
+  const def = deck?.compartments.find((c) => c.key === compartment.key);
+  return def === undefined ? id : roomPhrase(def);
 }
 
 export function machineCompartment(

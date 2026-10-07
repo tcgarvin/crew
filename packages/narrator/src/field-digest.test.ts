@@ -201,7 +201,7 @@ describe("the field digest: the leg's field", () => {
       ],
     });
     expect(lines(snapshot)[0]).toBe(
-      `field scheduled: heavy asteroid field, unseen (no warning: the first rock is the news), begins in ~40s; your scripted hits: knockout on the Main Engine (${engine}) at 115s (small rock); a rolled hit on the Galley at 20s [scheduled; nobody aboard knows]`,
+      `field scheduled: heavy asteroid field, unseen (no warning: the first rock is the news), begins in ~40s; your scripted hits: knockout on the Main Engine (${engine}) at 115s (small rock); a rolled hit on the galley at 20s [scheduled; nobody aboard knows]`,
     );
     expect(fieldBudgetLine(state)).toBe("fields: this leg has its field");
   });
@@ -376,7 +376,20 @@ describe("the field digest: damage known against damage that exists", () => {
     knows(state, cook, seen);
     knows(state, cook, damaged);
     expect(damageKnowledgeLine(state, content())).toBe(
-      `damage the crew know of: a scar in the Galley; the Galley Stove (${stove}) damaged. damage nobody aboard has seen: a scar in the Cargo Hold; the Coolant Pump (${pump}) damaged`,
+      `damage the crew know of: a scar in the galley; the Galley Stove (${stove}) damaged. damage nobody aboard has seen: a scar in the cargo hold; the Coolant Pump (${pump}) damaged`,
+    );
+  });
+
+  it("names engineering without an article, as the deck's phrase says (D94)", () => {
+    const state = inTransit().state;
+    const hit = scar(state, 1, "engineering");
+    problem(state, 1, "hullScar", {
+      scarId: hit.id,
+      compartmentId: hit.compartmentId,
+      tile: hit.tile,
+    });
+    expect(damageKnowledgeLine(state, content())).toBe(
+      "damage the crew know of: none. damage nobody aboard has seen: a scar in engineering",
     );
   });
 

@@ -77,7 +77,7 @@ describe("a passenger aboard", () => {
     const meal = run(tw, 20 * 60, () => actor.needs.hunger < 0.35);
     const ate = eventsOf(meal, "ateMeal").filter((e) => e.subjectIds[0] === halla);
     expect(ate).toHaveLength(1);
-    expect(meal.labels[halla]).toContain("walking to galley");
+    expect(meal.labels[halla]).toContain("walking to the galley");
     const galley = actor.location;
     expect(galley.kind === "onDeck" && Math.abs(galley.x - (GALLEY_TILE.x + 0.5)) < 2).toBe(true);
 

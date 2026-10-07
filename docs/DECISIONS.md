@@ -1734,7 +1734,11 @@ fault there, and on alert the generator joins them and a symptom on any of them 
 generator's off-watch electrician slept on: one ship sat stuck 183 s in a light field and was
 lost); Mk2 carries a second welder torch on the parts shelves (the patcher held the only one while
 the engine waited; a migrated save keeps the one it has). The officer of the watch on alert takes
-no damage work and holds the bridge.
+no damage work and holds the bridge. Spent kits are restocked at port as a D80 store: docked
+where a market sells a `patchKit` item (every port that sells plating does), fewer kits aboard
+than the scenario's `patchKit` `startingItems` (24 on Mk2) is a `reserveLow` for the difference,
+bought from ship's money and set down at the top of the cargo ramp like any purchase, where a
+patcher fetches them as readily as from a locker.
 
 **D94. Intercom panels and reporting.** Every rock is felt by everyone aboard (a `hullImpact` fact
 about the field) and placed only by those in the room; a sleeper there wakes. The bridge has no
@@ -1755,7 +1759,10 @@ the alert clearing. Slice-5 integration: re-checking every unwatched room after 
 about 35 scouts a heavy field, so a room is now looked at once while the rocks fall and once more
 when the field ends, any crew member in it (on watch or off, awake or asleep) covers it, and
 `scoutSent` and `hullPatched` are trace, off the ticker (the deck labels and the hull bar show
-them). Scouts fell from 19 to 7 a field in the beats below.
+them). Scouts fell from 19 to 7 a field in the beats below. Rooms are named in sentences through
+`roomPhrase`: "the" and the lowercased name, unless the deck's compartment carries its own
+`phrase` (Engineering's is "engineering"), so ticker lines, labels, the inspector and the field
+digest say "patched the hull in engineering", not "in the engineering".
 
 **D95. Save schema 12, prompt v0.24, the field on the phone, the beats field section, and the
 play-speed recommendation.** Schema 11 → 12 adds `hull` (whole, from the save's deck), `field`,

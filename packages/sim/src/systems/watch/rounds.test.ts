@@ -69,7 +69,7 @@ describe("the officer of the watch's rounds (D77)", () => {
     const firstRoundEnd = mara.stops[3]?.tick ?? Number.POSITIVE_INFINITY;
     const secondRound = mara.stops[4]?.tick ?? 0;
     expect(atChairIdle.some((t) => t > firstRoundEnd && t < secondRound)).toBe(true);
-    expect(log.labels[MARA]).toContain("walking to bridge");
+    expect(log.labels[MARA]).toContain("walking to the bridge");
 
     // The cadence runs from the start of one round to the start of the next.
     const starts = roundStarts(log, MARA).map((e) => e.tick);

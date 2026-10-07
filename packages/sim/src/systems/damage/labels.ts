@@ -1,3 +1,4 @@
+import { roomPhrase } from "../../core/rooms";
 /**
  * Labels for damage work (D93, D94), read by `systems/work/labels.ts`: "patching the hull in the
  * hold", "plating the hull in the hold", "fetching a patch kit", "fetching hull plating",
@@ -18,10 +19,10 @@ function roomName(ctx: LabelCtx, compartmentId: CompartmentId | undefined): stri
   const compartment =
     compartmentId === undefined ? undefined : ctx.state.compartments[compartmentId];
   if (compartment === undefined) return "somewhere";
-  const deck = ctx.content.decks[compartment.deckId];
-  return (
-    deck?.compartments.find((c) => c.key === compartment.key)?.name ?? compartment.key
-  ).toLowerCase();
+  const def = ctx.content.decks[compartment.deckId]?.compartments.find(
+    (c) => c.key === compartment.key,
+  );
+  return def === undefined ? `the ${compartment.key.toLowerCase()}` : roomPhrase(def);
 }
 
 /** The room a damage task is about: the scar's, the machine's, or the one to check. */
@@ -55,11 +56,11 @@ function fetchLabel(ctx: LabelCtx, itemId: ItemId): string {
 function workLabel(ctx: LabelCtx, task: DeepReadonly<Task>, room: string): string {
   switch (task.type) {
     case "patchHull":
-      return `patching the hull in the ${room}`;
+      return `patching the hull in ${room}`;
     case "plateHull":
-      return `plating the hull in the ${room}`;
+      return `plating the hull in ${room}`;
     case "checkCompartment":
-      return `checking the ${room}`;
+      return `checking ${room}`;
     default:
       return task.target.kind === "machine"
         ? `repairing impact damage to the ${machineName(ctx, task.target.machineId)}`
@@ -75,6 +76,6 @@ export function damageTaskLabel(
 ): string {
   const room = roomName(ctx, taskRoom(ctx, task));
   if (step.kind === "pickUp") return fetchLabel(ctx, step.itemId);
-  if (step.kind === "moveTo" && task.type !== "checkCompartment") return `walking to the ${room}`;
+  if (step.kind === "moveTo" && task.type !== "checkCompartment") return `walking to ${room}`;
   return workLabel(ctx, task, room);
 }

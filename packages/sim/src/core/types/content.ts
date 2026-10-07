@@ -394,6 +394,11 @@ export interface CompartmentDef {
   /** Single character used in `DeckDef.tiles`; must not be a space. */
   readonly symbol: string;
   readonly name: string;
+  /**
+   * How a sentence names the room, article and all, lower case: "engineering" where "the" would
+   * read wrong. Absent, it is "the" and the lowercased name ("the cargo hold"); see `roomPhrase`.
+   */
+  readonly phrase?: string;
   /** Semantic tags (`cargoHold`, `galley`, `quarters`, `bridge`, `engineering`). Tags alone grant no function. */
   readonly tags: readonly string[];
 }

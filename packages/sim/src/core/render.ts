@@ -9,6 +9,7 @@ import { findItemDef } from "./defs";
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
+import { roomPhrase } from "./rooms";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
 import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
@@ -264,10 +265,10 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
   const machine = (id: string) => machineDef(id)?.name;
   const room = (key: string) => {
     for (const deckId of Object.keys(state.deck.tiles)) {
-      const name = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
+      const def = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
         (c) => c.key === key,
-      )?.name;
-      if (name !== undefined) return `the ${name.toLowerCase()}`;
+      );
+      if (def !== undefined) return roomPhrase(def);
     }
     return "the room";
   };

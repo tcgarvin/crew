@@ -16,6 +16,7 @@ export const compartmentDefSchema = z.strictObject({
   key: localKeySchema,
   symbol: z.string().length(1).regex(/^\S$/),
   name: z.string().min(1),
+  phrase: z.string().min(1).exactOptional(),
   tags: z.array(z.string()),
 });
 

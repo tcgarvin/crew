@@ -7,8 +7,8 @@
  *
  * Added to the lounge deck: a workbench (11,0) in the gym, worked from (11,1); the welder torch in
  * the gym's stores (11,4); the captain's chair (19,0) on the bridge, sat at (19,1); two patch kits
- * in each of the five lockers (`kits: false` leaves them out); hull plating sold at the home port
- * when `plating` is given. Everything else (rooms, crew, interests, the 600 s day of two watches,
+ * in each of the five lockers (`kits: false` leaves them out); hull plating and patch kits sold at
+ * the home port when `plating` and `kitStock` are given. Everything else (rooms, crew, interests, the 600 s day of two watches,
  * docked at the home port) is the lounge fixture's, except the bill: Red = Mara (captain, the
  * officer of the watch), Noor, Tomas (the engineer, engineering 5) and Bettina stand watch 0;
  * White = Jax and Dane watch 1.
@@ -154,6 +154,8 @@ export interface DamageContentOptions {
   readonly kits?: boolean;
   /** Hull plating on the home port's market. */
   readonly plating?: { readonly count: number; readonly price: number };
+  /** Patch kits on the home port's market (D93's restock). */
+  readonly kitStock?: { readonly count: number; readonly price: number };
 }
 
 export function damageContent(
@@ -192,9 +194,16 @@ export function damageContent(
       [PORTS.a]: {
         ...home,
         market:
-          options.plating === undefined
+          options.plating === undefined && options.kitStock === undefined
             ? home.market
-            : [{ itemDefId: DAMAGE.plating, ...options.plating }],
+            : [
+                ...(options.plating === undefined
+                  ? []
+                  : [{ itemDefId: DAMAGE.plating, ...options.plating }]),
+                ...(options.kitStock === undefined
+                  ? []
+                  : [{ itemDefId: DAMAGE.kit, ...options.kitStock }]),
+              ],
       },
     },
     scenarios: {

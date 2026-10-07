@@ -11,6 +11,7 @@ import type {
   ScarId,
   WorldState,
 } from "@crew/sim";
+import { roomPhrase } from "@crew/sim";
 import type { PlaceInspection } from "./placeInspection";
 
 /** "8 hull points", "1 hull point"; fractions (a half-recovered odd charge) to one place. */
@@ -36,7 +37,7 @@ function scarWorkers(state: DeepReadonly<WorldState>, scarId: ScarId): string[] 
   return words;
 }
 
-function compartmentName(
+function compartmentPhrase(
   state: DeepReadonly<WorldState>,
   content: ContentBundle,
   compartmentId: CompartmentId,
@@ -46,16 +47,16 @@ function compartmentName(
     throw new Error(`inspectScar: no compartment ${compartmentId}`);
   }
   const deck = content.decks[compartment.deckId];
-  const name = deck?.compartments.find((c) => c.key === compartment.key)?.name;
-  if (name === undefined) {
+  const def = deck?.compartments.find((c) => c.key === compartment.key);
+  if (def === undefined) {
     throw new Error(`inspectScar: compartment ${compartment.key} is not on its deck`);
   }
-  return name.toLowerCase();
+  return roomPhrase(def);
 }
 
 function scarWords(scar: DeepReadonly<HullScar>, where: string): string {
   const rock = scar.rock === "large" ? "A large rock" : "A small rock";
-  const hit = `${rock} holed the ${where} here, costing ${points(scar.damage)}.`;
+  const hit = `${rock} holed ${where} here, costing ${points(scar.damage)}.`;
   if (!scar.patched) return `${hit} Not patched yet.`;
   const left = scar.damage - scar.recovered;
   return `${hit} A patch kit won back ${points(scar.recovered)}; ${points(left)} wait on plating at port.`;
@@ -73,7 +74,7 @@ export function inspectScar(
 ): PlaceInspection {
   const scar = state.hull.scars.find((s) => s.id === scarId);
   if (scar === undefined) throw new Error(`inspectScar: no scar ${scarId} in the snapshot`);
-  const words = [scarWords(scar, compartmentName(state, content, scar.compartmentId))];
+  const words = [scarWords(scar, compartmentPhrase(state, content, scar.compartmentId))];
   words.push(...scarWorkers(state, scarId));
   return {
     title: "Hull scar",

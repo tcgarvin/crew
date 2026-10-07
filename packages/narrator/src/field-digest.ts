@@ -20,7 +20,7 @@ import {
   effectiveMarket,
   scarDamageLeft,
 } from "@crew/sim";
-import { type State, compartmentName, machineName, portName } from "./lookups";
+import { type State, compartmentName, compartmentPhrase, machineName, portName } from "./lookups";
 import { helmHolder, helmOf } from "./watch-digest";
 
 type Field = NonNullable<State["field"]>;
@@ -47,7 +47,7 @@ function roomCounts(names: readonly string[]): string {
     .join(", ");
 }
 
-/** "the Main Engine (m3)", "the Cargo Hold", "tile (4, 7)": a scripted target in words. */
+/** "the Main Engine (m3)", "the cargo hold", "engineering", "tile (4, 7)": a scripted target in words. */
 function targetPhrase(state: State, content: ContentBundle, impact: ScriptedImpact): string {
   const target = impact.target;
   switch (target.kind) {
@@ -58,7 +58,7 @@ function targetPhrase(state: State, content: ContentBundle, impact: ScriptedImpa
         : `the ${machineName(content, machine)} (${machine.id})`;
     }
     case "compartment":
-      return `the ${compartmentName(content, state, target.compartmentId)}`;
+      return compartmentPhrase(content, state, target.compartmentId);
     case "tile":
       return `tile (${target.x}, ${target.y})`;
     case "actor":
@@ -265,14 +265,14 @@ function known(state: State, problem: DeepReadonly<Problem>): boolean {
 
 /**
  * "damage known to the crew: a scar in the Galley; the Galley Stove (m5) damaged. damage nobody
- * has seen: a scar in the Cargo Hold", from the open `hullScar` and `machineDamaged` problems.
+ * has seen: a scar in the cargo hold", from the open `hullScar` and `machineDamaged` problems.
  * Undefined when there is no open damage.
  */
 export function damageKnowledgeLine(state: State, content: ContentBundle): string | undefined {
   const seen: string[] = [];
   const unseen: string[] = [];
   for (const p of openProblems(state, "hullScar")) {
-    const said = `a scar in the ${compartmentName(content, state, p.payload.compartmentId)}`;
+    const said = `a scar in ${compartmentPhrase(content, state, p.payload.compartmentId)}`;
     (known(state, p) ? seen : unseen).push(said);
   }
   for (const p of openProblems(state, "machineDamaged")) {

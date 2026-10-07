@@ -341,6 +341,15 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
+  it("sells patch kits wherever it sells hull plating, so a scarred ship restocks both (D93)", () => {
+    const all = Object.values(ports);
+    const sells = (port: (typeof all)[number], itemDefId: string) =>
+      port.market.some((line) => line.itemDefId === itemDefId);
+    for (const port of all.filter((p) => sells(p, "item.hull_plating"))) {
+      expect(sells(port, "item.patch_kit"), port.id).toBe(true);
+    }
+  });
+
   it("stocks each port differently (D47)", () => {
     const stock = Object.values(ports).map((p) =>
       p.market.map((l) => `${l.itemDefId}:${l.count}:${l.price}`).join(","),

@@ -41,6 +41,7 @@
       "key": "galley",
       "symbol": "G",
       "name": "Galley & Mess",
+      "phrase": "the galley and mess",
       "tags": ["galley", "mess"]
     },
     {
@@ -53,6 +54,7 @@
       "key": "engineering",
       "symbol": "E",
       "name": "Engineering",
+      "phrase": "engineering",
       "tags": ["engineering"]
     },
     {

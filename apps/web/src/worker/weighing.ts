@@ -21,7 +21,7 @@ import type {
   WeighingWords,
   World,
 } from "@crew/sim";
-import { weighOptions } from "@crew/sim";
+import { roomPhrase, weighOptions } from "@crew/sim";
 
 interface Names {
   readonly state: ReadonlyWorldState;
@@ -44,8 +44,8 @@ function roomName(names: Names, compartmentId: CompartmentId): string {
   const compartment = names.state.compartments[compartmentId];
   if (compartment === undefined) return "a room";
   const deck = names.content.decks[compartment.deckId];
-  const name = deck?.compartments.find((c) => c.key === compartment.key)?.name;
-  return `the ${(name ?? compartment.key).toLowerCase()}`;
+  const def = deck?.compartments.find((c) => c.key === compartment.key);
+  return def === undefined ? `the ${compartment.key.toLowerCase()}` : roomPhrase(def);
 }
 
 function personName(names: Names, actorId: string): string {
