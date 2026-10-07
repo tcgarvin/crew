@@ -25,6 +25,13 @@ const memoryDefSchema = z.strictObject({
 });
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
+
+/** D92: one field severity: its mean impact rate, share of large rocks and length. */
+const severitySchema = z.strictObject({
+  impactsPerMinute: positive,
+  largeShare: unitInterval,
+  lengthSeconds: positive,
+});
 const unitRange = z
   .strictObject({ min: unitInterval, max: unitInterval })
   .refine((r) => r.min <= r.max, { message: "min must be <= max" });
@@ -290,5 +297,40 @@ export const configDefSchema = z.strictObject({
     privateTalkSeconds: positive,
     privateTalkWaitSeconds: positive,
   }),
+  field: z.strictObject({
+    warningSeconds: nonNegative,
+    alertClearSeconds: nonNegative,
+    severities: z.strictObject({
+      light: severitySchema,
+      heavy: severitySchema,
+      brutal: severitySchema,
+    }),
+    helmThreading: unitInterval,
+    unmannedRateFactor: positive,
+    stuckRateFactor: positive,
+    stuckDriftImpacts: positiveInt,
+    hullDamage: z.strictObject({ small: positive, large: positive }),
+    machineEffects: z
+      .strictObject({
+        none: nonNegative,
+        graze: nonNegative,
+        damage: nonNegative,
+        knockout: nonNegative,
+        fault: nonNegative,
+      })
+      .refine((w) => w.none + w.graze + w.damage + w.knockout + w.fault > 0, {
+        message: "machine effect weights must not all be 0",
+      }),
+    effectIntegrity: z.strictObject({ graze: unitInterval, damage: unitInterval }),
+    patchRecovers: unitInterval,
+    maxScripted: positiveInt,
+  }),
+  damage: z.strictObject({
+    patchSeconds: positive,
+    plateSeconds: positive,
+    repairSecondsPerIntegrity: positive,
+    checkSeconds: positive,
+  }),
+  intercom: z.strictObject({ reportSeconds: positive }),
   events: z.strictObject({ tickerMaxEntries: positiveInt, traceRingSize: positiveInt }),
 }) satisfies z.ZodType<ConfigDef>;

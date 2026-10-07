@@ -76,6 +76,10 @@ export type LocalId = Brand<string, "LocalId">;
 export type HazardId = Brand<string, "HazardId">;
 /** Slice 4: a group recreation session (`state.social.sessions`). */
 export type SessionId = Brand<string, "SessionId">;
+/** D92: an asteroid field the narrator placed (`state.field`). */
+export type FieldId = Brand<string, "FieldId">;
+/** D93: one impact's mark on the hull (`state.hull.scars`). */
+export type ScarId = Brand<string, "ScarId">;
 
 /**
  * Prefix per instance kind. The kernel's ID allocator (W2) is the only writer; it formats
@@ -102,6 +106,9 @@ export const ID_PREFIX = {
   hazard: "h",
   // Slice 4: group recreation sessions.
   session: "s",
+  // D92, D93: asteroid fields and hull scars (`r` for rent; `s` is the session).
+  field: "f",
+  scar: "r",
 } as const;
 
 export type InstanceKind = keyof typeof ID_PREFIX;
@@ -124,6 +131,8 @@ export interface InstanceIdOf {
   local: LocalId;
   hazard: HazardId;
   session: SessionId;
+  field: FieldId;
+  scar: ScarId;
 }
 
 /** Any kernel-allocated instance ID. */

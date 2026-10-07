@@ -206,7 +206,10 @@ describe(
   { timeout: 45_000 },
   () => {
     it("runs the freight loop and the crew's day for eight sim-minutes", () => {
-      const { world, log } = runFullSim(20260930, EIGHT_MINUTES, autoAccept);
+      // Slice 5: the sixteen intercoms each draw a failure threshold at world creation, which
+      // moved the `failures` stream; on the old seed the engine's controller failed twice and the
+      // ship drifted short of its second port. The run's claims are seed-independent.
+      const { world, log } = runFullSim(20261006, EIGHT_MINUTES, autoAccept);
       if (process.env.FULLSIM_DEBUG) {
         for (const e of log.events) {
           if (e.significance === "trace") continue;

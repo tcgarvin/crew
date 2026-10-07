@@ -91,7 +91,7 @@ const deck = {
     cargoTransferTiles: [{ x: 1, y: 2 }],
     personnelTransferTiles: [{ x: 5, y: 2 }],
   },
-  hull: { class: "test_hull", sizeClass: "S" },
+  hull: { class: "test_hull", sizeClass: "S", max: 100 },
   spawnPoints: [
     { key: "s1", tile: { x: 3, y: 2 }, tags: ["crew"] },
     { key: "p1", tile: { x: 6, y: 2 }, tags: ["passenger"] },
@@ -307,6 +307,7 @@ const thoughts = {
   heardOut: thought("heardOut", 0.1, false),
   dressedDown: thought("dressedDown", -0.15, false),
   ateATreat: thought("ateATreat", 0.1, false),
+  nearMiss: thought("nearMiss", -0.15, false),
 };
 
 const band = { min: 1, max: 3 };
@@ -524,6 +525,26 @@ const config = {
     privateTalkSeconds: 20,
     privateTalkWaitSeconds: 120,
   },
+  field: {
+    warningSeconds: 12,
+    alertClearSeconds: 60,
+    severities: {
+      light: { impactsPerMinute: 2, largeShare: 0.1, lengthSeconds: 90 },
+      heavy: { impactsPerMinute: 4, largeShare: 0.25, lengthSeconds: 135 },
+      brutal: { impactsPerMinute: 6, largeShare: 0.4, lengthSeconds: 180 },
+    },
+    helmThreading: 0.4,
+    unmannedRateFactor: 1.5,
+    stuckRateFactor: 0.7,
+    stuckDriftImpacts: 6,
+    hullDamage: { small: 3, large: 8 },
+    machineEffects: { none: 25, graze: 25, damage: 25, knockout: 10, fault: 15 },
+    effectIntegrity: { graze: 0.2, damage: 0.5 },
+    patchRecovers: 0.5,
+    maxScripted: 3,
+  },
+  damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
+  intercom: { reportSeconds: 3 },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
 };
 

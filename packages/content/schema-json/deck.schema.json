@@ -392,9 +392,14 @@
         "sizeClass": {
           "type": "string",
           "enum": ["S", "M", "L"]
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
-      "required": ["class", "sizeClass"],
+      "required": ["class", "sizeClass", "max"],
       "additionalProperties": false
     }
   },

@@ -15,8 +15,10 @@ import type {
   CargoClass,
   DeckDef,
   DirtTier,
+  FieldSeverity,
   ItemTag,
   MachineTag,
+  RockSize,
   RoleTag,
   SkillLevels,
   ToolKind,
@@ -38,11 +40,12 @@ import type {
   MachineDefId,
   MachineId,
   PortDefId,
+  ScarId,
   SessionId,
   TraitDefId,
 } from "./ids";
 import type { DoorPhysicalState } from "./ship";
-import type { GroupSession } from "./state";
+import type { AlertState, GroupSession } from "./state";
 import type { TravelStage } from "./travel";
 import type { Activity, Problem, Task } from "./work";
 
@@ -168,6 +171,12 @@ export interface KnownItemView {
  */
 export type SessionView = DeepReadonly<GroupSession> & { readonly label: string };
 
+/**
+ * D94: the ship is on alert, as everyone aboard knows it (the klaxon): when it sounded and why.
+ * Which compartments were reported is the intercom's to tell, through facts.
+ */
+export type AlertView = Readonly<Pick<AlertState, "sinceTick" | "cause">>;
+
 /** A task as its planner may see it. Claim bookkeeping is hidden (SD §14.5). */
 export type TaskView = DeepReadonly<Omit<Task, "claimState">> & {
   /** From a `taskClaim` fact, if the actor has learned someone else claimed it. */
@@ -253,6 +262,8 @@ export interface AgentView {
    * has is common knowledge, like the schematic. The recreation candidate scores them.
    */
   activities(): readonly DeepReadonly<ActivityDef>[];
+  /** D94: the alert, while the ship is on one (common knowledge: the klaxon); else undefined. */
+  alert(): AlertView | undefined;
   /**
    * W4a addition: schematic travel estimate in ticks from `from` (default: the actor's tile) to
    * `to`, or null if the layout has no route. Wraps spatial's `estimateTravelTicks`, which the
@@ -274,6 +285,8 @@ export interface AgentViewSnapshot {
   readonly roster: readonly RosterEntry[];
   /** Slice 4: the sessions the view saw. */
   readonly sessions: readonly SessionView[];
+  /** D94: the alert the view saw; absent off alert. */
+  readonly alert?: AlertView;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -488,6 +501,47 @@ export interface RenderSession {
   readonly running: boolean;
 }
 
+/** D93: a hull scar for the scar overlay: its tile (deck frame) and whether it is patched. */
+export interface RenderScar {
+  readonly id: ScarId;
+  readonly x: number;
+  readonly y: number;
+  readonly patched: boolean;
+  readonly rock: RockSize;
+}
+
+/** D93: the hull bar and the scar overlay. `lost` once the hull has given way. */
+export interface RenderHull {
+  readonly integrity: number;
+  readonly max: number;
+  readonly scars: readonly RenderScar[];
+  readonly lost: boolean;
+}
+
+/**
+ * D92: a rock that hit since the previous frame (from the tick's `asteroidImpact` events), for
+ * the flash: its centre tile and every tile its blast covered (deck frame).
+ */
+export interface RenderImpact {
+  readonly tick: Tick;
+  readonly x: number;
+  readonly y: number;
+  readonly rock: RockSize;
+  readonly tiles: readonly TileCoord[];
+}
+
+/**
+ * D92: the field as the rock layers draw it (truth, D7: the player sees rocks the crew may not
+ * have noticed). `near` within `field.warningSeconds` of its start, `active` while the ship is in
+ * it, `clearing` from its end until the alert stands down; absent otherwise.
+ */
+export interface RenderField {
+  readonly phase: "near" | "active" | "clearing";
+  readonly severity: FieldSeverity;
+  /** Engines out in the field: the rocks tumble past rather than stream. */
+  readonly stuck: boolean;
+}
+
 /**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
@@ -520,4 +574,12 @@ export interface RenderFrame {
   readonly headline: string;
   /** Slice 4: open and running group sessions, one plate each. */
   readonly sessions: readonly RenderSession[];
+  /** D93: the hull bar and its scars. */
+  readonly hull: RenderHull;
+  /** D92: the ship is on alert (the HUD tints, the bell line reads "ALERT"). */
+  readonly alert: boolean;
+  /** D92: the field near or around the ship; absent with none. */
+  readonly field?: RenderField;
+  /** D92: impacts since the previous frame, for the flash. */
+  readonly impacts: readonly RenderImpact[];
 }

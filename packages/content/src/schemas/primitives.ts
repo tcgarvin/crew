@@ -12,17 +12,20 @@ import type {
   CrewDefId,
   DeckDefId,
   DockDefId,
+  FieldSeverity,
   HullSizeClass,
   InterestTag,
   ItemDefId,
   ItemTag,
   MachineDefId,
+  MachineEffect,
   MachineTag,
   MemoryKey,
   PortDefId,
   PowerPriority,
   ProblemKind,
   RecipeActionKind,
+  RockSize,
   RoleTag,
   ScenarioDefId,
   SkillId,
@@ -125,6 +128,8 @@ export const itemTagSchema = z.enum([
   "book",
   "instrument",
   "treat",
+  "patchKit",
+  "plating",
 ]);
 export const toolKindSchema = z.enum([
   "wrench",
@@ -156,6 +161,7 @@ export const machineTagSchema = z.enum([
   "lifeSupport",
   "cooling",
   "rampControl",
+  "comm",
 ]);
 export const powerPrioritySchema = z.enum([
   "lifeSupport",
@@ -202,6 +208,7 @@ export const thoughtKeySchema = z.enum([
   "heardOut",
   "dressedDown",
   "ateATreat",
+  "nearMiss",
 ]);
 /** D88: what one person remembers about another (sim `MEMORY_KEYS`). */
 export const memoryKeySchema = z.enum([
@@ -258,7 +265,17 @@ export const problemKindSchema = z.enum([
   "mealToCook",
   "mealToCarry",
   "compartmentDirty",
+  "machineDamaged",
+  "hullScar",
+  "hullDamaged",
+  "compartmentToCheck",
 ]);
+/** D92: field severities (sim `FIELD_SEVERITIES`), the keys of `config.field.severities`. */
+export const fieldSeveritySchema = z.enum(["light", "heavy", "brutal"]);
+/** D92: rock sizes (sim `ROCK_SIZES`), the keys of `config.field.hullDamage`. */
+export const rockSizeSchema = z.enum(["small", "large"]);
+/** D92: machine effects (sim `MACHINE_EFFECTS`), the keys of `config.field.machineEffects`. */
+export const machineEffectSchema = z.enum(["none", "graze", "damage", "knockout", "fault"]);
 
 export const skillLevelsSchema = z.partialRecord(
   skillIdSchema,
@@ -292,4 +309,26 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof interestTagSchema>, InterestTag>,
   AssertEqual<z.infer<typeof activityOutcomeSchema>, ActivityOutcome>,
   AssertEqual<z.infer<typeof problemKindSchema>, ProblemKind>,
-] = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+  AssertEqual<z.infer<typeof fieldSeveritySchema>, FieldSeverity>,
+  AssertEqual<z.infer<typeof rockSizeSchema>, RockSize>,
+  AssertEqual<z.infer<typeof machineEffectSchema>, MachineEffect>,
+] = [
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+];

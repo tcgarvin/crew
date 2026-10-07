@@ -42,7 +42,7 @@ const deck: DeckDef = {
     cargoTransferTiles: [],
     personnelTransferTiles: [],
   },
-  hull: { class: "test_hull", sizeClass: "S" },
+  hull: { class: "test_hull", sizeClass: "S", max: 100 },
   spawnPoints: [],
 };
 
@@ -96,6 +96,26 @@ const config: PlannerConfig = {
     debate: { agreeWithin: 2, argueBeyond: 4 },
   },
   mood: { lowBelow: -0.4, highAbove: 0.4, lowWorkSpeed: 0.9, highWorkSpeed: 1.05 },
+  field: {
+    warningSeconds: 12,
+    alertClearSeconds: 60,
+    severities: {
+      light: { impactsPerMinute: 2, largeShare: 0.1, lengthSeconds: 90 },
+      heavy: { impactsPerMinute: 4, largeShare: 0.25, lengthSeconds: 135 },
+      brutal: { impactsPerMinute: 6, largeShare: 0.4, lengthSeconds: 180 },
+    },
+    helmThreading: 0.4,
+    unmannedRateFactor: 1.5,
+    stuckRateFactor: 0.7,
+    stuckDriftImpacts: 6,
+    hullDamage: { small: 3, large: 8 },
+    machineEffects: { none: 25, graze: 25, damage: 25, knockout: 10, fault: 15 },
+    effectIntegrity: { graze: 0.2, damage: 0.5 },
+    patchRecovers: 0.5,
+    maxScripted: 3,
+  },
+  damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
+  intercom: { reportSeconds: 3 },
   work: {
     reconsiderEveryTicks: 10,
     switchCooldownSeconds: 2,
@@ -194,6 +214,7 @@ function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): 
     sessions: () => [],
     travel: () => ({ stage: "docked" }),
     activities: () => [],
+    alert: () => undefined,
     knownItems: () => items,
     estimateTravelTicks: (to) => Math.abs(to.x) * 10,
   };

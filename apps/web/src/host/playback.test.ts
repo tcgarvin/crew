@@ -34,6 +34,9 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     locals: [],
     dockProps: [],
     sessions: [],
+    hull: { integrity: 100, max: 100, scars: [], lost: false },
+    alert: false,
+    impacts: [],
   };
 }
 

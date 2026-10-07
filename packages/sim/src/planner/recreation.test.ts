@@ -59,7 +59,7 @@ const deck: DeckDef = {
     cargoTransferTiles: [],
     personnelTransferTiles: [],
   },
-  hull: { class: "test_hull", sizeClass: "S" },
+  hull: { class: "test_hull", sizeClass: "S", max: 100 },
   spawnPoints: [],
 };
 

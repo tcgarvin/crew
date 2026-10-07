@@ -10,9 +10,12 @@
 import {
   FIXTURE_ACTIVITIES,
   FIXTURE_CABINS,
+  FIXTURE_DAMAGE,
   FIXTURE_DIRT,
+  FIXTURE_FIELD,
   FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
+  FIXTURE_INTERCOM,
   FIXTURE_MOOD,
   FIXTURE_RECREATION,
   FIXTURE_SOCIAL,
@@ -213,6 +216,9 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
     watches: fixtureWatches([0, 1, 2]),
     mood: FIXTURE_MOOD,
     hazards: FIXTURE_HAZARDS,
+    field: FIXTURE_FIELD,
+    damage: FIXTURE_DAMAGE,
+    intercom: FIXTURE_INTERCOM,
     galley: FIXTURE_GALLEY,
     dirt: FIXTURE_DIRT,
     social: {
@@ -269,7 +275,7 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
           cargoTransferTiles: [{ x: 0, y: 1 }],
           personnelTransferTiles: [{ x: 0, y: 1 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: [
           { key: "bunk1", tile: { x: 1, y: 1 }, tags: ["crew"] },
           { key: "bunk2", tile: { x: 2, y: 1 }, tags: ["crew"] },

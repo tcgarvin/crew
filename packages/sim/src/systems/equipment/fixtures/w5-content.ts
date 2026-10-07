@@ -106,7 +106,7 @@ export function w5Content(
           cargoTransferTiles: [{ x: 0, y: 0 }],
           personnelTransferTiles: [{ x: 0, y: 0 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: [{ key: "bunk", tile: { x: 0, y: 1 }, tags: ["crew"] }],
       },
     },

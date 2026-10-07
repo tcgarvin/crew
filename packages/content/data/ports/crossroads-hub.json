@@ -66,6 +66,16 @@
       "itemDefId": "item.med_kit",
       "count": 2,
       "price": 90
+    },
+    {
+      "itemDefId": "item.hull_plating",
+      "count": 6,
+      "price": 80
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 10,
+      "price": 25
     }
   ],
   "jobTemplates": [

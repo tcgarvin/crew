@@ -225,11 +225,22 @@ export interface System {
  * (`estimatedWorkSeconds`) on one scale for SD §15.3 step 5.
  *
  * Slice 4: `recreation`, `social` and `mood`, for the recreation candidate's join threshold,
- * affinity bands and mood bands.
+ * affinity bands and mood bands. Slice 5: `field`, `damage` and `intercom`, for the alert's
+ * candidates and the reporting reflex.
  */
 export type PlannerConfig = Pick<
   ConfigDef,
-  "work" | "urgency" | "needs" | "time" | "galley" | "recreation" | "social" | "mood"
+  | "work"
+  | "urgency"
+  | "needs"
+  | "time"
+  | "galley"
+  | "recreation"
+  | "social"
+  | "mood"
+  | "field"
+  | "damage"
+  | "intercom"
 >;
 
 /**

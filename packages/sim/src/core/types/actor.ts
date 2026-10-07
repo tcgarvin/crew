@@ -10,9 +10,11 @@ import type { PhysicalLocation, Tick, TileCoord } from "./common";
 import type { InterestTag, RoleTag, SkillLevels, ThoughtKey } from "./content";
 import type {
   ActorId,
+  CompartmentId,
   CrewDefId,
   DoorId,
   EntityId,
+  FieldId,
   LocalKey,
   MachineId,
   ProblemId,
@@ -176,6 +178,12 @@ export interface FactValues {
     /** W4a addition: seen doing nothing in particular (activity `idle`). */
     idle?: boolean;
   };
+  /**
+   * D94: a rock hit the ship (the subject is the field). Everyone aboard feels it; only those in
+   * the hit compartment see where, and only for them is `compartmentId` present. `observedTick`
+   * is the impact's tick, so the latest belief is the latest impact.
+   */
+  hullImpact: { fieldId: FieldId; compartmentId?: CompartmentId };
 }
 
 export type FactType = keyof FactValues;

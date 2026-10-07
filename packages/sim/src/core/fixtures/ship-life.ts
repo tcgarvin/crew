@@ -1,9 +1,9 @@
 /**
- * Ship life slice 2 (D77-D79), slice 3 (D81-D82) and slice 4 content every hand-built fixture
- * bundle needs: the twenty-six thought defs (`ContentBundle.thoughts` is required), three of the
+ * Ship life slice 2 (D77-D79), slice 3 (D81-D82), slice 4 and slice 5 content every hand-built
+ * fixture bundle needs: the twenty-seven thought defs (`ContentBundle.thoughts` is required), three of the
  * twelve activities and the seven topics (slice 4: `activities` and `topics` are required), and
- * the `watches`, `mood`, `hazards`, `galley`, `dirt`, `recreation`, `cabins` and slice 4 `social`
- * config at the default bundle's values. A fixture overrides `dayworkerOnWatches` to keep the
+ * the `watches`, `mood`, `hazards`, `galley`, `dirt`, `recreation`, `cabins`, slice 4 `social` and
+ * slice 5 `field`, `damage` and `intercom` config at the default bundle's values. A fixture overrides `dayworkerOnWatches` to keep the
  * duty pattern its tests were written against.
  */
 import type { ActivityDef, ConfigDef, ThoughtDef, ThoughtKey, TopicDef } from "../types/content";
@@ -184,6 +184,13 @@ export const FIXTURE_THOUGHTS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     label: "ate a treat",
     value: 0.1,
     durationDays: 0.3,
+    stacks: false,
+  },
+  nearMiss: {
+    key: "nearMiss",
+    label: "a rock came through a step away",
+    value: -0.15,
+    durationDays: 0.5,
     stacks: false,
   },
 };
@@ -387,3 +394,34 @@ export const FIXTURE_HAZARDS: ConfigDef["hazards"] = {
   difficulty: { easy: 3, hard: 5, brutal: 7 },
   delaySeconds: 60,
 };
+
+/** Slice 5 (D92): the asteroid field at the default bundle's values. */
+export const FIXTURE_FIELD: ConfigDef["field"] = {
+  warningSeconds: 12,
+  alertClearSeconds: 60,
+  severities: {
+    light: { impactsPerMinute: 2, largeShare: 0.1, lengthSeconds: 90 },
+    heavy: { impactsPerMinute: 4, largeShare: 0.25, lengthSeconds: 135 },
+    brutal: { impactsPerMinute: 6, largeShare: 0.4, lengthSeconds: 180 },
+  },
+  helmThreading: 0.4,
+  unmannedRateFactor: 1.5,
+  stuckRateFactor: 0.7,
+  stuckDriftImpacts: 6,
+  hullDamage: { small: 3, large: 8 },
+  machineEffects: { none: 25, graze: 25, damage: 25, knockout: 10, fault: 15 },
+  effectIntegrity: { graze: 0.2, damage: 0.5 },
+  patchRecovers: 0.5,
+  maxScripted: 3,
+};
+
+/** Slice 5 (D93): damage work at the default bundle's values. */
+export const FIXTURE_DAMAGE: ConfigDef["damage"] = {
+  patchSeconds: 20,
+  plateSeconds: 40,
+  repairSecondsPerIntegrity: 30,
+  checkSeconds: 3,
+};
+
+/** Slice 5 (D94): the intercom at the default bundle's values. */
+export const FIXTURE_INTERCOM: ConfigDef["intercom"] = { reportSeconds: 3 };

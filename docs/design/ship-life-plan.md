@@ -2737,10 +2737,13 @@ intercoms are machines nobody uses.
   `haltReason` returns `lost` while `hull.lostAtTick` is set. `core/migrations.ts` `11:` (hull at
   full from the save's deck, no field, no alert, `nextId.field`/`scar`, pending `asteroidBelt`
   hazards rewritten (call 28), the scenario's patch kits spawned into the lockers through
-  `spawnScenarioStores` with a `warn`); `save.test.ts` adds an 11 → 12 case. `core/invariants.ts`:
-  `hull.integrity` a number in [0, max] equal to `max` minus every scar's
-  `damage − recovered`; `recovered ≤ damage`; scar ids below `nextId.scar` and unique; a scar's
-  tile in the footprint; `field.id` below `nextId.field`; `alert.reports` keys are compartments.
+  `spawnScenarioStores` (which now checks what the save held before it spawned, so a def stocked
+  on several lines is spawned on each) with a `warn`); `save.test.ts` adds an 11 → 12 case.
+  `core/invariants.ts`: `hull.integrity` in [0, max] and equal to `max` minus every scar's
+  `damage − recovered`; `recovered ≤ damage`, and only a patched scar has recovered; scar ids
+  below `nextId.scar` and unique, in a known compartment; a lost hull at 0; `field.id` below
+  `nextId.field`, `stuckImpacts ≤ impacts`; `alert.reports` keys are compartments. That a scar's
+  tile is in the footprint needs content, so it is W1's (`systems/field/invariants.ts`).
 - `systems/field/` (new; owner W1): `field.ts` (`fieldSystem`, phase `equipment` after travel's
   hazards; stub: drops a scheduled field whose leg is gone with `fieldMissed`, otherwise no-op),
   `command.ts` (complete), `index.ts` with `registerField(registry)` (system + command).
@@ -2826,7 +2829,11 @@ intercoms are machines nobody uses.
 narrator's `HAZARD_NAMES` and the capabilities line "All three" follow the two kinds); fixtures
 under `packages/narrator/fixtures/` load through the migration (regenerated at integration);
 `translate.test.ts`'s narrator-kinds assertion follows `scheduleField` (the plan schema does not
-offer it until W5).
+offer it until W5); `apps/web/src/worker/fullSim.test.ts`'s eight-minute run moves to seed
+20261006 (the intercoms' sixteen failure-threshold draws at world creation shift the `failures`
+stream, and on the old seed the engine's controller failed twice and the ship drifted short of its
+second port; nothing the test claims depends on the seed). The gate also adds
+`systems/field/command.test.ts` for the complete `scheduleField` validation (W1 extends it).
 
 ### Workstreams (parallel after the gate)
 
@@ -2993,7 +3000,8 @@ Done when the web suite is green and a browser run at 390×700 with a scheduled 
 falling and the alert tint, and a scripted loss shows the end screen.
 
 **W5 — Narrator and CLI: the lever, the digest, the beats.** Owns `packages/narrator/**`,
-`packages/server/src/routes/narrator*.test.ts`, `apps/cli/**` (except the gate's registry lines).
+`packages/server/src/routes/narrator*.test.ts`, `apps/cli/**` (except the gate's registry lines
+and its `lost` stops).
 - `contract.ts`: `scheduleField` in the plan schema (`severity`, `detection`, `window` in the
   `scheduleHazard` words, `scripted` up to three with the target by name: a machine's name, a
   room's name, or a crew member's name, which translate drops with "people are not targets
@@ -3094,6 +3102,11 @@ section, and the lead runs `pnpm test:live` once.
   a field (sighted or entered, stuck, cleared). `asteroidImpact` is notable and reaches the
   ticker and the uploaded events; at a brutal field's eighteen impacts it is the loudest source,
   which the tuning commit holds.
+- **Slow tests under a loaded runner.** On a 16-core machine the full parallel run already timed
+  out three or four of the slowest real-content tests now and then before the gate (the galley,
+  harmonica and passenger runs, each a few seconds alone); sixteen more machines and 24 more items
+  make every real-content tick a little dearer. A stream that adds real-content runs gives them the
+  explicit `{ timeout }` `fullSim.test.ts` uses rather than leaning on vitest's 5 s.
 - **Save size**: a scar is about 150 bytes; a brutal field leaves twenty, plated away at port.
   `field` is one row; `alert.reports` at most sixteen keys.
 

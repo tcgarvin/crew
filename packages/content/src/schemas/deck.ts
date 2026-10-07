@@ -75,5 +75,7 @@ export const deckDefSchema = z.strictObject({
   hull: z.strictObject({
     class: z.string().min(1),
     sizeClass: hullSizeClassSchema,
+    /** D93: the hull bar's full value in hull points. */
+    max: positiveInt,
   }),
 }) satisfies z.ZodType<DeckDef>;

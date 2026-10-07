@@ -18,7 +18,8 @@
  *   side only), a pending `privateTalk` they are part of (`self.summons`), every group session
  *   (`sessions()`, the intercom: common knowledge like the roster), the travel stage
  *   (`travel()`), the activity defs (`activities()`), and whose a personal item is
- *   (`KnownItemView.ownerId`).
+ *   (`KnownItemView.ownerId`);
+ * - slice 5 (D94): the alert while the ship is on one (`alert()`, the klaxon: common knowledge).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
@@ -419,6 +420,10 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
     sessions: () => sessionsOf(world),
     travel: () => ({ stage: state.travel.stage }),
     activities: () => Object.values(world.content.activities),
+    alert: () => {
+      const alert = state.alert;
+      return alert === undefined ? undefined : { sinceTick: alert.sinceTick, cause: alert.cause };
+    },
     estimateTravelTicks: (to: TileCoord, from?: TileCoord) => {
       const start = from ?? self.tile;
       if (start === undefined) return null;

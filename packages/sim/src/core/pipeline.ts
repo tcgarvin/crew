@@ -140,6 +140,9 @@ function runPlannerStage(
     recreation: config.recreation,
     social: config.social,
     mood: config.mood,
+    field: config.field,
+    damage: config.damage,
+    intercom: config.intercom,
   };
   const due = dueActors(actorIds, base.tick, config.work.reconsiderEveryTicks);
   for (const actorId of due) {

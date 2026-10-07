@@ -115,6 +115,9 @@ function makeFakeKernel(hookAtTick: number) {
         locals: [],
         dockProps: [],
         sessions: [],
+        hull: { integrity: 100, max: 100, scars: [], lost: false },
+        alert: false,
+        impacts: [],
       };
     },
     serialize: (world) =>
@@ -468,6 +471,7 @@ describe("createHost agent view (slice-2 QA)", () => {
           knownTasks: () => [],
           roster: () => [],
           sessions: () => [],
+          alert: () => undefined,
         }) as never,
     };
   }

@@ -241,7 +241,7 @@ const mk2Footprint: DeckDef = {
     personnelTransferTiles: [{ x: 34, y: 18 }],
   },
   spawnPoints: [],
-  hull: { class: "light_freighter", sizeClass: "M" },
+  hull: { class: "light_freighter", sizeClass: "M", max: 100 },
 };
 
 describe("dock maps take both M-class footprints (D72)", () => {

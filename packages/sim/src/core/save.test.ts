@@ -415,6 +415,88 @@ describe("serialize / restore", () => {
     });
   });
 
+  it("migrates a schema-11 save to 12: a whole hull, no field, a retired asteroid belt a debris field, kits in the lockers (slice 5)", () => {
+    const KIT = "item.tiny.patch_kit" as ItemDefId;
+    // The tiny content with a locker the scenario stocks with two patch kits.
+    const lockerContent = (): ContentBundle => {
+      const base = tinyContent(tinyConfig());
+      const deck = base.decks[TINY.deck];
+      const scenario = base.scenarios[TINY.scenario];
+      if (deck === undefined || scenario === undefined) throw new Error("tiny content");
+      return {
+        ...base,
+        decks: {
+          [TINY.deck]: {
+            ...deck,
+            zones: [
+              ...deck.zones,
+              { key: "locker_1", name: "Locker", tags: ["locker"], tiles: [{ x: 4, y: 3 }] },
+            ],
+          },
+        },
+        items: {
+          ...base.items,
+          [KIT]: {
+            id: KIT,
+            name: "Patch Kit",
+            stacking: "stackable",
+            maxStack: 10,
+            tags: ["consumable", "patchKit"],
+            toolKinds: [],
+            mass: 2,
+          },
+        },
+        scenarios: {
+          [TINY.scenario]: {
+            ...scenario,
+            startingItems: [
+              ...scenario.startingItems,
+              { itemDefId: KIT, count: 2, zoneKey: "locker_1" },
+            ],
+          },
+        },
+      };
+    };
+    const registry = createRegistry();
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(TINY.scenario, 42, lockerContent(), tinyEffectiveConfig());
+    kernel.advance(world, 40);
+    const envelope = serialize(world);
+    type Json = Record<string, unknown>;
+    const at = (value: unknown, key: string) => (value as Json)[key] as Json;
+    const strip = (value: Json, key: string) => {
+      const { [key]: _gone, ...rest } = value;
+      return rest;
+    };
+    // Schema 11's shape: no hull, no field or scar counters, a waiting asteroid belt, no kits.
+    const raw = JSON.parse(JSON.stringify(envelope.state)) as Json;
+    const stripped = strip(raw, "hull");
+    stripped.schemaVersion = 11;
+    stripped.nextId = { ...strip(strip(at(raw, "nextId"), "field"), "scar"), hazard: 2 };
+    stripped.hazards = [{ id: "h1", kind: "asteroidBelt", difficulty: 4, fireAtTick: 900 }];
+    stripped.items = Object.fromEntries(
+      Object.entries(at(raw, "items")).filter(([, item]) => (item as Json).defId !== KIT),
+    );
+    const old = { ...envelope, schemaVersion: 11, state: stripped } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const state = restored.state;
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.hull).toEqual({ integrity: 100, max: 100, scars: [] });
+    expect(state.field).toBeUndefined();
+    expect(state.alert).toBeUndefined();
+    expect(state.nextId.field).toBe(1);
+    expect(state.nextId.scar).toBe(1);
+    expect(state.hazards).toEqual([
+      { id: "h1", kind: "debrisField", difficulty: 4, fireAtTick: 900 },
+    ]);
+    const kits = Object.values(state.items).filter((item) => item.defId === KIT);
+    expect(kits.reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0)).toBe(2);
+    expect(restored.warnings.some((w) => /predates the asteroid field/.test(w))).toBe(true);
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(60);
+  });
+
   it("restores a schema-10 save's config with the memory table from content (D88)", () => {
     const { world, kernel, registry } = tinyTestWorld();
     kernel.advance(world, 20);

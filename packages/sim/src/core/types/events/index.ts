@@ -12,10 +12,13 @@ import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
 import { CABINS_EVENT_SIGNIFICANCE, type CabinsEventPayloads } from "./cabins";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";
+import { DAMAGE_EVENT_SIGNIFICANCE, type DamageEventPayloads } from "./damage";
 import { DECISION_EVENT_SIGNIFICANCE, type DecisionEventPayloads } from "./decisions";
 import { DIRT_EVENT_SIGNIFICANCE, type DirtEventPayloads } from "./dirt";
 import { EQUIPMENT_EVENT_SIGNIFICANCE, type EquipmentEventPayloads } from "./equipment";
+import { FIELD_EVENT_SIGNIFICANCE, type FieldEventPayloads } from "./field";
 import { GALLEY_EVENT_SIGNIFICANCE, type GalleyEventPayloads } from "./galley";
+import { INTERCOM_EVENT_SIGNIFICANCE, type IntercomEventPayloads } from "./intercom";
 import { KERNEL_EVENT_SIGNIFICANCE, type KernelEventPayloads } from "./kernel";
 import { NEEDS_EVENT_SIGNIFICANCE, type NeedsEventPayloads } from "./needs";
 import { PERCEPTION_EVENT_SIGNIFICANCE, type PerceptionEventPayloads } from "./perception";
@@ -29,10 +32,13 @@ import { WORK_EVENT_SIGNIFICANCE, type WorkEventPayloads } from "./work";
 
 export type * from "./cabins";
 export type * from "./commerce";
+export type * from "./damage";
 export type * from "./decisions";
 export type * from "./dirt";
 export type * from "./equipment";
+export type * from "./field";
 export type * from "./galley";
+export type * from "./intercom";
 export type * from "./kernel";
 export type * from "./needs";
 export type * from "./perception";
@@ -60,7 +66,10 @@ export interface EventPayloadMap
     DirtEventPayloads,
     RecreationEventPayloads,
     SocialEventPayloads,
-    CabinsEventPayloads {}
+    CabinsEventPayloads,
+    FieldEventPayloads,
+    DamageEventPayloads,
+    IntercomEventPayloads {}
 
 export type EventType = keyof EventPayloadMap;
 
@@ -81,7 +90,20 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...RECREATION_EVENT_SIGNIFICANCE,
   ...SOCIAL_EVENT_SIGNIFICANCE,
   ...CABINS_EVENT_SIGNIFICANCE,
+  ...FIELD_EVENT_SIGNIFICANCE,
+  ...DAMAGE_EVENT_SIGNIFICANCE,
+  ...INTERCOM_EVENT_SIGNIFICANCE,
 };
+
+/**
+ * The asteroid-field family (slice 5, D92-D94): the field, the crew's damage work and the
+ * intercom. The beats report counts their ticker lines per field.
+ */
+export const FIELD_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  ...(Object.keys(FIELD_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(DAMAGE_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(INTERCOM_EVENT_SIGNIFICANCE) as EventType[]),
+]);
 
 /**
  * The off-watch family (slice 4, D84-D87): recreation, social and cabin events. The beats report

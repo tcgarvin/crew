@@ -34,7 +34,8 @@
           "battery",
           "lifeSupport",
           "cooling",
-          "rampControl"
+          "rampControl",
+          "comm"
         ]
       }
     },

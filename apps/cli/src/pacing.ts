@@ -58,6 +58,7 @@ import {
   commerceTaskDerivations,
   createKernel,
   createRegistry,
+  damageTaskDerivations,
   daysToSeconds,
   dirtTaskDerivations,
   equipmentStages,
@@ -65,9 +66,12 @@ import {
   galleyTaskDerivations,
   registerCabins,
   registerCommerce,
+  registerDamage,
   registerDirt,
   registerEquipmentSystems,
+  registerField,
   registerGalley,
+  registerIntercom,
   registerNeeds,
   registerPlannerDefaults,
   registerRecreation,
@@ -193,6 +197,7 @@ export function createPacingRegistry(): KernelRegistry {
   registerEquipmentSystems(registry);
   registerDirt(registry);
   registerTravel(registry);
+  registerField(registry);
   registerCommerce(registry);
   registerNeeds(registry);
   registerWatch(registry);
@@ -200,6 +205,8 @@ export function createPacingRegistry(): KernelRegistry {
   registerRecreation(registry);
   registerSocial(registry);
   registerCabins(registry);
+  registerDamage(registry);
+  registerIntercom(registry);
   registerWork(registry, {
     derivations: {
       ...equipmentTaskDerivation,
@@ -207,6 +214,7 @@ export function createPacingRegistry(): KernelRegistry {
       ...commerceTaskDerivations,
       ...galleyTaskDerivations,
       ...dirtTaskDerivations,
+      ...damageTaskDerivations,
     },
     stages: equipmentStages,
   });
@@ -404,7 +412,12 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
 
   const lead = (): number => world.state.tick - viewTick;
 
-  function onHalt(kind: "hook" | "decision"): void {
+  function onHalt(kind: "hook" | "decision" | "lost"): void {
+    if (kind === "lost") {
+      // D93: the hull gave way; the world never steps again, so the run ends here.
+      simDone = true;
+      return;
+    }
     haltedFor = kind;
     if (kind === "hook") {
       const hook = world.state.narrator.pendingHook;

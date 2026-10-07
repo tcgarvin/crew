@@ -112,9 +112,10 @@ const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
  * `progressRef`; any crew member may take it (no skill, no tool), the planner ranks it at the
  * problem's urgency, and the buyer walks to the market's counter (`marketCounter`, D63): the
  * dock's stall, its gate when it has no stall, or with no dock a cargo transfer tile. Shared by
- * `partsNeeded` and D80's `reserveLow`, which differ only in what the task names as its target.
+ * `partsNeeded` and D80's `reserveLow`, which differ only in what the task names as its target;
+ * exported for D93's `hullDamaged` (hull plating, `systems/damage/tasks.ts`).
  */
-function buySpec(
+export function buySpec(
   problem: { readonly baseUrgency: TaskSpec["baseUrgency"] },
   ctx: DerivationCtx,
   itemDefId: ItemDefId,

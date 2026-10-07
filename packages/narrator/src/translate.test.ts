@@ -1249,7 +1249,7 @@ describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
   it("maps every tier and kind", () => {
     const config = quietTooLongRequest(content()).snapshot.config;
     for (const difficulty of ["easy", "hard", "brutal"] as const) {
-      for (const kind of ["debrisField", "asteroidBelt", "ionStorm"]) {
+      for (const kind of ["debrisField", "ionStorm"]) {
         const req = withBudget(inTransit(200), 2);
         const result = translateIntents(
           plan([{ ...hazard, hazard: kind, difficulty }]),
@@ -1324,7 +1324,7 @@ describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
     snapshot.state.hazards = [
       {
         id: "hz1" as never,
-        kind: "asteroidBelt",
+        kind: "ionStorm",
         difficulty: 5,
         fireAtTick: snapshot.state.tick + 100,
       },

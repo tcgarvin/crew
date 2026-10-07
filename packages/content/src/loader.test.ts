@@ -88,7 +88,7 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 18 items, 26 thoughts, 12 activities and 7 topics", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 20 items, 27 thoughts, 12 activities and 7 topics", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
@@ -99,7 +99,7 @@ describe("loadBundle", () => {
       topics: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
-    expect(Object.keys(bundle.items)).toHaveLength(18);
+    expect(Object.keys(bundle.items)).toHaveLength(20);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
     expect(Object.keys(bundle.activities)).toHaveLength(12);
@@ -123,6 +123,7 @@ describe("loadBundle", () => {
       "helmScrape",
       "keepsBeatingMe",
       "lostContest",
+      "nearMiss",
       "noBunkOfMyOwn",
       "noisyBunkroom",
       "ownCabin",

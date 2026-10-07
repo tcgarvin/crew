@@ -97,8 +97,11 @@ export function createHost(deps: HostDeps): Host {
   let tickRate = 20;
   let speed = 1;
   let paused = false;
-  /** Set while a hook or decision halts `advance()`; cleared once resolved. */
-  let haltedFor: "hook" | "decision" | undefined;
+  /**
+   * Set while a hook or decision halts `advance()`; cleared once resolved. D93: `lost` never
+   * clears: the ship is gone and the world never steps again.
+   */
+  let haltedFor: "hook" | "decision" | "lost" | undefined;
   let lastViewTick: Tick | undefined;
   let accumulatorMs = 0;
   let lastLoopAt = clock.now();
@@ -172,13 +175,16 @@ export function createHost(deps: HostDeps): Host {
     return Math.max(0, capTicks - (world.state.tick - viewTick));
   }
 
-  function handleHalt(kind: "hook" | "decision"): void {
+  function handleHalt(kind: "hook" | "decision" | "lost"): void {
     if (!world) return;
     haltedFor = kind;
     // The halted tick is what the player inspects while a card waits (D63: an offer's crates
     // appear on the dock on that very tick), so the ring must hold it, not the last due one.
     pushSnapshotIfDue(true);
-    if (kind === "hook") {
+    if (kind === "lost") {
+      // D93: posted once; the halt never lifts, so this branch is not reached again.
+      deps.postMessage({ type: "shipLost", tick: world.state.tick });
+    } else if (kind === "hook") {
       const hook = world.state.narrator.pendingHook;
       if (hook) deps.postMessage({ type: "hookRaised", hook, tick: world.state.tick });
     } else {

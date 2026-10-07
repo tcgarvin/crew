@@ -39,8 +39,9 @@ function addPassenger(world: World, name: string, tile: TileCoord): ActorId {
 }
 
 function plannerConfig(world: World): PlannerConfig {
-  const { work, urgency, needs, time, galley, recreation, social, mood } = world.config.values;
-  return { work, urgency, needs, time, galley, recreation, social, mood };
+  const { work, urgency, needs, time, galley, recreation, social, mood, field, damage, intercom } =
+    world.config.values;
+  return { work, urgency, needs, time, galley, recreation, social, mood, field, damage, intercom };
 }
 
 describe("a passenger aboard", () => {

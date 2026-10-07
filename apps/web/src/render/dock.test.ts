@@ -100,6 +100,9 @@ function frameWith(actors: RenderActor[], items: RenderItem[], t: RenderTravel):
     locals: [],
     dockProps: [],
     sessions: [],
+    hull: { integrity: 100, max: 100, scars: [], lost: false },
+    alert: false,
+    impacts: [],
   };
 }
 

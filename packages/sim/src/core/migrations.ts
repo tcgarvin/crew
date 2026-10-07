@@ -433,11 +433,18 @@ function spawnScenarioStores(
   const deck = deckIds.map((id) => content.decks[id as DeckDefId]).find((d) => d !== undefined);
   if (scenario === undefined || deck === undefined || deck.id !== scenario.deckId) return [];
   const items = raw.items;
+  // Held before this migration, so a def stocked in several zones (slice 5's patch kits, one line
+  // per locker) is spawned on every line, not only the first.
+  const held = new Set(
+    Object.values(items).flatMap((item) =>
+      isRecord(item) && typeof item.defId === "string" ? [item.defId] : [],
+    ),
+  );
   const spawned: string[] = [];
   for (const line of scenario.startingItems) {
     const def = content.items[line.itemDefId];
     if (def === undefined || !wanted(def)) continue;
-    if (Object.values(items).some((item) => isRecord(item) && item.defId === def.id)) continue;
+    if (held.has(def.id)) continue;
     const zone = deck.zones.find((z) => z.key === line.zoneKey);
     if (zone === undefined || zone.tiles.length === 0) continue;
     const chunk = def.stacking === "unique" ? 1 : def.maxStack;
@@ -533,6 +540,48 @@ function affinityFromMemories(raw: unknown): unknown {
   return raw;
 }
 
+/**
+ * 11 → 12 (slice 5, D92-D95): the asteroid field.
+ * - `hull`: whole, at the save's deck's `hull.max` (`HullDef.max`); no scars;
+ * - no `field` and no `alert` (nothing was scheduled before the lever existed);
+ *   `nextId.field` and `nextId.scar` start at 1;
+ * - a waiting hazard of the retired kind `asteroidBelt` becomes a `debrisField` at the same
+ *   difficulty, so the narrator's spent budget still buys a check (call 28);
+ * - the scenario's `patchKit`-tagged `startingItems` (two per locker) spawned as 9 → 10 shelved
+ *   the books, unless the save holds a kit; the owner is told through `warn`.
+ */
+function asteroidField(raw: unknown, { content, warn }: MigrationContext): unknown {
+  if (!isRecord(raw)) return raw;
+  const deckIds = isRecord(raw.deck) && isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  if (!isRecord(raw.hull)) {
+    const deck = deckIds.map((id) => content.decks[id as DeckDefId]).find((d) => d !== undefined);
+    if (deck === undefined) {
+      throw new SaveCompatibilityError(
+        `Save's deck (${deckIds.join(", ") || "none"}) is not in this content; cannot size its hull`,
+      );
+    }
+    raw.hull = { integrity: deck.hull.max, max: deck.hull.max, scars: [] };
+  }
+  if (isRecord(raw.nextId)) {
+    if (typeof raw.nextId.field !== "number") raw.nextId.field = 1;
+    if (typeof raw.nextId.scar !== "number") raw.nextId.scar = 1;
+  }
+  if (Array.isArray(raw.hazards)) {
+    for (const hazard of raw.hazards) {
+      if (isRecord(hazard) && hazard.kind === "asteroidBelt") hazard.kind = "debrisField";
+    }
+  }
+  const spawned = spawnScenarioStores(raw, content, deckIds, (def) =>
+    def.tags.includes("patchKit"),
+  );
+  if (spawned.length > 0) {
+    warn?.(
+      `Save predates the asteroid field (schema 11); stowed the scenario's patch kits in ${spawned.length} lockers`,
+    );
+  }
+  return raw;
+}
+
 /** A detached plain-JSON copy, so a migrated actor never aliases content. */
 function structuredJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
@@ -549,4 +598,5 @@ export const migrations: MigrationRegistry = {
   8: galleyAndDirt,
   9: offWatch,
   10: affinityFromMemories,
+  11: asteroidField,
 };

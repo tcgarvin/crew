@@ -23,6 +23,10 @@ import {
  *   infirmary; who may take it is `cleaning.ts`'s);
  * - `cargoToLoad`/`cargoToUnload` and symptom inspection (`machineSymptom`) → routineObligation;
  * - `maintenanceDue` (D90) → the owner's base urgency (routine, essential once badly worn);
+ * - `machineDamaged`, `hullScar`, `hullDamaged`, `compartmentToCheck` (D93, D94) → the owner's
+ *   base urgency (damage raises them essential on alert; who may take them is `alert.ts`'s);
+ * - the reporting reflex (D94, `intercom.ts`) → containment, on alert only; the officer of the
+ *   watch's bridge hold (`alert.ts`) → essentialOperation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
  * - rest/socialize → the need's urgency as above, `voluntaryActivity` below the seek threshold
@@ -47,6 +51,7 @@ import type { ActivityDefId, ActorId, ItemId, MachineId, SessionId } from "../co
 import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView, KnownItemView, ProblemView, TaskView } from "../core/types/view";
 import type { RecreateRole } from "../core/types/work";
+import { alertCandidate, damageTaskAllowed, isDamageTask, recreationOffered } from "./alert";
 import { summonsCandidate } from "./cabins";
 import { cleanTaskAllowed, isCleaningTask } from "./cleaning";
 import {
@@ -66,6 +71,7 @@ import {
   mealCallFor,
 } from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
+import { reportCandidate } from "./intercom";
 import { recreationCandidate } from "./recreation";
 import { dutyIdleCandidate } from "./rounds";
 
@@ -171,6 +177,12 @@ export function taskUrgency(
       return "routineObligation";
     case "compartmentDirty":
       // D82: routine, essential while a galley or infirmary is filthy; dirt says which.
+      return problem.baseUrgency;
+    case "machineDamaged":
+    case "hullScar":
+    case "hullDamaged":
+    case "compartmentToCheck":
+      // D93, D94: essential on alert, routine after; damage says which.
       return problem.baseUrgency;
   }
 }
@@ -309,6 +321,10 @@ function taskCandidate(
   }
   if (isCleaningTask(task) && !cleanTaskAllowed(view, config, task, problem)) {
     return reject("notMyRoom");
+  }
+  // D93, D94: damage work has its own rules (`alert.ts`): the bridge sends scouts, never goes.
+  if (isDamageTask(task) && !damageTaskAllowed(view, config, task, problem)) {
+    return reject("notMyDamage");
   }
   const exempt = (helm && helmTaskExempt(view, task)) || galleyTaskExempt(view, task);
   const betterQualified = exempt ? undefined : deferTo(view, config, task);
@@ -472,6 +488,8 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   if (!passenger) {
     // Slice 4: a summons ranks with its class (essential), so it goes before the task loop.
     add(summonsCandidate(view, config));
+    // D94: the reporting reflex (containment) likewise.
+    add(reportCandidate(view, config));
     const problems = new Map(view.knownProblems().map((p) => [p.id as string, p]));
     const tasks = view.knownTasks();
     const liveTaskIds = new Set<string>(tasks.map((t) => t.id));
@@ -481,10 +499,13 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   add(sleepCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
-  add(recreationCandidate(view, config));
+  // D92: no recreation on alert (`alert.ts`).
+  if (recreationOffered(view)) add(recreationCandidate(view, config));
   if (!passenger) {
     add(gangwayCandidate(view, config));
     add(dutyIdleCandidate(view, config));
+    // D94: the officer of the watch holds the bridge on alert.
+    add(alertCandidate(view, config));
   }
   return { candidates, rejected };
 }

@@ -81,6 +81,8 @@ export function exampleWorldState(): WorldState {
       local: 1,
       hazard: 2,
       session: 2,
+      field: 1,
+      scar: 1,
     },
     actors: {
       [a1]: {
@@ -355,6 +357,7 @@ export function exampleWorldState(): WorldState {
       },
       captainsTableDay: -1,
     },
+    hull: { integrity: 100, max: 100, scars: [] },
     hazards: [
       {
         id: "h1" as HazardId,

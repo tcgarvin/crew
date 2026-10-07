@@ -17,8 +17,18 @@
  */
 import type { Actor } from "./actor";
 import type { CommandsState } from "./commands";
-import type { RngStreamName, Sfc32State, Tick } from "./common";
-import type { CrewDef, DirtTier, HazardKind, ItemDef, MemoryKey } from "./content";
+import type { RngStreamName, Sfc32State, Tick, TileCoord } from "./common";
+import type {
+  CrewDef,
+  DirtTier,
+  FieldDetection,
+  FieldSeverity,
+  HazardKind,
+  ItemDef,
+  MachineEffect,
+  MemoryKey,
+  RockSize,
+} from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
 import type { DocksideState } from "./dockside";
 import type {
@@ -30,6 +40,7 @@ import type {
   CrewDefId,
   DeckDefId,
   DoorId,
+  FieldId,
   HazardId,
   ItemDefId,
   ItemId,
@@ -39,6 +50,7 @@ import type {
   NextIdCounters,
   PortDefId,
   ProblemId,
+  ScarId,
   ScenarioDefId,
   SessionId,
   TaskId,
@@ -74,8 +86,12 @@ import type { Claim, Problem, Task } from "./work";
  * 11 (2026-10-05): D88, affinity from memories: `Relationship.affinity` is gone and
  * `Relationship.memories` holds what one remembers of the other. Migrated: affinities are dropped
  * (everyone starts at their compatibility), chat timing kept.
+ * 12 (2026-10-06): ship life slice 5 (D92-D95): `hull` (integrity, max and scars), `field` and
+ * `alert`, `nextId.field` and `scar`; the `asteroidBelt` hazard kind is gone. Migrated: the hull
+ * starts whole, a waiting `asteroidBelt` hazard becomes a `debrisField`, and an old save gets the
+ * scenario's patch kits in the lockers.
  */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** D88: one thing `from` remembers about `to`; its opinion is config's (`social.memories`). */
 export interface SocialMemory {
@@ -215,6 +231,109 @@ export interface ScheduledHazard {
   causeCommandId?: CommandId;
 }
 
+/**
+ * D92: what a scripted impact is aimed at. A compartment is hit on one of its tiles, uniformly;
+ * a machine on one of its footprint tiles. `actor` waits for bodies (slice 6): the command shape
+ * carries it and the kernel rejects it.
+ */
+export type ImpactTarget =
+  | { readonly kind: "machine"; readonly machineId: MachineId }
+  | { readonly kind: "compartment"; readonly compartmentId: CompartmentId }
+  | { readonly kind: "tile"; readonly x: number; readonly y: number }
+  | { readonly kind: "actor"; readonly actorId: ActorId };
+
+/**
+ * D92: one impact the narrator chose (`scheduleField.scripted`). `atSeconds` counts sim seconds
+ * from the field's start; an absent `rock` is drawn by the severity's large share, an absent
+ * `effect` rolled. It replaces the random impact due at that moment, so the rate holds.
+ */
+export interface ScriptedImpactDraft {
+  readonly atSeconds: number;
+  readonly target: ImpactTarget;
+  readonly rock?: RockSize;
+  readonly effect?: MachineEffect;
+}
+
+/** D92: a scripted impact on the field, with the tick it landed once it has. */
+export interface ScriptedImpact extends ScriptedImpactDraft {
+  firedTick?: Tick;
+}
+
+/**
+ * D92: where a field is in its life. `scheduled` until the first transit tick at or after its
+ * start; `active` while the ship is in it (it spans route progress up to `endsAtProgress`;
+ * `stuckSinceTick` while the engines are out); `ended` once crossed or drifted clear, kept until
+ * the leg ends so a leg holds one field.
+ */
+export type FieldPhase =
+  | { kind: "scheduled" }
+  | { kind: "active"; enteredTick: Tick; endsAtProgress: number; stuckSinceTick?: Tick }
+  | { kind: "ended"; enteredTick: Tick; endedTick: Tick; how: "crossed" | "drifted" };
+
+/**
+ * D92: the leg's asteroid field, from `scheduleField` to the leg's end. Owner: field
+ * (`systems/field/`).
+ */
+export interface ActiveField {
+  id: FieldId;
+  severity: FieldSeverity;
+  detection: FieldDetection;
+  /** Impacts may fall from here; the helm's check falls `field.warningSeconds` before it. */
+  startsAtTick: Tick;
+  phase: FieldPhase;
+  /** When the crew first knew: the helm sighted it, or the first impact. */
+  noticedAtTick?: Tick;
+  impacts: number;
+  /** Impacts taken while stuck (call 9's clock). */
+  stuckImpacts: number;
+  lastImpactTick?: Tick;
+  /** Hull points this field has cost so far. */
+  hullLost: number;
+  scripted: ScriptedImpact[];
+  causeCommandId?: CommandId;
+}
+
+/**
+ * D92, D94: the ship is on alert. Raised and cleared by the field (`clearsAtTick` is set when
+ * the field ends); `reports` is the last tick an intercom report covered each compartment
+ * (written by the intercom, read by damage response for its scouts). Common knowledge.
+ */
+export interface AlertState {
+  sinceTick: Tick;
+  cause: "field";
+  clearsAtTick?: Tick;
+  reports: Record<CompartmentId, Tick>;
+}
+
+/**
+ * D93: one impact's mark on the hull, on its centre tile (ship deck frame). `damage` is the hull
+ * points the impact actually cost; `recovered` what patching has given back (`patched` once a
+ * kit is welded on). Plating clears the scar and the rest of its damage.
+ */
+export interface HullScar {
+  id: ScarId;
+  fieldId: FieldId;
+  tile: TileCoord;
+  compartmentId: CompartmentId;
+  rock: RockSize;
+  damage: number;
+  recovered: number;
+  patched: boolean;
+  tick: Tick;
+}
+
+/**
+ * D93: the hull bar. `integrity` is `max` less every scar's damage not yet recovered
+ * (`core/hull.ts`); at 0 the ship is lost (`lostAtTick`) and the kernel halts for good. Owners:
+ * field (charges, loss), damage (patching, plating).
+ */
+export interface HullState {
+  integrity: number;
+  max: number;
+  scars: HullScar[];
+  lostAtTick?: Tick;
+}
+
 /** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
 export interface MarketLine {
   count: number;
@@ -280,6 +399,12 @@ export interface WorldState {
   hazards: ScheduledHazard[];
   /** Owner: dirt (D82). */
   dirt: DirtState;
+  /** D93: the hull bar. Owners per `HullState`. */
+  hull: HullState;
+  /** D92: the leg's asteroid field, from scheduling to the leg's end. Owner: field. */
+  field?: ActiveField;
+  /** D92: the ship is on alert. Owners per `AlertState`. */
+  alert?: AlertState;
   /** Owner: galley (D81). */
   galley: GalleyState;
   /** Slice 4: owners per `SocialState` (recreation, social, cabins). */

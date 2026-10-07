@@ -1657,6 +1657,222 @@
       ],
       "additionalProperties": false
     },
+    "field": {
+      "type": "object",
+      "properties": {
+        "warningSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "alertClearSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "severities": {
+          "type": "object",
+          "properties": {
+            "light": {
+              "type": "object",
+              "properties": {
+                "impactsPerMinute": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "largeShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lengthSeconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": ["impactsPerMinute", "largeShare", "lengthSeconds"],
+              "additionalProperties": false
+            },
+            "heavy": {
+              "type": "object",
+              "properties": {
+                "impactsPerMinute": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "largeShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lengthSeconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": ["impactsPerMinute", "largeShare", "lengthSeconds"],
+              "additionalProperties": false
+            },
+            "brutal": {
+              "type": "object",
+              "properties": {
+                "impactsPerMinute": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "largeShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lengthSeconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": ["impactsPerMinute", "largeShare", "lengthSeconds"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["light", "heavy", "brutal"],
+          "additionalProperties": false
+        },
+        "helmThreading": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unmannedRateFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "stuckRateFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "stuckDriftImpacts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "hullDamage": {
+          "type": "object",
+          "properties": {
+            "small": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "large": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": ["small", "large"],
+          "additionalProperties": false
+        },
+        "machineEffects": {
+          "type": "object",
+          "properties": {
+            "none": {
+              "type": "number",
+              "minimum": 0
+            },
+            "graze": {
+              "type": "number",
+              "minimum": 0
+            },
+            "damage": {
+              "type": "number",
+              "minimum": 0
+            },
+            "knockout": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fault": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["none", "graze", "damage", "knockout", "fault"],
+          "additionalProperties": false
+        },
+        "effectIntegrity": {
+          "type": "object",
+          "properties": {
+            "graze": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "damage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["graze", "damage"],
+          "additionalProperties": false
+        },
+        "patchRecovers": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxScripted": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "warningSeconds",
+        "alertClearSeconds",
+        "severities",
+        "helmThreading",
+        "unmannedRateFactor",
+        "stuckRateFactor",
+        "stuckDriftImpacts",
+        "hullDamage",
+        "machineEffects",
+        "effectIntegrity",
+        "patchRecovers",
+        "maxScripted"
+      ],
+      "additionalProperties": false
+    },
+    "damage": {
+      "type": "object",
+      "properties": {
+        "patchSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "plateSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "repairSecondsPerIntegrity": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "checkSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["patchSeconds", "plateSeconds", "repairSecondsPerIntegrity", "checkSeconds"],
+      "additionalProperties": false
+    },
+    "intercom": {
+      "type": "object",
+      "properties": {
+        "reportSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["reportSeconds"],
+      "additionalProperties": false
+    },
     "events": {
       "type": "object",
       "properties": {
@@ -1696,6 +1912,9 @@
     "social",
     "recreation",
     "cabins",
+    "field",
+    "damage",
+    "intercom",
     "events"
   ],
   "additionalProperties": false

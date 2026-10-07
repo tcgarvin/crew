@@ -101,7 +101,7 @@ describe("POST /api/games/:id/narrator, scheduleHazard (D78)", () => {
       window: "soon",
     };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { res } = await post(planWith([hazard, { ...hazard, hazard: "asteroidBelt" }]));
+    const { res } = await post(planWith([hazard, { ...hazard, hazard: "debrisField" }]));
     expect(warn).toHaveBeenCalledWith("[narrator] dropped", expect.anything());
     expect(res.status).toBe(200);
     const body = await readJson(res);

@@ -27,6 +27,10 @@ reading, tinkering and stargazing are never offered aboard. `crew content valida
 as notes, not failures, because no scenario sails Mk1; a scenario on this deck would make each
 one an error until the deck gains a venue for it.
 
+Intercoms (slice 5, D94): one `machine.intercom` per compartment, eight, each against a wall with
+its `panel` position on the room's floor. Mk1 has no locker zones, so no patch kits are stowed on
+it. The hull bar is 100 (`hull.max`).
+
 ```
 Freighter Mk1 (deck.freighter_mk1)
 32 x 18 tiles
@@ -72,7 +76,7 @@ Doors (10):
   engineering_cargo: (7,13) side e, interior, closed, power=main
   cargo_ramp: (18,17) side s, ramp, closed, power=main
 
-Machines (19):
+Machines (27):
   helm_1: machine.helm @ (30,3) rot=0
   engine_1: machine.engine @ (6,2) rot=180
   coolant_pump_1: machine.coolant_pump @ (6,5) rot=180
@@ -92,4 +96,12 @@ Machines (19):
   bunk_8: machine.bunk @ (23,5) rot=0
   nav_terminal_1: machine.nav_terminal @ (31,1) rot=0
   mess_table_1: machine.mess_table @ (13,5) rot=0
+  intercom_engineering: machine.intercom @ (0,0) rot=0
+  intercom_infirmary: machine.intercom @ (8,0) rot=0
+  intercom_galley: machine.intercom @ (12,7) rot=180
+  intercom_quarters: machine.intercom @ (18,0) rot=0
+  intercom_bridge: machine.intercom @ (28,7) rot=180
+  intercom_corridor: machine.intercom @ (31,8) rot=0
+  intercom_cargo_hold: machine.intercom @ (8,10) rot=0
+  intercom_airlock: machine.intercom @ (31,10) rot=0
 ```

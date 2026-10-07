@@ -21,9 +21,11 @@ import type {
   Task,
 } from "../../core/types/work";
 import { privateTalkPlan } from "../cabins/private-talk";
+import { checkPlan, holdBridgePlan, patchPlan, platePlan, repairDamagePlan } from "../damage/plans";
 import { cleanPlan } from "../dirt/clean";
 import { cookPlan } from "../galley/cook";
 import { carryMealPlan, eatPlan } from "../galley/eat";
+import { reportPlan } from "../intercom/plans";
 import { recreatePlan } from "../recreation/plans";
 import { estimateTravelTicks } from "../spatial/estimates";
 import { plotCoursePlan } from "../travel/course";
@@ -294,6 +296,11 @@ export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResul
   if (task.type === "cookMeal") return cookPlan(ctx, actor, task);
   if (task.type === "carryMeal") return carryMealPlan(ctx, actor, task);
   if (task.type === "cleanCompartment") return cleanPlan(ctx, actor, task);
+  // D93, D94: damage work's plans are damage response's (`systems/damage/`).
+  if (task.type === "repairDamage") return repairDamagePlan(ctx, actor, task);
+  if (task.type === "patchHull") return patchPlan(ctx, actor, task);
+  if (task.type === "plateHull") return platePlan(ctx, actor, task);
+  if (task.type === "checkCompartment") return checkPlan(ctx, actor, task);
   return machineTaskPlan(ctx, actor, task);
 }
 
@@ -335,6 +342,11 @@ export function buildPersonalPlan(
       return recreatePlan(ctx, actor, intent);
     case "privateTalk":
       return privateTalkPlan(ctx, actor);
+    // D94: the intercom's reflex, and the officer of the watch on the bridge.
+    case "report":
+      return reportPlan(ctx, actor, intent);
+    case "holdBridge":
+      return holdBridgePlan(ctx, actor);
     case "rest":
     case "socialize":
     case "wander":

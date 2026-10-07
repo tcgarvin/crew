@@ -357,7 +357,7 @@ export function galleyContent(
           cargoTransferTiles: [{ x: 0, y: 1 }],
           personnelTransferTiles: [{ x: 0, y: 1 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: spawnTiles.map((tile, i) => ({ key: `mess${i}`, tile, tags: ["crew"] })),
       },
     },

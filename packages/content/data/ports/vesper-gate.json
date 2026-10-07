@@ -61,6 +61,11 @@
       "itemDefId": "item.spare_parts_stack",
       "count": 0,
       "price": 240
+    },
+    {
+      "itemDefId": "item.hull_plating",
+      "count": 0,
+      "price": 150
     }
   ],
   "jobTemplates": [

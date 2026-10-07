@@ -36,7 +36,9 @@
           "meal",
           "book",
           "instrument",
-          "treat"
+          "treat",
+          "patchKit",
+          "plating"
         ]
       }
     },

@@ -1022,6 +1022,9 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
         kind: "resolveDecision",
         payload: { decisionId: head, side: "left" },
       });
+    } else if (result.halt.kind === "lost") {
+      // D93: the hull gave way; the world never steps again, so the run ends here.
+      break;
     } else if (advanced === 0) {
       stuckAdvances += 1;
       if (stuckAdvances > 3) throw new Error(`beats run stuck at tick ${world.state.tick}`);

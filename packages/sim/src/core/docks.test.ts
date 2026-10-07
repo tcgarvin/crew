@@ -26,7 +26,7 @@ function deck(width: number, height: number, sizeClass: HullSizeClass): Berthing
     id: `deck.test.${width}x${height}` as DeckDefId,
     width,
     height,
-    hull: { class: "test_hull", sizeClass },
+    hull: { class: "test_hull", sizeClass, max: 100 },
   };
 }
 

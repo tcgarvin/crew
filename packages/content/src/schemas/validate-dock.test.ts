@@ -216,7 +216,7 @@ describe("berth box against hull classes (D72)", () => {
 
   it("rejects a scenario whose ship's class does not fit a dock's berth box", () => {
     const bundle = {
-      decks: { "deck.big": { id: "deck.big", hull: { class: "x", sizeClass: "L" } } },
+      decks: { "deck.big": { id: "deck.big", hull: { class: "x", sizeClass: "L", max: 100 } } },
       docks: {
         "dock.small": { id: "dock.small", berth: { origin: { x: 0, y: 0 }, sizeClass: "M" } },
         "dock.large": { id: "dock.large", berth: { origin: { x: 0, y: 0 }, sizeClass: "L" } },

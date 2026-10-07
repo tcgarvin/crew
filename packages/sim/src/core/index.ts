@@ -33,6 +33,13 @@ export {
 } from "./docks";
 export { basePriceFor, effectiveMarket } from "./markets";
 export { floorSet } from "./floor-set";
+export {
+  blastTiles,
+  hullFootprint,
+  inHullFootprint,
+  integrityFromScars,
+  scarDamageLeft,
+} from "./hull";
 export { clearDockside, dressDock, personnelRampFoot } from "./locals";
 export { decisionShownTick, localNamed } from "./delivery";
 export { allocateId } from "./ids";

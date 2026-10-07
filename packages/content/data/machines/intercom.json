@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schema-json/machine.schema.json",
+  "id": "machine.intercom",
+  "name": "Intercom",
+  "tags": ["comm"],
+  "footprint": [
+    {
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "interactionPositions": [
+    {
+      "key": "panel",
+      "offset": {
+        "x": 0,
+        "y": 1
+      },
+      "purposes": ["operate"],
+      "capacity": 1
+    }
+  ],
+  "power": {
+    "role": "consumer",
+    "drawKw": 0.05,
+    "priority": "domestic",
+    "partialPower": "off"
+  },
+  "heat": {
+    "risePerSecond": 0,
+    "coolPerSecond": 0,
+    "derateAbove": 1
+  },
+  "operation": {
+    "requiresOperator": false
+  },
+  "failure": {
+    "baseHazardPerSecond": 0,
+    "heatFactor": 0,
+    "wearPerSecond": 0
+  },
+  "faults": [],
+  "components": []
+}

@@ -535,7 +535,7 @@ export function loungeContent(
           cargoTransferTiles: [{ x: 0, y: 2 }],
           personnelTransferTiles: [{ x: 0, y: 2 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: spawnTiles.map((tile, i) => ({ key: `lounge${i}`, tile, tags: ["crew"] })),
       },
     },

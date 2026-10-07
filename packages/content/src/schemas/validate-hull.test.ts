@@ -112,7 +112,7 @@ const RAW_DECK = {
     cargoTransferTiles: [{ x: 1, y: 2 }],
     personnelTransferTiles: [{ x: 5, y: 2 }],
   },
-  hull: { class: "test_hull", sizeClass: "S" },
+  hull: { class: "test_hull", sizeClass: "S", max: 100 },
   spawnPoints: [
     { key: "crew_1", tile: { x: 3, y: 2 }, tags: ["crew"] },
     { key: "passenger_1", tile: { x: 6, y: 2 }, tags: ["passenger"] },

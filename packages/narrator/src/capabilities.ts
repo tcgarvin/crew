@@ -105,7 +105,7 @@ function hazardLever(config: ConfigDef): string[] {
   const tiers = HAZARD_DIFFICULTIES.map((t) => `${t} (${config.hazards.difficulty[t]})`).join(", ");
   return [
     "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check for whoever has the helm",
-    `- hazard: ${HAZARD_KINDS.map((k) => `${k} (${HAZARD_NAMES[k]})`).join(", ")}. All three are the same check; pick the one that fits the leg and the story.`,
+    `- hazard: ${HAZARD_KINDS.map((k) => `${k} (${HAZARD_NAMES[k]})`).join(", ")}. Both are the same check; pick the one that fits the leg and the story.`,
     `- difficulty: ${tiers}: the piloting it is rolled against, on the 1-10 scale of "good at: piloting" under Crew. A pilot at or above it usually comes through clean; well below it, usually not.`,
     `- window: soon (${seconds(windows.soon[0])}-${seconds(windows.soon[1])}), later (${seconds(windows.later[0])}-${seconds(windows.later[1])}), muchLater (${seconds(windows.muchLater[0])}-${seconds(windows.muchLater[1])}) from now. It goes off at the first moment the ship is in transit at or after that, so one placed while docked with a course set waits for that leg's transit.`,
     "- Only while a course is set or the ship is under way, and only on a leg with transit left: dropped while docked with no course, on approach or docking, or when the window opens after this leg's transit ends. One hazard waits at a time. Uses one hazard from the budget in the digest.",

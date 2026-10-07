@@ -372,6 +372,86 @@
         "y": 5
       },
       "rotation": 0
+    },
+    {
+      "key": "intercom_engineering",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_infirmary",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 8,
+        "y": 0
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_galley",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 12,
+        "y": 7
+      },
+      "rotation": 180,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_quarters",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 18,
+        "y": 0
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_bridge",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 28,
+        "y": 7
+      },
+      "rotation": 180,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_corridor",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 31,
+        "y": 8
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_cargo_hold",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 8,
+        "y": 10
+      },
+      "rotation": 0,
+      "powerDomain": "main"
+    },
+    {
+      "key": "intercom_airlock",
+      "machineDefId": "machine.intercom",
+      "origin": {
+        "x": 31,
+        "y": 10
+      },
+      "rotation": 0,
+      "powerDomain": "main"
     }
   ],
   "powerDomains": [
@@ -654,19 +734,50 @@
       "key": "pantry",
       "name": "Pantry",
       "tags": ["pantry"],
-      "tiles": [{ "x": 12, "y": 0 }, { "x": 13, "y": 0 }, { "x": 12, "y": 1 }, { "x": 13, "y": 1 }]
+      "tiles": [
+        {
+          "x": 12,
+          "y": 0
+        },
+        {
+          "x": 13,
+          "y": 0
+        },
+        {
+          "x": 12,
+          "y": 1
+        },
+        {
+          "x": 13,
+          "y": 1
+        }
+      ]
     },
     {
       "key": "serving",
       "name": "Serving Counter",
       "tags": ["serving"],
-      "tiles": [{ "x": 17, "y": 3 }, { "x": 17, "y": 4 }]
+      "tiles": [
+        {
+          "x": 17,
+          "y": 3
+        },
+        {
+          "x": 17,
+          "y": 4
+        }
+      ]
     },
     {
       "key": "cleaning_locker",
       "name": "Cleaning Locker",
       "tags": ["cleaningLocker"],
-      "tiles": [{ "x": 17, "y": 7 }]
+      "tiles": [
+        {
+          "x": 17,
+          "y": 7
+        }
+      ]
     }
   ],
   "docking": {
@@ -769,6 +880,7 @@
   ],
   "hull": {
     "class": "light_freighter",
-    "sizeClass": "M"
+    "sizeClass": "M",
+    "max": 100
   }
 }

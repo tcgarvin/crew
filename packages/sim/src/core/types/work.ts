@@ -13,8 +13,10 @@
  *    `state.work.problems`. Equipment creates `machineSymptom` / `machineFault` /
  *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload`,
  *    travel `courseToPlot` (D78); the watch creates `stationToStaff` (D77); commerce creates
- *    `reserveLow` (D80). Before creating, it looks up an open problem with the same `dedupeKey`
- *    and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for one fault).
+ *    `reserveLow` (D80); damage creates `machineDamaged`, `hullScar`, `hullDamaged` and
+ *    `compartmentToCheck` (D93, D94). Before creating, it looks up an open problem with the same
+ *    `dedupeKey` and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for
+ *    one fault).
  * 2. The *work system* (W4) derives tasks from problems through the `TaskDerivationTable`: one
  *    rule per `ProblemKind`, each returning `TaskSpec`s. Each owning system exports the rules for
  *    the kinds it owns from `systems/<system>/tasks.ts` as a `Partial<TaskDerivationTable>`;
@@ -60,6 +62,7 @@ import type {
   MachineId,
   PortDefId,
   ProblemId,
+  ScarId,
   SessionId,
   TaskId,
 } from "./ids";
@@ -87,9 +90,17 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
 /**
  * Which system created a problem and is responsible for resolving it. D77: the watch owns
  * `stationToStaff` (the helm's watch and relief posts); D81: the galley owns `mealToCook` and
- * `mealToCarry`; D82: dirt owns `compartmentDirty`.
+ * `mealToCarry`; D82: dirt owns `compartmentDirty`; D93: damage owns `machineDamaged`, `hullScar`,
+ * `hullDamaged` and `compartmentToCheck`.
  */
-export type ProblemOwner = "equipment" | "travel" | "commerce" | "watch" | "galley" | "dirt";
+export type ProblemOwner =
+  | "equipment"
+  | "travel"
+  | "commerce"
+  | "watch"
+  | "galley"
+  | "dirt"
+  | "damage";
 
 /**
  * Who can see a problem in their AgentView.
@@ -156,6 +167,30 @@ export interface ProblemPayloads {
    * `cleanCompartment` task over the room's dirtiest tiles; resolved below `untidy`.
    */
   compartmentDirty: { compartmentId: CompartmentId; key: LocalKey; tier: DirtTier };
+  /**
+   * D93 (slice 5 call 21): a rock took integrity off `machineId`. Owner: damage (dedupe
+   * `machineDamaged:<machineId>`, discovered, located at the machine, essential); derives one
+   * `repairDamage` task; resolved when integrity is whole again. Faults are not this problem.
+   */
+  machineDamaged: { machineId: MachineId };
+  /**
+   * D93: a scar on the hull at `tile` in `compartmentId`. Owner: damage (dedupe
+   * `hullScar:<scarId>`, discovered, located at the compartment; essential on alert, routine
+   * after); derives `patchHull` underway and `plateHull` at port; resolved when plated.
+   */
+  hullScar: { scarId: ScarId; compartmentId: CompartmentId; tile: TileCoord };
+  /**
+   * D93 (call 23): docked at a port that sells hull plating (`itemDefId`, a `plating` item) with
+   * `count` more scars unplated than plates aboard. Owner: damage; routine; derives commerce's
+   * `buyParts` task through `buySpec`.
+   */
+  hullDamaged: { itemDefId: ItemDefId; count: number };
+  /**
+   * D94: on alert, nobody has reported `compartmentId` since the last impact. Owner: damage
+   * (dedupe `check:<compartmentId>`, public, essential); derives one `checkCompartment` task (a
+   * scout walks there and perception does the rest); resolved by a report or the scout's arrival.
+   */
+  compartmentToCheck: { compartmentId: CompartmentId };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -200,6 +235,14 @@ export const TASK_TYPES = [
   "carryMeal",
   /** D82: mop a room's dirtiest tiles with the mop (`compartmentDirty`). */
   "cleanCompartment",
+  /** D93: weld impact damage on a machine back to whole (`machineDamaged`). */
+  "repairDamage",
+  /** D93: weld a patch kit over a hull scar, underway (`hullScar`). */
+  "patchHull",
+  /** D93: fit a hull plate over a scar, at port (`hullScar`). */
+  "plateHull",
+  /** D94: a scout's walk to a compartment nobody has reported (`compartmentToCheck`). */
+  "checkCompartment",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -213,7 +256,9 @@ export type TaskTarget =
   /** D80: a purchase for the ship's stores, at this port's market (no machine waits on it). */
   | { kind: "market"; portId: PortDefId }
   /** D82: a room to be cleaned (`cleanCompartment`); its tiles are the task's `interactionTiles`. */
-  | { kind: "compartment"; compartmentId: CompartmentId };
+  | { kind: "compartment"; compartmentId: CompartmentId }
+  /** D93: a hull scar to patch or plate; the tiles beside it are the task's `interactionTiles`. */
+  | { kind: "scar"; scarId: ScarId };
 
 /**
  * Where the task's physical progress lives (SD §14.4). The task holds a reference, never the
@@ -230,7 +275,13 @@ export type ProgressRef =
   /** D81: a meal is served or not; the servings on the counter are the progress. */
   | { kind: "meal"; watchIndex: number }
   /** D82: a room's dirt is its own progress (`WorldState.dirt.cells`). */
-  | { kind: "room"; compartmentId: CompartmentId };
+  | { kind: "room"; compartmentId: CompartmentId }
+  /** D93: a scar's own `recovered`/`patched` are its progress (`WorldState.hull.scars`). */
+  | { kind: "scar"; scarId: ScarId }
+  /** D93: a damaged machine's integrity is the repair's progress. */
+  | { kind: "integrity"; machineId: MachineId }
+  /** D94: a check has no progress; the scout being there is the point. */
+  | { kind: "check"; compartmentId: CompartmentId };
 
 /** SD §14.7 structured blockage reasons. */
 export const BLOCKAGE_REASONS = [
@@ -375,6 +426,8 @@ export interface ActionStages {
   recreate: "waiting" | "playing";
   /** Slice 4: a `privateTalk` in the captain's cabin. */
   confer: "talking";
+  /** D94: a report on the intercom. */
+  report: "talking";
 }
 
 export type ActionKind = keyof ActionStages;
@@ -429,6 +482,10 @@ export const PERSONAL_ACTIVITIES = [
   "recreate",
   /** Slice 4: answering (or holding) a `privateTalk` summons in the captain's cabin. */
   "privateTalk",
+  /** D94: the reporting reflex: to the nearest working intercom panel, and a report. */
+  "report",
+  /** D94: the officer of the watch on alert, holding the bridge. */
+  "holdBridge",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -457,10 +514,20 @@ export type WorkStageKey =
   /** D81: cooking at the stove (`galley/cook.ts` `runCook`). */
   | "cook"
   /** D82: mopping one tile (`dirt/clean.ts` `runMop`). */
-  | "mop";
+  | "mop"
+  /** D93: welding a patch kit over a scar (`damage/steps.ts` `runPatch`). */
+  | "patch"
+  /** D93: fitting a hull plate over a scar (`damage/steps.ts` `runPlate`). */
+  | "plate"
+  /** D93: repairing a machine's impact damage (`damage/steps.ts` `runMend`). */
+  | "mend"
+  /** D94: a scout's look round a compartment (`damage/steps.ts` `runCheck`). */
+  | "check"
+  /** D94: a report at an intercom panel (`intercom/report.ts` `runReport`). */
+  | "report";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
-export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway";
+export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway" | "bridge";
 
 /**
  * W4a addition: one step of an activity's bounded plan (SD §14.3). The work system builds the

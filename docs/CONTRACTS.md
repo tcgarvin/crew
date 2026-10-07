@@ -62,7 +62,11 @@ These are the kernel rules from PLAN §5, made concrete.
    are known only through facts. A few things are common knowledge aboard and read as truth
    without facts: the roster (`roster()`), assigned beds (`assignedBeds()`, D74), and since slice 4
    the open and running group sessions (`sessions()`: the intercom, `social.sessions`), the
-   travel stage (`travel()`) and the activity defs (`activities()`).
+   travel stage (`travel()`) and the activity defs (`activities()`), and since slice 5 the
+   alert (`alert()`: the klaxon, D94). Where a rock hit is not common knowledge: everyone holds a
+   `hullImpact` fact about the field, with the compartment only for those who were in it, and
+   damage is learned by sight or by an intercom report (`report` evidence, original
+   `observedTick`).
 8. **Validate, then apply.** A command is validated when enqueued and again when applied;
    validation is pure and produces a plan; applying cannot fail, so a rejection never leaves a
    partial mutation. `AUTHORITY[source]` is checked first.
@@ -83,7 +87,9 @@ The one way a system asks the crew to do something (details in `core/types/work.
    `cargoToUnload`; commerce owns `reserveLow` (D80: the ship's stores, bought like a part; D81:
    provisions are one of them, counted in days of meals); the watch owns `stationToStaff` (D77:
    the helm's `watch` and `relief` posts); the galley owns `mealToCook` and `mealToCarry` (D81);
-   dirt owns `compartmentDirty` (D82).
+   dirt owns `compartmentDirty` (D82); damage owns `machineDamaged`, `hullScar`, `hullDamaged`
+   and `compartmentToCheck` (D93, D94; `hullDamaged` derives commerce's `buyParts` through
+   `buySpec`).
 2. The work system derives `Task`s through the `TaskDerivationTable`, one rule per problem kind.
    Each owning system exports its rules from `systems/<system>/tasks.ts`; `systems/work/`
    merges them.

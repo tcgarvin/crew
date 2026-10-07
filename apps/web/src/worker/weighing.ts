@@ -65,6 +65,8 @@ function targetName(names: Names, task: TaskView): string {
       return "the market";
     case "door":
       return "a door";
+    case "scar":
+      return "the hull";
   }
 }
 
@@ -94,6 +96,14 @@ export function taskWords(names: Names, task: TaskView, problem: ProblemView | u
       return "taking a plate to the helm";
     case "cleanCompartment":
       return `mopping ${what}`;
+    case "repairDamage":
+      return `repairing the damage to ${what}`;
+    case "patchHull":
+      return "patching the hull";
+    case "plateHull":
+      return "plating the hull";
+    case "checkCompartment":
+      return `checking ${what} for damage`;
   }
 }
 
@@ -134,6 +144,10 @@ function candidateWords(names: Names, view: AgentView, candidate: Candidate): st
     }
     case "privateTalk":
       return "a word with the captain";
+    case "report":
+      return "reporting on the intercom";
+    case "holdBridge":
+      return "holding the bridge";
   }
 }
 
@@ -157,6 +171,8 @@ function refWords(names: Names, view: AgentView, ref: string): string {
     post: "going to their post",
     chair: "going to the captain's chair",
     privateTalk: "a word with the captain",
+    report: "reporting on the intercom",
+    holdBridge: "holding the bridge",
   };
   return words[head] ?? head;
 }
@@ -172,6 +188,7 @@ const REASON_WORDS: Readonly<Record<string, string>> = {
   notMyHelm: "not theirs: the watch decides the helm",
   notMyMeal: "not theirs: the cook's or a dayworker's",
   notMyRoom: "not theirs to clean",
+  notMyDamage: "not theirs: the bridge sends the scouts",
   mealCall: "dinner first",
   noFreeBed: "no free bed",
   noKnownFood: "knows of no food",

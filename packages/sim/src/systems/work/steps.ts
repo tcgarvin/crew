@@ -35,12 +35,14 @@ import type { Item } from "../../core/types/ship";
 import type { ActivityStep, BlockageReason, StepTarget, Task } from "../../core/types/work";
 import { runConfer } from "../cabins/private-talk";
 import { buyFromMarket, marketStoreLocation, setDownBought } from "../commerce/market";
+import { bridgeHoldDone, runCheck, runMend, runPatch, runPlate } from "../damage/steps";
 import { runMop } from "../dirt/clean";
 import { depositDirt } from "../dirt/deposit";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
+import { runReport } from "../intercom/report";
 import { runRecreate } from "../recreation/steps";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
@@ -574,6 +576,8 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
       return false;
     case "gangway":
       return gangwayHoldDone(ctx, actor, step);
+    case "bridge":
+      return bridgeHoldDone(ctx, actor, step);
   }
 }
 
@@ -593,6 +597,17 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
       return runCook(ctx, actor, step);
     case "mop":
       return runMop(ctx, actor, step);
+    // D93, D94: damage work's stages, and the intercom's report.
+    case "patch":
+      return runPatch(ctx, actor, step);
+    case "plate":
+      return runPlate(ctx, actor, step);
+    case "mend":
+      return runMend(ctx, actor, step);
+    case "check":
+      return runCheck(ctx, actor, step);
+    case "report":
+      return runReport(ctx, actor, step);
     case "eat":
     case "buy":
     case "rounds":

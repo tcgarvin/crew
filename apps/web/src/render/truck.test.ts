@@ -64,6 +64,9 @@ function frame(crates: number): RenderFrame {
     locals: [],
     dockProps: [],
     sessions: [],
+    hull: { integrity: 100, max: 100, scars: [], lost: false },
+    alert: false,
+    impacts: [],
   };
 }
 

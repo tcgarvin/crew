@@ -66,14 +66,83 @@
       "itemDefId": "item.book",
       "count": 3,
       "zoneKey": "book_shelf"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_1"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_2"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_3"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_4"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_5"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_6"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_7"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_bunk_8"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_captain"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_first_officer"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_passenger_1"
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 2,
+      "zoneKey": "locker_passenger_2"
     }
   ],
   "initialFaults": [],
   "watchBill": {
     "sections": [
-      { "key": "red", "members": ["crew.noor_haddad", "crew.mara_osei", "crew.priya_kessler"] },
-      { "key": "white", "members": ["crew.jax_okonkwo", "crew.tomas_ruiz"] },
-      { "key": "blue", "members": ["crew.dane_whitcross", "crew.sunniva_park"] }
+      {
+        "key": "red",
+        "members": ["crew.noor_haddad", "crew.mara_osei", "crew.priya_kessler"]
+      },
+      {
+        "key": "white",
+        "members": ["crew.jax_okonkwo", "crew.tomas_ruiz"]
+      },
+      {
+        "key": "blue",
+        "members": ["crew.dane_whitcross", "crew.sunniva_park"]
+      }
     ],
     "dayworkers": ["crew.bettina_solheim", "crew.oyelaran_abiodun"]
   }

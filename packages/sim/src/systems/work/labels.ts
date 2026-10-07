@@ -29,6 +29,8 @@ import type { ContentBundle } from "../../core/types/content";
 import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/types/ids";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import type { ActivityStep, HoldKind, StepTarget, Task } from "../../core/types/work";
+import { damageTaskLabel } from "../damage/labels";
+import { reportLabel } from "../intercom/labels";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { whoHasTheHelm } from "../watch/helm";
 import { currentStep } from "./activity";
@@ -197,6 +199,15 @@ function taskStepLabel(
   if (task?.type === "carryMeal" && step.kind === "moveTo" && carryingMeal(ctx, actor)) {
     return "taking a plate to the helm";
   }
+  // D93, D94: damage work says what it is doing (`systems/damage/labels.ts`).
+  if (
+    task?.type === "repairDamage" ||
+    task?.type === "patchHull" ||
+    task?.type === "plateHull" ||
+    task?.type === "checkCompartment"
+  ) {
+    return damageTaskLabel(ctx, actor, task, step);
+  }
   switch (step.kind) {
     case "moveTo":
       if (isHelmTask(ctx, task)) return "going to the helm";
@@ -262,6 +273,7 @@ const HOLD_LABEL: Readonly<Record<HoldKind, string>> = {
   socialize: "chatting",
   staff: "on station",
   gangway: "on the gangway",
+  bridge: "holding the bridge",
 };
 
 function personalStepLabel(
@@ -475,6 +487,8 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
     );
   }
   if (activity.activity === "privateTalk") return talkLabel(ctx, actor, step);
+  // D94: the walk to the panel and the report read as one activity.
+  if (activity.activity === "report") return reportLabel(ctx, actor, step);
   return personalStepLabel(ctx, actor, step);
 }
 

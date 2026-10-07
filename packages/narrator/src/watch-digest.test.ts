@@ -283,7 +283,7 @@ describe("buildDigest: the helm's stakes (D78)", () => {
       event(3_900, "helmUnattended", { machineId: machineOf(state, "machine.helm"), seconds: 20 }),
       event(3_950, "navHazard", {
         hazardId: "hz3" as never,
-        kind: "asteroidBelt",
+        kind: "ionStorm",
         difficulty: brutal,
         skill: 0,
         outcome: "unattended",
@@ -291,7 +291,7 @@ describe("buildDigest: the helm's stakes (D78)", () => {
       }),
       event(3_990, "navHazard", {
         hazardId: "hz4" as never,
-        kind: "asteroidBelt",
+        kind: "ionStorm",
         difficulty: 9,
         standerId: noor.id,
         skill: 3,
@@ -309,10 +309,10 @@ describe("buildDigest: the helm's stakes (D78)", () => {
     );
     expect(text).toContain("helm empty t3900: nobody at the helm for 20s in transit");
     expect(text).toContain(
-      "helm check t3950: asteroid belt (brutal): nobody at the helm: scraped through, and lost 60s on the leg",
+      "helm check t3950: ion storm (brutal): nobody at the helm: scraped through, and lost 60s on the leg",
     );
     expect(text).toContain(
-      "helm check t3990: asteroid belt (difficulty 9): Noor Haddad at the helm (piloting 3): lost 60s on the leg",
+      "helm check t3990: ion storm (difficulty 9): Noor Haddad at the helm (piloting 3): lost 60s on the leg",
     );
   });
 

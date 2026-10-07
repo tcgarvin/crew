@@ -226,7 +226,7 @@ export function bridgeContent(
           cargoTransferTiles: [{ x: 0, y: 1 }],
           personnelTransferTiles: [{ x: 0, y: 1 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: [3, 4, 5, 6, 7].flatMap((x) => [
           { key: `mess${x}a`, tile: { x, y: 1 }, tags: ["crew"] },
           { key: `mess${x}b`, tile: { x, y: 2 }, tags: ["crew"] },
