@@ -1860,7 +1860,10 @@ and hands back `notesTurn`, which continues the same conversation: the same syst
 reads from the prompt cache: 96-98% of its input in the live run), the plan's user turn, the plan
 as the assistant turn with the model's `reasoning_details`, then a user turn with what became of
 the plan (each dropped intent and why, and a thread a beat card started) and the notes schema.
-The rules say the notes are written as they stand after the plan.
+The rules say the notes are written as they stand after the plan, and that the plan reply is the
+JSON object alone: Sonnet, told only that the notes come next, wrote them anyway as prose after a
+fenced plan and failed every story case, so the plan's user turn now ends by saying so again
+(`PLAN_ONLY`); with it Sonnet passed eight of eight (plans 3.9-12.4 s, notes 5.9-11.6 s).
 
 *Reasoning handed back.* OpenRouter returns an OpenAI model's reasoning as an encrypted
 `reasoning_details` block; the transport sends it back on the assistant turn, with
@@ -1888,4 +1891,6 @@ as well, and `crew narrator eval` prints the notes turn.
 *Live run* (`pnpm test:live`, luna at `low`): every story case green with its notes turn; the plan
 took 2.4-5.3 s (157-429 output tokens) and the notes turn 1.3-4.0 s, against 4.8-7.0 s for both in
 one reply before (D96's run). The staging case once staged no post at `low` (a floor set in play) and passed three
-reruns. Prompt v0.25.
+reruns. Luna at `low` writes malformed JSON about one call in twelve on a policy card (a stray
+`""` key, an extra brace), with the v0.24 prompt as well as this one; the client retries it
+(D43). Prompt v0.25.

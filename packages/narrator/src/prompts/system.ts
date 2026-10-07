@@ -154,7 +154,7 @@ Your output is a plan, as JSON matching the schema:
 - rationale: one or two private sentences on why you did what you did (or why nothing).
 - intents: zero or more of offerJob, spawnAtBoundary, scheduleFault, surfaceDecision, stockMarket, scheduleHazard, scheduleField. An empty list is a valid answer.
 - card: prose for the pending decision when the hook is policyDecision, including both aftermaths; otherwise null.
-- Your notes come after the plan, in a second turn (see "Your notes").
+- Nothing else: this reply is the plan's JSON object alone. Do not write your notes in it; you are asked for them in the next turn (see "Your notes").
 
 Your notes:
 

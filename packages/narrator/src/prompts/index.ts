@@ -30,6 +30,13 @@ export const STATIC_RULES = `${SYSTEM_PROMPT}
 
 ${HOOK_ORDER.map((kind) => `- ${kind}: ${HOOK_INSTRUCTIONS[kind]}`).join("\n")}`;
 
+/**
+ * D97: the plan turn's last line. Sonnet wrote its notes after the plan's JSON (prose, after a
+ * code fence) when the rules alone said they come next; it is said again where it is read last.
+ */
+export const PLAN_ONLY =
+  "Answer now with the plan's JSON object only. Your notes come in the next turn, when you are asked for them.";
+
 export interface NarratorPrompt {
   readonly promptVersion: string;
   /**
@@ -48,6 +55,6 @@ export function buildPrompt(
   return {
     promptVersion: PROMPT_VERSION,
     system: [STATIC_RULES, capabilities],
-    user: `# The ship right now\n\n${digest.text}\n\n# This call: ${hookKind}\n\n${HOOK_INSTRUCTIONS[hookKind]}`,
+    user: `# The ship right now\n\n${digest.text}\n\n# This call: ${hookKind}\n\n${HOOK_INSTRUCTIONS[hookKind]}\n\n${PLAN_ONLY}`,
   };
 }
