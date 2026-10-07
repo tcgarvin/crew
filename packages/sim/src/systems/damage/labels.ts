@@ -1,29 +1,80 @@
 /**
  * Labels for damage work (D93, D94), read by `systems/work/labels.ts`: "patching the hull in the
- * hold", "plating the hull in the hold", "fetching a patch kit", "repairing impact damage to the
- * galley stove", "checking the hold".
- *
- * Gate stub: a plain verb per task type.
+ * hold", "plating the hull in the hold", "fetching a patch kit", "fetching hull plating",
+ * "fetching the welder torch", "repairing impact damage to the galley stove", "checking the hold"
+ * (the scout's walk there and the look round alike), and "walking to the hold" on the way to a
+ * scar or a machine. "holding the bridge" is the work system's hold label.
  *
  * Owner: W2 of ship life slice 5.
  */
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly } from "../../core/types/common";
+import type { CompartmentId, ItemId } from "../../core/types/ids";
 import type { ActivityStep, Task } from "../../core/types/work";
-import type { LabelCtx } from "../work/labels";
+import { compartmentAt } from "../spatial/geometry";
+import { type LabelCtx, itemName, machineName } from "../work/labels";
 
-const TASK_VERBS: Readonly<Record<string, string>> = {
-  repairDamage: "repairing impact damage",
-  patchHull: "patching the hull",
-  plateHull: "plating the hull",
-  checkCompartment: "checking for damage",
-};
+function roomName(ctx: LabelCtx, compartmentId: CompartmentId | undefined): string {
+  const compartment =
+    compartmentId === undefined ? undefined : ctx.state.compartments[compartmentId];
+  if (compartment === undefined) return "somewhere";
+  const deck = ctx.content.decks[compartment.deckId];
+  return (
+    deck?.compartments.find((c) => c.key === compartment.key)?.name ?? compartment.key
+  ).toLowerCase();
+}
+
+/** The room a damage task is about: the scar's, the machine's, or the one to check. */
+function taskRoom(ctx: LabelCtx, task: DeepReadonly<Task>): CompartmentId | undefined {
+  const target = task.target;
+  if (target.kind === "compartment") return target.compartmentId;
+  if (target.kind === "scar") {
+    return ctx.state.hull.scars.find((s) => s.id === target.scarId)?.compartmentId;
+  }
+  if (target.kind === "machine") {
+    const machine = ctx.state.machines[target.machineId];
+    if (machine === undefined) return undefined;
+    const placement = ctx.content.decks[machine.deckId]?.machines.find(
+      (p) => p.key === machine.placementKey,
+    );
+    const geometry = ctx.caches.nav.decks[machine.deckId];
+    if (placement === undefined || geometry === undefined) return undefined;
+    return compartmentAt(geometry, placement.origin.x, placement.origin.y);
+  }
+  return undefined;
+}
+
+function fetchLabel(ctx: LabelCtx, itemId: ItemId): string {
+  const item = ctx.state.items[itemId];
+  const tags = item === undefined ? [] : (ctx.content.items[item.defId]?.tags ?? []);
+  if (tags.includes("patchKit")) return "fetching a patch kit";
+  if (tags.includes("plating")) return "fetching hull plating";
+  return `fetching the ${itemName(ctx, itemId)}`;
+}
+
+function workLabel(ctx: LabelCtx, task: DeepReadonly<Task>, room: string): string {
+  switch (task.type) {
+    case "patchHull":
+      return `patching the hull in the ${room}`;
+    case "plateHull":
+      return `plating the hull in the ${room}`;
+    case "checkCompartment":
+      return `checking the ${room}`;
+    default:
+      return task.target.kind === "machine"
+        ? `repairing impact damage to the ${machineName(ctx, task.target.machineId)}`
+        : "repairing impact damage";
+  }
+}
 
 export function damageTaskLabel(
-  _ctx: LabelCtx,
+  ctx: LabelCtx,
   _actor: DeepReadonly<Actor>,
   task: DeepReadonly<Task>,
-  _step: DeepReadonly<ActivityStep>,
+  step: DeepReadonly<ActivityStep>,
 ): string {
-  return TASK_VERBS[task.type] ?? "working";
+  const room = roomName(ctx, taskRoom(ctx, task));
+  if (step.kind === "pickUp") return fetchLabel(ctx, step.itemId);
+  if (step.kind === "moveTo" && task.type !== "checkCompartment") return `walking to the ${room}`;
+  return workLabel(ctx, task, room);
 }
