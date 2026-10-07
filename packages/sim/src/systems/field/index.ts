@@ -18,3 +18,4 @@ export function registerField(registry: KernelRegistry): Unregister {
 
 export { scheduleField, scriptedHullDamage } from "./command";
 export { fieldSystem } from "./field";
+export { fieldViolations } from "./invariants";
