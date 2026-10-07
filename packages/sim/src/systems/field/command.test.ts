@@ -145,6 +145,25 @@ describe("scheduleField (D92, slice 5 calls 2, 19, 20)", () => {
     expect(schedule(test, { ...heavy, scripted: survivable }).status).toBe("accepted");
   });
 
+  it("never starts sooner than the warning, so the helm's check is never already past", () => {
+    const test = fieldWorld();
+    planCourse(test);
+    schedule(test, { ...heavy, windowTicks: [0, 0] });
+    test.kernel.advance(test.world, 1);
+    const warning = test.world.config.values.field.warningSeconds;
+    const tickRate = test.world.config.values.time.tickRate;
+    expect(test.world.state.field?.startsAtTick).toBeGreaterThanOrEqual(
+      test.world.state.tick + warning * tickRate,
+    );
+  });
+
+  it("is refused once the ship is lost", () => {
+    const test = fieldWorld();
+    planCourse(test);
+    test.world.state.hull.lostAtTick = test.world.state.tick;
+    expect(rejection(schedule(test, heavy))?.reason).toContain("the ship is lost");
+  });
+
   it("is refused once the leg's transit is over", () => {
     const test = fieldWorld();
     planCourse(test);
