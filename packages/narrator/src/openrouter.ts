@@ -96,6 +96,9 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
         { role: "system", content: systemParts },
         { role: "user", content: request.user },
       ],
+      ...(request.reasoningEffort === "default"
+        ? {}
+        : { reasoning: { effort: request.reasoningEffort } }),
     };
 
     let response: Response;

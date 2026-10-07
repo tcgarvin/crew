@@ -44,6 +44,8 @@ export {
   type ModelRequest,
   type ModelResult,
   type ModelTransport,
+  REASONING_EFFORTS,
+  type ReasoningEffort,
   TransportError,
 } from "./transport";
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";

@@ -1835,3 +1835,18 @@ every 10 s at 1×, 5 s at 2× (readable) and 2.6 s at 4× (not, without the slow
 the one beat dense enough for 1×, and its sighting or first rock already drops the speed there.
 If the owner prefers 4× as the target, the run-ahead cap (`host.runAheadCapSeconds`) wants about
 100 s first so a narrator call stops stalling it.
+
+**D96. Narrator reasoning effort is configurable; production runs luna at `low`.** Prod logs showed
+story calls on `openai/gpt-6-luna` taking a median 20 s (`notableEvent`), with latency tracking
+output tokens almost exactly (9.5 ms a token plus 1.4 s, r = 0.98), so the slow tail hit the 25 s
+timeout and the client retried the same slow call (D43): 11 timeouts in 41 story calls on
+2026-10-06/07. OpenRouter is not the cost: its 1.4 s fixed overhead includes time to first token.
+Replaying four prod requests with streaming showed the output tokens are mostly hidden
+reasoning: at the model's default effort 672-1,737 of 1,105-2,221 output tokens were reasoning
+and calls took 11-22 s; at `low`, 127-496 of 504-997, and 5.5-10 s. The plan was complete
+(`"notes"` key reached) at 3.9-8 s on `low`; the notes rewrite is about 300 tokens, 1-3 s.
+`CREW_NARRATOR_REASONING_EFFORT` (and `CREW_STAGING_REASONING_EFFORT`, defaulting to it) is sent
+as OpenRouter's `reasoning.effort`; `default` sends nothing, because on a model that does not
+reason by default (Sonnet, the preview model) any effort switches thinking on and makes the call
+slower. The live suite reads the same variable and passed eight of eight on luna at `low`
+(3.6-8 s a call). The 25 s timeout stays; at these latencies it is no longer the binding limit.

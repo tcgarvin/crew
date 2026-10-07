@@ -14,7 +14,7 @@ import type { NarratorNotes } from "../notes";
 import { nullNarratorResponse } from "../null";
 import { planJsonSchema } from "../plan";
 import { PROMPT_VERSION } from "../prompts/system";
-import type { ModelTransport } from "../transport";
+import type { ModelTransport, ReasoningEffort } from "../transport";
 import { type StagingEnvelope, buildStagingPlanSchema, stagingEnvelopeSchema } from "./plan";
 import { buildStagingCatalogue, buildStagingPrompt } from "./prompt";
 import { type StageDockHook, translateStaging } from "./translate";
@@ -34,6 +34,7 @@ export interface StagingInputs {
   readonly transport: ModelTransport | undefined;
   readonly model: string;
   readonly timeoutMs: number;
+  readonly reasoningEffort: ReasoningEffort;
 }
 
 export interface StagingRun {
@@ -74,6 +75,7 @@ export async function runStaging(inputs: StagingInputs): Promise<StagingRun> {
       schemaName: "staging_plan",
       jsonSchema: planJsonSchema(buildStagingPlanSchema()),
       maxTokens: STAGING_MAX_TOKENS,
+      reasoningEffort: inputs.reasoningEffort,
       timeoutMs: inputs.timeoutMs,
     });
     rawContent = contentOf(result);

@@ -2,7 +2,7 @@
  * Environment configuration (W8). Read once at startup; every value the rest of the package
  * needs is derived here so nothing else touches `process.env` directly.
  */
-import { STAGING_TIMEOUT_MS } from "@crew/narrator";
+import { REASONING_EFFORTS, type ReasoningEffort, STAGING_TIMEOUT_MS } from "@crew/narrator";
 
 function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): number {
   const raw = source[name];
@@ -15,6 +15,22 @@ function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): num
 }
 
 /** An OpenRouter model slug from `name`; unset or empty = `fallback`. */
+function readReasoningEffort(
+  source: NodeJS.ProcessEnv,
+  name: string,
+  fallback: ReasoningEffort,
+): ReasoningEffort {
+  const raw = source[name];
+  if (raw === undefined || raw === "") return fallback;
+  const effort = REASONING_EFFORTS.find((e) => e === raw);
+  if (effort === undefined) {
+    throw new Error(
+      `Invalid ${name}: expected one of ${REASONING_EFFORTS.join(", ")}, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return effort;
+}
+
 function readModel(source: NodeJS.ProcessEnv, name: string, fallback: string): string {
   const raw = source[name];
   return raw === undefined || raw === "" ? fallback : raw;
@@ -58,6 +74,14 @@ export interface Env {
    */
   readonly stagingModel: string;
   /**
+   * D96: `CREW_NARRATOR_REASONING_EFFORT`, one of `REASONING_EFFORTS`; unset = `"default"`, which
+   * sends nothing. Set it per model: on a model that does not reason by default, any other value
+   * switches reasoning on.
+   */
+  readonly narratorReasoningEffort: ReasoningEffort;
+  /** D96: `CREW_STAGING_REASONING_EFFORT`; unset = the story call's, like `stagingModel`. */
+  readonly stagingReasoningEffort: ReasoningEffort;
+  /**
    * D70: `CREW_STAGING_TIMEOUT_MS`, how long one staging attempt may take before it gives up
    * (milliseconds); unset = the narrator's `STAGING_TIMEOUT_MS` (10 s). Story calls keep 25 s.
    */
@@ -90,12 +114,23 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
 
   const narratorModel = readModel(source, "CREW_NARRATOR_MODEL", DEFAULT_SERVER_NARRATOR_MODEL);
+  const narratorReasoningEffort = readReasoningEffort(
+    source,
+    "CREW_NARRATOR_REASONING_EFFORT",
+    "default",
+  );
   return {
     databaseUrl,
     useMemoryDb,
     openRouterApiKey: source.OPENROUTER_API_KEY,
     narratorModel,
     stagingModel: readModel(source, "CREW_STAGING_MODEL", narratorModel),
+    narratorReasoningEffort,
+    stagingReasoningEffort: readReasoningEffort(
+      source,
+      "CREW_STAGING_REASONING_EFFORT",
+      narratorReasoningEffort,
+    ),
     stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),

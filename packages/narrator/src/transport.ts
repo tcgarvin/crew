@@ -6,6 +6,22 @@
  */
 import type { NarratorUsage } from "./contract";
 
+/**
+ * D96: how hard a reasoning model thinks before it answers (OpenRouter's `reasoning.effort`).
+ * `default` sends nothing, so the model keeps its own default and a model that does not reason
+ * by default (Sonnet) is not switched into extended thinking.
+ */
+export const REASONING_EFFORTS = [
+  "default",
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
 export interface ModelRequest {
   readonly model: string;
   /** System content parts in order; the last one is the prompt-cache breakpoint. */
@@ -15,6 +31,7 @@ export interface ModelRequest {
   /** Closed JSON Schema for the plan (all properties required, no recursion). */
   readonly jsonSchema: Readonly<Record<string, unknown>>;
   readonly maxTokens: number;
+  readonly reasoningEffort: ReasoningEffort;
   readonly signal: AbortSignal;
 }
 

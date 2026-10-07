@@ -9,6 +9,7 @@ import {
   type FallbackReason,
   type NarratorRequest,
   type NarratorResponse,
+  type ReasoningEffort,
   defaultContent,
   nullNarratorResponse,
   openRouterTransport,
@@ -26,6 +27,8 @@ export interface NarratorCtx {
   readonly model?: string;
   /** D70: the model timeout for this call (`CREW_STAGING_TIMEOUT_MS` for staging); absent = default. */
   readonly timeoutMs?: number;
+  /** D96: `CREW_NARRATOR_REASONING_EFFORT` (or the staging one for `stageDock`). */
+  readonly reasoningEffort: ReasoningEffort;
 }
 
 /**
@@ -90,6 +93,7 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     transport: openRouterTransport({ apiKey: ctx.openRouterApiKey }),
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
+    reasoningEffort: ctx.reasoningEffort,
   });
   return { response: run.response, ...(run.error === undefined ? {} : { error: run.error }) };
 };

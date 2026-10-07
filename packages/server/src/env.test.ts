@@ -34,6 +34,27 @@ describe("loadEnv staging model (D67)", () => {
   });
 });
 
+describe("loadEnv reasoning effort (D96)", () => {
+  it("sends nothing by default and lets staging follow the story call unless set", () => {
+    expect(loadEnv({}).narratorReasoningEffort).toBe("default");
+    expect(loadEnv({}).stagingReasoningEffort).toBe("default");
+    const story = loadEnv({ CREW_NARRATOR_REASONING_EFFORT: "low" });
+    expect(story.narratorReasoningEffort).toBe("low");
+    expect(story.stagingReasoningEffort).toBe("low");
+    const both = loadEnv({
+      CREW_NARRATOR_REASONING_EFFORT: "low",
+      CREW_STAGING_REASONING_EFFORT: "minimal",
+    });
+    expect(both.stagingReasoningEffort).toBe("minimal");
+  });
+
+  it("refuses an effort OpenRouter does not know", () => {
+    expect(() => loadEnv({ CREW_NARRATOR_REASONING_EFFORT: "lowest" })).toThrow(
+      /CREW_NARRATOR_REASONING_EFFORT/,
+    );
+  });
+});
+
 describe("loadEnv staging timeout (D70)", () => {
   it("defaults to the narrator's 10 s staging timeout and reads CREW_STAGING_TIMEOUT_MS", () => {
     expect(loadEnv({}).stagingTimeoutMs).toBe(STAGING_TIMEOUT_MS);

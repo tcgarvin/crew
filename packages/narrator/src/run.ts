@@ -49,7 +49,7 @@ import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/inde
 import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
 import { translateIntents } from "./translate";
-import type { ModelTransport } from "./transport";
+import type { ModelTransport, ReasoningEffort } from "./transport";
 
 /** Default model slug (owner); override with `CREW_NARRATOR_MODEL` via `ctx.model`. */
 export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
@@ -84,6 +84,8 @@ export interface RunNarratorCtx {
   readonly callId?: string;
   /** Per-call model timeout; absent = `STAGING_TIMEOUT_MS` for `stageDock`, else `NARRATOR_TIMEOUT_MS`. */
   readonly timeoutMs?: number;
+  /** D96: the model's reasoning effort for this call; absent = `"default"` (nothing sent). */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 /** Everything the eval harness prints, beyond the response. */
@@ -356,6 +358,7 @@ export async function runNarratorWithTrace(
   const timeoutMs =
     ctx.timeoutMs ?? (req.hook.kind === "stageDock" ? STAGING_TIMEOUT_MS : NARRATOR_TIMEOUT_MS);
   const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
+  const reasoningEffort = ctx.reasoningEffort ?? "default";
   if (req.hook.kind === "stageDock") {
     // D67: the staging call has its own prompt, schema and translator, over the same digest.
     const staged = await runStaging({
@@ -369,6 +372,7 @@ export async function runNarratorWithTrace(
       transport: ctx.transport,
       model,
       timeoutMs,
+      reasoningEffort,
     });
     return {
       response: staged.response,
@@ -404,6 +408,7 @@ export async function runNarratorWithTrace(
       schemaName: "narrator_plan",
       jsonSchema: planJsonSchema(schema),
       maxTokens: NARRATOR_MAX_TOKENS,
+      reasoningEffort,
       timeoutMs,
     });
     rawContent = contentOf(result);

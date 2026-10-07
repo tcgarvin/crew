@@ -218,6 +218,7 @@ export function registerNarratorRoutes(
         gameId,
         notes: game.narrativeNotes,
         model: staging ? env.stagingModel : env.narratorModel,
+        reasoningEffort: staging ? env.stagingReasoningEffort : env.narratorReasoningEffort,
         ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
       });
       const response: NarratorResponse = outcome.response;

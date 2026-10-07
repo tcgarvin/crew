@@ -141,3 +141,26 @@ describe("OpenRouter plan schema (D53)", () => {
     });
   });
 });
+
+describe("OpenRouter reasoning effort (D96)", () => {
+  it("sends no reasoning field by default, so a model that does not reason keeps not reasoning", async () => {
+    const { bodies, fetch } = recordingFetch();
+    await runNarrator(approachRequest(content()), {
+      gameId: "g1",
+      content: content(),
+      transport: openRouterTransport({ apiKey: "test", fetch }),
+    });
+    expect(bodies[0]).not.toHaveProperty("reasoning");
+  });
+
+  it("sends the configured effort as reasoning.effort", async () => {
+    const { bodies, fetch } = recordingFetch();
+    await runNarrator(approachRequest(content()), {
+      gameId: "g1",
+      content: content(),
+      transport: openRouterTransport({ apiKey: "test", fetch }),
+      reasoningEffort: "low",
+    });
+    expect(bodies[0]).toHaveProperty("reasoning", { effort: "low" });
+  });
+});
