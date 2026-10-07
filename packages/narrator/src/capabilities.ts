@@ -1,5 +1,5 @@
 /**
- * The capability list (D11): exactly what the six narrator levers can do in this game,
+ * The capability list (D11): exactly what the seven narrator levers can do in this game,
  * generated from content, config and the ship's machines so the prompt never promises what the
  * sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
@@ -10,7 +10,9 @@
 import {
   type ConfigDef,
   type ContentBundle,
+  FIELD_SEVERITIES,
   type FaultEffect,
+  type FieldSeverity,
   HAZARD_KINDS,
   JOB_URGENCIES,
   MARKET_PRICE_TIERS,
@@ -18,7 +20,7 @@ import {
   basePriceFor,
   effectiveMarket,
 } from "@crew/sim";
-import { HAZARD_DIFFICULTIES } from "./contract";
+import { FIELD_MOMENTS, HAZARD_DIFFICULTIES, SCRIPTED_EFFECTS } from "./contract";
 import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
@@ -29,6 +31,7 @@ import {
   machineName,
   pathBetween,
   portHereOrNext,
+  shipDeckOf,
 } from "./lookups";
 import { HAZARD_NAMES } from "./watch-digest";
 
@@ -105,11 +108,82 @@ function hazardLever(config: ConfigDef): string[] {
   const tiers = HAZARD_DIFFICULTIES.map((t) => `${t} (${config.hazards.difficulty[t]})`).join(", ");
   return [
     "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check for whoever has the helm",
-    `- hazard: ${HAZARD_KINDS.map((k) => `${k} (${HAZARD_NAMES[k]})`).join(", ")}. Both are the same check; pick the one that fits the leg and the story.`,
+    `- hazard: ${HAZARD_KINDS.map((k) => `${k} (${HAZARD_NAMES[k]})`).join(", ")}. debrisField and ionStorm are the same check; pick the one that fits the leg and the story. An asteroid field is not a hazard: it is scheduleField (7).`,
     `- difficulty: ${tiers}: the piloting it is rolled against, on the 1-10 scale of "good at: piloting" under Crew. A pilot at or above it usually comes through clean; well below it, usually not.`,
     `- window: soon (${seconds(windows.soon[0])}-${seconds(windows.soon[1])}), later (${seconds(windows.later[0])}-${seconds(windows.later[1])}), muchLater (${seconds(windows.muchLater[0])}-${seconds(windows.muchLater[1])}) from now. It goes off at the first moment the ship is in transit at or after that, so one placed while docked with a course set waits for that leg's transit.`,
     "- Only while a course is set or the ship is under way, and only on a leg with transit left: dropped while docked with no course, on approach or docking, or when the window opens after this leg's transit ends. One hazard waits at a time. Uses one hazard from the budget in the digest.",
     `- The sim rolls it against whoever has the helm when it goes off, never you: clean (nothing happens), a scrape (one of the ship's machines takes a fault, which the crew must find and repair like any other), or a delay (about ${seconds(config.hazards.delaySeconds)} lost on the leg). With nobody at the helm it is a scrape and a delay both. The next digest shows who was at the helm and how it went.`,
+  ];
+}
+
+/**
+ * D95: what a field of each severity costs as it comes, before the helm: its rocks
+ * (`impactsPerMinute` over `lengthSeconds`) and their hull points at the severity's large share.
+ */
+export function fieldExpectation(
+  config: ConfigDef,
+  severity: FieldSeverity,
+): { readonly rocks: number; readonly hull: number; readonly seconds: number } {
+  const s = config.field.severities[severity];
+  const rocks = (s.impactsPerMinute * s.lengthSeconds) / 60;
+  const perRock =
+    config.field.hullDamage.small * (1 - s.largeShare) +
+    config.field.hullDamage.large * s.largeShare;
+  return { rocks, hull: rocks * perRock, seconds: s.lengthSeconds };
+}
+
+/** The helm's check tier for a field's severity (W1's detection: light/heavy/brutal). */
+const FIELD_CHECK_TIER: Readonly<Record<FieldSeverity, (typeof HAZARD_DIFFICULTIES)[number]>> = {
+  light: "easy",
+  heavy: "hard",
+  brutal: "brutal",
+};
+
+/**
+ * D95: the ship's rooms, each with its machines by id and name: what a scripted impact may aim
+ * at. Rooms in deck order; a machine outside every room (none on the authored decks) is left out.
+ */
+function targetLines(state: State, content: ContentBundle): string[] {
+  const deckId = shipDeckOf(state);
+  const deck = Object.values(content.decks).find((d) => d.id === deckId);
+  if (deck === undefined) throw new Error(`capabilities: no deck def ${deckId}`);
+  const byRoom = new Map<string, string[]>();
+  const machines = Object.values(state.machines)
+    .filter((m) => m.deckId === deckId)
+    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+  for (const machine of machines) {
+    const room = machineCompartment(content, machine);
+    if (room === undefined) continue;
+    byRoom.set(room, [
+      ...(byRoom.get(room) ?? []),
+      `${machine.id} ${machineName(content, machine)}`,
+    ]);
+  }
+  return deck.compartments.map(
+    (c) => `  - "${c.name}": ${(byRoom.get(c.name) ?? []).join(", ") || "no machines"}`,
+  );
+}
+
+/** D95: the seventh lever, an asteroid field (D92, D93), from config and the ship's deck. */
+function fieldLever(state: State, content: ContentBundle, config: ConfigDef): string[] {
+  const f = config.field;
+  const severities = FIELD_SEVERITIES.map((severity) => {
+    const e = fieldExpectation(config, severity);
+    return `${severity} (~${Math.round(e.rocks)} rocks over ${seconds(e.seconds)}, ~${Math.round(e.hull)} hull points)`;
+  }).join(", ");
+  const tiers = FIELD_SEVERITIES.map((s) => `${s} as ${FIELD_CHECK_TIER[s]}`).join(", ");
+  const effects = SCRIPTED_EFFECTS.filter((e) => e !== "").join(" | ");
+  return [
+    "## 7. scheduleField: an asteroid field on the leg, rocks that hit the ship",
+    `- severity: ${severities}, as it comes. The helm threads it: a pilot at the helm takes fewer rocks (up to ${Math.round(f.helmThreading * 100)}% fewer at piloting 10), an empty helm ${f.unmannedRateFactor}x as many. Against a hull of ${state.hull.max}, brutal can sink the ship.`,
+    `- detection: rolled (whoever has the helm gets a piloting check ${seconds(f.warningSeconds)} before it, at the hazard tiers ${tiers}: pass, and they sight it, the ship goes on alert and braces; fail, or an empty helm, and nobody knows until the first rock) or unseen (no warning whatever the helm does: the first rock is the news).`,
+    "- window: the same three windows as scheduleHazard. The field begins at the first moment the ship is in transit at or after it and lies along the leg for its length; one that would begin after this leg's transit ends is dropped.",
+    `- The rocks are the sim's: they land anywhere on the deck with the same chance for every tile. A small rock hits one tile, a large one a 3x3; each costs the hull once (small ${f.hullDamage.small}, large ${f.hullDamage.large} points) and leaves a scar. Every machine under it rolls: glanced off, grazed, damaged (it runs derated), knocked out (stopped in one hit) or one of its own faults. Engines knocked out leave the ship stuck in the rocks, still being hit, until the engineers fix them or she drifts clear after ${f.stuckDriftImpacts} more rocks.`,
+    `- scripted: up to ${f.maxScripted} hits you choose, to tell a story (the galley stove out before dinner, the engine knocked out on a long leg, the hold holed with the cargo in it). Each has target (a machine id or a room name from the list below), at (${FIELD_MOMENTS.join(" | ")} in the field), rock (small | large, or empty for the severity's draw) and effect on the machines it hits (${effects}, or empty to roll). A scripted hit takes the place of a random one, so the field is no heavier for it. Never a person: nobody can be hurt yet, and a name from Crew is dropped. Scripted hits alone must leave the hull above zero (an empty rock is counted as large), or the field is dropped.`,
+    "- One field per leg, no budget; only while a course is set or the ship is under way with transit left (dropped while docked with no course, on approach or docking). The hull is in the digest; at zero the ship is lost and the game ends.",
+    "- What follows is the crew's: whoever sees damage reports it on the nearest intercom, the officer of the watch holds the bridge and sends someone to look, scars are patched underway with patch kits (half the damage back) and plated at a port that sells hull plating (the rest), and damaged machines are repaired. Nothing holds the ship in port for the hull; leaving with repairs unfinished is a story.",
+    "- Rooms and their machines (scripted targets):",
+    ...targetLines(state, content),
   ];
 }
 
@@ -131,7 +205,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly six levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly seven levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
   lines.push(
     "The ids below (ports, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -245,5 +319,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   }
   lines.push("");
   lines.push(...hazardLever(config));
+  lines.push("");
+  lines.push(...fieldLever(state, content, config));
   return lines.join("\n");
 }

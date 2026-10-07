@@ -75,6 +75,16 @@ describe("NarratorPlan structured-output schema", () => {
         { kind: "scheduleFault", machine: "m1", faultKey: "wornBearing", window: "later" },
         { kind: "scheduleHazard", hazard: "ionStorm", difficulty: "brutal", window: "soon" },
         {
+          kind: "scheduleField",
+          severity: "heavy",
+          detection: "unseen",
+          window: "later",
+          scripted: [
+            { target: "m21", at: "late", rock: "small", effect: "knockout" },
+            { target: "Galley", at: "early", rock: "", effect: "" },
+          ],
+        },
+        {
           kind: "surfaceDecision",
           title: "A stranger at the ramp",
           speaker: "",

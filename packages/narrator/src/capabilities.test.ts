@@ -1,6 +1,6 @@
-import { HAZARD_KINDS } from "@crew/sim";
+import { FIELD_SEVERITIES, HAZARD_KINDS } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { buildCapabilities } from "./capabilities";
+import { buildCapabilities, fieldExpectation } from "./capabilities";
 import { captainAshoreRequest, quietTooLongRequest } from "./fixtures";
 import { pathBetween, routeDistance } from "./lookups";
 import { content } from "./test-support";
@@ -58,7 +58,7 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the six narrator levers (D47 added stockMarket, D78 scheduleHazard)", () => {
+  it("names exactly the seven narrator levers (D47 added stockMarket, D78 scheduleHazard, D95 scheduleField)", () => {
     const levers = [...text.matchAll(/^## \d\. (\w+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
@@ -67,9 +67,10 @@ describe("buildCapabilities", () => {
       "surfaceDecision",
       "stockMarket",
       "scheduleHazard",
+      "scheduleField",
     ]);
-    expect(text).toContain("You have exactly six levers");
-    expect(text).not.toContain("five levers");
+    expect(text).toContain("You have exactly seven levers");
+    expect(text).not.toContain("six levers");
   });
 
   it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (D78)", () => {
@@ -93,6 +94,42 @@ describe("buildCapabilities", () => {
     );
     expect(text).toContain(`about ${Math.round(config.hazards.delaySeconds)}s lost on the leg`);
     expect(text).toContain("With nobody at the helm it is a scrape and a delay both.");
+  });
+
+  it("documents scheduleField: severities priced from config, detection, scripted hits, the guard, one per leg (D95)", () => {
+    const config = req.snapshot.config;
+    const lever = text.split("## 7. scheduleField")[1] ?? "";
+    expect(lever).toContain(": an asteroid field on the leg, rocks that hit the ship");
+    for (const severity of FIELD_SEVERITIES) {
+      const e = fieldExpectation(config, severity);
+      expect(lever).toContain(
+        `${severity} (~${Math.round(e.rocks)} rocks over ${e.seconds}s, ~${Math.round(e.hull)} hull points)`,
+      );
+    }
+    // The default config: 2/min over 90 s at a 10% large share of 3- and 8-point rocks.
+    expect(lever).toContain("light (~3 rocks over 90s, ~11 hull points)");
+    expect(lever).toContain(`check ${config.field.warningSeconds}s before it`);
+    expect(lever).toContain("unseen (no warning whatever the helm does");
+    expect(lever).toContain(`up to ${config.field.maxScripted} hits you choose`);
+    expect(lever).toContain("at (early | middle | late in the field)");
+    expect(lever).toContain("(none | graze | damage | knockout | fault, or empty to roll)");
+    expect(lever).toContain("Never a person: nobody can be hurt yet");
+    expect(lever).toContain("Scripted hits alone must leave the hull above zero");
+    expect(lever).toContain("One field per leg, no budget");
+    expect(lever).toContain("leaving with repairs unfinished is a story");
+    // The hazard lever says the two hazard kinds are one check and points fields at lever 7.
+    expect(text).toContain("debrisField and ionStorm are the same check");
+  });
+
+  it("lists every room aboard with its machines by id, as scripted targets (D95)", () => {
+    const lever = text.split("## 7. scheduleField")[1] ?? "";
+    const deckId = Object.keys(req.snapshot.state.deck.tiles)[0];
+    const deck = Object.values(content().decks).find((d) => d.id === deckId);
+    for (const room of deck?.compartments ?? []) expect(lever).toContain(`  - "${room.name}": `);
+    for (const machine of Object.values(req.snapshot.state.machines)) {
+      expect(lever).toMatch(new RegExp(`[:,] ${machine.id} `));
+    }
+    expect(lever).toContain('  - "Galley": ');
   });
 
   it("lists every port's character, legs and distance from the port the ship is heading for (§2.4)", () => {
@@ -148,13 +185,13 @@ describe("buildCapabilities", () => {
     expect(text).toContain("you never cause it");
   });
 
-  it("documents privateTalk as a card side effect, warm or stern, and keeps six levers (D86)", () => {
+  it("documents privateTalk as a card side effect, warm or stern, and not as a lever (D86)", () => {
     expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
     expect(text).toContain("the talk moves how they feel about the captain");
     expect(text).toContain("never the captain herself, a passenger or someone ashore");
-    expect(text).toContain("You have exactly six levers.");
-    expect(text.match(/^## \d\. /gm)).toHaveLength(6);
+    expect(text).toContain("You have exactly seven levers.");
+    expect(text.match(/^## \d\. /gm)).toHaveLength(7);
   });
 
   it("measures distance from the docked port when docked", () => {

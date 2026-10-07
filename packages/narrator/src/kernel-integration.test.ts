@@ -8,6 +8,7 @@ import {
   createKernel,
   createRegistry,
   registerCommerce,
+  registerField,
   registerTravel,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
@@ -199,5 +200,57 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
       { kind: "ionStorm", difficulty: bundle.config.hazards.difficulty.brutal },
     ]);
     expect(world.state.narrator.budget.hazardsRemaining).toBe(budget - 1);
+  });
+
+  it("accepts a translated scheduleField with scripted hits by name, and the field waits on the leg (D95)", () => {
+    const bundle = content();
+    const registry = createRegistry();
+    registerTravel(registry);
+    registerField(registry);
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(FIXTURE_SCENARIO, 7, bundle, {
+      values: bundle.config,
+      hash: bundle.hash,
+    });
+    const travel = world.state.travel;
+    if (travel.stage !== "docked") throw new Error("expected a new world to start docked");
+    world.state.travel = { ...travel, plannedDestinationId: "port.kessler_drift" as PortDefId };
+    const ctx: TranslationCtx = {
+      snapshot: kernel.serialize(world),
+      content: bundle,
+      hookTick: world.state.tick,
+      callId: "call-field",
+    };
+    const { commands, dropped } = translateIntents(
+      emptyPlan({
+        intents: [
+          {
+            kind: "scheduleField",
+            severity: "heavy",
+            detection: "unseen",
+            window: "soon",
+            scripted: [
+              { target: "Main Engine", at: "late", rock: "small", effect: "knockout" },
+              { target: "Galley", at: "early", rock: "", effect: "" },
+            ],
+          },
+        ] as unknown as NarratorPlan["intents"],
+      }),
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    const [command] = commands;
+    if (command === undefined) throw new Error("no command");
+    expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    kernel.advance(world, 2);
+    const field = world.state.field;
+    expect(field).toMatchObject({
+      severity: "heavy",
+      detection: "unseen",
+      phase: { kind: "scheduled" },
+    });
+    // Sorted by the second they land: the galley early, the engine late.
+    expect(field?.scripted.map((s) => s.target.kind)).toEqual(["compartment", "machine"]);
+    expect(field?.scripted[1]).toMatchObject({ rock: "small", effect: "knockout" });
   });
 });
