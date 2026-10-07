@@ -67,6 +67,27 @@ export function placePhrase(
   return name === undefined ? "" : ` in ${name}`;
 }
 
+/**
+ * D95: the ship's deck: the one deck with tiles in state (the sim's `shipDeckId`, which hosts do
+ * not import). A snapshot with none or several is broken, so it throws.
+ */
+export function shipDeckOf(state: State): string {
+  const ids = Object.keys(state.deck.tiles);
+  const [only] = ids;
+  if (only === undefined || ids.length !== 1) {
+    throw new Error(`expected exactly one ship deck in state, found ${ids.length}`);
+  }
+  return only;
+}
+
+/** D95: a compartment's name by its instance id (from its deck's def), or the id when unknown. */
+export function compartmentName(content: ContentBundle, state: State, id: string): string {
+  const compartment = state.compartments[id as keyof State["compartments"]];
+  if (compartment === undefined) return id;
+  const deck = Object.values(content.decks).find((d) => d.id === compartment.deckId);
+  return deck?.compartments.find((c) => c.key === compartment.key)?.name ?? id;
+}
+
 export function machineCompartment(
   content: ContentBundle,
   machine: DeepReadonly<Machine>,

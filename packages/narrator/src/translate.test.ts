@@ -1348,3 +1348,209 @@ describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
     for (const drop of result.dropped) expect(drop.reason).toContain("scheduleHazard: invalid");
   });
 });
+
+describe("translateIntents: scheduleField, the seventh lever (D95)", () => {
+  const field = {
+    kind: "scheduleField",
+    severity: "heavy",
+    detection: "rolled",
+    window: "soon",
+    scripted: [] as unknown[],
+  };
+  const hit = (target: string, at = "middle", rock = "", effect = "") => ({
+    target,
+    at,
+    rock,
+    effect,
+  });
+
+  /** In transit with `secondsLeft` of the leg to run at nominal speed. */
+  function inTransit(secondsLeft: number): NarratorRequest {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const travel = snapshot.state.travel;
+    if (travel.stage === "docked") throw new Error("fixture: expected the ship under way");
+    const speed = snapshot.config.travel.nominalSpeed;
+    snapshot.state.travel = {
+      ...travel,
+      routeDistance: 400,
+      routeProgress: 400 - secondsLeft * speed,
+    };
+    return { ...req, snapshot };
+  }
+
+  function machineIdOf(req: NarratorRequest, defId: string): string {
+    const machine = Object.values(req.snapshot.state.machines).find((m) => m.defId === defId);
+    if (machine === undefined) throw new Error(`fixture: no ${defId}`);
+    return machine.id;
+  }
+
+  function onlyDrop(req: NarratorRequest, intent: object): string | undefined {
+    const result = translateIntents(plan([intent]), ctxOf(req));
+    expect(result.commands).toEqual([]);
+    return result.dropped[0]?.reason;
+  }
+
+  it("translates severity, detection, the window and scripted hits by machine id, machine name and room name", () => {
+    const req = inTransit(200);
+    const engine = machineIdOf(req, "machine.engine");
+    const stove = machineIdOf(req, "machine.galley_stove");
+    const result = translateIntents(
+      plan([
+        {
+          ...field,
+          detection: "unseen",
+          scripted: [
+            hit(engine, "late", "small", "knockout"),
+            hit("galley stove", "early", "", "damage"),
+            hit("Cargo Hold", "middle", "large", ""),
+          ],
+        },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.dropped).toEqual([]);
+    const [command] = result.commands;
+    if (command?.kind !== "scheduleField") throw new Error("no field");
+    const config = req.snapshot.config;
+    const length = config.field.severities.heavy.lengthSeconds;
+    expect(command.source).toBe("narrator");
+    expect(command.payload.severity).toBe("heavy");
+    expect(command.payload.detection).toBe("unseen");
+    const third = (config.narrator.maxFaultWindowSeconds / 3) * config.time.tickRate;
+    expect(command.payload.windowTicks).toEqual([0, Math.round(third)]);
+    const hold = Object.values(req.snapshot.state.compartments).find((c) => c.key === "cargoHold");
+    expect(hold).toBeDefined();
+    expect(command.payload.scripted).toEqual([
+      {
+        atSeconds: Math.round(length * 0.85),
+        target: { kind: "machine", machineId: engine },
+        rock: "small",
+        effect: "knockout",
+      },
+      {
+        atSeconds: Math.round(length * 0.15),
+        target: { kind: "machine", machineId: stove },
+        effect: "damage",
+      },
+      {
+        atSeconds: Math.round(length * 0.5),
+        target: { kind: "compartment", compartmentId: hold?.id },
+        rock: "large",
+      },
+    ]);
+  });
+
+  it("spaces scripted hits at the same moment a few seconds apart, inside the field", () => {
+    const req = inTransit(200);
+    const late = [hit("Galley", "late"), hit("Galley", "late"), hit("Galley", "late")];
+    const result = translateIntents(
+      plan([{ ...field, severity: "light", scripted: late }]),
+      ctxOf(req),
+    );
+    const [command] = result.commands;
+    if (command?.kind !== "scheduleField") throw new Error("no field");
+    const length = req.snapshot.config.field.severities.light.lengthSeconds;
+    const first = Math.round(length * 0.85);
+    expect(command.payload.scripted.map((s) => s.atSeconds)).toEqual([first, first + 4, first + 8]);
+    for (const s of command.payload.scripted) expect(s.atSeconds).toBeLessThan(length);
+  });
+
+  it("drops an unknown target, an ambiguous machine name and a person, each with its reason", () => {
+    const req = inTransit(200);
+    expect(onlyDrop(req, { ...field, scripted: [hit("Reactor Nine")] })).toBe(
+      'scheduleField: scripted[0]: no machine or room "Reactor Nine" aboard; use an id or room name from What you can do',
+    );
+    const bunks = Object.values(req.snapshot.state.machines)
+      .filter((m) => m.defId === "machine.bunk")
+      .map((m) => m.id);
+    expect(bunks.length).toBeGreaterThan(1);
+    expect(onlyDrop(req, { ...field, scripted: [hit("Galley"), hit("Bunk")] })).toBe(
+      `scheduleField: scripted[1]: ${bunks.length} machines aboard are called "Bunk"; use the machine id (${bunks.join(", ")})`,
+    );
+    expect(onlyDrop(req, { ...field, scripted: [hit("Jax Okonkwo")] })).toBe(
+      'scheduleField: scripted[0]: "Jax Okonkwo" is a person: people are not targets until bodies; aim at a machine or a room',
+    );
+  });
+
+  it("drops a fourth scripted impact", () => {
+    const req = inTransit(200);
+    const four = [hit("Galley"), hit("Cargo Hold"), hit("Bridge"), hit("Gym")];
+    expect(onlyDrop(req, { ...field, scripted: four })).toBe(
+      `scheduleField: at most ${req.snapshot.config.field.maxScripted} scripted impacts, got 4`,
+    );
+  });
+
+  it("drops a window after this leg's transit, a docked ship with no course, and the approach", () => {
+    expect(onlyDrop(inTransit(10), { ...field, window: "later" })).toBe(
+      "scheduleField: window later opens after this leg's transit ends (~10s left); use soon, or place it on the next leg",
+    );
+    expect(onlyDrop(docked(approachRequest(content())), field)).toBe(
+      "scheduleField: the ship is docked with no course set; a field needs a leg to lie on",
+    );
+    expect(onlyDrop(approachRequest(content()), field)).toBe(
+      "scheduleField: the ship is approaching: this leg's transit is over; place it on the next leg once a course is set",
+    );
+  });
+
+  it("allows one field per leg: none on top of the leg's field, and only one per call", () => {
+    const req = inTransit(200);
+    const two = translateIntents(plan([field, { ...field, severity: "light" }]), ctxOf(req));
+    expect(two.commands.map((c) => c.kind)).toEqual(["scheduleField"]);
+    expect(two.dropped.map((d) => d.reason)).toEqual([
+      "scheduleField: this leg already has its field (one per leg); place the next on a later leg",
+    ]);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.field = {
+      id: "f1" as never,
+      severity: "light",
+      detection: "rolled",
+      startsAtTick: snapshot.state.tick + 100,
+      phase: { kind: "scheduled" },
+      impacts: 0,
+      stuckImpacts: 0,
+      hullLost: 0,
+      scripted: [],
+    };
+    expect(onlyDrop({ ...req, snapshot }, field)).toContain("this leg already has its field");
+  });
+
+  it("drops scripted hits that alone would sink the ship, pricing an unsized rock as large", () => {
+    const req = inTransit(200);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.hull = { ...snapshot.state.hull, integrity: 20 };
+    const weak = { ...req, snapshot };
+    const { small, large } = snapshot.config.field.hullDamage;
+    expect(3 * large).toBeGreaterThanOrEqual(20);
+    expect(3 * small).toBeLessThan(20);
+    const three = [hit("Galley"), hit("Cargo Hold"), hit("Gym")];
+    expect(onlyDrop(weak, { ...field, scripted: three })).toBe(
+      `scheduleField: scripted impacts alone would sink the ship (${3 * large} hull points against 20 left); script fewer or smaller rocks`,
+    );
+    const smaller = three.map((h) => ({ ...h, rock: "small" }));
+    const accepted = translateIntents(plan([{ ...field, scripted: smaller }]), ctxOf(weak));
+    expect(accepted.dropped).toEqual([]);
+  });
+
+  it("drops any field once the ship is lost", () => {
+    const req = inTransit(200);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.hull = { ...snapshot.state.hull, integrity: 0, lostAtTick: snapshot.state.tick };
+    expect(onlyDrop({ ...req, snapshot }, field)).toBe("scheduleField: the ship is lost");
+  });
+
+  it("drops an unknown severity, moment or effect at the schema", () => {
+    const req = inTransit(200);
+    const result = translateIntents(
+      plan([
+        { ...field, severity: "apocalyptic" },
+        { ...field, scripted: [hit("Galley", "whenever")] },
+        { ...field, scripted: [hit("Galley", "early", "", "vaporise")] },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.commands).toEqual([]);
+    expect(result.dropped).toHaveLength(3);
+    for (const drop of result.dropped) expect(drop.reason).toContain("scheduleField: invalid");
+  });
+});

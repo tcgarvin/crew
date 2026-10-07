@@ -349,10 +349,21 @@ describe("crew beats arguments", () => {
   it("defaults to three days, seed 1, both scenarios", () => {
     expect(parseBeatsArgs([])).toEqual({
       days: 3,
-      seed: 1,
+      seeds: [1],
       scenarios: ["plain", "freight"],
+      fields: "cycle",
       json: false,
     });
+  });
+
+  it("takes a seed range and a field plan (D95)", () => {
+    expect(parseBeatsArgs(["--seeds", "1-5", "--fields", "brutal"])).toMatchObject({
+      seeds: [1, 2, 3, 4, 5],
+      fields: "brutal",
+    });
+    expect(parseBeatsArgs(["--seed", "7"])).toMatchObject({ seeds: [7] });
+    expect(parseBeatsArgs(["--seeds", "5-1"])).toHaveProperty("error");
+    expect(parseBeatsArgs(["--fields", "apocalyptic"])).toHaveProperty("error");
   });
 
   it("refuses part days and unknown options", () => {
@@ -366,7 +377,7 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
   // One run for both pins below (a ship's day of the real game takes a while).
   let day: ReturnType<typeof runBeats> | undefined;
   const oneDay = () => {
-    day ??= runBeats({ scenario: "freight", days: 1, seed: 1 });
+    day ??= runBeats({ scenario: "freight", days: 1, seed: 1, fields: "none" });
     return day;
   };
 
@@ -381,7 +392,8 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
       expect(sum).toBeCloseTo(1);
     }
     const report = formatBeatsReport([result]);
-    expect(report).toContain("# Beats: 1 day, 3 watches of 400 s");
+    expect(report).toContain("# Beats: 1 day, 3 watches of 400 s (seed 1,");
+    expect(report).toContain("Fields: none scheduled (--fields none).");
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
     // D81/D83: the cook serves a meal before each bell, so a day is three meals, none missed.
     expect(result.beats.mealsServed).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
