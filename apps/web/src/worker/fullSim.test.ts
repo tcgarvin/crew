@@ -287,6 +287,12 @@ describe(
       );
       expect(gaveUp).toEqual([]);
       expect(log.hooks.filter((h) => h === "stageDock").length).toBeGreaterThanOrEqual(2);
+
+      // Slice 5: with no field scheduled the game is unchanged: no rock, no scar, no alert.
+      expect(count(log, "asteroidImpact")).toBe(0);
+      expect(count(log, "alertRaised")).toBe(0);
+      expect(world.state.hull.scars).toEqual([]);
+      expect(world.state.hull.integrity).toBe(world.state.hull.max);
     }, 60_000);
 
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {

@@ -1,8 +1,8 @@
 /**
  * Tap-to-select (D68): what a tap at a deck-frame point selects in the picture as drawn. People
  * first, crew and the dock's locals alike, the nearest within reach; then the ship's items, the
- * staging call's props, machines, bare deck floor (its room, D82), and last a dock post or bare
- * dock floor. A person standing at a post is what a tap there means, so the post never takes the
+ * staging call's props, machines, a hull scar (D93), bare deck floor (its room, D82), and last a
+ * dock post or bare dock floor. A person standing at a post is what a tap there means, so the post never takes the
  * tap from them.
  */
 import type { DockDef, RenderFrame } from "@crew/sim";
@@ -11,6 +11,7 @@ import { berthInView, isShipTile } from "./dock";
 import { dockTargetAt } from "./dockHit";
 import { type DrawSelection, deckPiles } from "./draw";
 import { dockPropKey } from "./locals";
+import { scarAt } from "./scars";
 
 /** How close to a person's dot a tap must land, tiles. */
 export const PERSON_HIT_RADIUS_TILES = 0.8;
@@ -111,6 +112,8 @@ export function pickAt(
   if (prop !== undefined) return { kind: "dockProp", id: prop.key };
   const machine = machineAt(shown, layout, x, y);
   if (machine !== undefined) return machine;
+  const scar = isShipTile(layout, x, y) ? scarAt(shown.hull.scars, x, y) : undefined;
+  if (scar !== undefined) return { kind: "scar", id: scar.id };
   const room = roomAt(layout, x, y);
   if (room !== undefined) return room;
   return dock === undefined

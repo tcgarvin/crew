@@ -22,6 +22,7 @@ import type { DockTarget } from "./dockHit";
 import { dockShape, dockSurface } from "./dockShape";
 import { type GrimePaint, drawGrime } from "./grime";
 import { type Bounds, type HullGeometry, drawHull, drawPlume } from "./hull";
+import { type Flash, drawImpactFlashes } from "./impacts";
 import {
   type Box,
   LABEL_COSTS,
@@ -35,6 +36,8 @@ import {
 } from "./labels";
 import { drawDockProps, drawLocalDots, drawLocalTrolleys, localLabelText } from "./locals";
 import { drawRamps } from "./ramps";
+import { type RockPaint, drawRockLayer } from "./rocks";
+import { drawScars } from "./scars";
 import type { Scene } from "./scene";
 import {
   type SceneryFrame,
@@ -845,6 +848,13 @@ export interface Scenery {
    * frame arrives, which draws the deck clean.
    */
   readonly grime?: GrimePaint;
+  /**
+   * D92: the asteroid field's rock layers, absent while no field is near or fading out (the
+   * canvas's `RockFade` is at zero).
+   */
+  readonly rocks?: RockPaint;
+  /** D92: impact flashes under way (`ImpactFlashes.active`); absent or empty with none. */
+  readonly flashes?: readonly Flash[];
 }
 
 /**
@@ -855,6 +865,8 @@ export interface Scenery {
 export type DrawSelection =
   | { readonly kind: "actor" | "machine" | "item"; readonly id: string }
   | { readonly kind: "room"; readonly id: string }
+  /** D93: a hull scar, by scar id. */
+  | { readonly kind: "scar"; readonly id: string }
   | { readonly kind: "local"; readonly id: string }
   | { readonly kind: "dockProp"; readonly id: string }
   | DockTarget;
@@ -887,9 +899,9 @@ function inTileSpace(ctx: CanvasRenderingContext2D, t: ViewTransform, draw: () =
 }
 
 /**
- * One canvas frame, back to front (dockside §2.3): sky, stars, far scenery, the dock map (or the
- * stand-in berth), plume and hull, the deck (rooms, walls, ramps, doors, machines), the
- * foreground; then, upright in screen space, labels, items and people, those on the dock moved
+ * One canvas frame, back to front (dockside §2.3): sky, stars, the far rocks (D92), far scenery,
+ * the dock map (or the stand-in berth), plume and hull, the deck (rooms, walls, ramps, doors,
+ * machines, hull scars and impact flashes), the foreground and the near rocks; then, upright in screen space, labels, items and people, those on the dock moved
  * with it while it slides (`withDockSlide`). The portrait rotation applies to every layer.
  */
 export function drawFrame(
@@ -928,14 +940,10 @@ export function drawFrame(
     ctx.rotate(-Math.PI / 2);
   }
   inTileSpace(ctx, t, () => drawSky(ctx, scene, sceneryFrame));
-  drawStars(
-    ctx,
-    scenery.stars,
-    { x: 0, y: 0, width: fitW, height: fitH },
-    scenery.starScrollPx,
-    scene.starSpeed,
-    scene.starAlpha,
-  );
+  const fitArea = { x: 0, y: 0, width: fitW, height: fitH };
+  const { rocks } = scenery;
+  drawStars(ctx, scenery.stars, fitArea, scenery.starScrollPx, scene.starSpeed, scene.starAlpha);
+  if (rocks !== undefined) drawRockLayer(ctx, rocks.field.far, fitArea, t.scale, rocks);
   const berth = dock === undefined ? undefined : berthInView(dock, layout);
   const dockPaint: DockPaint | undefined =
     berth === undefined
@@ -975,11 +983,16 @@ export function drawFrame(
   drawDoors(ctx, t, layout, frame);
   drawMachines(ctx, t, layout, frame, selectedIdOf(selected, "machine"));
   inTileSpace(ctx, t, () => {
+    // D93: scars on the grime layer's terms (over the floor, under the people), after the
+    // machines so a hit machine shows its wound; the flash over both.
+    drawScars(ctx, frame.hull.scars, sceneryFrame.px, selectedIdOf(selected, "scar"));
+    drawImpactFlashes(ctx, scenery.flashes ?? [], sceneryFrame.px);
     if (dock !== undefined && dockPaint !== undefined) {
       drawDockForeground(ctx, dock, dockPaint, hull.bounds, sceneryFrame.view);
     }
     drawForeground(ctx, scene, sceneryFrame, dock === undefined);
   });
+  if (rocks !== undefined) drawRockLayer(ctx, rocks.field.near, fitArea, t.scale, rocks);
   ctx.restore();
 
   // Everything with text (and the dots and crates that text and badges sit on) is drawn after

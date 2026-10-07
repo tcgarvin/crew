@@ -12,6 +12,8 @@ import type {
   RenderActor,
   RenderFrame,
   RenderLocal,
+  RenderScar,
+  ScarId,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";
@@ -80,6 +82,7 @@ function bareFloor(key: string): { x: number; y: number } {
 
 function frame(
   parts: Partial<Pick<RenderFrame, "actors" | "locals" | "items" | "dockProps" | "machines">>,
+  scars: readonly RenderScar[] = [],
 ) {
   return {
     actors: [],
@@ -87,6 +90,7 @@ function frame(
     items: [],
     dockProps: [],
     machines: [],
+    hull: { integrity: 100, max: 100, scars, lost: false },
     ...parts,
   } as unknown as RenderFrame;
 }
@@ -190,6 +194,29 @@ describe("pickAt", () => {
     });
     const shown = frame({ machines, actors: [crew(x, y)] });
     expect(pickAt(shown, layout, dock, 0, x, y)?.kind).toBe("actor");
+  });
+
+  it("picks a hull scar over the room's floor, and a person over the scar (D93)", () => {
+    const galley = deck.compartments.find((c) => c.tags.includes("galley"));
+    if (galley === undefined) throw new Error("the deck has a galley");
+    const floor = bareFloor(galley.key);
+    const scar: RenderScar = {
+      id: "r1" as ScarId,
+      x: Math.floor(floor.x),
+      y: Math.floor(floor.y),
+      patched: false,
+      rock: "small",
+    };
+    expect(pickAt(frame({}, [scar]), layout, dock, 0, floor.x + 0.3, floor.y - 0.3)).toEqual({
+      kind: "scar",
+      id: "r1",
+    });
+    // The next tile over is floor again.
+    expect(pickAt(frame({}, [scar]), layout, undefined, 0, floor.x + 1, floor.y)?.kind).not.toBe(
+      "scar",
+    );
+    const shown = frame({ actors: [crew(floor.x, floor.y)] }, [scar]);
+    expect(pickAt(shown, layout, dock, 0, floor.x, floor.y)?.kind).toBe("actor");
   });
 
   it("selects no room off the ship or on void", () => {

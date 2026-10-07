@@ -34,6 +34,13 @@ describe("worker registry + real content", () => {
     const snapshot = toAgentViewSnapshot(view);
     expect(snapshot.self.id).toBe(first);
     expect(structuredClone(snapshot)).toEqual(snapshot);
+
+    // D92/D93: the frame the canvas and the top bar read: a whole hull, no alert, no rocks.
+    const frame = kernel.getRenderFrame(world);
+    expect(frame.hull).toEqual({ integrity: 100, max: 100, scars: [], lost: false });
+    expect(frame.alert).toBe(false);
+    expect(frame.field).toBeUndefined();
+    expect(frame.impacts).toEqual([]);
   });
 
   it("registers the watch: the inspector reads each person's section, and the bell rings at the end of the watch (D77)", () => {
