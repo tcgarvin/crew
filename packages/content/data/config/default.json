@@ -406,7 +406,7 @@
         "lengthSeconds": 135
       },
       "brutal": {
-        "impactsPerMinute": 6,
+        "impactsPerMinute": 4.5,
         "largeShare": 0.4,
         "lengthSeconds": 180
       }
