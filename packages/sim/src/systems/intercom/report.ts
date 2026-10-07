@@ -23,8 +23,8 @@ import { isMachineBlocked } from "../equipment/equipment";
 import { emitSim } from "../work/events";
 import { directSight, writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
-import { isPanel } from "./plans";
 import type { StepResult } from "../work/steps";
+import { isPanel } from "./plans";
 
 /** The problem kinds a report carries (the planner's `REPORTED_PROBLEM_KINDS`). */
 const REPORTED: ReadonlySet<ProblemKind> = new Set<ProblemKind>([

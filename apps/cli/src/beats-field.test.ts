@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBeatsReport, runBeats } from "./beats";
+import { formatBeatsReport, runBeatsAsync } from "./beats";
 import { FieldTally, fieldSection } from "./beats-field";
 
 const TICK_RATE = 20;
@@ -104,8 +104,9 @@ describe("the field tally (D95)", () => {
 });
 
 describe("crew beats with fields: one ship's day with a heavy field a leg (real content)", () => {
-  it("schedules a field on each leg's transit and prints the field section", () => {
-    const result = runBeats({ scenario: "freight", days: 1, seed: 1, fields: "heavy" });
+  it("schedules a field on each leg's transit and prints the field section", async () => {
+    // Yields between chunks so the worker's RPC is answered (`yielding.ts`).
+    const result = await runBeatsAsync({ scenario: "freight", days: 1, seed: 1, fields: "heavy" });
     expect(result.field.plan).toBe("heavy");
     expect(result.field.fields.length).toBeGreaterThanOrEqual(1);
     for (const field of result.field.fields) expect(field.severity).toBe("heavy");

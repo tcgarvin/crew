@@ -83,6 +83,7 @@ import {
   shortestPath,
   travelTaskDerivations,
 } from "@crew/sim";
+import { type ChunkedRun, drain, drainAsync } from "./yielding";
 
 export const HUB_PORT_ID = "port.crossroads_hub" as PortDefId;
 export const FAR_PORT_ID = "port.ossory_station" as PortDefId;
@@ -354,6 +355,18 @@ function countByKind(
  * simulated, so the result is reproducible and the test can assert on it.
  */
 export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult {
+  return drain(pacingRun(options, kernel));
+}
+
+/** `runPacing`, letting the event loop run between chunks (for tests; see `yielding.ts`). */
+export function runPacingAsync(options: PacingOptions, kernel?: Kernel): Promise<PacingResult> {
+  return drainAsync(pacingRun(options, kernel));
+}
+
+/** Host loop iterations between yields: 50 s of simulated wall clock. */
+const LOOPS_PER_CHUNK = 1_000;
+
+function* pacingRun(options: PacingOptions, kernel?: Kernel): ChunkedRun<PacingResult> {
   const { bundle, config, scenarioId } = loadPacingContent();
   const k = kernel ?? createKernel(createPacingRegistry());
   const world = k.createWorld(scenarioId, options.seed, bundle, config);
@@ -546,10 +559,13 @@ export function runPacing(options: PacingOptions, kernel?: Kernel): PacingResult
     if (pendingCall !== undefined) pendingCall.stallMs += shortfallMs;
   }
 
+  let loops = 0;
   while (!(simDone && viewTick >= world.state.tick)) {
     hostLoop();
     viewerLoop();
     wallMs += LOOP_INTERVAL_MS;
+    loops += 1;
+    if (loops % LOOPS_PER_CHUNK === 0) yield;
     if (world.state.tick > MAX_SIM_TICKS) {
       throw new Error(
         `pacing run did not complete within ${MAX_SIM_TICKS / tickRate} sim-seconds (at ${describeLeg(world)}, ${legs.length} legs, job ${script.jobStatus(world) ?? "none"})`,

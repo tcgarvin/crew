@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     name: "@crew/server",
     environment: "node",
+    setupFiles: ["../../vitest.setup.ts"],
     include: ["src/**/*.test.ts"],
   },
 });

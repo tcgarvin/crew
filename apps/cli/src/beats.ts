@@ -71,6 +71,7 @@ import {
   createPacingRegistry,
   loadPacingContent,
 } from "./pacing";
+import { type ChunkedRun, drain, drainAsync } from "./yielding";
 
 // ---------------------------------------------------------------------------------------------
 // What is counted
@@ -959,6 +960,18 @@ function rivalriesAtEnd(world: World): string[] {
 
 /** Run `days` ship's days of the pacing voyage and tally its beats. Deterministic per seed. */
 export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
+  return drain(beatsRun(options, kernel));
+}
+
+/** `runBeats`, letting the event loop run between chunks (for tests; see `yielding.ts`). */
+export function runBeatsAsync(options: BeatsOptions, kernel?: Kernel): Promise<BeatsResult> {
+  return drainAsync(beatsRun(options, kernel));
+}
+
+/** Advances between yields: 100 sim seconds at 20 Hz. */
+const ADVANCES_PER_CHUNK = 200;
+
+function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResult> {
   if (!Number.isInteger(options.days) || options.days <= 0) {
     throw new RangeError(`runBeats: days must be a positive integer, got ${options.days}`);
   }
@@ -1000,7 +1013,10 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
   const affinityByDay: AffinitySpread[] = [];
   const wear = new WearTally(world);
 
+  let advances = 0;
   while (world.state.tick < endTick) {
+    advances += 1;
+    if (advances % ADVANCES_PER_CHUNK === 0) yield;
     const before = world.state.tick;
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
