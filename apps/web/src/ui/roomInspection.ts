@@ -2,7 +2,7 @@
  * D82 (ship-life slice 3 call 15): the inspector's view of a room, from a tap on its bare floor.
  * Read from the snapshot at the view tick, as the machine inspector is, so it agrees with the tint
  * on screen and never shows the run-ahead state (D14): the room's name, its tier, how dirty its
- * floor is on average and at the worst spot, and who is mopping it.
+ * floor is on average and at the worst spot, who is mopping it, and (D93) its hull scars.
  */
 import {
   type ActorId,
@@ -14,6 +14,7 @@ import {
 } from "@crew/sim";
 import type { DeckLayout } from "../render/deckLayout";
 import type { PlaceInspection } from "./placeInspection";
+import { roomScarsLine } from "./scarInspection";
 
 /** Someone holding the room's cleaning task, and what their label says they are doing. */
 export interface RoomMopper {
@@ -90,9 +91,12 @@ export function inspectRoom(
   const tier = state.dirt.tiers[key as LocalKey] ?? "clean";
   const grime = `Floor ${percent(sum / indexes.length)}% dirty on average, ${percent(worst)}% at the worst spot.`;
   const moppers = roomMoppers(state, layout, key);
-  return {
-    title: name,
-    subtitle: tier,
-    text: moppers.length === 0 ? grime : `${grime} ${mopperWords(moppers)}`,
-  };
+  const compartment = Object.values(state.compartments).find(
+    (c) => c.deckId === layout.deckId && c.key === key,
+  );
+  const scars = compartment === undefined ? undefined : roomScarsLine(state, compartment.id);
+  const words = [grime];
+  if (moppers.length > 0) words.push(mopperWords(moppers));
+  if (scars !== undefined) words.push(scars);
+  return { title: name, subtitle: tier, text: words.join(" ") };
 }

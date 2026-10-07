@@ -37,7 +37,7 @@ const LAYERS = [
 ] as const;
 
 /** A 32-bit integer hash (lowbias32), so the field is the same on every load. */
-function hash(n: number): number {
+export function hash(n: number): number {
   let x = n | 0;
   x ^= x >>> 16;
   x = Math.imul(x, 0x7feb352d);

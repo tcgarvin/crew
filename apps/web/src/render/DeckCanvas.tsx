@@ -36,7 +36,9 @@ import {
 } from "./draw";
 import type { GrimeTint } from "./grime";
 import { engineOutput, hullGeometry } from "./hull";
+import { ImpactFlashes } from "./impacts";
 import { pickAt } from "./pick";
+import { RockFade, buildRockField, rockScrollSpeed } from "./rocks";
 import { sceneAt, withDockSky } from "./scene";
 import type { ViewTransform } from "./screen";
 import { StarScroll, buildStarField } from "./stars";
@@ -97,6 +99,12 @@ export function DeckCanvas({
   const hull = useMemo(() => hullGeometry(layout), [layout]);
   const stars = useMemo(() => buildStarField(), []);
   const scrollRef = useRef(new StarScroll());
+  /** D92: the asteroid field's rocks, their own scroll (still while stuck), fade and flashes. */
+  const rockField = useMemo(() => buildRockField(), []);
+  const rockScrollRef = useRef(new StarScroll());
+  const rockFadeRef = useRef(new RockFade());
+  const flashesRef = useRef(new ImpactFlashes());
+  const flashCountRef = useRef(0);
   /** Bumped whenever the picture must be redrawn even if nothing is animating. */
   const dirtyRef = useRef(true);
   const latest = useRef({ frame, dirt, selected, paused });
@@ -161,7 +169,28 @@ export function DeckCanvas({
         const plume = scene.plume * engineOutput(current, layout);
         const flickering = !still && !reducedMotion && plume > 0.01;
         scrollRef.current.advance(delta, still ? 0 : scene.starSpeed);
-        if (streaming || flickering || dirtyRef.current) {
+        // D92: the rocks stream with the stars but hold still while the ship is stuck; their fade
+        // and the impact flashes run on real time, held while paused.
+        const field = current.field;
+        const running = still ? 0 : delta;
+        rockScrollRef.current.advance(delta, rockScrollSpeed(field, scene.starSpeed, still));
+        const fade = rockFadeRef.current;
+        const alphaBefore = fade.alpha;
+        fade.advance(running, field);
+        const flashes = flashesRef.current;
+        flashes.advance(running);
+        flashes.note(current.impacts, current.tick);
+        const flashing = flashes.active();
+        // One more draw after the last flash ends, to clear it.
+        const flashesChanged = flashing.length > 0 || flashCountRef.current > 0;
+        flashCountRef.current = flashing.length;
+        if (
+          streaming ||
+          flickering ||
+          dirtyRef.current ||
+          fade.alpha !== alphaBefore ||
+          flashesChanged
+        ) {
           dirtyRef.current = false;
           const { width, height } = sizeRef.current;
           const transform = computeFitTransform(
@@ -196,6 +225,17 @@ export function DeckCanvas({
               dock,
               clamps: clampEngagement(current.travel),
               ...(grime === undefined ? {} : { grime: { dirt: grime, tint: grimeTint } }),
+              ...(fade.alpha <= 0
+                ? {}
+                : {
+                    rocks: {
+                      field: rockField,
+                      scrollPx: rockScrollRef.current.offsetPx,
+                      alpha: fade.alpha,
+                      severity: fade.severity,
+                    },
+                  }),
+              flashes: flashing,
             },
             chosen,
           );
@@ -208,7 +248,7 @@ export function DeckCanvas({
       cancelAnimationFrame(raf);
       media.removeEventListener("change", onMotionChange);
     };
-  }, [layout, ports, docks, hull, stars, grimeTint]);
+  }, [layout, ports, docks, hull, stars, rockField, grimeTint]);
 
   const handlePointer = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
