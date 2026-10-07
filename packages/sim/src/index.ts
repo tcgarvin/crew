@@ -35,6 +35,9 @@ export { dirtTaskDerivations, dirtViolations, registerDirt } from "./systems/dir
 export { registerRecreation } from "./systems/recreation/index";
 export { registerSocial } from "./systems/social/index";
 export { registerCabins } from "./systems/cabins/index";
+export { registerField, scriptedHullDamage } from "./systems/field/index";
+export { damageTaskDerivations, registerDamage } from "./systems/damage/index";
+export { registerIntercom } from "./systems/intercom/index";
 export { interestScore } from "./core/interests";
 export { affinitiesFrom, affinityOf, compatibility } from "./core/social";
 export {

@@ -24,6 +24,11 @@ stations (ship life §6). The nav terminal, ops terminal, vid screen and enginee
 a little `domestic` power. The off-watch furniture placed in slice 1 is used from slice 4 (D84):
 see "Off watch" below the map.
 
+Intercoms (slice 5, D94): one `machine.intercom` per compartment, sixteen, each on a free tile
+against a wall with its `panel` position on the room's floor, off every spawn point, zone and
+interaction tile. A report at a panel reaches everyone aboard. The default scenario stows two
+patch kits in each of the twelve bunk lockers (D93). The hull bar is 100 (`hull.max`).
+
 ```
 Freighter Mk2 (deck.freighter_mk2)
 36 x 20 tiles
@@ -88,7 +93,7 @@ Doors (19):
   personnel_ramp: (34,19) side s, ramp, closed, power=main
   cargo_ramp: (13,19) side s, ramp, closed, power=main
 
-Machines (33):
+Machines (49):
   helm_1: machine.helm @ (34,2) rot=0
   nav_terminal_1: machine.nav_terminal @ (34,0) rot=0
   ops_terminal_1: machine.ops_terminal @ (34,5) rot=0
@@ -122,6 +127,22 @@ Machines (33):
   galley_stove_1: machine.galley_stove @ (21,8) rot=0
   exercise_rig_1: machine.exercise_rig @ (25,15) rot=0
   cargo_crane_1: machine.cargo_crane @ (15,18) rot=0
+  intercom_bridge: machine.intercom @ (28,0) rot=0
+  intercom_captains_cabin: machine.intercom @ (27,0) rot=0
+  intercom_officers_cabin: machine.intercom @ (24,0) rot=0
+  intercom_passenger_cabin: machine.intercom @ (19,5) rot=180
+  intercom_bunkroom: machine.intercom @ (13,5) rot=180
+  intercom_lounge: machine.intercom @ (12,5) rot=180
+  intercom_engineering: machine.intercom @ (5,0) rot=0
+  intercom_corridor: machine.intercom @ (35,6) rot=0
+  intercom_cross_passage: machine.intercom @ (31,19) rot=180
+  intercom_infirmary: machine.intercom @ (35,13) rot=180
+  intercom_airlock: machine.intercom @ (35,14) rot=0
+  intercom_mess: machine.intercom @ (29,13) rot=180
+  intercom_galley: machine.intercom @ (20,8) rot=0
+  intercom_stores: machine.intercom @ (23,19) rot=180
+  intercom_gym: machine.intercom @ (24,14) rot=0
+  intercom_cargo_hold: machine.intercom @ (6,8) rot=0
 ```
 
 ## Off watch

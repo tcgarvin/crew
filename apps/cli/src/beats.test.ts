@@ -2,6 +2,7 @@ import { loadBundle } from "@crew/content";
 import { describe, expect, it } from "vitest";
 import {
   type BeatEvent,
+  type BeatsResult,
   BeatsTally,
   MESS_FULL_EATERS,
   type PersonSample,
@@ -11,7 +12,7 @@ import {
   helmStood,
   parseBeatsArgs,
   recreationLabels,
-  runBeats,
+  runBeatsAsync,
 } from "./beats";
 import { crew } from "./index";
 
@@ -349,10 +350,21 @@ describe("crew beats arguments", () => {
   it("defaults to three days, seed 1, both scenarios", () => {
     expect(parseBeatsArgs([])).toEqual({
       days: 3,
-      seed: 1,
+      seeds: [1],
       scenarios: ["plain", "freight"],
+      fields: "cycle",
       json: false,
     });
+  });
+
+  it("takes a seed range and a field plan (D95)", () => {
+    expect(parseBeatsArgs(["--seeds", "1-5", "--fields", "brutal"])).toMatchObject({
+      seeds: [1, 2, 3, 4, 5],
+      fields: "brutal",
+    });
+    expect(parseBeatsArgs(["--seed", "7"])).toMatchObject({ seeds: [7] });
+    expect(parseBeatsArgs(["--seeds", "5-1"])).toHaveProperty("error");
+    expect(parseBeatsArgs(["--fields", "apocalyptic"])).toHaveProperty("error");
   });
 
   it("refuses part days and unknown options", () => {
@@ -363,15 +375,16 @@ describe("crew beats arguments", () => {
 });
 
 describe("crew beats: one ship's day of the pacing voyage (real content, every system)", () => {
-  // One run for both pins below (a ship's day of the real game takes a while).
-  let day: ReturnType<typeof runBeats> | undefined;
-  const oneDay = () => {
-    day ??= runBeats({ scenario: "freight", days: 1, seed: 1 });
+  // One run for every pin below (a ship's day of the real game takes a while), yielding between
+  // chunks so the worker's RPC is answered (`yielding.ts`).
+  let day: Promise<BeatsResult> | undefined;
+  const oneDay = (): Promise<BeatsResult> => {
+    day ??= runBeatsAsync({ scenario: "freight", days: 1, seed: 1, fields: "none" });
     return day;
   };
 
-  it("completes and rings three bells, one per watch", () => {
-    const result = oneDay();
+  it("completes and rings three bells, one per watch", async () => {
+    const result = await oneDay();
     expect(result.watches).toBe(3);
     expect(result.simSeconds).toBe(result.days * 3 * result.watchSeconds);
     expect(result.beats.bells).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
@@ -381,7 +394,8 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
       expect(sum).toBeCloseTo(1);
     }
     const report = formatBeatsReport([result]);
-    expect(report).toContain("# Beats: 1 day, 3 watches of 400 s");
+    expect(report).toContain("# Beats: 1 day, 3 watches of 400 s (seed 1,");
+    expect(report).toContain("Fields: none scheduled (--fields none).");
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
     // D81/D83: the cook serves a meal before each bell, so a day is three meals, none missed.
     expect(result.beats.mealsServed).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
@@ -397,12 +411,12 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(Number.isFinite(result.provisionsDaysAtEnd)).toBe(true);
   }, 90_000);
 
-  it("reports at least one handover at the helm in a one-day run (D77)", () => {
-    expect(oneDay().beats.handovers.total).toBeGreaterThanOrEqual(1);
+  it("reports at least one handover at the helm in a one-day run (D77)", async () => {
+    expect((await oneDay()).beats.handovers.total).toBeGreaterThanOrEqual(1);
   }, 90_000);
 
-  it("prints the off-watch columns and lines (D84-D87)", () => {
-    const result = oneDay();
+  it("prints the off-watch columns and lines (D84-D87)", async () => {
+    const result = await oneDay();
     const report = formatBeatsReport([result]);
     for (const row of [
       "sessionsStarted",
@@ -424,15 +438,15 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(result.beats.tickerLines.total).toBeGreaterThan(0);
   }, 90_000);
 
-  it("reports at least one session started in a one-day run (slice 4 W1)", () => {
-    const result = oneDay();
+  it("reports at least one session started in a one-day run (slice 4 W1)", async () => {
+    const result = await oneDay();
     expect(result.beats.sessionsStarted.total).toBeGreaterThanOrEqual(1);
     // Every started session ends in the off-watch family's lines (call 18).
     expect(result.beats.offWatchLines.total).toBeGreaterThanOrEqual(1);
   }, 90_000);
 
-  it("reports each wearing machine's condition by day, its lowest and its services (D90)", () => {
-    const result = oneDay();
+  it("reports each wearing machine's condition by day, its lowest and its services (D90)", async () => {
+    const result = await oneDay();
     const names = result.machineWear.map((m) => m.name);
     expect(names).toContain("Coolant Pump");
     expect(names).toContain("Life Support Unit");

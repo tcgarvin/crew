@@ -32,7 +32,15 @@ export {
   isOnDock,
 } from "./docks";
 export { basePriceFor, effectiveMarket } from "./markets";
+export { roomPhrase } from "./rooms";
 export { floorSet } from "./floor-set";
+export {
+  blastTiles,
+  hullFootprint,
+  inHullFootprint,
+  integrityFromScars,
+  scarDamageLeft,
+} from "./hull";
 export { clearDockside, dressDock, personnelRampFoot } from "./locals";
 export { decisionShownTick, localNamed } from "./delivery";
 export { allocateId } from "./ids";

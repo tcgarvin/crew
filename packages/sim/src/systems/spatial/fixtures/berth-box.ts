@@ -139,7 +139,7 @@ function footprintDeck(footprint: Footprint): DeckDef {
       cargoTransferTiles: [{ x: cargoLanding.x, y: bottom }],
       personnelTransferTiles: [{ x: personnelLanding.x, y: bottom }],
     },
-    hull: { class: "test_hull", sizeClass: "M" },
+    hull: { class: "test_hull", sizeClass: "M", max: 100 },
     spawnPoints: [{ key: "hallWest", tile: { x: 0, y: bottom }, tags: ["crew"] }],
   };
 }

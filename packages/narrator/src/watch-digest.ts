@@ -24,7 +24,6 @@ type Actor = State["actors"][keyof State["actors"]];
 /** D78: how each hazard kind reads in the digest and the capability list. */
 export const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
   debrisField: "debris field",
-  asteroidBelt: "asteroid belt",
   ionStorm: "ion storm",
 };
 

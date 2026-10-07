@@ -4,10 +4,12 @@
  * Polish A adds the items aboard (D28) and a one-line ship headline (D27). D61 adds the dock
  * alongside, with everyone and everything on it flagged `onDock`.
  */
+import { configTicks } from "./clock";
 import { findItemDef } from "./defs";
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
+import { roomPhrase } from "./rooms";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
 import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
@@ -22,7 +24,10 @@ import type {
   RenderActor,
   RenderDock,
   RenderDockProp,
+  RenderField,
   RenderFrame,
+  RenderHull,
+  RenderImpact,
   RenderItem,
   RenderItemKind,
   RenderItemLocation,
@@ -54,6 +59,7 @@ const ACTION_VERBS: Readonly<Record<ActionKind, string>> = {
   wait: "waiting",
   recreate: "taking it easy",
   confer: "having a word",
+  report: "on the intercom",
 };
 
 /** Short present-tense label for an actor: "repairing coolant pump", "sleeping", "walking". */
@@ -156,6 +162,8 @@ const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
   "invariantViolated",
   // D78: the narrator's bookkeeping (its hazard came to nothing); the player saw nothing happen.
   "navHazardMissed",
+  // D92: likewise for a field whose leg ended before it began.
+  "fieldMissed",
 ]);
 
 /** Should `event` reach the ticker at all? (`describeEvent` may still drop it with `null`.) */
@@ -182,7 +190,6 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
 /** D78: how each navigation hazard kind reads in the ticker. */
 const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
   debrisField: "Debris field",
-  asteroidBelt: "Asteroid belt",
   ionStorm: "Ion storm",
 };
 
@@ -258,10 +265,10 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
   const machine = (id: string) => machineDef(id)?.name;
   const room = (key: string) => {
     for (const deckId of Object.keys(state.deck.tiles)) {
-      const name = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
+      const def = content.decks[deckId as keyof ContentBundle["decks"]]?.compartments.find(
         (c) => c.key === key,
-      )?.name;
-      if (name !== undefined) return `the ${name.toLowerCase()}`;
+      );
+      if (def !== undefined) return roomPhrase(def);
     }
     return "the room";
   };
@@ -527,8 +534,82 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "privateTalkMissed":
       return `${n.actor(event.payload.actorId) ?? "Someone"} never made it to ${n.cabinOf(event.payload.captainId)}`;
     default:
+      return fieldLine(event, n);
+  }
+}
+
+/**
+ * Slice 5 (D92-D94): the asteroid field's lines: the rocks, the alert, the crew's answer and the
+ * intercom. `undefined` for any other event (the generic line).
+ */
+function fieldLine(event: SimEvent, n: Names): string | null | undefined {
+  switch (event.type) {
+    case "fieldSighted":
+      return `${n.actor(event.payload.standerId) ?? "The helm"}: rocks ahead`;
+    case "fieldEntered":
+      // A sighted field's first hit is the impact's own line.
+      return event.payload.noticedBefore ? null : "The ship shudders: we're in rocks";
+    case "asteroidImpact":
+      return impactLine(event, n);
+    case "machineKnockedOut":
+      return capitalise(`the ${n.machineLower(event.payload.machineId)} is out`);
+    case "nearMiss":
+      return `A rock came through ${n.compartment(event.payload.compartmentId)} a step from ${n.actor(event.payload.actorId) ?? "someone"}`;
+    case "alertRaised":
+      return "General alert";
+    case "alertCleared":
+      return "Alert stood down";
+    case "shipStuck":
+      return "Engines out: we're stuck in the rocks";
+    case "shipUnstuck":
+      return "Engines back: under way again";
+    case "fieldCleared": {
+      const { how, integrity, max } = event.payload;
+      const head = how === "drifted" ? "Drifted clear of the rocks" : "Clear of the rocks";
+      return `${head}: hull at ${Math.round(integrity)} of ${max}`;
+    }
+    case "shipLost":
+      return "The hull gave way. The ship is lost.";
+    case "scoutSent":
+      return `${n.actor(event.payload.officerId) ?? "The officer of the watch"} sent ${n.actor(event.payload.scoutId) ?? "someone"} to check ${n.compartment(event.payload.compartmentId)}`;
+    case "hullPatched":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} patched the hull in ${n.compartment(event.payload.compartmentId)}`;
+    case "hullPlated":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} plated the hull in ${n.compartment(event.payload.compartmentId)}`;
+    case "machineMended":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} repaired the ${n.machineLower(event.payload.machineId)}`;
+    case "intercomReport":
+      return intercomLine(event, n);
+    default:
       return undefined;
   }
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** "Rock strike in the galley; the galley stove took it", or null when it hit no machine. */
+function impactLine(event: Extract<SimEvent, { type: "asteroidImpact" }>, n: Names): string | null {
+  const struck = event.payload.hits.filter((hit) => hit.effect !== "none");
+  if (struck.length === 0) return null;
+  const machines = nameList(struck.map((hit) => `the ${n.machineLower(hit.machineId)}`));
+  return `Rock strike in ${n.compartment(event.payload.compartmentId)}; ${machines} took it`;
+}
+
+/** "Bettina Solheim on the intercom: the galley's hit, the galley stove's out". */
+function intercomLine(event: Extract<SimEvent, { type: "intercomReport" }>, n: Names): string {
+  const who = n.actor(event.payload.actorId) ?? "Someone";
+  const parts = event.payload.damage.map((damage) =>
+    damage.kind === "scar"
+      ? `${n.compartment(damage.compartmentId)}'s hit`
+      : `the ${n.machineLower(damage.machineId)}'s ${damage.out ? "out" : "damaged"}`,
+  );
+  const said =
+    parts.length === 0
+      ? `no damage in ${n.compartment(event.payload.compartmentId)}`
+      : [...new Set(parts)].join(", ");
+  return `${who} on the intercom: ${said}`;
 }
 
 /** "Jax", "Jax and Tomas", "Jax, Tomas and Dane". */
@@ -1169,6 +1250,51 @@ export function renderSessions(state: ReadonlyWorldState, content: ContentBundle
   return out;
 }
 
+/** D93: the hull bar and its scars. */
+export function renderHull(state: ReadonlyWorldState): RenderHull {
+  const hull = state.hull;
+  return {
+    integrity: hull.integrity,
+    max: hull.max,
+    scars: hull.scars.map((scar) => ({
+      id: scar.id,
+      x: scar.tile.x,
+      y: scar.tile.y,
+      patched: scar.patched,
+      rock: scar.rock,
+    })),
+    lost: hull.lostAtTick !== undefined,
+  };
+}
+
+/**
+ * D92: the field as the rock layers see it: `near` in transit within `field.warningSeconds` of
+ * its start, `active` while the ship is in it, `clearing` once it ended and the alert still
+ * stands; undefined otherwise (call 16).
+ */
+export function renderField(state: ReadonlyWorldState, config: ConfigDef): RenderField | undefined {
+  const field = state.field;
+  if (field === undefined) return undefined;
+  const { severity, phase } = field;
+  switch (phase.kind) {
+    case "scheduled": {
+      const warning = configTicks(config, config.field.warningSeconds);
+      const near = state.travel.stage === "transit" && state.tick >= field.startsAtTick - warning;
+      return near ? { phase: "near", severity, stuck: false } : undefined;
+    }
+    case "active":
+      return { phase: "active", severity, stuck: phase.stuckSinceTick !== undefined };
+    case "ended":
+      return state.alert === undefined ? undefined : { phase: "clearing", severity, stuck: false };
+  }
+}
+
+/** D92: an impact for the flash, from its event. */
+function renderImpact(event: Extract<SimEvent, { type: "asteroidImpact" }>): RenderImpact {
+  const { tile, rock, tiles } = event.payload;
+  return { tick: event.tick, x: tile.x, y: tile.y, rock, tiles: tiles.map((t) => ({ ...t })) };
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors = Object.values(state.actors).flatMap(
@@ -1182,12 +1308,15 @@ export function getRenderFrame(world: World): RenderFrame {
     placementKey: machine.placementKey,
   }));
   const tickerEvents: TickerEntry[] = [];
+  const impacts: RenderImpact[] = [];
   for (const event of world.caches.diagnostics.lastEvents) {
+    if (event.type === "asteroidImpact") impacts.push(renderImpact(event));
     const text = tickerLine(event, state, content);
     if (text !== null) {
       tickerEvents.push({ tick: event.tick, text, significance: event.significance });
     }
   }
+  const field = renderField(state, world.config.values);
   const presence = state.deck.dock;
   const dock: RenderDock | undefined =
     presence === undefined ? undefined : { dockId: presence.dockId, deckId: presence.deckId };
@@ -1211,5 +1340,9 @@ export function getRenderFrame(world: World): RenderFrame {
     dockProps: renderDockProps(state, content),
     headline: shipHeadline(state, content, world.config.values.travel),
     sessions: renderSessions(state, content),
+    hull: renderHull(state),
+    alert: state.alert !== undefined,
+    ...(field === undefined ? {} : { field }),
+    impacts,
   };
 }

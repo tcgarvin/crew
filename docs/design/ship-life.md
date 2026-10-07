@@ -271,9 +271,8 @@ a day: the single biggest visible change in this proposal.
   the idle post.
 - *Officer's rounds* — **yes** (§2): the officer of the watch's main on-duty activity.
 - *Course plotting* — **yes, mandatory** (owner: part of the routine, not a bonus). See §6.
-- *Drills* — **yes, cheap**. Every other day the FO calls a muster at the gym `muster` zone;
-  everyone not on watch walks there; first-aid/firefighting skill ticks. A whole-ship motion
-  beat for nearly zero code.
+- *Drills* — **cut** (owner, 2026-10-06, D91). Was: every other day the FO calls a muster at
+  the gym `muster` zone; everyone not on watch walks there; first-aid/firefighting skill ticks.
 - *Sparring injuries* — yes, minor only, so the medic finally has work.
 - *Reviewing the log at an ops terminal* — **cut** (owner). Too thin a mechanic.
 - *Laundry* — **no**: no story, pure busywork. *Stocktake* — no, fold into Stores tidying.
@@ -524,12 +523,17 @@ change, and regressions are easiest to attribute while behaviour is otherwise un
    defs, group sessions, the twelve activities, rivalries and debates, own-cabin and bunkroom
    thoughts, narrator digest lines for interests/mood/rivalries/cabin and a `privateTalk`
    command for cards.
-5. **The bridge, later stations.** Engineering console and workbench, drills, the
-   `requiredWhen`/`alert` station framework so shields and weapons are content, `seedTopic`,
-   the beats-per-watch report rerun to retune pacing.
+5. **The asteroid field** (re-sequenced 2026-10-06, D91). A narrator-scheduled field with
+   narrator-chosen hits, detection by the helm and an alert state, random impacts with blast,
+   machine outages and damage, a global hull bar with patching and port repair, getting stuck,
+   ship loss as game over, intercom panels and scouts. See the plan's slice 5.
+6. **Atmosphere and breaches**, with bodies and the medic.
+7. **Fire.**
+8. **Tactical and shields**: the `requiredWhen`/`alert` station framework, the alert bill and
+   hold-until-relieved.
 
-Cut from all five: laundry, hygiene, stocktake, sick call, an ops-terminal mechanic,
-multi-deck, the cat, lighting.
+Cut from all eight (drills too, D91): laundry, hygiene, stocktake, sick call, an ops-terminal
+mechanic, multi-deck, the cat, lighting.
 
 ## 13. Owner rulings and open questions
 
@@ -553,6 +557,9 @@ Open:
    automatic re-forming of the watch bill, with a narrator card only when the shortfall will
    outlast a day.
 2. **Target play speed** — which speed should a quiet stretch be tuned for (1×, or 4× with
-   auto-slowdown)? Settle after the first slice-2 playtest using the beats-per-watch report.
+   auto-slowdown)? Recommended at slice-5 integration (D95), for the owner to confirm: 2×, with
+   auto-slowdown to 1× for set pieces and 4×/8× as skip speeds; at 4× the narrator's run-ahead
+   is shorter than its latency and every call stalls the ship (19 % of wall time over a round
+   trip), and a watch's ~39 ticker lines come one every 2.6 s.
 3. **Hazard frequency** — narrator-scheduled only, or also a kernel-sampled rate per route?
    Recommendation: narrator-only first, so every hazard is placed for a reason.

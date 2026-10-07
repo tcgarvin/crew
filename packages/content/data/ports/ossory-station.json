@@ -66,6 +66,16 @@
       "itemDefId": "item.provisions",
       "count": 6,
       "price": 60
+    },
+    {
+      "itemDefId": "item.hull_plating",
+      "count": 10,
+      "price": 60
+    },
+    {
+      "itemDefId": "item.patch_kit",
+      "count": 20,
+      "price": 15
     }
   ],
   "jobTemplates": [

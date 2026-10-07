@@ -83,6 +83,8 @@ export type FromWorker =
   /** The worker stopped at a hook at `tick`; the main thread shows the narrator loading state when playback reaches it. */
   | { readonly type: "hookRaised"; readonly hook: NarratorHook; readonly tick: Tick }
   | { readonly type: "decisionPending"; readonly decision: Decision }
+  /** D93: the ship was lost at `tick`; the worker has stopped for good. */
+  | { readonly type: "shipLost"; readonly tick: Tick }
   | { readonly type: "commandResult"; readonly requestId: string; readonly result: EnqueueResult }
   | { readonly type: "saveBlob"; readonly requestId: string; readonly envelope: SaveEnvelope }
   | {

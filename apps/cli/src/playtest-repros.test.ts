@@ -19,6 +19,7 @@ import { createPacingRegistry, freightDraft, loadPacingContent } from "./pacing"
 
 const SPARES = "item.spare_parts_stack" as ItemDefId;
 const KESSLER = "port.kessler_drift" as PortDefId;
+const KIT = "item.patch_kit" as ItemDefId;
 
 let counter = 0;
 function send(kernel: Kernel, world: World, command: Omit<Command, "id">): void {
@@ -188,4 +189,35 @@ describe("slice-2 QA repros (D77 addendum)", () => {
     // All aboard before the Red bell, so it was not the Red watch coming on that loaded.
     expect(world.state.tick).toBeLessThan(3 * watch);
   }, 60_000);
+});
+
+describe("patch kits restocked at port (D93)", () => {
+  it(
+    "a ship short of patch kits at a port that sells them buys back to the scenario's 24 (D93)",
+    { timeout: 60_000 },
+    () => {
+      const { kernel, world } = freshWorld();
+      const kitsAboard = (w: World): number =>
+        Object.values(w.state.items)
+          .filter((i) => i.defId === KIT && i.location.kind === "onDeck")
+          .reduce((n, i) => n + (i.stacking === "stack" ? i.count : 1), 0);
+      expect(kitsAboard(world)).toBe(24);
+      // Three lockers' kits spent on scars underway.
+      const spent = Object.values(world.state.items)
+        .filter((i) => i.defId === KIT)
+        .slice(0, 3);
+      for (const item of spent) delete world.state.items[item.id];
+      expect(kitsAboard(world)).toBe(18);
+      const money = world.state.money.balance;
+      const travel = world.state.travel;
+      if (travel.stage !== "docked") throw new Error("expected a new world to start docked");
+      const price = effectiveMarket(world.state, world.content, travel.portId)[KIT]?.price ?? 0;
+      expect(price).toBeGreaterThan(0);
+      const events = drive(kernel, world, 300, (w) => kitsAboard(w) >= 24);
+      expect(kitsAboard(world)).toBe(24);
+      const bought = events.filter((e) => e.type === "partsBought" && e.payload.itemDefId === KIT);
+      expect(bought.length).toBeGreaterThan(0);
+      expect(world.state.money.balance).toBeLessThanOrEqual(money - 6 * price);
+    },
+  );
 });

@@ -40,6 +40,7 @@ import type { World } from "../../../core/types/kernel";
 import type { Problem } from "../../../core/types/work";
 import { registerPlannerDefaults } from "../../../planner/index";
 import { commerceTaskDerivations } from "../../commerce/tasks";
+import { damageTaskDerivations } from "../../damage/tasks";
 import { dirtTaskDerivations } from "../../dirt/tasks";
 import { equipmentTaskDerivation } from "../../equipment/tasks";
 import { galleyTaskDerivations } from "../../galley/tasks";
@@ -246,6 +247,7 @@ export const ALL_DERIVATIONS = {
   ...travelTaskDerivations,
   ...galleyTaskDerivations,
   ...dirtTaskDerivations,
+  ...damageTaskDerivations,
 };
 
 export interface CrewWorldOptions {

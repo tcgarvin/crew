@@ -45,7 +45,9 @@ export type AdvanceHalt =
   /** A narrator hook is pending (D5); host must call the narrator then `acknowledgeHook`. */
   | { readonly kind: "hook" }
   /** A decision is pending; host pauses until `resolveDecision`. */
-  | { readonly kind: "decision" };
+  | { readonly kind: "decision" }
+  /** D93: the hull gave way (`hull.lostAtTick`); the world never steps again. */
+  | { readonly kind: "lost" };
 
 /**
  * W0 decision: `advance` returns a result object rather than a bare event array, so the host

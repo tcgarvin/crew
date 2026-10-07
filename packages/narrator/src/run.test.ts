@@ -828,7 +828,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.23");
+    expect(PROMPT_VERSION).toBe("v0.24");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -893,7 +893,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
-    expect(STATIC_RULES).toContain("Only use the six levers");
+    expect(STATIC_RULES).toContain("Only use the seven levers");
     expect(STATIC_RULES).toContain("surfaceDecision, stockMarket, scheduleHazard");
     expect(STATIC_RULES).not.toContain("five levers");
   });
@@ -935,9 +935,29 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain(
       "how it went shows next call in what they feel about the captain",
     );
-    expect(STATIC_RULES).toContain("Only use the six levers");
+    expect(STATIC_RULES).toContain("Only use the seven levers");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("so can a rivalry or an argument");
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
+  });
+
+  it("tells the model it shapes a field the sim plays, weighs the hull first, and uses damage as hooks (D95, v0.24)", () => {
+    expect(STATIC_RULES).toContain("You shape it and the sim plays it.");
+    expect(STATIC_RULES).toContain("unseen means nobody does, whatever the helm");
+    expect(STATIC_RULES).toContain("Aim them at a machine or a room, never a person");
+    expect(STATIC_RULES).toContain(
+      "Never schedule a field the hull cannot survive (a severity whose cost is near or above the hull left), unless the ship left port damaged",
+    );
+    expect(STATIC_RULES).toContain("Hull damage and unfinished repairs are story hooks.");
+    expect(STATIC_RULES).toContain("LEAVING WITH REPAIRS UNFINISHED");
+    expect(STATIC_RULES).toContain(
+      "Nothing in the sim holds the ship for her hull; only a card can.",
+    );
+    expect(STATIC_RULES).toContain("A field is the biggest pressure of all");
+    expect(STATIC_RULES).toContain("stockMarket, scheduleHazard, scheduleField. An empty list");
+    for (const type of ["fieldSighted", "fieldEntered", "shipStuck", "fieldCleared"]) {
+      expect(HOOK_INSTRUCTIONS.notableEvent).toContain(type);
+    }
+    expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleField on a leg");
   });
 });
 

@@ -115,6 +115,9 @@ function makeFakeKernel(hookAtTick: number) {
         locals: [],
         dockProps: [],
         sessions: [],
+        hull: { integrity: 100, max: 100, scars: [], lost: false },
+        alert: false,
+        impacts: [],
       };
     },
     serialize: (world) =>
@@ -453,6 +456,61 @@ describe("createHost hook halt", () => {
   });
 });
 
+/** D93: a kernel whose hull gives way at `lostAtTick`; from then `advance` halts `lost` for good. */
+function makeLosingKernel(lostAtTick: number): Kernel {
+  const base = makeFakeKernel(Number.POSITIVE_INFINITY).kernel;
+  type FakeState = { tick: number; lost?: true };
+  return {
+    ...base,
+    advance(world, ticks): AdvanceResult {
+      const state = world.state as unknown as FakeState;
+      if (state.lost) return { events: [], ticksAdvanced: 0, halt: { kind: "lost" } };
+      let advanced = 0;
+      while (advanced < ticks) {
+        state.tick += 1;
+        advanced += 1;
+        if (state.tick === lostAtTick) {
+          state.lost = true;
+          return { events: [], ticksAdvanced: advanced, halt: { kind: "lost" } };
+        }
+      }
+      return { events: [], ticksAdvanced: advanced, halt: { kind: "completed" } };
+    },
+    getRenderFrame(world) {
+      const frame = base.getRenderFrame(world);
+      const lost = (world.state as unknown as FakeState).lost === true;
+      return { ...frame, hull: { integrity: lost ? 0 : 100, max: 100, scars: [], lost } };
+    },
+  };
+}
+
+describe("createHost ship lost (D93)", () => {
+  it("posts shipLost once at the loss and never steps the world again", () => {
+    const { messages, advance } = startHost(makeLosingKernel(7), { runAheadCapSeconds: 60 });
+    for (let i = 0; i < 30; i++) advance(50);
+    expect(ofType(messages, "shipLost")).toEqual([{ type: "shipLost", tick: 7 }]);
+    expect(Math.max(...frameTicks(messages))).toBe(7);
+    expect(ofType(messages, "frame").at(-1)?.frame.hull.lost).toBe(true);
+  });
+
+  it("shows a save that loads already lost as lost, from its first frame", () => {
+    const kernel = makeLosingKernel(7);
+    const first = startHost(kernel, { runAheadCapSeconds: 60 });
+    for (let i = 0; i < 30; i++) first.advance(50);
+    first.host.handleMessage({ type: "requestSave", requestId: "save1" });
+    const saved = ofType(first.messages, "saveBlob").find((m) => m.requestId === "save1");
+    if (saved === undefined) throw new Error("the host answered the save request");
+
+    const { host, messages, advance } = startHost(kernel, { runAheadCapSeconds: 60 });
+    messages.length = 0;
+    host.handleMessage({ type: "load", source: { kind: "save", envelope: saved.envelope } });
+    expect(ofType(messages, "frame")[0]?.frame.hull.lost).toBe(true);
+    for (let i = 0; i < 10; i++) advance(50);
+    expect(ofType(messages, "shipLost")).toEqual([{ type: "shipLost", tick: 7 }]);
+    expect(frameTicks(messages).every((tick) => tick === 7)).toBe(true);
+  });
+});
+
 describe("createHost agent view (slice-2 QA)", () => {
   /** The fake kernel with an agent view that reports the tick of the world it was taken on. */
   function viewingKernel(hookAtTick: number): Kernel {
@@ -468,6 +526,7 @@ describe("createHost agent view (slice-2 QA)", () => {
           knownTasks: () => [],
           roster: () => [],
           sessions: () => [],
+          alert: () => undefined,
         }) as never,
     };
   }

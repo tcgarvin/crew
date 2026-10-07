@@ -2,6 +2,7 @@
  * Cheap physical and structural invariants (SD §19.4, CONTRACTS rules 2 and 4). Returns one
  * message per violation; empty means healthy. Used by tests after every step and by `restore`.
  */
+import { integrityFromScars } from "./hull";
 import { parseInstanceId } from "./ids";
 import { INTEREST_TAGS } from "./types/content";
 import type { InstanceKind } from "./types/ids";
@@ -333,6 +334,73 @@ function hazardViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
+/** Floating-point slack for the hull's sums (patching restores fractions of a scar). */
+const HULL_EPSILON = 1e-9;
+
+/**
+ * D93: the hull bar is `max` less every scar's damage left; a scar gives back no more than it
+ * cost; scar ids are allocated and unique. (That a scar's tile is on the deck needs content: the
+ * field system checks it.)
+ */
+function hullViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  const hull = state.hull;
+  if (!Number.isInteger(hull.max) || hull.max <= 0) out.push(`hull.max is ${hull.max}`);
+  if (hull.integrity < 0 || hull.integrity > hull.max) {
+    out.push(`hull.integrity ${hull.integrity} is outside [0, ${hull.max}]`);
+  }
+  const expected = integrityFromScars(hull);
+  if (Math.abs(hull.integrity - expected) > HULL_EPSILON) {
+    out.push(`hull.integrity ${hull.integrity} is not max less the scars' damage (${expected})`);
+  }
+  if (hull.lostAtTick !== undefined && hull.integrity > HULL_EPSILON) {
+    out.push(`hull is lost at tick ${hull.lostAtTick} with integrity ${hull.integrity}`);
+  }
+  const seen = new Set<string>();
+  hull.scars.forEach((scar, i) => {
+    const where = `hull.scars[${i}]`;
+    const parsed = parseInstanceId(scar.id);
+    if (parsed?.kind !== "scar" || parsed.counter >= state.nextId.scar) {
+      out.push(`${where} has unallocated id ${scar.id}`);
+    }
+    if (seen.has(scar.id)) out.push(`${where} repeats id ${scar.id}`);
+    seen.add(scar.id);
+    if (!(scar.damage > 0)) out.push(`${where} has damage ${scar.damage}`);
+    if (scar.recovered < 0 || scar.recovered > scar.damage + HULL_EPSILON) {
+      out.push(`${where} recovered ${scar.recovered} of ${scar.damage}`);
+    }
+    if (scar.recovered > 0 && !scar.patched) out.push(`${where} recovered hull unpatched`);
+    if (state.compartments[scar.compartmentId] === undefined) {
+      out.push(`${where} is in unknown compartment ${scar.compartmentId}`);
+    }
+  });
+  return out;
+}
+
+/** D92: the field's id is allocated; the alert's reports name compartments. */
+function fieldViolations(state: ReadonlyWorldState): string[] {
+  const out: string[] = [];
+  const field = state.field;
+  if (field !== undefined) {
+    const parsed = parseInstanceId(field.id);
+    if (parsed?.kind !== "field" || parsed.counter >= state.nextId.field) {
+      out.push(`field has unallocated id ${field.id}`);
+    }
+    if (!Number.isInteger(field.impacts) || field.impacts < 0) {
+      out.push(`field.impacts is ${field.impacts}`);
+    }
+    if (field.stuckImpacts > field.impacts) {
+      out.push(`field.stuckImpacts ${field.stuckImpacts} exceeds impacts ${field.impacts}`);
+    }
+  }
+  for (const compartmentId of Object.keys(state.alert?.reports ?? {})) {
+    if (state.compartments[compartmentId as keyof typeof state.compartments] === undefined) {
+      out.push(`alert.reports names unknown compartment ${compartmentId}`);
+    }
+  }
+  return out;
+}
+
 /**
  * D74: every berth belongs to an actor that exists, and no two actors share a bed. That each value
  * is a `bed` placement on the ship's deck needs content: `systems/needs` checks it.
@@ -463,6 +531,8 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...marketViolations(state),
     ...berthViolations(state),
     ...hazardViolations(state),
+    ...hullViolations(state),
+    ...fieldViolations(state),
     ...dirtAndGalleyViolations(state),
     ...socialViolations(state),
     ...taskCycleViolations(state),

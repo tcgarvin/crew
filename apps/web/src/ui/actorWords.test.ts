@@ -323,6 +323,13 @@ const DEFS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.3,
     stacks: false,
   },
+  nearMiss: {
+    key: "nearMiss",
+    label: "a rock came through a step away",
+    value: -0.15,
+    durationDays: 0.5,
+    stacks: false,
+  },
 };
 
 const thought = (

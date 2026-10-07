@@ -31,7 +31,7 @@ describe("eating", () => {
       y: GALLEY_TILE.y + 0.5,
     });
     const labels = log.labels[MARA] ?? [];
-    expect(labels).toContain("walking to galley");
+    expect(labels).toContain("walking to the galley");
     expect(labels).toContain("eating");
     // Meal took at least mealDays.
     const started = log.events.find(

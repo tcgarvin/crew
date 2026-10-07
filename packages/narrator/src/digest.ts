@@ -30,6 +30,7 @@ import {
   ticksToSeconds,
 } from "@crew/sim";
 import { onDockLines, personLine, stagingDockLines } from "./dockside-digest";
+import { fieldBudgetLine, fieldDigestLines } from "./field-digest";
 import {
   compartmentDirtyDetail,
   dirtLine,
@@ -224,6 +225,8 @@ function shipSection(
   // D77, D78: who has the watch and the helm, and the helm's stakes since the last call.
   lines.push(watchLine(state, content, snapshot.config));
   lines.push(...helmEventLines(recentEvents, state, content, snapshot.config));
+  // D95: the asteroid field, the alert, the hull and its repairs, damage known and unseen.
+  lines.push(...fieldDigestLines(state, content, snapshot.config, recentEvents));
   lines.push(`money: ${state.money.balance} credits`);
   // D81-D83: the galley (counter, next meal, provisions) and any room at dirty or worse.
   const galley = galleyLine(state, content, snapshot.config);
@@ -688,6 +691,7 @@ function budgetSection(state: State): Section {
     `spawns remaining: ${b.spawnsRemaining}`,
     `faults remaining: ${b.faultsRemaining}`,
     `hazards remaining: ${b.hazardsRemaining}`,
+    fieldBudgetLine(state),
   ];
   return section("Your budget", lines, NEVER_DROPS);
 }

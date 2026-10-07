@@ -19,11 +19,15 @@ import {
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  FIELD_DETECTIONS,
+  FIELD_SEVERITIES,
   HAZARD_KINDS,
   JOB_URGENCIES,
+  MACHINE_EFFECTS,
   MARKET_PRICE_TIERS,
   type NarratorCommand,
   type NarratorHook,
+  ROCK_SIZES,
   type SaveEnvelope,
   type SimEvent,
   type Tick,
@@ -166,6 +170,7 @@ const EMPTY_FOR_NONE = "empty for none";
 export const PAY_TIERS = ["low", "standard", "generous"] as const;
 /** Coarse fault window; the translator maps it to relative ticks within config limits. */
 export const FAULT_WINDOWS = ["soon", "later", "muchLater"] as const;
+export type FaultWindow = (typeof FAULT_WINDOWS)[number];
 /** Coarse quantity; the translator maps it to a count within config limits. */
 export const QUANTITIES = ["one", "few", "several"] as const;
 /**
@@ -190,6 +195,18 @@ export type HazardDifficulty = (typeof HAZARD_DIFFICULTIES)[number];
  * empty string, not a nullable).
  */
 export const PRIVATE_TALK_TONES = ["warm", "stern", ""] as const;
+
+/**
+ * D95: when in the field a scripted impact lands, as the model writes it; the translator maps
+ * the tier to seconds into the severity's length (`FIELD_MOMENT_SHARE`), so the model never
+ * writes the number.
+ */
+export const FIELD_MOMENTS = ["early", "middle", "late"] as const;
+export type FieldMoment = (typeof FIELD_MOMENTS)[number];
+/** D95: a scripted impact's rock, empty for the severity's own draw (D45: empty, not nullable). */
+export const SCRIPTED_ROCKS = [...ROCK_SIZES, ""] as const;
+/** D95: a scripted impact's effect on the machines it hits, empty for the rolled table. */
+export const SCRIPTED_EFFECTS = [...MACHINE_EFFECTS, ""] as const;
 
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
@@ -261,6 +278,25 @@ export function buildNarratorPlanSchema() {
     window: z.enum(FAULT_WINDOWS),
   });
 
+  // D95: the seventh lever, an asteroid field on the leg (D92). `scripted` hits are the
+  // narrator's chosen outcomes; the translator resolves each target by name and caps the count.
+  const scheduleField = z.strictObject({
+    kind: z.literal("scheduleField"),
+    severity: z.enum(FIELD_SEVERITIES),
+    detection: z.enum(FIELD_DETECTIONS),
+    window: z.enum(FAULT_WINDOWS),
+    scripted: z
+      .array(
+        z.strictObject({
+          target: z.string().describe(`Machine id or room name ${ID_HINT}.`),
+          at: z.enum(FIELD_MOMENTS),
+          rock: z.enum(SCRIPTED_ROCKS),
+          effect: z.enum(SCRIPTED_EFFECTS),
+        }),
+      )
+      .describe("Chosen hits, at most 3; empty for none."),
+  });
+
   // D47: what a port sells. The only way a part gets to a port; the crew buy it themselves.
   const stockMarket = z.strictObject({
     kind: z.literal("stockMarket"),
@@ -315,6 +351,7 @@ export function buildNarratorPlanSchema() {
         surfaceDecision,
         stockMarket,
         scheduleHazard,
+        scheduleField,
       ]),
     ),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */

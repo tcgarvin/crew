@@ -23,12 +23,15 @@
  * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
  * name when the machine is in the actor's own compartment.
  */
+import { roomPhrase } from "../../core/rooms";
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
 import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/types/ids";
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import type { ActivityStep, HoldKind, StepTarget, Task } from "../../core/types/work";
+import { damageTaskLabel } from "../damage/labels";
+import { reportLabel } from "../intercom/labels";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { whoHasTheHelm } from "../watch/helm";
 import { currentStep } from "./activity";
@@ -62,11 +65,14 @@ export function machineName(ctx: LabelCtx, machineId: MachineId): string {
   );
 }
 
+/** D94: the room as a sentence names it ("the galley", "engineering"). */
 function compartmentName(ctx: LabelCtx, compartmentId: CompartmentId): string {
   const compartment = ctx.state.compartments[compartmentId];
   if (compartment === undefined) return "somewhere";
-  const deck = ctx.content.decks[compartment.deckId];
-  return lower(deck?.compartments.find((c) => c.key === compartment.key)?.name, compartment.key);
+  const def = ctx.content.decks[compartment.deckId]?.compartments.find(
+    (c) => c.key === compartment.key,
+  );
+  return def === undefined ? `the ${lower(compartment.key, "room")}` : roomPhrase(def);
 }
 
 function targetTile(
@@ -130,7 +136,7 @@ function carryingMeal(ctx: LabelCtx, actor: DeepReadonly<Actor>): boolean {
 /** D82: "mopping the galley", from the task's room. */
 function mopLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
   if (task?.target.kind !== "compartment") return "mopping";
-  return `mopping the ${compartmentName(ctx, task.target.compartmentId)}`;
+  return `mopping ${compartmentName(ctx, task.target.compartmentId)}`;
 }
 
 /**
@@ -197,6 +203,15 @@ function taskStepLabel(
   if (task?.type === "carryMeal" && step.kind === "moveTo" && carryingMeal(ctx, actor)) {
     return "taking a plate to the helm";
   }
+  // D93, D94: damage work says what it is doing (`systems/damage/labels.ts`).
+  if (
+    task?.type === "repairDamage" ||
+    task?.type === "patchHull" ||
+    task?.type === "plateHull" ||
+    task?.type === "checkCompartment"
+  ) {
+    return damageTaskLabel(ctx, actor, task, step);
+  }
   switch (step.kind) {
     case "moveTo":
       if (isHelmTask(ctx, task)) return "going to the helm";
@@ -262,6 +277,7 @@ const HOLD_LABEL: Readonly<Record<HoldKind, string>> = {
   socialize: "chatting",
   staff: "on station",
   gangway: "on the gangway",
+  bridge: "holding the bridge",
 };
 
 function personalStepLabel(
@@ -416,7 +432,7 @@ function sleepLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
     (c) => c.key === compartment?.key,
   );
   if (def === undefined || !def.tags.includes("cabin")) return HOLD_LABEL.sleep;
-  return `${HOLD_LABEL.sleep} in the ${def.name.toLowerCase()}`;
+  return `${HOLD_LABEL.sleep} in ${roomPhrase(def)}`;
 }
 
 /**
@@ -475,6 +491,8 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
     );
   }
   if (activity.activity === "privateTalk") return talkLabel(ctx, actor, step);
+  // D94: the walk to the panel and the report read as one activity.
+  if (activity.activity === "report") return reportLabel(ctx, actor, step);
   return personalStepLabel(ctx, actor, step);
 }
 

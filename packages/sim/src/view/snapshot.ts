@@ -15,5 +15,7 @@ export function toAgentViewSnapshot(view: AgentView): AgentViewSnapshot {
     roster: view.roster(),
     sessions: view.sessions(),
   };
-  return JSON.parse(JSON.stringify(snapshot)) as AgentViewSnapshot;
+  const alert = view.alert();
+  const withAlert: AgentViewSnapshot = alert === undefined ? snapshot : { ...snapshot, alert };
+  return JSON.parse(JSON.stringify(withAlert)) as AgentViewSnapshot;
 }

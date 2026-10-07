@@ -13,6 +13,7 @@ import type {
   NarratorHook,
   RenderFrame,
   SaveEnvelope,
+  ScarId,
   SimEvent,
   Tick,
   ToWorker,
@@ -55,6 +56,7 @@ import { Inspector, type InspectorData } from "./ui/Inspector";
 import { Log } from "./ui/Log";
 import { NarratorErrorPanel } from "./ui/NarratorErrorPanel";
 import { NarratorOverlay } from "./ui/NarratorOverlay";
+import { ShipLost } from "./ui/ShipLost";
 import { Toast, useToast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
@@ -78,6 +80,8 @@ import {
 import { portraitCssVars } from "./ui/portraitLayout";
 import { rejectionMessage } from "./ui/rejectionMessage";
 import { inspectRoom } from "./ui/roomInspection";
+import { inspectScar } from "./ui/scarInspection";
+import { lastDay } from "./ui/shipLost";
 import { loadWebContent } from "./worker/content";
 
 /** Wall-clock cadence of routine server saves (PLAN §3: "Neon every ~60 s"). */
@@ -398,6 +402,11 @@ export function App() {
         case "hookRaised":
           void answerHook(message.hook, message.tick);
           return;
+        case "shipLost":
+          // D93: the world never steps again; keep the lost run, so a reload shows the end screen
+          // (the frame's `hull.lost` brings it up once playback reaches the loss).
+          save("milestone");
+          return;
         case "decisionPending":
           setDecision(message.decision);
           setDecisionHidden(false);
@@ -609,6 +618,11 @@ export function App() {
             setInspectorData({ kind: "place", place });
             return;
           }
+          if (next.kind === "scar") {
+            const place = inspectScar(msg.state, bundle, next.id as ScarId);
+            setInspectorData({ kind: "place", place });
+            return;
+          }
           const machine = msg.state.machines[next.id as MachineId] as Machine | undefined;
           if (machine === undefined) {
             setInspectorData(undefined);
@@ -679,6 +693,9 @@ export function App() {
   }, [decision, prose, bundle]);
 
   const money = frame?.money ?? 0;
+  // D93: before the first frame the hull is whole, as a new game's is.
+  const hull = frame?.hull ?? { integrity: deck.hull.max, max: deck.hull.max };
+  const clock = shipClock(viewTick, config.values, sections);
   const travelState = frame?.travel.state ?? "docked";
   const showCard = card !== undefined && decisionDue && !decisionHidden && !thinking;
   const runAheadSeconds = runAhead.buffered / tickRate;
@@ -697,7 +714,9 @@ export function App() {
         paused={paused}
         onSetSpeed={onSetSpeed}
         onTogglePause={onTogglePause}
-        clock={shipClock(viewTick, config.values, sections)}
+        clock={clock}
+        hull={hull}
+        alert={frame?.alert ?? false}
         money={money}
         runAheadBufferedSeconds={runAheadSeconds}
         health={health}
@@ -760,6 +779,14 @@ export function App() {
       )}
       {decisionDue && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
       <Toast message={toast} />
+      {frame?.hull.lost === true && (
+        // D93: the hull gave way; nothing goes on but a new game. A save that loads already lost
+        // shows this from its first frame.
+        <ShipLost
+          lastDay={lastDay(frame.travel, clock.day, visible, frame.tick, bundle.ports)}
+          onNewGame={onNewGame}
+        />
+      )}
     </div>
   );
 }

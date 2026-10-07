@@ -12,6 +12,7 @@ import { createDefLookup } from "./defs";
 import { emptyCells } from "./dirt-grid";
 import { dockForPort } from "./docks";
 import { createEventBuffer } from "./events";
+import { wholeHull } from "./hull";
 import { allocateId, initialIdCounters } from "./ids";
 import { dressDock } from "./locals";
 import { marketSeed } from "./markets";
@@ -46,7 +47,7 @@ import type { Machine } from "./types/ship";
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
 import { resolveWatchBill, sectionsByCrewDef } from "./watch-bill";
 
-function emptyState(scenario: ScenarioDef, seed: number): WorldState {
+function emptyState(scenario: ScenarioDef, deck: DeckDef, seed: number): WorldState {
   return {
     schemaVersion: SCHEMA_VERSION,
     scenarioId: scenario.id,
@@ -67,6 +68,7 @@ function emptyState(scenario: ScenarioDef, seed: number): WorldState {
     watch: { lastBellWatch: 0, helm: {} },
     hazards: [],
     dirt: { cells: {}, tiers: {}, dustThisVisit: 0 },
+    hull: wholeHull(deck),
     galley: { lastMealWatch: 0 },
     social: emptySocial(),
     jobs: {},
@@ -336,7 +338,7 @@ export function createWorld(
     throw new Error(`Content has no thought def for ${missingThoughts.join(", ")}`);
   }
 
-  const state = emptyState(scenario, seed);
+  const state = emptyState(scenario, deck, seed);
   seedMarkets(state, content);
   const values = config.values;
   state.narrator.budget = {
@@ -425,6 +427,8 @@ const COMPLETED: AdvanceHalt = { kind: "completed" };
  * first. The host therefore always sees `hook` before `decision` for a policy card.
  */
 export function haltReason(state: WorldState): AdvanceHalt | null {
+  // D93: a lost ship never steps again; nothing queued can lift it.
+  if (state.hull.lostAtTick !== undefined) return { kind: "lost" };
   const nextTick = state.tick + 1;
   const queuedDue = (predicate: (command: Command) => boolean) =>
     state.commands.queue.some((c) => c.applyAtTick <= nextTick && predicate(c));
@@ -448,6 +452,7 @@ export function haltReason(state: WorldState): AdvanceHalt | null {
 
 /** Halt after a completed tick: anything pending stops the run (D37: a hook first). */
 function haltAfterStep(state: WorldState): AdvanceHalt | null {
+  if (state.hull.lostAtTick !== undefined) return { kind: "lost" };
   if (state.narrator.pendingHook !== undefined) return { kind: "hook" };
   if (state.decisions.queue.length > 0 && headNeedingNarration(state) === undefined) {
     return { kind: "decision" };

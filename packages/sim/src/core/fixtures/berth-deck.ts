@@ -241,7 +241,7 @@ export function berthContent(config: ConfigDef = tinyConfig()): ContentBundle {
           cargoTransferTiles: [{ x: 15, y: 6 }],
           personnelTransferTiles: [{ x: 15, y: 6 }],
         },
-        hull: { class: "test_hull", sizeClass: "S" },
+        hull: { class: "test_hull", sizeClass: "S", max: 100 },
         spawnPoints: [
           ...[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((x) => ({
             key: `crew_${x}`,

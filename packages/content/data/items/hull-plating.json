@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.hull_plating",
+  "name": "Hull Plating",
+  "stacking": "stackable",
+  "maxStack": 5,
+  "tags": ["consumable", "plating"],
+  "toolKinds": [],
+  "mass": 12.0
+}

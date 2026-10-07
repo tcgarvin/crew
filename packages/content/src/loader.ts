@@ -24,6 +24,7 @@ import machineGalleyStove from "../data/machines/galley-stove.json";
 import machineGamesTable from "../data/machines/games-table.json";
 import machineGenerator from "../data/machines/generator.json";
 import machineHelm from "../data/machines/helm.json";
+import machineIntercom from "../data/machines/intercom.json";
 import machineLifeSupport from "../data/machines/life-support.json";
 import machineMedbayBed from "../data/machines/medbay-bed.json";
 import machineMessTable from "../data/machines/mess-table.json";
@@ -41,9 +42,11 @@ import itemCratePerishable from "../data/items/crate-perishable.json";
 import itemHandTruck from "../data/items/hand-truck.json";
 import itemHarmonica from "../data/items/harmonica.json";
 import itemHotMeal from "../data/items/hot-meal.json";
+import itemHullPlating from "../data/items/hull-plating.json";
 import itemMedKit from "../data/items/med-kit.json";
 import itemMop from "../data/items/mop.json";
 import itemOldPhotograph from "../data/items/old-photograph.json";
+import itemPatchKit from "../data/items/patch-kit.json";
 import itemProvisions from "../data/items/provisions.json";
 import itemRationPack from "../data/items/ration-pack.json";
 import itemSparePartsStack from "../data/items/spare-parts-stack.json";
@@ -109,6 +112,7 @@ import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
 import thoughtHelmScrape from "../data/thoughts/helm-scrape.json";
 import thoughtKeepsBeatingMe from "../data/thoughts/keeps-beating-me.json";
 import thoughtLostContest from "../data/thoughts/lost-contest.json";
+import thoughtNearMiss from "../data/thoughts/near-miss.json";
 import thoughtNoBunkOfMyOwn from "../data/thoughts/no-bunk-of-my-own.json";
 import thoughtNoisyBunkroom from "../data/thoughts/noisy-bunkroom.json";
 import thoughtOwnCabin from "../data/thoughts/own-cabin.json";
@@ -167,6 +171,7 @@ const MACHINES = [
   machineExerciseRig,
   machineWorkbench,
   machineEngineeringConsole,
+  machineIntercom,
 ];
 const ITEMS = [
   itemToolkit,
@@ -187,6 +192,8 @@ const ITEMS = [
   itemMop,
   itemBook,
   itemTreat,
+  itemPatchKit,
+  itemHullPlating,
 ];
 const CREW = [
   crewMaraOsei,
@@ -256,6 +263,7 @@ const THOUGHTS = [
   thoughtHeardOut,
   thoughtDressedDown,
   thoughtAteATreat,
+  thoughtNearMiss,
 ];
 const ACTIVITIES = [
   activityCards,

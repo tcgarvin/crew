@@ -3,22 +3,28 @@
  * both run exactly the same systems in the same order (W4a's order):
  *
  * spatial → power + equipment → dirt (D82) → travel + commerce → needs → watch (D77: the bell) →
- * galley (D81: the meal) → recreation, social, cabins (slice 4: off watch) → work (execution,
- * perception, chat, derivation with every system's rules, AgentView builder) → planner.
+ * galley (D81: the meal) → recreation, social, cabins (slice 4: off watch) → damage, intercom
+ * (slice 5: the crew's answer to the rocks) → work (execution, perception, chat, derivation with
+ * every system's rules, AgentView builder) → planner. The field (slice 5) registers after travel,
+ * so it runs after travel's hazards in the equipment phase.
  */
 import {
   type KernelRegistry,
   commerceTaskDerivations,
   createRegistry,
+  damageTaskDerivations,
   dirtTaskDerivations,
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
   registerCabins,
   registerCommerce,
+  registerDamage,
   registerDirt,
   registerEquipmentSystems,
+  registerField,
   registerGalley,
+  registerIntercom,
   registerNeeds,
   registerPlannerDefaults,
   registerRecreation,
@@ -36,6 +42,7 @@ export function createFullRegistry(): KernelRegistry {
   registerEquipmentSystems(registry);
   registerDirt(registry);
   registerTravel(registry);
+  registerField(registry);
   registerCommerce(registry);
   registerNeeds(registry);
   registerWatch(registry);
@@ -43,6 +50,8 @@ export function createFullRegistry(): KernelRegistry {
   registerRecreation(registry);
   registerSocial(registry);
   registerCabins(registry);
+  registerDamage(registry);
+  registerIntercom(registry);
   // `registerWork` also installs the AgentView builder (the inspector reads it).
   registerWork(registry, {
     derivations: {
@@ -51,6 +60,7 @@ export function createFullRegistry(): KernelRegistry {
       ...commerceTaskDerivations,
       ...galleyTaskDerivations,
       ...dirtTaskDerivations,
+      ...damageTaskDerivations,
     },
     stages: equipmentStages,
   });

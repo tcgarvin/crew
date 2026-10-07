@@ -77,6 +77,10 @@ export const ITEM_TAGS = [
   "instrument",
   /** Slice 4: a baked snack (also `food`), eaten where found; never `meal`. */
   "treat",
+  /** Slice 5 (D93): one patch for one hull scar underway (`patchHull` consumes one). */
+  "patchKit",
+  /** Slice 5 (D93): a hull plate, fitted over a scar at port (`plateHull` consumes one). */
+  "plating",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
 
@@ -123,6 +127,8 @@ export const MACHINE_TAGS = [
   "lifeSupport",
   "cooling",
   "rampControl",
+  /** Slice 5 (D94): an intercom panel, where a report is made to the whole ship. */
+  "comm",
 ] as const;
 export type MachineTag = (typeof MACHINE_TAGS)[number];
 
@@ -199,6 +205,8 @@ export const THOUGHT_KEYS = [
   "dressedDown",
   /** Slice 4: ate a `treat`-tagged item. */
   "ateATreat",
+  /** Slice 5: a rock came through the tile they stood on (no bodies yet: a fright, not a wound). */
+  "nearMiss",
 ] as const;
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
 
@@ -259,10 +267,36 @@ export type MealQuality = (typeof MEAL_QUALITIES)[number];
 
 /**
  * D78: kinds of navigation hazard the narrator's `scheduleHazard` may place on a leg. The kernel
- * rolls them all the same way; display names live in `core/render.ts`.
+ * rolls them all the same way; display names live in `core/render.ts`. Slice 5 (D92): the
+ * asteroid belt left this list for `scheduleField`, a field the ship crosses.
  */
-export const HAZARD_KINDS = ["debrisField", "asteroidBelt", "ionStorm"] as const;
+export const HAZARD_KINDS = ["debrisField", "ionStorm"] as const;
 export type HazardKind = (typeof HAZARD_KINDS)[number];
+
+/**
+ * D92: how hard an asteroid field is (`ConfigDef.field.severities`: rate, large-rock share and
+ * length). The helm's detection check reads `hazards.difficulty` at easy/hard/brutal.
+ */
+export const FIELD_SEVERITIES = ["light", "heavy", "brutal"] as const;
+export type FieldSeverity = (typeof FIELD_SEVERITIES)[number];
+
+/**
+ * D92: how a field is noticed: `rolled` by the helm-stander's piloting check before it starts,
+ * `unseen` at the first impact whatever the helm does.
+ */
+export const FIELD_DETECTIONS = ["rolled", "unseen"] as const;
+export type FieldDetection = (typeof FIELD_DETECTIONS)[number];
+
+/** D92: a `small` rock hits one tile; a `large` one the tile and its eight neighbours. */
+export const ROCK_SIZES = ["small", "large"] as const;
+export type RockSize = (typeof ROCK_SIZES)[number];
+
+/**
+ * D92: what a rock does to a machine with a tile in its blast (`ConfigDef.field.machineEffects`
+ * weights): nothing, integrity down a little or a lot, integrity to zero, or one of its faults.
+ */
+export const MACHINE_EFFECTS = ["none", "graze", "damage", "knockout", "fault"] as const;
+export type MachineEffect = (typeof MACHINE_EFFECTS)[number];
 
 /**
  * Slice 4: what people like doing off watch (`Actor.interests`, `ActivityDef.interest`). A closed
@@ -320,6 +354,8 @@ export interface HullDef {
   /** Informational: "light_freighter". */
   readonly class: string;
   readonly sizeClass: HullSizeClass;
+  /** D93: the hull bar's full value in hull points (100 for a light freighter). */
+  readonly max: number;
 }
 
 /**
@@ -358,6 +394,11 @@ export interface CompartmentDef {
   /** Single character used in `DeckDef.tiles`; must not be a space. */
   readonly symbol: string;
   readonly name: string;
+  /**
+   * How a sentence names the room, article and all, lower case: "engineering" where "the" would
+   * read wrong. Absent, it is "the" and the lowercased name ("the cargo hold"); see `roomPhrase`.
+   */
+  readonly phrase?: string;
   /** Semantic tags (`cargoHold`, `galley`, `quarters`, `bridge`, `engineering`). Tags alone grant no function. */
   readonly tags: readonly string[];
 }
@@ -1558,6 +1599,58 @@ export interface ConfigDef {
     readonly privateTalkSeconds: Seconds;
     /** A `privateTalk` not held this long after it was called is missed. */
     readonly privateTalkWaitSeconds: Seconds;
+  };
+  /** D92: the asteroid field (the narrator's `scheduleField`, `systems/field/`). */
+  readonly field: {
+    /** The helm's detection check falls this long before the field's start. */
+    readonly warningSeconds: Seconds;
+    /** The alert stands this long after the field ends. */
+    readonly alertClearSeconds: Seconds;
+    /** Per severity: mean impacts a minute, the share of large rocks, and the field's length. */
+    readonly severities: Readonly<
+      Record<
+        FieldSeverity,
+        {
+          readonly impactsPerMinute: number;
+          readonly largeShare: number;
+          readonly lengthSeconds: Seconds;
+        }
+      >
+    >;
+    /** Call 8: a manned helm multiplies the rate by `1 − helmThreading × piloting / 10`. */
+    readonly helmThreading: number;
+    /** Call 8: the rate multiplier with nobody at the helm. */
+    readonly unmannedRateFactor: number;
+    /** Call 9: the rate multiplier while stuck (engines out, tumbling with the rocks). */
+    readonly stuckRateFactor: number;
+    /** Call 9: impacts taken while stuck before the ship drifts clear and the field ends. */
+    readonly stuckDriftImpacts: number;
+    /** Hull points one impact costs, by rock, however many tiles it covers. */
+    readonly hullDamage: Readonly<Record<RockSize, number>>;
+    /** Relative weights of the machine effects a rock rolls (call 7). */
+    readonly machineEffects: Readonly<Record<MachineEffect, number>>;
+    /** Integrity a `graze` and a `damage` take off a machine. */
+    readonly effectIntegrity: { readonly graze: number; readonly damage: number };
+    /** D93: the share of a scar's hull damage a patch kit restores underway. */
+    readonly patchRecovers: number;
+    /** Call 2: the most scripted impacts one `scheduleField` may carry. */
+    readonly maxScripted: number;
+  };
+  /** D93: the crew's damage work (`systems/damage/`). */
+  readonly damage: {
+    /** Welding a patch kit over a scar. */
+    readonly patchSeconds: Seconds;
+    /** Fitting a hull plate over a scar at port. */
+    readonly plateSeconds: Seconds;
+    /** Repairing impact damage: seconds per whole unit of machine integrity restored. */
+    readonly repairSecondsPerIntegrity: Seconds;
+    /** A scout's look round a compartment once there. */
+    readonly checkSeconds: Seconds;
+  };
+  /** D94: intercom panels (`systems/intercom/`). */
+  readonly intercom: {
+    /** A report at a panel. */
+    readonly reportSeconds: Seconds;
   };
   readonly events: {
     readonly tickerMaxEntries: number;

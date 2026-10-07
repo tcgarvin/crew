@@ -16,6 +16,7 @@ import {
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
+  type ImpactTarget,
   type ItemDef,
   type ItemDefId,
   type Job,
@@ -26,17 +27,21 @@ import {
   type PortDef,
   type PortDefId,
   STAGING_COMMAND_KINDS,
+  type ScriptedImpactDraft,
   type TempRef,
   basePriceFor,
   configTicks,
   isOnDock,
   jobBlockingAcceptance,
+  scriptedHullDamage,
 } from "@crew/sim";
 import {
   AFTERMATH_MAX_WORDS,
   CARD_SITUATION_MAX_WORDS,
   type DecisionCardProse,
   type DroppedIntent,
+  type FaultWindow,
+  type FieldMoment,
   type NarratorIntent,
   type NarratorPlan,
   PITCH_MAX_WORDS,
@@ -58,15 +63,18 @@ import {
   SPAWN_QUANTITY_UNITS,
   type Snapshot,
   type State,
+  compartmentName,
   fareFor,
   faultDiscovery,
   faultWindowSeconds,
   faultWindowTicks,
   livePassage,
+  machineName,
   offerPortNow,
   pathBetween,
   payFor,
   portName,
+  shipDeckOf,
 } from "./lookups";
 import { clipWords } from "./notes";
 
@@ -158,6 +166,8 @@ interface Tally {
   spawns: number;
   faults: number;
   hazards: number;
+  /** D95: fields placed this call (one per leg). */
+  fields: number;
   cardUsed: boolean;
   /** D39: the thread this call's beat card was attributed to. */
   beatCardThread: string | undefined;
@@ -389,20 +399,18 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
 }
 
 /**
- * D78: why a hazard has no leg to lie on, or undefined. The kernel accepts one while a course is
- * planned or the ship is underway; it fires at the first `transit` tick at or after its moment,
- * so one placed after this leg's transit would wait for some later leg the story did not choose.
- * The translator therefore also refuses the end of a leg (approach, docking) and a window that
- * opens after the transit left at nominal speed (a drift only lengthens it).
+ * D78: why a hazard (D95: or a field) has no leg to lie on, or undefined. The kernel accepts one
+ * while a course is planned or the ship is underway; it fires at the first `transit` tick at or
+ * after its moment, so one placed after this leg's transit would wait for some later leg the
+ * story did not choose (a field is dropped with its leg instead). The translator therefore also
+ * refuses the end of a leg (approach, docking) and a window that opens after the transit left at
+ * nominal speed (a drift only lengthens it).
  */
-function hazardLegProblem(
-  env: Env,
-  window: Intent<"scheduleHazard">["window"],
-): string | undefined {
+function legProblem(env: Env, window: FaultWindow, what: "hazard" | "field"): string | undefined {
   const travel = env.snapshot.state.travel;
   if (travel.stage === "docked") {
     return travel.plannedDestinationId === undefined
-      ? "the ship is docked with no course set; a hazard needs a leg to lie on"
+      ? `the ship is docked with no course set; a ${what} needs a leg to lie on`
       : undefined;
   }
   if (travel.stage === "approaching" || travel.stage === "docking") {
@@ -430,7 +438,7 @@ function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<Na
   }
   const budget = snapshot.state.narrator.budget.hazardsRemaining - env.tally.hazards;
   if (budget <= 0) return no("hazard budget exhausted");
-  const leg = hazardLegProblem(env, intent.window);
+  const leg = legProblem(env, intent.window, "hazard");
   if (leg !== undefined) return no(leg);
   const windowTicks = faultWindowTicks(config, intent.window);
   const maxWindow = configTicks(config, config.narrator.maxFaultWindowSeconds);
@@ -444,6 +452,138 @@ function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<Na
       kind: intent.hazard,
       difficulty: config.hazards.difficulty[intent.difficulty],
       windowTicks: [windowTicks[0], windowTicks[1]],
+    },
+  });
+}
+
+/** D95: a scripted moment as a share of the severity's length. */
+export const FIELD_MOMENT_SHARE: Readonly<Record<FieldMoment, number>> = {
+  early: 0.15,
+  middle: 0.5,
+  late: 0.85,
+};
+/** D95: scripted impacts at the same moment land this many seconds apart. */
+export const FIELD_MOMENT_SPACING_SECONDS = 4;
+
+/** D95: is someone aboard (crew or passenger) called this? For the "not a target yet" drop. */
+function personNamed(env: Env, name: string): boolean {
+  const wanted = name.toLowerCase();
+  return Object.values(env.snapshot.state.actors).some((a) => a.name.toLowerCase() === wanted);
+}
+
+/**
+ * D95: a scripted impact's target by what the model wrote: a machine id aboard, a room's name,
+ * or a machine's name when only one machine aboard has it. A person is refused by name (bodies
+ * arrive in slice 6), anything else as unknown.
+ */
+function fieldTarget(env: Env, written: string): Outcome<ImpactTarget> {
+  const { snapshot, content } = env;
+  const state = snapshot.state;
+  const deckId = shipDeckOf(state);
+  const name = written.trim();
+  const machine = state.machines[name as MachineId];
+  if (machine !== undefined && machine.deckId === deckId) {
+    return ok({ kind: "machine", machineId: machine.id });
+  }
+  const wanted = name.toLowerCase();
+  const room = Object.values(state.compartments).find(
+    (c) =>
+      c.deckId === deckId &&
+      (c.id === name || compartmentName(content, state, c.id).toLowerCase() === wanted),
+  );
+  if (room !== undefined) return ok({ kind: "compartment", compartmentId: room.id });
+  const named = Object.values(state.machines).filter(
+    (m) => m.deckId === deckId && machineName(content, m).toLowerCase() === wanted,
+  );
+  const [only] = named;
+  if (only !== undefined && named.length === 1) {
+    return ok({ kind: "machine", machineId: only.id });
+  }
+  if (named.length > 1) {
+    return no(
+      `${named.length} machines aboard are called "${name}"; use the machine id (${named.map((m) => m.id).join(", ")})`,
+    );
+  }
+  if (personNamed(env, name)) {
+    return no(
+      `"${name}" is a person: people are not targets until bodies; aim at a machine or a room`,
+    );
+  }
+  return no(`no machine or room "${name}" aboard; use an id or room name from What you can do`);
+}
+
+type ScriptedIntent = Intent<"scheduleField">["scripted"][number];
+
+/** D95: the scripted impacts as the kernel takes them, moments turned into seconds. */
+function scriptedDrafts(
+  env: Env,
+  scripted: readonly ScriptedIntent[],
+  lengthSeconds: number,
+): Outcome<ScriptedImpactDraft[]> {
+  const drafts: ScriptedImpactDraft[] = [];
+  const atMoment: Partial<Record<FieldMoment, number>> = {};
+  for (const [index, impact] of scripted.entries()) {
+    const target = fieldTarget(env, impact.target);
+    if (!target.ok) return no(`scripted[${index}]: ${target.reason}`);
+    const earlier = atMoment[impact.at] ?? 0;
+    atMoment[impact.at] = earlier + 1;
+    const atSeconds = Math.min(
+      lengthSeconds - 1,
+      Math.round(lengthSeconds * FIELD_MOMENT_SHARE[impact.at]) +
+        earlier * FIELD_MOMENT_SPACING_SECONDS,
+    );
+    drafts.push({
+      atSeconds,
+      target: target.value,
+      ...(impact.rock === "" ? {} : { rock: impact.rock }),
+      ...(impact.effect === "" ? {} : { effect: impact.effect }),
+    });
+  }
+  return ok(drafts);
+}
+
+/**
+ * D95: `scheduleField`, the seventh lever (D92). No budget: one field per leg is the limit, as
+ * the kernel rules it. The window is the fault windows'; scripted hits are resolved by name and
+ * capped at `field.maxScripted`; the guard is the kernel's (scripted hits alone, an unsized rock
+ * priced large, must leave the hull above zero).
+ */
+function translateField(env: Env, intent: Intent<"scheduleField">): Outcome<NarratorDraft> {
+  const { snapshot } = env;
+  const config = snapshot.config;
+  const state = snapshot.state;
+  if (state.hull.lostAtTick !== undefined) return no("the ship is lost");
+  if (state.field !== undefined || env.tally.fields > 0) {
+    return no("this leg already has its field (one per leg); place the next on a later leg");
+  }
+  const leg = legProblem(env, intent.window, "field");
+  if (leg !== undefined) return no(leg);
+  const max = config.field.maxScripted;
+  if (intent.scripted.length > max) {
+    return no(`at most ${max} scripted impacts, got ${intent.scripted.length}`);
+  }
+  const lengthSeconds = config.field.severities[intent.severity].lengthSeconds;
+  const scripted = scriptedDrafts(env, intent.scripted, lengthSeconds);
+  if (!scripted.ok) return scripted;
+  const cost = scriptedHullDamage(config, scripted.value);
+  if (cost >= state.hull.integrity) {
+    return no(
+      `scripted impacts alone would sink the ship (${cost} hull points against ${state.hull.integrity} left); script fewer or smaller rocks`,
+    );
+  }
+  const windowTicks = faultWindowTicks(config, intent.window);
+  const maxWindow = configTicks(config, config.narrator.maxFaultWindowSeconds);
+  if (windowTicks[1] - windowTicks[0] > maxWindow || windowTicks[0] < 0) {
+    return no("window outside config bounds");
+  }
+  env.tally.fields += 1;
+  return ok({
+    kind: "scheduleField",
+    payload: {
+      severity: intent.severity,
+      detection: intent.detection,
+      windowTicks: [windowTicks[0], windowTicks[1]],
+      scripted: scripted.value,
     },
   });
 }
@@ -739,6 +879,8 @@ function translateByKind(env: Env, intent: NarratorIntent): Outcome<NarratorDraf
       return translateStock(env, intent);
     case "scheduleHazard":
       return translateHazard(env, intent);
+    case "scheduleField":
+      return translateField(env, intent);
   }
 }
 
@@ -855,6 +997,7 @@ export const translateIntents: TranslateIntents = (
       spawns: 0,
       faults: 0,
       hazards: 0,
+      fields: 0,
       // D70: a card on its way to the captain in person is as good as on screen.
       cardUsed:
         snapshot.state.decisions.queue.length > 0 || snapshot.state.decisions.held.length > 0,

@@ -1,4 +1,4 @@
-import type { PortDefId, RenderFrame } from "@crew/sim";
+import type { PortDefId, RenderFrame, RenderImpact, Tick } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { FramePlayback, interpolateFrame, interpolateTravel, lerp, lerpAngle } from "./playback";
 
@@ -34,6 +34,9 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     locals: [],
     dockProps: [],
     sessions: [],
+    hull: { integrity: 100, max: 100, scars: [], lost: false },
+    alert: false,
+    impacts: [],
   };
 }
 
@@ -279,5 +282,46 @@ describe("interpolateFrame and the dock's locals (D66)", () => {
     const prev = withLocals(frame(0, 0, 0), [{ id: "o1", x: 0, facing: 0 }]);
     const next = withLocals(frame(2, 0, 0), []);
     expect(interpolateFrame(prev, next, 0.5).locals).toEqual([]);
+  });
+});
+
+describe("interpolateFrame and the asteroid field (D92, D93)", () => {
+  function hit(tick: number, x: number): RenderImpact {
+    return { tick: tick as Tick, x, y: 3, rock: "small", tiles: [{ x, y: 3 }] };
+  }
+
+  it("snaps the hull, the alert and the field to the next frame", () => {
+    const prev = frame(0, 0, 0);
+    const next: RenderFrame = {
+      ...frame(2, 0, 0),
+      hull: { integrity: 92, max: 100, scars: [], lost: false },
+      alert: true,
+      field: { phase: "active", severity: "heavy", stuck: false },
+    };
+    const mid = interpolateFrame(prev, next, 0.25);
+    expect(mid.hull.integrity).toBe(92);
+    expect(mid.alert).toBe(true);
+    expect(mid.field).toEqual(next.field);
+    // A field that ended drops out at once, like the dock.
+    expect(interpolateFrame(next, prev, 0.25).field).toBeUndefined();
+  });
+
+  it("keeps both frames' impacts while blending, each once", () => {
+    const prev = { ...frame(0, 0, 0), impacts: [hit(0, 1)] };
+    const next = { ...frame(2, 0, 0), impacts: [hit(0, 1), hit(2, 5)] };
+    expect(interpolateFrame(prev, next, 0.5).impacts).toEqual([hit(0, 1), hit(2, 5)]);
+  });
+
+  it("carries the impacts of frames playback skipped onto the frame it shows", () => {
+    const playback = new FramePlayback(20);
+    playback.push(frame(0, 0, 0));
+    playback.push({ ...frame(2, 0, 0), impacts: [hit(2, 1)] });
+    playback.push({ ...frame(4, 0, 0), impacts: [hit(4, 2)] });
+    playback.push(frame(6, 0, 0));
+    playback.push(frame(8, 0, 0));
+    // Far enough at once to skip the frames at ticks 0, 2 and 4.
+    const step = playback.advance(320);
+    expect(step?.viewTick).toBe(6);
+    expect(step?.frame.impacts.map((i) => i.tick)).toEqual([2, 4]);
   });
 });

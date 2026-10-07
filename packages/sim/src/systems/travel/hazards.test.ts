@@ -439,12 +439,12 @@ describe("a hazard lies on its own leg only (D78)", () => {
     const test = freightTestWorld();
     const tick = test.world.state.tick;
     test.world.state.hazards = [
-      { id: "h1" as never, kind: "asteroidBelt", difficulty: 3, fireAtTick: tick + 50 },
+      { id: "h1" as never, kind: "ionStorm", difficulty: 3, fireAtTick: tick + 50 },
     ];
     const missed = step(test).find((e) => e.type === "navHazardMissed");
     expect(missed?.payload).toEqual({
       hazardId: "h1",
-      kind: "asteroidBelt",
+      kind: "ionStorm",
       difficulty: 3,
       fromPortId: PORTS.a,
     });

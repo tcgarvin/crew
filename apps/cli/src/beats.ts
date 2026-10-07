@@ -24,7 +24,11 @@
  *   longest stretch bored (recreation above `seekThreshold`, and above `RECREATION_HIGH`); at the
  *   end, the affinity extremes and every rivalry;
  * - machine wear (D90): each wearing machine's condition at the end of each ship's day, the
- *   lowest it fell to, and how often it was serviced.
+ *   lowest it fell to, and how often it was serviced;
+ * - the asteroid fields (D95, `beats-field.ts`): the run schedules one a leg (`--fields`), and
+ *   the report gives each field's rocks, hull lost, time stuck, first intercom report and ticker
+ *   lines, the totals per severity, scars patched and plated, and whether the ship was lost.
+ *   `--seeds` runs several seeds and says how many ships were lost over them.
  *
  * Unlike `crew pacing` there is no wall clock: the sim simply advances, so the numbers are sim
  * time and independent of playback speed. An event at tick T happened in the step ending at T,
@@ -37,6 +41,7 @@ import {
   type CommandId,
   type ContentBundle,
   type EventType,
+  FIELD_EVENT_TYPES,
   type Kernel,
   type MachineId,
   type NarratorHook,
@@ -53,11 +58,20 @@ import {
   watchTicks,
 } from "@crew/sim";
 import {
+  FIELD_PLANS,
+  type FieldPlan,
+  FieldScript,
+  FieldTally,
+  type FieldTallyResult,
+  fieldSection,
+} from "./beats-field";
+import {
   type PacingScenario,
   VoyageScript,
   createPacingRegistry,
   loadPacingContent,
 } from "./pacing";
+import { type ChunkedRun, drain, drainAsync } from "./yielding";
 
 // ---------------------------------------------------------------------------------------------
 // What is counted
@@ -721,6 +735,8 @@ export interface BeatsOptions {
   readonly scenario: PacingScenario;
   readonly days: number;
   readonly seed: number;
+  /** D95: which asteroid fields the run schedules, one a leg. */
+  readonly fields: FieldPlan;
 }
 
 export interface BeatsResult extends BeatsTallyResult {
@@ -746,6 +762,8 @@ export interface BeatsResult extends BeatsTallyResult {
   readonly affinityByDay: readonly AffinitySpread[];
   /** D90: every machine that wears, in deck order. */
   readonly machineWear: readonly MachineWear[];
+  /** D95: the asteroid fields and what they cost. */
+  readonly field: FieldTallyResult;
 }
 
 /** D90: how a wearing machine held up over the run. */
@@ -866,6 +884,16 @@ export interface TickerSample {
   readonly offWatch: boolean;
 }
 
+/** D95: how many of the last advance's ticker lines were the field family's. */
+function fieldTickerLines(world: World): number {
+  return world.caches.diagnostics.lastEvents.filter(
+    (event) =>
+      FIELD_EVENT_TYPES.has(event.type) &&
+      event.significance !== "trace" &&
+      tickerLine(event, world.state, world.content) !== null,
+  ).length;
+}
+
 /** The notable-or-better lines the last advance put on the ticker (as `getRenderFrame` does). */
 function tickerSamples(world: World): TickerSample[] {
   return world.caches.diagnostics.lastEvents.flatMap((event) =>
@@ -932,6 +960,18 @@ function rivalriesAtEnd(world: World): string[] {
 
 /** Run `days` ship's days of the pacing voyage and tally its beats. Deterministic per seed. */
 export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
+  return drain(beatsRun(options, kernel));
+}
+
+/** `runBeats`, letting the event loop run between chunks (for tests; see `yielding.ts`). */
+export function runBeatsAsync(options: BeatsOptions, kernel?: Kernel): Promise<BeatsResult> {
+  return drainAsync(beatsRun(options, kernel));
+}
+
+/** Advances between yields: 100 sim seconds at 20 Hz. */
+const ADVANCES_PER_CHUNK = 200;
+
+function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResult> {
   if (!Number.isInteger(options.days) || options.days <= 0) {
     throw new RangeError(`runBeats: days must be a positive integer, got ${options.days}`);
   }
@@ -965,13 +1005,18 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     }
   };
   let script = new VoyageScript(options.scenario, send);
+  const fieldScript = new FieldScript(options.fields, send);
+  const fieldTally = new FieldTally(options.fields, tickRate);
   let roundTrips = 0;
   let stuckAdvances = 0;
   const ticksPerDay = dayTicks(values, 1);
   const affinityByDay: AffinitySpread[] = [];
   const wear = new WearTally(world);
 
+  let advances = 0;
   while (world.state.tick < endTick) {
+    advances += 1;
+    if (advances % ADVANCES_PER_CHUNK === 0) yield;
     const before = world.state.tick;
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
@@ -979,6 +1024,8 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     wear.events(result.events, world);
     wear.sample(world);
     tally.tickerLines(tickerSamples(world));
+    fieldTally.events(result.events);
+    fieldTally.tickerLines(fieldTickerLines(world));
     if (advanced > 0) {
       stuckAdvances = 0;
       const people = crewSamples(world);
@@ -1005,6 +1052,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
       wear.endOfDay(world);
     }
     script.step(world, result.events);
+    fieldScript.step(world);
     if (script.done) {
       roundTrips += 1;
       script = new VoyageScript(options.scenario, send);
@@ -1022,6 +1070,9 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
         kind: "resolveDecision",
         payload: { decisionId: head, side: "left" },
       });
+    } else if (result.halt.kind === "lost") {
+      // D93: the hull gave way; the world never steps again, so the run ends here.
+      break;
     } else if (advanced === 0) {
       stuckAdvances += 1;
       if (stuckAdvances > 3) throw new Error(`beats run stuck at tick ${world.state.tick}`);
@@ -1043,6 +1094,7 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
     rivalries: rivalriesAtEnd(world),
     affinityByDay,
     machineWear: wear.result(),
+    field: fieldTally.result(world.state.tick, world.state.hull),
   };
 }
 
@@ -1052,17 +1104,35 @@ export function runBeats(options: BeatsOptions, kernel?: Kernel): BeatsResult {
 
 export interface BeatsCliOptions {
   readonly days: number;
-  readonly seed: number;
+  /** D95: one run per seed per scenario (`--seed 1`, or `--seeds 1-5`). */
+  readonly seeds: readonly number[];
   readonly scenarios: readonly PacingScenario[];
+  readonly fields: FieldPlan;
   readonly json: boolean;
 }
 
-const USAGE = "crew beats [--days 3] [--seed 1] [--scenario plain|freight|both] [--json]";
+const USAGE =
+  "crew beats [--days 3] [--seed 1 | --seeds 1-5] [--scenario plain|freight|both] [--fields none|light|heavy|brutal|cycle] [--json]";
+
+/** "1-5" → [1, 2, 3, 4, 5]; "3" → [3]; undefined when it is neither. */
+function parseSeedRange(value: string | undefined): number[] | undefined {
+  const match = /^(-?\d+)(?:-(-?\d+))?$/.exec(value ?? "");
+  if (match === null) return undefined;
+  const from = Number(match[1]);
+  const to = match[2] === undefined ? from : Number(match[2]);
+  if (to < from) return undefined;
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+function isFieldPlan(value: string | undefined): value is FieldPlan {
+  return (FIELD_PLANS as readonly (string | undefined)[]).includes(value);
+}
 
 export function parseBeatsArgs(args: readonly string[]): BeatsCliOptions | { error: string } {
   let days = 3;
-  let seed = 1;
+  let seeds: readonly number[] = [1];
   let scenarios: readonly PacingScenario[] = ["plain", "freight"];
+  let fields: FieldPlan = "cycle";
   let json = false;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -1085,10 +1155,26 @@ export function parseBeatsArgs(args: readonly string[]): BeatsCliOptions | { err
         if (value === undefined || !Number.isInteger(parsed)) {
           return { error: `--seed: bad value "${value ?? ""}"` };
         }
-        seed = parsed;
+        seeds = [parsed];
         i += 1;
         break;
       }
+      case "--seeds": {
+        const range = parseSeedRange(value);
+        if (range === undefined) {
+          return { error: `--seeds: expected a seed or a range like 1-5, got "${value ?? ""}"` };
+        }
+        seeds = range;
+        i += 1;
+        break;
+      }
+      case "--fields":
+        if (!isFieldPlan(value)) {
+          return { error: `--fields: expected ${FIELD_PLANS.join(", ")}, got "${value ?? ""}"` };
+        }
+        fields = value;
+        i += 1;
+        break;
       case "--scenario":
         if (value === "both") scenarios = ["plain", "freight"];
         else if (value === "plain" || value === "freight") scenarios = [value];
@@ -1099,7 +1185,7 @@ export function parseBeatsArgs(args: readonly string[]): BeatsCliOptions | { err
         return { error: `unknown option "${arg}"` };
     }
   }
-  return { days, seed, scenarios, json };
+  return { days, seeds, scenarios, fields, json };
 }
 
 const pct = (share: number): string => `${Math.round(share * 100)}%`;
@@ -1108,7 +1194,7 @@ const fmt = (n: number, digits = 1): string => n.toFixed(digits);
 function scenarioSection(r: BeatsResult): string[] {
   const lines = [
     "",
-    `## Scenario: ${r.scenario} (${r.roundTrips} round trip${r.roundTrips === 1 ? "" : "s"})`,
+    `## Scenario: ${r.scenario}, seed ${r.seed} (${r.roundTrips} round trip${r.roundTrips === 1 ? "" : "s"})`,
     "",
     "| Beat | Total | Per watch (mean) | Least | Most |",
     "|---|---|---|---|---|",
@@ -1156,7 +1242,7 @@ function scenarioSection(r: BeatsResult): string[] {
       `| ${p.name} | ${shares.join(" | ")} | ${fmt(p.longestIdleSeconds, 0)} | ${p.daysRecreated}/${r.days} | ${fmt(p.longestBoredSeconds, 0)} | ${fmt(p.longestVeryBoredSeconds, 0)} | ${sleeps} |`,
     );
   }
-  lines.push(...offWatchLines(r), ...wearLines(r));
+  lines.push(...offWatchLines(r), ...wearLines(r), ...fieldSection(r.field));
   const other = Object.entries(r.otherLabels);
   if (other.length > 0) {
     lines.push(
@@ -1218,8 +1304,13 @@ function offWatchLines(r: BeatsResult): string[] {
 export function formatBeatsReport(results: readonly BeatsResult[]): string {
   const first = results[0];
   if (first === undefined) return "beats: no results";
+  const seeds = [...new Set(results.map((r) => r.seed))];
+  const seedWord = seeds.length === 1 ? `seed ${seeds[0]}` : `seeds ${seeds.join(", ")}`;
+  const lost = results.filter((r) => r.field.lostAtSeconds !== null);
   return [
-    `# Beats: ${first.days} day${first.days === 1 ? "" : "s"}, ${first.watches} watches of ${fmt(first.watchSeconds, 0)} s (seed ${first.seed}, instant narrator, cards answered left)`,
+    `# Beats: ${first.days} day${first.days === 1 ? "" : "s"}, ${first.watches} watches of ${fmt(first.watchSeconds, 0)} s (${seedWord}, instant narrator, cards answered left, fields ${first.field.plan})`,
+    "",
+    `Ships lost: ${lost.length} of ${results.length} run${results.length === 1 ? "" : "s"}${lost.length === 0 ? "" : ` (${lost.map((r) => `${r.scenario} seed ${r.seed}`).join(", ")})`}.`,
     ...results.flatMap(scenarioSection),
   ].join("\n");
 }
@@ -1230,8 +1321,10 @@ export function runBeatsCli(args: readonly string[]): { output: string; exitCode
     return { output: `crew beats: ${options.error} (usage: ${USAGE})`, exitCode: 1 };
   }
   const kernel = createKernel(createPacingRegistry());
-  const results = options.scenarios.map((scenario) =>
-    runBeats({ scenario, days: options.days, seed: options.seed }, kernel),
+  const results = options.scenarios.flatMap((scenario) =>
+    options.seeds.map((seed) =>
+      runBeats({ scenario, days: options.days, seed, fields: options.fields }, kernel),
+    ),
   );
   const output = options.json ? JSON.stringify(results, null, 2) : formatBeatsReport(results);
   return { output, exitCode: 0 };

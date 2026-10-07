@@ -178,9 +178,10 @@ const ofType = <T extends SimEvent["type"]>(log: RunLog, type: T) =>
 
 /**
  * Real content and every system: 5-10 s alone since D76 made Kessler–Ossory a 400 s spur (the
- * passage is ~400 sim-s, was ~320), and 2-3× that under the full parallel suite.
+ * passage is ~400 sim-s, was ~320), and 2-3× that under the full parallel suite; slice 5's
+ * sixteen intercom panels made every tick dearer and the run reached 47 s under load.
  */
-const REAL_CONTENT_TIMEOUT_MS = 45_000;
+const REAL_CONTENT_TIMEOUT_MS = 90_000;
 
 describe("round-trip passage Hub -> Ossory through Kessler (real content, every system)", () => {
   it(

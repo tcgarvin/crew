@@ -59,7 +59,8 @@
               "battery",
               "lifeSupport",
               "cooling",
-              "rampControl"
+              "rampControl",
+              "comm"
             ]
           },
           "zoneTag": {
@@ -196,7 +197,8 @@
             "satWithTheCaptain",
             "heardOut",
             "dressedDown",
-            "ateATreat"
+            "ateATreat",
+            "nearMiss"
           ]
         },
         "lose": {
@@ -227,7 +229,8 @@
             "satWithTheCaptain",
             "heardOut",
             "dressedDown",
-            "ateATreat"
+            "ateATreat",
+            "nearMiss"
           ]
         },
         "joined": {
@@ -258,7 +261,8 @@
             "satWithTheCaptain",
             "heardOut",
             "dressedDown",
-            "ateATreat"
+            "ateATreat",
+            "nearMiss"
           ]
         },
         "listened": {
@@ -289,7 +293,8 @@
             "satWithTheCaptain",
             "heardOut",
             "dressedDown",
-            "ateATreat"
+            "ateATreat",
+            "nearMiss"
           ]
         },
         "listenedDislike": {
@@ -320,7 +325,8 @@
             "satWithTheCaptain",
             "heardOut",
             "dressedDown",
-            "ateATreat"
+            "ateATreat",
+            "nearMiss"
           ]
         }
       },
@@ -424,7 +430,9 @@
             "meal",
             "book",
             "instrument",
-            "treat"
+            "treat",
+            "patchKit",
+            "plating"
           ]
         },
         "own": {
@@ -475,7 +483,11 @@
           "reserveLow",
           "mealToCook",
           "mealToCarry",
-          "compartmentDirty"
+          "compartmentDirty",
+          "machineDamaged",
+          "hullScar",
+          "hullDamaged",
+          "compartmentToCheck"
         ]
       }
     }

@@ -16,6 +16,7 @@ export const compartmentDefSchema = z.strictObject({
   key: localKeySchema,
   symbol: z.string().length(1).regex(/^\S$/),
   name: z.string().min(1),
+  phrase: z.string().min(1).exactOptional(),
   tags: z.array(z.string()),
 });
 
@@ -75,5 +76,7 @@ export const deckDefSchema = z.strictObject({
   hull: z.strictObject({
     class: z.string().min(1),
     sizeClass: hullSizeClassSchema,
+    /** D93: the hull bar's full value in hull points. */
+    max: positiveInt,
   }),
 }) satisfies z.ZodType<DeckDef>;

@@ -10,6 +10,8 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
  * knowledge or money directly; no such command exists. D47 (owner-approved vocabulary change,
  * D6/D11): `stockMarket` sets what a port sells, never what the ship has or owes. D78: the sixth
  * lever, `scheduleHazard`, places a piloting check the sim rolls; it never decides the outcome.
+ * D92: the seventh, `scheduleField`, places an asteroid field; the sim rolls the impacts, and the
+ * narrator's scripted ones can never alone sink the ship.
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
@@ -19,6 +21,7 @@ export const NARRATOR_COMMAND_KINDS = [
   "stockMarket",
   "stageDock",
   "scheduleHazard",
+  "scheduleField",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
@@ -86,5 +89,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "stageDock",
     "scheduleHazard",
     "privateTalk",
+    "scheduleField",
   ],
 };
