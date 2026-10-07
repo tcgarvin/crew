@@ -75,7 +75,7 @@ async function liveRun(
     transport: openRouterTransport({ apiKey, appTitle: "Crew live tests" }),
     model: options.model ?? model,
     notes: options.notes,
-    reasoningEffort,
+    ...(reasoningEffort ? { reasoningEffort } : {}),
   });
 }
 
