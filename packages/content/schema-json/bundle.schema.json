@@ -56,6 +56,10 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "phrase": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "tags": {
                   "type": "array",
                   "items": {
