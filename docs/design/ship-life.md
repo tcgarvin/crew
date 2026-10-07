@@ -557,6 +557,9 @@ Open:
    automatic re-forming of the watch bill, with a narrator card only when the shortfall will
    outlast a day.
 2. **Target play speed** — which speed should a quiet stretch be tuned for (1×, or 4× with
-   auto-slowdown)? Settle after the first slice-2 playtest using the beats-per-watch report.
+   auto-slowdown)? Recommended at slice-5 integration (D95), for the owner to confirm: 2×, with
+   auto-slowdown to 1× for set pieces and 4×/8× as skip speeds; at 4× the narrator's run-ahead
+   is shorter than its latency and every call stalls the ship (19 % of wall time over a round
+   trip), and a watch's ~39 ticker lines come one every 2.6 s.
 3. **Hazard frequency** — narrator-scheduled only, or also a kernel-sampled rate per route?
    Recommendation: narrator-only first, so every hazard is placed for a reason.

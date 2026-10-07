@@ -1677,3 +1677,154 @@ waits for their watch", "leaving it to Priya Kessler, who is better at it"). `we
 (planner, pure over the `AgentView`) returns the ranking and the selector's intent; the worker
 words it (`apps/web/src/worker/weighing.ts`, where the names are) and ships it with the agent view.
 It is computed on the tap, never stored, so saves and the pipeline are unchanged.
+
+**D91. Ship Life is re-sequenced around the asteroid field.** Slice 5 as first sequenced
+(engineering-console diagnostics, drills, a station framework with tactical and shields on an
+`alert` state nothing raised, `seedTopic`) built machinery with nothing to do. Re-planned with the
+owner on 2026-10-06, slice 5 builds the threat first: a narrator-scheduled asteroid field the ship
+crosses in transit, the damage it does, and how the crew find, report and repair it (D92-D95).
+The later slices answer it: 6 atmosphere and breaches with bodies and the medic (the narrator's
+`target` gains a person), 7 fire, 8 tactical, shields and the station framework. Drills are cut
+(the owner wants no muster drills); `seedTopic` and engineering-console diagnostics move to later;
+PLAN §7's deferral of atmosphere, fire, breaches and bodies is lifted in that order. Nobody aboard
+is hurt in slice 5: a rock on an occupied tile gives a `nearMiss` thought and a ticker line, and no
+pretend injury state exists before bodies do.
+
+**D92. The asteroid field.** A narrator beat, not a route property: `scheduleField` (the seventh
+narrator lever and a scenario command) replaces the `asteroidBelt` hazard kind (the instant
+`debrisField` and `ionStorm` stay the helm's; a pending `asteroidBelt` migrates to a `debrisField`
+at the same difficulty). It carries `severity` (`light | heavy | brutal`: rate, large-rock share and
+length from `field.severities`), `detection` (`rolled`: the helm-stander's piloting against the
+severity's hazard tier 12 s ahead; `unseen`: the first rock is the news), `windowTicks` sampled as
+`scheduleHazard`'s, and up to three scripted impacts `{ atSeconds, target, rock?, effect? }` aimed
+at a machine, a compartment or a tile (a person is refused until bodies). One field a leg, no
+budget. The kernel's guard prices an absent rock as large and refuses scripted hits that alone
+would take the hull to zero; random rocks can, which is the danger. A field scheduled before
+transit is held until the first transit tick, so the helm's check always gets its full warning;
+it lies along `lengthSeconds × nominalSpeed` of route from there and ends by the approach lead
+at the latest (`stageDock` holds transit at the leg's end), and a field due past that is missed
+(`fieldMissed`). Scripted hits thin the random rate by their share, so a scripted field is no
+heavier. Impacts are uniform over the deck's footprint (every deck tile: walls are edges here),
+Poisson at `impactsPerMinute × (1 − 0.4 × skill/10)` with someone at the helm and × 1.5 with
+nobody; a large rock hits its tile and the eight around it; every rock costs the hull once
+(small 3, large 8) and leaves a scar on its centre tile. Each machine in the blast rolls once on a
+weighted table (none, graze −0.2, damage −0.5, knockout to 0, or one of its faults through the
+fault path; a machine with no faults left rolls damage). The ship goes on alert at a sighting or
+the first rock (`WorldState.alert`, cleared 60 s after the field). Stuck is a clock: with the
+engines out the ship makes no way, stays in the rocks at × 0.7 the rate, and drifts clear after
+six such rocks; fixing the engines resumes it. An unnoticed field that hit nothing clears as
+trace. Tuned (slice-5 integration, D95): brutal throws 4.5 rocks a minute (was 6).
+
+**D93. A global hull bar and ship loss, superseding simulation-design §10.6.** `WorldState.hull
+{ integrity; max; scars; lostAtTick? }`, `max` from the deck's hull class (100 on Mk1 and Mk2);
+`integrity` is always `max` minus every scar's damage not yet recovered (an invariant; the field
+charges, damage response patches and plates, all through `core/hull.ts`). Underway a scar is
+patched with a patch kit (two per locker zone, 24 aboard Mk2; welder, engineering 1, 20 s) for
+half its damage; at a port that sells hull plating (all six do; Vesper Gate's line is at count 0)
+`hullDamaged` buys a plate per unplated scar through commerce's parts purchase (`buySpec`) and
+`plateHull` restores the rest and removes the scar. Impact damage to a machine is its own problem,
+`machineDamaged`, repaired to whole with the welder (30 s per unit of integrity), separate from
+faults (a `fault` effect takes the fault's own recipe). Nothing gates departure on the hull: a
+conflict between repairs and a departure, short money or no plating here is the narrator's hook,
+not a check. Hull zero is game over: `shipLost`, `lostAtTick`, and `advance` halts `{ kind:
+"lost" }` for good (a lost save restores lost); the web shows an end screen with a new-game
+button. Slice-5 integration: impact damage to the engine or life support is containment like a
+fault there, and on alert the generator joins them and a symptom on any of them is containment
+(before, a knocked-out engine waited behind a dozen essential patches and checks, and a shorted
+generator's off-watch electrician slept on: one ship sat stuck 183 s in a light field and was
+lost); Mk2 carries a second welder torch on the parts shelves (the patcher held the only one while
+the engine waited; a migrated save keeps the one it has). The officer of the watch on alert takes
+no damage work and holds the bridge.
+
+**D94. Intercom panels and reporting.** Every rock is felt by everyone aboard (a `hullImpact` fact
+about the field) and placed only by those in the room; a sleeper there wakes. The bridge has no
+hull sensors: the player sees the hull bar fall, the crew learn where by eyes and the intercom.
+Sixteen `machine.intercom` panels (one per compartment on Mk2, eight on Mk1). Whoever sees damage
+on alert that the ship has not heard of (an open `machineDamaged`, `hullScar` or `machineSymptom`
+raised since the alert, `discovered`, held by direct sight) walks to the nearest panel they believe
+working and reports for 3 s: a planner reflex in the containment class, not a weighed task. The
+report gives every crew member the reporter's facts as `report` evidence with the original
+observation tick, marks `alert.reports` for each room covered, and flips each problem it carries
+to `public` (an intercom report makes it ship-wide knowledge), which is what ends the reflex. A dead
+panel sends the reporter to the next; slice-5 integration: a panel found without power marks every
+unpowered panel dead for that reporter (with the generator out, reporters toured all sixteen dark
+panels for minutes). The officer of the watch holds the bridge and raises `compartmentToCheck`
+(public, essential) for a room nobody has covered since the last rock; the nearest on-watch hand
+(never the captain or the officer) is sent, and the check settles by a report, the scout's look, or
+the alert clearing. Slice-5 integration: re-checking every unwatched room after every rock sent
+about 35 scouts a heavy field, so a room is now looked at once while the rocks fall and once more
+when the field ends, any crew member in it (on watch or off, awake or asleep) covers it, and
+`scoutSent` and `hullPatched` are trace, off the ticker (the deck labels and the hull bar show
+them). Scouts fell from 19 to 7 a field in the beats below.
+
+**D95. Save schema 12, prompt v0.24, the field on the phone, the beats field section, and the
+play-speed recommendation.** Schema 11 → 12 adds `hull` (whole, from the save's deck), `field`,
+`alert` and the `field`/`scar` counters, rewrites a pending `asteroidBelt`, and stows the scenario's
+patch kits. On the phone: two hash-seeded rock layers (behind the hull and a sparser one over it)
+scroll with the stars while a field is near or active and stand still while stuck; an impact
+flashes its tiles once at playback; scars are an overlay from `RenderFrame.hull.scars` under the
+actors (patched dimmer), pickable and listed in the room inspection; a hull bar beside the ship's
+state, red below a third; alert tints the top bar and the bell line reads "ALERT" (shortened to
+"White" below 430 px); `shipLost` shows the end screen, including for a save loaded already lost.
+Auto-slowdown fires on `fieldSighted`, `fieldEntered`, `shipStuck`, `machineKnockedOut` and
+`shipLost`; the narrator is hooked on `fieldSighted`, `fieldEntered`, `fieldCleared` and
+`shipStuck`. The narrator's seventh lever, `scheduleField`, names scripted hits by machine id or
+room name and lands them early, middle or late in the field; the translator enforces the hull
+guard and drops a person with "people are not targets until bodies". The digest gains the hull
+(scars patched and not, the ship leaving with repairs unfinished), the field scheduled or in
+progress, damage the crew know against damage that exists, and who reported. Prompt v0.24 makes a
+field a set piece, never filler, weighed against the hull. In the live run (`pnpm test:live`, all
+eight green) the model never reached for a field on its own on a first call, preferring an easy
+debris field; given a thread whose next beat is "the lane proves him right", it scheduled a heavy
+`rolled` field with the coolant pump knocked out late (a valid machine id, translated to 115 s
+into a 135 s field) and, another time, a light field reasoned as survivable at full hull. `crew
+beats` gains `--fields none|light|heavy|brutal|cycle` (a field on each leg long enough to hold
+one, at its transit) and `--seeds 1-5`, and a field section (per severity and per field: rocks,
+hull lost, stuck time, first report, field ticker lines; scars patched and plated, machines mended,
+scouts, ships lost).
+
+*Tuning (seeds 1-5, both scenarios).* Before is the merged slice, after is the integration fixes
+and brutal at 4.5 rocks a minute (at 5 the first brutal field cost 42-94); hull lost per field
+with a manned helm, means with ranges; "cycle" is 3 days of `--fields cycle`, the severity runs
+2 days of one severity on every long leg.
+
+| | Before (merge) | After |
+|---|---|---|
+| Light (< 15) | 7.0, 2 fields (the rest on 25 s hops) | 7.9 [3-17] light runs; 10.8 cycle |
+| Heavy (25-45) | 31.2 [3-50] | 32.2 [3-54] heavy runs; 31.1 [17-46] cycle |
+| Brutal (50-80) | 56.0 [44-92], cycle, any hull | 62.6 [39-75], the first, from a whole hull |
+| Ships lost, cycle, 3 days | 10 of 10 | 3 of 10, each in a field entered at hull 56 or less |
+| Longest stuck (field length) | none seen | light 98 s (90), heavy 134 (135), brutal 123 (180) |
+| First report after the first rock | mean 14 s, max 33 s | mean 13-19 s, max 56 s |
+| Field ticker lines, mean (max) | heavy 57 (90), brutal 21 (49) | 8 (17), 11 (20), 14 (25) |
+| Scouts a field | 19 | 7 |
+
+No ship was lost in its first field of any severity; every loss came on a later leg after the
+beats script, a captain who never waits, sailed before the plating was done (plated 0-7 of 24
+scars a run), which is the narrator's conflict to tell (D93) and which the prompt forbids it to
+compound. A first report slower than 30 s is a first rock in an empty room, found by a scout.
+Known and not fixed: a random wear fault on the engine just before the rocks counts as stuck from
+the field's start, and the fault recipe's four tools make that repair slow (one heavy field stuck
+204 s, drifting clear); room names read "the engineering" in ticker lines and labels; the 24
+patch kits are spent in two or three fields (every cycle run patched 24 scars) and nothing
+restocks them unless someone buys them at Crossroads Hub or Ossory Station (no reserve rule keeps
+them, unlike spares), so later scars wait for plating at port.
+
+*The suite under load.* The merged slice passed every test and `pnpm test` still exited 1:
+Vitest's worker reports over an RPC with a fixed 60 s timeout, and a synchronous stretch past a
+minute (a real-content beats day, or full-sim tests back to back, which the runner starts without
+returning to the event loop) trips it. `runBeats` and `runPacing` are generators the tests drain
+with a yield between chunks (`apps/cli/src/yielding.ts`), a shared `vitest.setup.ts` turns the
+event loop after every test, and the sim project's per-test timeout is 15 s.
+
+*Target play speed (ship-life §13, open question 2): a recommendation for the owner to confirm,
+not a ruling.* Tune the quiet stretch for **2×**, with auto-slowdown to 1× for set pieces and 4×
+and 8× as skip speeds. Evidence: `crew pacing` (plain round trip, seed 1, 25 s narrator latency)
+runs 1415 sim s in 1420 s of wall time at 1× (4.8 s stalled on the narrator), 723 s at 2× (15 s,
+2 %), 434 s at 4× (80 s, 19 %) and 305 s at 8× (128 s, 42 %): the narrator's 60 s of run-ahead
+is 15 s of wall time at 4×, under its latency, so every call freezes the ship at 4× and above.
+The beats show 39 ticker lines a 400 s watch with fields or without (38.8 and 38.6), so a line
+every 10 s at 1×, 5 s at 2× (readable) and 2.6 s at 4× (not, without the slowdown). A field is
+the one beat dense enough for 1×, and its sighting or first rock already drops the speed there.
+If the owner prefers 4× as the target, the run-ahead cap (`host.runAheadCapSeconds`) wants about
+100 s first so a narrator call stops stalling it.
