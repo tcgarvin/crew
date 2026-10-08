@@ -149,6 +149,13 @@ export interface HookContexts {
   quietTooLong: { quietSinceTick: Tick };
   notableEvent: { eventIds: EventId[] };
   policyDecision: { decisionId: DecisionId; machineId?: MachineId };
+  /**
+   * D99: the call the narrator asked for (`NarratorState.callBack`), now due: the tick the ship
+   * cast off (`departure`) or halfway through a transit (`midLeg`). `why` is its own private line,
+   * read back to it; `requestedTick` is when it asked. A `nextPort` request raises nothing: it
+   * is served by the first story hook docked elsewhere.
+   */
+  requestedCall: { when: "departure" | "midLeg"; why: string; requestedTick: Tick };
 }
 
 export type NarratorHookKind = keyof HookContexts;
@@ -166,6 +173,37 @@ interface NarratorHookBase<K extends NarratorHookKind> {
  * `hookResolved`. Only one hook is pending at a time.
  */
 export type NarratorHook = { [K in NarratorHookKind]: NarratorHookBase<K> }[NarratorHookKind];
+
+/** D99: when the narrator wants its next call. `nextPort` is the default and raises nothing. */
+export const CALL_BACK_WHEN = ["nextPort", "departure", "midLeg"] as const;
+export type CallBackWhen = (typeof CALL_BACK_WHEN)[number];
+
+/** D99: the longest private `why` a call-back request may carry. */
+export const CALL_BACK_WHY_MAX = 200;
+
+/**
+ * D99: the narrator's standing request for its next call (the `requestCall` command). One at a
+ * time; every story call's plan replaces it. It is deleted when the hook that served it is
+ * acknowledged; a request that never comes due stands until the next one replaces it.
+ */
+export interface CallBackRequest {
+  when: CallBackWhen;
+  /** Private, read back on the call it asked for; at most `CALL_BACK_WHY_MAX` characters. */
+  why: string;
+  requestedTick: Tick;
+  /**
+   * `nextPort` only: the port the ship was docked at when asked (absent if asked in flight). It
+   * is served by the first story hook raised while docked anywhere else.
+   */
+  portId?: PortDefId;
+  /**
+   * `midLeg` only: asked in transit before the halfway point, so this transit (its
+   * `stageStartedTick`) is the one meant. Absent otherwise: the next transit is.
+   */
+  legStartedTick?: Tick;
+  /** The story hook that served it; `acknowledgeHook` deletes the request with that hook. */
+  servedByHookId?: HookId;
+}
 
 /**
  * Narrator-facing bookkeeping kept in sim state (review §D.3: budgets are state).
@@ -190,13 +228,15 @@ export interface NarratorState {
   recentHookIds: HookId[];
   /**
    * The most recent `narrative`-significance event committed (phase 8, `core/pipeline.ts`),
-   * preferring within one tick an event whose type is in `config.narrator.hookOnEvents`. Travel
+   * preferring within one tick an event whose type is in `config.narrator.hookOnEvents` (D100: or
+   * a hookable aftermath event, which may be of `notable` significance). Travel
    * raises the `notableEvent` hook from it the following tick (events are stamped after the
    * systems run, so a hook cannot be raised in the same tick), by way of `pendingNotable`.
    */
   lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
   /**
-   * D69: the latest hookable event (type in `config.narrator.hookOnEvents`) still owed a
+   * D69: the latest hookable event (type in `config.narrator.hookOnEvents`, or D100's
+   * `aftermathHookOnEvents` that passes its filter) still owed a
    * `notableEvent` hook. Set when it is committed (phase 8); travel raises the hook from it the
    * first tick no other hook is pending, so a staging call raised the tick after the event no
    * longer swallows it. A story hook raised after the event clears it, since that call reads
@@ -212,4 +252,6 @@ export interface NarratorState {
    * the answer names, for the rest of the docking, even if the command perspective (D8) moves.
    */
   captainAshoreLastAsk?: { portId: PortDefId; tick: Tick; actorId: ActorId };
+  /** D99: the narrator's standing call-back request; absent when none stands. */
+  callBack?: CallBackRequest;
 }

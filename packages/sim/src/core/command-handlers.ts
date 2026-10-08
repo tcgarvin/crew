@@ -1,7 +1,7 @@
 /**
  * Handlers for the kernel-owned command kinds: scenario setup (`scenarioSpawn`,
- * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `surfaceDecision` and
- * `resolveDecision`. Other kinds belong to their systems and register through the same
+ * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `requestCall` (D99),
+ * `surfaceDecision` and `resolveDecision`. Other kinds belong to their systems and register through the same
  * `registerCommandHandler` path.
  */
 import { commandActor, isFitForCommand } from "./command-actor";
@@ -34,7 +34,13 @@ import type {
 import { AUTHORITY } from "./types/commands/authority";
 import type { PhysicalLocation } from "./types/common";
 import type { CrewDef } from "./types/content";
-import type { Decision, DecisionOption } from "./types/decisions";
+import {
+  CALL_BACK_WHEN,
+  CALL_BACK_WHY_MAX,
+  type CallBackRequest,
+  type Decision,
+  type DecisionOption,
+} from "./types/decisions";
 import type { ActorId, CommandId, DecisionId, EntityId, TempRef } from "./types/ids";
 import type { Item } from "./types/ship";
 
@@ -390,12 +396,77 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
     const hookId = command.payload.hookId;
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined` (CONTRACTS rule 2).
     delete narrator.pendingHook;
+    // D99: the call-back request this hook served is spent. A fresh one applied earlier in the
+    // same tick (the plan's `requestCall` runs before the ack) has no `servedByHookId`, so it
+    // stands.
+    if (narrator.callBack?.servedByHookId === hookId) {
+      // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+      delete narrator.callBack;
+    }
     pushCapped(narrator.recentHookIds, hookId, RECENT_HOOK_IDS_CAP);
     ctx.emit({
       ...causedBy(command),
       type: "narratorHookResolved",
       subjectIds: [hookId],
       payload: { hookId },
+    });
+    return NO_TEMP_REFS;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// requestCall (D99)
+// ---------------------------------------------------------------------------------------------
+
+/** Why `why` is not a private line a call-back request can carry, or undefined. */
+function whyProblem(why: unknown): string | undefined {
+  if (typeof why !== "string") return "why must be text";
+  if (why.length > CALL_BACK_WHY_MAX) return `why is longer than ${CALL_BACK_WHY_MAX} characters`;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to find them.
+  if (/[\u0000-\u001f\u007f]/.test(why)) return "why has control characters";
+  return undefined;
+}
+
+/**
+ * D99: replace the narrator's standing call-back request. The whole request is replaced, so a
+ * new one is never already served. It remembers the port it was asked at (a `nextPort` request
+ * is served elsewhere) and, for `midLeg` asked before a transit's halfway point, that transit.
+ */
+const requestCall: CommandHandler<"requestCall", null> = {
+  validate(ctx, command) {
+    const { when, why } = command.payload;
+    if (!(CALL_BACK_WHEN as readonly unknown[]).includes(when)) {
+      return reject(
+        "invalidPayload",
+        `requestCall: when must be one of ${CALL_BACK_WHEN.join(", ")}, got "${String(when)}"`,
+      );
+    }
+    const problem = whyProblem(why);
+    if (problem !== undefined) return reject("invalidPayload", `requestCall: ${problem}`);
+    if (ctx.state.hull.lostAtTick !== undefined) {
+      return reject("preconditionFailed", "requestCall: the ship is lost");
+    }
+    return ok(null);
+  },
+  apply(ctx, command) {
+    const { when, why } = command.payload;
+    const travel = ctx.state.travel;
+    const request: CallBackRequest = { when, why, requestedTick: ctx.tick };
+    if (travel.stage === "docked") {
+      request.portId = travel.portId;
+    } else if (
+      when === "midLeg" &&
+      travel.stage === "transit" &&
+      travel.routeProgress < travel.routeDistance / 2
+    ) {
+      request.legStartedTick = travel.stageStartedTick;
+    }
+    ctx.state.narrator.callBack = request;
+    ctx.emit({
+      ...causedBy(command),
+      type: "callBackRequested",
+      subjectIds: [],
+      payload: { when },
     });
     return NO_TEMP_REFS;
   },
@@ -619,6 +690,7 @@ export function registerCoreCommandHandlers(registry: KernelRegistry): void {
   registry.registerCommandHandler("scenarioInjectFault", scenarioInjectFault);
   registry.registerCommandHandler("scenarioSetNeeds", scenarioSetNeeds);
   registry.registerCommandHandler("acknowledgeHook", acknowledgeHook);
+  registry.registerCommandHandler("requestCall", requestCall);
   registry.registerCommandHandler("surfaceDecision", surfaceDecisionHandler(registry));
   registry.registerCommandHandler("resolveDecision", resolveDecisionHandler(registry));
 }

@@ -21,6 +21,12 @@ describe("loadBundle", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("calls the narrator in the aftermath on alertCleared, navHazard and faultRepaired, and no longer on fieldCleared (D100)", () => {
+    const narrator = authoredBundle().config.narrator;
+    expect(narrator.aftermathHookOnEvents).toEqual(["alertCleared", "navHazard", "faultRepaired"]);
+    expect(narrator.hookOnEvents).not.toContain("fieldCleared");
+  });
+
   it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (D71)", () => {
     const raw = rawBundle() as { scenarios: Record<string, { startingItems: unknown[] }> };
     const scenario = raw.scenarios["scenario.default_freighter_run"];

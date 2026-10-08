@@ -170,9 +170,9 @@
       "passengerReturned",
       "fieldSighted",
       "fieldEntered",
-      "fieldCleared",
       "shipStuck"
     ],
+    "aftermathHookOnEvents": ["alertCleared", "navHazard", "faultRepaired"],
     "hazardBudget": 2
   },
   "host": {

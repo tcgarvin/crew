@@ -145,7 +145,10 @@ function advanceRepair(ctx: RecipeCtx, task: Task, actorId: ActorId, ticks: numb
         0,
         1,
       );
-      events.push(machineEvent("faultRepaired", machineId, { machineId, faultKey }));
+      // D100: the repair names what caused the fault, so the narrator's aftermath call comes
+      // for a fault it (or its hazard, or its field) caused, never for wear.
+      const causes = fault.causeCommandId === undefined ? [] : [fault.causeCommandId];
+      events.push(machineEvent("faultRepaired", machineId, { machineId, faultKey }, causes));
       // D82: a repair leaves its mess round the machine (its placement's origin tile).
       const origin = ctx.content.decks[machine.deckId]?.machines.find(
         (p) => p.key === machine.placementKey,

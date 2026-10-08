@@ -557,6 +557,25 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(world.state.tick + 20);
   });
 
+  it("fills aftermathHookOnEvents from content for a save from before D100, keeping its own hookOnEvents", () => {
+    const { world, registry } = tinyTestWorld();
+    const envelope = serialize(world);
+    const { aftermathHookOnEvents: _list, ...narrator } = envelope.config.narrator;
+    const old = {
+      ...envelope,
+      config: { ...envelope.config, narrator: { ...narrator, hookOnEvents: ["fieldCleared"] } },
+    } as unknown as typeof envelope;
+    const content = tinyContent({
+      ...tinyConfig(),
+      narrator: { ...tinyConfig().narrator, aftermathHookOnEvents: ["alertCleared"] },
+    });
+
+    const restored = restore(old, content, registry);
+    expect(restored.config.values.narrator.aftermathHookOnEvents).toEqual(["alertCleared"]);
+    expect(restored.config.values.narrator.hookOnEvents).toEqual(["fieldCleared"]);
+    expect(restored.warnings.join("\n")).toMatch(/config\.narrator\.aftermathHookOnEvents/);
+  });
+
   it("restores a save made with other content, with a warning", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);

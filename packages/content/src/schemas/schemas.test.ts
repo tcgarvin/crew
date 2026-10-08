@@ -436,6 +436,7 @@ const config = {
     faultBudget: 2,
     budgetRefillDays: 0.5,
     hookOnEvents: [],
+    aftermathHookOnEvents: [],
     hazardBudget: 2,
   },
   host: {
@@ -672,6 +673,16 @@ describe("content def schemas", () => {
     expect(activityDefSchema.safeParse(remembered).success).toBe(true);
     const unknown = { ...activity, memories: { together: "goodCompany" } };
     expect(activityDefSchema.safeParse(unknown).success).toBe(false);
+  });
+
+  it("requires the narrator's aftermath event list, of non-empty names (D100)", () => {
+    const withNarrator = (narrator: Record<string, unknown>) => ({ ...config, narrator });
+    const { aftermathHookOnEvents: _list, ...without } = config.narrator;
+    expect(configDefSchema.safeParse(withNarrator(without)).success).toBe(false);
+    const listed = { ...config.narrator, aftermathHookOnEvents: ["alertCleared", "navHazard"] };
+    expect(configDefSchema.safeParse(withNarrator(listed)).success).toBe(true);
+    const blank = { ...config.narrator, aftermathHookOnEvents: [""] };
+    expect(configDefSchema.safeParse(withNarrator(blank)).success).toBe(false);
   });
 
   it("requires a voice on every crew member (D38)", () => {

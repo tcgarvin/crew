@@ -163,6 +163,8 @@ export const configDefSchema = z.strictObject({
     faultBudget: z.number().int().min(0),
     budgetRefillDays: positive,
     hookOnEvents: z.array(z.string().min(1)),
+    /** D100: events that raise the narrator's aftermath call, at any significance. */
+    aftermathHookOnEvents: z.array(z.string().min(1)),
     hazardBudget: z.number().int().min(0),
   }),
   host: z.strictObject({

@@ -220,3 +220,38 @@ describe("integrity restore on repair (D35)", () => {
     expect(engine.integrity).toBe(0.9);
   });
 });
+
+describe("a repair carries its fault's cause (D100)", () => {
+  function repairedEvent(outcome: RecipeOutcome) {
+    if (outcome.status !== "recipeComplete") throw new Error(`repair is ${outcome.status}`);
+    const event = outcome.events.find((e) => e.type === "faultRepaired");
+    if (event === undefined) throw new Error("no faultRepaired event");
+    return event;
+  }
+
+  it("names the command that caused the fault, so the narrator's aftermath call can follow it", () => {
+    const { kernel, world } = w5TestWorld();
+    const techId = Object.keys(world.state.actors)[0] as ActorId;
+    const machineId = injectEngineFault(world, kernel);
+    const cause = byDef(world, W5.engine).faults[0]?.causeCommandId;
+    expect(cause).toBeDefined();
+    const recipeCtx = recipeCtxOf(world);
+    const { repairTaskId } = diagnoseThenPlanRepair(world, recipeCtx, machineId, techId);
+    const finished = advanceStage(recipeCtx, repairTaskId, techId, ALL_THE_TICKS);
+    expect(repairedEvent(finished).causeIds).toEqual([cause]);
+  });
+
+  it("names no cause for a fault that came from wear", () => {
+    const { kernel, world } = w5TestWorld();
+    const techId = Object.keys(world.state.actors)[0] as ActorId;
+    const machineId = injectEngineFault(world, kernel);
+    const fault = byDef(world, W5.engine).faults[0];
+    if (fault === undefined) throw new Error("no fault");
+    // biome-ignore lint/performance/noDelete: a wear fault has no cause key at all.
+    delete fault.causeCommandId;
+    const recipeCtx = recipeCtxOf(world);
+    const { repairTaskId } = diagnoseThenPlanRepair(world, recipeCtx, machineId, techId);
+    const finished = advanceStage(recipeCtx, repairTaskId, techId, ALL_THE_TICKS);
+    expect(repairedEvent(finished).causeIds).toEqual([]);
+  });
+});

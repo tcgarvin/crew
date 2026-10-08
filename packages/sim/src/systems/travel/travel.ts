@@ -36,6 +36,7 @@ import { coursePlotted } from "./course";
 import { departureCleared, impairmentOutOfReach } from "./departure-gate";
 import { nextHop } from "./graph";
 import { dismissLocals, dressDockAlongside } from "./locals";
+import { checkRequestedCall } from "./requested-call";
 import { stageDockIfDue, stagingAnswered } from "./staging";
 import { portStoreLocation } from "./stores";
 
@@ -616,7 +617,9 @@ function advanceStage(ctx: StepCtx): void {
 function checkNotableEventHook(ctx: StepCtx): void {
   const owed = ctx.state.narrator.pendingNotable;
   if (owed === undefined || owed.tick >= ctx.tick) return;
-  if (!ctx.config.narrator.hookOnEvents.includes(owed.type)) {
+  // D100: an aftermath event passed its filter when phase 8 recorded it.
+  const { hookOnEvents, aftermathHookOnEvents } = ctx.config.narrator;
+  if (!hookOnEvents.includes(owed.type) && !aftermathHookOnEvents.includes(owed.type)) {
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
     delete ctx.state.narrator.pendingNotable;
     return;
@@ -636,6 +639,8 @@ export const travelSystem: System = {
   phase: "equipment",
   run(ctx) {
     advanceTravel(ctx);
+    // D99: before the notable check, so a requested call settles a notable owed meanwhile.
+    checkRequestedCall(ctx);
     checkNotableEventHook(ctx);
   },
 };

@@ -4855,6 +4855,13 @@
                 "minLength": 1
               }
             },
+            "aftermathHookOnEvents": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
             "hazardBudget": {
               "type": "integer",
               "minimum": 0,
@@ -4870,6 +4877,7 @@
             "faultBudget",
             "budgetRefillDays",
             "hookOnEvents",
+            "aftermathHookOnEvents",
             "hazardBudget"
           ],
           "additionalProperties": false
