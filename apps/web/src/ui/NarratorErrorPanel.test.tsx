@@ -28,9 +28,6 @@ describe("NarratorErrorPanel (D43)", () => {
       expect(narratorReasonText(code)).toBe("The model's answer could not be used");
     }
     expect(narratorReasonText("network")).toBe("Could not reach the server");
-    expect(narratorReasonText("budget")).toBe(
-      "The narrator's call budget for this game is used up for now",
-    );
   });
 
   it("Retry restarts the backoff sequence from attempt 1", () => {

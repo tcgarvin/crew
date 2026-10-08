@@ -27,7 +27,7 @@ function recordingFetch() {
   const fake = async (_url: unknown, init?: { body?: unknown }) => {
     bodies.push(JSON.parse(String(init?.body)) as SentBody);
     const reply = {
-      model: "anthropic/claude-sonnet-4.6",
+      model: "openai/gpt-6-luna",
       choices: [{ message: { content: JSON.stringify(emptyPlan()) }, finish_reason: "stop" }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     };
@@ -143,12 +143,23 @@ describe("OpenRouter plan schema (D53)", () => {
 });
 
 describe("OpenRouter reasoning effort (D96)", () => {
-  it("sends no reasoning field by default, so a model that does not reason keeps not reasoning", async () => {
+  it("sends the default model's effort when none is given (D102: luna at low)", async () => {
     const { bodies, fetch } = recordingFetch();
     await runNarrator(approachRequest(content()), {
       gameId: "g1",
       content: content(),
       transport: openRouterTransport({ apiKey: "test", fetch }),
+    });
+    expect(bodies[0]).toMatchObject({ reasoning: { effort: "low" } });
+  });
+
+  it("sends no reasoning field for effort default, so a model that does not reason keeps not reasoning", async () => {
+    const { bodies, fetch } = recordingFetch();
+    await runNarrator(approachRequest(content()), {
+      gameId: "g1",
+      content: content(),
+      transport: openRouterTransport({ apiKey: "test", fetch }),
+      reasoningEffort: "default",
     });
     expect(bodies[0]).not.toHaveProperty("reasoning");
   });

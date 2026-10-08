@@ -76,7 +76,7 @@ const OK_RESPONSE = {
     lastRejections: [],
   },
   callId: "call-1",
-  model: "anthropic/claude-sonnet-4.6",
+  model: "openai/gpt-6-luna",
   promptVersion: "v0.3",
   usage: {
     inputTokens: 1200,
@@ -160,9 +160,7 @@ describe("narrator-log", () => {
     expect(okIndex).toBeGreaterThan(failedIndex);
     expect(out).toContain("quietTooLong  error  null-narrator  v0  25000ms  -/- tokens");
     expect(out).toContain("error: OpenRouter timed out");
-    expect(out).toContain(
-      "approachingPort  ok  anthropic/claude-sonnet-4.6  v0.3  4200ms  1200/300 tokens",
-    );
+    expect(out).toContain("approachingPort  ok  openai/gpt-6-luna  v0.3  4200ms  1200/300 tokens");
     expect(out).toContain(
       'card: "The Foreman\'s Offer" — Mara Voss — Mara waves you over. "Got ore that needs moving." | Take the job / Pass',
     );

@@ -29,6 +29,7 @@ export {
 } from "./prompts/index";
 export {
   DEFAULT_NARRATOR_MODEL,
+  DEFAULT_NARRATOR_REASONING_EFFORT,
   NARRATOR_TIMEOUT_MS,
   NOTES_TIMEOUT_MS,
   type NotesRun,

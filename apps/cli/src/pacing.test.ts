@@ -134,8 +134,7 @@ describe("crew pacing: there-and-back voyage", () => {
       const report = formatPacingReport([slow, fast]);
       expect(report).toContain("| 1x |");
       expect(report).toContain("| 8x |");
-      expect(report).toContain("cap of 6/hour");
-      expect(report).toContain("cap of 30/hour");
+      expect(report).toContain("calls per round trip.");
     },
     SLOW_TEST_TIMEOUT_MS,
   );

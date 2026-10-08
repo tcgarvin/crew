@@ -28,7 +28,12 @@ import {
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
 import { openRouterTransport } from "../openrouter";
-import { DEFAULT_NARRATOR_MODEL, type NarratorRun, runNarratorWithTrace } from "../run";
+import {
+  DEFAULT_NARRATOR_MODEL,
+  DEFAULT_NARRATOR_REASONING_EFFORT,
+  type NarratorRun,
+  runNarratorWithTrace,
+} from "../run";
 import { content } from "../test-support";
 import { captainName } from "../translate";
 import { REASONING_EFFORTS } from "../transport";
@@ -49,7 +54,7 @@ const model = process.env.CREW_NARRATOR_MODEL ?? DEFAULT_NARRATOR_MODEL;
 const stagingModel = process.env.CREW_STAGING_MODEL ?? model;
 /** D96: as the server's `CREW_NARRATOR_REASONING_EFFORT` (staging uses the same here). */
 const reasoningEffort = REASONING_EFFORTS.find(
-  (e) => e === (process.env.CREW_NARRATOR_REASONING_EFFORT ?? "default"),
+  (e) => e === (process.env.CREW_NARRATOR_REASONING_EFFORT ?? DEFAULT_NARRATOR_REASONING_EFFORT),
 );
 if (reasoningEffort === undefined) {
   throw new Error(

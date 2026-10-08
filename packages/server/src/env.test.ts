@@ -1,12 +1,16 @@
-import { STAGING_TIMEOUT_MS } from "@crew/narrator";
+import {
+  DEFAULT_NARRATOR_MODEL,
+  DEFAULT_NARRATOR_REASONING_EFFORT,
+  STAGING_TIMEOUT_MS,
+} from "@crew/narrator";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SERVER_NARRATOR_MODEL, loadEnv } from "./env";
+import { loadEnv } from "./env";
 
 describe("loadEnv", () => {
   it("defaults the narrator model when CREW_NARRATOR_MODEL is unset or empty", () => {
-    expect(loadEnv({}).narratorModel).toBe(DEFAULT_SERVER_NARRATOR_MODEL);
-    expect(loadEnv({ CREW_NARRATOR_MODEL: "" }).narratorModel).toBe(DEFAULT_SERVER_NARRATOR_MODEL);
-    expect(DEFAULT_SERVER_NARRATOR_MODEL).toBe("anthropic/claude-sonnet-4.6");
+    expect(loadEnv({}).narratorModel).toBe(DEFAULT_NARRATOR_MODEL);
+    expect(loadEnv({ CREW_NARRATOR_MODEL: "" }).narratorModel).toBe(DEFAULT_NARRATOR_MODEL);
+    expect(DEFAULT_NARRATOR_MODEL).toBe("openai/gpt-6-luna");
   });
 
   it("uses CREW_NARRATOR_MODEL when set, and passes the key and database URL through", () => {
@@ -23,7 +27,7 @@ describe("loadEnv", () => {
 
 describe("loadEnv staging model (D67)", () => {
   it("follows the story model unless CREW_STAGING_MODEL is set", () => {
-    expect(loadEnv({}).stagingModel).toBe(DEFAULT_SERVER_NARRATOR_MODEL);
+    expect(loadEnv({}).stagingModel).toBe(DEFAULT_NARRATOR_MODEL);
     expect(loadEnv({ CREW_NARRATOR_MODEL: "a/story" }).stagingModel).toBe("a/story");
     expect(loadEnv({ CREW_NARRATOR_MODEL: "a/story", CREW_STAGING_MODEL: "" }).stagingModel).toBe(
       "a/story",
@@ -35,9 +39,10 @@ describe("loadEnv staging model (D67)", () => {
 });
 
 describe("loadEnv reasoning effort (D96)", () => {
-  it("sends nothing by default and lets staging follow the story call unless set", () => {
-    expect(loadEnv({}).narratorReasoningEffort).toBe("default");
-    expect(loadEnv({}).stagingReasoningEffort).toBe("default");
+  it("defaults to the narrator's effort and lets staging follow the story call unless set", () => {
+    expect(DEFAULT_NARRATOR_REASONING_EFFORT).toBe("low");
+    expect(loadEnv({}).narratorReasoningEffort).toBe("low");
+    expect(loadEnv({}).stagingReasoningEffort).toBe("low");
     const story = loadEnv({ CREW_NARRATOR_REASONING_EFFORT: "low" });
     expect(story.narratorReasoningEffort).toBe("low");
     expect(story.stagingReasoningEffort).toBe("low");
@@ -61,13 +66,6 @@ describe("loadEnv staging timeout (D70)", () => {
     expect(STAGING_TIMEOUT_MS).toBe(10_000);
     expect(loadEnv({ CREW_STAGING_TIMEOUT_MS: "8000" }).stagingTimeoutMs).toBe(8000);
     expect(() => loadEnv({ CREW_STAGING_TIMEOUT_MS: "soon" })).toThrow(/CREW_STAGING_TIMEOUT_MS/);
-  });
-});
-
-describe("loadEnv narrator budget", () => {
-  it("defaults the hourly call cap to 30, enough for a passage (passengers-and-galaxy §8.6)", () => {
-    expect(loadEnv({}).narratorMaxCallsPerHour).toBe(45);
-    expect(loadEnv({ CREW_NARRATOR_MAX_CALLS_PER_HOUR: "6" }).narratorMaxCallsPerHour).toBe(6);
   });
 });
 

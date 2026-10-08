@@ -117,7 +117,7 @@ the next tick. Default `hookOnEvents`: `driftingChanged`, `contractCompleted`.
 returned commands at hook tick + 1 and always sends `acknowledgeHook`, on failure too, with a
 "narrator unavailable" toast. Card prose is kept on the main thread keyed by decision ID; the
 modal shows template text (`@crew/content` `templateCard`) until prose arrives. Default server
-narrator model: `anthropic/claude-sonnet-4.6` when `CREW_NARRATOR_MODEL` is unset.
+narrator model: `anthropic/claude-sonnet-4.6` when `CREW_NARRATOR_MODEL` is unset (D102: now `openai/gpt-6-luna`).
 
 **D23. The API ships as a bundled Build Output API function** (`scripts/vercel-output.mjs`), not
 a zero-config `api/` file: see `docs/DEPLOYMENT.md` "The Vercel function".
@@ -1983,3 +1983,20 @@ events already made the ending plain (an offer the captain turned down, a story 
 wrapped up). Over the six-thread cap, new unseen threads give way first. `lastBeatTick` is the
 proxy for "seen" rather than a link to job ids, because threads without jobs exist (D32) and the
 title is already a thread's identity (D56, D98).
+
+**D102. No narrator call cap in software; one model, luna.** Owner: the cap is "really just
+there to save the wallet", and the OpenRouter key already has a credit limit, so a software cap
+is not worth keeping. Two things limited calls: the per-game hourly cap
+(`CREW_NARRATOR_MAX_CALLS_PER_HOUR`, a code default of 45 that a Vercel env var on production and
+preview overrode, which is how it ended up lower than the code said), and the story-call tick
+spacing (`MIN_TICKS_BETWEEN_NARRATOR_CALLS`, D43). The hourly cap is gone: the env var, the route
+check and its 429 `hourly` reason, the db count, the client's five-minute wait-out and its error
+panel text, and the cap comparison in `crew pacing`. A 429 without `reason: "spacing"` is now a
+retryable failure. The spacing rule stays: it paces the story (a refused `quietTooLong` or
+`notableEvent` is "no narration this time"), and it is not a budget. A cap can come back,
+application-wide and far above the worst case, if the key's limit stops being enough.
+The model defaults were three: the narrator package's `anthropic/claude-opus-4.6` (the live suite
+and tests), the server's `anthropic/claude-sonnet-4.6` (previews, which set no model), and
+production's env var, `openai/gpt-6-luna` at `low`. Now there is one: `DEFAULT_NARRATOR_MODEL` is
+`openai/gpt-6-luna` and `DEFAULT_NARRATOR_REASONING_EFFORT` is `low` (D96), and the server and
+the live suite read both from `@crew/narrator`.

@@ -134,21 +134,6 @@ export class MemoryDb implements Db {
     this.narratorCalls.set(id, { ...row, ...input });
   }
 
-  async countNarratorCallsSince(
-    gameId: string,
-    sinceMs: number,
-    kind: NarratorCallKind,
-  ): Promise<number> {
-    const cutoff = Date.now() - sinceMs;
-    let count = 0;
-    for (const call of this.narratorCalls.values()) {
-      if (call.status === "budgetExceeded") continue; // rejections never reached the model (D43)
-      if (narratorCallKind(call.hookKind) !== kind) continue; // D67: one budget per kind
-      if (call.gameId === gameId && call.createdAt.getTime() >= cutoff) count += 1;
-    }
-    return count;
-  }
-
   async getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined> {
     let latest: NarratorCallRow | undefined;
     for (const call of this.narratorCalls.values()) {

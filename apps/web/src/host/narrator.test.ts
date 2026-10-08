@@ -66,8 +66,7 @@ describe("classifyFailure", () => {
     expect(fail(0, "network")).toMatchObject({ kind: "retryable", reason: "network" });
     expect(fail(200, "badResponse")).toMatchObject({ kind: "retryable", reason: "network" });
     expect(fail(429, "budgetExceeded", { reason: "spacing" })).toMatchObject({ kind: "spacing" });
-    expect(fail(429, "budgetExceeded", { reason: "hourly" })).toMatchObject({ kind: "budget" });
-    expect(fail(429, "budgetExceeded")).toMatchObject({ kind: "budget" });
+    expect(fail(429, "budgetExceeded")).toMatchObject({ kind: "retryable", reason: "server" });
     expect(
       fail(503, "narratorUnavailable", { reason: "notConfigured", retryable: false }),
     ).toMatchObject({ kind: "fatal", reason: "notConfigured" });

@@ -8,7 +8,7 @@
  * `world.ts` keeps a decision that still needs narration from halting the world on its own.
  *
  * Job offers are excluded: the offer card already carries the issuer's pitch in their own voice
- * (D25), and a narrator call per offer would spend the hourly budget on cards that are dressed
+ * (D25), and a narrator call per offer would spend a call on cards that are dressed
  * already.
  */
 import { raiseHookIfIdle } from "./hooks";

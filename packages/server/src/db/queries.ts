@@ -4,7 +4,7 @@
  * `./memory.ts` exactly (tests run against the memory fake; this file is exercised only by hand
  * against a real Neon database — see `docs/DEPLOYMENT.md`).
  */
-import { type SQL, and, desc, eq, gte, ne, notInArray, sql } from "drizzle-orm";
+import { type SQL, and, desc, eq, notInArray, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { games, narratorCalls, saves, users } from "./schema";
 import {
@@ -189,27 +189,6 @@ export class DrizzleDb implements Db {
       .where(eq(narratorCalls.id, id))
       .returning({ id: narratorCalls.id });
     if (rows.length === 0) throw new Error(`finishNarratorCall: no narrator call ${id}`);
-  }
-
-  async countNarratorCallsSince(
-    gameId: string,
-    sinceMs: number,
-    kind: NarratorCallKind,
-  ): Promise<number> {
-    const cutoff = new Date(Date.now() - sinceMs);
-    const rows = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(narratorCalls)
-      .where(
-        and(
-          eq(narratorCalls.gameId, gameId),
-          gte(narratorCalls.createdAt, cutoff),
-          // Rejections never reach the model, so they must not keep the window full (D43).
-          ne(narratorCalls.status, "budgetExceeded"),
-          kindCondition(kind),
-        ),
-      );
-    return rows[0]?.count ?? 0;
   }
 
   async getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined> {

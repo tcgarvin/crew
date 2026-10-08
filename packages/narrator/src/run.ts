@@ -56,8 +56,13 @@ import { runStaging } from "./staging/run";
 import { translateIntents } from "./translate";
 import type { ModelTransport, ReasoningDetails, ReasoningEffort } from "./transport";
 
-/** Default model slug (owner); override with `CREW_NARRATOR_MODEL` via `ctx.model`. */
-export const DEFAULT_NARRATOR_MODEL = "anthropic/claude-opus-4.6";
+/**
+ * D102: the one default model slug, for the server, the live suite and tests alike; override with
+ * `CREW_NARRATOR_MODEL` via `ctx.model`.
+ */
+export const DEFAULT_NARRATOR_MODEL = "openai/gpt-6-luna";
+/** D102: the reasoning effort `DEFAULT_NARRATOR_MODEL` runs at (D96: luna at `low`). */
+export const DEFAULT_NARRATOR_REASONING_EFFORT: ReasoningEffort = "low";
 /**
  * Vercel's function budget is ~30 s; 25 s leaves time to log the call and answer. No retry: a
  * retry could not finish inside the budget, and the null fallback keeps the game going.
@@ -512,7 +517,7 @@ export async function runNarratorWithTrace(
   const timeoutMs =
     ctx.timeoutMs ?? (req.hook.kind === "stageDock" ? STAGING_TIMEOUT_MS : NARRATOR_TIMEOUT_MS);
   const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
-  const reasoningEffort = ctx.reasoningEffort ?? "default";
+  const reasoningEffort = ctx.reasoningEffort ?? DEFAULT_NARRATOR_REASONING_EFFORT;
   if (req.hook.kind === "stageDock") {
     // D67: the staging call has its own prompt, schema and translator, over the same digest.
     const staged = await runStaging({

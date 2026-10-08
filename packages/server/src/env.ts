@@ -2,7 +2,13 @@
  * Environment configuration (W8). Read once at startup; every value the rest of the package
  * needs is derived here so nothing else touches `process.env` directly.
  */
-import { REASONING_EFFORTS, type ReasoningEffort, STAGING_TIMEOUT_MS } from "@crew/narrator";
+import {
+  DEFAULT_NARRATOR_MODEL,
+  DEFAULT_NARRATOR_REASONING_EFFORT,
+  REASONING_EFFORTS,
+  type ReasoningEffort,
+  STAGING_TIMEOUT_MS,
+} from "@crew/narrator";
 
 function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): number {
   const raw = source[name];
@@ -37,12 +43,6 @@ function readModel(source: NodeJS.ProcessEnv, name: string, fallback: string): s
 }
 
 /**
- * Integration 2: the model used when `CREW_NARRATOR_MODEL` is unset — cheaper than the
- * narrator package's own default for the first live runs; the owner can raise it via env.
- */
-export const DEFAULT_SERVER_NARRATOR_MODEL = "anthropic/claude-sonnet-4.6";
-
-/**
  * D43: what the narrator route does when the model cannot answer. `"error"` refuses the hook
  * (503 without a key, 502 on a model failure) so the client retries and, failing that, pauses
  * the game; `"null"` answers with the deterministic template narrator instead. Players must
@@ -66,7 +66,7 @@ export interface Env {
   readonly useMemoryDb: boolean;
   /** `OPENROUTER_API_KEY`, passed through to the narrator ctx only (W9: OpenRouter transport). */
   readonly openRouterApiKey: string | undefined;
-  /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; unset = `DEFAULT_SERVER_NARRATOR_MODEL`. */
+  /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; unset = the narrator's `DEFAULT_NARRATOR_MODEL` (D102). */
   readonly narratorModel: string;
   /**
    * D67: `CREW_STAGING_MODEL`, the model for the staging call (`stageDock`); unset = the story
@@ -74,9 +74,9 @@ export interface Env {
    */
   readonly stagingModel: string;
   /**
-   * D96: `CREW_NARRATOR_REASONING_EFFORT`, one of `REASONING_EFFORTS`; unset = `"default"`, which
-   * sends nothing. Set it per model: on a model that does not reason by default, any other value
-   * switches reasoning on.
+   * D96: `CREW_NARRATOR_REASONING_EFFORT`, one of `REASONING_EFFORTS`; unset = the narrator's
+   * `DEFAULT_NARRATOR_REASONING_EFFORT` (D102). Set it per model: on a model that does not reason
+   * by default, any value but `"default"` (which sends nothing) switches reasoning on.
    */
   readonly narratorReasoningEffort: ReasoningEffort;
   /** D96: `CREW_STAGING_REASONING_EFFORT`; unset = the story call's, like `stagingModel`. */
@@ -93,8 +93,6 @@ export interface Env {
   readonly narratorFallback: NarratorFallbackMode;
   /** Max accepted save size, in bytes, measured on the gzipped blob (post-gzip, pre-base64). */
   readonly maxSaveBytes: number;
-  /** Narrator budget: max calls per game per rolling wall-clock hour. */
-  readonly narratorMaxCallsPerHour: number;
   readonly nodeEnv: string;
   /**
    * D97: `VERCEL=1`, set by Vercel in its functions: work after the response goes to
@@ -118,11 +116,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     );
   }
 
-  const narratorModel = readModel(source, "CREW_NARRATOR_MODEL", DEFAULT_SERVER_NARRATOR_MODEL);
+  const narratorModel = readModel(source, "CREW_NARRATOR_MODEL", DEFAULT_NARRATOR_MODEL);
   const narratorReasoningEffort = readReasoningEffort(
     source,
     "CREW_NARRATOR_REASONING_EFFORT",
-    "default",
+    DEFAULT_NARRATOR_REASONING_EFFORT,
   );
   return {
     databaseUrl,
@@ -139,7 +137,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
-    narratorMaxCallsPerHour: readInt(source, "CREW_NARRATOR_MAX_CALLS_PER_HOUR", 45),
     nodeEnv,
     onVercel: source.VERCEL === "1",
   };

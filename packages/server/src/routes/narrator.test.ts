@@ -165,38 +165,25 @@ describe("narrator", () => {
     expect(lastCall?.status).toBe("ok");
   });
 
-  it("429s once the hourly call budget is exceeded, and logs the rejection", async () => {
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" });
-    const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
+  it("has no hourly call cap: spaced calls keep going through (D102)", async () => {
+    const env = loadEnv({ CREW_DB: "memory" });
+    const { app } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
-
-    const first = await sendJson(
-      app,
-      token,
-      "POST",
-      `/api/games/${game.id}/narrator`,
-      narratorBody(game.id, 0),
-    );
-    expect(first.status).toBe(200);
-
-    const second = await sendJson(
-      app,
-      token,
-      "POST",
-      `/api/games/${game.id}/narrator`,
-      narratorBody(game.id, 500),
-    );
-    expect(second.status).toBe(429);
-    const secondBody = await readJson(second);
-    expect(secondBody.error.code).toBe("budgetExceeded");
-
-    const lastCall = await db.getLastNarratorCall(game.id);
-    expect(lastCall?.status).toBe("budgetExceeded");
+    for (let i = 0; i < 60; i += 1) {
+      const res = await sendJson(
+        app,
+        token,
+        "POST",
+        `/api/games/${game.id}/narrator`,
+        narratorBody(game.id, i * 500),
+      );
+      expect(res.status).toBe(200);
+    }
   });
 
   it("429s a call too soon after the last one, but not a policyDecision hook (D37)", async () => {
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
@@ -213,23 +200,13 @@ describe("narrator", () => {
     const policy = await post(narratorBody(game.id, 40, "policyDecision"));
     expect(policy.status).toBe(200);
     expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("policyDecision");
-
-    // The hourly cap still does.
-    const capped = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" });
-    const second = buildTestApp({ env: capped, runNarrator: echoNarrator });
-    const user = await mintUser(second.app);
-    const { game: other } = await createGame(second.app, user.token);
-    const postOther = (body: unknown) =>
-      sendJson(second.app, user.token, "POST", `/api/games/${other.id}/narrator`, body);
-    expect((await postOther(narratorBody(other.id, 0))).status).toBe(200);
-    expect((await postOther(narratorBody(other.id, 500, "policyDecision"))).status).toBe(429);
   });
 
   it("answers a captainAshore ask however soon after the last call, since it is never asked twice (D70)", async () => {
     // Browser QA: delivered at Kessler Drift (t20003, a `notableEvent` the model answered), the
     // captain stepped onto the dock 29 ticks later; the ask was refused as too soon, the client
     // acknowledged it unanswered, and the sim (one ask per docking) never asked again.
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
@@ -244,22 +221,10 @@ describe("narrator", () => {
     const quiet = await post(narratorBody(game.id, 20_060));
     expect(quiet.status).toBe(429);
     expect((await readJson(quiet)).error).toMatchObject({ reason: "spacing" });
-
-    // The hourly cap still applies (D69: waited out, then the error panel, never unanswered).
-    const capped = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" });
-    const second = buildTestApp({ env: capped, runNarrator: echoNarrator });
-    const user = await mintUser(second.app);
-    const { game: other } = await createGame(second.app, user.token);
-    const postOther = (body: unknown) =>
-      sendJson(second.app, user.token, "POST", `/api/games/${other.id}/narrator`, body);
-    expect((await postOther(narratorBody(other.id, 0))).status).toBe(200);
-    const over = await postOther(narratorBody(other.id, 500, "captainAshore"));
-    expect(over.status).toBe(429);
-    expect((await readJson(over)).error).toMatchObject({ reason: "hourly" });
   });
 
   it("answers a requestedCall however soon after the last call, since it is raised once (D99)", async () => {
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
@@ -276,9 +241,9 @@ describe("narrator", () => {
     expect((await readJson(quiet)).error).toMatchObject({ reason: "spacing" });
   });
 
-  it("marks the hourly cap and the spacing rule apart in the 429 body (D43)", async () => {
-    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "2" });
-    const { app } = buildTestApp({ env, runNarrator: echoNarrator });
+  it("says which rule fired in the 429 body, and does not log the spacing rejection as a call (D43)", async () => {
+    const env = loadEnv({ CREW_DB: "memory" });
+    const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
     const { game } = await createGame(app, token);
     const post = (body: unknown) =>
@@ -291,15 +256,8 @@ describe("narrator", () => {
       code: "budgetExceeded",
       reason: "spacing",
     });
-    // The rejection does not count toward the cap of 2 (it never reached the model), so a
-    // properly spaced call still goes through; the one after it hits the hourly rule.
+    expect((await db.getLastNarratorCall(game.id))?.status).toBe("budgetExceeded");
     expect((await post(narratorBody(game.id, 500))).status).toBe(200);
-    const capped = await post(narratorBody(game.id, 1000));
-    expect(capped.status).toBe(429);
-    expect((await readJson(capped)).error).toMatchObject({
-      code: "budgetExceeded",
-      reason: "hourly",
-    });
   });
 
   describe("CREW_NARRATOR_FALLBACK=error (D43)", () => {
@@ -352,7 +310,6 @@ describe("narrator", () => {
       const env = loadEnv({
         CREW_DB: "memory",
         CREW_NARRATOR_FALLBACK: "error",
-        CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10",
       });
       let attempts = 0;
       const flaky: RunNarrator = async (req, ctx) => {

@@ -153,9 +153,7 @@ describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
   });
 
   it("is outside the story spacing rule both ways", async () => {
-    const { gameId, post } = await setup(
-      loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" }),
-    );
+    const { gameId, post } = await setup(loadEnv({ CREW_DB: "memory" }));
     expect((await post(storyBody(gameId, 1000))).status).toBe(200);
     // Ten ticks after a story call: a staging call is never "too soon"...
     expect((await post(stagingBody(gameId, 1010))).status).toBe(200);
@@ -165,17 +163,6 @@ describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
     const tooSoon = await post(storyBody(gameId, 1150));
     expect(tooSoon.status).toBe(429);
     expect((await readJson(tooSoon)).error.reason).toBe("spacing");
-  });
-
-  it("has its own hourly budget: staging calls never use up the story's", async () => {
-    const { gameId, post } = await setup(
-      loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "1" }),
-    );
-    expect((await post(stagingBody(gameId, 1000))).status).toBe(200);
-    const second = await post(stagingBody(gameId, 3000));
-    expect(second.status).toBe(429);
-    expect((await readJson(second)).error.reason).toBe("hourly");
-    expect((await post(storyBody(gameId, 4000))).status).toBe(200);
   });
 
   it("null mode: a failing model falls back to the floor set, logged, with no error", async () => {

@@ -1,10 +1,10 @@
 /**
- * `POST /api/games/:id/narrator` (W8). Validates the request, enforces per-game budgets, stores
+ * `POST /api/games/:id/narrator` (W8). Validates the request, enforces the tick spacing, stores
  * the snapshot as a milestone save (its id is the `basis_save_id` for this call and for the next
- * budget check), calls the injected `runNarrator`, logs the call, and persists `notesUpdate`.
+ * spacing check), calls the injected `runNarrator`, logs the call, and persists `notesUpdate`.
+ * There is no call cap in software (D102): the OpenRouter key's own limit guards spending.
  *
- * D67: a `stageDock` hook is a staging call. It runs on the staging model, has its own hourly
- * budget, is never spaced (in either direction: it is neither refused as too soon nor counted as
+ * D67: a `stageDock` hook is a staging call. It runs on the staging model, is never spaced (in either direction: it is neither refused as too soon nor counted as
  * the last call when a story call is spaced), and never writes notes. A staging failure is
  * answered like a story failure in `error` mode (502/503, so the client retries per D43); the
  * client then acknowledges with the floor set instead of pausing the game (D57's exception to
@@ -57,12 +57,11 @@ const narratorRequestSchema = z.object({
   recentEvents: z.array(z.unknown()),
 });
 
-// Server-side tunables not (yet) worth a dedicated env var; bump alongside playtesting feedback.
-const NARRATOR_CALL_WINDOW_MS = 60 * 60 * 1000;
+// A server-side tunable not (yet) worth a dedicated env var; bump alongside playtesting feedback.
 const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
 /**
  * Hooks the sim raises once and never again, so a spacing refusal (which the client acknowledges
- * unanswered, D43) would lose them for good; the hourly cap still applies. The spacing rule is
+ * unanswered, D43) would lose them for good. The spacing rule is
  * for the hooks the sim raises again on its own (`quietTooLong`, `notableEvent`): a refused one
  * costs one check-in.
  * - `policyDecision` (D37): a policy card can follow another hook within a few ticks (the
@@ -297,15 +296,6 @@ export function registerNarratorRoutes(
     const logRejection = (error: string) =>
       logCall({ ...UNANSWERED, latencyMs: null, status: "budgetExceeded", error });
 
-    // The 429 body says which rule fired (D43): the client waits out the hourly cap but treats
-    // spacing as a deliberate "no narration this time", not a failure.
-    const callsInWindow = await db.countNarratorCallsSince(gameId, NARRATOR_CALL_WINDOW_MS, kind);
-    if (callsInWindow >= env.narratorMaxCallsPerHour) {
-      const message = `Hourly narrator call budget (${env.narratorMaxCallsPerHour}) exceeded for this game.`;
-      await logRejection(message);
-      return apiError(c, 429, "budgetExceeded", message, { reason: "hourly" });
-    }
-
     // Spacing is measured from the last story call the model answered: a failed attempt narrated
     // nothing, so the client's retry of the same hook (D43) must not be refused as "too soon",
     // and a staging call (D67) is not story, so it neither is spaced nor spaces the next one.
@@ -319,6 +309,7 @@ export function registerNarratorRoutes(
       if (reqBody.snapshot.savedAtTick - lastTick < MIN_TICKS_BETWEEN_NARRATOR_CALLS) {
         const message = `Too soon since the last narrator call (min ${MIN_TICKS_BETWEEN_NARRATOR_CALLS} ticks).`;
         await logRejection(message);
+        // The client treats spacing as a deliberate "no narration this time", not a failure (D43).
         return apiError(c, 429, "budgetExceeded", message, { reason: "spacing" });
       }
     }

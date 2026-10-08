@@ -93,13 +93,6 @@ const LOOP_INTERVAL_MS = 50;
 const RUN_AHEAD_CAP_SECONDS = 60;
 const BURST_TICKS_PER_LOOP = 40;
 
-/**
- * Narrator budget caps the report compares against: the pre-D51 default of
- * `CREW_NARRATOR_MAX_CALLS_PER_HOUR` (6) and the current one (30, `packages/server/src/env.ts`).
- * Plain numbers, not an import: the server reads the cap from the environment, not a constant.
- */
-const HOURLY_CAPS = [6, 30] as const;
-
 const DEFAULT_SPEEDS = [1, 2, 4, 8] as const;
 const DEFAULT_LATENCY_SECONDS = 25;
 const DEFAULT_SEED = 1;
@@ -732,18 +725,16 @@ function scenarioSection({ scenario, rows, sample }: ScenarioRows): string[] {
   return lines;
 }
 
-/** How one round trip, and back-to-back trips, compare with each hourly narrator cap. */
+/** Calls one round trip makes, and the hourly rate back-to-back trips would run at (D102: no cap). */
 function budgetLines({ scenario, rows, sample }: ScenarioRows): string[] {
-  const lines = HOURLY_CAPS.map((cap) => {
-    const verdict = sample.totalCalls <= cap ? "within" : "over";
-    return `- ${scenario}: ${sample.totalCalls} calls per round trip is ${verdict} a cap of ${cap}/hour (one trip uses ${fmt((100 * sample.totalCalls) / cap, 0)}% of it).`;
-  });
   const perHour = rows.map((r) => `${r.speed}x ≈ ${fmt(r.callsPerHour, 0)}/h`).join(", ");
-  lines.push(`- ${scenario}: back-to-back trips would spend ${perHour}.`);
-  return lines;
+  return [
+    `- ${scenario}: ${sample.totalCalls} calls per round trip.`,
+    `- ${scenario}: back-to-back trips would spend ${perHour}.`,
+  ];
 }
 
-/** The markdown report: one table per scenario, a legs table, and the cap comparison. */
+/** The markdown report: one table per scenario, a legs table, and the call rates. */
 export function formatPacingReport(results: readonly PacingResult[]): string {
   const first = results[0];
   if (first === undefined) return "pacing: no results";
@@ -756,7 +747,7 @@ export function formatPacingReport(results: readonly PacingResult[]): string {
     `# Pacing: hub → Ossory Station → hub (latency ${first.latencySeconds} s, quiet window ${Number(first.quietTooLongSeconds.toFixed(1))} s)`,
     ...groups.flatMap(scenarioSection),
     "",
-    "## Narrator budget",
+    "## Narrator calls",
     "",
     ...groups.flatMap(budgetLines),
   ].join("\n");

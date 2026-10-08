@@ -77,8 +77,8 @@ function realNarrator(transport: ModelTransport, notesSeen: unknown[] = []): Run
   };
 }
 
-async function setUp(runNarrator: RunNarrator, maxCallsPerHour = "30") {
-  const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: maxCallsPerHour });
+async function setUp(runNarrator: RunNarrator) {
+  const env = loadEnv({ CREW_DB: "memory" });
   const { app, db } = buildTestApp({ env, runNarrator });
   const { token } = await mintUser(app);
   const { game } = await createGame(app, token);
@@ -98,8 +98,8 @@ describe("POST /api/games/:id/narrator, the notes turn (D97)", () => {
     expect(notesRow?.status).toBe("ok");
     expect(notesRow?.outputTokens).toBe(50);
     expect((notesRow?.response as { notes: NarratorNotes }).notes.summary).toBe(WRITTEN.summary);
-    // Not a story call: the hourly story budget counts one call, not two.
-    expect(await db.countNarratorCallsSince(gameId, 60 * 60 * 1000, "story")).toBe(1);
+    // Not a story call: one story row, not two.
+    expect(await db.listNarratorCalls({ gameId, kind: "story", limit: 5 })).toHaveLength(1);
   });
 
   it("keeps the plan's notes and logs an error row when the notes turn fails", async () => {

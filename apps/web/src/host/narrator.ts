@@ -50,18 +50,17 @@ export interface NarratorCallDeps {
  * How the client treats a failed call (D43):
  * - `retryable`: a model or transport failure; retry with backoff, then the error panel.
  * - `fatal`: no point retrying (no narrator configured, a rejected request); the error panel.
- * - `budget`: the hourly call cap; wait it out in 30 s steps for a while, then the error panel.
  * - `spacing`: the min-tick spacing rule; acknowledge the hook with no answer, silently. The
  *   server applies it only to hooks the sim raises again (`quietTooLong`, `notableEvent`).
  */
-export type NarratorFailureKind = "retryable" | "fatal" | "budget" | "spacing";
+export type NarratorFailureKind = "retryable" | "fatal" | "spacing";
 
 export interface NarratorFailure {
   readonly kind: NarratorFailureKind;
   /**
    * The narrator's `FallbackReason` (`notConfigured`, `apiError`, `timeout`, `refusal`,
    * `truncated`, `schemaInvalid`) or the client's own: `network`, `server`, `request`,
-   * `budget`, `spacing`, `snapshot`, `malformed`.
+   * `spacing`, `snapshot`, `malformed`.
    */
   readonly reason: string;
   /** The raw message, for the error panel's small print and the console. */
@@ -86,7 +85,8 @@ export function classifyFailure(
   }
   if (status === 429) {
     if (result.reason === "spacing") return { kind: "spacing", reason: "spacing", message };
-    return { kind: "budget", reason: "budget", message };
+    // No hourly cap since D102: any other 429 is someone else's throttle, so back off and retry.
+    return { kind: "retryable", reason: "server", message };
   }
   if (code === "narratorUnavailable") {
     const reason = result.reason ?? "apiError";

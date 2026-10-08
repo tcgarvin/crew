@@ -42,8 +42,8 @@ export type NarratorCallStatus = "ok" | "error" | "budgetExceeded" | "pending";
 /**
  * D67: the kinds of narrator call. A staging call is exactly a `stageDock` hook, so the kind is
  * read from `hook_kind` rather than stored twice: no column, no migration. D97: a notes turn is
- * logged as its own row with hook kind `notes`; it is not a story call, so it neither uses the
- * story budget nor spaces the next story call.
+ * logged as its own row with hook kind `notes`; it is not a story call, so it does not space
+ * the next story call.
  */
 export type NarratorCallKind = "story" | "staging" | "notes";
 export const STAGING_HOOK_KIND = "stageDock";
@@ -152,11 +152,6 @@ export interface Db {
   logNarratorCall(input: LogNarratorCallInput): Promise<NarratorCallRow>;
   /** D97: completes a `pending` notes-turn row; throws if there is no such row. */
   finishNarratorCall(id: string, input: FinishNarratorCallInput): Promise<void>;
-  /**
-   * Narrator calls of one kind for a game within the last `sinceMs` milliseconds (wall clock),
-   * for the hourly budget; rejections are not counted. D67: each kind has its own budget.
-   */
-  countNarratorCallsSince(gameId: string, sinceMs: number, kind: NarratorCallKind): Promise<number>;
   /** Most recent narrator call for a game, if any, for the min-ticks-between-calls check. */
   getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined>;
 

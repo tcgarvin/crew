@@ -8,27 +8,20 @@
  * could not help anyway: the world is halted on it, so its tick never moves past the window.
  *
  * A model/transport failure backs off through `RETRY_DELAYS_MS` (about a minute in all, which
- * the run-ahead lead mostly hides). The hourly call budget is waited out in
- * `BUDGET_RETRY_DELAY_MS` steps for up to `BUDGET_RETRY_WINDOW_MS`. A fatal failure gives up at
- * once. The two counters are independent, so a budget wait does not use up the model retries.
+ * the run-ahead lead mostly hides). A fatal failure gives up at once. There is no hourly call
+ * cap to wait out (D102).
  */
 import type { NarratorFailure } from "./narrator";
 
 /** Backoff between model/transport retries: 2 s, 4 s, 8 s, 16 s, 30 s (about 60 s in all). */
 export const RETRY_DELAYS_MS: readonly number[] = [2_000, 4_000, 8_000, 16_000, 30_000];
-/** Hourly budget: poll every 30 s ... */
-export const BUDGET_RETRY_DELAY_MS = 30_000;
-/** ... for up to 5 minutes before the error panel. */
-export const BUDGET_RETRY_WINDOW_MS = 5 * 60_000;
 
 export interface RetryState {
   /** Model/transport failures so far; indexes `RETRY_DELAYS_MS`. */
   readonly failures: number;
-  /** Budget (429 hourly) waits so far. */
-  readonly budgetWaits: number;
 }
 
-export const INITIAL_RETRY_STATE: RetryState = { failures: 0, budgetWaits: 0 };
+export const INITIAL_RETRY_STATE: RetryState = { failures: 0 };
 
 export type RetryAction =
   | {
@@ -45,7 +38,7 @@ export type RetryAction =
 
 /** Attempts made so far, counting the first call. */
 export function attemptsMade(state: RetryState): number {
-  return 1 + state.failures + state.budgetWaits;
+  return 1 + state.failures;
 }
 
 export function nextRetryAction(state: RetryState, failure: NarratorFailure): RetryAction {
@@ -54,19 +47,6 @@ export function nextRetryAction(state: RetryState, failure: NarratorFailure): Re
       return { type: "acknowledge" };
     case "fatal":
       return { type: "fail", reason: failure.reason, message: failure.message };
-    case "budget": {
-      const waited = state.budgetWaits * BUDGET_RETRY_DELAY_MS;
-      if (waited + BUDGET_RETRY_DELAY_MS > BUDGET_RETRY_WINDOW_MS) {
-        return { type: "fail", reason: failure.reason, message: failure.message };
-      }
-      const next = { ...state, budgetWaits: state.budgetWaits + 1 };
-      return {
-        type: "retry",
-        delayMs: BUDGET_RETRY_DELAY_MS,
-        attempt: attemptsMade(next),
-        state: next,
-      };
-    }
     case "retryable": {
       const delayMs = RETRY_DELAYS_MS[state.failures];
       if (delayMs === undefined) {
@@ -90,7 +70,7 @@ export const STAGING_RETRY_DELAYS_MS: readonly number[] = [2_000, 4_000];
 /**
  * D67 (D57's exception to D43): the staging call (`stageDock`) never ends on the error panel.
  * D69: it retries a transient failure on `STAGING_RETRY_DELAYS_MS`, and where that runs out, or
- * the failure is fatal or the hourly budget (which a story call waits out), the hook is
+ * the failure is fatal, the hook is
  * acknowledged with no plan and the dock is the sim's floor set: staging is not story.
  */
 export function stagingRetryAction(state: RetryState, failure: NarratorFailure): RetryAction {

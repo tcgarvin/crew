@@ -82,11 +82,11 @@ export interface ApiError {
       | "internal";
     readonly message: string;
     /**
-     * `budgetExceeded`: `"hourly"` (the per-game cap; retry later) or `"spacing"` (too soon
-     * after the last call; a rate rule, not a failure, and only for hooks the sim raises again:
-     * never `stageDock`, `policyDecision` or `captainAshore`). `narratorUnavailable` (D43): the
-     * narrator's `FallbackReason` (`notConfigured`, `apiError`, `timeout`, `refusal`,
-     * `truncated`, `schemaInvalid`).
+     * `budgetExceeded`: `"spacing"` (too soon after the last call; a rate rule, not a failure,
+     * and only for hooks the sim raises again: never `stageDock`, `policyDecision`,
+     * `captainAshore` or `requestedCall`); D102 removed the per-game hourly cap.
+     * `narratorUnavailable` (D43): the narrator's `FallbackReason` (`notConfigured`,
+     * `apiError`, `timeout`, `refusal`, `truncated`, `schemaInvalid`).
      */
     readonly reason?: string;
     /** `narratorUnavailable` only: false for `notConfigured`, true for every model failure. */

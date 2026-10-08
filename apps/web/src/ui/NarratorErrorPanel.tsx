@@ -25,8 +25,6 @@ export function narratorReasonText(reason: string): string {
       return "The server returned an error";
     case "request":
       return "The server rejected the request";
-    case "budget":
-      return "The narrator's call budget for this game is used up for now";
     case "snapshot":
       return "The game state could not be captured for the narrator";
     default:
