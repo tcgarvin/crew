@@ -187,7 +187,7 @@ describe("buildDigest", () => {
     const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
     expect(text).toContain("summary: The pump has been grumbling.");
     expect(text).toContain(
-      "- [season] A buyer at Meridian (Ysolde Maren, Jax): Ysolde hinted she has a buyer. Next: When we next dock at Meridian, she names a price. Last beat t1200",
+      '- [season] "A buyer at Meridian" (Ysolde Maren, Jax): Ysolde hinted she has a buyer. Next: When we next dock at Meridian, she names a price. Last beat t1200',
     );
     expect(text).toContain("rejected last time: offerJob: no route");
   });
@@ -368,10 +368,37 @@ describe("buildDigest", () => {
     };
     const { text } = buildDigest(req.snapshot, [], notes, content(), req.hook);
     expect(text).toContain(
-      "- [episode] The quiet pump (Priya Kessler): Priya heard something. Next: Underway, the pump fails. Last beat t400 (foreshadowed)\n",
+      '- [episode] "The quiet pump" (Priya Kessler): Priya heard something. Next: Underway, the pump fails. Last beat t400 (foreshadowed)\n',
     );
     expect(text).toMatch(
-      /^- \[episode\] Plain \(Priya Kessler\): Priya heard something\. Next: Underway, the pump fails\. Last beat t400$/m,
+      /^- \[episode\] "Plain" \(Priya Kessler\): Priya heard something\. Next: Underway, the pump fails\. Last beat t400$/m,
+    );
+  });
+
+  it("lists the open thread titles on their own, quoted, to copy into closesThread (D98)", () => {
+    const req = quietTooLongRequest(content());
+    const thread = {
+      title: "The Seed-Bank Archive Run",
+      scale: "episode" as const,
+      people: ["Tilde Haugen"],
+      stage: "Tilde offered the archive",
+      nextBeat: "On delivery, her last word",
+      lastBeatTick: 400,
+      beatCardShown: false,
+    };
+    const { text } = buildDigest(
+      req.snapshot,
+      [],
+      { ...EMPTY_NOTES, threads: [thread] },
+      content(),
+      req.hook,
+    );
+    expect(text).toContain(
+      '## Open threads\nCopy one of these exactly into closesThread (a closing card) or beatOfThread (a beat card):\n- "The Seed-Bank Archive Run"\n',
+    );
+    const empty = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook).text;
+    expect(empty).toContain(
+      "## Open threads\n(none: a closing card has nothing to close, so leave closesThread empty)",
     );
   });
 

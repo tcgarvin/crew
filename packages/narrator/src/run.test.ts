@@ -354,7 +354,7 @@ describe("runNarrator", () => {
     };
     await runBothTurns(quietTooLongRequest(content()), { ...ctx(transport), notes });
     expect(transport.calls[0]?.user).toContain("summary: They owe the Guild a favour.");
-    expect(transport.calls[0]?.user).toContain("- [episode] The Guild's favour (nobody yet)");
+    expect(transport.calls[0]?.user).toContain('- [episode] "The Guild\'s favour" (nobody yet)');
   });
 
   it.each([
@@ -614,7 +614,7 @@ describe("what the captain has seen (D31)", () => {
     const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
     expect(transport.calls.at(-1)?.user).toContain('(closed thread "The stranger")');
     expect(again.commands).toEqual([]);
-    expect(again.notesUpdate?.lastRejections[0]).toMatch(/matches no open thread/);
+    expect(again.notesUpdate?.lastRejections[0]).toMatch(/already closed by an earlier card/);
     expect(again.notesUpdate?.threads).toEqual([]);
   });
 
@@ -831,7 +831,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.25");
+    expect(PROMPT_VERSION).toBe("v0.26");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {

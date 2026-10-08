@@ -554,6 +554,9 @@ export async function runNarratorWithTrace(
       callId,
       hook: req.hook,
       threads: notes.threads,
+      closedThreads: notes.cardsShown.flatMap((c) =>
+        c.closedThread === null ? [] : [c.closedThread],
+      ),
     });
     const translated: TranslationResult = {
       ...translatedIntents,

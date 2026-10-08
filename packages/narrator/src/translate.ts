@@ -190,6 +190,8 @@ interface Env {
   readonly secrets: readonly string[];
   /** The stored threads (D97: the notes for this call are written after the plan). */
   readonly threads: readonly KnownThread[];
+  /** D98: titles of threads a shown card already closed, lowercased and trimmed. */
+  readonly closedThreads: readonly string[];
   /** D41: the player's avatar; never a card speaker. Undefined when nobody is tagged captain. */
   readonly captainName: string | undefined;
   readonly tally: Tally;
@@ -747,25 +749,32 @@ function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string
   return ok(thread.title);
 }
 
+/** D98: what a card's closesThread named: nothing, a stored thread, or a title matching none. */
+type ClosingThread =
+  | { readonly kind: "none" }
+  | { readonly kind: "closes"; readonly title: string }
+  | { readonly kind: "unmatched"; readonly written: string };
+
 /**
- * D56: a closing card must name a stored thread (one the digest showed); the server retires it
- * once the card goes up, so a second closing card for the same thread finds nothing to close.
- * A card cannot both foreshadow and close.
+ * D56: a closing card names a stored thread (one the digest showed); the server retires it once
+ * the card goes up. A second closing card for a thread a card already closed is dropped. D98: a
+ * title that matches neither (the model named the offer or the issuer, or the thread was lost in
+ * a notes rewrite) no longer costs the captain the ending: the card goes up closing nothing, and
+ * the model is told so next call. A card cannot both foreshadow and close.
  */
-function closingThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
-  const raw = intent.closesThread;
-  if (raw.trim() === "") return ok(undefined);
+function closingThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<ClosingThread> {
+  const raw = intent.closesThread.trim();
+  if (raw === "") return ok({ kind: "none" });
   if (intent.beatOfThread.trim() !== "") {
     return no("a card cannot both foreshadow a thread (beatOfThread) and close one (closesThread)");
   }
-  const wanted = raw.trim().toLowerCase();
+  const wanted = raw.toLowerCase();
   const thread = env.threads.find((t) => t.stored && t.title.trim().toLowerCase() === wanted);
-  if (thread === undefined) {
-    return no(
-      `closesThread "${raw.trim()}" matches no open thread in your notes; it may already be closed`,
-    );
+  if (thread !== undefined) return ok({ kind: "closes", title: thread.title });
+  if (env.closedThreads.includes(wanted)) {
+    return no(`closesThread "${raw}" was already closed by an earlier card; a thread closes once`);
   }
-  return ok(thread.title);
+  return ok({ kind: "unmatched", written: raw });
 }
 
 /**
@@ -804,7 +813,13 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   }
   env.tally.cardUsed = true;
   env.tally.beatCardThread = beat.value;
-  env.tally.closedThread = closing.value;
+  const closed = closing.value.kind === "closes" ? closing.value.title : undefined;
+  env.tally.closedThread = closed;
+  if (closing.value.kind === "unmatched") {
+    env.notes.push(
+      `closesThread: "${closing.value.written}" matches no title under "Open threads", so the card went up closing nothing; copy the title exactly`,
+    );
+  }
   const sideSpec = (s: SideCommands, aftermath: string) => ({
     label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
     commands: s.commands,
@@ -823,9 +838,7 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
           params: {
             title,
             ...(speaker.value === undefined ? {} : { speaker: speaker.value }),
-            ...(closing.value === undefined
-              ? {}
-              : { closesThread: closedLabel(env, closing.value) }),
+            ...(closed === undefined ? {} : { closesThread: closedLabel(env, closed) }),
           },
           prose: situation,
         },
@@ -979,6 +992,7 @@ export const translateIntents: TranslateIntents = (
     hook,
     secrets: secretPhrases(snapshot, ctx.content),
     threads: (ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
+    closedThreads: (ctx.closedThreads ?? []).map((t) => t.trim().toLowerCase()),
     captainName: captainName(snapshot, ctx.content),
     tally: {
       spawns: 0,

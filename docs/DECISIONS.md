@@ -1894,3 +1894,28 @@ one reply before (D96's run). The staging case once staged no post at `low` (a f
 reruns. Luna at `low` writes malformed JSON about one call in twelve on a policy card (a stray
 `""` key, an extra brace), with the v0.24 prompt as well as this one; the client retries it
 (D43). Prompt v0.25.
+
+**D98. Closing cards copy their thread's title from a list, and a wrong title no longer costs the
+ending.** In the owner's 2026-10-07 game (`5bace940…`, luna at `low`, about twenty deliveries),
+eleven `notableEvent` calls on `contractCompleted` wrote a closing card that the translator then
+dropped because `closesThread` "matches no open thread". Two causes appeared in the stored notes.
+In some calls the right thread was open but the model wrote the offer card's title or the issuer's
+name instead ("Tilde Haugen, seed-bank archivist" for "The Seed-Bank Archive Run"). In others the
+delivered job's thread was already gone: the captain had walked ashore first, and that call's notes
+rewrite swapped the finished job's thread for the new offer's, so the closing card had nothing to
+name. Either way the captain got no ending.
+
+*The list.* The digest gains an "Open threads" section, never trimmed and not shown to the
+staging call. It lists each open thread's title in quotes, under a line that says to copy one
+exactly into `closesThread` or `beatOfThread`; with no threads it says to leave `closesThread`
+empty. The thread lines under "Your notes so far" quote the title too. The rule on arcs says the
+title is copied from "Open threads", never the offer card's title or the issuer's name; the beat
+card rule points at the same list.
+
+*The fallback.* A `closesThread` that matches no stored thread and no thread an earlier card
+closed no longer drops the card. The card goes up closing nothing, and the model is told why in
+the notes turn and next call (the D41 correction channel; it is told only when the card is
+actually accepted). A title an earlier card already closed is still dropped ("a thread closes
+once"), checked against the closed titles in "What the captain has seen" (`TranslationCtx.
+closedThreads`). Not done here: stopping a notes rewrite from losing a job's thread before
+its closing card, and the call-back hint and aftermath hooks discussed alongside it. Prompt v0.26.

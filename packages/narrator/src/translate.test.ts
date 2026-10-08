@@ -497,19 +497,41 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(command.payload.card.prompt.params.closesThread).toBe("");
   });
 
-  it("drops a closing card for a thread that is not open in the stored notes (D56)", () => {
+  it("puts up a closing card whose title matches no open thread, closing nothing (D98)", () => {
     const req = docked(approachRequest(content()));
-    const { lastBeatTick: _t, beatCardShown: _b, ...written } = sensorThread;
-    // Written back by the model this call, but already retired from the stored notes.
-    const rewritten = emptyPlan({
-      intents: [{ ...decision, closesThread: "the aft sensor" }] as never,
-      notes: { summary: "s", threads: [written], cast: [] },
+    // The model named the offer's issuer, not the thread.
+    const closing = { ...decision, closesThread: "Tilde Haugen, seed-bank archivist" };
+    const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [sensorThread] });
+    expect(result.dropped).toEqual([]);
+    expect(result.closedThread).toBeUndefined();
+    const command = result.commands[0];
+    if (command?.kind !== "surfaceDecision") throw new Error("expected a surfaced card");
+    expect(command.payload.card.prompt.params).not.toHaveProperty("closesThread");
+    expect(result.notes).toEqual([
+      'closesThread: "Tilde Haugen, seed-bank archivist" matches no title under "Open threads", so the card went up closing nothing; copy the title exactly',
+    ]);
+  });
+
+  it("says nothing about an unmatched closesThread when the card is dropped anyway (D98)", () => {
+    const req = docked(approachRequest(content()));
+    const closing = { ...decision, closesThread: "Somebody's run", right: decision.left };
+    const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [] });
+    expect(result.dropped[0]?.reason).toBe("surfaceDecision: both sides have the same label");
+    expect(result.notes).toEqual([]);
+  });
+
+  it("drops a closing card for a thread an earlier card already closed (D56, D98)", () => {
+    const req = docked(approachRequest(content()));
+    const closing = { ...decision, closesThread: "the aft sensor" };
+    const result = translateIntents(plan([closing]), {
+      ...ctxOf(req),
+      threads: [],
+      closedThreads: ["The aft sensor"],
     });
-    const result = translateIntents(rewritten, { ...ctxOf(req), threads: [] });
     expect(result.commands).toEqual([]);
     expect(result.closedThread).toBeUndefined();
     expect(result.dropped[0]?.reason).toBe(
-      'surfaceDecision: closesThread "the aft sensor" matches no open thread in your notes; it may already be closed',
+      'surfaceDecision: closesThread "the aft sensor" was already closed by an earlier card; a thread closes once',
     );
   });
 

@@ -427,6 +427,11 @@ export interface TranslationCtx {
    * the plan's notes introduce this call.
    */
   readonly threads?: readonly Thread[];
+  /**
+   * D98: titles of threads a card already closed (from "What the captain has seen"), so a second
+   * closing card for one is dropped while a closing card naming no thread at all still goes up.
+   */
+  readonly closedThreads?: readonly string[];
 }
 
 export interface TranslationResult {

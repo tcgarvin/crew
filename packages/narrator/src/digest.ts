@@ -705,7 +705,7 @@ function notesSection(notes: NarratorNotes): Section {
     // D39: a thread that has had its beat card gets no second one; the next card pays it off.
     const foreshadowed = t.beatCardShown ? " (foreshadowed)" : "";
     lines.push(
-      `- [${t.scale}] ${t.title} (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}${foreshadowed}`,
+      `- [${t.scale}] "${t.title}" (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}${foreshadowed}`,
     );
   }
   for (const c of notes.cast) {
@@ -714,6 +714,22 @@ function notesSection(notes: NarratorNotes): Section {
   }
   for (const r of notes.lastRejections) lines.push(`rejected last time: ${r}`);
   return section("Your notes so far", lines, 5);
+}
+
+/**
+ * D98: the open thread titles on their own, never trimmed. A closing card's closesThread (and a
+ * beat card's beatOfThread) must copy one exactly; buried in the thread lines, the model wrote
+ * the offer's card title or the issuer's name instead.
+ */
+function openThreadsSection(notes: NarratorNotes): Section {
+  const lines =
+    notes.threads.length === 0
+      ? ["(none: a closing card has nothing to close, so leave closesThread empty)"]
+      : [
+          "Copy one of these exactly into closesThread (a closing card) or beatOfThread (a beat card):",
+          ...notes.threads.map((t) => `- "${t.title}"`),
+        ];
+  return section("Open threads", lines, NEVER_DROPS);
 }
 
 /**
@@ -784,6 +800,7 @@ export function buildDigest(
     jobSection(state, content),
     crewSection(snapshot, content),
     notesSection(notes),
+    ...(staging ? [] : [openThreadsSection(notes)]),
     cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),
     ...dockSections(state, content),
