@@ -1919,3 +1919,67 @@ actually accepted). A title an earlier card already closed is still dropped ("a 
 once"), checked against the closed titles in "What the captain has seen" (`TranslationCtx.
 closedThreads`). Not done here: stopping a notes rewrite from losing a job's thread before
 its closing card, and the call-back hint and aftermath hooks discussed alongside it. Prompt v0.26.
+
+**D99. The narrator asks when it wants its next call.** In the owner's 2026-10-07 game every
+story call came at a port with no course set (22 `captainAshore`, 23 `notableEvent`, one
+`quietTooLong` in about twenty deliveries), and `scheduleField` and `scheduleHazard` need a course,
+so the narrator never placed a field, a hazard or a fault. The core legs (25-70 s of transit) are
+shorter than the 400 s quiet window, so no check-in ever happened in flight.
+
+*The hint.* The plan now carries a required `callBack: { when, why }`, with `when` one of `nextPort`
+(the default answer; the docking calls come anyway, so it raises nothing), `departure` and
+`midLeg`. `why` is one private line, at most 200 characters, read back on the call it asked for.
+The translator turns it into `requestCall`, the eighth narrator command (allow-listed, D6). It
+stores `NarratorState.callBack`, which keeps the port it was asked at for `nextPort` and the
+transit it meant for a `midLeg` asked before halfway. One request stands at a time, and every
+story call's plan replaces it. The digest shows the standing request on every call, and the prompt
+says to restate it.
+
+*Serving it.* Travel checks the request each tick before the owed `notableEvent`, so a requested
+call settles that debt (D69). `departure` is due once the ship has cast off on a stage that started
+after the request (`departing` or `transit`). `midLeg` is due at half of a hop's transit, per hop,
+never the whole voyage. Either raises the new hook kind `requestedCall`, with context
+`{ when, why, requestedTick }`. A `nextPort` request is marked served by the first story hook raised
+while docked somewhere other than where it was asked. Any served request is cleared when its hook
+is acknowledged; a replacement applied in the same tick survives the ack. A request that never
+comes due stands until the next story call replaces it, and the quiet timer guarantees one.
+`requestedCall` is spacing-exempt on the server: it is raised once, and a spacing refusal would
+lose it. The hourly story-call budget default rises from 30 to 45, for roughly one extra call a leg.
+No save schema bump: `callBack` is optional.
+
+*The prompt.* The prompt says an episode's set piece usually belongs on a leg, so offering a job is
+the moment to ask for a departure call and say in `why` what the leg will bring. The
+`requestedCall` hook instruction says the whole leg is ahead at departure (pick the fault window to
+the transit time the hook line gives), and that mid-leg is a breath for shipboard life. The
+hazard and field levers name the departure call as their natural moment. Prompt v0.27.
+
+**D100. The narrator is called in the aftermath.** The narrator's threads wrote `nextBeat`
+conditions nothing woke it for ("when the repair is completed…"), and the prompt called a
+hazard's helm check "the beat" with no call after it. A new config key,
+`narrator.aftermathHookOnEvents`, hooks these events even when they are only `notable`:
+
+- `alertCleared` replaces `fieldCleared`. It fires once the alert stands down after a field and
+  the crew have reported in, rather than at the field's edge while the damage is still being found.
+- `navHazard`, the hazard's outcome.
+- `faultRepaired`, but only for a fault the narrator caused (it carries the fault's
+  `causeCommandId`, which the repair now passes on) and only off a field's leg, where `alertCleared`
+  tells the story.
+
+`lastNarrativeTick` still counts narrative events only. A new key rather than an append to
+`hookOnEvents`, because `fillConfig` fills missing keys for old saves but never merges arrays: an
+old save gets the aftermath list, and keeps its own `fieldCleared`, so its fields end with two
+calls. Not hooked: `problemResolved` (no cause; every mop and meal), `machineMended`, `hullPlated`,
+`shipUnstuck`, and the missed-hazard and missed-field bookkeeping. The `notableEvent` hook line
+says which aftermath it is.
+
+**D101. A thread the captain has seen stays in the notes until its closing card.** D98's second
+cause: the notes are rewritten in full each call. When the captain walked ashore before a
+delivery completed, that call's rewrite swapped the delivered job's thread for the new offer's, so
+the `contractCompleted` call had nothing to close. `mergeThreads` now keeps any previous thread
+the model omitted when the captain has seen a beat of it (`lastBeatTick` set) and no card closed
+it, and says so next call under "rejected last time". A thread the captain never saw may still go
+silently. The notes schema gains `retired`, titles that end without a card of their own because
+events already made the ending plain (an offer the captain turned down, a story another card
+wrapped up). Over the six-thread cap, new unseen threads give way first. `lastBeatTick` is the
+proxy for "seen" rather than a link to job ids, because threads without jobs exist (D32) and the
+title is already a thread's identity (D56, D98).
