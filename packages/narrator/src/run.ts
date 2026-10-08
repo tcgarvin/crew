@@ -39,6 +39,7 @@ import { applyDecisionEvents, recordCardsFromCall } from "./history";
 import { type State, portName } from "./lookups";
 import { FallbackError, callModel, contentOf, parseJsonReply, schemaIssue } from "./model-call";
 import {
+  type MergedThreads,
   type MetIssuer,
   type NarratorCastEntry,
   type NarratorNotes,
@@ -334,16 +335,18 @@ function notesFrom(
     commands,
     translated.closedThread,
   );
+  const merged = mergeThreads(
+    written.threads,
+    previous.threads,
+    tick,
+    textsShown(translated),
+    translated.beatCardThread,
+    cardsShown.flatMap((c) => (c.closedThread === null ? [] : [c.closedThread])),
+    written.retired,
+  );
   return boundNotes({
     summary: written.summary,
-    threads: mergeThreads(
-      written.threads,
-      previous.threads,
-      tick,
-      textsShown(translated),
-      translated.beatCardThread,
-      cardsShown.flatMap((c) => (c.closedThread === null ? [] : [c.closedThread])),
-    ),
+    threads: merged.threads,
     cardsShown,
     cast: placeEndedPassengers(
       mergeCast(castWritten(written, content), previous.cast, issuersMet(commands, content), tick),
@@ -352,8 +355,26 @@ function notesFrom(
     ),
     lastUpdatedTick: tick,
     // D41: non-fatal corrections ride along with the drop reasons.
-    lastRejections: [...dropped.map((d) => d.reason), ...translated.notes],
+    lastRejections: [
+      ...dropped.map((d) => d.reason),
+      ...translated.notes,
+      ...threadCorrections(merged),
+    ],
   });
+}
+
+/** D101: what the server did to the model's thread list, said back to it on the next call. */
+function threadCorrections(merged: MergedThreads): string[] {
+  return [
+    ...merged.kept.map(
+      (title) =>
+        `kept thread "${title}": the captain has seen a beat of it and no card closed it; give it a closing card (closesThread), or name it in retired if it truly must go without one`,
+    ),
+    ...merged.retiredWithoutCard.map((title) => `retired "${title}" without a closing card`),
+    ...merged.droppedForRoom.map(
+      (title) => `dropped new thread "${title}": no room beside the threads the captain has seen`,
+    ),
+  ];
 }
 
 /**
@@ -371,6 +392,8 @@ function writtenFrom(notes: NarratorNotes): WrittenNotes {
       nextBeat,
     })),
     cast: notes.cast.map(({ name, note, portId }) => ({ name, note, portId: portId ?? "" })),
+    // The plan-time merge keeps nothing: it only carries this call's changes over.
+    retired: [],
   };
 }
 

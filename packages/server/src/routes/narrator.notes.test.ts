@@ -30,7 +30,12 @@ function content(): ContentBundle {
 }
 
 const PLAN = { rationale: "Nothing yet.", intents: [], card: null };
-const WRITTEN = { summary: "A quiet leg, written after the plan.", threads: [], cast: [] };
+const WRITTEN = {
+  summary: "A quiet leg, written after the plan.",
+  threads: [],
+  cast: [],
+  retired: [],
+};
 
 /** The plan turn gets `PLAN`; the notes turn (the one with a continuation) gets `notesReply`. */
 function twoTurns(notesReply: string): ModelTransport {

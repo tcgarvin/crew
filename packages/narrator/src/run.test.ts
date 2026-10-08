@@ -151,7 +151,7 @@ describe("runNarrator", () => {
   it("translates a valid plan and rewrites the notes", async () => {
     const plan = emptyPlan({
       intents: [offer, { ...offer, fromPort: "port.green_meridian" }] as never,
-      notes: { summary: "Arrived at the Drift.", threads: [assayThread], cast: [] },
+      notes: { summary: "Arrived at the Drift.", threads: [assayThread], cast: [], retired: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = captainAshoreRequest(content());
@@ -203,7 +203,7 @@ describe("runNarrator", () => {
     };
     const plan = emptyPlan({
       intents: [passage] as never,
-      notes: { summary: "A passenger at the Hub.", threads: [], cast: [] },
+      notes: { summary: "A passenger at the Hub.", threads: [], cast: [], retired: [] },
     });
     const req = farCaptainAshoreRequest(content());
     const res = await runBothTurns(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
@@ -260,6 +260,7 @@ describe("runNarrator", () => {
       notes: {
         summary: "s",
         threads: [],
+        retired: [],
         cast: [{ name: "Halla Thorne", note: aboardNote, portId: "" }],
       },
     });
@@ -309,6 +310,7 @@ describe("runNarrator", () => {
       const placed = emptyPlan({
         notes: {
           summary: "s",
+          retired: [],
           threads: [],
           cast: [
             { name: "Halla Thorne", note: "went home by liner", portId: "port.kessler_drift" },
@@ -326,6 +328,7 @@ describe("runNarrator", () => {
       const again = emptyPlan({
         notes: {
           summary: "s",
+          retired: [],
           threads: [],
           cast: [
             {
@@ -519,6 +522,7 @@ describe("what the captain has seen (D31)", () => {
       intents: [stranger] as never,
       notes: {
         summary: "s",
+        retired: [],
         threads: [{ ...assayThread, title: "The stranger", people: ["Dane Whitcross"] }],
         cast: [],
       },
@@ -547,7 +551,7 @@ describe("what the captain has seen (D31)", () => {
   it("nulls the captain as a speaker, keeps the card and says why next call (D41)", async () => {
     const plan = emptyPlan({
       intents: [{ ...stranger, speaker: "Mara Osei" }] as never,
-      notes: { summary: "s", threads: [], cast: [] },
+      notes: { summary: "s", threads: [], cast: [], retired: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
@@ -569,7 +573,7 @@ describe("what the captain has seen (D31)", () => {
     const beat = { ...stranger, beatOfThread: "the stranger" };
     const plan = emptyPlan({
       intents: [beat] as never,
-      notes: { summary: "s", threads: [thread], cast: [] },
+      notes: { summary: "s", threads: [thread], cast: [], retired: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
@@ -596,7 +600,7 @@ describe("what the captain has seen (D31)", () => {
     // The model keeps writing the thread; the server retires it anyway.
     const plan = emptyPlan({
       intents: [closing] as never,
-      notes: { summary: "s", threads: [thread], cast: [] },
+      notes: { summary: "s", threads: [thread], cast: [], retired: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
@@ -1071,7 +1075,12 @@ describe("the notes turn (D97)", () => {
   it("continues from the plan and its reasoning, over the same cached system prefix", async () => {
     const plan = emptyPlan({
       intents: [offer, { ...offer, fromPort: "port.green_meridian" }] as never,
-      notes: { summary: "Halla's cores are aboard.", threads: [assayThread], cast: [] },
+      notes: {
+        summary: "Halla's cores are aboard.",
+        threads: [assayThread],
+        cast: [],
+        retired: [],
+      },
     });
     const reasoningDetails = [{ type: "reasoning.encrypted", data: "opaque" }];
     const transport = fakeTransport({ ...okResult(JSON.stringify(plan)), reasoningDetails });
@@ -1127,5 +1136,66 @@ describe("the notes turn (D97)", () => {
     expect(run.response.fallback).toBeUndefined();
     expect(run.response.notesUpdate).toBeDefined();
     expect(await run.notesTurn?.()).toMatchObject({ ok: false, reason: "schemaInvalid" });
+  });
+});
+
+describe("threads the captain has seen survive the rewrite (D101)", () => {
+  const seenThread = { ...assayThread, lastBeatTick: 30, beatCardShown: false };
+  const stored = { ...EMPTY_NOTES, threads: [seenThread] };
+  const omitting = (retired: string[] = []) =>
+    emptyPlan({ notes: { summary: "s", threads: [], cast: [], retired } });
+
+  it("keeps a seen thread the notes turn left out, and says so next call", async () => {
+    const transport = fakeTransport(okResult(JSON.stringify(omitting())));
+    const res = await runBothTurns(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      notes: stored,
+    });
+    expect(res.notesUpdate?.threads).toEqual([seenThread]);
+    expect(res.notesUpdate?.lastRejections).toEqual([
+      expect.stringContaining('kept thread "The assay office"'),
+    ]);
+  });
+
+  it("lets the next call close the kept thread with a closing card", async () => {
+    const transport = fakeTransport(okResult(JSON.stringify(omitting())));
+    const first = await runBothTurns(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      notes: stored,
+    });
+    const closing = { ...stranger, closesThread: "The assay office" };
+    const closeTransport = fakeTransport(
+      okResult(JSON.stringify({ ...omitting(), intents: [closing] })),
+    );
+    const second = await runBothTurns(quietTooLongRequest(content()), {
+      ...ctx(closeTransport),
+      notes: first.notesUpdate ?? EMPTY_NOTES,
+    });
+    expect(second.dropped).toEqual([]);
+    expect(second.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(second.notesUpdate?.cardsShown[0]?.closedThread).toBe("The assay office");
+    expect(second.notesUpdate?.threads).toEqual([]);
+  });
+
+  it("lets the model retire a seen thread by naming it, and reports it", async () => {
+    const transport = fakeTransport(okResult(JSON.stringify(omitting(["The assay office"]))));
+    const res = await runBothTurns(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      notes: stored,
+    });
+    expect(res.notesUpdate?.threads).toEqual([]);
+    expect(res.notesUpdate?.lastRejections).toEqual([
+      'retired "The assay office" without a closing card',
+    ]);
+  });
+
+  it("keeps nothing in the plan-time merge, so the stored notes pass through unchanged", async () => {
+    const transport = fakeTransport(okResult(JSON.stringify(omitting())));
+    const run = await runNarratorWithTrace(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      notes: stored,
+    });
+    expect(run.response.notesUpdate?.threads).toEqual([seenThread]);
+    expect(run.response.notesUpdate?.lastRejections).toEqual([]);
   });
 });

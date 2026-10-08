@@ -124,6 +124,7 @@ describe("NarratorPlan structured-output schema", () => {
         },
       ],
       cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
+      retired: [],
     };
     expect(buildNotesSchema().parse(notes)).toEqual(notes);
     const plan = { rationale: "", intents: [], card: null };

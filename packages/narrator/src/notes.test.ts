@@ -107,21 +107,24 @@ describe("mergeThreads (D32)", () => {
   ];
 
   it("stamps the hook tick on threads whose people were on a card or made an offer", () => {
-    const merged = mergeThreads(written, [thread], 90, ["Halla Iyer", "Priya catches you aft."]);
+    const merged = mergeThreads(written, [thread], 90, [
+      "Halla Iyer",
+      "Priya catches you aft.",
+    ]).threads;
     expect(merged.map((t) => t.lastBeatTick)).toEqual([90, null, 90]);
   });
 
   it("keeps the previous tick for a thread that stayed quiet", () => {
-    const merged = mergeThreads(written, [thread], 90, []);
+    const merged = mergeThreads(written, [thread], 90, []).threads;
     expect(merged.map((t) => t.lastBeatTick)).toEqual([30, null, null]);
   });
 
   it("sets beatCardShown on the thread a beat card foreshadowed and keeps it afterwards (D39)", () => {
-    const merged = mergeThreads(written, [thread], 90, [], "jax's debt");
+    const merged = mergeThreads(written, [thread], 90, [], "jax's debt").threads;
     expect(merged.map((t) => t.beatCardShown)).toEqual([false, true, false]);
     // A beat card is a card: the thread's last beat is now.
     expect(merged[1]?.lastBeatTick).toBe(90);
-    const later = mergeThreads(written, merged, 120, []);
+    const later = mergeThreads(written, merged, 120, []).threads;
     expect(later.map((t) => t.beatCardShown)).toEqual([false, true, false]);
   });
 
@@ -129,5 +132,83 @@ describe("mergeThreads (D32)", () => {
     const { beatCardShown: _omitted, ...stored } = thread;
     const notes = parseNotes({ summary: "s", threads: [stored], cast: [], lastUpdatedTick: 1 });
     expect(notes.threads[0]?.beatCardShown).toBe(false);
+  });
+});
+
+describe("mergeThreads keeps threads the captain has seen (D101)", () => {
+  const write = (title: string) => ({
+    title,
+    scale: "episode" as const,
+    people: ["Nobody Named"],
+    stage: "s",
+    nextBeat: "n",
+  });
+  const seen = (title: string, lastBeatTick = 30) => ({ ...thread, title, lastBeatTick });
+  const unseen = (title: string) => ({ ...thread, title, lastBeatTick: null });
+
+  it("keeps an omitted seen thread unchanged and reports it", () => {
+    const old = { ...seen("Jax's debt"), beatCardShown: true };
+    const merged = mergeThreads([write("Other")], [old], 90, []);
+    expect(merged.threads.map((t) => t.title)).toEqual(["Other", "Jax's debt"]);
+    expect(merged.threads[1]).toEqual(old);
+    expect(merged.kept).toEqual(["Jax's debt"]);
+  });
+
+  it("drops an omitted thread the captain never saw, silently", () => {
+    const merged = mergeThreads([write("Other")], [unseen("Quiet one")], 90, []);
+    expect(merged.threads.map((t) => t.title)).toEqual(["Other"]);
+    expect(merged.kept).toEqual([]);
+    expect(merged.retiredWithoutCard).toEqual([]);
+  });
+
+  it("lets retired drop a seen thread and reports it; unknown titles are ignored", () => {
+    const merged = mergeThreads(
+      [],
+      [seen("Jax's debt")],
+      90,
+      [],
+      undefined,
+      [],
+      [" JAX'S DEBT ", "No such thread"],
+    );
+    expect(merged.threads).toEqual([]);
+    expect(merged.kept).toEqual([]);
+    expect(merged.retiredWithoutCard).toEqual(["Jax's debt"]);
+  });
+
+  it("never keeps a closed thread", () => {
+    const merged = mergeThreads([], [seen("Jax's debt")], 90, [], undefined, ["jax's debt"]);
+    expect(merged.threads).toEqual([]);
+    expect(merged.kept).toEqual([]);
+    expect(merged.retiredWithoutCard).toEqual([]);
+  });
+
+  it("does not keep a seen thread the model wrote itself", () => {
+    const merged = mergeThreads([write("Jax's debt")], [seen("Jax's debt")], 90, []);
+    expect(merged.threads).toHaveLength(1);
+    expect(merged.kept).toEqual([]);
+  });
+
+  it("drops an unseen new thread first when a kept thread would overflow the limit", () => {
+    const fresh = Array.from({ length: NOTES_LIMITS.threads }, (_, i) => write(`New ${i}`));
+    const merged = mergeThreads(fresh, [seen("Old seen")], 90, []);
+    expect(merged.threads).toHaveLength(NOTES_LIMITS.threads);
+    expect(merged.threads.map((t) => t.title)).toContain("Old seen");
+    expect(merged.droppedForRoom).toEqual([`New ${NOTES_LIMITS.threads - 1}`]);
+  });
+
+  it("does not drop for room a thread a beat card just foreshadowed", () => {
+    const fresh = Array.from({ length: NOTES_LIMITS.threads }, (_, i) => write(`New ${i}`));
+    const last = `New ${NOTES_LIMITS.threads - 1}`;
+    const merged = mergeThreads(fresh, [seen("Old seen")], 90, [], last);
+    expect(merged.threads.map((t) => t.title)).toContain(last);
+    expect(merged.droppedForRoom).toEqual([`New ${NOTES_LIMITS.threads - 2}`]);
+  });
+});
+
+describe("parseNotes without retired (D101)", () => {
+  it("still loads stored notes, which never held a retired list", () => {
+    const notes = parseNotes({ summary: "s", threads: [thread], cast: [], lastUpdatedTick: 1 });
+    expect(notes.threads).toHaveLength(1);
   });
 });

@@ -399,6 +399,11 @@ export function buildNotesSchema() {
         }),
       )
       .describe("Supporting characters, not crew; keep those the captain has met."),
+    retired: z
+      .array(z.string())
+      .describe(
+        'Titles copied from "Open threads" that end without a closing card because events made them moot before the captain saw any card of them; usually empty.',
+      ),
   });
 }
 

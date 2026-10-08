@@ -311,7 +311,23 @@ export type WrittenThread = Omit<Thread, "lastBeatTick" | "beatCardShown">;
  * D56: a closed thread is retired by the server, whatever the model wrote: the one this call's
  * closing card ended, and any whose closing card is still in the card history (so a model that
  * keeps writing a finished thread cannot reopen it and close it again).
+ *
+ * D101: a thread the captain has seen a beat of (`lastBeatTick` set) never vanishes before its
+ * closing card. One the model left out is kept as it was and reported in `kept`, unless the model
+ * named it in `retired` (reported in `retiredWithoutCard`). An omitted thread the captain never
+ * saw is dropped silently. Over the thread limit, threads that are new this call and unseen go
+ * first (`droppedForRoom`), so the limit never cuts a seen thread.
  */
+export interface MergedThreads {
+  readonly threads: Thread[];
+  /** Titles of seen threads the model omitted and the server kept. */
+  readonly kept: string[];
+  /** Titles of seen threads the model retired without a closing card. */
+  readonly retiredWithoutCard: string[];
+  /** Titles of new, unseen threads dropped to make room for seen ones. */
+  readonly droppedForRoom: string[];
+}
+
 export function mergeThreads(
   written: readonly WrittenThread[],
   previous: readonly Thread[],
@@ -322,7 +338,9 @@ export function mergeThreads(
   beatCardThread: string | undefined = undefined,
   /** Titles of threads closed by a card: this call's and those in the card history. */
   closedThreads: readonly string[] = [],
-): Thread[] {
+  /** D101: titles the model ends without a closing card. */
+  retired: readonly string[] = [],
+): MergedThreads {
   const key = (s: string) => s.trim().toLowerCase();
   const before = new Map(previous.map((t) => [key(t.title), t]));
   const lowered = textsThisCall.map(key);
@@ -332,7 +350,8 @@ export function mergeThreads(
   };
   const beatKey = beatCardThread === undefined ? undefined : key(beatCardThread);
   const closed = new Set(closedThreads.map(key));
-  return written
+  const retiredKeys = new Set(retired.map(key));
+  const threads: Thread[] = written
     .filter((t) => !closed.has(key(t.title)))
     .map((t) => {
       const earlier = before.get(key(t.title));
@@ -344,4 +363,27 @@ export function mergeThreads(
         beatCardShown: foreshadowedNow || (earlier?.beatCardShown ?? false),
       };
     });
+  const writtenKeys = new Set(written.map((t) => key(t.title)));
+  const kept: string[] = [];
+  const retiredWithoutCard: string[] = [];
+  for (const old of previous) {
+    const k = key(old.title);
+    if (writtenKeys.has(k) || closed.has(k) || old.lastBeatTick === null) continue;
+    if (retiredKeys.has(k)) {
+      retiredWithoutCard.push(old.title);
+    } else {
+      threads.push(old);
+      kept.push(old.title);
+    }
+  }
+  const droppedForRoom: string[] = [];
+  for (let i = threads.length - 1; i >= 0 && threads.length > NOTES_LIMITS.threads; i--) {
+    const t = threads[i];
+    if (t === undefined) continue;
+    const k = key(t.title);
+    if (before.has(k) || t.lastBeatTick !== null || k === beatKey) continue;
+    threads.splice(i, 1);
+    droppedForRoom.push(t.title);
+  }
+  return { threads, kept, retiredWithoutCard, droppedForRoom };
 }
