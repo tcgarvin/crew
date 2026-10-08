@@ -29,7 +29,13 @@ function content(): ContentBundle {
   return bundle;
 }
 
-const PLAN = { rationale: "Nothing yet.", intents: [], card: null };
+// D99: every plan the model writes carries its call-back request.
+const PLAN = {
+  rationale: "Nothing yet.",
+  intents: [],
+  card: null,
+  callBack: { when: "nextPort", why: "" },
+};
 const WRITTEN = {
   summary: "A quiet leg, written after the plan.",
   threads: [],

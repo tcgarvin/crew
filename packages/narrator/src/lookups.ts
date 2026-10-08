@@ -172,6 +172,16 @@ export function portHereOrNext(state: State): PortDefId {
 }
 
 /**
+ * D78: seconds of transit left on the current leg at nominal speed (a drift only lengthens it):
+ * the whole leg before transit begins, zero once it is over. Zero while docked.
+ */
+export function transitSecondsLeft(state: State, config: DeepReadonly<ConfigDef>): number {
+  const travel = state.travel;
+  if (travel.stage === "docked") return 0;
+  return Math.max(0, travel.routeDistance - travel.routeProgress) / config.travel.nominalSpeed;
+}
+
+/**
  * The voyage the ship is on beyond the current leg (§2.3): the voyage destination when it is set
  * and is not the port the ship is at or about to reach, with the hops and distance still to run
  * from there. Undefined for a single-leg trip or no trip at all.

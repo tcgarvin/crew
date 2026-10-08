@@ -32,6 +32,8 @@ function planWith(intents: unknown[]): ModelTransport {
             rationale: "A long quiet leg and the junior at the helm: put something in her path.",
             intents,
             card: null,
+            // D99: every plan the model writes carries its call-back request.
+            callBack: { when: "nextPort", why: "" },
           },
     ),
     finish: "stop",
@@ -87,7 +89,8 @@ describe("POST /api/games/:id/narrator, scheduleHazard (D78)", () => {
     const body = await readJson(res);
     expect(body.fallback).toBeUndefined();
     expect(body.dropped).toEqual([]);
-    expect(body.commands).toHaveLength(1);
+    expect(body.commands).toHaveLength(2);
+    expect(body.commands[1]).toMatchObject({ kind: "requestCall" });
     expect(body.commands[0]).toMatchObject({
       kind: "scheduleHazard",
       source: "narrator",
@@ -111,7 +114,10 @@ describe("POST /api/games/:id/narrator, scheduleHazard (D78)", () => {
     expect(res.status).toBe(200);
     const body = await readJson(res);
     expect(body.fallback).toBeUndefined();
-    expect(body.commands.map((c: { kind: string }) => c.kind)).toEqual(["scheduleHazard"]);
+    expect(body.commands.map((c: { kind: string }) => c.kind)).toEqual([
+      "scheduleHazard",
+      "requestCall",
+    ]);
     expect(body.dropped).toEqual([
       {
         intentIndex: 1,

@@ -1,5 +1,6 @@
 import {
   AUTHORITY,
+  CALL_BACK_WHY_MAX,
   type CommandKind,
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
@@ -7,13 +8,14 @@ import {
   type SaveEnvelope,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import type { NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
+import type { CallBackPlan, NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
 import {
   FIXTURE_PASSENGER,
   approachRequest,
   farCaptainAshoreRequest,
   passengerAboardRequest,
   quietTooLongRequest,
+  requestedCallRequest,
 } from "./fixtures";
 import { fareFor, pathBetween, payFor, routeDistance } from "./lookups";
 import { content, emptyPlan } from "./test-support";
@@ -1560,5 +1562,64 @@ describe("translateIntents: scheduleField, the seventh lever (D95)", () => {
     expect(result.commands).toEqual([]);
     expect(result.dropped).toHaveLength(3);
     for (const drop of result.dropped) expect(drop.reason).toContain("scheduleField: invalid");
+  });
+});
+
+describe("translateIntents: the call-back request (D99)", () => {
+  const req = docked(quietTooLongRequest(content()));
+
+  it("emits requestCall after the intents, at the next tick, with the plan's when and why", () => {
+    const res = translateIntents(
+      emptyPlan({
+        intents: [decision] as NarratorPlan["intents"],
+        callBack: { when: "departure", why: "A debris field on Noor's first hard watch." },
+      }),
+      ctxOf(req),
+    );
+    expect(res.dropped).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
+    expect(res.commands[1]).toEqual({
+      id: "cmd:narrator:call1:1",
+      source: "narrator",
+      targetTick: req.hook.tick + 1,
+      kind: "requestCall",
+      payload: { when: "departure", why: "A debris field on Noor's first hard watch." },
+    });
+  });
+
+  it("emits nextPort too: it replaces a standing request", () => {
+    const res = translateIntents(
+      emptyPlan({ callBack: { when: "nextPort", why: "" } }),
+      ctxOf(requestedCallRequest(content())),
+    );
+    expect(res.commands).toEqual([
+      expect.objectContaining({ kind: "requestCall", payload: { when: "nextPort", why: "" } }),
+    ]);
+  });
+
+  it("clips why to CALL_BACK_WHY_MAX and strips control characters", () => {
+    const why = `line one\nline\u0007two ${"x".repeat(300)}`;
+    const res = translateIntents(emptyPlan({ callBack: { when: "midLeg", why } }), ctxOf(req));
+    const command = res.commands[0];
+    if (command?.kind !== "requestCall") throw new Error("no requestCall");
+    expect(command.payload.why.length).toBeLessThanOrEqual(CALL_BACK_WHY_MAX);
+    expect(command.payload.why.startsWith("line one line two x")).toBe(true);
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to find them.
+    expect(command.payload.why).not.toMatch(/[\u0000-\u001f\u007f]/);
+  });
+
+  it("asks for nothing when the plan has no callBack (a plan built in code)", () => {
+    const res = translateIntents(emptyPlan(), ctxOf(req));
+    expect(res.commands).toEqual([]);
+    expect(res.dropped).toEqual([]);
+  });
+
+  it("drops a malformed callBack with a reason instead of passing it on", () => {
+    const res = translateIntents(
+      emptyPlan({ callBack: { when: "never", why: "" } as unknown as CallBackPlan }),
+      ctxOf(req),
+    );
+    expect(res.commands).toEqual([]);
+    expect(res.dropped).toEqual([expect.objectContaining({ intentIndex: -1, kind: "callBack" })]);
   });
 });

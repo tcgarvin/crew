@@ -3,6 +3,8 @@ import { z } from "zod";
 import { buildNarratorPlanSchema, buildNotesSchema } from "./contract";
 
 const schema = buildNarratorPlanSchema();
+/** D99: every plan the model writes carries a call-back request. */
+const callBack = { when: "nextPort", why: "" };
 
 /** Walk a JSON Schema and collect every object node. */
 function walk(node: unknown, visit: (n: Record<string, unknown>) => void): void {
@@ -104,6 +106,7 @@ describe("NarratorPlan structured-output schema", () => {
         },
       ],
       card: null,
+      callBack,
     };
     expect(schema.parse(plan)).toEqual(plan);
     expect(schema.safeParse({ ...plan, intents: [{ kind: "setMoney", amount: 5 }] }).success).toBe(
@@ -127,7 +130,7 @@ describe("NarratorPlan structured-output schema", () => {
       retired: [],
     };
     expect(buildNotesSchema().parse(notes)).toEqual(notes);
-    const plan = { rationale: "", intents: [], card: null };
+    const plan = { rationale: "", intents: [], card: null, callBack };
     expect(schema.safeParse(plan).success).toBe(true);
     expect(schema.safeParse({ ...plan, notes }).success).toBe(false);
   });
@@ -137,6 +140,7 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "",
       intents: [],
       card: null,
+      callBack,
     };
     const passage = {
       kind: "offerJob",
@@ -186,6 +190,7 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "",
       intents: [],
       card: null,
+      callBack,
     };
     const word = {
       kind: "surfaceDecision",
@@ -245,6 +250,7 @@ describe("NarratorPlan structured-output schema", () => {
       rationale: "r",
       intents: [],
       card,
+      callBack,
     };
     expect(schema.safeParse(plan).success).toBe(true);
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: "Mara Osei" } }).success).toBe(
@@ -254,5 +260,16 @@ describe("NarratorPlan structured-output schema", () => {
     expect(schema.safeParse({ ...plan, card: withoutSpeaker }).success).toBe(false);
     // D45: null is a union type for the grammar compiler; empty means none.
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: null } }).success).toBe(false);
+  });
+
+  it("requires callBack, with when one of nextPort, departure, midLeg (D99)", () => {
+    const plan = { rationale: "", intents: [], card: null };
+    expect(schema.safeParse(plan).success).toBe(false);
+    const departure = { when: "departure", why: "A debris field on the junior pilot's watch." };
+    expect(schema.safeParse({ ...plan, callBack: departure }).success).toBe(true);
+    expect(schema.safeParse({ ...plan, callBack: { ...departure, when: "never" } }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...plan, callBack: { when: "midLeg" } }).success).toBe(false);
   });
 });

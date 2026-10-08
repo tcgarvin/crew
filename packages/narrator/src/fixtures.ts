@@ -10,6 +10,7 @@ import {
   type CrewDefId,
   type DecisionId,
   type EventId,
+  type HullScar,
   type JobId,
   type MachineId,
   PASSENGER_OVERDUE_PROMPT_KEY,
@@ -624,4 +625,111 @@ export function departureGateRequest(content: ContentBundle, seed = 11): Narrato
     event(3, base.hook.tick, "decisionPending", { decisionId }, "narrative"),
   ];
   return { ...base, hook, snapshot, recentEvents };
+}
+
+/**
+ * D99: the departure call the narrator asked for when it offered the Meridian run at Crossroads
+ * Hub. The ship has just cast off (`departing`, the tick `departed` is emitted) with the whole
+ * 45 s leg ahead; the request is in state, served by this `requestedCall` hook.
+ */
+export function requestedCallRequest(content: ContentBundle, seed = 23): NarratorRequest {
+  const base = quietTooLongRequest(content, seed);
+  const tick = 3_300;
+  const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
+  const state = snapshot.state;
+  state.tick = tick;
+  state.travel = {
+    stage: "departing",
+    fromPortId: HUB,
+    toPortId: MERIDIAN,
+    stageProgress: 0,
+    routeProgress: 0,
+    routeDistance: 45,
+    drifting: false,
+    stageStartedTick: tick,
+  };
+  alignDock(state, content);
+  // A clean ship: the pump's wear is the quiet check-in's business, not this leg's.
+  for (const machine of Object.values(state.machines)) {
+    machine.faults = [];
+    machine.output = 1;
+    machine.condition = 1;
+  }
+  const why = "spring a debris field on the junior pilot";
+  const requestedTick = 2_900;
+  const hook = {
+    id: allocateId(state, "hook"),
+    kind: "requestedCall" as const,
+    context: { when: "departure" as const, why, requestedTick },
+    tick,
+  };
+  state.narrator.pendingHook = hook;
+  state.narrator.lastNarrativeTick = tick;
+  state.narrator.callBack = { when: "departure", why, requestedTick, portId: HUB };
+  state.narrator.callBack.servedByHookId = hook.id;
+  const recentEvents = [
+    ...base.recentEvents.filter((e) => e.type === "jobAccepted"),
+    event(2, tick, "departed", { fromPortId: HUB, toPortId: MERIDIAN }, "narrative"),
+  ];
+  return { gameId: "fixture-requested-call", hook, snapshot, recentEvents };
+}
+
+/**
+ * D100: the aftermath of a field on the Meridian leg. The field is over and the alert has stood
+ * down (`alertCleared`), the crew have reported in, and the hull carries one unpatched scar.
+ */
+export function alertClearedRequest(content: ContentBundle, seed = 23): NarratorRequest {
+  const base = quietTooLongRequest(content, seed);
+  const tick = 4_400;
+  const snapshot: SaveEnvelope = { ...structuredClone(base.snapshot), savedAtTick: tick };
+  const state = snapshot.state;
+  state.tick = tick;
+  if (state.travel.stage === "docked") throw new Error("fixture: expected the ship in transit");
+  state.travel = { ...state.travel, routeProgress: 38 };
+  alignDock(state, content);
+  const stores = Object.values(state.compartments).find((c) => c.key === "stores");
+  if (stores === undefined) throw new Error("fixture: no stores room");
+  const fieldId = "f1" as HullScar["fieldId"];
+  state.hull.scars.push({
+    id: "r1" as HullScar["id"],
+    fieldId,
+    tile: { x: 1, y: 1 },
+    compartmentId: stores.id,
+    rock: "large",
+    damage: 8,
+    recovered: 0,
+    patched: false,
+    tick: 4_250,
+  });
+  state.hull.integrity = state.hull.max - 8;
+  const cleared = event(
+    5,
+    4_390,
+    "fieldCleared",
+    {
+      fieldId,
+      how: "crossed",
+      impacts: 4,
+      hullLost: 8,
+      integrity: state.hull.integrity,
+      max: state.hull.max,
+    },
+    "narrative",
+  );
+  const stoodDown = event(6, 4_399, "alertCleared", { cause: "field" }, "notable");
+  const hook = {
+    id: allocateId(state, "hook"),
+    kind: "notableEvent" as const,
+    context: { eventIds: [stoodDown.id] },
+    tick,
+  };
+  state.narrator.pendingHook = hook;
+  state.narrator.lastNarrativeTick = 4_390;
+  state.narrator.lastNarrativeEvent = { tick: 4_399, type: "alertCleared", eventId: stoodDown.id };
+  return {
+    gameId: "fixture-alert-cleared",
+    hook,
+    snapshot,
+    recentEvents: [...base.recentEvents, cleared, stoodDown],
+  };
 }

@@ -219,4 +219,13 @@ describe("buildCapabilities", () => {
     }
     expect(text).toContain("The crew buy what a stalled repair needs themselves");
   });
+
+  it("points the hazard and field levers at the departure call (D99)", () => {
+    const sentence =
+      "The departure call you ask for with callBack (when: departure) is the natural moment: the ship has just cast off and the whole leg is ahead.";
+    const hazard = text.slice(text.indexOf("## 6. scheduleHazard"), text.indexOf("## 7."));
+    const field = text.slice(text.indexOf("## 7. scheduleField"));
+    expect(hazard).toContain(sentence);
+    expect(field).toContain(sentence);
+  });
 });

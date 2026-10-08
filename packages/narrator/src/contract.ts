@@ -16,6 +16,7 @@
  * - `NarratorCommand`: the kernel's strict command subset. Only the translator produces these.
  */
 import {
+  CALL_BACK_WHEN,
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
@@ -44,6 +45,7 @@ export type {
   WrittenThread,
 } from "./notes";
 export { THREAD_SCALES } from "./notes";
+export { CALL_BACK_WHEN } from "@crew/sim";
 
 // ---------------------------------------------------------------------------------------------
 // HTTP exchange
@@ -366,6 +368,22 @@ export function buildNarratorPlanSchema() {
         rightAftermath: aftermath,
       })
       .nullable(),
+    /**
+     * D99: when the model wants its next call and why. Required of the model: every story call
+     * replaces the standing request, so it states it each time (`nextPort` asks for nothing).
+     */
+    callBack: z.strictObject({
+      when: z
+        .enum(CALL_BACK_WHEN)
+        .describe(
+          "When you want your next call: nextPort (the docking calls come anyway), departure (the tick the ship casts off with a course: the whole leg ahead, for a hazard, a field or a card as the port falls away), midLeg (halfway through the next transit, or this one if it is not halfway yet).",
+        ),
+      why: z
+        .string()
+        .describe(
+          "One private line: what you mean to do on that call. Read back to you then. Max 200 characters.",
+        ),
+    }),
   });
 }
 
@@ -402,7 +420,7 @@ export function buildNotesSchema() {
     retired: z
       .array(z.string())
       .describe(
-        'Titles copied from "Open threads" that end without a closing card because events made them moot before the captain saw any card of them; usually empty.',
+        'Titles copied from "Open threads" that end without a closing card of their own because events already made the ending plain (an offer the captain turned down, a story another card already wrapped up); usually empty.',
       ),
   });
 }
@@ -411,7 +429,14 @@ export type NotesSchema = ReturnType<typeof buildNotesSchema>;
 export type WrittenNotes = z.infer<NotesSchema>;
 
 export type NarratorPlanSchema = ReturnType<typeof buildNarratorPlanSchema>;
-export type NarratorPlan = z.infer<NarratorPlanSchema>;
+type ModelPlan = z.infer<NarratorPlanSchema>;
+export type CallBackPlan = ModelPlan["callBack"];
+/**
+ * A plan as the translator takes it. D99: the model always writes `callBack` (the schema requires
+ * it); a plan built in code (the null narrator, tests) may leave it out, and then no call-back
+ * request is made and the standing one stays.
+ */
+export type NarratorPlan = Omit<ModelPlan, "callBack"> & { readonly callBack?: CallBackPlan };
 export type NarratorIntent = NarratorPlan["intents"][number];
 
 // ---------------------------------------------------------------------------------------------

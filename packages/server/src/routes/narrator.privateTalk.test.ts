@@ -45,6 +45,8 @@ function cardCallingIn(talkWith: string): ModelTransport {
             rationale: "The rivalry at the card table is souring; give the captain the call.",
             intents: [card],
             card: null,
+            // D99: every plan the model writes carries its call-back request.
+            callBack: { when: "nextPort", why: "" },
           },
     ),
     finish: "stop",
@@ -97,7 +99,8 @@ describe("POST /api/games/:id/narrator, a privateTalk side (D86)", () => {
     expect(body.fallback).toBeUndefined();
     expect(body.dropped).toEqual([]);
     const jax = Object.values(req.snapshot.state.actors).find((a) => a.name === "Jax Okonkwo");
-    expect(body.commands).toHaveLength(1);
+    expect(body.commands).toHaveLength(2);
+    expect(body.commands[1]).toMatchObject({ kind: "requestCall" });
     expect(body.commands[0]).toMatchObject({
       kind: "surfaceDecision",
       source: "narrator",
@@ -117,7 +120,7 @@ describe("POST /api/games/:id/narrator, a privateTalk side (D86)", () => {
     const { res } = await post(cardCallingIn("Mara Osei"));
     expect(res.status).toBe(200);
     const body = await readJson(res);
-    expect(body.commands).toEqual([]);
+    expect(body.commands.map((c: { kind: string }) => c.kind)).toEqual(["requestCall"]);
     expect(body.dropped).toEqual([
       {
         intentIndex: 0,

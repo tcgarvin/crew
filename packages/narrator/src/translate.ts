@@ -11,6 +11,7 @@ import { NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
  */
 import {
   AUTHORITY,
+  CALL_BACK_WHY_MAX,
   type CommandDraft,
   type CommandId,
   type ContentBundle,
@@ -75,6 +76,7 @@ import {
   payFor,
   portName,
   shipDeckOf,
+  transitSecondsLeft,
 } from "./lookups";
 import { clipWords } from "./notes";
 
@@ -420,8 +422,7 @@ function legProblem(env: Env, window: FaultWindow, what: "hazard" | "field"): st
   }
   if (travel.stage !== "transit") return undefined;
   const config = env.snapshot.config;
-  const left =
-    Math.max(0, travel.routeDistance - travel.routeProgress) / config.travel.nominalSpeed;
+  const left = transitSecondsLeft(env.snapshot.state, config);
   const [opens] = faultWindowSeconds(config)[window];
   if (opens < left) return undefined;
   return `window ${window} opens after this leg's transit ends (~${Math.round(left)}s left); use soon, or place it on the next leg`;
@@ -973,6 +974,45 @@ export function commandIdFor(callId: string, n: number): CommandId {
   return `cmd:narrator:${callId}:${n}` as CommandId;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Call-back request (D99)
+// ---------------------------------------------------------------------------------------------
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to strip them.
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
+
+/**
+ * D99: the plan's `callBack` as a `requestCall` command, after the intents. Absent (a plan built
+ * in code) asks for nothing and leaves the standing request. `why` is private, so it has no
+ * player-facing text rules; it is only made fit for the kernel's (control characters out,
+ * clipped to `CALL_BACK_WHY_MAX`).
+ */
+function translateCallBack(
+  ctx: TranslationCtx,
+  raw: NarratorPlan["callBack"],
+  index: number,
+  dropped: DroppedIntent[],
+): NarratorCommand | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = buildNarratorPlanSchema().shape.callBack.safeParse(raw);
+  if (!parsed.success) {
+    dropped.push({
+      intentIndex: -1,
+      kind: "callBack",
+      reason: invalidIntentReason("callBack", parsed.error.issues),
+    });
+    return undefined;
+  }
+  const why = clipChars(parsed.data.why.replace(CONTROL_CHARACTERS, " "), CALL_BACK_WHY_MAX);
+  return {
+    id: commandIdFor(ctx.callId, index),
+    source: "narrator",
+    targetTick: ctx.hookTick + 1,
+    kind: "requestCall",
+    payload: { when: parsed.data.when, why },
+  };
+}
+
 /**
  * Translate a plan. The plan is treated as untrusted even though it passed the schema: each
  * intent is re-parsed against the intent schema, so a hand-built or partially valid plan cannot
@@ -1041,6 +1081,9 @@ export const translateIntents: TranslateIntents = (
       ...draft,
     } as NarratorCommand);
   });
+
+  const callBack = translateCallBack(ctx, plan.callBack, commands.length, dropped);
+  if (callBack !== undefined) commands.push(callBack);
 
   const card = policyCard(env, plan, dropped);
   const beat = env.tally.beatCardThread;

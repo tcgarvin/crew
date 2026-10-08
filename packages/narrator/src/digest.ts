@@ -9,6 +9,7 @@ import { templateCard } from "@crew/content";
  */
 import {
   type ActorId,
+  type ConfigDef,
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
@@ -50,6 +51,7 @@ import {
   placePhrase,
   portHereOrNext,
   portName,
+  transitSecondsLeft,
   voyageAhead,
 } from "./lookups";
 import type { NarratorNotes } from "./notes";
@@ -148,15 +150,72 @@ function notableHookLine(
     .map((e) => describeEvent(e, state as never, content))
     .filter((line) => line !== "");
   const base = `notableEvent: events ${hook.context.eventIds.join(", ")}`;
-  return said.length === 0 ? base : `${base}: ${said.join("; ")}`;
+  const aftermath = events
+    .filter((e) => ids.has(e.id))
+    .map((e) => AFTERMATH_SUFFIX[e.type])
+    .filter((suffix): suffix is string => suffix !== undefined);
+  const head = said.length === 0 ? base : `${base}: ${said.join("; ")}`;
+  return `${head}${[...new Set(aftermath)].join("")}`;
+}
+
+/**
+ * D100: what an aftermath call is about, said after the event, so the model reads it as the end
+ * of something it set in motion rather than a new turn.
+ */
+const AFTERMATH_SUFFIX: Readonly<Partial<Record<string, string>>> = {
+  alertCleared:
+    "; the field is over and the alert has stood down: the crew have reported in, the hull and damage lines under Ship are what they know",
+  navHazard: "; the hazard you placed has been rolled: see the helm check line",
+  faultRepaired: "; the fault you caused is repaired",
+};
+
+/**
+ * D99: the call the model asked for, read back with where the ship is: the leg and the transit
+ * still ahead (what the hazard and field windows must fit), and the voyage beyond it.
+ */
+function requestedCallHookLine(
+  hook: DeepReadonly<Extract<NarratorHook, { kind: "requestedCall" }>>,
+  state: State,
+  content: ContentBundle,
+  config: DeepReadonly<ConfigDef>,
+): string {
+  const { when, why, requestedTick } = hook.context;
+  const asked = `requestedCall: you asked at t${requestedTick} to be called ${when === "departure" ? "when the ship cast off" : "mid-leg"}: "${why}"`;
+  const t = state.travel;
+  if (t.stage === "docked") return `${asked}. The ship is docked at ${portName(content, t.portId)}`;
+  const voyage = voyageAhead(state, content);
+  const bound =
+    voyage === undefined
+      ? ""
+      : `, bound for ${portName(content, voyage.destinationId)} (${voyage.destinationId}); ${hopsWord(voyage.hops, voyage.distance)} still to go from there`;
+  const left = Math.round(transitSecondsLeft(state, config));
+  return `${asked}. ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ~${left}s of transit ahead${bound}`;
+}
+
+/**
+ * D99: the standing call-back request under the hook line, so the model restates or replaces
+ * it: read back when this call is the next-port call it asked for, or shown as still standing.
+ * A departure or midLeg request served by this hook is the hook line itself.
+ */
+function callBackLine(state: State, hook: DeepReadonly<NarratorHook>): string | undefined {
+  const request = state.narrator.callBack;
+  if (request === undefined || hook.kind === "stageDock") return undefined;
+  if (request.servedByHookId === hook.id) {
+    return request.when === "nextPort"
+      ? `This is the call you asked for at the next port: "${request.why}" (asked t${request.requestedTick}).`
+      : undefined;
+  }
+  if (request.servedByHookId !== undefined) return undefined;
+  return `Your standing request: ${request.when} — "${request.why}" (asked t${request.requestedTick}). This call's callBack replaces it.`;
 }
 
 function hookLine(
   hook: DeepReadonly<NarratorHook>,
   events: readonly SimEvent[],
-  state: State,
+  snapshot: Snapshot,
   content: ContentBundle,
 ): string {
+  const state = snapshot.state;
   switch (hook.kind) {
     case "stageDock":
       return `stageDock: dressing the dock at ${portName(content, hook.context.portId)} (${hook.context.portId}) before the ship comes alongside`;
@@ -171,7 +230,7 @@ function hookLine(
     case "policyDecision":
       return policyHookLine(hook, state, content);
     case "requestedCall":
-      return `requestedCall: you asked at t${hook.context.requestedTick} to be called ${hook.context.when === "departure" ? "when the ship cast off" : "mid-leg"}: "${hook.context.why}"`;
+      return requestedCallHookLine(hook, state, content, snapshot.config);
   }
 }
 
@@ -784,9 +843,13 @@ export function buildDigest(
   maxChars: number = DIGEST_MAX_CHARS,
 ): NarratorDigest {
   const state = snapshot.state;
+  const callBack = hook === undefined ? undefined : callBackLine(state, hook);
   const hookSection = section(
     "Why you were called",
-    [hook === undefined ? "no hook recorded" : hookLine(hook, recentEvents, state, content)],
+    [
+      hook === undefined ? "no hook recorded" : hookLine(hook, recentEvents, snapshot, content),
+      ...(callBack === undefined ? [] : [callBack]),
+    ],
     NEVER_DROPS,
   );
   // D67: the staging call has no story levers, so it is not shown the story budget.

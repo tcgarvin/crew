@@ -18,10 +18,12 @@ import { loadBundle } from "@crew/content";
 import {
   type ModelTransport,
   type NarratorRequest,
+  alertClearedRequest,
   approachRequest,
   farCaptainAshoreRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  requestedCallRequest,
   runNarratorWithTrace,
   stageDockRequest,
 } from "@crew/narrator";
@@ -47,6 +49,8 @@ export function runNarratorFixtures(outDir?: string): CliResult {
     "quiet-too-long-pump.json": quietTooLongRequest(bundle),
     "far-captain-ashore.json": farCaptainAshoreRequest(bundle),
     "passenger-overdue.json": passengerOverdueRequest(bundle),
+    "requested-call-departure.json": requestedCallRequest(bundle),
+    "alert-cleared.json": alertClearedRequest(bundle),
   };
   for (const [name, request] of Object.entries(fixtures)) {
     writeFileSync(path.join(dir, name), `${JSON.stringify(request, null, 2)}\n`);

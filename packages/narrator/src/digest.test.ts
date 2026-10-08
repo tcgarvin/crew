@@ -18,11 +18,14 @@ import { describe, expect, it } from "vitest";
 import { DIGEST_MAX_CHARS, buildDigest } from "./digest";
 import {
   FIXTURE_PASSENGER,
+  alertClearedRequest,
   approachRequest,
+  captainAshoreRequest,
   farCaptainAshoreRequest,
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  requestedCallRequest,
 } from "./fixtures";
 import { pathBetween, portName } from "./lookups";
 import { EMPTY_NOTES } from "./notes";
@@ -776,5 +779,91 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
     ).text;
     expect(text).toContain(`notableEvent: events evt9: ${FIXTURE_PASSENGER} is back aboard`);
     expect(text).toContain(`${FIXTURE_PASSENGER}, passenger, on the way home to Crossroads Hub;`);
+  });
+});
+
+describe("buildDigest: the call-back request (D99) and aftermath calls (D100)", () => {
+  const hub = "port.crossroads_hub";
+  const meridian = "port.green_meridian";
+
+  function hookSection(text: string): string[] {
+    const body = text.split("## Why you were called\n")[1] ?? "";
+    return (body.split("\n\n")[0] ?? "").split("\n");
+  }
+
+  it("reads the requested departure call back with the leg and the transit ahead", () => {
+    const req = requestedCallRequest(content());
+    const { text } = buildDigest(req.snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook);
+    const seconds = Math.round(45 / req.snapshot.config.travel.nominalSpeed);
+    expect(hookSection(text)).toEqual([
+      `requestedCall: you asked at t2900 to be called when the ship cast off: "spring a debris field on the junior pilot". ${portName(content(), hub)} -> ${portName(content(), meridian)} (${meridian}), ~${seconds}s of transit ahead`,
+    ]);
+  });
+
+  it("says mid-leg, and what is left of a voyage beyond this leg", () => {
+    const req = requestedCallRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const ossory = "port.ossory_station" as PortDefId;
+    snapshot.state.travel = {
+      ...snapshot.state.travel,
+      stage: "transit",
+      routeProgress: 25,
+      voyageDestinationId: ossory,
+    } as SaveEnvelope["state"]["travel"];
+    if (req.hook.kind !== "requestedCall") throw new Error("fixture hook kind");
+    const hook = { ...req.hook, context: { ...req.hook.context, when: "midLeg" as const } };
+    const { text } = buildDigest(snapshot, req.recentEvents, EMPTY_NOTES, content(), hook);
+    const onward = pathWords(meridian, ossory);
+    const line = hookSection(text)[0] ?? "";
+    expect(line).toContain("to be called mid-leg:");
+    expect(line).toContain(
+      `~${Math.round(20 / snapshot.config.travel.nominalSpeed)}s of transit ahead`,
+    );
+    expect(line).toContain(
+      `, bound for ${portName(content(), ossory)} (${ossory}); ${onward.hops} still to go from there`,
+    );
+  });
+
+  it("shows a standing request that has not come due, to be restated or replaced", () => {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.narrator.callBack = {
+      when: "departure",
+      why: "a card from Noor as the Hub falls away",
+      requestedTick: 2_900,
+    };
+    const { text } = buildDigest(snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook);
+    expect(hookSection(text)[1]).toBe(
+      'Your standing request: departure — "a card from Noor as the Hub falls away" (asked t2900). This call\'s callBack replaces it.',
+    );
+  });
+
+  it("reads a next-port request back on the call that served it", () => {
+    const req = captainAshoreRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    snapshot.state.narrator.callBack = {
+      when: "nextPort",
+      why: "Tobiah owes us; bring him back",
+      requestedTick: 900,
+      servedByHookId: req.hook.id,
+    };
+    const { text } = buildDigest(snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook);
+    expect(hookSection(text)[1]).toBe(
+      'This is the call you asked for at the next port: "Tobiah owes us; bring him back" (asked t900).',
+    );
+  });
+
+  it("adds no line under the hook when no request stands", () => {
+    const req = quietTooLongRequest(content());
+    const { text } = buildDigest(req.snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook);
+    expect(hookSection(text)).toHaveLength(1);
+  });
+
+  it("says an alertCleared call is the field's end, with the crew reported in", () => {
+    const req = alertClearedRequest(content());
+    const { text } = buildDigest(req.snapshot, req.recentEvents, EMPTY_NOTES, content(), req.hook);
+    expect(hookSection(text)[0]).toBe(
+      "notableEvent: events evt6: Alert stood down; the field is over and the alert has stood down: the crew have reported in, the hull and damage lines under Ship are what they know",
+    );
   });
 });

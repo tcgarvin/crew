@@ -50,8 +50,9 @@ export function okResult(content: string): ModelResult {
 }
 
 /**
- * D97: a story fixture answer with `notes` goes to the plan turn without them and to the notes
- * turn as just the notes; any other answer (and every staging answer) is returned as given.
+ * D97: a story fixture answer with `notes` goes to the plan turn without them (D99: and with
+ * `FIXTURE_CALL_BACK` if it has no callBack) and to the notes turn as just the notes; any other
+ * answer (and every staging answer) is returned as given.
  */
 function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): ModelResult {
   if (result.content === null || request.schemaName !== "narrator_plan") return result;
@@ -64,7 +65,17 @@ function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): M
   if (parsed === null || typeof parsed !== "object" || !("notes" in parsed)) return result;
   const { notes, ...plan } = parsed as Record<string, unknown>;
   const notesTurn = request.continuation.length > 0;
-  return { ...result, content: JSON.stringify(notesTurn ? notes : plan) };
+  return { ...result, content: JSON.stringify(notesTurn ? notes : withCallBack(plan)) };
+}
+
+/**
+ * D99: the model always writes `callBack` (the schema requires it); a fixture plan built without
+ * one answers with the plain request, nextPort, so it still parses.
+ */
+export const FIXTURE_CALL_BACK = { when: "nextPort", why: "" } as const;
+
+function withCallBack(plan: Record<string, unknown>): Record<string, unknown> {
+  return "callBack" in plan ? plan : { ...plan, callBack: FIXTURE_CALL_BACK };
 }
 
 /**

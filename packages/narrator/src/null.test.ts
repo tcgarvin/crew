@@ -7,7 +7,12 @@
 import type { ActorId, ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
-import { approachRequest, quietTooLongRequest, stageDockRequest } from "./fixtures";
+import {
+  approachRequest,
+  quietTooLongRequest,
+  requestedCallRequest,
+  stageDockRequest,
+} from "./fixtures";
 import { pathBetween, payFor, routeDistance } from "./lookups";
 import { NULL_NARRATOR_MODEL, nullNarratorResponse } from "./null";
 import { content } from "./test-support";
@@ -186,5 +191,15 @@ describe("null narrator offers work (D40)", () => {
       nullNarratorResponse(quietTooLongRequest(content()), { callId: "c", content: content() })
         .commands,
     ).toEqual([]);
+  });
+
+  it("answers the call the narrator asked for with nothing, and asks for no call back (D99)", () => {
+    const res = nullNarratorResponse(requestedCallRequest(content()), {
+      callId: "c",
+      content: content(),
+    });
+    expect(res.commands).toEqual([]);
+    expect(res.card).toBeUndefined();
+    expect(res.model).toBe(NULL_NARRATOR_MODEL);
   });
 });

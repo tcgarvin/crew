@@ -23,6 +23,7 @@ import {
   notableEventRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  requestedCallRequest,
   stageDockRequest,
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
@@ -128,6 +129,45 @@ const STAGING_NOTES = {
   lastRejections: [],
 };
 
+/**
+ * D99: notes for the requested departure call: the Meridian run taken at the Hub, and the leg
+ * the model meant to test the junior pilot on.
+ */
+const REQUESTED_CALL_NOTES = {
+  summary:
+    "The crew took Tobiah Rask's crates for the Meridian growers at Crossroads Hub. Noor Haddad, the junior pilot, has the helm for the run.",
+  threads: [
+    {
+      title: "Noor's first hard leg",
+      scale: "episode",
+      people: ["Noor Haddad", "Jax Okonkwo"],
+      stage:
+        "Noor has the helm on the Meridian run; Jax thinks she is not ready for anything rough.",
+      nextBeat: "Once the ship is under way to Green Meridian, the leg tests Noor at the helm.",
+      lastBeatTick: null,
+      beatCardShown: false,
+    },
+  ],
+  cardsShown: [],
+  cast: [
+    {
+      name: "Tobiah Rask",
+      note: "freight broker, Meridian Trading House; gave us the growers' crates",
+      portId: "port.crossroads_hub",
+      lastSeenTick: 2_600,
+    },
+  ],
+  lastUpdatedTick: 2_900,
+  lastRejections: [],
+};
+
+/** D99: the call-back request the model wrote, for the run log. */
+function callBackOf(run: NarratorRun): string {
+  const plan = run.trace.plan;
+  if (plan === undefined || !("callBack" in plan)) return "none";
+  return JSON.stringify(plan.callBack);
+}
+
 /** The checks every hook shares: the model answered, the plan parsed, nothing fell back. */
 function expectModelAnswered(run: NarratorRun): NarratorResponse {
   const { response } = run;
@@ -197,6 +237,7 @@ suite(
         const response = expectModelAnswered(run);
         const offer = response.commands.find((c) => c.kind === "offerJob");
         const rationale = run.trace.plan?.rationale?.trim() ?? "";
+        console.log(`captainAshore callBack: ${callBackOf(run)}`);
         expect(
           offer !== undefined || rationale.length > 0,
           `no offer and no stated reason (dropped: ${JSON.stringify(response.dropped)})`,
@@ -214,6 +255,30 @@ suite(
         );
         if (request.hook.kind !== "captainAshore") throw new Error("fixture hook kind");
         expect(offer.payload.job.fromPortId).toBe(request.hook.context.portId);
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "requestedCall at departure: the model carries out its plan for the leg, or says why not, and asks again (D99)",
+      async () => {
+        const request = requestedCallRequest(content());
+        const run = await liveRun(request, { notes: REQUESTED_CALL_NOTES });
+        const response = expectModelAnswered(run);
+        const kinds = response.commands.map((c) => c.kind);
+        const rationale = run.trace.plan?.rationale?.trim() ?? "";
+        console.log(
+          `requestedCall: commands ${JSON.stringify(kinds)}, callBack ${callBackOf(run)}; rationale: ${rationale}`,
+        );
+        const setPiece = kinds.some(
+          (k) => k === "scheduleHazard" || k === "scheduleField" || k === "surfaceDecision",
+        );
+        expect(
+          setPiece || rationale.length > 0,
+          `no hazard, field or card and no stated reason (dropped: ${JSON.stringify(response.dropped)})`,
+        ).toBe(true);
+        expect(kinds, "no requestCall emitted").toContain("requestCall");
+        expect(kinds, "an offer in flight").not.toContain("offerJob");
       },
       LIVE_TIMEOUT_MS,
     );
@@ -261,6 +326,7 @@ suite(
         const offers = response.commands.filter((c) => c.kind === "offerJob");
         const passage = offers.find((c) => c.payload.job.passenger === true);
         const rationale = run.trace.plan?.rationale ?? "";
+        console.log(`far captainAshore callBack: ${callBackOf(run)}`);
         expect(
           passage !== undefined || rationale.length > 0,
           `no passenger offer and no rationale explaining the choice (dropped: ${JSON.stringify(response.dropped)})`,

@@ -679,6 +679,7 @@ const HOOK_COLUMN_ORDER: readonly NarratorHook["kind"][] = [
   "captainAshore",
   "quietTooLong",
   "notableEvent",
+  "requestedCall",
 ];
 
 /** The hook kinds that fired in any of `results`, in report order. */

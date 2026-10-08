@@ -157,7 +157,7 @@ describe("runNarrator", () => {
     const req = captainAshoreRequest(content());
     const res = await runBothTurns(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
-    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob", "requestCall"]);
     expect(res.model).toBe("anthropic/claude-opus-4.6");
     expect(res.promptVersion).toBe(PROMPT_VERSION);
     expect(res.usage?.cacheReadInputTokens).toBe(900);
@@ -208,7 +208,7 @@ describe("runNarrator", () => {
     const req = farCaptainAshoreRequest(content());
     const res = await runBothTurns(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
     expect(res.dropped).toEqual([]);
-    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["offerJob", "requestCall"]);
     expect(res.notesUpdate?.cast).toEqual([
       {
         name: "Halla Thorne",
@@ -490,7 +490,7 @@ describe("policy decisions are narrated (D37)", () => {
     expect(res.fallback).toBeUndefined();
     expect(res.card).toEqual({ decisionId: "d9", ...card });
     expect(res.card?.speaker).toBe("Priya Kessler");
-    expect(res.commands).toEqual([]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["requestCall"]);
 
     // The digest tells the model who brings the card and which machine it is about, and does not
     // list the card as already seen.
@@ -530,7 +530,7 @@ describe("what the captain has seen (D31)", () => {
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
     const res = await runBothTurns(req, ctx(transport));
-    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(res.notesUpdate?.cardsShown).toEqual([
       {
         tick: req.hook.tick,
@@ -557,7 +557,7 @@ describe("what the captain has seen (D31)", () => {
     const req = quietTooLongRequest(content());
     const res = await runBothTurns(req, ctx(transport));
     expect(res.dropped).toEqual([]);
-    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(res.notesUpdate?.cardsShown[0]?.speaker).toBeNull();
     expect(res.notesUpdate?.lastRejections).toEqual([
       'speaker: "Mara Osei" is the captain and cannot bring a card; name the crew member who does',
@@ -583,13 +583,13 @@ describe("what the captain has seen (D31)", () => {
     };
     const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
-    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(res.notesUpdate?.threads).toEqual([
       { ...thread, lastBeatTick: req.hook.tick, beatCardShown: true },
     ]);
     // A second beat card for the same thread is refused next call, with the reason in the notes.
     const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
-    expect(again.commands).toEqual([]);
+    expect(again.commands.map((c) => c.kind)).toEqual(["requestCall"]);
     expect(again.notesUpdate?.lastRejections[0]).toMatch(/already had its beat card/);
     expect(again.notesUpdate?.threads[0]?.beatCardShown).toBe(true);
   });
@@ -610,14 +610,14 @@ describe("what the captain has seen (D31)", () => {
     };
     const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
-    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(res.notesUpdate?.threads).toEqual([]);
     expect(res.notesUpdate?.cardsShown[0]?.closedThread).toBe("The stranger");
     // Next call: the digest shows the card as closing it, a second closing card is refused, and
     // the thread stays retired even though the model writes it back again.
     const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
     expect(transport.calls.at(-1)?.user).toContain('(closed thread "The stranger")');
-    expect(again.commands).toEqual([]);
+    expect(again.commands.map((c) => c.kind)).toEqual(["requestCall"]);
     expect(again.notesUpdate?.lastRejections[0]).toMatch(/already closed by an earlier card/);
     expect(again.notesUpdate?.threads).toEqual([]);
   });
@@ -835,7 +835,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.26");
+    expect(PROMPT_VERSION).toBe("v0.27");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -961,10 +961,51 @@ describe("prompt text (D29, D31, D32)", () => {
     );
     expect(STATIC_RULES).toContain("A field is the biggest pressure of all");
     expect(STATIC_RULES).toContain("stockMarket, scheduleHazard, scheduleField. An empty list");
-    for (const type of ["fieldSighted", "fieldEntered", "shipStuck", "fieldCleared"]) {
+    // D100: the field's end calls at alertCleared, with the crew reported in, not fieldCleared.
+    for (const type of ["fieldSighted", "fieldEntered", "shipStuck", "alertCleared"]) {
       expect(HOOK_INSTRUCTIONS.notableEvent).toContain(type);
     }
+    expect(HOOK_INSTRUCTIONS.notableEvent).not.toContain("fieldCleared");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleField on a leg");
+  });
+
+  it("tells the model to ask for its next call, and what to do on it (D99, v0.27)", () => {
+    expect(STATIC_RULES).toContain(
+      "- callBack: when you want to be called next (when: nextPort, departure or midLeg) and why",
+    );
+    expect(STATIC_RULES).toContain(
+      "when you offer a job, ask for a departure call and say in why what you mean to do with the leg",
+    );
+    expect(STATIC_RULES).toContain(
+      "Every call replaces the standing request (the digest shows it)",
+    );
+    expect(HOOK_INSTRUCTIONS.captainAshore).toContain(
+      "Offering a job is the moment to ask for a departure call (callBack when: departure)",
+    );
+    expect(HOOK_INSTRUCTIONS.requestedCall).toContain("You asked for this call");
+    expect(HOOK_INSTRUCTIONS.requestedCall).toContain("pick the window to the leg");
+    expect(HOOK_INSTRUCTIONS.requestedCall).toContain("Offers are never made in flight.");
+    expect(STATIC_RULES).toContain(`- requestedCall: ${HOOK_INSTRUCTIONS.requestedCall}`);
+  });
+
+  it("tells the model about the aftermath calls (D100, v0.27)", () => {
+    expect(STATIC_RULES).toContain(
+      "You are also called in the aftermath: when the alert stands down after a field, when a hazard has been rolled, and when a fault you caused is repaired.",
+    );
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
+      "Some calls are aftermath: alertCleared (the field's end, the crew reported in), navHazard (your hazard rolled, clean or not), faultRepaired (a fault you caused is mended).",
+    );
+  });
+
+  it("tells the model a seen thread is kept until its closing card, and what retired is for (D101, v0.27)", () => {
+    expect(STATIC_RULES).toContain(
+      "A thread the captain has seen a beat of stays in your notes until its closing card: leave it out of threads and it is kept for you, and you are told.",
+    );
+    expect(STATIC_RULES).toContain(
+      "Name it in retired only when it ends without a card of its own because events already made the ending plain (an offer the captain turned down, a story another card already wrapped up).",
+    );
+    expect(STATIC_RULES).toContain('retired: titles copied from "Open threads"');
+    expect(STATIC_RULES).not.toContain("moot before the captain ever saw it");
   });
 });
 
@@ -1131,7 +1172,11 @@ describe("the notes turn (D97)", () => {
 
   it("reports a notes reply that fails the notes schema, keeping the plan's answer", async () => {
     // A plan without notes: the fake gives the notes turn the same reply, which is no notes.
-    const transport = fakeTransport(okResult('{"rationale": "", "intents": [], "card": null}'));
+    const transport = fakeTransport(
+      okResult(
+        '{"rationale": "", "intents": [], "card": null, "callBack": {"when": "nextPort", "why": ""}}',
+      ),
+    );
     const run = await runNarratorWithTrace(captainAshoreRequest(content()), ctx(transport));
     expect(run.response.fallback).toBeUndefined();
     expect(run.response.notesUpdate).toBeDefined();
@@ -1172,7 +1217,7 @@ describe("threads the captain has seen survive the rewrite (D101)", () => {
       notes: first.notesUpdate ?? EMPTY_NOTES,
     });
     expect(second.dropped).toEqual([]);
-    expect(second.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(second.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(second.notesUpdate?.cardsShown[0]?.closedThread).toBe("The assay office");
     expect(second.notesUpdate?.threads).toEqual([]);
   });

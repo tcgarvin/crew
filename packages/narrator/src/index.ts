@@ -54,6 +54,7 @@ export {
 } from "./transport";
 export { commandIdFor, secretPhrases, translateIntents } from "./translate";
 export {
+  alertClearedRequest,
   approachRequest,
   FAR_FIXTURE_PORT,
   FIXTURE_PASSENGER,
@@ -63,6 +64,7 @@ export {
   passengerAboardRequest,
   passengerOverdueRequest,
   quietTooLongRequest,
+  requestedCallRequest,
   stageDockRequest,
 } from "./fixtures";
 export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";

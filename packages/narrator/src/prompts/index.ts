@@ -21,6 +21,7 @@ const HOOK_ORDER: readonly StoryHookKind[] = [
   "quietTooLong",
   "notableEvent",
   "policyDecision",
+  "requestedCall",
 ];
 
 /** The static prefix: `SYSTEM_PROMPT` plus the instructions for every hook, in a fixed order. */
