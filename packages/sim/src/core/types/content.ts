@@ -1387,6 +1387,14 @@ export interface ConfigDef {
      */
     readonly hookOnEvents: readonly string[];
     /**
+     * D100: event types (plain strings, as `hookOnEvents`) that raise `notableEvent` at any
+     * significance, as the aftermath of something the narrator set in motion: the alert standing
+     * down after a field, a hazard rolled, a fault it caused repaired. Some have a filter of their
+     * own (`core/pipeline.ts` `hooksNarrator`: `faultRepaired` only for a fault with a cause,
+     * and not while a field is on).
+     */
+    readonly aftermathHookOnEvents: readonly string[];
+    /**
      * D78: narrator-caused navigation hazards before the budget refills (`scheduleHazard`), a
      * budget of their own beside spawns and faults.
      */

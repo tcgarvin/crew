@@ -1,20 +1,24 @@
 import type { EventDraft, EventPayloadMap, EventType } from "../../core/types/events";
-import type { MachineId } from "../../core/types/ids";
+import type { CommandId, EventId, MachineId } from "../../core/types/ids";
 
 export function clamp(value: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, value));
 }
 
-/** A sim-sourced event about `machineId`, located at it, with no causes. */
+/**
+ * A sim-sourced event about `machineId`, located at it, with `causeIds` (none by default; D100:
+ * a repair carries the command that caused its fault).
+ */
 export function machineEvent<T extends EventType>(
   type: T,
   machineId: MachineId,
   payload: EventPayloadMap[T],
+  causeIds: readonly (EventId | CommandId)[] = [],
 ): EventDraft {
   return {
     type,
     subjectIds: [machineId],
-    causeIds: [],
+    causeIds: [...causeIds],
     source: "sim",
     locationRef: { kind: "machine", machineId },
     payload,

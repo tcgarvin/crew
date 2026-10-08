@@ -10,6 +10,7 @@
  */
 import { allocateId } from "./ids";
 import type { HookContexts, NarratorHookKind } from "./types/decisions";
+import type { HookId } from "./types/ids";
 import type { StepCtx } from "./types/pipeline";
 
 /**
@@ -32,6 +33,7 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
   const hookId = allocateId(ctx.state, "hook");
   ctx.state.narrator.pendingHook = { id: hookId, kind, context, tick: ctx.tick } as never;
   ctx.state.narrator.lastNarrativeTick = ctx.tick;
+  if (kind !== "stageDock") serveNextPortRequest(ctx, hookId);
   ctx.emit({
     type: "narratorHookRaised",
     subjectIds: [hookId],
@@ -40,4 +42,19 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
     payload: { hookId, kind },
   });
   return true;
+}
+
+/**
+ * D99: a `nextPort` call-back request is served by the first story hook raised while docked
+ * at a port other than the one it was asked at (any port, if it was asked in flight); the
+ * digest reads it back on that call, and acknowledging the hook spends it.
+ */
+function serveNextPortRequest(ctx: StepCtx, hookId: HookId): void {
+  const request = ctx.state.narrator.callBack;
+  if (request === undefined || request.when !== "nextPort") return;
+  if (request.servedByHookId !== undefined) return;
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked") return;
+  if (request.portId !== undefined && request.portId === travel.portId) return;
+  request.servedByHookId = hookId;
 }

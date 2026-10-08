@@ -11,10 +11,11 @@ describe("W0 contracts", () => {
     expect(JSON.parse(JSON.stringify(state))).toStrictEqual(state);
   });
 
-  it("narrator authority is the V1 kinds plus stockMarket (D47), staging-only stageDock (D66), scheduleHazard (D78) and scheduleField (D92)", () => {
+  it("narrator authority is the V1 kinds plus stockMarket (D47), staging-only stageDock (D66), scheduleHazard (D78), scheduleField (D92) and requestCall (D99)", () => {
     expect([...AUTHORITY.narrator].sort()).toEqual(
       [
         "offerJob",
+        "requestCall",
         "scheduleFault",
         "scheduleField",
         "scheduleHazard",

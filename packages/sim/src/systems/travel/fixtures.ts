@@ -71,6 +71,8 @@ export interface FixtureConfigOverrides {
   quietTooLongSeconds?: number;
   dockingFee?: number;
   hookOnEvents?: readonly string[];
+  /** D100: `narrator.aftermathHookOnEvents` (none by default). */
+  aftermathHookOnEvents?: readonly string[];
   maxCratesPerJob?: number;
   passage?: ConfigDef["commerce"]["passage"];
   /** D80: `travel.limpSpeedFraction` (0, no limp, by default). */
@@ -200,6 +202,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       faultBudget: 2,
       budgetRefillDays: 600 / FIXTURE_DAY,
       hookOnEvents: overrides.hookOnEvents ?? [],
+      aftermathHookOnEvents: overrides.aftermathHookOnEvents ?? [],
       hazardBudget: 2,
     },
     host: {

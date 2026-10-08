@@ -187,6 +187,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       faultBudget: 2,
       budgetRefillDays: 600 / day,
       hookOnEvents: [],
+      aftermathHookOnEvents: [],
       hazardBudget: 2,
     },
     host: {

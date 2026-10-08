@@ -12,6 +12,7 @@ import { createEventBuffer } from "./events";
 import { raiseHookIfIdle } from "./hooks";
 import type { KernelRegistry } from "./registry";
 import { createRngApi } from "./rng";
+import type { ConfigDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { ActorId } from "./types/ids";
 import type { World } from "./types/kernel";
@@ -81,30 +82,48 @@ export function runStep(world: World, registry: KernelRegistry): SimEvent[] {
 }
 
 /**
- * Bookkeeping over the committed events: the quiet timer's input, the last narrative event (a
- * type in `config.narrator.hookOnEvents` wins within a tick), the `notableEvent` owed for a
- * hookable one (D69) and the trace ring.
+ * Does `event` call the narrator (a `notableEvent` hook)? A `narrative` event whose type is in
+ * `narrator.hookOnEvents`, or (D100) an aftermath event of any significance whose type is in
+ * `narrator.aftermathHookOnEvents` and that passes its type's filter: `faultRepaired` only for
+ * a fault something caused (a scheduled fault, a hazard scrape, a field impact; never wear) and
+ * not while a field is on, when the field's own calls cover it.
+ */
+export function hooksNarrator(
+  event: SimEvent,
+  state: World["state"],
+  narrator: Pick<ConfigDef["narrator"], "hookOnEvents" | "aftermathHookOnEvents">,
+): boolean {
+  if (event.significance === "narrative" && narrator.hookOnEvents.includes(event.type)) {
+    return true;
+  }
+  if (!narrator.aftermathHookOnEvents.includes(event.type)) return false;
+  switch (event.type) {
+    case "faultRepaired":
+      return event.causeIds.length > 0 && state.field === undefined;
+    default:
+      return true;
+  }
+}
+
+/**
+ * Bookkeeping over the committed events: the quiet timer's input (`narrative` events only), the
+ * last narrative event (a hookable one, `hooksNarrator`, wins within a tick, whatever its
+ * significance), the `notableEvent` owed for a hookable one (D69) and the trace ring.
  */
 function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void {
   const { state, caches } = world;
   const ringSize = world.config.values.events.traceRingSize;
-  const hookable = world.config.values.narrator.hookOnEvents;
+  const narrator = world.config.values.narrator;
   let hookableSeen = false;
   for (const event of events) {
-    if (event.significance === "narrative") {
-      state.narrator.lastNarrativeTick = event.tick;
-      const isHookable = hookable.includes(event.type);
-      if (isHookable || !hookableSeen) {
-        state.narrator.lastNarrativeEvent = {
-          tick: event.tick,
-          type: event.type,
-          eventId: event.id,
-        };
-      }
-      hookableSeen ||= isHookable;
-    } else if (event.significance === "trace") {
-      caches.diagnostics.traceEvents.push(event);
+    const isHookable = hooksNarrator(event, state, narrator);
+    const isNarrative = event.significance === "narrative";
+    if (isNarrative) state.narrator.lastNarrativeTick = event.tick;
+    if (isHookable || (isNarrative && !hookableSeen)) {
+      state.narrator.lastNarrativeEvent = { tick: event.tick, type: event.type, eventId: event.id };
     }
+    hookableSeen ||= isHookable;
+    if (event.significance === "trace") caches.diagnostics.traceEvents.push(event);
   }
   // D69: owed a `notableEvent` until travel raises it (or a later story hook covers it).
   const last = state.narrator.lastNarrativeEvent;

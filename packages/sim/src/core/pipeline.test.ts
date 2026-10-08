@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { queuePolicyDecision } from "./decisions";
 import { cmd, tinyTestWorld } from "./fixtures/test-world";
-import { TINY } from "./fixtures/tiny-content";
+import { TINY, tinyConfig, tinyContent, tinyEffectiveConfig } from "./fixtures/tiny-content";
 import { raiseHookIfIdle } from "./hooks";
-import { dueActors, isStaggerDue, runStep } from "./pipeline";
-import { NotImplementedError } from "./registry";
-import type { ActorId, HookId } from "./types/ids";
+import { createKernel } from "./kernel";
+import { dueActors, hooksNarrator, isStaggerDue, runStep } from "./pipeline";
+import { type KernelRegistry, NotImplementedError, createRegistry } from "./registry";
+import type { EventDraft, Significance, SimEvent } from "./types/events";
+import type { ActorId, CommandId, EventId, HookId, LocalKey, MachineId } from "./types/ids";
 import type { World } from "./types/kernel";
 import { PHASES, type Phase, type StepCtx } from "./types/pipeline";
 import type { AgentView } from "./types/view";
@@ -323,5 +325,108 @@ describe("quiet-too-long timer", () => {
       cmd({ source: "system", kind: "acknowledgeHook", payload: { hookId: "k9" as HookId } }),
     );
     expect(result.status === "rejected" && result.rejection.code).toBe("preconditionFailed");
+  });
+});
+
+describe("aftermath hooks (D100)", () => {
+  function aftermathWorld(hookOnEvents: string[], aftermathHookOnEvents: string[]) {
+    const registry = createRegistry();
+    const kernel = createKernel(registry);
+    const base = tinyConfig({ quietTooLongSeconds: 1000 });
+    const config = { ...base, narrator: { ...base.narrator, hookOnEvents, aftermathHookOnEvents } };
+    const world = kernel.createWorld(
+      TINY.scenario,
+      42,
+      tinyContent(config),
+      tinyEffectiveConfig(config),
+    );
+    return { registry, kernel, world };
+  }
+
+  /** Emit `drafts` at `tick` from an equipment-phase test system. */
+  function emitAt(registry: KernelRegistry, tick: number, drafts: readonly EventDraft[]) {
+    registry.registerSystem({
+      name: "aftermathSource",
+      phase: "equipment",
+      run: (ctx) => {
+        if (ctx.tick === tick) for (const draft of drafts) ctx.emit(draft);
+      },
+    });
+  }
+
+  const alertCleared: EventDraft = {
+    type: "alertCleared",
+    subjectIds: [],
+    causeIds: [],
+    source: "sim",
+    payload: { cause: "field" },
+  };
+  const arrived: EventDraft = {
+    type: "arrived",
+    subjectIds: [],
+    causeIds: [],
+    source: "sim",
+    payload: { portId: TINY.port },
+  };
+
+  function repaired(causeIds: readonly CommandId[], significance: Significance): SimEvent {
+    return {
+      id: "e1" as EventId,
+      tick: 5,
+      seq: 0,
+      type: "faultRepaired",
+      subjectIds: [],
+      causeIds,
+      source: "sim",
+      significance,
+      payload: { machineId: "m1" as MachineId, faultKey: "wornBearing" as LocalKey },
+    };
+  }
+
+  it("owes a notableEvent for a listed aftermath event of notable significance", () => {
+    const { world, kernel, registry } = aftermathWorld([], ["alertCleared"]);
+    emitAt(registry, 5, [alertCleared]);
+    kernel.advance(world, 10);
+    expect(world.state.narrator.pendingNotable).toMatchObject({ tick: 5, type: "alertCleared" });
+    expect(world.state.narrator.lastNarrativeEvent).toMatchObject({
+      tick: 5,
+      type: "alertCleared",
+    });
+    // Contact for the quiet timer is still narrative events (and hooks) only.
+    expect(world.state.narrator.lastNarrativeTick).toBe(0);
+  });
+
+  it("owes nothing for an aftermath event the config does not list", () => {
+    const { world, kernel, registry } = aftermathWorld([], ["navHazard"]);
+    emitAt(registry, 5, [alertCleared]);
+    kernel.advance(world, 10);
+    expect(world.state.narrator.pendingNotable).toBeUndefined();
+    expect(world.state.narrator.lastNarrativeEvent).toBeUndefined();
+  });
+
+  it("lets the hookable aftermath event win within a tick over a narrative one that is not", () => {
+    const { world, kernel, registry } = aftermathWorld([], ["alertCleared"]);
+    emitAt(registry, 5, [alertCleared, arrived]);
+    kernel.advance(world, 10);
+    expect(world.state.narrator.lastNarrativeEvent).toMatchObject({ type: "alertCleared" });
+    expect(world.state.narrator.pendingNotable).toMatchObject({ type: "alertCleared" });
+    expect(world.state.narrator.lastNarrativeTick).toBe(5);
+  });
+
+  it("hooks faultRepaired only for a fault with a cause, and not while a field is on", () => {
+    const { world } = aftermathWorld([], ["faultRepaired"]);
+    const narrator = world.config.values.narrator;
+    const caused = repaired(["cmd:fault" as CommandId], "narrative");
+    expect(hooksNarrator(caused, world.state, narrator)).toBe(true);
+    expect(hooksNarrator(repaired([], "narrative"), world.state, narrator)).toBe(false);
+    const inField = { ...world.state, field: {} } as unknown as World["state"];
+    expect(hooksNarrator(caused, inField, narrator)).toBe(false);
+  });
+
+  it("keeps hookOnEvents unfiltered and narrative-only", () => {
+    const { world } = aftermathWorld(["faultRepaired"], []);
+    const narrator = world.config.values.narrator;
+    expect(hooksNarrator(repaired([], "narrative"), world.state, narrator)).toBe(true);
+    expect(hooksNarrator(repaired([], "notable"), world.state, narrator)).toBe(false);
   });
 });

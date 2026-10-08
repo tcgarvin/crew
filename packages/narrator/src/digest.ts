@@ -170,6 +170,8 @@ function hookLine(
       return notableHookLine(hook, events, state, content);
     case "policyDecision":
       return policyHookLine(hook, state, content);
+    case "requestedCall":
+      return `requestedCall: you asked at t${hook.context.requestedTick} to be called ${hook.context.when === "departure" ? "when the ship cast off" : "mid-leg"}: "${hook.context.why}"`;
   }
 }
 
