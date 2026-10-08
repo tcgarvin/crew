@@ -258,6 +258,24 @@ describe("narrator", () => {
     expect((await readJson(over)).error).toMatchObject({ reason: "hourly" });
   });
 
+  it("answers a requestedCall however soon after the last call, since it is raised once (D99)", async () => {
+    const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "10" });
+    const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
+    const { token } = await mintUser(app);
+    const { game } = await createGame(app, token);
+    const post = (body: unknown) =>
+      sendJson(app, token, "POST", `/api/games/${game.id}/narrator`, body);
+
+    expect((await post(narratorBody(game.id, 20_003, "notableEvent"))).status).toBe(200);
+    const requested = await post(narratorBody(game.id, 20_010, "requestedCall"));
+    expect(requested.status).toBe(200);
+    expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("requestedCall");
+    // Story calls after it are still spaced.
+    const quiet = await post(narratorBody(game.id, 20_030));
+    expect(quiet.status).toBe(429);
+    expect((await readJson(quiet)).error).toMatchObject({ reason: "spacing" });
+  });
+
   it("marks the hourly cap and the spacing rule apart in the 429 body (D43)", async () => {
     const env = loadEnv({ CREW_DB: "memory", CREW_NARRATOR_MAX_CALLS_PER_HOUR: "2" });
     const { app } = buildTestApp({ env, runNarrator: echoNarrator });

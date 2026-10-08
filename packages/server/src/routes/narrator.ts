@@ -72,8 +72,14 @@ const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
  *   destination). Refused, the docking's one ask was spent on nothing and the ship looked for
  *   work for good (offline, the ask is the only source of work). The sim already spaces it: one
  *   per docking.
+ * - `requestedCall` (D99): raised once, at the cast-off or mid-leg the narrator asked for; a
+ *   spacing refusal would lose it for good, and the sim raises it only for a request it holds.
  */
-const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set(["policyDecision", "captainAshore"]);
+const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set([
+  "policyDecision",
+  "captainAshore",
+  "requestedCall",
+]);
 
 /**
  * D97: how long a call waits for the previous call's notes turn: its timeout plus slack for the
