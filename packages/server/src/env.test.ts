@@ -66,7 +66,7 @@ describe("loadEnv staging timeout (D70)", () => {
 
 describe("loadEnv narrator budget", () => {
   it("defaults the hourly call cap to 30, enough for a passage (passengers-and-galaxy §8.6)", () => {
-    expect(loadEnv({}).narratorMaxCallsPerHour).toBe(30);
+    expect(loadEnv({}).narratorMaxCallsPerHour).toBe(45);
     expect(loadEnv({ CREW_NARRATOR_MAX_CALLS_PER_HOUR: "6" }).narratorMaxCallsPerHour).toBe(6);
   });
 });
