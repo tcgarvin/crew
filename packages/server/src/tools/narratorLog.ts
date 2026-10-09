@@ -176,7 +176,10 @@ function renderCallSummary(call: NarratorCallRow): string {
   return lines.join("\n");
 }
 
-/** A D32 thread (`{title, scale, people, stage, nextBeat}`), or a pre-D32 plain string. */
+/**
+ * A D32 thread (`{title, scale, people, arcNotes, nextBeat}`; `stage` before D103), or a pre-D32
+ * plain string.
+ */
 function threadLine(thread: unknown): string {
   if (typeof thread === "string") return text(thread);
   const people = list(field(thread, "people")).map(text).join(", ");
@@ -184,7 +187,8 @@ function threadLine(thread: unknown): string {
   const header = `${text(field(thread, "title"))} [${scale}${people === "" ? "" : `; ${people}`}]`;
   const nextBeat = field(thread, "nextBeat");
   const next = typeof nextBeat === "string" && nextBeat !== "" ? ` → ${nextBeat}` : "";
-  return `${header}: ${text(field(thread, "stage"))}${next}`;
+  const arcNotes = field(thread, "arcNotes");
+  return `${header}: ${text(arcNotes === undefined ? field(thread, "stage") : arcNotes)}${next}`;
 }
 
 /** A D31 `CardShown` entry, or whatever older notes stored. */
@@ -217,6 +221,15 @@ function renderNotes(notes: unknown): string {
     const shown = list(notes.cardsShown);
     lines.push(`cardsShown (${shown.length}):`);
     for (const card of shown) lines.push(`  - ${cardShownLine(card)}`);
+  }
+  if (notes.pastArcs !== undefined) {
+    const arcs = list(notes.pastArcs);
+    lines.push(`pastArcs (${arcs.length}):`);
+    for (const arc of arcs) {
+      lines.push(
+        `  - t${text(field(arc, "openedTick"))}-t${text(field(arc, "closedTick"))} ${text(field(arc, "title"))} [${text(field(arc, "scale"))}; ${text(field(arc, "ending"))}] ${text(field(arc, "shape"))}: ${text(field(arc, "summary"))}`,
+      );
+    }
   }
   const rejections = list(notes.lastRejections);
   if (rejections.length > 0) {

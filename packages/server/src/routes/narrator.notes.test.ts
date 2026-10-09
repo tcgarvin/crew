@@ -41,6 +41,7 @@ const WRITTEN = {
   threads: [],
   cast: [],
   retired: [],
+  endedArcs: [],
 };
 
 /** The plan turn gets `PLAN`; the notes turn (the one with a continuation) gets `notesReply`. */

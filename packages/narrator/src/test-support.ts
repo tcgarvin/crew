@@ -29,7 +29,7 @@ export function emptyPlan(overrides: Partial<PlanWithNotes> = {}): PlanWithNotes
     rationale: "test",
     intents: [],
     card: null,
-    notes: { summary: "so far", threads: [], cast: [], retired: [] },
+    notes: { summary: "so far", threads: [], cast: [], retired: [], endedArcs: [] },
     ...overrides,
   };
 }

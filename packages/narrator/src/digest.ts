@@ -54,7 +54,7 @@ import {
   transitSecondsLeft,
   voyageAhead,
 } from "./lookups";
-import type { NarratorNotes } from "./notes";
+import type { ArcEnding, NarratorNotes } from "./notes";
 import { crewOffWatchClauses, offWatchLine, rivalriesLine } from "./offwatch-digest";
 import { dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
@@ -757,6 +757,12 @@ function budgetSection(state: State): Section {
   return section("Your budget", lines, NEVER_DROPS);
 }
 
+/** Arc notes are free text; the thread line reads as sentences whether or not they end in one. */
+function asSentence(text: string): string {
+  const trimmed = text.trim();
+  return /[.!?…"”]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 function notesSection(notes: NarratorNotes): Section {
   const lines: string[] = [];
   lines.push(`summary: ${notes.summary || "(nothing yet: this is the first call)"}`);
@@ -766,7 +772,7 @@ function notesSection(notes: NarratorNotes): Section {
     // D39: a thread that has had its beat card gets no second one; the next card pays it off.
     const foreshadowed = t.beatCardShown ? " (foreshadowed)" : "";
     lines.push(
-      `- [${t.scale}] "${t.title}" (${people}): ${t.stage}. Next: ${t.nextBeat || "(none set)"}. Last beat ${last}${foreshadowed}`,
+      `- [${t.scale}] "${t.title}" (${people}): ${asSentence(t.arcNotes)} Next: ${t.nextBeat || "(none set)"}. Last beat ${last}${foreshadowed}`,
     );
   }
   for (const c of notes.cast) {
@@ -775,6 +781,32 @@ function notesSection(notes: NarratorNotes): Section {
   }
   for (const r of notes.lastRejections) lines.push(`rejected last time: ${r}`);
   return section("Your notes so far", lines, 5);
+}
+
+const ARC_ENDING_TEXT: Readonly<Record<ArcEnding, string>> = {
+  closingCard: "ended on its closing card",
+  retired: "ended without a card",
+};
+
+/**
+ * D103: every story that has ended this game, oldest first, so the narrator sees the shape of
+ * what it has told (a run of cargo runs with no trouble shows as one). Never trimmed, and outside
+ * the digest's character budget: the owner chose the tokens over a narrator that forgets.
+ */
+function pastArcsSection(notes: NarratorNotes): Section {
+  const arcs = notes.pastArcs;
+  const lines =
+    arcs.length === 0
+      ? ["(none yet: no story has ended this game)"]
+      : [
+          `${arcs.length === 1 ? "1 story has" : `${arcs.length} stories have`} ended this game:`,
+          ...arcs.map((a) => {
+            const people = a.people.length > 0 ? a.people.join(", ") : "nobody named";
+            const shape = a.shape === "" ? "" : ` ${a.shape}.`;
+            return `- t${a.openedTick}-t${a.closedTick} [${a.scale}] "${a.title}" (${people}):${shape} ${a.summary} (${ARC_ENDING_TEXT[a.ending]})`;
+          }),
+        ];
+  return section("Past arcs", lines, NEVER_DROPS);
 }
 
 /**
@@ -866,6 +898,7 @@ export function buildDigest(
     crewSection(snapshot, content),
     notesSection(notes),
     ...(staging ? [] : [openThreadsSection(notes)]),
+    ...(staging ? [] : [pastArcsSection(notes)]),
     cardsSeenSection(notes, hook),
     peopleSection(snapshot, notes, content),
     ...dockSections(state, content),
@@ -877,7 +910,11 @@ export function buildDigest(
   const noteFor = (n: number) =>
     n === 0 ? undefined : `[digest truncated: ${n} lower-priority lines omitted to fit the budget]`;
   let text = render(sections, undefined);
-  while (text.length > maxChars) {
+  // D103: past arcs are outside the budget, so a long game never trims the rest to fit them.
+  const arcsSection = sections.find((s) => s.heading === "Past arcs");
+  const budget =
+    maxChars + (arcsSection === undefined ? 0 : render([arcsSection], undefined).length);
+  while (text.length > budget) {
     const victim = sections
       .filter((s) => s.lines.length > 0 && Number.isFinite(s.priority))
       .sort((a, b) => a.priority - b.priority)[0];

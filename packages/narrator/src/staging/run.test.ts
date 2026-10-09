@@ -15,7 +15,7 @@ const STORED_NOTES = {
       title: "Greta's grudge",
       scale: "episode",
       people: ["Greta Lindholm"],
-      stage: "Greta thinks the ship jumped the queue last time.",
+      arcNotes: "Greta thinks the ship jumped the queue last time.",
       nextBeat: "Next time at the Drift, she makes them wait.",
       lastBeatTick: 400,
       beatCardShown: false,

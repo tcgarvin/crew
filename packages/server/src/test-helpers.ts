@@ -83,6 +83,7 @@ export const TEST_NOTES = {
   summary: "updated notes",
   threads: [],
   cardsShown: [],
+  pastArcs: [],
   cast: [],
   lastUpdatedTick: 0,
   lastRejections: [],

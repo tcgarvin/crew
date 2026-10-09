@@ -114,7 +114,7 @@ const STAGING_NOTES = {
       title: "Greta's queue",
       scale: "episode",
       people: ["Greta Lindholm", "Ilse Brandt"],
-      stage: "Greta thinks the ship jumped her queue on the last visit, and has not forgotten.",
+      arcNotes: "Greta thinks the ship jumped her queue on the last visit, and has not forgotten.",
       nextBeat:
         "Next time the ship is at Kessler Drift, Greta makes them wait, and Ilse offers a way round her.",
       lastBeatTick: 600,

@@ -390,7 +390,8 @@ export function buildNarratorPlanSchema() {
 /**
  * D97: the running notes the model writes in its follow-up turn, after the plan (W9: the full
  * replacement, structured, see `NarratorNotes`). D31: the card history is server-kept and not
- * written by the model; D32: threads are structured.
+ * written by the model; D32: threads are structured; D103: a thread carries its arc notes, and
+ * one that ends gets its summary in `endedArcs`.
  */
 export function buildNotesSchema() {
   return z.strictObject({
@@ -401,7 +402,11 @@ export function buildNotesSchema() {
           title: z.string(),
           scale: z.enum(THREAD_SCALES),
           people: z.array(z.string()).describe("Full names."),
-          stage: z.string().describe("Where it is now."),
+          arcNotes: z
+            .string()
+            .describe(
+              "The arc so far: what has happened in it, what went wrong or changed, what the captain chose, and where it stands now. Max 600 characters.",
+            ),
           nextBeat: z
             .string()
             .describe("What must be true before it returns, and roughly what then."),
@@ -421,6 +426,25 @@ export function buildNotesSchema() {
       .array(z.string())
       .describe(
         'Titles copied from "Open threads" that end without a closing card of their own because events already made the ending plain (an offer the captain turned down, a story another card already wrapped up); usually empty.',
+      ),
+    endedArcs: z
+      .array(
+        z.strictObject({
+          title: z.string().describe('The ended thread\'s title, copied from "Open threads".'),
+          shape: z
+            .string()
+            .describe(
+              'A few words on what kind of story it was, e.g. "cargo run, no trouble", "passenger with a past", "stuck in the rocks". Max 60 characters.',
+            ),
+          summary: z
+            .string()
+            .describe(
+              "What happened, what went wrong or changed, what the captain chose, how it came out. Max 500 characters.",
+            ),
+        }),
+      )
+      .describe(
+        "One for every thread that ends this call: the one your closing card closed and each one in retired; usually empty.",
       ),
   });
 }

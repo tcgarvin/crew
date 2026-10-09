@@ -232,7 +232,7 @@ describe("narrator-log", () => {
           title: "The Coolant Leak",
           scale: "episode",
           people: ["Jax Oduya"],
-          stage: "Jax has asked twice.",
+          arcNotes: "Jax has asked twice.",
           nextBeat: "Once docked, Jax forces the issue.",
           lastBeatTick: 1800,
         },

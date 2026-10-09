@@ -2000,3 +2000,29 @@ and tests), the server's `anthropic/claude-sonnet-4.6` (previews, which set no m
 production's env var, `openai/gpt-6-luna` at `low`. Now there is one: `DEFAULT_NARRATOR_MODEL` is
 `openai/gpt-6-luna` and `DEFAULT_NARRATOR_REASONING_EFFORT` is `low` (D96), and the server and
 the live suite read both from `@crew/narrator`.
+
+## 2026-10-09 — Arcs remembered
+
+**D103. Every ended thread becomes a past arc the narrator sees for the rest of the game, and the
+prompt asks for variety.** The owner's 2026-10-08 game (prompt v0.27, luna) ran six jobs as six
+episode threads, each a cargo run closed on delivery, with no complication, beat card, hazard or
+field; across all of prod, `scheduleField` and `scheduleHazard` had never been issued. The
+narrator could not see the pattern: a thread left the notes when it closed, the card history keeps
+the last twelve cards, and its summary described the present. Restraint ("Quiet is fine… Doing
+nothing is often right", "never filler") was the only guidance it could act on, so on all seven
+departure calls it had asked for to set up a leg, it asked again instead.
+A thread's `stage` (one sentence) becomes `arcNotes` (up to 600 characters): the arc so far, what
+went wrong or changed, what the captain chose. When a thread ends, by its closing card or named in
+`retired`, the notes turn writes `endedArcs` (`shape`, a few words, and `summary`), and the server
+appends a `PastArc` (title, scale, people, the ticks it opened and closed, how it ended). The
+notes turn is told which thread its closing card ended; an arc the model wrote nothing for keeps
+its arc notes as its summary and the next call is told. `openedTick` is server-kept on threads.
+"Past arcs" lists them all, oldest first, up to 40, never trimmed and outside the digest's
+10,000-character budget: the owner chose the tokens (roughly 100 per arc) over a narrator that
+forgets. Prompt v0.28 adds "Variety and excitement are the job": read "Past arcs"; two stories of
+the same shape in a row means the next is a different kind; most episodes take a turn before they
+close, and one with nothing happening is never twice running; "never stack pressures" means one at
+a time, not none. "Quiet is fine" narrows to a breath after something happened. captainAshore asks
+for an offer of a different kind from the past arcs, and requestedCall says to give the leg its
+beat on the call asked for rather than asking again. Not done: a server-side pressure count, or
+sim-side fields independent of the narrator (D92 stands); both wait on how v0.28 plays.

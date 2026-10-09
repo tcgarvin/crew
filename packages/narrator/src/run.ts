@@ -43,6 +43,7 @@ import {
   type MetIssuer,
   type NarratorCastEntry,
   type NarratorNotes,
+  appendPastArcs,
   boundNotes,
   mergeCast,
   mergeThreads,
@@ -321,8 +322,8 @@ function castWritten(written: WrittenNotes, content: ContentBundle) {
 
 /**
  * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
- * cast sightings, D31 card history, D32 thread beats, D39 beat cards, and why intents were
- * dropped).
+ * cast sightings, D31 card history, D32 thread beats, D39 beat cards, D103 past arcs, and why
+ * intents were dropped).
  */
 function notesFrom(
   written: WrittenNotes,
@@ -349,10 +350,12 @@ function notesFrom(
     cardsShown.flatMap((c) => (c.closedThread === null ? [] : [c.closedThread])),
     written.retired,
   );
+  const arcs = appendPastArcs(previous.pastArcs, merged.ended, written.endedArcs, tick);
   return boundNotes({
     summary: written.summary,
     threads: merged.threads,
     cardsShown,
+    pastArcs: arcs.pastArcs,
     cast: placeEndedPassengers(
       mergeCast(castWritten(written, content), previous.cast, issuersMet(commands, content), tick),
       state,
@@ -364,6 +367,10 @@ function notesFrom(
       ...dropped.map((d) => d.reason),
       ...translated.notes,
       ...threadCorrections(merged),
+      ...arcs.missing.map(
+        (title) =>
+          `no arc summary written for ended thread "${title}": its arc notes were kept as its summary under "Past arcs"`,
+      ),
     ],
   });
 }
@@ -389,16 +396,17 @@ function threadCorrections(merged: MergedThreads): string[] {
 function writtenFrom(notes: NarratorNotes): WrittenNotes {
   return {
     summary: notes.summary,
-    threads: notes.threads.map(({ title, scale, people, stage, nextBeat }) => ({
+    threads: notes.threads.map(({ title, scale, people, arcNotes, nextBeat }) => ({
       title,
       scale,
       people: [...people],
-      stage,
+      arcNotes,
       nextBeat,
     })),
     cast: notes.cast.map(({ name, note, portId }) => ({ name, note, portId: portId ?? "" })),
     // The plan-time merge keeps nothing: it only carries this call's changes over.
     retired: [],
+    endedArcs: [],
   };
 }
 
@@ -417,12 +425,19 @@ function notesRequest(translated: TranslationResult, stored: NarratorNotes): str
           `Your beat card foreshadows a new thread, "${beat}": write it into threads with that title.`,
         ]
       : [];
+  // D103: the thread this call's closing card ended needs its summary.
+  const closed = translated.closedThread;
+  const closedArc =
+    closed === undefined
+      ? []
+      : [`Your closing card ended "${closed}": write its summary in endedArcs.`];
   return [
     "# Now your notes",
     "",
     ...outcome,
     ...translated.notes,
     ...newThread,
+    ...closedArc,
     "",
     'Write your notes now (see "Your notes").',
     schemaInstruction(planJsonSchema(buildNotesSchema())),

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_NOTES, NOTES_LIMITS, mergeThreads, parseNotes } from "./notes";
+import { EMPTY_NOTES, NOTES_LIMITS, appendPastArcs, mergeThreads, parseNotes } from "./notes";
 
 const thread = {
   title: "The assay office",
   scale: "episode" as const,
   people: ["Halla Iyer"],
-  stage: "Halla wants her cores delivered upright.",
+  arcNotes: "Halla wants her cores delivered upright.",
   nextBeat: "On arrival at the Hub, the lab finds one cracked.",
+  openedTick: 0,
   lastBeatTick: 30,
   beatCardShown: false,
 };
@@ -29,6 +30,7 @@ describe("parseNotes", () => {
       summary: "s",
       threads: [thread],
       cardsShown: [card],
+      pastArcs: [],
       cast: [{ name: "Ines", note: "dock boss", portId: "port.kessler_drift", lastSeenTick: 30 }],
       lastUpdatedTick: 40,
       lastRejections: ["r"],
@@ -60,8 +62,9 @@ describe("parseNotes", () => {
         title: "Who is the stranger?",
         scale: "episode",
         people: [],
-        stage: "Who is the stranger?",
+        arcNotes: "Who is the stranger?",
         nextBeat: "",
+        openedTick: 40,
         lastBeatTick: null,
         beatCardShown: false,
       },
@@ -99,11 +102,23 @@ describe("mergeThreads (D32)", () => {
       title: "The assay office",
       scale: "episode" as const,
       people: ["Halla Iyer"],
-      stage: "s",
+      arcNotes: "s",
       nextBeat: "n",
     },
-    { title: "Jax's debt", scale: "season" as const, people: ["Jax"], stage: "s", nextBeat: "n" },
-    { title: "New thread", scale: "beat" as const, people: ["Priya"], stage: "s", nextBeat: "n" },
+    {
+      title: "Jax's debt",
+      scale: "season" as const,
+      people: ["Jax"],
+      arcNotes: "s",
+      nextBeat: "n",
+    },
+    {
+      title: "New thread",
+      scale: "beat" as const,
+      people: ["Priya"],
+      arcNotes: "s",
+      nextBeat: "n",
+    },
   ];
 
   it("stamps the hook tick on threads whose people were on a card or made an offer", () => {
@@ -140,11 +155,11 @@ describe("mergeThreads keeps threads the captain has seen (D101)", () => {
     title,
     scale: "episode" as const,
     people: ["Nobody Named"],
-    stage: "s",
+    arcNotes: "s",
     nextBeat: "n",
   });
   const seen = (title: string, lastBeatTick = 30) => ({ ...thread, title, lastBeatTick });
-  const unseen = (title: string) => ({ ...thread, title, lastBeatTick: null });
+  const unseen = (title: string) => ({ ...thread, title, openedTick: 0, lastBeatTick: null });
 
   it("keeps an omitted seen thread unchanged and reports it", () => {
     const old = { ...seen("Jax's debt"), beatCardShown: true };
@@ -210,5 +225,97 @@ describe("parseNotes without retired (D101)", () => {
   it("still loads stored notes, which never held a retired list", () => {
     const notes = parseNotes({ summary: "s", threads: [thread], cast: [], lastUpdatedTick: 1 });
     expect(notes.threads).toHaveLength(1);
+  });
+});
+
+describe("arcs remembered (D103)", () => {
+  const write = (title: string) => ({
+    title,
+    scale: "episode" as const,
+    people: ["Halla Iyer"],
+    arcNotes: "s",
+    nextBeat: "n",
+  });
+
+  it("opens a new thread at the hook tick and carries the opening tick after that", () => {
+    const first = mergeThreads([write("Fresh")], [], 90, []).threads;
+    expect(first[0]?.openedTick).toBe(90);
+    const later = mergeThreads([write("Fresh")], first, 200, []).threads;
+    expect(later[0]?.openedTick).toBe(90);
+  });
+
+  it("returns the threads that ended this call, by closing card or retired", () => {
+    const old = { ...thread, title: "Jax's debt", openedTick: 12 };
+    const byCard = mergeThreads([write("Jax's debt")], [old], 90, [], undefined, ["jax's debt"]);
+    expect(byCard.ended).toEqual([{ thread: old, ending: "closingCard" }]);
+    const byRetired = mergeThreads([], [old], 90, [], undefined, [], ["Jax's debt"]);
+    expect(byRetired.ended).toEqual([{ thread: old, ending: "retired" }]);
+    // Kept (seen, omitted, not retired) and dropped (never seen) threads have not ended.
+    const kept = mergeThreads(
+      [],
+      [old, { ...thread, title: "Unseen", lastBeatTick: null }],
+      90,
+      [],
+    );
+    expect(kept.ended).toEqual([]);
+  });
+
+  it("appends an ended thread with the summary the model wrote for it", () => {
+    const ended = [{ thread: { ...thread, openedTick: 12 }, ending: "closingCard" as const }];
+    const written = [
+      {
+        title: " the ASSAY office ",
+        shape: "cargo run, cracked core",
+        summary: "One core cracked.",
+      },
+    ];
+    const { pastArcs, missing } = appendPastArcs([], ended, written, 90);
+    expect(missing).toEqual([]);
+    expect(pastArcs).toEqual([
+      {
+        title: "The assay office",
+        scale: "episode",
+        people: ["Halla Iyer"],
+        openedTick: 12,
+        closedTick: 90,
+        ending: "closingCard",
+        shape: "cargo run, cracked core",
+        summary: "One core cracked.",
+      },
+    ]);
+  });
+
+  it("keeps the arc notes as the summary when the model wrote none, and says so", () => {
+    const ended = [{ thread, ending: "retired" as const }];
+    const earlier = appendPastArcs([], ended, [], 50).pastArcs;
+    const { pastArcs, missing } = appendPastArcs(earlier, ended, [], 90);
+    expect(missing).toEqual(["The assay office"]);
+    expect(pastArcs).toHaveLength(2);
+    expect(pastArcs[1]).toMatchObject({ shape: "", summary: thread.arcNotes, closedTick: 90 });
+  });
+
+  it("keeps past arcs to their limit, oldest dropped first", () => {
+    const arc = appendPastArcs([], [{ thread, ending: "retired" }], [], 1).pastArcs[0];
+    if (arc === undefined) throw new Error("no arc");
+    const many = Array.from({ length: NOTES_LIMITS.pastArcs + 3 }, (_, i) => ({
+      ...arc,
+      closedTick: i,
+    }));
+    const notes = parseNotes({ ...EMPTY_NOTES, pastArcs: many });
+    expect(notes.pastArcs).toHaveLength(NOTES_LIMITS.pastArcs);
+    expect(notes.pastArcs[0]?.closedTick).toBe(3);
+  });
+
+  it("reads a thread stored before D103: its stage becomes its arc notes", () => {
+    const { arcNotes: _a, openedTick: _o, ...rest } = thread;
+    const notes = parseNotes({
+      summary: "s",
+      threads: [{ ...rest, stage: "Halla is waiting." }],
+      cast: [],
+      lastUpdatedTick: 7,
+    });
+    expect(notes.threads[0]?.arcNotes).toBe("Halla is waiting.");
+    expect(notes.threads[0]?.openedTick).toBe(thread.lastBeatTick);
+    expect(notes.pastArcs).toEqual([]);
   });
 });

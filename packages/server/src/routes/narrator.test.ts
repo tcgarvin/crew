@@ -379,13 +379,15 @@ describe("narrator", () => {
           title: "Who is the assay clerk?",
           scale: "episode" as const,
           people: ["Ines Varga"],
-          stage: "Ines was nervous at the handover.",
+          arcNotes: "Ines was nervous at the handover.",
           nextBeat: "When the ship is next at the Drift, she asks a favour.",
+          openedTick: 0,
           lastBeatTick: null,
           beatCardShown: false,
         },
       ],
       cardsShown: [],
+      pastArcs: [],
       cast: [
         {
           name: "Ines Varga",

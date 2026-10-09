@@ -52,7 +52,7 @@ const assayThread = {
   title: "The assay office",
   scale: "episode" as const,
   people: ["Halla Iyer"],
-  stage: "Halla wants her cores at the Hub upright.",
+  arcNotes: "Halla wants her cores at the Hub upright.",
   nextBeat: "At the Hub, the lab finds one cracked.",
 };
 
@@ -151,7 +151,13 @@ describe("runNarrator", () => {
   it("translates a valid plan and rewrites the notes", async () => {
     const plan = emptyPlan({
       intents: [offer, { ...offer, fromPort: "port.green_meridian" }] as never,
-      notes: { summary: "Arrived at the Drift.", threads: [assayThread], cast: [], retired: [] },
+      notes: {
+        summary: "Arrived at the Drift.",
+        threads: [assayThread],
+        cast: [],
+        retired: [],
+        endedArcs: [],
+      },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = captainAshoreRequest(content());
@@ -164,8 +170,16 @@ describe("runNarrator", () => {
     expect(res.notesUpdate).toEqual({
       summary: "Arrived at the Drift.",
       // D32: Halla made an offer this call, so her thread's last beat is now.
-      threads: [{ ...assayThread, lastBeatTick: req.hook.tick, beatCardShown: false }],
+      threads: [
+        {
+          ...assayThread,
+          openedTick: req.hook.tick,
+          lastBeatTick: req.hook.tick,
+          beatCardShown: false,
+        },
+      ],
       cardsShown: [],
+      pastArcs: [],
       // D25: whoever made an offer joins the cast at their port, even if the model forgot them.
       cast: [
         {
@@ -203,7 +217,13 @@ describe("runNarrator", () => {
     };
     const plan = emptyPlan({
       intents: [passage] as never,
-      notes: { summary: "A passenger at the Hub.", threads: [], cast: [], retired: [] },
+      notes: {
+        summary: "A passenger at the Hub.",
+        threads: [],
+        cast: [],
+        retired: [],
+        endedArcs: [],
+      },
     });
     const req = farCaptainAshoreRequest(content());
     const res = await runBothTurns(req, ctx(fakeTransport(okResult(JSON.stringify(plan)))));
@@ -261,6 +281,7 @@ describe("runNarrator", () => {
         summary: "s",
         threads: [],
         retired: [],
+        endedArcs: [],
         cast: [{ name: "Halla Thorne", note: aboardNote, portId: "" }],
       },
     });
@@ -311,6 +332,7 @@ describe("runNarrator", () => {
         notes: {
           summary: "s",
           retired: [],
+          endedArcs: [],
           threads: [],
           cast: [
             { name: "Halla Thorne", note: "went home by liner", portId: "port.kessler_drift" },
@@ -329,6 +351,7 @@ describe("runNarrator", () => {
         notes: {
           summary: "s",
           retired: [],
+          endedArcs: [],
           threads: [],
           cast: [
             {
@@ -523,6 +546,7 @@ describe("what the captain has seen (D31)", () => {
       notes: {
         summary: "s",
         retired: [],
+        endedArcs: [],
         threads: [{ ...assayThread, title: "The stranger", people: ["Dane Whitcross"] }],
         cast: [],
       },
@@ -551,7 +575,7 @@ describe("what the captain has seen (D31)", () => {
   it("nulls the captain as a speaker, keeps the card and says why next call (D41)", async () => {
     const plan = emptyPlan({
       intents: [{ ...stranger, speaker: "Mara Osei" }] as never,
-      notes: { summary: "s", threads: [], cast: [], retired: [] },
+      notes: { summary: "s", threads: [], cast: [], retired: [], endedArcs: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
@@ -573,19 +597,19 @@ describe("what the captain has seen (D31)", () => {
     const beat = { ...stranger, beatOfThread: "the stranger" };
     const plan = emptyPlan({
       intents: [beat] as never,
-      notes: { summary: "s", threads: [thread], cast: [], retired: [] },
+      notes: { summary: "s", threads: [thread], cast: [], retired: [], endedArcs: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
     const stored = {
       ...EMPTY_NOTES,
-      threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
+      threads: [{ ...thread, openedTick: 0, lastBeatTick: null, beatCardShown: false }],
     };
     const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
     expect(res.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "requestCall"]);
     expect(res.notesUpdate?.threads).toEqual([
-      { ...thread, lastBeatTick: req.hook.tick, beatCardShown: true },
+      { ...thread, openedTick: 0, lastBeatTick: req.hook.tick, beatCardShown: true },
     ]);
     // A second beat card for the same thread is refused next call, with the reason in the notes.
     const again = await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
@@ -600,13 +624,13 @@ describe("what the captain has seen (D31)", () => {
     // The model keeps writing the thread; the server retires it anyway.
     const plan = emptyPlan({
       intents: [closing] as never,
-      notes: { summary: "s", threads: [thread], cast: [], retired: [] },
+      notes: { summary: "s", threads: [thread], cast: [], retired: [], endedArcs: [] },
     });
     const transport = fakeTransport(okResult(JSON.stringify(plan)));
     const req = quietTooLongRequest(content());
     const stored = {
       ...EMPTY_NOTES,
-      threads: [{ ...thread, lastBeatTick: null, beatCardShown: false }],
+      threads: [{ ...thread, openedTick: 0, lastBeatTick: null, beatCardShown: false }],
     };
     const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
     expect(res.dropped).toEqual([]);
@@ -620,6 +644,46 @@ describe("what the captain has seen (D31)", () => {
     expect(again.commands.map((c) => c.kind)).toEqual(["requestCall"]);
     expect(again.notesUpdate?.lastRejections[0]).toMatch(/already closed by an earlier card/);
     expect(again.notesUpdate?.threads).toEqual([]);
+  });
+
+  it("keeps the closed thread as a past arc with the summary the notes turn wrote (D103)", async () => {
+    const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
+    const closing = { ...stranger, closesThread: "the stranger" };
+    const endedArcs = [
+      { title: "The stranger", shape: "passenger with a past", summary: "He left at the Hub." },
+    ];
+    const plan = emptyPlan({
+      intents: [closing] as never,
+      notes: { summary: "s", threads: [], cast: [], retired: [], endedArcs },
+    });
+    const transport = fakeTransport(okResult(JSON.stringify(plan)));
+    const req = quietTooLongRequest(content());
+    const stored = {
+      ...EMPTY_NOTES,
+      threads: [{ ...thread, openedTick: 5, lastBeatTick: 20, beatCardShown: false }],
+    };
+    const res = await runBothTurns(req, { ...ctx(transport), notes: stored });
+    // The notes turn is told which thread its closing card ended.
+    expect(transport.calls[1]?.continuation[1]?.content).toContain(
+      'Your closing card ended "The stranger": write its summary in endedArcs.',
+    );
+    expect(res.notesUpdate?.pastArcs).toEqual([
+      {
+        title: "The stranger",
+        scale: "episode",
+        people: ["Dane Whitcross"],
+        openedTick: 5,
+        closedTick: req.hook.tick,
+        ending: "closingCard",
+        shape: "passenger with a past",
+        summary: "He left at the Hub.",
+      },
+    ]);
+    // Every later call shows it under "Past arcs".
+    await runBothTurns(req, { ...ctx(transport), notes: res.notesUpdate });
+    expect(transport.calls.at(-1)?.user).toContain(
+      `- t5-t${req.hook.tick} [episode] "The stranger" (Dane Whitcross): passenger with a past. He left at the Hub. (ended on its closing card)`,
+    );
   });
 
   it("records the policy card prose with the pending decision's id", async () => {
@@ -830,12 +894,24 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).not.toContain("the port board is empty");
   });
 
+  it("asks for variety and excitement, read against the past arcs (D103)", () => {
+    expect(STATIC_RULES).toContain("Variety and excitement are the job.");
+    expect(STATIC_RULES).toContain('read "Past arcs"');
+    expect(STATIC_RULES).toContain("never twice running");
+    expect(STATIC_RULES).not.toContain("Quiet is fine.");
+    expect(STATIC_RULES).toContain("endedArcs: for every thread that ends this call");
+    expect(HOOK_INSTRUCTIONS.requestedCall).toContain("give it one now rather than asking again");
+    expect(HOOK_INSTRUCTIONS.captainAshore).toContain(
+      "make it a different kind from the last ones",
+    );
+  });
+
   it("tells the model the captain is the player and never speaks on a card (D41)", () => {
     expect(STATIC_RULES).toContain("The captain is the player and never speaks on a card");
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.27");
+    expect(PROMPT_VERSION).toBe("v0.28");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -1121,6 +1197,7 @@ describe("the notes turn (D97)", () => {
         threads: [assayThread],
         cast: [],
         retired: [],
+        endedArcs: [],
       },
     });
     const reasoningDetails = [{ type: "reasoning.encrypted", data: "opaque" }];
@@ -1185,10 +1262,10 @@ describe("the notes turn (D97)", () => {
 });
 
 describe("threads the captain has seen survive the rewrite (D101)", () => {
-  const seenThread = { ...assayThread, lastBeatTick: 30, beatCardShown: false };
+  const seenThread = { ...assayThread, openedTick: 10, lastBeatTick: 30, beatCardShown: false };
   const stored = { ...EMPTY_NOTES, threads: [seenThread] };
   const omitting = (retired: string[] = []) =>
-    emptyPlan({ notes: { summary: "s", threads: [], cast: [], retired } });
+    emptyPlan({ notes: { summary: "s", threads: [], cast: [], retired, endedArcs: [] } });
 
   it("keeps a seen thread the notes turn left out, and says so next call", async () => {
     const transport = fakeTransport(okResult(JSON.stringify(omitting())));
@@ -1231,6 +1308,7 @@ describe("threads the captain has seen survive the rewrite (D101)", () => {
     expect(res.notesUpdate?.threads).toEqual([]);
     expect(res.notesUpdate?.lastRejections).toEqual([
       'retired "The assay office" without a closing card',
+      'no arc summary written for ended thread "The assay office": its arc notes were kept as its summary under "Past arcs"',
     ]);
   });
 

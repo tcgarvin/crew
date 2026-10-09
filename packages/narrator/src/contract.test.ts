@@ -122,12 +122,13 @@ describe("NarratorPlan structured-output schema", () => {
           title: "Who is the stranger?",
           scale: "episode",
           people: ["Ines Varga"],
-          stage: "A stranger asked for passage at Port A.",
+          arcNotes: "A stranger asked for passage at Port A.",
           nextBeat: "Once underway, she lets slip why she left.",
         },
       ],
       cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
       retired: [],
+      endedArcs: [],
     };
     expect(buildNotesSchema().parse(notes)).toEqual(notes);
     const plan = { rationale: "", intents: [], card: null, callBack };

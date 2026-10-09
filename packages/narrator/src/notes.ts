@@ -1,6 +1,8 @@
 /**
  * The narrator's running notes (`games.narrative_notes`, jsonb). Rewritten in full by every call;
- * the digest feeds them back so the next call keeps continuity (GDD §18, §21).
+ * the digest feeds them back so the next call keeps continuity (GDD §18, §21). D103: each thread
+ * carries its arc notes, and a thread that ends becomes a past arc, summarized by the model and
+ * kept by the server for the rest of the game.
  *
  * W9 decision: a small JSON object rather than free text, so the server can store it as jsonb and
  * the digest can bound each part separately. Dropped intents from the previous call are carried
@@ -36,10 +38,15 @@ export interface Thread {
   readonly scale: ThreadScale;
   /** Who is involved: crew names or cast names. */
   readonly people: readonly string[];
-  /** One sentence: where the thread is now. */
-  readonly stage: string;
+  /**
+   * D103: the arc so far, rewritten each call: what has happened in it (beats, complications,
+   * the captain's choices) and where it stands now. Was D32's one-sentence `stage`.
+   */
+  readonly arcNotes: string;
   /** One sentence: what must be true before it returns, and roughly what happens then. */
   readonly nextBeat: string;
+  /** D103: server-kept, the hook tick of the call that first wrote this thread. */
+  readonly openedTick: number;
   /** Hook tick of the last call that put a card or an offer from this thread in front of the captain. */
   readonly lastBeatTick: number | null;
   /**
@@ -69,6 +76,28 @@ export interface CardShown {
   readonly closedThread: string | null;
 }
 
+/** D103: how a thread ended: on its closing card, or named in `retired` without one. */
+export const ARC_ENDINGS = ["closingCard", "retired"] as const;
+export type ArcEnding = (typeof ARC_ENDINGS)[number];
+
+/**
+ * D103: a thread that has ended, kept for the rest of the game so the narrator can see the shape
+ * of every story it has told. The model writes `shape` and `summary` in the notes turn of the
+ * call that ended it; the rest is the server's.
+ */
+export interface PastArc {
+  readonly title: string;
+  readonly scale: ThreadScale;
+  readonly people: readonly string[];
+  readonly openedTick: number;
+  readonly closedTick: number;
+  readonly ending: ArcEnding;
+  /** A few words on what kind of story it was ("cargo run, no trouble", "passenger with a past"). */
+  readonly shape: string;
+  /** What happened, what went wrong or changed, what the captain chose, how it came out. */
+  readonly summary: string;
+}
+
 export interface NarratorNotes {
   /** The story so far, a few sentences. */
   readonly summary: string;
@@ -76,6 +105,8 @@ export interface NarratorNotes {
   readonly threads: readonly Thread[];
   /** D31: the most recent cards shown, oldest first; server-maintained. */
   readonly cardsShown: readonly CardShown[];
+  /** D103: every thread that has ended this game, oldest first, up to `NOTES_LIMITS.pastArcs`. */
+  readonly pastArcs: readonly PastArc[];
   /** Supporting characters the narrator has introduced (not the crew). */
   readonly cast: readonly NarratorCastEntry[];
   /** Tick of the hook that produced these notes; -1 before the first call. */
@@ -88,6 +119,10 @@ export const NOTES_LIMITS = {
   summaryChars: 1200,
   threads: 6,
   threadChars: 200,
+  arcNotesChars: 600,
+  pastArcs: 40,
+  arcShapeChars: 60,
+  arcSummaryChars: 500,
   threadPeople: 6,
   cardsShown: 12,
   gistWords: 25,
@@ -100,6 +135,7 @@ export const EMPTY_NOTES: NarratorNotes = {
   summary: "",
   threads: [],
   cardsShown: [],
+  pastArcs: [],
   cast: [],
   lastUpdatedTick: -1,
   lastRejections: [],
@@ -109,11 +145,26 @@ const storedThreadSchema = z.object({
   title: z.string(),
   scale: z.enum(THREAD_SCALES),
   people: z.array(z.string()),
-  stage: z.string(),
+  /** Notes stored before D103 have `stage` instead. */
+  arcNotes: z.string().optional(),
+  stage: z.string().optional(),
   nextBeat: z.string(),
+  /** Notes stored before D103 have no opening tick. */
+  openedTick: z.number().int().optional(),
   lastBeatTick: z.number().int().nullable(),
   /** Notes stored before D39 have no beat-card flag. */
   beatCardShown: z.boolean().optional(),
+});
+
+const storedPastArcSchema = z.object({
+  title: z.string(),
+  scale: z.enum(THREAD_SCALES),
+  people: z.array(z.string()),
+  openedTick: z.number().int(),
+  closedTick: z.number().int(),
+  ending: z.enum(ARC_ENDINGS),
+  shape: z.string(),
+  summary: z.string(),
 });
 
 const storedCardSchema = z.object({
@@ -135,6 +186,8 @@ const storedNotesSchema = z.object({
   openThreads: z.array(z.string()).optional(),
   threads: z.array(storedThreadSchema).optional(),
   cardsShown: z.array(storedCardSchema).optional(),
+  /** Notes stored before D103 have no past arcs. */
+  pastArcs: z.array(storedPastArcSchema).optional(),
   cast: z.array(
     z.object({
       name: z.string(),
@@ -161,13 +214,14 @@ export function clipWords(text: string, max: number): string {
 }
 
 /** D32: an `openThreads` string from before structured threads becomes an episode thread. */
-export function threadFromLegacy(text: string): Thread {
+export function threadFromLegacy(text: string, tick: number): Thread {
   return {
     title: text,
     scale: "episode",
     people: [],
-    stage: text,
+    arcNotes: text,
     nextBeat: "",
+    openedTick: tick,
     lastBeatTick: null,
     beatCardShown: false,
   };
@@ -178,10 +232,24 @@ function boundThread(thread: Thread): Thread {
     title: clip(thread.title, 80),
     scale: thread.scale,
     people: thread.people.slice(0, NOTES_LIMITS.threadPeople).map((p) => clip(p, 60)),
-    stage: clip(thread.stage, NOTES_LIMITS.threadChars),
+    arcNotes: clip(thread.arcNotes, NOTES_LIMITS.arcNotesChars),
     nextBeat: clip(thread.nextBeat, NOTES_LIMITS.threadChars),
+    openedTick: thread.openedTick,
     lastBeatTick: thread.lastBeatTick,
     beatCardShown: thread.beatCardShown,
+  };
+}
+
+function boundPastArc(arc: PastArc): PastArc {
+  return {
+    title: clip(arc.title, 80),
+    scale: arc.scale,
+    people: arc.people.slice(0, NOTES_LIMITS.threadPeople).map((p) => clip(p, 60)),
+    openedTick: arc.openedTick,
+    closedTick: arc.closedTick,
+    ending: arc.ending,
+    shape: clip(arc.shape, NOTES_LIMITS.arcShapeChars),
+    summary: clip(arc.summary, NOTES_LIMITS.arcSummaryChars),
   };
 }
 
@@ -254,6 +322,7 @@ export function boundNotes(notes: NarratorNotes): NarratorNotes {
     summary: clip(notes.summary, NOTES_LIMITS.summaryChars),
     threads: notes.threads.slice(0, NOTES_LIMITS.threads).map(boundThread),
     cardsShown: notes.cardsShown.slice(-NOTES_LIMITS.cardsShown).map(boundCard),
+    pastArcs: notes.pastArcs.slice(-NOTES_LIMITS.pastArcs).map(boundPastArc),
     cast: keepRecentCast(notes.cast).map((c) => ({
       name: clip(c.name, 60),
       note: clip(c.note, NOTES_LIMITS.castNoteChars),
@@ -276,14 +345,21 @@ export function parseNotes(raw: unknown): NarratorNotes {
   }
   const parsed = storedNotesSchema.safeParse(raw);
   if (!parsed.success) return EMPTY_NOTES;
-  const { openThreads, threads, cardsShown, ...rest } = parsed.data;
+  const { openThreads, threads, cardsShown, pastArcs, ...rest } = parsed.data;
+  const lastTick = parsed.data.lastUpdatedTick;
   return boundNotes({
     ...rest,
-    // Notes stored before D32 have free-text threads; before D31 no card history.
+    // Notes stored before D32 have free-text threads; before D31 no card history; before D103
+    // a thread's `stage` stood for its arc notes, and nothing says when it opened.
     threads:
-      threads?.map((t) => ({ ...t, beatCardShown: t.beatCardShown ?? false })) ??
-      (openThreads ?? []).map(threadFromLegacy),
+      threads?.map(({ stage, arcNotes, openedTick, ...t }) => ({
+        ...t,
+        arcNotes: arcNotes ?? stage ?? "",
+        openedTick: openedTick ?? t.lastBeatTick ?? lastTick,
+        beatCardShown: t.beatCardShown ?? false,
+      })) ?? (openThreads ?? []).map((text) => threadFromLegacy(text, lastTick)),
     cardsShown: (cardsShown ?? []).map((c) => ({ ...c, closedThread: c.closedThread ?? null })),
+    pastArcs: pastArcs ?? [],
     // Notes stored before D25 have no port or sighting for their cast.
     cast: parsed.data.cast.map((c) => ({
       name: c.name,
@@ -296,7 +372,7 @@ export function parseNotes(raw: unknown): NarratorNotes {
 }
 
 /** What the model writes for a thread: everything the server does not keep for it. */
-export type WrittenThread = Omit<Thread, "lastBeatTick" | "beatCardShown">;
+export type WrittenThread = Omit<Thread, "openedTick" | "lastBeatTick" | "beatCardShown">;
 
 /**
  * D32: the threads after a call. The model rewrites them in full; the server carries
@@ -317,6 +393,10 @@ export type WrittenThread = Omit<Thread, "lastBeatTick" | "beatCardShown">;
  * named it in `retired` (reported in `retiredWithoutCard`). An omitted thread the captain never
  * saw is dropped silently. Over the thread limit, threads that are new this call and unseen go
  * first (`droppedForRoom`), so the limit never cuts a seen thread.
+ *
+ * D103: `openedTick` is carried by title, the hook tick for a new thread. A previous thread that
+ * ends this call, by a closing card or named in `retired`, is returned in `ended` to become a
+ * past arc.
  */
 export interface MergedThreads {
   readonly threads: Thread[];
@@ -326,6 +406,8 @@ export interface MergedThreads {
   readonly retiredWithoutCard: string[];
   /** Titles of new, unseen threads dropped to make room for seen ones. */
   readonly droppedForRoom: string[];
+  /** D103: previous threads that ended this call, and how. */
+  readonly ended: { readonly thread: Thread; readonly ending: ArcEnding }[];
 }
 
 export function mergeThreads(
@@ -358,6 +440,7 @@ export function mergeThreads(
       const foreshadowedNow = beatKey !== undefined && key(t.title) === beatKey;
       return {
         ...t,
+        openedTick: earlier?.openedTick ?? tick,
         lastBeatTick:
           t.people.some(named) || foreshadowedNow ? tick : (earlier?.lastBeatTick ?? null),
         beatCardShown: foreshadowedNow || (earlier?.beatCardShown ?? false),
@@ -366,11 +449,17 @@ export function mergeThreads(
   const writtenKeys = new Set(written.map((t) => key(t.title)));
   const kept: string[] = [];
   const retiredWithoutCard: string[] = [];
+  const ended: MergedThreads["ended"] = [];
   for (const old of previous) {
     const k = key(old.title);
-    if (writtenKeys.has(k) || closed.has(k) || old.lastBeatTick === null) continue;
+    if (closed.has(k)) {
+      ended.push({ thread: old, ending: "closingCard" });
+      continue;
+    }
+    if (writtenKeys.has(k) || old.lastBeatTick === null) continue;
     if (retiredKeys.has(k)) {
       retiredWithoutCard.push(old.title);
+      ended.push({ thread: old, ending: "retired" });
     } else {
       threads.push(old);
       kept.push(old.title);
@@ -385,5 +474,43 @@ export function mergeThreads(
     threads.splice(i, 1);
     droppedForRoom.push(t.title);
   }
-  return { threads, kept, retiredWithoutCard, droppedForRoom };
+  return { threads, kept, retiredWithoutCard, droppedForRoom, ended };
+}
+
+/** D103: what the model writes for a thread that ended this call. */
+export interface WrittenArcSummary {
+  readonly title: string;
+  readonly shape: string;
+  readonly summary: string;
+}
+
+/**
+ * D103: the past arcs after a call: the previous ones, then each thread that ended this call
+ * with the summary the model wrote for it (matched by title). A thread the model wrote no summary
+ * for keeps its arc notes as the summary, and `missing` names it so the next call is told.
+ */
+export function appendPastArcs(
+  previous: readonly PastArc[],
+  ended: MergedThreads["ended"],
+  written: readonly WrittenArcSummary[],
+  tick: number,
+): { readonly pastArcs: PastArc[]; readonly missing: string[] } {
+  const key = (s: string) => s.trim().toLowerCase();
+  const byTitle = new Map(written.map((w) => [key(w.title), w]));
+  const missing: string[] = [];
+  const added = ended.map(({ thread, ending }): PastArc => {
+    const summary = byTitle.get(key(thread.title));
+    if (summary === undefined) missing.push(thread.title);
+    return {
+      title: thread.title,
+      scale: thread.scale,
+      people: thread.people,
+      openedTick: thread.openedTick,
+      closedTick: tick,
+      ending,
+      shape: summary?.shape ?? "",
+      summary: summary?.summary ?? thread.arcNotes,
+    };
+  });
+  return { pastArcs: [...previous, ...added], missing };
 }

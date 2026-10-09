@@ -148,6 +148,40 @@ describe("buildDigest", () => {
     expect(digest.approxTokens).toBeLessThanOrEqual(2_500);
   });
 
+  it("lists every past arc, never trimmed and outside the character budget (D103)", () => {
+    const req = quietTooLongRequest(content());
+    const empty = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
+    expect(empty.text).toContain("## Past arcs\n(none yet: no story has ended this game)");
+    const arc = {
+      title: "Bo's produce",
+      scale: "episode" as const,
+      people: ["Bo Sandoval"],
+      openedTick: 100,
+      closedTick: 900,
+      ending: "closingCard" as const,
+      shape: "cargo run, no trouble",
+      summary: "Produce to the Hub, delivered on time.",
+    };
+    const pastArcs = Array.from({ length: 30 }, (_, i) => ({ ...arc, title: `Run ${i}` }));
+    const notes = { ...EMPTY_NOTES, pastArcs };
+    const small = buildDigest(req.snapshot, manyEvents(20), notes, content(), req.hook, 1_500);
+    expect(small.text).toContain("30 stories have ended this game:");
+    expect(small.text).toContain(
+      '- t100-t900 [episode] "Run 0" (Bo Sandoval): cargo run, no trouble. Produce to the Hub, delivered on time. (ended on its closing card)',
+    );
+    expect(small.text).toContain('"Run 29"');
+    // The rest is trimmed to the same budget as without the arcs.
+    const without = buildDigest(
+      req.snapshot,
+      manyEvents(20),
+      EMPTY_NOTES,
+      content(),
+      req.hook,
+      1_500,
+    );
+    expect(small.text.split("## Past arcs")[0]).toBe(without.text.split("## Past arcs")[0]);
+  });
+
   it("truncates deterministically, lowest priority first, and says so", () => {
     const req = quietTooLongRequest(content());
     const small = buildDigest(
@@ -179,8 +213,9 @@ describe("buildDigest", () => {
           title: "A buyer at Meridian",
           scale: "season" as const,
           people: ["Ysolde Maren", "Jax"],
-          stage: "Ysolde hinted she has a buyer",
+          arcNotes: "Ysolde hinted she has a buyer",
           nextBeat: "When we next dock at Meridian, she names a price",
+          openedTick: 0,
           lastBeatTick: 1200,
           beatCardShown: false,
         },
@@ -360,8 +395,9 @@ describe("buildDigest", () => {
       title: "The quiet pump",
       scale: "episode" as const,
       people: ["Priya Kessler"],
-      stage: "Priya heard something",
+      arcNotes: "Priya heard something",
       nextBeat: "Underway, the pump fails",
+      openedTick: 0,
       lastBeatTick: 400,
       beatCardShown: true,
     };
@@ -384,8 +420,9 @@ describe("buildDigest", () => {
       title: "The Seed-Bank Archive Run",
       scale: "episode" as const,
       people: ["Tilde Haugen"],
-      stage: "Tilde offered the archive",
+      arcNotes: "Tilde offered the archive",
       nextBeat: "On delivery, her last word",
+      openedTick: 0,
       lastBeatTick: 400,
       beatCardShown: false,
     };
