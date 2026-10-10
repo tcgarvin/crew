@@ -10,10 +10,10 @@
     "tick": 2400
   },
   "snapshot": {
-    "schemaVersion": 12,
+    "schemaVersion": 13,
     "simVersion": "0.1.0",
-    "contentHash": "9fe8f317c8721377",
-    "configHash": "9fe8f317c8721377",
+    "contentHash": "c4ede4483e2fd24b",
+    "configHash": "c4ede4483e2fd24b",
     "savedAtTick": 2400,
     "config": {
       "time": {
@@ -186,9 +186,9 @@
           "passengerReturned",
           "fieldSighted",
           "fieldEntered",
-          "fieldCleared",
           "shipStuck"
         ],
+        "aftermathHookOnEvents": ["alertCleared", "navHazard", "faultRepaired"],
         "hazardBudget": 2
       },
       "host": {
@@ -209,7 +209,9 @@
           "fieldEntered",
           "shipStuck",
           "machineKnockedOut",
-          "shipLost"
+          "shipLost",
+          "expeditionContact",
+          "died"
         ],
         "dirtFrameEverySeconds": 5
       },
@@ -382,6 +384,24 @@
             "opinion": 1,
             "durationDays": 7,
             "stackLimit": 1
+          },
+          "foughtBeside": {
+            "label": "fought beside me",
+            "opinion": 1,
+            "durationDays": 7,
+            "stackLimit": 2
+          },
+          "carriedMeOut": {
+            "label": "carried me out",
+            "opinion": 3,
+            "durationDays": 14,
+            "stackLimit": 1
+          },
+          "leftMeBehind": {
+            "label": "left me behind",
+            "opinion": -3,
+            "durationDays": 14,
+            "stackLimit": 1
           }
         },
         "affinityRange": 10,
@@ -458,19 +478,140 @@
       "intercom": {
         "reportSeconds": 3
       },
+      "bodies": {
+        "tolerance": {
+          "head": 2,
+          "torso": 3,
+          "leftArm": 2,
+          "rightArm": 2,
+          "leftLeg": 2,
+          "rightLeg": 2
+        },
+        "severityDamage": {
+          "graze": 0.5,
+          "serious": 1.2,
+          "grave": 2.5
+        },
+        "severityPain": {
+          "graze": 0.1,
+          "serious": 0.3,
+          "grave": 0.6
+        },
+        "painDecayPerSecond": 0.01,
+        "bleedPerSecond": {
+          "graze": 0,
+          "serious": 0.004,
+          "grave": 0.012
+        },
+        "bleedStopsAfterSeconds": {
+          "graze": 0,
+          "serious": 60,
+          "grave": 180
+        },
+        "bloodRecoverPerSecond": 0.002,
+        "stunPerHit": 0.5,
+        "stunDecayPerSecond": 0.004,
+        "incapacitatedBelow": {
+          "consciousness": 0.3,
+          "movement": 0.15
+        },
+        "deadBelowBlood": 0.25,
+        "healPerDay": 0.5,
+        "partTable": {
+          "head": 10,
+          "torso": 45,
+          "leftArm": 10,
+          "rightArm": 10,
+          "leftLeg": 12.5,
+          "rightLeg": 12.5
+        },
+        "stunPartTable": {
+          "head": 0,
+          "torso": 0,
+          "leftArm": 25,
+          "rightArm": 25,
+          "leftLeg": 25,
+          "rightLeg": 25
+        }
+      },
+      "expedition": {
+        "decideEverySeconds": 0.5,
+        "maxFightSeconds": 120,
+        "alertClearSeconds": 60,
+        "hitSkillBase": 0.7,
+        "hitPerFighting": 0.06,
+        "rangeFalloffFloor": 0.5,
+        "coverPenalty": 0.5,
+        "movingTargetFactor": 0.8,
+        "movingShooterFactor": 0.7,
+        "meleeAdjacentOnly": true,
+        "resolveTiers": {
+          "shaky": 0.45,
+          "steady": 0.7,
+          "hard": 0.95
+        },
+        "tie": {
+          "paid": {
+            "resolve": 0.8,
+            "loyalty": 0.3
+          },
+          "bound": {
+            "resolve": 1,
+            "loyalty": 0.7
+          },
+          "devoted": {
+            "resolve": 1.25,
+            "loyalty": 1
+          }
+        },
+        "castFighting": {
+          "shaky": 2,
+          "steady": 4,
+          "hard": 6
+        },
+        "crewResolve": {
+          "base": 0.6,
+          "perFighting": 0.03,
+          "perMood": 0.1,
+          "perLeaderAffinity": 0.02
+        },
+        "morale": {
+          "hitSelf": -0.25,
+          "allyDown": -0.2,
+          "allyDead": -0.3,
+          "underFireNoCoverPerSecond": -0.05,
+          "outnumberedPerSecond": -0.03,
+          "allyHit": 0.05,
+          "inCoverPerSecond": 0.02,
+          "leaderNearPerSecond": 0.02,
+          "outflanked": -0.3,
+          "targetTaken": -0.4,
+          "waverBelow": 0.5,
+          "breakBelow": 0.25,
+          "recoverAbove": 0.6
+        },
+        "withdrawWhen": {
+          "firstDown": 1,
+          "halfDown": 0.5
+        },
+        "leaderNearTiles": 3,
+        "surrenderIfCornered": true,
+        "blasters": 3,
+        "batons": 2
+      },
       "events": {
         "tickerMaxEntries": 30,
         "traceRingSize": 1000
       }
     },
     "state": {
-      "schemaVersion": 12,
+      "schemaVersion": 13,
       "scenarioId": "scenario.default_freighter_run",
       "seed": 11,
       "tick": 2400,
       "rng": {
         "setup": [624639101, 3782221826, 3611072834, 2642480727],
-        "failures": [2047384806, 218730179, 2080762606, 331545598],
+        "failures": [219089412, 1546994270, 4171540580, 331545599],
         "perception": [2529467439, 2466509179, 3806309496, 3389621],
         "social": [4013384287, 356094304, 665230829, 3499190074],
         "commerce": [2132857224, 449436560, 669363701, 3920415277],
@@ -478,8 +619,8 @@
       },
       "nextId": {
         "actor": 10,
-        "machine": 50,
-        "item": 30,
+        "machine": 51,
+        "item": 35,
         "door": 20,
         "compartment": 17,
         "task": 1,
@@ -494,7 +635,8 @@
         "hazard": 1,
         "session": 1,
         "field": 1,
-        "scar": 1
+        "scar": 1,
+        "wound": 1
       },
       "actors": {
         "a1": {
@@ -530,7 +672,8 @@
             "engineering": 2,
             "electrical": 1,
             "medical": 1,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 4
           },
           "traits": [],
           "mood": 0,
@@ -559,6 +702,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a2": {
@@ -594,7 +763,8 @@
             "engineering": 4,
             "electrical": 3,
             "medical": 2,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 5
           },
           "traits": ["trait.steady", "trait.methodical"],
           "mood": 0,
@@ -623,6 +793,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a3": {
@@ -658,7 +854,8 @@
             "cargo": 2,
             "piloting": 1,
             "medical": 1,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 2
           },
           "traits": ["trait.night_owl"],
           "mood": 0,
@@ -687,6 +884,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a4": {
@@ -722,7 +945,8 @@
             "cargo": 4,
             "piloting": 1,
             "medical": 1,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 3
           },
           "traits": ["trait.brisk_walker"],
           "mood": 0,
@@ -751,6 +975,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a5": {
@@ -786,7 +1036,8 @@
             "engineering": 2,
             "electrical": 1,
             "medical": 1,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 3
           },
           "traits": [],
           "mood": 0,
@@ -815,6 +1066,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a6": {
@@ -850,7 +1127,8 @@
             "medical": 2,
             "engineering": 1,
             "electrical": 1,
-            "piloting": 1
+            "piloting": 1,
+            "fighting": 1
           },
           "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
           "mood": 0,
@@ -874,6 +1152,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a7": {
@@ -909,7 +1213,8 @@
             "cooking": 2,
             "engineering": 1,
             "electrical": 1,
-            "piloting": 2
+            "piloting": 2,
+            "fighting": 2
           },
           "traits": [],
           "mood": 0,
@@ -933,6 +1238,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a8": {
@@ -968,7 +1299,8 @@
             "electrical": 1,
             "medical": 1,
             "cooking": 2,
-            "piloting": 1
+            "piloting": 1,
+            "fighting": 4
           },
           "traits": [],
           "mood": 0,
@@ -997,6 +1329,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         },
         "a9": {
@@ -1032,7 +1390,8 @@
             "engineering": 1,
             "electrical": 1,
             "medical": 1,
-            "cooking": 1
+            "cooking": 1,
+            "fighting": 2
           },
           "traits": [],
           "mood": 0,
@@ -1061,6 +1420,32 @@
           "knowledge": {},
           "navigationKnowledgeRevision": 0,
           "availability": "available",
+          "body": {
+            "parts": {
+              "head": {
+                "damage": 0
+              },
+              "torso": {
+                "damage": 0
+              },
+              "leftArm": {
+                "damage": 0
+              },
+              "rightArm": {
+                "damage": 0
+              },
+              "leftLeg": {
+                "damage": 0
+              },
+              "rightLeg": {
+                "damage": 0
+              }
+            },
+            "blood": 1,
+            "pain": 0,
+            "stun": 0,
+            "wounds": []
+          },
           "crew": true
         }
       },
@@ -2601,6 +2986,30 @@
           "roleState": {
             "role": "none"
           }
+        },
+        "m50": {
+          "id": "m50",
+          "defId": "machine.arms_locker",
+          "deckId": "deck.freighter_mk2",
+          "placementKey": "arms_locker",
+          "integrity": 1,
+          "condition": 1,
+          "desiredMode": "on",
+          "actualMode": "on",
+          "output": 1,
+          "powerAllocatedKw": 0,
+          "temperature": 0,
+          "faults": [],
+          "scheduledFaults": [],
+          "failure": {
+            "accumulatedHazard": 0,
+            "threshold": 0.9284012326891444
+          },
+          "lastMaintainedTick": 0,
+          "maintenanceProgress": 0,
+          "roleState": {
+            "role": "none"
+          }
         }
       },
       "power": {
@@ -2982,6 +3391,66 @@
           },
           "count": 2,
           "reserved": 0
+        },
+        "i30": {
+          "id": "i30",
+          "defId": "item.blaster",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 32.5,
+            "y": 14.5
+          },
+          "condition": 1
+        },
+        "i31": {
+          "id": "i31",
+          "defId": "item.blaster",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 32.5,
+            "y": 14.5
+          },
+          "condition": 1
+        },
+        "i32": {
+          "id": "i32",
+          "defId": "item.blaster",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 32.5,
+            "y": 14.5
+          },
+          "condition": 1
+        },
+        "i33": {
+          "id": "i33",
+          "defId": "item.baton",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 32.5,
+            "y": 14.5
+          },
+          "condition": 1
+        },
+        "i34": {
+          "id": "i34",
+          "defId": "item.baton",
+          "stacking": "unique",
+          "location": {
+            "kind": "onDeck",
+            "deckId": "deck.freighter_mk2",
+            "x": 32.5,
+            "y": 14.5
+          },
+          "condition": 1
         }
       },
       "berths": {
@@ -3120,6 +3589,10 @@
           "item.hull_plating": {
             "count": 3,
             "price": 110
+          },
+          "item.patch_kit": {
+            "count": 6,
+            "price": 30
           }
         },
         "port.green_meridian": {
@@ -3138,6 +3611,10 @@
           "item.hull_plating": {
             "count": 4,
             "price": 90
+          },
+          "item.patch_kit": {
+            "count": 8,
+            "price": 20
           }
         },
         "port.ossory_station": {
@@ -3190,6 +3667,10 @@
           "item.hull_plating": {
             "count": 0,
             "price": 150
+          },
+          "item.patch_kit": {
+            "count": 4,
+            "price": 40
           }
         },
         "port.terns_rest": {
@@ -3216,8 +3697,13 @@
           "item.hull_plating": {
             "count": 2,
             "price": 130
+          },
+          "item.patch_kit": {
+            "count": 4,
+            "price": 35
           }
-        }
+        },
+        "port.boathouse": {}
       },
       "dockside": {
         "dockId": "dock.crossroads_hub",
