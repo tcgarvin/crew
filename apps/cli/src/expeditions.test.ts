@@ -240,23 +240,21 @@ describe("crew expeditions: CI bounds on the default cast (ruling 13)", () => {
     return s.contactToEnd.mean;
   };
 
-  // enabled at integration once W2 lands
-  it.skip("hold: few party deaths, never timed out", { timeout: 120_000 }, async () => {
+  it("hold: few party deaths, never timed out", { timeout: 120_000 }, async () => {
     const hold = await runPlan("hold-lethal-armed");
     expect(deathsPerFight(hold)).toBeLessThanOrEqual(0.25);
     expect(hold.outcomes.timedOut + hold.outcomes.cutOff).toBe(0);
     expect(hold.outcomes.targetFled + hold.outcomes.targetTaken).toBeGreaterThanOrEqual(0.8);
   });
 
-  // enabled at integration once W2 lands
-  it.skip("assault: few party deaths, never timed out", { timeout: 120_000 }, async () => {
+  it("assault: few party deaths, never timed out", { timeout: 120_000 }, async () => {
     const assault = await runPlan("assault-lethal-armed");
     expect(deathsPerFight(assault)).toBeLessThanOrEqual(0.25);
     expect(assault.outcomes.timedOut + assault.outcomes.cutOff).toBe(0);
     expect(assault.outcomes.targetTaken).toBeGreaterThanOrEqual(0.6);
   });
 
-  // enabled at integration once W2 lands
+  // enabled after the tuning commit
   it.skip("hold costs fewer wounds and assault ends sooner", () => {
     const hold = summaryOf("hold-lethal-armed");
     const assault = summaryOf("assault-lethal-armed");
