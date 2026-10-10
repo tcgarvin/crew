@@ -418,7 +418,18 @@ export interface Expedition {
   leaderId: ActorId;
   plan?: BattlePlan;
   startedTick: Tick;
+  /** Expeditions A1 (W2): when the leader first stood on the site floor (`approach` began). */
+  approachTick?: Tick;
   fightStartedTick?: Tick;
+  /**
+   * Expeditions A1 (W2): when the objective was held (the target taken, the item reached, the
+   * guards broken); from then the party brings the target and the down back to the ramp.
+   */
+  objectiveTick?: Tick;
+  /** Expeditions A1 (W2): when `flank`'s small group reached the flank post. */
+  flankTick?: Tick;
+  /** Expeditions A1 (W2): when the party was ordered back (`withdrawWhen`, or `withdrawParty`). */
+  withdrawTick?: Tick;
   resolvedTick?: Tick;
   outcome?: ExpeditionOutcome;
   shots: number;

@@ -521,6 +521,8 @@
   "expedition": {
     "decideEverySeconds": 0.5,
     "maxFightSeconds": 120,
+    "contactAfterSeconds": 15,
+    "maxApproachSeconds": 90,
     "alertClearSeconds": 60,
     "hitSkillBase": 0.7,
     "hitPerFighting": 0.06,
@@ -549,9 +551,9 @@
       }
     },
     "castFighting": {
-      "shaky": 2,
-      "steady": 4,
-      "hard": 6
+      "shaky": 1,
+      "steady": 3,
+      "hard": 5
     },
     "crewResolve": {
       "base": 0.6,

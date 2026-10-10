@@ -26,10 +26,18 @@ import type {
   ContentBundle,
   DockDef,
   ItemDef,
+  MachineDef,
   PortDef,
   SiteCastEntryDef,
 } from "../../../core/types/content";
-import type { CommandId, DockDefId, ItemDefId, PortDefId } from "../../../core/types/ids";
+import type {
+  CommandId,
+  DockDefId,
+  ItemDefId,
+  MachineDefId,
+  PortDefId,
+  ScenarioDefId,
+} from "../../../core/types/ids";
 import { registerPlannerDefaults } from "../../../planner/index";
 import { registerBodies } from "../../bodies/index";
 import { registerNeeds } from "../../needs/index";
@@ -39,13 +47,19 @@ import { docksideConfig, docksideContent } from "../../travel/fixtures-dock";
 import { registerTravel } from "../../travel/index";
 import { ALL_DERIVATIONS, CREW } from "../../work/fixtures/crew-deck";
 import { registerWork } from "../../work/index";
+import type { DamageFn } from "../combat";
 import { registerExpedition } from "../index";
+import { testDamage } from "./damage";
 
 export const SITE = {
   port: "port.test.site" as PortDefId,
   dock: "dock.test.site" as DockDefId,
   blaster: "item.test.blaster" as ItemDefId,
   baton: "item.test.baton" as ItemDefId,
+  locker: "machine.test.arms_locker" as MachineDefId,
+  /** The arms locker on the crew deck's corridor, and the tile it is used from. */
+  lockerTile: { x: 4, y: 5 },
+  lockerUse: { x: 4, y: 6 },
 } as const;
 
 export const SITE_CAST: readonly SiteCastEntryDef[] = [
@@ -159,10 +173,66 @@ const weapon = (id: ItemDefId, kind: "blaster" | "baton"): ItemDef => ({
         },
 });
 
+const LOCKER: MachineDef = {
+  id: SITE.locker,
+  name: "Arms Locker",
+  tags: ["armsLocker"],
+  footprint: [{ x: 0, y: 0 }],
+  interactionPositions: [{ key: "use", offset: { x: 0, y: 1 }, purposes: ["use"], capacity: 1 }],
+  power: { role: "none" },
+  heat: { risePerSecond: 0, coolPerSecond: 0, derateAbove: 1 },
+  operation: { requiresOperator: false },
+  failure: { baseHazardPerSecond: 0, heatFactor: 0, wearPerSecond: 0 },
+  faults: [],
+  components: [],
+};
+
+/** The crew deck with the arms locker, and both crew scenarios with three blasters and two batons. */
+function armed(base: ContentBundle): Pick<ContentBundle, "decks" | "scenarios"> {
+  const decks = Object.fromEntries(
+    Object.entries(base.decks).map(([id, deck]) => [
+      id,
+      {
+        ...deck,
+        machines: [
+          ...deck.machines,
+          { key: "arms_locker", machineDefId: SITE.locker, origin: SITE.lockerTile, rotation: 0 },
+        ],
+        zones: [
+          ...deck.zones,
+          {
+            key: "arms",
+            name: "Arms locker",
+            tags: ["armsLocker"],
+            tiles: [SITE.lockerTile],
+            machineKey: "arms_locker",
+          },
+        ],
+      },
+    ]),
+  ) as ContentBundle["decks"];
+  const scenarios = Object.fromEntries(
+    Object.entries(base.scenarios).map(([id, scenario]) => [
+      id,
+      {
+        ...scenario,
+        startingItems: [
+          ...scenario.startingItems,
+          { itemDefId: SITE.blaster, count: 3, zoneKey: "arms" },
+          { itemDefId: SITE.baton, count: 2, zoneKey: "arms" },
+        ],
+      },
+    ]),
+  ) as ContentBundle["scenarios"];
+  return { decks, scenarios };
+}
+
 export function siteContent(config: ConfigDef = docksideConfig()): ContentBundle {
   const base = docksideContent(config);
   return {
     ...base,
+    ...armed(base),
+    machines: { ...base.machines, [SITE.locker]: LOCKER },
     ports: { ...base.ports, [SITE.port]: SITE_PORT },
     docks: { ...base.docks, [SITE.dock]: SITE_DOCK },
     items: {
@@ -174,20 +244,33 @@ export function siteContent(config: ConfigDef = docksideConfig()): ContentBundle
   };
 }
 
-/** The dockside world with the site in content, bodies and the expedition registered. */
-export function siteWorld(config: ConfigDef = docksideConfig()): TestWorld {
+export interface SiteWorldOptions {
+  readonly config?: ConfigDef;
+  /** Crew of two (Mara and Jon, the default) or of eight. */
+  readonly scenario?: ScenarioDefId;
+  readonly seed?: number;
+  /** The damage entry point; the test double (`fixtures/damage.ts`) unless given. */
+  readonly applyDamage?: DamageFn;
+}
+
+/**
+ * The dockside world with the site in content, bodies and the expedition registered (the
+ * expedition with the damage double until W1's `applyDamage` lands).
+ */
+export function siteWorld(opts: SiteWorldOptions = {}): TestWorld {
+  const config = opts.config ?? docksideConfig();
   const registry = createRegistry();
   registerSpatial(registry);
   registerTravel(registry);
   registerNeeds(registry);
   registerBodies(registry);
-  registerExpedition(registry);
+  registerExpedition(registry, { applyDamage: opts.applyDamage ?? testDamage });
   registerWork(registry, { derivations: ALL_DERIVATIONS });
   registerPlannerDefaults(registry);
   const kernel = createKernel(registry);
   const world = kernel.createWorld(
-    CREW.scenario2,
-    11,
+    opts.scenario ?? CREW.scenario2,
+    opts.seed ?? 11,
     siteContent(config),
     tinyEffectiveConfig(config),
   );

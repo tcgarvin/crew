@@ -18,7 +18,7 @@ import type { DeepReadonly } from "../../core/types/common";
 import type { ConfigDef, ContentBundle } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
-import type { BattlePlan, SquadRule } from "../../core/types/state";
+import type { BattlePlan, Expedition, SquadRule } from "../../core/types/state";
 import { shipDeckId } from "../../core/world";
 import { gangwayStanderOf, whoHasTheHelm } from "../watch/helm";
 import { lockerWeapons } from "./muster";
@@ -101,5 +101,70 @@ export function squadFor(ctx: SquadCtx, squad: SquadRule): ActorId[] {
       const best = [...rest].sort((a, b) => fightingOf(b) - fightingOf(a) || byId(a, b));
       return [leader, ...best.slice(0, 2)].map((a) => a.id);
     }
+  }
+}
+
+/**
+ * §8.3: what a party member does under the plan's posture at this moment.
+ * - `press`: go for the objective, firing on the way.
+ * - `hold`: stay in cover by the ramp and fire.
+ * - `toFlank`: `flank`'s small group on its way to the flank post.
+ * - `bait`: `bait`'s leader walking in on the guards, not firing.
+ * - `creep`: keep to tiles nobody would notice.
+ */
+export type PostureMode = "press" | "hold" | "toFlank" | "bait" | "creep";
+
+/**
+ * `flank`'s two groups: the party by `fighting` (ties by id), alternating; the second group (the
+ * smaller, or the same size) goes round.
+ */
+export function flankGroups(
+  state: ReadonlyWorldState,
+  party: readonly ActorId[],
+): { readonly small: readonly ActorId[]; readonly large: readonly ActorId[] } {
+  const ranked = party
+    .map((id) => state.actors[id])
+    .filter((a): a is DeepReadonly<Actor> => a !== undefined)
+    .sort((a, b) => fightingOf(b) - fightingOf(a) || byId(a, b))
+    .map((a) => a.id);
+  return {
+    small: ranked.filter((_, i) => i % 2 === 1),
+    large: ranked.filter((_, i) => i % 2 === 0),
+  };
+}
+
+/** What `postureMode` reads. */
+export interface PostureInput {
+  readonly state: ReadonlyWorldState;
+  readonly expedition: DeepReadonly<Expedition>;
+  readonly actorId: ActorId;
+  /** Is any armed cast member still able to fight (not down, gone, running or given up)? */
+  readonly armedCastLeft: boolean;
+}
+
+/**
+ * The posture's mode for one party member. After contact `bait` and `creep` become `press`;
+ * `hold` presses once no armed cast member is left to fight (ruling 6); `flank`'s large group
+ * holds until the small group reaches the flank post, then both press.
+ */
+export function postureMode(input: PostureInput): PostureMode {
+  const { expedition, actorId } = input;
+  const posture = expedition.plan?.posture ?? "hold";
+  const contact = expedition.phase === "fight";
+  switch (posture) {
+    case "assault":
+      return "press";
+    case "hold":
+      return contact && !input.armedCastLeft ? "press" : "hold";
+    case "flank": {
+      if (expedition.flankTick !== undefined) return "press";
+      const { small } = flankGroups(input.state, expedition.party);
+      return small.includes(actorId) ? "toFlank" : "hold";
+    }
+    case "bait":
+      if (contact) return "press";
+      return actorId === expedition.leaderId ? "bait" : "hold";
+    case "creep":
+      return contact ? "press" : "creep";
   }
 }

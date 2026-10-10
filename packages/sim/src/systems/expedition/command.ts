@@ -66,7 +66,7 @@ import { planMenu } from "../../view/planMenu";
 import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
 import { orderWithdrawal } from "./expedition";
-import { dispositionOf } from "./morale";
+import { dispositionOf, initialState } from "./morale";
 import { squadFor } from "./plans";
 
 type StartPayload = CommandOfKind<"scenarioStartExpedition">["payload"];
@@ -199,9 +199,10 @@ function dockProblem(ctx: ValidateCtx): string | undefined {
 }
 
 /** The menu's option `planId`, if it is there and available; else why not. */
-function chosenPlan(ctx: ValidateCtx, planId: unknown): BattlePlan | string {
+function chosenPlan(ctx: ValidateCtx, planId: unknown, siteId: PortDefId): BattlePlan | string {
   if (typeof planId !== "string") return "plan must be a menu id";
-  const option = planMenu(ctx.state, ctx.content, ctx.config).find((o) => o.id === planId);
+  const menu = planMenu(ctx.state, ctx.content, ctx.config, siteId);
+  const option = menu.find((o) => o.id === planId);
   if (option === undefined) return `"${planId}" is not on the plan menu`;
   if (!option.available) return `"${planId}" is not available: ${option.why}`;
   return option.plan;
@@ -248,7 +249,7 @@ function validateStart(ctx: ValidateCtx, payload: StartPayload): Validation<Star
   if (problem !== undefined) return fail(kind, problem.code, problem.reason);
   let plan: BattlePlan | undefined;
   if (payload.plan !== undefined) {
-    const chosen = chosenPlan(ctx, payload.plan);
+    const chosen = chosenPlan(ctx, payload.plan, siteId);
     if (typeof chosen === "string") return fail(kind, "preconditionFailed", chosen);
     plan = chosen;
   }
@@ -306,7 +307,12 @@ function swapToSite(ctx: ApplyCtx, plan: StartPlan): void {
 }
 
 /** Spawn one cast member at their post with their weapon in hand. */
-function spawnCast(ctx: ApplyCtx, plan: StartPlan, entry: SiteCastEntryDef): ActorId {
+function spawnCast(
+  ctx: ApplyCtx,
+  plan: StartPlan,
+  entry: SiteCastEntryDef,
+  index: number,
+): ActorId {
   const { state } = ctx;
   const deckId = shipDeckId(state);
   const deck = ctx.content.decks[deckId];
@@ -330,12 +336,14 @@ function spawnCast(ctx: ApplyCtx, plan: StartPlan, entry: SiteCastEntryDef): Act
   const disposition = dispositionOf(entry, ctx.config);
   actor.crew = false;
   actor.facing = postFacing(post);
+  const every = configTicks(ctx.config, ctx.config.expedition.decideEverySeconds);
   actor.combatant = {
     side: "them",
     disposition,
-    state: "steady",
+    state: initialState(disposition.resolveBase, ctx.config.expedition.morale),
     resolve: disposition.resolveBase,
-    lastDecidedTick: ctx.tick,
+    // Staggered by their place in the cast, as the planner staggers (call 9).
+    lastDecidedTick: ctx.tick - (index % Math.max(1, every)),
   };
   state.actors[id] = actor;
   const weaponId =
@@ -366,7 +374,7 @@ export const scenarioStartExpedition: CommandHandler<"scenarioStartExpedition", 
   },
   apply(ctx, command, plan) {
     swapToSite(ctx, plan);
-    const castIds = plan.cast.map((entry) => spawnCast(ctx, plan, entry));
+    const castIds = plan.cast.map((entry, i) => spawnCast(ctx, plan, entry, i));
     const expedition: Expedition = {
       siteId: plan.siteId,
       phase: "mustering",
@@ -405,7 +413,7 @@ export const adoptPlan: CommandHandler<"adoptPlan", AdoptPlan> = {
     if (expedition.plan !== undefined) {
       return fail(kind, "preconditionFailed", `the plan is already "${expedition.plan.id}"`);
     }
-    const chosen = chosenPlan(ctx, command.payload.planId);
+    const chosen = chosenPlan(ctx, command.payload.planId, expedition.siteId);
     if (typeof chosen === "string") return fail(kind, "preconditionFailed", chosen);
     return ok({ plan: chosen, ...partyOf(ctx, chosen) });
   },

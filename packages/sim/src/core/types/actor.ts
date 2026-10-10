@@ -146,6 +146,8 @@ export interface Combatant {
   lastDecidedTick: Tick;
   cover?: TileCoord;
   aim?: { targetId: ActorId; sinceTick: Tick };
+  /** Expeditions A1 (W2): already took `morale.outflanked` this fight (it lands once). */
+  outflanked?: true;
 }
 
 /** SD §11.1 availability. Sleeping is an activity, not an availability state. */

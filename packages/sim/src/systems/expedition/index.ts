@@ -5,12 +5,24 @@
  * spatial and before `work.execute`.
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
+import type { CombatDeps } from "./combat";
 import { adoptPlan, scenarioStartExpedition, withdrawParty } from "./command";
-import { expeditionSystem } from "./expedition";
+import { expeditionSystem, makeExpeditionSystem } from "./expedition";
 
-export function registerExpedition(registry: KernelRegistry): Unregister {
+/**
+ * Register the expedition's commands and system. `options.applyDamage` replaces the damage entry
+ * point (`systems/bodies/damage.ts` `applyDamage`) for tests; hosts pass nothing.
+ */
+export function registerExpedition(
+  registry: KernelRegistry,
+  options: Partial<CombatDeps> = {},
+): Unregister {
+  const system =
+    options.applyDamage === undefined
+      ? expeditionSystem
+      : makeExpeditionSystem({ applyDamage: options.applyDamage });
   const unregister = [
-    registry.registerSystem(expeditionSystem),
+    registry.registerSystem(system),
     registry.registerCommandHandler("scenarioStartExpedition", scenarioStartExpedition),
     registry.registerCommandHandler("adoptPlan", adoptPlan),
     registry.registerCommandHandler("withdrawParty", withdrawParty),
@@ -21,7 +33,9 @@ export function registerExpedition(registry: KernelRegistry): Unregister {
 }
 
 export { adoptPlan, scenarioStartExpedition, withdrawParty } from "./command";
-export { expeditionSystem, orderWithdrawal } from "./expedition";
+export type { CombatDeps, DamageFn } from "./combat";
+export { expeditionSystem, makeExpeditionSystem, orderWithdrawal } from "./expedition";
+export { inCover, lineOfSight } from "./los";
 export { fightLabel, musterLabel } from "./labels";
 export { type LockerWeapon, handOutMuster, lockerWeapons, musterPlan, runArm } from "./muster";
 export { DEFAULT_PLANS, fitToGo, squadFor } from "./plans";
