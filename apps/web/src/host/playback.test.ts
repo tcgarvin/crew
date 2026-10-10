@@ -1,6 +1,20 @@
-import type { PortDefId, RenderFrame, RenderImpact, Tick } from "@crew/sim";
+import type {
+  PortDefId,
+  RenderExpedition,
+  RenderFrame,
+  RenderImpact,
+  RenderShot,
+  Tick,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { FramePlayback, interpolateFrame, interpolateTravel, lerp, lerpAngle } from "./playback";
+import {
+  FramePlayback,
+  interpolateFrame,
+  interpolateTravel,
+  lerp,
+  lerpAngle,
+  mergeShots,
+} from "./playback";
 
 function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
   return {
@@ -325,5 +339,42 @@ describe("interpolateFrame and the asteroid field (§rock-impacts)", () => {
     const step = playback.advance(320);
     expect(step?.viewTick).toBe(6);
     expect(step?.frame.impacts.map((i) => i.tick)).toEqual([2, 4]);
+  });
+});
+
+describe("interpolateFrame and the fight (expeditions A1, §8.6)", () => {
+  function shot(tick: number, toX: number, hit: boolean): RenderShot {
+    return { tick: tick as Tick, fromX: 1, fromY: 1, toX, toY: 4, hit };
+  }
+  const header = (them: RenderExpedition["them"]): RenderExpedition => ({
+    phase: "fight",
+    us: "steady",
+    them,
+  });
+
+  it("keeps both frames' shots while blending, each once", () => {
+    const prev = { ...frame(0, 0, 0), shots: [shot(0, 3, false)] };
+    const next = { ...frame(2, 0, 0), shots: [shot(0, 3, false), shot(2, 5, true)] };
+    expect(interpolateFrame(prev, next, 0.5).shots).toEqual([shot(0, 3, false), shot(2, 5, true)]);
+    expect(mergeShots([shot(1, 2, true)], [])).toEqual([shot(1, 2, true)]);
+  });
+
+  it("snaps the expedition's header to the next frame, and drops it when the next has none", () => {
+    const prev = { ...frame(0, 0, 0), expedition: header("steady") };
+    const next = { ...frame(2, 0, 0), expedition: header("breaking") };
+    expect(interpolateFrame(prev, next, 0.1).expedition?.them).toBe("breaking");
+    expect(interpolateFrame(prev, frame(2, 0, 0), 0.1).expedition).toBeUndefined();
+  });
+
+  it("carries the shots of frames playback skipped onto the frame it shows", () => {
+    const playback = new FramePlayback(20);
+    playback.push(frame(0, 0, 0));
+    playback.push({ ...frame(2, 0, 0), shots: [shot(2, 3, true)] });
+    playback.push({ ...frame(4, 0, 0), shots: [shot(4, 6, false)] });
+    playback.push(frame(6, 0, 0));
+    playback.push(frame(8, 0, 0));
+    const step = playback.advance(320);
+    expect(step?.viewTick).toBe(6);
+    expect(step?.frame.shots.map((s) => s.tick)).toEqual([2, 4]);
   });
 });

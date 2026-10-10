@@ -5,7 +5,14 @@
  * interpolation math is unit-testable; `runPlaybackLoop` is the thin `requestAnimationFrame`
  * driver used in the browser.
  */
-import type { RenderActor, RenderFrame, RenderImpact, RenderLocal, RenderTravel } from "@crew/sim";
+import type {
+  RenderActor,
+  RenderFrame,
+  RenderImpact,
+  RenderLocal,
+  RenderShot,
+  RenderTravel,
+} from "@crew/sim";
 
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -29,13 +36,20 @@ export function lerpAngle(a: number, b: number, t: number): number {
  * it is interpolated within one stage of one leg and snaps otherwise. Per §field-lifecycle and
  * §hull-scars-and-ship-loss, the hull, the alert and the field snap to `next` too; impacts are
  * events, not state, so both frames' are kept (`mergeImpacts`) and none is lost to the blend.
+ * Expeditions A1 (§8.6): shots are events too and accumulate the same way (`mergeShots`); the
+ * expedition's header snaps to `next`.
  */
 export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number): RenderFrame {
   const clamped = Math.max(0, Math.min(1, t));
   // §travel-stages: the dock comes and goes with a stage change, so it snaps to `next` like the
   // doors; an optional field cannot ride the base spread, which would keep `prev`'s dock for a
   // frame.
-  const { dock: _prevDock, field: _prevField, ...base } = clamped >= 1 ? next : prev;
+  const {
+    dock: _prevDock,
+    field: _prevField,
+    expedition: _prevExpedition,
+    ...base
+  } = clamped >= 1 ? next : prev;
   const prevById = new Map(prev.actors.map((a) => [a.id, a] as const));
   const actors: RenderActor[] = next.actors.map((na) => {
     const pa = prevById.get(na.id);
@@ -55,6 +69,7 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     ...base,
     ...(next.dock === undefined ? {} : { dock: next.dock }),
     ...(next.field === undefined ? {} : { field: next.field }),
+    ...(next.expedition === undefined ? {} : { expedition: next.expedition }),
     tick: Math.round(lerp(prev.tick, next.tick, clamped)),
     actors,
     machines: next.machines,
@@ -71,7 +86,20 @@ export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number
     hull: next.hull,
     alert: next.alert,
     impacts: mergeImpacts(prev.impacts, next.impacts),
+    shots: mergeShots(prev.shots, next.shots),
   };
+}
+
+/** `a` then whichever of `b` it does not already hold (same tick and ends is the same shot). */
+export function mergeShots(
+  a: readonly RenderShot[],
+  b: readonly RenderShot[],
+): readonly RenderShot[] {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+  const key = (s: RenderShot) => `${s.tick}:${s.fromX},${s.fromY}>${s.toX},${s.toY}`;
+  const seen = new Set(a.map(key));
+  return [...a, ...b.filter((s) => !seen.has(key(s)))];
 }
 
 /** `a` then whichever of `b` it does not already hold (same tick and centre is the same impact). */
@@ -193,9 +221,9 @@ export class FramePlayback {
     const msPerTick = 1000 / this.tickRate;
 
     // Drop fully-consumed leading intervals (handles a burst of buffered frames or a speed jump).
-    // §rock-impacts: a dropped frame's impacts ride on to the frame shown, so a flash is never
-    // skipped.
-    let skipped: readonly RenderImpact[] = [];
+    // §rock-impacts: a dropped frame's impacts (and shots) ride on to the frame shown, so a flash
+    // or a tracer is never skipped.
+    let skipped: Skipped = NOTHING_SKIPPED;
     while (this.buffer.length > 2) {
       const first = this.buffer[0];
       const second = this.buffer[1];
@@ -204,32 +232,47 @@ export class FramePlayback {
       if (this.elapsedMs < intervalMs) break;
       this.elapsedMs -= intervalMs;
       this.buffer.shift();
-      skipped = mergeImpacts(skipped, first.impacts);
+      skipped = {
+        impacts: mergeImpacts(skipped.impacts, first.impacts),
+        shots: mergeShots(skipped.shots, first.shots),
+      };
     }
 
     const a = this.buffer[0];
     const b = this.buffer[1];
     if (!a || !b) {
-      return a ? { frame: withImpacts(a, skipped), viewTick: a.tick } : undefined;
+      return a ? { frame: withSkipped(a, skipped), viewTick: a.tick } : undefined;
     }
     const intervalMs = Math.max(1, (b.tick - a.tick) * msPerTick);
     if (this.elapsedMs >= intervalMs) {
       this.buffer.shift();
       this.elapsedMs = 0;
-      return { frame: withImpacts(b, skipped), viewTick: b.tick };
+      return { frame: withSkipped(b, skipped), viewTick: b.tick };
     }
     const t = this.elapsedMs / intervalMs;
     return {
-      frame: withImpacts(interpolateFrame(a, b, t), skipped),
+      frame: withSkipped(interpolateFrame(a, b, t), skipped),
       viewTick: Math.round(lerp(a.tick, b.tick, t)),
     };
   }
 }
 
-/** `frame` with `earlier` impacts ahead of its own; the same object when there are none. */
-function withImpacts(frame: RenderFrame, earlier: readonly RenderImpact[]): RenderFrame {
-  if (earlier.length === 0) return frame;
-  return { ...frame, impacts: mergeImpacts(earlier, frame.impacts) };
+/** The events of frames playback dropped unshown, to ride on to the frame it shows. */
+interface Skipped {
+  readonly impacts: readonly RenderImpact[];
+  readonly shots: readonly RenderShot[];
+}
+
+const NOTHING_SKIPPED: Skipped = { impacts: [], shots: [] };
+
+/** `frame` with `earlier` events ahead of its own; the same object when there are none. */
+function withSkipped(frame: RenderFrame, earlier: Skipped): RenderFrame {
+  if (earlier.impacts.length === 0 && earlier.shots.length === 0) return frame;
+  return {
+    ...frame,
+    impacts: mergeImpacts(earlier.impacts, frame.impacts),
+    shots: mergeShots(earlier.shots, frame.shots),
+  };
 }
 
 export interface PlaybackLoopHandle {

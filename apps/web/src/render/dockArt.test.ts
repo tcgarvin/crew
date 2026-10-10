@@ -18,7 +18,7 @@ import { loadWebContent } from "../worker/content";
 import { cameraBounds } from "./camera";
 import { buildDeckLayout } from "./deckLayout";
 import { berthInView, clampEngagement, dockInView, shipInDock } from "./dock";
-import { drawDock, drawDockForeground } from "./dockArt";
+import { coverLookOf, drawDock, drawDockForeground } from "./dockArt";
 import { PROP_DRAWERS, drawProp } from "./dockProps";
 import { dockShape, dockSurface } from "./dockShape";
 import { CREW_DOT_COLOR, computeFitTransform, drawFrame, shouldRotate } from "./draw";
@@ -351,6 +351,57 @@ describe("dockShape", () => {
     }
     // Every map has a quay edge the ramps come down onto.
     for (const dock of allDocks) expect(dockShape(dock).quay.length, dock.id).toBeGreaterThan(0);
+  });
+
+  it("draws a landing site as ground, not a dock: a pad, loose shingle, fields below (§4)", () => {
+    const site = docks["dock.boathouse" as DockDef["id"]];
+    if (site === undefined) throw new Error("no Boathouse");
+    const shape = dockShape(site);
+    expect(shape.site).toBe(true);
+    expect(shape.berthStyle).toBe("pad");
+    expect(dockSurface(shape, settingOf(site))).toEqual({
+      floorPattern: "shingle",
+      overSky: false,
+    });
+    // The crates on the apron and the net racks in the shed are cover runs.
+    expect(shape.runs.cover.map((r) => [r.y, r.x0, r.x1])).toEqual([
+      [21, 20, 22],
+      [21, 30, 32],
+      [25, 13, 15],
+      [25, 22, 24],
+    ]);
+    expect(coverLookOf("n")).toBe("nets");
+    expect(coverLookOf("c")).toBe("crates");
+    // No dock is a site.
+    for (const dock of allDocks)
+      if (dock !== site) expect(dockShape(dock).site, dock.id).toBe(false);
+  });
+
+  it("draws the site's cover and no quay stripe, and marks a tapped site post", () => {
+    const site = docks["dock.boathouse" as DockDef["id"]];
+    if (site === undefined) throw new Error("no Boathouse");
+    const berth = berthInView(site, layout);
+    const paint = {
+      origin: { x: -berth.shipAt.x, y: -berth.shipAt.y },
+      ship: shipInDock(berth, layout),
+      alpha: 1,
+      clamps: 1,
+      px: 0.05,
+      view: { minX: -10, minY: -10, maxX: 60, maxY: 40 },
+      enclosure: 1,
+      setting: settingOf(site),
+    };
+    const plain = mockCanvas();
+    drawDock(plain.ctx, site, paint);
+    // Without the cover runs the same map draws fewer strokes: the nets and crates are there.
+    const bare = mockCanvas();
+    drawDock(bare.ctx, { ...site, legend: { ...site.legend, c: "floor", n: "floor" } }, paint);
+    expect(plain.calls.get("stroke") ?? 0).toBeGreaterThan(bare.calls.get("stroke") ?? 0);
+    // A site has no quay: the hazard stripe's clip never happens.
+    expect(plain.calls.get("clip") ?? 0).toBe(4);
+    const tapped = mockCanvas();
+    drawDock(tapped.ctx, site, { ...paint, selectedPostKey: "east_door" });
+    expect(tapped.calls.get("arc") ?? 0).toBeGreaterThan(plain.calls.get("arc") ?? 0);
   });
 
   /** A 40×26 map with an M box at (2,2) and 4 rows of quay, `ring` round the box's other sides. */

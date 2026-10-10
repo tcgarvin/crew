@@ -36,10 +36,18 @@ export interface FloorEdge {
  */
 export type BerthStyle = "pad" | "open";
 
-/** Floor surface: station plating, pier boards (a planet berth open to the sky), or slabs. */
-export type FloorPattern = "plates" | "planks" | "slabs";
+/**
+ * Floor surface: station plating, pier boards (a planet berth open to the sky), slabs, or a landing
+ * site's loose ground (expeditions A1, §4: no quay was ever built there).
+ */
+export type FloorPattern = "plates" | "planks" | "slabs" | "shingle";
 
 export interface DockShape {
+  /**
+   * Expeditions A1 (§4): a landing site (`DockDef.kind: "site"`), not a dock: the ship sits on the
+   * ground, so there is no quay structure and the berth always reads as a pad.
+   */
+  readonly site: boolean;
   /** Row-major tile kinds, `width × height`. */
   readonly kinds: readonly DockTileKind[];
   readonly runs: Readonly<Record<DockTileKind, readonly TileRun[]>>;
@@ -179,11 +187,13 @@ export function dockShape(dock: DockDef): DockShape {
   const kinds = tileKinds(dock);
   const runs = rowRuns(kinds, width, height);
   const berth = berthBox(dock);
+  const site = dock.kind === "site";
   const shape: DockShape = {
+    site,
     kinds,
     runs,
     berth,
-    berthStyle: surroundShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
+    berthStyle: site || surroundShare(kinds, width, height, berth) >= 0.5 ? "pad" : "open",
     quay: edgesToFloor(kinds, width, height, (x, y) => inBox(berth, x, y)),
     lips: edgesToFloor(
       kinds,
@@ -207,14 +217,18 @@ export interface DockSurface {
 }
 
 export function dockSurface(
-  shape: Pick<DockShape, "berthStyle">,
+  shape: Pick<DockShape, "berthStyle" | "site">,
   setting: PortSetting,
 ): DockSurface {
   const overSky = setting === "planet" && shape.berthStyle === "open";
-  return {
-    floorPattern: setting === "station" ? "plates" : overSky ? "planks" : "slabs",
-    overSky,
-  };
+  const floorPattern: FloorPattern = shape.site
+    ? "shingle"
+    : setting === "station"
+      ? "plates"
+      : overSky
+        ? "planks"
+        : "slabs";
+  return { floorPattern, overSky };
 }
 
 /** The tile kind at dock tile (x, y), or `void` off the map. */

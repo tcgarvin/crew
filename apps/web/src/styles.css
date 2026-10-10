@@ -212,6 +212,19 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Expeditions A1 (§8.6): the shore header leads the headline at a site; the alert's tint. */
+.headline-alert {
+  background: #3a1214;
+  border-bottom-color: var(--danger);
+}
+.headline-shore {
+  font-weight: 800;
+  color: #ffd27a;
+}
+.headline-alert .headline-shore {
+  color: #ff8a7e;
+}
+
 /* ---------------------------------------------------------------- main area */
 
 /*
@@ -557,6 +570,10 @@ body {
 /* D79: mood as a word, and the thoughts behind it. */
 .inspector-mood {
   text-transform: capitalize;
+}
+/* Expeditions A1 (§8.6): a hurt body line stands out from "unhurt". */
+.inspector-hurt {
+  color: #ff8a7e;
 }
 .inspector-mood-low {
   color: #e8846f;

@@ -22,6 +22,7 @@ import { decisionShownTick, describeEvent } from "@crew/sim";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
+import { devExpeditionCommand, devExpeditionFromSearch } from "./host/devExpedition";
 import { DirtQueue } from "./host/dirtQueue";
 import {
   type NarratorFailure,
@@ -62,6 +63,7 @@ import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { personWords } from "./ui/actorWords";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
+import { bodyLine } from "./ui/bodyWords";
 import { clockSections, shipClock } from "./ui/clock";
 import { dockInspection } from "./ui/dockInspection";
 import { gatheringLine } from "./ui/gathering";
@@ -520,9 +522,26 @@ export function App() {
     const grace = new Promise<undefined>((resolve) =>
       setTimeout(() => resolve(undefined), SERVER_OPEN_GRACE_MS),
     );
+    // Dev only: `?expedition=<siteId>[&plan=<planId>]` starts a fresh game set down at that site,
+    // so a reload replays the fight rather than restoring the save it left behind.
+    const devExpedition = import.meta.env.DEV
+      ? devExpeditionFromSearch(window.location.search)
+      : undefined;
     void Promise.all([readLocalSave(), Promise.race([serverOpen, grace])]).then(
       ([local, opened]) => {
         if (disposed) return;
+        if (devExpedition !== undefined) {
+          connection.send({
+            type: "load",
+            source: { kind: "scenario", scenarioId, seed: Math.floor(Math.random() * 1_000_000) },
+          });
+          const command = devExpeditionCommand(devExpedition);
+          const requestId = nextRequestId();
+          // Toasted on rejection like a player's command: a mistyped site or plan should show.
+          playerCommands.current.set(requestId, command.kind);
+          connection.send({ type: "command", requestId, command });
+          return;
+        }
         const chosen = newerSave(local, opened?.headSave);
         if (chosen) {
           connection.send({ type: "load", source: { kind: "save", envelope: chosen } });
@@ -602,13 +621,34 @@ export function App() {
           (msg) => {
             if (msg.type === "agentViewResult") {
               const view = msg.view as AgentViewSnapshot;
-              setInspectorData({
-                kind: "actor",
-                view,
-                ...(label === undefined ? {} : { label }),
-                person: personWords(view, bundle.thoughts, config.values.mood),
-                weighing: msg.weighing,
-              });
+              const { weighing } = msg;
+              // Expeditions A1 (§8.6): where they are hurt is on the actor's body, not in their
+              // view, so the body line reads the snapshot at the tick the view came from.
+              request(
+                connection,
+                (snapshotId) => ({
+                  type: "requestSnapshotAt",
+                  requestId: snapshotId,
+                  tick: msg.tick,
+                }),
+                (snap) => {
+                  if (snap.type !== "snapshot" && snap.type !== "error") return;
+                  const actor = snap.type === "snapshot" ? snap.state.actors[actorId] : undefined;
+                  if (actor === undefined) {
+                    console.warn(`[inspector] no body for ${actorId} at tick ${msg.tick}`);
+                  }
+                  setInspectorData({
+                    kind: "actor",
+                    view,
+                    ...(label === undefined ? {} : { label }),
+                    person: personWords(view, bundle.thoughts, config.values.mood),
+                    weighing,
+                    ...(actor === undefined
+                      ? {}
+                      : { body: bodyLine(actor.body, actor.availability) }),
+                  });
+                },
+              );
             } else if (msg.type === "error") {
               setInspectorData(undefined);
             }
@@ -737,7 +777,11 @@ export function App() {
         health={health}
         onNewGame={onNewGame}
       />
-      <Headline text={frame?.headline ?? ""} />
+      <Headline
+        text={frame?.headline ?? ""}
+        {...(frame?.expedition === undefined ? {} : { expedition: frame.expedition })}
+        alert={frame?.alert ?? false}
+      />
       <TravelBar stage={travelState} progress={frame?.travel.progress ?? 0} />
       {stale && (
         <div className="stale-banner" role="alert">

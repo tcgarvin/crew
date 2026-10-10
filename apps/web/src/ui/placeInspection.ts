@@ -27,6 +27,19 @@ const POST_ROLE: Readonly<Record<DockPostKind, string>> = {
   bystander: "Somebody who is not part of this.",
 };
 
+/**
+ * Expeditions A1 (§4): what kind of spot a landing site's post is, for the subtitle, since nothing
+ * is drawn there to say so.
+ */
+const SITE_POST_KIND: Readonly<Partial<Record<DockPostKind, string>>> = {
+  target: "the objective",
+  guard: "a guard post",
+  loot: "the loot",
+  exit: "the way out",
+  flank: "the flank",
+  bystander: "a bystander's spot",
+};
+
 function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -45,9 +58,12 @@ export function inspectPlace(
   target: { readonly kind: "post" | "dock"; readonly id: string },
 ): PlaceInspection {
   if (target.kind === "dock") {
-    return { title: dock.name, subtitle: "the dock", text: dock.ambience };
+    const subtitle = dock.kind === "site" ? "the landing site" : "the dock";
+    return { title: dock.name, subtitle, text: dock.ambience };
   }
   const post = dock.posts.find((p) => p.key === target.id);
   if (post === undefined) throw new Error(`Dock "${dock.id}" has no post "${target.id}"`);
-  return { title: postTitle(post.name), subtitle: dock.name, text: POST_ROLE[post.kind] };
+  const kind = SITE_POST_KIND[post.kind];
+  const subtitle = kind === undefined ? dock.name : `${capitalise(kind)} · ${dock.name}`;
+  return { title: postTitle(post.name), subtitle, text: POST_ROLE[post.kind] };
 }
