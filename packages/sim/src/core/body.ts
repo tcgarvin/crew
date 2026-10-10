@@ -6,18 +6,41 @@
  * `bodyCapacities` for `SelfView.body` (the planner may not import systems, so the formulas live
  * here).
  *
- * SD §12.2's aggregation at A1's minimum: a part's function is `1 − damage / tolerance`, clamped;
- * movement is the mean of the two leg chains, manipulation of the two arm chains (a chain is the
- * limb alone: no hands or feet yet); consciousness is the weakest of the head, the blood above the
- * death floor and the stun debt, eased by pain (pain at 1 halves it). A whole body is 1 across, so
- * nothing changes until someone is hurt. Owner after the gate: W1 of expeditions A1 (bodies), who
- * may add helpers but keeps the formulas here.
+ * SD §12.2 names the aggregation but gives no numbers; A1's formulas, all here:
+ *
+ * - A part's function is `clamp(1 − damage / tolerance, 0, 1)`, where a part's damage is the sum
+ *   of its open wounds' damage (`woundDamage`).
+ * - Movement is the mean of the two leg chains' function, manipulation of the two arm chains' (a
+ *   chain is the limb alone: no hands or feet yet). One `serious` leg wound (1.2 against 2) leaves
+ *   that leg at 0.4 and movement at 0.7; two on one arm leave it at 0 and manipulation at 0.5.
+ * - Consciousness is the weakest of the head's function, the blood term (blood above the death
+ *   floor as a share of the way to full: `(blood − deadBelowBlood) / (1 − deadBelowBlood)`) and
+ *   `1 − stun`, times the pain term `1 − pain / 2` (pain at 1 halves it). Two stun hits (0.5 each)
+ *   put it at 0; it is back above a 0.3 floor once stun is down to 0.7.
+ * - Death is a threshold, never a timer (SD §12.4): head or torso damage at or past tolerance, or
+ *   blood below `deadBelowBlood`. Incapacity is consciousness or movement below its floor.
+ * - A wound bleeds when it is a `blaster` `serious` or `grave` (`bleedsOnHit`), for
+ *   `bleedStopsAfterSeconds` from its tick; then it heals, losing `healPerDay` of its severity's
+ *   damage a day (a `serious` one is gone two days after it stops). A `stun` wound has no damage
+ *   and closes when the body's stun is back to 0.
+ *
+ * A whole body is 1 across, so nothing changes until someone is hurt. Owner after the gate: W1 of
+ * expeditions A1 (bodies).
  */
-import type { Actor, Body, Capacities } from "./types/actor";
+import type { Actor, Body, Capacities, Wound } from "./types/actor";
 import type { DeepReadonly } from "./types/common";
-import { BODY_PARTS, type BodyPart, type ConfigDef } from "./types/content";
+import type { Tick } from "./types/common";
+import {
+  BODY_PARTS,
+  type BodyPart,
+  type ConfigDef,
+  type DamageType,
+  type WoundSeverity,
+} from "./types/content";
 
 type BodiesConfig = Pick<ConfigDef, "bodies">;
+/** What the wound clock reads: the body's rates and the tick rate and day length. */
+export type WoundClockConfig = Pick<ConfigDef, "bodies" | "time">;
 /** What `applyCapacities` reads: fatigue's curve and the body's tolerances. */
 export type CapacityConfig = Pick<ConfigDef, "bodies" | "urgency" | "movement">;
 
@@ -148,4 +171,38 @@ export function incapacityOf(
   }
   if (capacities.movement < floors.movement) return "movement";
   return undefined;
+}
+
+/** A fresh wound of this type and severity bleeds: a `blaster` `serious` or `grave`. */
+export function bleedsOnHit(type: DamageType, severity: WoundSeverity): boolean {
+  return type === "blaster" && (severity === "serious" || severity === "grave");
+}
+
+/**
+ * The tick a wound stops bleeding on its own and starts to heal: `bleedStopsAfterSeconds` after
+ * it was made for one that bled, at once for one that never did. (First aid, phase B, will stop a
+ * bleed early and must record when; A1's bleeds only stop on this clock.)
+ */
+export function woundHealsFromTick(
+  wound: DeepReadonly<Pick<Wound, "tick" | "type" | "severity">>,
+  config: WoundClockConfig,
+): Tick {
+  if (!bleedsOnHit(wound.type, wound.severity)) return wound.tick;
+  return wound.tick + config.bodies.bleedStopsAfterSeconds[wound.severity] * config.time.tickRate;
+}
+
+/**
+ * The damage `wound` still does at `tick`: its severity's full damage until it starts to heal,
+ * then less by `healPerDay` of that a day, down to 0. A `stun` wound does none.
+ */
+export function woundDamage(
+  wound: DeepReadonly<Pick<Wound, "tick" | "type" | "severity">>,
+  tick: Tick,
+  config: WoundClockConfig,
+): number {
+  if (wound.type === "stun") return 0;
+  const full = config.bodies.severityDamage[wound.severity];
+  const healingTicks = Math.max(0, tick - woundHealsFromTick(wound, config));
+  const days = healingTicks / config.time.tickRate / config.time.daySeconds;
+  return Math.max(0, full * (1 - config.bodies.healPerDay * days));
 }
