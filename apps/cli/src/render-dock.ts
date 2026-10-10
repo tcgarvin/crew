@@ -11,6 +11,7 @@ import {
   type DockRect,
   HULL_SIZE_BOX,
   type PortDef,
+  type SiteCastEntryDef,
   type TileCoord,
   berthPlacement,
 } from "@crew/sim";
@@ -31,6 +32,18 @@ const AREA_CHAR: Readonly<Record<DockDef["areas"][number]["kind"], string>> = {
 
 const POST_CHARS = "123456789abcefghijklmnopqrtuwyz";
 
+/** The characters naming posts on this map: never one its legend also uses (a site's cover). */
+function postChars(dock: DockDef): string {
+  return [...POST_CHARS].filter((ch) => dock.legend[ch] === undefined).join("");
+}
+
+/** A map character: cover keeps the legend's own (`c` crates, `n` net racks), the rest are fixed. */
+function baseChar(dock: DockDef, ch: string): string {
+  const kind = dock.legend[ch];
+  if (kind === "cover") return ch;
+  return BASE_CHAR[kind ?? ""] ?? "?";
+}
+
 function rectTiles(rect: DockRect): TileCoord[] {
   const tiles: TileCoord[] = [];
   for (let y = rect.y; y < rect.y + rect.h; y++) {
@@ -50,9 +63,7 @@ function berthRect(dock: DockDef): DockRect {
 
 /** The map grid with the ship, areas, props, landings and posts drawn in, plus rulers. */
 function compositeMap(dock: DockDef, deck: DeckDef): string[] {
-  const grid = dock.rows.map((row) =>
-    [...row].map((ch) => BASE_CHAR[dock.legend[ch] ?? ""] ?? "?"),
-  );
+  const grid = dock.rows.map((row) => [...row].map((ch) => baseChar(dock, ch)));
   const put = (t: TileCoord, ch: string) => {
     const row = grid[t.y];
     if (row !== undefined && t.x >= 0 && t.x < row.length) row[t.x] = ch;
@@ -71,7 +82,8 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
     for (const t of rectTiles(prop.rect)) put(t, prop.blocking ? "%" : ":");
   }
   for (const landing of dockRampLandings(dock, deck)) put(landing.tile, "v");
-  dock.posts.forEach((post, i) => put(post.tile, POST_CHARS[i] ?? "*"));
+  const chars = postChars(dock);
+  dock.posts.forEach((post, i) => put(post.tile, chars[i] ?? "*"));
 
   const xs = [...Array(dock.width).keys()];
   const tens = xs.map((x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : " ")).join("");
@@ -83,6 +95,29 @@ function compositeMap(dock: DockDef, deck: DeckDef): string[] {
   ];
 }
 
+const ARMS_TEXT: Readonly<Record<SiteCastEntryDef["arms"], string>> = {
+  none: "unarmed",
+  melee: "melee",
+  blaster: "blaster",
+};
+
+/** A site's notice radius and default cast (§5.3), one line a person; nothing for a dock. */
+function castLines(dock: DockDef): string[] {
+  if (dock.kind !== "site") return [];
+  const cast = dock.defaultCast ?? [];
+  const radius = dock.noticeRadius === undefined ? "none" : `${dock.noticeRadius} tiles`;
+  return [
+    "",
+    `Notice radius: ${radius}`,
+    "",
+    `Default cast (${cast.length}):`,
+    ...cast.map(
+      (e) =>
+        `  ${e.name}, ${e.role} ("${e.look}"): ${e.part} at ${e.post}, ${ARMS_TEXT[e.arms]}, resolve ${e.resolve}, tie ${e.tie}, wants ${e.wants}`,
+    ),
+  ];
+}
+
 /**
  * Renders the dock map with each deck docked in its berth box (one map per deck), and every
  * post, area, prop and landing listed.
@@ -91,7 +126,8 @@ export function renderDock(dock: DockDef, decks: readonly DeckDef[], port: PortD
   const lines: string[] = [];
   const box = berthRect(dock);
   lines.push(`${dock.name} (${dock.id})`);
-  lines.push(`${port.setting} dock for ${port.name} (${port.id})`);
+  const what = dock.kind === "site" ? "landing site" : "dock";
+  lines.push(`${port.setting} ${what} for ${port.name} (${port.id})`);
   lines.push(
     `${dock.width} x ${dock.height} tiles; ${dock.berth.sizeClass} berth box ${box.w} x ${box.h} at (${box.x},${box.y})`,
   );
@@ -108,13 +144,22 @@ export function renderDock(dock: DockDef, decks: readonly DeckDef[], port: PortD
   lines.push("  =  berth box tile no ship floor covers");
   lines.push("  v  ramp landing     s  freight staging     d  delivery bay");
   lines.push("  %  blocking prop    :  prop you can walk past    1-9  posts (below)");
+  const cover = Object.keys(dock.legend).filter((ch) => dock.legend[ch] === "cover");
+  if (cover.length > 0) {
+    lines.push(`  ${cover.join(" ")}  cover (not walkable; shelters whoever crouches beside it)`);
+  }
   lines.push("");
   lines.push(`Posts (${dock.posts.length}):`);
+  const chars = postChars(dock);
   dock.posts.forEach((post, i) => {
     const regulars = port.castSeed.filter((seed) => seed.post === post.key).map((s) => s.name);
-    const who = regulars.length > 0 ? `; regular: ${regulars.join(", ")}` : "";
+    const cast = (dock.defaultCast ?? []).filter((e) => e.post === post.key).map((e) => e.name);
+    const who = [
+      regulars.length > 0 ? `; regular: ${regulars.join(", ")}` : "",
+      cast.length > 0 ? `; cast: ${cast.join(", ")}` : "",
+    ].join("");
     lines.push(
-      `  ${POST_CHARS[i] ?? "*"}  ${post.key}: ${post.kind}, ${post.name}, at (${post.tile.x},${post.tile.y}) facing ${post.facing}${who}`,
+      `  ${chars[i] ?? "*"}  ${post.key}: ${post.kind}, ${post.name}, at (${post.tile.x},${post.tile.y}) facing ${post.facing}${who}`,
     );
   });
   for (const deck of decks) {
@@ -124,6 +169,7 @@ export function renderDock(dock: DockDef, decks: readonly DeckDef[], port: PortD
       lines.push(`  ${landing.key}: (${landing.tile.x},${landing.tile.y})`);
     }
   }
+  lines.push(...castLines(dock));
   lines.push("");
   lines.push(`Areas (${dock.areas.length}):`);
   for (const area of dock.areas) {

@@ -199,6 +199,96 @@ describe("dock map validation", () => {
   });
 });
 
+const BOATHOUSE = "dock.boathouse";
+
+/** The authored bundle with the Boathouse site map edited; returns every issue message. */
+function siteMessagesAfter(edit: (dock: MutableDock) => void): string[] {
+  return messagesAfter((_hub, raw) => edit(raw.docks?.[BOATHOUSE] as MutableDock));
+}
+
+type Post = DockDef["posts"][number];
+
+describe("site map validation (expeditions A1, call 10)", () => {
+  it("accepts the Boathouse, whose flank meets the direct route only beside the target", () => {
+    expect(siteMessagesAfter(() => {})).toEqual([]);
+  });
+
+  it("needs exactly one target and one exit and at least one guard", () => {
+    const messages = siteMessagesAfter((dock) => {
+      dock.posts = dock.posts.filter((p) => p.kind !== "exit" && p.kind !== "guard");
+      dock.defaultCast = (dock.defaultCast ?? []).filter((e) => e.part !== "guard");
+    });
+    expect(messages).toContainEqual(
+      expect.stringContaining("a site needs exactly 1 exit post, found 0"),
+    );
+    expect(messages).toContainEqual(
+      expect.stringContaining("a site needs at least 1 guard post, found 0"),
+    );
+  });
+
+  it("rejects a flank whose only way into the shed is the direct route's door", () => {
+    const messages = siteMessagesAfter((dock) => {
+      // Shut the west door (10,26) and the north wall's west door (16,22): the east door is left.
+      setTile(dock, 10, 26, "#");
+      setTile(dock, 16, 22, "#");
+    });
+    expect(messages).toContainEqual(
+      expect.stringContaining(
+        'flank post "west_door" at (8,26) reaches the target only along the direct route from ramp "personnel_ramp" of "deck.freighter_mk2"',
+      ),
+    );
+  });
+
+  it("rejects a cast of seven", () => {
+    const messages = siteMessagesAfter((dock) => {
+      const pell = dock.defaultCast?.find((e) => e.part === "bystander");
+      if (pell === undefined) throw new Error("the Boathouse has no bystander");
+      const extra = [1, 2, 3].map((n) => ({ ...pell, name: `Netter ${n}` }));
+      dock.defaultCast = [...(dock.defaultCast ?? []), ...extra];
+    });
+    expect(messages).toContainEqual(expect.stringContaining("7 people; at most 6"));
+  });
+
+  it("rejects a target at a guard post", () => {
+    const messages = siteMessagesAfter((dock) => {
+      dock.defaultCast = (dock.defaultCast ?? []).map((e) =>
+        e.part === "target" ? { ...e, post: "east_door" } : e,
+      );
+    });
+    expect(messages).toContainEqual(
+      expect.stringContaining('Corran Vale is a target, at a target post, not "east_door" (guard)'),
+    );
+  });
+
+  it("rejects a notice radius as wide as the map", () => {
+    const messages = siteMessagesAfter((dock) => {
+      dock.noticeRadius = 44;
+    });
+    expect(messages).toContainEqual(
+      expect.stringContaining("noticeRadius 44 is not under the map's width 44"),
+    );
+  });
+
+  it("lets a port's dock carry a bench and site post kinds, and ignores them", () => {
+    const messages = messagesAfter((dock) => {
+      const at = (key: string, kind: Post["kind"]): Post => ({
+        key,
+        kind,
+        name: key,
+        tile: PERSONNEL_LANDING,
+        facing: "n",
+      });
+      dock.posts = [
+        ...dock.posts.filter((p) => p.kind !== "bench"),
+        at("bench", "bench"),
+        at("odd_target", "target"),
+        at("odd_flank", "flank"),
+      ];
+    });
+    expect(messages).toEqual([]);
+  });
+});
+
 describe("berth box against hull classes (§orientation-and-size)", () => {
   it("leaves a deck whose class is bigger than the box out of the dock's landing checks", () => {
     const messages = messagesAfter((_dock, raw) => {
