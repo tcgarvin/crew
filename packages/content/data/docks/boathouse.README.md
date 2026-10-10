@@ -36,15 +36,15 @@ Freighter Mk2 (deck.freighter_mk2) docked at (4,0)
 18     EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
 19     EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
 20 .................v....................v.....
-21 ..:.................cc........cc.......:....
+21 ..:.................cc.................:....
 22 ..........######.#########.#####............
 23 ..........#.%%.................#.%%%........
 24 ..........#.....4.........3....#.%%%........
 25 ..........#..nn.......nn.......#............
-26 ........7......................#        ..
-27 ..........#..........12......5.#        ..
+26 7.......8.............5........#        ..
+27 ..........#..........12......6.#        ..
 28           #....................#        ..
-29           ######################        .6
+29           ######################        ..
 
 Freighter Mk1 (deck.freighter_mk1) docked at (6,2)
 
@@ -71,15 +71,15 @@ Freighter Mk1 (deck.freighter_mk1) docked at (6,2)
 18     ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 19     ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 20 ........................v..........v........
-21 ..:.................cc........cc.......:....
+21 ..:.................cc.................:....
 22 ..........######.#########.#####............
 23 ..........#.%%.................#.%%%........
 24 ..........#.....4.........3....#.%%%........
 25 ..........#..nn.......nn.......#............
-26 ........7......................#        ..
-27 ..........#..........12......5.#        ..
+26 7.......8.............5........#        ..
+27 ..........#..........12......6.#        ..
 28           #....................#        ..
-29           ######################        .6
+29           ######################        ..
 
 Key:
   .  floor     #  wall     (blank)  void     A-Z  the ship (deck symbols)
@@ -88,14 +88,15 @@ Key:
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
   c n  cover (not walkable; shelters whoever crouches beside it)
 
-Posts (7):
+Posts (8):
   1  target: target, the keeper's bench, at (21,27) facing n; cast: Corran Vale
   2  loot: loot, the strongbox shelf, at (22,27) facing n
-  3  east_door: guard, the east door, at (26,24) facing n; cast: Hesk Marrow
+  3  east_door: guard, the east door, at (26,24) facing n
   4  west_door_inside: guard, inside the west door, at (16,24) facing n; cast: Darrow Finch
-  5  net_bench: bystander, the net bench, at (29,27) facing w; cast: Old Pell
-  6  jetty_end: exit, the jetty, at (41,29) facing s
-  7  west_door: flank, the west door, at (8,26) facing e
+  5  bench_end: guard, the end of the bench, at (22,26) facing n; cast: Hesk Marrow
+  6  net_bench: bystander, the net bench, at (29,27) facing w; cast: Old Pell
+  7  shingle_path: exit, the shingle path, at (0,26) facing w
+  8  west_door: flank, the west door, at (8,26) facing e
 
 Ramp landings (deck.freighter_mk2):
   personnel_ramp: (38,20)
@@ -105,11 +106,11 @@ Ramp landings (deck.freighter_mk1):
   personnel_ramp: (35,20)
   cargo_ramp: (24,20)
 
-Notice radius: 6 tiles
+Notice radius: 4 tiles
 
 Default cast (4):
   Corran Vale, boat-shed keeper ("grey, wiry, never still"): target at target, unarmed, resolve steady, tie bound, wants out
-  Hesk Marrow, hired hand ("big, bored, a blaster across his knees"): guard at east_door, blaster, resolve steady, tie paid, wants money
+  Hesk Marrow, hired hand ("big, bored, a blaster across his knees"): guard at bench_end, blaster, resolve steady, tie paid, wants money
   Darrow Finch, the keeper's nephew ("young, trying to look hard"): guard at west_door_inside, melee, resolve shaky, tie bound, wants out
   Old Pell, net mender ("deaf, or pretending"): bystander at net_bench, unarmed, resolve shaky, tie paid, wants nothing
 

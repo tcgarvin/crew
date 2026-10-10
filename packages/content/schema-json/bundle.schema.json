@@ -6952,6 +6952,14 @@
               "type": "number",
               "exclusiveMinimum": 0
             },
+            "targetBoltsAfterSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "guardSearchAfterSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
             "alertClearSeconds": {
               "type": "number",
               "minimum": 0
@@ -7216,6 +7224,8 @@
             "maxFightSeconds",
             "contactAfterSeconds",
             "maxApproachSeconds",
+            "targetBoltsAfterSeconds",
+            "guardSearchAfterSeconds",
             "alertClearSeconds",
             "hitSkillBase",
             "hitPerFighting",

@@ -1902,6 +1902,16 @@ export interface ConfigDef {
     readonly contactAfterSeconds: Seconds;
     /** An approach with no contact this long after the party is ashore ends `timedOut`. */
     readonly maxApproachSeconds: Seconds;
+    /**
+     * A target who wants out keeps low this long after contact, then makes for the exit (unless
+     * cornered first): the party's window to take them.
+     */
+    readonly targetBoltsAfterSeconds: Seconds;
+    /**
+     * A steady guard with no party member in sight this long after contact leaves the post to
+     * find a line to them (ruling 2).
+     */
+    readonly guardSearchAfterSeconds: Seconds;
     /** The alert stands this long after the fight resolves. */
     readonly alertClearSeconds: Seconds;
     readonly hitSkillBase: number;

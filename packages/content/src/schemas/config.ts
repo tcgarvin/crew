@@ -382,6 +382,8 @@ export const configDefSchema = z.strictObject({
     maxFightSeconds: positive,
     contactAfterSeconds: positive,
     maxApproachSeconds: positive,
+    targetBoltsAfterSeconds: nonNegative,
+    guardSearchAfterSeconds: nonNegative,
     alertClearSeconds: nonNegative,
     hitSkillBase: nonNegative,
     hitPerFighting: nonNegative,

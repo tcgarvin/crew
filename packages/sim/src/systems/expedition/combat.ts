@@ -10,7 +10,8 @@
  * or ally notices a party member on the site floor within `noticeRadius` they can see (half the
  * radius for someone whose resolve starts below `waverBelow`: the shaky are not watching; W2
  * decision, so `creep` can work against a shaky cast); the first shot; or (ruling 1) the party
- * ashore `contactAfterSeconds` under any posture but `creep`.
+ * ashore `contactAfterSeconds` under any posture but `creep`; or a creeper beside the objective
+ * (they spring: the taking needs no guard within two tiles, so one there makes it a fight).
  *
  * **A decision** moves resolve by the interval's terms (after contact; `morale.ts`), then picks
  * what to do by side, part and state:
@@ -18,18 +19,20 @@
  *   member beside them) or unarmed; the party `retreat` aboard by the ramp.
  * - The party by posture (`plans.ts` `postureMode`): `press` (`fire` at what is in sight and in
  *   range, standing within three tiles, else while they `advance` on the objective); `hold`
- *   (`takeCover` at their cover spot by the ramp, `fire`, else `guardPassage`); `flank`'s small
- *   group `advance`s to the flank post first; `bait`'s leader walks in on the nearest guard and
- *   does not fire; `creep` keeps to tiles nobody would notice. Wavering, they do not advance.
+ *   (`takeCover` at their cover spot by the ramp, `fire`, else `guardPassage`; a baton waits at
+ *   the head of the ramp, out of the shooting, and `hold` presses once no cast member who shoots
+ *   is left); `flank`'s small group `advance`s to the flank post first; `bait`'s leader walks in
+ *   on the nearest guard and does not fire; `creep` keeps to tiles nobody would notice.
+ *   Wavering, they do not advance.
  *   `rescue` comes first for whoever is nearest a down ally in sight with no armed enemy in sight.
  *   After the objective is held, everyone falls back to the ramp foot.
  * - Guards: at their post until contact; then `fire` at the party in sight and range, a wavering
- *   one `takeCover` first; a devoted one closes in; with nobody in sight ten seconds after contact
- *   a steady guard moves to a spot that sees the nearest party member (ruling 2); else
- *   `guardPassage` at the post. A baton needs adjacency (`melee`).
- * - The target (ruling 4): a target who wants out `retreat`s to the exit at contact unless a party
- *   member is beside them; one who wants blood fights if armed. A bystander gets clear at the
- *   first shot.
+ *   one `takeCover` first; a devoted one closes in; with nobody in sight
+ *   `guardSearchAfterSeconds` after contact a steady guard moves to a spot that sees the nearest
+ *   party member (ruling 2); else `guardPassage` at the post. A baton needs adjacency (`melee`).
+ * - The target (ruling 4): a target who wants out keeps low for `targetBoltsAfterSeconds` after
+ *   contact, then `retreat`s to the exit, unless a party member is beside them; one who wants
+ *   blood fights if armed. A bystander gets clear at the first shot.
  *
  * **Fire selection** (ruling 5): the party fires only at armed cast who can still fight (never a
  *   bystander, never the unarmed target, never someone running); the cast at any party member up.
@@ -94,8 +97,6 @@ const REPOSITION_STEPS = 12;
 const HOLD_SHIFT_STEPS = 2;
 /** How far off their post a guard steps to cover the way in, in steps. */
 const GUARD_STEPS = 3;
-/** Ruling 2: a guard with nobody in sight this long after contact goes looking. */
-const REPOSITION_AFTER_SECONDS = 10;
 /** A presser stops to shoot within this many tiles of their mark. */
 const STAND_AND_SHOOT_TILES = 3;
 /** "At the ramp": this close to its foot. */
@@ -459,16 +460,31 @@ function noticed(fight: Fight): boolean {
   return false;
 }
 
-/** Contact by noticing, or (ruling 1) by the party standing ashore long enough. */
+/**
+ * Contact by noticing, by (ruling 1) the party standing ashore long enough, or by a creeper
+ * springing: beside the objective unnoticed, they show themselves (a guard still within reach of
+ * it means the taking is a fight at arm's length).
+ */
 export function checkContact(fight: Fight): void {
   const { ctx, expedition } = fight;
   if (expedition.phase !== "approach") return;
   const since = expedition.approachTick;
+  const creeping = fight.plan?.posture === "creep";
   const loud =
-    fight.plan?.posture !== "creep" &&
+    !creeping &&
     since !== undefined &&
     ctx.tick - since >= configTicks(ctx.config, ctx.config.expedition.contactAfterSeconds);
-  if (loud || noticed(fight)) startFight(fight);
+  if (loud || noticed(fight) || (creeping && sprung(fight))) startFight(fight);
+}
+
+/** Is a party member standing beside the objective? */
+function sprung(fight: Fight): boolean {
+  return fight.people.some((p) => {
+    if (!isParty(p) || !standingInFight(fight, p)) return false;
+    const at = tileOfActor(fight.ctx.state, p);
+    const goal = at === undefined ? undefined : objectiveTile(fight, at);
+    return at !== undefined && goal !== undefined && adjacent8(at, goal);
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -622,8 +638,16 @@ function modeOf(fight: Fight, person: Actor): PostureMode {
     state: fight.ctx.state,
     expedition: fight.expedition,
     actorId: person.id,
-    armedCastLeft: fight.people.some((p) => !isParty(p) && fairGame(fight, p)),
+    armedCastLeft: fight.people.some((p) => !isParty(p) && shootsBack(fight, p)),
   });
+}
+
+/**
+ * Cast who keep `hold` holding: armed with something that reaches past arm's length. A baton
+ * out of sight cannot pin the party at the ramp, so it does not freeze `hold`.
+ */
+function shootsBack(fight: Fight, other: Actor): boolean {
+  return fairGame(fight, other) && (heldWeapon(fight.ctx, other)?.range ?? 0) > 1;
 }
 
 function partyTurn(fight: Fight, person: Actor, from: TileCoord, enemies: readonly Seen[]): void {
@@ -722,14 +746,23 @@ function pressTurn(
   if (mark === undefined) setLabel(person, to === undefined ? "pinned" : "advancing");
 }
 
-/** `hold`: the spot this holder takes, by their place among the holders. */
+/**
+ * `hold`: the spot this holder takes, by their place among the holders who can shoot (a baton
+ * waits at the head of the ramp: `holdTurn`).
+ */
 function holdSpot(fight: Fight, person: Actor): TileCoord {
   const { ground } = fight;
   const threat = ground.posts.target ?? ground.foot;
   const spots = coverSpots(ground, threat, 4);
   const holders = fight.expedition.party.filter((id) => {
     const p = fight.ctx.state.actors[id];
-    return p !== undefined && p.combatant !== undefined && canAct(p.combatant) && inFight(p);
+    return (
+      p !== undefined &&
+      p.combatant !== undefined &&
+      canAct(p.combatant) &&
+      inFight(p) &&
+      shoots(fight, p)
+    );
   });
   const index = holders.indexOf(person.id);
   return spots[index] ?? ground.foot;
@@ -753,11 +786,24 @@ function holdTurn(fight: Fight, person: Actor, from: TileCoord, mark: Seen | und
     setLabel(person, "firing");
     return;
   }
+  lowerAim(person);
+  if (!shoots(fight, person)) {
+    // Nothing to hold the line with: a baton waits at the head of the ramp, out of the shooting,
+    // until `hold` presses.
+    const there = from.x === ground.top.x && from.y === ground.top.y;
+    if (!there) goTo(ctx, person, ground.top);
+    setLabel(person, there ? "holding the ramp" : "back to the ramp");
+    return;
+  }
   const spot = holdSpot(fight, person);
   const there = from.x === spot.x && from.y === spot.y;
   if (!there) goTo(ctx, person, spot);
-  lowerAim(person);
   setLabel(person, there ? "in cover" : "taking cover");
+}
+
+/** Can `person` hit anyone past arm's length? */
+function shoots(fight: Fight, person: Actor): boolean {
+  return (weaponOf(fight, person)?.range ?? 0) > 1;
 }
 
 function toFlank(fight: Fight, person: Actor, from: TileCoord, firing: boolean): void {
@@ -802,10 +848,26 @@ function creepTurn(fight: Fight, person: Actor, from: TileCoord): void {
   const path =
     searchPath(ground, from, reach, { avoid: (t) => isWatched(watched, t) }) ??
     searchPath(ground, from, reach);
-  // A waypoint a few tiles along the quiet route, so the walk keeps to it.
-  const next = path?.[Math.min(2, path.length - 1)];
+  const next = path === undefined ? undefined : quietWaypoint(from, path);
   if (next !== undefined) goTo(ctx, person, next);
   setLabel(person, "creeping in");
+}
+
+/**
+ * A waypoint up to three tiles along the quiet route, but only as far as it runs straight: the
+ * walker's own route to a waypoint round a bend may cut the corner across a watched tile.
+ */
+function quietWaypoint(from: TileCoord, path: readonly TileCoord[]): TileCoord | undefined {
+  const first = path[0];
+  if (first === undefined) return undefined;
+  const dx = first.x - from.x;
+  const dy = first.y - from.y;
+  let at = first;
+  for (const tile of path.slice(1, 3)) {
+    if (tile.x - at.x !== dx || tile.y - at.y !== dy) break;
+    at = tile;
+  }
+  return at;
 }
 
 /** `rescue`: the nearest able party member goes for a down ally in sight and drags them out. */
@@ -926,8 +988,8 @@ function guardTurn(fight: Fight, person: Actor, from: TileCoord, enemies: readon
   const party = nearestPartyTile(fight, from);
   if (combatant.state === "steady" && weapon.range > 1 && party !== undefined) {
     // `guardPassage`: cover the way in from a step or two off the post; ruling 2: with nobody
-    // in sight ten seconds after contact, go further to find a line to them.
-    const lookAfter = configTicks(ctx.config, REPOSITION_AFTER_SECONDS);
+    // in sight `guardSearchAfterSeconds` after contact, go further to find a line to them.
+    const lookAfter = configTicks(ctx.config, ctx.config.expedition.guardSearchAfterSeconds);
     const started = expedition.fightStartedTick ?? ctx.tick;
     const far = ctx.tick - started >= lookAfter;
     const spot = spotSeeing(
@@ -974,6 +1036,13 @@ function targetTurn(fight: Fight, person: Actor, from: TileCoord, enemies: reado
   if (combatant.disposition.wants !== "out" || exit === undefined || beside) {
     halt(ctx, person);
     setLabel(person, beside ? "cornered" : "keeping still");
+    return;
+  }
+  const started = expedition.fightStartedTick ?? ctx.tick;
+  const boltAfter = configTicks(ctx.config, ctx.config.expedition.targetBoltsAfterSeconds);
+  if (ctx.tick - started < boltAfter) {
+    halt(ctx, person);
+    setLabel(person, "keeping low");
     return;
   }
   goTo(ctx, person, exit);

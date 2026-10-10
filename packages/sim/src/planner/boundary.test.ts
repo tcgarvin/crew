@@ -138,6 +138,8 @@ const config: PlannerConfig = {
     maxFightSeconds: 120,
     contactAfterSeconds: 15,
     maxApproachSeconds: 90,
+    targetBoltsAfterSeconds: 60,
+    guardSearchAfterSeconds: 10,
     alertClearSeconds: 60,
     hitSkillBase: 0.7,
     hitPerFighting: 0.06,

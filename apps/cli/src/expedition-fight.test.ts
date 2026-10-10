@@ -1,8 +1,9 @@
 /**
  * Expeditions A1 (W2): the fight at the Boathouse on the real content and the full registry. Bounds
- * over a few seeds, never one fight's events: `hold` and `assault` end differently (the target
- * slips out along the jetty past a party that holds; an assault takes him, sooner), nobody dies
- * often, every fight resolves, and `creep` against a shaky cast takes the target unnoticed.
+ * over a few seeds, never one fight's events: `hold` and `assault` end differently (an assault
+ * takes the target, sooner; against a cast too shaky to come out, a party that holds watches him
+ * slip away by the shingle path), nobody dies often, every fight resolves, and `creep` against a
+ * shaky cast reaches the target unnoticed and takes him.
  */
 import { describe, expect, it } from "vitest";
 import { type FightRecord, runFight } from "./expedition-fight-fixture";
@@ -24,8 +25,8 @@ describe("the fight at the Boathouse (expeditions A1)", () => {
       expect(["targetTaken", "targetFled"]).toContain(record.outcome);
       expect(record.toContact).toBeDefined();
     }
-    expect(share(hold, "targetFled")).toBeGreaterThanOrEqual(2 / 3);
     expect(share(assault, "targetTaken")).toBeGreaterThanOrEqual(2 / 3);
+    expect(share(fights("hold-lethal-armed", "shaky"), "targetFled")).toBeGreaterThanOrEqual(2 / 3);
     expect(mean(assault.map((r) => r.seconds))).toBeLessThan(mean(hold.map((r) => r.seconds)));
     expect(mean([...hold, ...assault].map((r) => r.deadUs))).toBeLessThanOrEqual(0.25);
     for (const record of hold) {
@@ -35,7 +36,7 @@ describe("the fight at the Boathouse (expeditions A1)", () => {
     }
   }, 60_000);
 
-  it("takes the target unnoticed by creeping in on a shaky cast", () => {
+  it("reaches the target unnoticed by creeping in on a shaky cast, and takes him", () => {
     const creep = fights("creep-lethal-armed", "shaky");
     expect(creep.filter((r) => r.quiet).length / creep.length).toBeGreaterThanOrEqual(0.5);
     expect(share(creep, "targetTaken")).toBeGreaterThanOrEqual(0.5);

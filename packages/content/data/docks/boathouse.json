@@ -34,7 +34,7 @@
     "                                            ",
     "                                            ",
     "............................................",
-    "....................cc........cc............",
+    "....................cc......................",
     "..........######.#########.#####............",
     "..........#....................#............",
     "..........#....................#............",
@@ -100,6 +100,16 @@
       "facing": "n"
     },
     {
+      "key": "bench_end",
+      "kind": "guard",
+      "name": "the end of the bench",
+      "tile": {
+        "x": 22,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
       "key": "net_bench",
       "kind": "bystander",
       "name": "the net bench",
@@ -110,14 +120,14 @@
       "facing": "w"
     },
     {
-      "key": "jetty_end",
+      "key": "shingle_path",
       "kind": "exit",
-      "name": "the jetty",
+      "name": "the shingle path",
       "tile": {
-        "x": 41,
-        "y": 29
+        "x": 0,
+        "y": 26
       },
-      "facing": "s"
+      "facing": "w"
     },
     {
       "key": "west_door",
@@ -204,7 +214,7 @@
   "ambience": "Gulls on the shed roof, the tide pulling at the jetty piles, and nobody in sight who wants to be.",
   "grime": 0.6,
   "airborneDust": 0.4,
-  "noticeRadius": 6,
+  "noticeRadius": 4,
   "defaultCast": [
     {
       "name": "Corran Vale",
@@ -226,7 +236,7 @@
       "resolve": "steady",
       "tie": "paid",
       "wants": "money",
-      "post": "east_door"
+      "post": "bench_end"
     },
     {
       "name": "Darrow Finch",

@@ -254,8 +254,7 @@ describe("crew expeditions: CI bounds on the default cast (ruling 13)", () => {
     expect(assault.outcomes.targetTaken).toBeGreaterThanOrEqual(0.6);
   });
 
-  // enabled after the tuning commit
-  it.skip("hold costs fewer wounds and assault ends sooner", () => {
+  it("hold costs fewer wounds and assault ends sooner", () => {
     const hold = summaryOf("hold-lethal-armed");
     const assault = summaryOf("assault-lethal-armed");
     expect(woundsPerFight(hold)).toBeLessThanOrEqual(0.75 * woundsPerFight(assault));

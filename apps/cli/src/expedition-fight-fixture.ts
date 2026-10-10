@@ -32,7 +32,10 @@ export interface FightRecord {
   readonly deadUs: number;
   readonly deadThem: number;
   readonly downUs: number;
-  /** The objective was held before anyone noticed the party. */
+  /**
+   * The party reached the objective before anyone noticed them: it was held before contact, or
+   * contact came with a party member already beside the target (a creeper springing).
+   */
   readonly quiet: boolean;
   readonly fled: readonly string[];
   readonly surrendered: readonly string[];
@@ -91,12 +94,16 @@ export function runFight(
   const surrendered: string[] = [];
   const lines: string[] = [];
   const party = new Set<string>();
+  let sprang = false;
   for (let t = 0; t < cap && resolved === undefined; ) {
     const result = kernel.advance(world, 20);
     t += Math.max(1, result.ticksAdvanced);
     for (const event of result.events) {
       if (event.type === "expeditionStarted") for (const id of event.payload.party) party.add(id);
-      if (event.type === "expeditionContact") contactTick = event.tick;
+      if (event.type === "expeditionContact") {
+        contactTick = event.tick;
+        sprang = partyBesideTarget(world, party);
+      }
       if (event.type === "shotFired") {
         if (party.has(event.payload.byActorId)) shotsUs += 1;
         else shotsThem += 1;
@@ -137,11 +144,33 @@ export function runFight(
     woundsThem: resolved?.woundsThem ?? 0,
     deadUs: resolved?.deadUs ?? 0,
     deadThem: resolved?.deadThem ?? 0,
-    quiet: objective !== undefined && (contact === undefined || objective < contact),
+    quiet: objective !== undefined && (contact === undefined || objective < contact || sprang),
     downUs: members.filter((a) => a?.availability === "incapacitated").length,
     fled,
     surrendered,
     lines,
     world,
   };
+}
+
+/**
+ * Is a party member standing beside the target now? Read just after the advance that brought
+ * contact, so a step or two late: a creeper who sprang is still there, taking him.
+ */
+function partyBesideTarget(world: World, party: ReadonlySet<string>): boolean {
+  const tileOf = (id: string) => {
+    const location = world.state.actors[id as ActorId]?.location;
+    return location?.kind === "onDeck"
+      ? { x: Math.floor(location.x), y: Math.floor(location.y) }
+      : undefined;
+  };
+  const target = Object.values(world.state.actors).find(
+    (a) => a.combatant?.disposition.part === "target",
+  );
+  const at = target === undefined ? undefined : tileOf(target.id);
+  if (at === undefined) return false;
+  return [...party].some((id) => {
+    const tile = tileOf(id);
+    return tile !== undefined && Math.max(Math.abs(tile.x - at.x), Math.abs(tile.y - at.y)) <= 1;
+  });
 }

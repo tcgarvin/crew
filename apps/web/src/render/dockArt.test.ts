@@ -366,7 +366,6 @@ describe("dockShape", () => {
     // The crates on the apron and the net racks in the shed are cover runs.
     expect(shape.runs.cover.map((r) => [r.y, r.x0, r.x1])).toEqual([
       [21, 20, 22],
-      [21, 30, 32],
       [25, 13, 15],
       [25, 22, 24],
     ]);

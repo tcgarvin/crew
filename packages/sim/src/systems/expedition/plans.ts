@@ -138,7 +138,10 @@ export interface PostureInput {
   readonly state: ReadonlyWorldState;
   readonly expedition: DeepReadonly<Expedition>;
   readonly actorId: ActorId;
-  /** Is any armed cast member still able to fight (not down, gone, running or given up)? */
+  /**
+   * Is any cast member armed beyond arm's length still able to fight (not down, gone, running or
+   * given up)? A baton does not count: it cannot pin a party holding at the ramp.
+   */
   readonly armedCastLeft: boolean;
 }
 
