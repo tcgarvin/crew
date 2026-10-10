@@ -9,6 +9,7 @@
  * The render frame is truth (D7: the player's map shows truth) but only what the canvas needs.
  */
 import type {
+  Availability,
   Capacities,
   CombatantState,
   FactType,
@@ -21,6 +22,7 @@ import type {
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
 import type {
   ActivityDef,
+  BodyPart,
   CargoClass,
   DeckDef,
   DirtTier,
@@ -31,6 +33,7 @@ import type {
   RoleTag,
   SkillLevels,
   ToolKind,
+  WoundSeverity,
 } from "./content";
 import type { Significance } from "./events";
 import type {
@@ -100,15 +103,26 @@ export interface WatchView {
   readonly gangway?: true;
 }
 
+/** Expeditions A1 (§7.1): one open wound as its bearer knows it: where, how bad, and bleeding. */
+export interface WoundView {
+  readonly part: BodyPart;
+  readonly severity: WoundSeverity;
+  readonly bleeding: boolean;
+}
+
 /**
  * Expeditions A1 (§7.1): what someone knows of their own body: the body's capacities alone
  * (`core/body.ts` `bodyCapacities`, before fatigue), whether a wound is open, and whether one
- * bleeds.
+ * bleeds; the open wounds that hurt (not the stun hits, which `stunned` stands for), whether they
+ * are still reeling from stun (`STUNNED_ABOVE`), and whether they are up, down or dead.
  */
 export interface BodyView {
   readonly capacities: Readonly<Capacities>;
   readonly wounded: boolean;
   readonly bleeding: boolean;
+  readonly wounds: readonly WoundView[];
+  readonly stunned: boolean;
+  readonly availability: Availability;
 }
 
 /** The actor's own state: they always know their body, needs and what they carry. */
@@ -120,6 +134,10 @@ export interface SelfView {
   readonly capacities: Readonly<Capacities>;
   /** Expeditions A1: their body. */
   readonly body: BodyView;
+  /** Their crew def's `bio`: for a site's cast, their role there ("boat-shed keeper"). */
+  readonly bio: string;
+  /** Expeditions A1 (§8.2): their side and state in a fight; absent outside one. */
+  readonly combatant?: { readonly side: "us" | "them"; readonly state: CombatantState };
   readonly skills: SkillLevels;
   readonly traits: readonly TraitDefId[];
   readonly mood: number;

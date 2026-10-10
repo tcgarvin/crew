@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SESSION_PLATE_CHARS,
   activityShortLabel,
+  firstName,
   sessionMemberIds,
   sessionPlateText,
 } from "./sessions";
@@ -27,6 +28,18 @@ function session(over: Readonly<Record<string, unknown>>): RenderSession {
     ...over,
   } as unknown as RenderSession;
 }
+
+describe("firstName", () => {
+  it("takes the first word of a name", () => {
+    expect(firstName("Jax Okonkwo")).toBe("Jax");
+    expect(firstName("Pell")).toBe("Pell");
+  });
+
+  it("skips a leading title or epithet for the name after it", () => {
+    expect(firstName("Old Pell")).toBe("Pell");
+    expect(firstName("Sister Aurelie Doucet")).toBe("Aurelie");
+  });
+});
 
 describe("sessionMemberIds", () => {
   it("collects every member of every session", () => {

@@ -6,6 +6,7 @@ import {
   rosterRole,
   thoughtText,
 } from "./actorWords";
+import { bodyLine } from "./bodyWords";
 import type { LocalInspection } from "./localInspection";
 import type { PlaceInspection } from "./placeInspection";
 
@@ -18,8 +19,6 @@ export type InspectorData =
       readonly person: PersonWords;
       /** §what-a-crew-member-weighs: what they are weighing and what they will do next. */
       readonly weighing: WeighingWords;
-      /** Expeditions A1 (§8.6): `bodyLine`; absent when the snapshot had no body for them. */
-      readonly body?: string;
     }
   | {
       readonly kind: "machine";
@@ -86,7 +85,6 @@ export function Inspector({ data, onClose }: InspectorProps) {
             label={data.label}
             person={data.person}
             weighing={data.weighing}
-            body={data.body}
           />
         )}
         {data.kind === "machine" && (
@@ -105,15 +103,16 @@ function ActorInspector({
   label,
   person,
   weighing,
-  body,
 }: {
   view: AgentViewSnapshot;
   label?: string | undefined;
   person: PersonWords;
   weighing: WeighingWords;
-  body?: string | undefined;
 }) {
   const self = view.self;
+  const body = bodyLine(self.body);
+  // Expeditions A1 (§5.1): a site's cast member has no watch, needs or work of ours to show.
+  if (self.combatant?.side === "them") return <CastInspector view={view} body={body} />;
   // Passengers stand no watch (passengers §3.2): the bill and the helm are the crew's.
   const crew = self.passenger !== true;
   return (
@@ -123,12 +122,7 @@ function ActorInspector({
       <dl className="inspector-grid">
         <dt>Activity</dt>
         <dd>{label ?? self.activity.kind}</dd>
-        {body !== undefined && (
-          <>
-            <dt>Body</dt>
-            <dd className={body === "unhurt" ? undefined : "inspector-hurt"}>{body}</dd>
-          </>
-        )}
+        <BodyRow body={body} />
         {crew && (
           <>
             <dt>Watch</dt>
@@ -203,6 +197,40 @@ function ActorInspector({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Expeditions A1 (§8.6): the body line, marked when they are hurt. */
+function BodyRow({ body }: { body: string }) {
+  return (
+    <>
+      <dt>Body</dt>
+      <dd className={body === "unhurt" ? undefined : "inspector-hurt"}>{body}</dd>
+    </>
+  );
+}
+
+/**
+ * Expeditions A1 (§5.1, §8.6): one of a site's cast: who they are, their role there, their body and
+ * where they stand in the fight. They stand no watch and plan no work of ours, so the crew's
+ * sections are left out.
+ */
+function CastInspector({ view, body }: { view: AgentViewSnapshot; body: string }) {
+  const self = view.self;
+  return (
+    <div>
+      <h2>{self.name}</h2>
+      <p className="inspector-subtitle">{self.bio}</p>
+      <dl className="inspector-grid">
+        <BodyRow body={body} />
+        {self.combatant !== undefined && (
+          <>
+            <dt>State</dt>
+            <dd>{self.combatant.state}</dd>
+          </>
+        )}
+      </dl>
     </div>
   );
 }

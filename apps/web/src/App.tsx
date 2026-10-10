@@ -63,7 +63,6 @@ import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { personWords } from "./ui/actorWords";
 import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
-import { bodyLine } from "./ui/bodyWords";
 import { clockSections, shipClock } from "./ui/clock";
 import { dockInspection } from "./ui/dockInspection";
 import { gatheringLine } from "./ui/gathering";
@@ -621,34 +620,13 @@ export function App() {
           (msg) => {
             if (msg.type === "agentViewResult") {
               const view = msg.view as AgentViewSnapshot;
-              const { weighing } = msg;
-              // Expeditions A1 (§8.6): where they are hurt is on the actor's body, not in their
-              // view, so the body line reads the snapshot at the tick the view came from.
-              request(
-                connection,
-                (snapshotId) => ({
-                  type: "requestSnapshotAt",
-                  requestId: snapshotId,
-                  tick: msg.tick,
-                }),
-                (snap) => {
-                  if (snap.type !== "snapshot" && snap.type !== "error") return;
-                  const actor = snap.type === "snapshot" ? snap.state.actors[actorId] : undefined;
-                  if (actor === undefined) {
-                    console.warn(`[inspector] no body for ${actorId} at tick ${msg.tick}`);
-                  }
-                  setInspectorData({
-                    kind: "actor",
-                    view,
-                    ...(label === undefined ? {} : { label }),
-                    person: personWords(view, bundle.thoughts, config.values.mood),
-                    weighing,
-                    ...(actor === undefined
-                      ? {}
-                      : { body: bodyLine(actor.body, actor.availability) }),
-                  });
-                },
-              );
+              setInspectorData({
+                kind: "actor",
+                view,
+                ...(label === undefined ? {} : { label }),
+                person: personWords(view, bundle.thoughts, config.values.mood),
+                weighing: msg.weighing,
+              });
             } else if (msg.type === "error") {
               setInspectorData(undefined);
             }

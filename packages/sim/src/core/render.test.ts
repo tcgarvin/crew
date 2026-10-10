@@ -116,6 +116,18 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Docked at Tiny Dock — looking for work");
   });
 
+  it("says the ship is set down at a landing site, with no work to look for", () => {
+    const { world } = tinyTestWorld();
+    const content = world.content;
+    const port = content.ports[TINY.port];
+    if (port === undefined) throw new Error("tiny content has no port");
+    const siteContent = {
+      ...content,
+      ports: { ...content.ports, [TINY.port]: { ...port, kind: "site" as const } },
+    };
+    expect(headline(world.state, siteContent)).toBe("Set down at Tiny Dock");
+  });
+
   it("waits for a passenger ashore by name, ahead of the planned course home", () => {
     const { world } = tinyTestWorld();
     const passage: JobPassage = { actorId: "a1" as never, roundTrip: true, leg: "ashore" };

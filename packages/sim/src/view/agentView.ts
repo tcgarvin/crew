@@ -28,8 +28,9 @@
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
  * of the following tick. Backoff and blockage `retryAfterTick`s compare against this tick.
  */
-import { bodyCapacities } from "../core/body";
+import { STUNNED_ABOVE, bodyCapacities } from "../core/body";
 import { watchOfDay } from "../core/clock";
+import { findCrewDef } from "../core/defs";
 import { isOnDock } from "../core/docks";
 import { affinitiesFrom } from "../core/social";
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
@@ -196,6 +197,9 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
   const tile = onDeck ? tileOf(location) : undefined;
   const compartmentId = onDeck ? compartmentAt(geometry, location.x, location.y) : undefined;
   const berth = berthOf(state, actor.id, geometry.deckId);
+  const crewDef = findCrewDef(world.content, state, actor.defId);
+  if (crewDef === undefined)
+    throw new Error(`AgentView: no crew def ${actor.defId} for ${actor.id}`);
   return {
     id: actor.id,
     name: actor.name,
@@ -207,7 +211,16 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
       capacities: bodyCapacities(actor.body, config),
       wounded: actor.body.wounds.length > 0,
       bleeding: actor.body.wounds.some((w) => w.bleeding),
+      wounds: actor.body.wounds
+        .filter((w) => w.type !== "stun")
+        .map((w) => ({ part: w.part, severity: w.severity, bleeding: w.bleeding })),
+      stunned: actor.body.stun > STUNNED_ABOVE,
+      availability: actor.availability,
     },
+    bio: crewDef.bio,
+    ...(actor.combatant === undefined
+      ? {}
+      : { combatant: { side: actor.combatant.side, state: actor.combatant.state } }),
     skills: actor.skills,
     traits: actor.traits,
     mood: actor.mood,

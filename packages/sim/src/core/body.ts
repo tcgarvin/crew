@@ -46,6 +46,12 @@ export type CapacityConfig = Pick<ConfigDef, "bodies" | "urgency" | "movement">;
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
+/**
+ * Stun (consciousness debt) above which someone is still reeling from a stun hit; it decays slowly,
+ * so a trace left minutes after the hit is not worth a word (the inspector's "stunned").
+ */
+export const STUNNED_ABOVE = 0.05;
+
 /** A whole body: no damage, full blood, no pain or stun, no wounds. */
 export function wholeBody(): Body {
   const parts = {} as Record<BodyPart, { damage: number }>;

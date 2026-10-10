@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { STUNNED_ABOVE } from "../core/body";
+import type { WoundId } from "../core/types/ids";
 import {
   JON,
   MARA,
@@ -53,5 +55,34 @@ describe("AgentView", () => {
     expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
     expect(snapshot.self.id).toBe(MARA);
     expect(snapshot.facts.length).toBeGreaterThan(0);
+  });
+
+  it("gives their own wounds (not the stun hits), whether they are stunned, and the fight (§7.1)", () => {
+    const tw = crewWorld();
+    const { world, kernel } = tw;
+    const mara = world.state.actors[MARA];
+    if (mara === undefined) throw new Error("no Mara");
+    const at = { tick: 0, bleeding: false, severity: "serious" } as const;
+    mara.body.wounds.push(
+      { ...at, id: "w1" as WoundId, part: "rightLeg", type: "blaster", bleeding: true },
+      { ...at, id: "w2" as WoundId, part: "leftArm", type: "stun" },
+    );
+    mara.body.stun = STUNNED_ABOVE * 2;
+    const body = kernel.getAgentView(world, MARA).self.body;
+    expect(body.wounds).toEqual([{ part: "rightLeg", severity: "serious", bleeding: true }]);
+    expect(body.stunned).toBe(true);
+    expect(body.availability).toBe("available");
+    expect(kernel.getAgentView(world, MARA).self.combatant).toBeUndefined();
+    mara.combatant = {
+      side: "us",
+      disposition: { part: "ally", resolveBase: 0.6, loyalty: 1, wants: "nothing" },
+      state: "wavering",
+      resolve: 0.4,
+      lastDecidedTick: 0,
+    };
+    expect(kernel.getAgentView(world, MARA).self.combatant).toEqual({
+      side: "us",
+      state: "wavering",
+    });
   });
 });

@@ -25,9 +25,29 @@ export function activityShortLabel(label: string): string {
   return label.replace(/^playing /, "");
 }
 
-/** "Jax Okonkwo" → "Jax". */
+/**
+ * Words that lead a name as a title or epithet rather than as the name itself ("Old Pell", "Sister
+ * Aurelie Doucet"): the label skips them for the word after.
+ */
+const NAME_TITLES: ReadonlySet<string> = new Set([
+  "Old",
+  "Young",
+  "Big",
+  "Little",
+  "Sister",
+  "Brother",
+  "Mother",
+  "Father",
+  "Doc",
+  "Captain",
+]);
+
+/** "Jax Okonkwo" → "Jax"; a leading title is skipped: "Old Pell" → "Pell". */
 export function firstName(name: string): string {
-  return name.split(/\s+/)[0] ?? name;
+  const words = name.split(/\s+/);
+  const [first, second] = words;
+  if (first !== undefined && second !== undefined && NAME_TITLES.has(first)) return second;
+  return first ?? name;
 }
 
 function truncate(text: string, maxChars: number): string {

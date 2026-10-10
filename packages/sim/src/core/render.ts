@@ -10,6 +10,7 @@ import { findItemDef } from "./defs";
 import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
+import { isSite } from "./places";
 import { roomPhrase } from "./rooms";
 import { siteOf } from "./sites";
 import type { Actor } from "./types/actor";
@@ -1099,7 +1100,9 @@ export function shipHeadline(
 ): string {
   const travel = state.travel;
   if (travel.stage === "docked") {
-    const here = `Docked at ${portName(content, travel.portId)}`;
+    // Expeditions A1 (§3.1): a landing site is set down on, and has no work to look for.
+    const site = isSite(content, travel.portId);
+    const here = `${site ? "Set down at" : "Docked at"} ${portName(content, travel.portId)}`;
     // §looking-for-work: the captain ashore is the moment to watch; the freight count comes back
     // after.
     const ashore = captainAshoreLine(state);
@@ -1130,7 +1133,7 @@ export function shipHeadline(
     }
     // Offers are the card's story to tell, not the headline's (§the-ship-headline): the headline
     // only says what the ship is doing.
-    return `${here} — looking for work`;
+    return site ? here : `${here} — looking for work`;
   }
 
   const to = portName(content, travel.toPortId);

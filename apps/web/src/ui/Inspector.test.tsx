@@ -1,4 +1,10 @@
-import type { AgentViewSnapshot, Machine, WeighingWords } from "@crew/sim";
+import type {
+  AgentViewSnapshot,
+  BodyView,
+  CombatantState,
+  Machine,
+  WeighingWords,
+} from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Inspector } from "./Inspector";
@@ -6,7 +12,13 @@ import type { PersonWords } from "./actorWords";
 
 /** The fields `ActorInspector` reads; a passenger has no skills, tasks or post. */
 function snapshot(
-  who: { roleTags: string[]; passenger?: true },
+  who: {
+    roleTags: string[];
+    passenger?: true;
+    body?: Partial<BodyView>;
+    bio?: string;
+    combatant?: { side: "us" | "them"; state: CombatantState };
+  },
   problems: readonly { id: string; kind: string }[] = [],
 ): AgentViewSnapshot {
   const self = {
@@ -18,7 +30,9 @@ function snapshot(
     onDuty: false,
     watch: { onWatch: false, dayworker: true, helmRole: "none", officerOfTheWatch: false },
     thoughts: [],
+    bio: "",
     ...who,
+    body: { wounds: [], stunned: false, availability: "available", ...who.body },
   };
   return {
     tick: 0,
@@ -77,25 +91,50 @@ describe("Inspector actor sheet", () => {
     expect(html).toContain("repairing the generator: ");
   });
 
-  it("gives a body line when the snapshot had one, marked when they are hurt (§8.6)", () => {
-    const sheet = (body?: string) =>
+  it("gives a body line from their view, marked when they are hurt (§8.6)", () => {
+    const sheet = (body: Partial<BodyView>) =>
       renderToStaticMarkup(
         <Inspector
           data={{
             kind: "actor",
             weighing: NOTHING,
-            view: snapshot({ roleTags: ["engineer"] }),
+            view: snapshot({ roleTags: ["engineer"], body }),
             person: steady,
-            ...(body === undefined ? {} : { body }),
           }}
           onClose={() => {}}
         />,
       );
-    expect(sheet("wounded: right leg (serious), bleeding")).toContain(
+    const hurt = { wounds: [{ part: "rightLeg", severity: "serious", bleeding: true }] } as const;
+    expect(sheet(hurt)).toContain(
       '<dt>Body</dt><dd class="inspector-hurt">wounded: right leg (serious), bleeding</dd>',
     );
-    expect(sheet("unhurt")).toContain("<dt>Body</dt><dd>unhurt</dd>");
-    expect(sheet()).not.toContain("<dt>Body</dt>");
+    expect(sheet({})).toContain("<dt>Body</dt><dd>unhurt</dd>");
+  });
+
+  it("shows a site's cast member by name, role, body and state, without the crew's sections", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        data={{
+          kind: "actor",
+          weighing: NOTHING,
+          view: snapshot({
+            roleTags: [],
+            bio: "boat-shed keeper",
+            combatant: { side: "them", state: "wavering" },
+            body: { stunned: true },
+          }),
+          person: steady,
+        }}
+        onClose={() => {}}
+      />,
+    );
+    expect(html).toContain("<h2>Halla Thorne</h2>");
+    expect(html).toContain('<p class="inspector-subtitle">boat-shed keeper</p>');
+    expect(html).toContain('<dt>Body</dt><dd class="inspector-hurt">stunned</dd>');
+    expect(html).toContain("<dt>State</dt><dd>wavering</dd>");
+    for (const crewOnly of ["Watch", "Hunger", "Mood", "Weighing", "Roster", "Known problems"]) {
+      expect(html).not.toContain(crewOnly);
+    }
   });
 
   it("shows no weighing for a passenger, who plans no work", () => {
