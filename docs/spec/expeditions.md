@@ -79,8 +79,8 @@ A weapon is an item with the `weapon` tag and an `ItemDef.weapon` (`kind`, `rang
 requires the two together. `item.blaster`: range 8, aim 1.2 s, hit 0.55, `serious`, `blaster`,
 stuns. `item.baton`: range 1, aim 0.6 s, hit 0.7, `serious`, `blunt`. A party member with nothing
 in hand fights with fists, a baton at hit 0.5 that grazes. The arms live in the ship's arms locker
-(§arms-locker). `expedition.blasters`, `batons` and `meleeAdjacentOnly` are in the config but
-read by nothing: the scenario stows the arms, and a baton always needs adjacency.
+(§arms-locker); the config holds no count of them, since the muster hands out what the locker
+holds, and a baton always needs adjacency.
 
 `fighting` is the seventh skill. The crew have it from their defs (Dane 5, Sunniva and Mara 4,
 Tomas and Jax 3, Noor, Priya and Oyelaran 2, Bettina 1); a cast member's comes from their resolve
@@ -170,7 +170,9 @@ passengers, not the helm stander and not on gangway watch, in rank order: the ca
 the first officer, then by `fighting`, ties by id (`systems/expedition/plans.ts` `squadFor`).
 `everyone` takes them all; `armedOnly` as many as there are weapons in the locker; `blastersOnly`
 as many as blasters; `smallTeam` the captain and the two best at `fighting`. The first is the
-leader, for the whole expedition. Why the captain: the owner's ruling (D103).
+leader. While the leader is down or dead the lead passes to the first of the party in that rank
+order who is not, and comes back when the leader is up (`leaderNow`); "leader near" in morale
+(§morale) reads whoever leads now. Why the captain: the owner's ruling (D103).
 
 ### The muster
 
@@ -262,14 +264,16 @@ the target and bystanders neither waver nor break.
   to the cast; each hit their side lands +0.05.
 - Per second, at each decision after contact: under fire (someone aiming at them) and not in cover
   −0.05; outnumbered (more armed enemies in sight than armed friends in sight, self included)
-  −0.03; in cover from the nearest armed enemy +0.02; the party's leader able and within
-  `leaderNearTiles` (3) +0.02.
+  −0.03; in cover from the nearest armed enemy +0.02; whoever leads the party now (§who-goes)
+  able and within `leaderNearTiles` (3) +0.02.
 - The ladder: someone starts `wavering` if their resolve is below `waverBelow` (0.5), else
   `steady`. Below `waverBelow` they waver, below `breakBelow` (0.25) they break
   (`combatantBroke`), and a wavering one recovers only above `recoverAbove` (0.6). Breaking does
   not recover within a fight. `fled`, `surrendered`, `down` and `dead` end their part in it.
 
-`morale.outflanked` is configured but nothing applies it yet.
+Outflanked: under `flank`, once the second group has reached the flank post, a guard or ally who
+sees a member of each group takes `morale.outflanked` (−0.3), once a fight
+(`Combatant.outflanked`).
 
 ### Postures
 
@@ -278,13 +282,16 @@ A battle plan (`BattlePlan`) is a squad rule, a posture, a fire rule (`lethal`, 
 posture sets each party member's mode (`postureMode`):
 
 - **assault**: press. Go for the objective by the tiles beside it, firing at a mark on the way
-  and standing to shoot within three tiles of it.
+  and standing to shoot within five tiles of it.
 - **hold**: everyone who shoots takes a spot by the ramp: site floor beside cover, within four rows
   of the ramp foot, those in cover from the target's post first, one each. A holder with a mark
   steps up to two tiles into cover from it, else fires where they stand. A baton waits at the head
-  of the ramp. After contact, once no cast member armed past arm's length can fight, they press.
+  of the ramp (its top, or a free deck tile beside it). After contact, once no cast member armed past arm's length can fight, they press.
 - **flank**: the party ranked by `fighting` splits alternately; the second group goes to the flank
-  post, firing on the way, while the first holds; once the second reaches it, all press.
+  post, firing on the way, while the first holds; once the second reaches it, all press. The
+  second group walks the route the cast sees least of (a tile a watcher would notice them on
+  costs twelve steps), a few straight tiles at a time. Why: by the shortest path the Boathouse's
+  flankers walked through the shed past both guards; this way they go round the west end.
 - **bait**: before contact the leader walks in on the nearest guard, "talking", and nobody fires;
   the rest hold. At contact everyone presses.
 - **creep**: before contact everyone walks toward the objective by a route off every tile a
@@ -293,6 +300,25 @@ posture sets each party member's mode (`postureMode`):
 
 A wavering party member shoots but does not advance. A breaking one runs for the top of the ramp
 and is `fled` once aboard. `holdFire` keeps the party's fire until contact.
+
+Tuned on the Boathouse (`crew expeditions --plans hold-lethal-armed,assault-lethal-armed,
+flank-lethal-armed --casts all --n 10 --seeds 1-3`): against the default cast `assault` takes the
+target in 22 s from contact at 0.47 party wounds and 7 party shots a fight, `hold` in 40 s at
+0.23 wounds, `flank` in 40 s, every fight ending with the cast broken and no party deaths; against
+the `hard` cast `hold` watches the keeper go at 70 s, `assault` takes him in 31 s at 2.4 wounds,
+and no party member dies.
+
+### One to a tile
+
+A side does not stack: every tile choice prefers a tile no other living combatant of that side
+stands on or is walking to (a walk claims its end at the decision that starts it, so a later
+decision the same tick sees it), falling back to the next best. That covers the hold spots,
+taking cover, a wavering guard's cover, covering the way in, a guard closing in, the baton at the
+head of the ramp, and a presser's side of the objective once within six tiles of it (further out
+the nearest side, so the party does not split round it on the way in). Someone standing still on
+a tile an ally earlier by id also stands still on steps to a free tile beside it, one with a line
+to the nearest enemy in sight if there is one. Why: a phone shows one figure a tile, so a
+stacked party read as one person.
 
 ### Fire and targets
 
@@ -333,7 +359,10 @@ one set down there remembers `carriedMeOut` about the carrier.
 The objective is held when, during the approach or the fight:
 
 - `takeTarget`: a party member going for the objective stands beside the target and no armed cast
-  member who can fight is within two tiles. The target gives up and walks to the ramp with them.
+  member who can fight is within four tiles with a line to it. The target gives up and walks to
+  the ramp with them. Why: once the party spread round the target (§one-to-a-tile), a guard who
+  stepped back into cover past two tiles let it take him from the other side before any exchange
+  of fire, and `assault` lost half its shots.
 - `takeItem`: the same beside the loot post (no item is taken yet).
 - `breakThem`: after contact, no armed cast member can fight.
 

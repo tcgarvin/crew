@@ -162,9 +162,13 @@ said an issuer was offering freight, a claim the narrator never made.
 ### The shore header
 
 While an expedition's site is alongside (`RenderFrame.expedition`), the headline opens with one
-word a side, "Us: steady · Them: breaking", in bold, tinted with the alert. A side is `done` when
-nobody on it can fight, else `breaking` when anyone breaks, `shaky` when anyone wavers, and
-`steady` otherwise (and before anyone is in it). It snaps to the later frame like the headline.
+word a side, "Us: steady · Them: breaking", in bold, tinted with the alert. Only those who fight
+count: the party, and the cast's guards and allies (not the target or a bystander, who have no
+morale of their own). A side is `done` when none of them can fight, else `breaking` when anyone
+breaks, `shaky` when anyone wavers, and `steady` otherwise (and before anyone is in it). Once the
+expedition is resolved the words drop and the line keeps only the alert's tint, since its people
+are out of the fight and would read `steady` again. It snaps to the later frame like the
+headline. Why: a shaky bystander made the cast read "shaky".
 
 ## Ship's log
 
