@@ -19,7 +19,8 @@ vocabularies, so the renderer knows what it must draw), an `ambience` line, a pa
 also has a `sky`), and `grime` and `airborneDust` (see `crew-life.md`). Walkable means a `floor`
 tile under no blocking prop. A dock is a station or a planet because its port is, never by a
 setting of its own: a planet port's dock must have a `sky`, and a station's has none and no
-`airborneDust`.
+`airborneDust`. A landing site's map is a `DockDef` of `kind: "site"` with cover and posts of its
+own (§site-maps).
 
 A port's `castSeed` regulars name a `post` on its dock, and every port has at least one posted
 regular. Kessler Drift has no stall (its market is through the gate); Vesper Gate's chapel doors
@@ -36,8 +37,9 @@ builder and a test keeps the two masks identical. Every dock's warehouse door li
 steps of its delivery bay. Why: a receiver sent from further lost the race to the cast-off and
 the delivery was taken in instantly instead of on foot.
 
-A port with no dock map (hand-built test content) keeps the transfer tiles and stores, and none
-of the rules below apply.
+A landing site's map skips the gate, warehouse, stall and area rules for its own
+(§site-map-validation). A port with no dock map (hand-built test content) keeps the transfer tiles
+and stores, and none of the rules below apply.
 
 ## The graft
 
@@ -179,16 +181,16 @@ across a ramp still lowering waits.
 ### Looking for work
 
 `lookForWork` is a personal activity the planner never chooses. Commerce hands it to the command
-actor at essential-operation urgency, every tick until it starts, while docked at a port with a
-dock map, `captainIsIdleAt` holds (§offer-source), the personnel ramp is fully down, and the actor
-is idle or passing the time (they finish what they are doing first). They walk to the foot of the
-personnel ramp; on the tick they stand on dock floor `captainAshore` is raised, once per docking
-(§captain-ashore-ask). If the captain stops being idle before stepping off (an offer, a course) the
-walk is cancelled and the ask is not spent. On the dock the activity waits (`awaitWord`) for the
-answer; if nothing is held for the captain it goes on to a look round: a dock post, half the time
-out through the gate for `travel.gateVisitSeconds` (4), and back aboard. There is no second ask.
-Why: the owner's ruling, "the captain should leave the ship to go look for work, and [their]
-leaving the ship should trigger narration" (D57).
+actor at essential-operation urgency, every tick until it starts, while docked at a port with a dock
+map (never at a landing site), `captainIsIdleAt` holds (§offer-source), the personnel ramp is fully
+down, and the actor is idle or passing the time (they finish what they are doing first). They walk
+to the foot of the personnel ramp; on the tick they stand on dock floor `captainAshore` is raised,
+once per docking (§captain-ashore-ask). If the captain stops being idle before stepping off (an
+offer, a course) the walk is cancelled and the ask is not spent. On the dock the activity waits
+(`awaitWord`) for the answer; if nothing is held for the captain it goes on to a look round: a dock
+post, half the time out through the gate for `travel.gateVisitSeconds` (4), and back aboard. There
+is no second ask. Why: the owner's ruling, "the captain should leave the ship to go look for work,
+and [their] leaving the ship should trigger narration" (D57).
 
 The captain out through the gate is still fit for command (`isFitForCommand`,
 `core/command-actor.ts`), so going ashore never hands the ship or a card's perspective to the

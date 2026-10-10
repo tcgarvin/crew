@@ -8,7 +8,8 @@ is `packages/sim/src/systems/travel/`. The dock itself and its people are in `do
 
 ### Port graph
 
-Six ports: a core triangle (Crossroads Hub, Kessler Drift, Green Meridian) and three far spurs
+Six ports, and one landing site (§landing-sites) that no port lists and no course reaches yet: a
+core triangle (Crossroads Hub, Kessler Drift, Green Meridian) and three far spurs
 (Ossory Station off Kessler Drift, Vesper Gate off Green Meridian, Tern's Rest off the Hub). Port
 files are `packages/content/data/ports/*.json`; the legs there are the truth (the triangle's are
 25, 45 and 70, each spur's 400). Routes are listed on both ends with equal distance, and the

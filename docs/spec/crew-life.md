@@ -21,7 +21,7 @@ A need above `needs.seekThreshold` (0.5) is a routine candidate, above `urgency.
 (0.7) essential, above `urgency.needSurvivalAbove` (0.9) immediate survival. `needThresholdCrossed`
 fires at the seek threshold (trace) and rising past survival (notable); recreation has no survival
 crossing. Above survival, fatigue lowers movement and manipulation linearly to
-`movement.fatigueSpeedFloor` (0.6) at 1.0.
+`movement.fatigueSpeedFloor` (0.6) at 1.0, times what the body allows (§bodies-and-capacities).
 
 ### Starting needs
 

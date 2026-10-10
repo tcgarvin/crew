@@ -42,9 +42,9 @@ the first raised wins and the rest wait or yield. Raising any hook re-arms the q
 `fieldSighted`, `fieldEntered`, `shipStuck`), or for an aftermath event of any significance whose
 type is in `narrator.aftermathHookOnEvents` (default: `alertCleared`, `navHazard`,
 `faultRepaired`). Aftermath events wake the narrator for the conditions its threads wait on:
-`alertCleared` once the alert stands down after a field and the crew have reported in,
-`navHazard` for a hazard's outcome, `faultRepaired` only for a fault something caused (a
-scheduled fault, a hazard scrape, a field impact; never wear) and only off a field's leg. Not
+`alertCleared` once the alert stands down after a field (never a fight's) and the crew have
+reported in, `navHazard` for a hazard's outcome, `faultRepaired` only for a fault something caused
+(a scheduled fault, a hazard scrape, a field impact; never wear) and only off a field's leg. Not
 hooked: `problemResolved`, `machineMended`, `hullPlated`, `shipUnstuck`.
 Why: the list is a separate key because config filling adds missing keys to old saves but never
 merges arrays.

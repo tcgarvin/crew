@@ -71,9 +71,10 @@ ship (`shipLost`) halts for good.
 `apps/web/src/host/playback.ts` consumes the buffered `RenderFrame`s and interpolates actor
 positions and facing between consecutive frames. Everything else (machines, doors, the dock, the
 hull and field, money, headline) snaps to the later frame: truth, not a smoothed guess (D7). Travel
-progress interpolates within one stage of one leg. Impacts are events, so both frames' are kept.
-The main thread reports its position with `viewProgress`; that position, not wall time, sets the
-run-ahead budget.
+progress interpolates within one stage of one leg. Impacts and shots are events, so both frames' are
+kept, and a dropped frame's ride on to the frame shown, so no flash or tracer is skipped. The main
+thread reports its position with `viewProgress`; that position, not wall time, sets the run-ahead
+budget.
 
 ### Snapshot ring and the inspector
 
@@ -147,6 +148,11 @@ collects into `warnings`. A caller with nobody to tell omits `warn`.
 Saves of schema 6 or older are refused: the deck was mirrored and the dock maps reshaped, and
 the host starts a new game. Schema 7 onward migrate.
 
+Schema 13 (expeditions) gives every actor a whole body (§bodies-and-capacities) and
+`skills.fighting` from their crew def (0 without one), starts the `wound` id counter, instantiates
+a deck's arms locker into a save that lacks the placement, and stows the scenario's weapons in it
+(§arms-locker), with a warning. `combatant` and `expedition` are optional and absent.
+
 ### Config filling
 
 A save keeps the config it was made with, but a key the loaded content has and the save lacks is
@@ -216,6 +222,27 @@ boredom, affinity extremes, rivalries); machine wear; and, with `--fields` and `
 asteroid fields crossed, hull lost per severity and ships lost. Numbers are sim time, independent of
 playback speed. It is the instrument tuning commits answer to: add a count here when a system
 gains something to tune.
+
+### The expeditions instrument
+
+`crew expeditions [--site] [--plans <ids|all>] [--casts <default,shaky,hard|all>] [--n] [--seeds]
+[--json]` (`apps/cli/src/expeditions.ts`) is the fight's tuning instrument (§the-fight). For each
+plan, cast and seed it starts the default game, sets down at the site (`port.boathouse` by
+default) with the plan at tick 0 and runs to `expeditionResolved` (cut off at 360 s), never
+calling the narrator. Defaults: `--n` 20, seeds 1–5. `all` plans are the default pair, every
+other posture lethal-armed and `assault-stun-armed`; the casts are the map's default, `shaky`
+(every guard shaky and paid) and `hard` (every guard hard and devoted, armed with blasters up to
+the cap). Per plan and cast it reports the outcome mix, seconds from contact to the end and from
+the muster to contact, wounds per side by severity, people down and dead, how the fight ended, the
+cast's fled and surrendered shares, shots and hit rate per side, party wavers and breaks, and log
+lines per fight.
+
+Its CI test (`expeditions.test.ts`) runs `hold-lethal-armed` and `assault-lethal-armed` against
+the default cast, four fights on each of seeds 1 and 2, and asserts bounds, not values: party
+deaths at most 0.25 a fight for each, no timeouts, `assault` taking the target in at least 60%,
+`hold` ending `targetFled` or `targetTaken` in at least 80%, `hold`'s party wounds at most 0.75 of
+`assault`'s, and `assault`'s fight at most 0.8 of `hold`'s long. Seeded, so the same code and seed
+give the same fight; not a determinism claim (D4).
 
 ### Narrator log and live tests
 

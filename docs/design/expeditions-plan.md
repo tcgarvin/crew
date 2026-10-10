@@ -1,12 +1,13 @@
 # Expeditions: Implementation Plan
 
-Status: plan for phase A1, 2026-10-10. Design and rationale: `docs/design/expeditions.md`
-(section references below are to that file unless another doc is named). Phases A2, B, C and D
-are planned here when the one before each lands, as `docs/design/ship-life-plan.md` did its
-slices. A1 ends with all four checks green (`pnpm typecheck && pnpm lint && pnpm depcruise &&
-pnpm test`), `crew content validate` clean, the `crew expeditions` numbers recorded, a phone
-playtest, the owner's rulings as the next `docs/DECISIONS.md` entry, and the A1 mechanics in
-`docs/spec/` (see the closing section).
+Status: phase A1 landed on `expeditions-a1`, 2026-10-10; what was built is in
+`docs/spec/expeditions.md` and D103, and where it differs from this plan the spec wins. Design and
+rationale: `docs/design/expeditions.md` (section references below are to that file unless another
+doc is named). Phases A2, B, C and D are planned here when the one before each lands, as
+`docs/design/ship-life-plan.md` did its slices. A1 ends with all four checks green
+(`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), `crew content validate` clean, the
+`crew expeditions` numbers recorded, a phone playtest, the owner's rulings as the next
+`docs/DECISIONS.md` entry, and the A1 mechanics in `docs/spec/` (see the closing section).
 
 ## Phase A1: the fight, measured
 

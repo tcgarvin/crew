@@ -15,12 +15,13 @@ How the game works **now**, one file per system. Code and docs cite a section by
 | `dockside.md` | dock maps, the graft, locals, the floor set, dock hands, staging, the captain ashore |
 | `equipment.md` | machines, faults, symptoms, heat, integrity, diagnosis, repair, parts and tools, servicing |
 | `work.md` | problems, tasks, claims, activities, the planner, supplies, the hand truck, what crew know |
-| `ship.md` | the hull contract, the ships, berths and lockers |
+| `ship.md` | the hull contract, the ships, berths and lockers, the arms locker |
 | `time-and-watches.md` | the ship's day, play speed, the watch bill, the bell, the helm |
 | `crew-life.md` | needs, thoughts and mood, the galley and mess call, dirt and cleaning, sleep and cabins |
 | `social.md` | recreation and activities, interests, affinity, relationships, the private talk |
 | `hull-and-field.md` | the asteroid field, the hull bar, scars, ship loss, intercom and reporting |
-| `client.md` | the renderer, scene and camera, headline, ship's log, inspector, labels, the phone |
+| `expeditions.md` | bodies and wounds, weapons, landing sites and the Boathouse, the expedition and the muster, the fight, morale and postures, the plan menu |
+| `client.md` | the renderer, scene and camera, headline, ship's log, inspector, labels, the phone, dev tools |
 
 ## Writing a section
 

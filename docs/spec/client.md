@@ -67,6 +67,10 @@ slides in during `docking` and away during `undocking` and `departing`.
 - Ramps are drawn by `RenderDoor.openFraction` (a jammed door reads shut), so the picture shows how
   far a ramp really is open. Powered ramps travel open and shut in `doors.rampOpenSeconds` (2 s).
   Docked ramps stay down.
+- A landing site (§site-maps) has no quay: no edge, clamps or bay walls; the berth is the same
+  loose ground as the rest, pressed darker, and the fields round it take the site's sky. Cover is
+  drawn by its legend character: `n` as net racks (two posts and a dark lattice), any other as the
+  crates prop. A site's posts have no drawing; a tapped one gets a small marker.
 
 ### Camera
 
@@ -117,6 +121,16 @@ moment playback first shows the impact (`render/impacts.ts`, held while paused).
 (`RenderFrame.hull.scars`) are an overlay over the floor and under the people, patched ones dimmer,
 and are pickable. Hull and field rules are in `hull-and-field.md`.
 
+### Fight drawing
+
+Each `RenderShot` (`RenderFrame.shots`, from the tick's `shotFired`) is a tracer from shooter to
+target for 120 ms and, on a hit, a flash at the target for 360 ms (`render/shots.ts`), keyed by
+its tick so it plays once from the moment playback first shows it, on a real-time clock held while
+paused. The other side's dots take a local's hue and darker rim, stable per person
+(§locals-and-props: never crew gold); the down are dimmed toward grey and the dead more so with a
+cross. A fighter's label is the combat system's (§the-combat-system-owns-its-combatants), "down"
+for someone incapacitated in the fight.
+
 The top bar carries the hull bar next to the clock, red below a third of the hull, and the whole
 bar tints on alert, when the bell line reads "ALERT" (shortened below 430 px). `shipLost` replaces
 the screen with an end screen: the day, where the ship was bound, the last six log lines up to the
@@ -131,6 +145,8 @@ saying what the ship is doing, derived from state: travel stage, destination, ET
 unloading counts, and what the ship waits for. The ticker is secondary. Why: the owner found "not
 clear what's happening at the top level."
 
+At a landing site it reads "Set down at <site>" and never "looking for work".
+
 Docked, the first match wins: the captain ashore ("Docked at <port> — <name> is ashore looking for
 work", or "... is talking with <name>"), then unloading or loading progress, then a passenger the
 ship waits for, a stop on the way to a farther destination, holding for repairs, preparing to
@@ -142,6 +158,13 @@ is not aboard. Under way it gives the ETA at the current engine output, or limpi
 The headline never narrates. Docked with no cargo work it reads "looking for work" whether or not an
 offer is open; offers and every other story claim are the card's to tell. Why: the headline once
 said an issuer was offering freight, a claim the narrator never made.
+
+### The shore header
+
+While an expedition's site is alongside (`RenderFrame.expedition`), the headline opens with one
+word a side, "Us: steady · Them: breaking", in bold, tinted with the alert. A side is `done` when
+nobody on it can fight, else `breaking` when anyone breaks, `shaky` when anyone wavers, and
+`steady` otherwise (and before anyone is in it). It snaps to the later frame like the headline.
 
 ## Ship's log
 
@@ -168,7 +191,9 @@ A crew member's, passenger's or labelled local's plate is their first name alone
 doing is in the inspector. A local is labelled only while doing something, in a dimmer text colour.
 A group session is one plate at its venue naming the game and every member's first name ("cards —
 Jax, Tomas"), cut to 34 characters, and its members' own labels are left out, since one plate stands
-for several people. Why: name plus action crowded the phone view.
+for several people. Why: name plus action crowded the phone view. A leading title or epithet is
+skipped for the word after it ("Old Pell" reads "Pell", "Sister Aurelie Doucet" "Aurelie"; the
+list is in `render/sessions.ts`).
 
 ### Label placement
 
@@ -207,6 +232,8 @@ or prop that left the frame between the draw and the tap opens nothing.
   face's look line.
 - A prop shows its name, "on the dock" and that it belongs to the port, not the ship. A room shows
   its dirt, who mops it and its hull scars.
+- At a landing site the ground reads "the landing site", and a post's subtitle names its kind
+  ("A guard post · The Boathouse, on the shingle") with a line on what the spot is for.
 
 ### The person sheet and weighing
 
@@ -218,6 +245,14 @@ which comes next, a one-line verdict, and a collapsed list of what was ruled out
 worded in the worker, where the names are, on the tap. Passengers have no watch or weighing
 section.
 
+### The body line
+
+Every person's sheet has a body line from their agent view (`SelfView.body`): "unhurt",
+"stunned", "wounded: right leg (serious), bleeding", "down — wounded: torso (grave), bleeding",
+"dead"; marked when not "unhurt". One of a site's cast (`combatant.side` `them`) shows only name,
+their role there, the body line and their state in the fight, with none of the crew's watch,
+needs, weighing, problems or roster.
+
 ## The phone
 
 ### Portrait layout
@@ -227,3 +262,12 @@ In portrait the chrome has fixed heights (`ui/portraitLayout.ts`, set as CSS cus
 while not docked, and a compact log under the canvas that a toggle opens out. The canvas takes the
 rest, so the camera tests can check legibility against the size the app lays out. In landscape the
 log is a full-height column.
+
+## Dev tools
+
+### Dev expedition start
+
+In a dev build only, `?expedition=<siteId>[&plan=<planId>]` starts a fresh game (never the saved
+one, so a reload replays the fight) and posts `scenarioStartExpedition` after the worker loads
+(`host/devExpedition.ts`, read in `App.tsx` under `import.meta.env.DEV`); a rejected site or plan
+shows as a toast. Production builds carry none of it.

@@ -46,7 +46,8 @@ Fast-forward drops to 1x when playback (not the run-ahead sim) reaches an event 
 `host.slowDownOnEvents`, naming it with the ticker's own text in a toast and a highlighted log
 line (cleared after 8 s or at the next slowdown). Nothing happens at 1x or while paused. The list
 is for news the player should stop for: hazards, an empty helm, drifting, limping, a filthy room,
-an argument, and the field events (§field-hooks). Good news on a listed type (the
+an argument, the field events (§field-hooks), and a fight's contact and any death
+(`expeditionContact`, `died`). Good news on a listed type (the
 engines coming back) does not slow, and nothing slows the game again within
 `SLOWDOWN_COOLDOWN_SECONDS` (120) of view time after a slowdown, so a fault and the drift it
 causes are one stop. Cards pause the game on their own and are not on the list.

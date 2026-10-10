@@ -53,7 +53,9 @@ containment, essential, routine, voluntary), then the lowest estimated seconds t
 intervention in `work.timeBucketSeconds` (1) buckets, then higher skill, older task, stable id.
 Candidates that are claimed by someone else, backing off, blocked, unreachable or beyond the
 actor's skill or tools are rejected and never compete. Each actor reconsiders every
-`work.reconsiderEveryTicks` (10), staggered.
+`work.reconsiderEveryTicks` (10), staggered. Someone on a `muster` or `fight` activity is the
+expedition's: the planner answers `continue` until it hands them back
+(§the-combat-system-owns-its-combatants).
 
 A problem's urgency is the owner's `baseUrgency` unless `planner/candidates.ts` says otherwise
 (a fault on an engine or life support is containment; known heat escalates a repair).
