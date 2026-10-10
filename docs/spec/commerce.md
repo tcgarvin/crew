@@ -11,8 +11,9 @@ reserves.
 ### Offer source
 
 The narrator is the only source of work (D40): commerce never creates a job on its own. The
-`captainAshore` hook asks for an offer (see `dockside.md` and `narrator-calls.md`); the null
-narrator answers offline with one templated offer through the same translator. The ask is only
+`captainAshore` hook asks for an offer (§looking-for-work, §captain-ashore-ask); offline, the null
+narrator answers with one templated offer through the same translator
+(§no-offline-narrator-for-players). The ask is only
 raised when the captain has nothing on at the port (`captainIsIdleAt`, `travel/hooks.ts`): no
 offer open at the port, no job in hand, no passenger walking off, no job decision queued or held,
 no course planned or voyage under way (a waypoint is not a port to look for work at), and no
@@ -21,8 +22,8 @@ offer from this port declined or expired within `commerce.reofferDays` (0.075).
 ### Issuers and pitches
 
 Every `offerJob` carries an `issuer` person (name, role, optional organisation) and a `pitch` line
-of dialogue; there are no companies. The narrator keeps issuers in its cast so they recur. An
-offer's pay is never printed on its card.
+of dialogue; there are no companies. Issuers join the narrator's cast so they recur
+(§narrator-notes). Pay is never on the card (§cards-never-mention-pay).
 
 ### Offer command and price bands
 
@@ -35,9 +36,10 @@ offer's pay is never printed on its card.
 
 A freight job is clamped to `commerce.maxCratesPerJob` (6) units, dropping from the last line and
 scaling pay by the same ratio. An offer expires `commerce.jobOfferTtlDays` (0.5) after it is made
-(`jobExpired`). A surfaced offer (one that raises a card) needs the ship docked at its origin; its
-card is held until the captain meets the issuer in person (see `cards.md`), and the log shows the
-card, not the `jobOffered` event, until then. A quiet offer may be posted anywhere.
+(`jobExpired`). Offers are made in person at the dock: a surfaced offer (one that raises a card) is
+refused unless the ship is docked at its origin, and the translator drops one in flight; its card
+is held until the captain meets the issuer (§holding-a-card). A quiet offer may be posted anywhere,
+for scenarios.
 
 ### Offer card
 
@@ -53,10 +55,9 @@ but its destination; or a passage with a port still to reach. A job being finish
 port (freight unloading at its destination, a passenger walking off) does not block. Why: an offer
 carded on the first docked tick would otherwise deadlock behind its own card.
 
-The translator drops an `offerJob` by the same rule; hooks ask for one offer, and none while a job
-is in hand or at a waypoint. A passenger offer whose card slot is taken is dropped with that
-reason, never posted quietly. `setCourse` cannot replace a live passage's far destination;
-neighbours remain detours.
+The translator drops an `offerJob` by the same rule (§offer-lever); hooks ask for one offer, and
+none while a job is in hand or at a waypoint. A live passage limits `setCourse` to detours
+(§voyages).
 
 ## Freight on the dock
 
@@ -67,9 +68,9 @@ origin dock's staging area while that dock is alongside (`docking` or `docked`) 
 still `offered`: at `offerJob` when docked there, else on the tick the dock comes alongside. The
 crates are nobody's: no `cargoToLoad` exists, so no crew member touches them, equipment does not
 count them as parts aboard, and the render frame marks them `offered`. A declined, expired or
-departed-from offer has its crates withdrawn (`freightWithdrawn`). Dock hands do the carting (see
-`dockside.md`). `commerceViolations` (`invariants.ts`) holds the rule for tests. A port with no
-dock map keeps the store and the cargo transfer tiles.
+departed-from offer has its crates withdrawn (`freightWithdrawn`). Dock hands do the carting
+(§dock-hand-errands). `commerceViolations` (`invariants.ts`) holds the rule for tests. A port with
+no dock map keeps the store and the cargo transfer tiles.
 
 ### Loading
 
@@ -85,7 +86,7 @@ crate aiming at its own bay tile first; the job is delivered when every crate is
 port's store (`deliveryComplete`). Once the unload work is done commerce pays once
 (`contractCompleted`, `paymentMade`, a `jobPayment` transaction, guarded by
 `paymentTransactionId`), then dock hands cart the crates into the warehouse store
-(`cargoTransferred`). Carting happens whenever a dock is alongside, not only while `docked`.
+(§dock-hand-errands, `cargoTransferred`), whenever a dock is alongside, not only while `docked`.
 
 ## Passages
 
@@ -135,10 +136,9 @@ withdrawn. Names carry no pronouns, so cards say "them".
 
 - `leftBehind`: the passenger is ashore (the overdue card's "leave"). They stay at that port as an
   off-ship actor, the narrator's to use as cast; the voyage home is kept.
-- `putOff`: a card-side effect (`decisionSide.effect`: `none | setCourse | endPassage`) puts an
-  aboard passenger off at the next docking (now, if docked). The voyage, and the course when
-  docked, is cancelled; luggage is unloaded where they leave and holds the ship until it is on
-  the dock.
+- `putOff`: the card-side effect (§end-passage-effect) puts an aboard passenger off at the next
+  docking (now, if docked). The voyage, and the course when docked, is cancelled; luggage is
+  unloaded where they leave and holds the ship until it is on the dock.
 
 Either way the passenger leaves the roster and the digest's Aboard line and appears in the
 narrator's people section at that port. The narrator never decides a passenger's fate and never
@@ -151,21 +151,18 @@ narrates what they did ashore as fact; the null narrator never offers passages. 
 
 A port's market is content (`PortDef.market`: item, count, per-unit price); live stock and prices
 are in `state.markets[portId]`, seeded from content at world creation and on first write. The
-narrator's `stockMarket` lever sets a line (`marketStocked`); it never buys, delivers, repairs or
-pays. Its tiers, per-command cap and default price are `commerce.market.*`: `priceTiers`
-(cheap 0.6, fair 1, dear 1.6), `maxStockPerCommand` (4), `defaultPrice` (100). There are no
-scheduled deliveries. Why, owner: "let's just deal with things that are already there."
+narrator's `stockMarket` lever sets a line (`marketStocked`, §market-lever).
 
 ### Buying parts
 
-A repair whose remaining steps consume a part the ship lacks raises `partsNeeded` (see
-`equipment.md`). While docked at a port whose market has the item and the ship can pay for at
-least one unit, commerce derives one `buyParts` task (`buySpec`, `tasks.ts`); any crew member may
-take it, no skill or tool. It is not a captain decision. If the market lacks the item or money is
-short the problem stays open and the digest says why (`marketBlock`: `notDocked`, `notSoldHere`,
-`cannotAfford`).
+A repair short of a part or tool raises `partsNeeded` (§parts-and-tools-needed). While docked at a
+port whose market has the item and the ship can pay for at least one unit, commerce derives one
+`buyParts` task (`buySpec`, `tasks.ts`); any crew member may take it, no skill or tool. It is not a
+captain decision. If the market lacks the item or money is short the problem stays open and the
+digest says why (`marketBlock`: `notDocked`, `notSoldHere`, `cannotAfford`).
 
-The buyer walks to the market counter (`marketCounter`, `core/docks.ts`) and spends
+The buyer walks to the market counter (`marketCounter`, `core/docks.ts`: the floor tile the stall
+post faces, leaving the post tile for its local) and spends
 `commerce.market.buySeconds` (3) there. The `buy` step (`buyFromMarket`, `market.ts`) commits: up
 to the wanted count that stock and money allow; the balance drops (a `purchase` transaction); the
 market count drops; every crew member is told where the units are; `partsBought` is emitted; and
@@ -175,9 +172,9 @@ bumped so the task re-derives for the rest.
 - With a dock stall, the units go into the buyer's hands at the stall's counter tile and they carry
   them up to the top of the cargo ramp (`stowBought`); the task ends when they are set down, so a
   claimed `buyParts` task outlives its resolved problem.
-- With no stall the buyer walks to the gate and steps through (off ship, in the port's market
-  store, for `buySeconds`), then returns and carries the units aboard. Travel counts them ashore;
-  an overdue call, or the dock's last-guard clear, ends the errand at the gate.
+- With no stall the buyer walks to the gate and steps through (`throughGate`, off ship, in the
+  port's market store, for `buySeconds`), then returns and carries the units aboard. Travel counts
+  them ashore; an overdue call, or the dock's last-guard clear, ends the errand at the gate.
 - With no dock alongside, the buyer goes to a cargo transfer tile and the units land at their feet.
 
 ## Reserves
@@ -193,7 +190,7 @@ Underway, or where nothing is for sale, the crew can do nothing, so there is no 
 
 ### Reserve kinds
 
-- Provisions: counted in days of meals, a crate a meal (see §galley-provisions). Under
+- Provisions: counted in days of meals, a crate a meal (§galley-provisions). Under
   `galley.lowBelowDays` (2) the crew buy up to `galley.restockToDays` (5); `lowBelowDays` 0 turns
   it off. Bought only where a market stocks a `provisions` item; every port market lists them.
 - Food (rations, any `food` without a `meal`): days of hunger, nutrition aboard over eaters (crew

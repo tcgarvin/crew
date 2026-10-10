@@ -43,7 +43,7 @@ Validation (L3) requires every scenario to carry, among its starting items, a to
 that a repair or inspection recipe on its deck names. Markets may still sell tools, as
 replacements. Why: a tool only a far port sells leaves every fault needing it unrepairable
 everywhere else (the welder the ship never carried). The default scenario stows a welder torch in
-the hold beside the toolkits. The sim's side of a lost tool is in `equipment.md`.
+the hold beside the toolkits. A lost tool is §tool-shortfall.
 
 ## Berths on the dock map
 
@@ -93,15 +93,12 @@ The dead, anyone removed from the ship, and a passenger left behind free their b
 briefly ashore (`offShip`) keeps theirs. State holds the berth as the bed's placement key
 (`WorldState.berths`).
 
-An unberthed crew member serving aboard holds the `noBunkOfMyOwn` thought; the cabins system checks
-every `cabins.checkEverySeconds` (60). See `crew-life.md` for the cabin thoughts.
+An unberthed crew member serving aboard holds `noBunkOfMyOwn` (§unberthed-crew).
 
 ### Sleeping in a berth
 
-People sleep in their own berth or a bed nobody is assigned, never in another's: the planner reads
-`AgentView.assignedBeds()` and the sleep plan refuses one as a second guard. There is no
-hot-bunking. A sleeper in a cabin is labelled by the cabin ("asleep in the captain's cabin"),
-since content has no pronouns.
+Who sleeps where is §sleeping-places. The planner reads `AgentView.assignedBeds()`, and the sleep
+plan refuses another's bed as a second guard.
 
 ### Lockers
 

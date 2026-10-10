@@ -77,11 +77,11 @@ run-ahead budget.
 
 ### Snapshot ring and the inspector
 
-The worker keeps a ring of serialized snapshots of the past, one about every `snapshotIntervalSeconds`
-(2), kept three run-ahead caps long, and always one at a halt tick. The inspector and `requestSnapshotAt`
-read the ring, never the ahead-state, so the future does not leak. An agent view restores the
-nearest snapshot and advances that copy to the tapped tick. Why: the inspector must show what the
-viewer has seen. D14.
+The worker keeps a ring of serialized snapshots of the past, one about every
+`snapshotIntervalSeconds` (2), kept three run-ahead caps long, and always one at a halt tick. The
+inspector and `requestSnapshotAt` read the ring, never the ahead-state, so the future does not leak.
+An agent view restores the nearest snapshot and advances that copy to the tapped tick. Why: the
+inspector must show what the viewer has seen. D14.
 
 ### Reload of a save
 
@@ -93,22 +93,9 @@ ahead-state at committed tick boundaries.
 
 ### Narrator call from the main thread
 
-The worker never calls the narrator. When it posts `hookRaised`, the main thread
-(`apps/web/src/host/narrator.ts`) holds the anonymous token and POSTs the snapshot to the server,
-forwards the returned commands at hook tick + 1, then sends `acknowledgeHook`. A failure leaves the
-hook unacknowledged while the client retries with backoff (`host/narratorRetry.ts`), and pauses
-the game on an error panel when retries are spent. Two exceptions acknowledge without an answer: the
-server's spacing rule, and an exhausted `stageDock` call, whose dock then uses the sim's floor set.
-The call path, retries and budgets are in `narrator-calls.md`.
-
-`apps/web/src` may not import `@crew/narrator` or `@crew/server` (dependency-cruiser
-`web-no-secrets`); the reply shape is restated structurally.
-
-### Card prose on the main thread
-
-Card prose is kept on the main thread keyed by decision id. The modal shows `templateCard`
-(`@crew/content`) text until prose arrives, and keeps showing it if none does. Prose is
-presentation only; the sim holds the decision.
+The worker never calls the narrator: on `hookRaised` the main thread
+(`apps/web/src/host/narrator.ts`) makes the call and acknowledges the hook
+(§browser-to-model-and-back), retrying on failure (§story-retry-schedule).
 
 ## Saves and migrations
 
@@ -116,8 +103,8 @@ presentation only; the sim holds the decision.
 
 `serialize` produces a `SaveEnvelope`: `schemaVersion`, `simVersion` (informational, for bug
 reports), `contentHash`, `configHash`, `savedAtTick`, the full effective `config` and `state`.
-Content is referenced by hash only, plus whatever the state carries as dynamic defs. The host
-gzips and stores it: IndexedDB locally (one slot, about every 15 sim-seconds and at every decision) and
+Content is referenced by hash only, plus whatever the state carries as dynamic defs. The host gzips
+and stores it: IndexedDB locally (one slot, about every 15 sim-seconds and at every decision) and
 the server about every 60 wall seconds and at milestones (`host/saves.ts`). An unreachable server
 means local saves only.
 
@@ -194,25 +181,18 @@ determinism tool. `packages/content` may import `@crew/sim` for types only.
 - **L3 semantic and physical**: tile maps match their legend and size; doors, ramps, footprints,
   interaction tiles, zones and spawns are on floor; the deck is connected; the hull contract,
   dock maps, watch bill, berths and activity venues hold (`validate-hull.ts`, `validate-dock.ts`,
-  `validate-venues.ts`).
+  `validate-venues.ts`); every recipe tool kind is provided by some item def, and each scenario
+  starts with one of every kind its deck's recipes name (§scenario-tools).
 - **L4 simulation smoke** lives in `apps/cli`, not in the package.
-
-### Scenario tools rule
-
-A recipe's tool kinds must be provided by some item def, and every tool kind a recipe on a
-scenario's deck names must be carried from the start by one of the scenario's starting items.
-Markets may still sell tools, as replacements. Why: a tool only a far port sells leaves every fault
-that needs it unrepairable everywhere else (the welder).
 
 ## Dev instruments
 
 ### Content commands
 
 `crew content validate` loads and validates the bundle, grafts every dock onto every deck with the
-sim's own nav builder (`dockGraftIssues`: content cannot call the sim, so this catches the two
-drifting apart), and prints counts and the hash; activity venues a deck no scenario sails lack are
-notes, not failures. `crew content schemas` writes JSON Schemas; `render-deck <id>` and
-`render-dock <id>` draw maps as text (`apps/cli/src/index.ts`).
+sim's own nav builder (`dockGraftIssues`, §dock-map-validation), and prints counts and the hash;
+activity venues a deck no scenario sails lack are notes, not failures. `crew content schemas` writes
+JSON Schemas; `render-deck <id>` and `render-dock <id>` draw maps as text (`apps/cli/src/index.ts`).
 
 ### The pacing instrument
 
@@ -233,18 +213,14 @@ rooms filthy and mopped, faults, hazards, cards and conversations; the mess fill
 share of time by activity class and the longest idle stretch; provisions at the end; helm
 coverage; port-call stalls; sleep starts; the off-watch family (sessions, contests, arguments,
 boredom, affinity extremes, rivalries); machine wear; and, with `--fields` and `--seeds`, the
-asteroid fields crossed, hull lost per severity and ships lost. Numbers are sim time, independent
-of playback speed. It is the instrument tuning commits answer to: add a count here when a system
+asteroid fields crossed, hull lost per severity and ships lost. Numbers are sim time, independent of
+playback speed. It is the instrument tuning commits answer to: add a count here when a system
 gains something to tune.
 
 ### Narrator log and live tests
 
 `pnpm --filter @crew/server narrator-log` reads recorded narrator calls and rebuilds the digest a
-call saw; `pnpm test:live` makes one real model call per story hook kind through the production
-transport and fails on any fallback. Why: the unit suite fakes every transport, so a provider
-rejecting the real request left production failing while `pnpm test` was green. Owner: "a suite
-of LLM tests to use not all the time, but for these kinds of situations." Both are in
-`docs/DEPLOYMENT.md`.
+call saw; `pnpm test:live` is §live-narrator-tests. Both are in `docs/DEPLOYMENT.md`.
 
 ## The API and its build
 

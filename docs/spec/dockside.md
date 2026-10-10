@@ -62,7 +62,7 @@ portals would have needed an area tag on every bare `TileCoord` outside `systems
 Ramps are owned by travel alone: they never auto-close, actors never request them, and planning
 treats a ramp as passable only while fully open and still wanted open. `detachDock` refuses while
 a ramp is down or anyone or anything is on the dock, so departure brings everyone aboard and keeps
-the ramps down until it has (prep and the call aboard are in `travel.md`). Anything still lying on
+the ramps down until it has (§calling-the-crew-aboard). Anything still lying on
 the dock when it goes is left at the port's warehouse (`leftOnDock`), except the ship's own hand
 truck, which the dock crew hand up the cargo ramp (`gearBroughtAboard`); anyone still on it is
 brought aboard first as a last guard.
@@ -71,9 +71,9 @@ brought aboard first as a last guard.
 
 Someone on the dock looks around the dock (items and people), their walks are labelled "going
 ashore", "walking on the dock" and "coming aboard", a step across a ramp emits `wentAshore` or
-`cameAboard` (trace), and the narrator digest says "on the dock". A part on the dock counts
-towards `partsNeeded` (it is within reach while docked); freight on the dock, and a put-off
-passenger's luggage, counts as not aboard for loading.
+`cameAboard` (trace), and the narrator digest says "on the dock". A part on the dock is aboard for
+`partsNeeded` (§parts-and-tools-needed); freight on the dock, and a put-off passenger's luggage, is
+not aboard for loading.
 
 ## Locals
 
@@ -129,20 +129,19 @@ label, up to three props (catalogue items, 1 to 4 units, on the staging area or 
 one ambience line. It is valid only while a `stageDock` hook is pending for the leg in flight and
 the plan is unset (one plan per call). It is validated whole: posts exist on the dock, text is
 non-blank with no control characters or template braces and within caps (`STAGING_LIMITS`), seeds
-exist, nobody aboard is placed, no name twice. Any problem rejects the whole plan; the narrator
-translator drops bad parts first. `validateCommand` refuses it from the narrator outside a
-pending `stageDock` hook and refuses every other narrator command while one is pending. Why: a
-staging-only vocabulary change is the owner's ruling (D57).
+exist, nobody aboard is placed, no name twice. Any problem rejects the whole plan; the staging
+translator drops bad parts first (§staging-prompt). `validateCommand` refuses it from the narrator
+outside a pending `stageDock` hook (§staging-hook-and-the-hold) and refuses every other narrator
+command while one is pending (`preconditionFailed`). Why: a staging-only vocabulary change is the
+owner's ruling (D57).
 
 ### Staging plan dressing
 
 The plan is added to the floor set: a placement naming someone already in it moves them to the
 plan's post and label instead of adding a second. A plan sets the stage only: no card, no arc or
 note changes. The ambience line reaches the ticker as a notable `dockAmbience`, never narrative.
-With no plan (a failed or empty call) the dock is dressed with the floor set alone. Why: arrival
-is never held for a failing narrator, an exception to D43. The hook is raised and holds the ship
-at the end of transit (see `narrator-calls.md`); the plan rides on the travel stage record and is
-spent at `docking`.
+With no plan (a failed or empty call, §staging-retries-and-the-floor-set) the dock is dressed with
+the floor set alone.
 
 ## Dock hands
 
@@ -171,12 +170,8 @@ believes it is, the dock included.
 
 ### Dock market and passengers
 
-Buying parts walks the buyer to the stall's counter (the floor tile the post faces, leaving the
-post tile for its local) and the units are carried up to the top of the cargo ramp. With no stall
-the buyer walks to the gate and steps through (`throughGate`, off ship, in the port's market
-store). Travel counts a buyer out through the gate as ashore; an overdue call, or the last guard,
-ends the errand at the gate (see `commerce.md`). Passengers appear at the gate when booked or back
-from ashore and walk aboard (`comeAboard`); walking off, they go out through the gate. A walk
+Buying parts on foot, at the stall or through the gate, is §buying-parts. Passengers come and go
+through the gate: aboard as §passage-job says, and out through it when walking off. A walk
 across a ramp still lowering waits.
 
 ## The captain ashore
@@ -185,42 +180,37 @@ across a ramp still lowering waits.
 
 `lookForWork` is a personal activity the planner never chooses. Commerce hands it to the command
 actor at essential-operation urgency, every tick until it starts, while docked at a port with a
-dock map, `captainIsIdleAt` holds (which counts held cards, offers, a planned course, a walking
-passenger), the personnel ramp is fully down, and the actor is idle or passing the time (they
-finish what they are doing first). They walk to the foot of the personnel ramp; on the tick they
-stand on dock floor `captainAshore` is raised (port, the actor who went), retried every tick
-while another hook is pending, and `narrator.captainAshoreLastAsk` records port, tick and actor:
-one ask per docking, and it is cleared when the ship is no longer docked. If the captain stops
-being idle before stepping off (an offer, a course) the walk is cancelled and the ask is not
-spent. On the dock the activity waits (`awaitWord`) for the answer; if nothing is held for the
-captain it goes on to a look round: a dock post, half the time out through the gate for
-`travel.gateVisitSeconds` (4), and back aboard. There is no second ask. A port with no dock map
-raises the ask on the first idle docked tick. Why: the owner's ruling, "the captain should leave
-the ship to go look for work, and [their] leaving the ship should trigger narration" (D57).
+dock map, `captainIsIdleAt` holds (§offer-source), the personnel ramp is fully down, and the actor
+is idle or passing the time (they finish what they are doing first). They walk to the foot of the
+personnel ramp; on the tick they stand on dock floor `captainAshore` is raised, once per docking
+(§captain-ashore-ask). If the captain stops being idle before stepping off (an offer, a course) the
+walk is cancelled and the ask is not spent. On the dock the activity waits (`awaitWord`) for the
+answer; if nothing is held for the captain it goes on to a look round: a dock post, half the time
+out through the gate for `travel.gateVisitSeconds` (4), and back aboard. There is no second ask.
+Why: the owner's ruling, "the captain should leave the ship to go look for work, and [their]
+leaving the ship should trigger narration" (D57).
 
 The captain out through the gate is still fit for command (`isFitForCommand`,
 `core/command-actor.ts`), so going ashore never hands the ship or a card's perspective to the
-first officer. An interrupted walk (a survival need, an emergency, incapacity, the call aboard)
-just stops and is handed out again on the next free tick, to the first officer if the captain is no
-longer fit. Hand-outs give way to anything at essential operation or above and to the call aboard,
-as `comeAboard` does. Log and headline: notable `lookingForWork`, `talkingWith`, `wentToSee`,
-`cameToSee` (never narrative, so they neither wake `notableEvent` nor reset the quiet timer), and
-trace `cardHeld`, `cardDelivered`.
+first officer. This walk and the meeting walks (§meetings-and-visitors) are re-handed every tick
+until they start, override routine work, and give way to anything at essential operation or above
+and to the call aboard, as `comeAboard` does. An interrupted walk (a survival need, an emergency,
+incapacity, the call aboard) just stops and is handed out again on the next free tick, to the first
+officer if the captain is no longer fit. Log and headline: notable `lookingForWork`,
+`talkingWith`, `wentToSee`, `cameToSee` (never narrative, so they neither wake `notableEvent` nor
+reset the quiet timer), and trace `cardHeld`, `cardDelivered`.
 
 ### Offers in person
 
-Offers are made in person at the dock: `offerJob` with `surface: true` is refused unless docked at
-its origin (a quiet offer may be posted anywhere), the translator drops an offer in flight, and
-the digest says so. A passenger who walked over with their offer (or a local of that name)
+Offers are made in person at the dock (§offer-command-and-price-bands), and the digest says so
+(§market-and-parts-lines). A passenger who walked over with their offer (or a local of that name)
 becomes the passenger on acceptance: the local goes and the passenger boards from where they
 stood, so the dock never has one person twice.
 
 ### Meetings and visitors
 
-While docked at a port whose dock is alongside, a card whose speaker is one of the port's people
-is held, not queued (`decisions.held`; hold and delivery rules are in `cards.md`). The oldest held
-card is delivered one at a time, and how is decided when its meeting starts, from where the walker
-is (whoever went ashore this docking, else the command actor):
+A card from one of the port's people is held (§holding-a-card) until the captain and the speaker
+meet (§delivery). The meeting walks:
 
 - Ashore, or on the way: `meetSpeaker` walks up beside the local on the dock and `talk`s for
   `travel.talkSeconds` (3) ("talking with Fenwick Adair"), and the card comes up at the
@@ -232,8 +222,6 @@ is (whoever went ashore this docking, else the command actor):
   when they arrive; then a visitor goes back out and a local back to their post. A dock hand
   mid-errand finishes it first.
 
-Nothing waits forever: a card held `travel.cardDeliveryGiveUpSeconds` (45) comes up anyway
-(`cardDelivered`, reason `gaveUp`); one whose port the ship has left comes up at once (`leaving`);
-one with no way to meet comes up as `noWayToMeet`. An offer card whose job closed while it waited
-is dropped (`decisionDropped`). Departure from the dock waits while a card is held, as does a
-voyage at a waypoint. Meetings are plain state, so a save mid-walk finishes the same way.
+Nothing waits forever (§give-up-and-leaving, §stale-held-cards), and departure waits for a held
+card (§departure-while-a-card-is-held). Meetings are plain state, so a save mid-walk finishes the
+same way.

@@ -17,22 +17,19 @@ sets a body, a health, a position, a piece of knowledge or money. The capability
 (`buildCapabilities`) is generated from content, config and the ship's machines, so the prompt
 never promises what the sim cannot do. It carries every id the plan may use (ports and their legs,
 store keys, cargo items, machines and faults, each port's market); the plan's ids are plain
-strings the translator checks against it. Why: strict structured output compiles the schema into a
-grammar, and per-game enums for ids made it too large.
+strings the translator checks against it (§plan-schema-in-the-prompt).
 
 ### Offer lever
 
 `offerJob` makes a freight contract or a passenger passage.
 
-- Every offer comes from a person: `issuerName`, `issuerRole`, optional `issuerOrg`, and a
-  `pitch` of at most 30 words they say to the captain. Issuers join the narrator's cast, so they
-  recur. Neither pitch nor description ever mentions pay; `payTier` (low, standard, generous)
-  places the pay inside the class price band and the engine computes it.
-- `fromPort` must be the port the ship is docked at: offers are made in person at the dock, never
-  in flight. `toPort` may be any reachable port; beyond one hop the accepted job is a voyage.
-- One job at a time. The translator drops an offer by the kernel's own rule
-  (`jobBlockingAcceptance`), so freight being unloaded at its destination does not block a new
-  offer, and a job still under way does.
+- Every offer comes from a person (§issuers-and-pitches): `issuerName`, `issuerRole`, optional
+  `issuerOrg`, and a `pitch` they say to the captain. Neither pitch nor description ever mentions
+  pay; `payTier` (low, standard, generous) places the pay inside the class price band
+  (§offer-command-and-price-bands) and the engine computes it.
+- `fromPort` must be the port the ship is docked at (offers are made in person). `toPort` may be
+  any reachable port; beyond one hop the accepted job is a voyage.
+- One job at a time: the translator drops an offer by the kernel's own rule (§one-job-in-hand).
 - `surface: true` makes it an accept/decline card and counts as the call's one card; `false`
   posts it quietly on the port board. A passenger offer is always surfaced (a person at the ramp)
   and is dropped, not posted quietly, if the call's card is taken. `roundTrip` needs `passenger`.
@@ -55,40 +52,36 @@ in the same tick sees the refilled budget. Fields have no budget (one per leg).
 ### Market lever
 
 `stockMarket {port, item, count 0-4, priceTier cheap|fair|dear}` sets what a port's market sells
-of one item (any item def, not only cargo; provisions included). Count is clamped to
-`commerce.market.maxStockPerCommand` and 0 withdraws the item. The price is the content price for
-that item at that port times the tier's multiplier (`commerce.market.priceTiers`). It is the only
-way a part reaches a port: the crew buy for themselves from the ship's money (see `commerce.md`),
-and the narrator never buys, delivers, repairs or pays. There are no scheduled deliveries. Why: the
-owner, "let's just deal with things that are already there."
+of one item (any item def, not only cargo; provisions included; §market-stock). Count is clamped
+to `commerce.market.maxStockPerCommand` (4) and 0 withdraws the item. The price is the content
+price for that item at that port times the tier's multiplier (`commerce.market.priceTiers`: cheap
+0.6, fair 1, dear 1.6; `defaultPrice` 100). It is the only way a part reaches a port: the crew buy
+for themselves from the ship's money (§buying-parts), and the narrator never buys, delivers,
+repairs or pays. There are no scheduled deliveries. Why: the owner, "let's just deal with things
+that are already there."
 
 ### Hazard and field levers
 
-`scheduleHazard` places a piloting check for whoever holds the helm (`debrisField`, `ionStorm`;
-tier easy, hard or brutal mapped to `hazards.difficulty`). `scheduleField` places an asteroid
-field (severity `light | heavy | brutal`, `detection` rolled or unseen, and up to
-`field.maxScripted` (3) scripted impacts; the field's play is in `hull-and-field.md`). For both:
+`scheduleHazard` places a piloting check for whoever holds the helm
+(§debris-fields-and-ion-storms). `scheduleField` places an asteroid field, its severity, detection
+and scripted impacts (§scheduling-a-field). For both:
 
 - Only on a leg: a course set or the ship under way with transit left. Dropped while docked with
   no course, on approach or docking, or when the window opens after this leg's transit ends. The
   departure call the narrator requests with `callBack` is the natural moment.
-- One hazard may wait at a time (and spends the hazard budget). One field per leg, no budget.
-- A scripted impact names a machine id, a room name, or a machine name unique aboard, a moment
+- One hazard may wait at a time. One field per leg.
+- A scripted impact names a machine id, a room name, or a machine name unique aboard, and a moment
   (`early | middle | late` of the field's length, 15, 50 and 85%; impacts at one moment land 4 s
-  apart), and optionally a rock size and machine effect. A person is refused until bodies exist.
-  Scripted impacts alone (an unsized rock priced large) must leave the hull above zero, or the
-  whole field is dropped. A field is also refused once the ship is lost.
+  apart). A field failing the command's guard is dropped whole, and one is refused once the ship
+  is lost.
 
 ### Card lever
 
-`surfaceDecision` puts a two-sided card in front of the captain (shape and delivery in
-`cards.md`). Each side has an effect: none, `setCourse` (only docked, or a detour on a voyage),
-`endPassage` (puts the current passenger off at the next docking, no fare, valid only with a
-passenger aboard or ashore on a live passage), or `privateTalk` (a warm or stern word with a named
-crew member aboard; never the captain, a passenger or someone ashore; see `social.md`). The card
-also carries `speaker`, an aftermath per side, `beatOfThread` and `closesThread`. A reply's
-`card` field is only for dressing a pending policy decision; `beatOfThread` or `closesThread`
-written on it are stripped before validation and fed back as a correction.
+`surfaceDecision` puts a two-sided card in front of the captain (§cards-and-sides). Each side has an
+effect (§side-effects). The card also carries `speaker`, an aftermath per side, `beatOfThread` and
+`closesThread`. A reply's `card` field is only for dressing a pending policy decision;
+`beatOfThread` or `closesThread` written on it are stripped before validation and fed back as a
+correction.
 
 ## Translator
 
@@ -109,8 +102,8 @@ speaker and issuer names) is clipped to its cap and refused if it is empty, stat
 consequence (a credit amount, a percentage, a signed delta), or contains a secret phrase: the name
 or symptom of an undiscovered fault or a scheduled one (a deliberately conservative substring
 check). Caps: situation 70 words, aftermath 20, pitch 30, side label 48 characters, title 60. A
-blank aftermath means "none" and does not drop the card. Both sides of a card may not share a
-label. The staging translator reuses the same checks.
+blank aftermath is §aftermath-caption's "none". Both sides of a card may not share a label. The
+staging translator reuses the same checks.
 
 ### One card per call
 
@@ -121,9 +114,9 @@ card.
 
 ### Captain never speaks
 
-The `captain`-tagged crew member is the player's avatar. A card whose speaker is the captain is
-kept as an observed scene and the model is told why. The captain's voice line only shapes how
-others react to them.
+The `captain`-tagged crew member is the player's avatar and never a card speaker. A card whose
+speaker is the captain is kept as an observed scene and the model is told why, as a correction.
+The captain's voice line, shown to the narrator only, shapes how others react to them.
 
 ## Notes, threads and arcs
 
@@ -230,8 +223,8 @@ notes section quote the title too. The staging call is not shown it.
 ### Held cards
 
 "Cards on their way to the captain in person" lists cards held for delivery (who, how, "not shown
-yet"). They are not under pending decisions and not in "What the captain has seen"; they count as
-the call's one card.
+yet"). They are not under pending decisions and not in "What the captain has seen"; they count
+toward §one-card-per-call.
 
 ### Crew lines
 
@@ -295,9 +288,8 @@ designer reasons about:
 - Variety is the job: read "Past arcs"; two stories of one shape in a row means the next is a
   different kind; most episodes take a turn before they close; "never stack pressures" means one at
   a time, not none.
-- Every card is brought by someone: a grievance by the crew member who has it, an operational
-  matter by the first officer, an offer by its issuer; never the captain. Each person is written
-  in their `voice`. A card shows one concrete moment, 35 to 55 words (never over 70), with a
+- Every card is brought by someone (§spoken-cards), never the captain. Each person is written in
+  their `voice`. A card shows one concrete moment, 35 to 55 words (never over 70), with a
   stage line and quoted speech; sides are two to six words, a line of dialogue or a concrete act.
 - No numbers or pay on any player-facing text. Nothing about an undiscovered fault until the crew
   notice it. Never narrate what the digest does not show: a repair, delivery, purchase, meal,
@@ -316,25 +308,22 @@ designer reasons about:
 ## Staging prompt
 
 The staging call (`staging/`) is a separate model call, made before a ship comes alongside, that
-sets the stage and nothing else. Its calling, budget and failure fallback are in
-`narrator-calls.md`.
+sets the stage and nothing else. Its calling, budget and failure fallback are
+§staging-hook-and-the-hold, §staging-call-on-the-server and §staging-retries-and-the-floor-set.
 
 - It has its own system prompt (`STAGING_RULES`) and the item catalogue as a second cached block.
-  The reply is `rationale` plus intents `placePerson` (a seed, a cast member or a new face with
-  role and look, at a post, with an optional label), `placeProp` (catalogue items on the staging
-  area or by a post) and `setAmbience`. Limits come from `STAGING_LIMITS`: three people, three
-  props, one ambience line, capped labels, looks and names. It never offers, makes cards, schedules
-  faults, stocks markets or writes notes.
+  The reply is `rationale` plus intents `placePerson`, `placeProp` and `setAmbience`, the parts of
+  the `stageDock` plan with its limits (§staging-plan-command). It never offers, makes cards,
+  schedules faults, stocks markets or writes notes.
 - Its digest is the story digest minus the story budget and open threads, plus "The dock you are
-  dressing": ambience, posts by key, areas and the floor set the sim places anyway. Placing a
-  floor-set person under their own name moves them and relabels them.
+  dressing": ambience, posts by key, areas and the floor set the sim places anyway
+  (§staging-plan-dressing).
 - The reply is parsed with intents left raw, so a story intent in it is dropped with a reason by
   the staging translator rather than failing the call; a reply with anything beside `rationale`
   and `intents` is `schemaInvalid`. The translator produces at most one `stageDock` command,
-  checks each part against the kernel's rules (posts of this dock, seeds by exact name, cast names
-  against stored notes, nobody aboard, no name twice, catalogue items, text rules), clips labels,
-  looks and the ambience line, refuses over-long names and roles, and drops each bad part alone so
-  the kernel never refuses a whole plan for one placement. It reads the notes and never writes
-  them.
+  checks each part against the kernel's rules plus cast names against stored notes, catalogue
+  items and the text rules, clips labels, looks and the ambience line, refuses over-long names and
+  roles, and drops each bad part alone so the kernel never refuses a whole plan for one placement.
+  It reads the notes and never writes them.
 - Prompt guidance: less is more (one or two touches; an empty list is valid), continuity before new
   faces, stage what the story may do next without doing it, never place anyone aboard.

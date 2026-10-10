@@ -10,13 +10,13 @@ repair needs, and routine servicing. Code is in `packages/sim/src/systems/equipm
 ### Heat
 
 A machine heats while it is on and not under an `inoperable` fault, and cools every tick; the
-temperature stays in [0, 1.5]. Cooling is a flat `coolPerSecond` from the machine's def, so a machine
-whose rise beats its cooling would reach 1.0 and stop: the engine and generator cool faster than
-they rise and do not overheat in normal running. Heat comes from `overheat` fault effects and from a
-downed coolant pump. A pump is any machine tagged `cooling` on the machine's power domain; while
-others on the domain are all off, cooling falls to a fifth. A domain with no pump is unaffected.
-Above `derateAbove` output falls linearly to 0 at 1.0, where the machine stops. Above 1.0 it loses
-integrity at `equipment.overheatDamagePerSecond` (0.02).
+temperature stays in [0, 1.5]. Cooling is a flat `coolPerSecond` from the machine's def, so a
+machine whose rise beats its cooling would reach 1.0 and stop: the engine and generator cool faster
+than they rise and do not overheat in normal running. Heat comes from `overheat` fault effects and
+from a downed coolant pump. A pump is any machine tagged `cooling` on the machine's power domain;
+while others on the domain are all off, cooling falls to a fifth. A domain with no pump is
+unaffected. Above `derateAbove` output falls linearly to 0 at 1.0, where the machine stops. Above
+1.0 it loses integrity at `equipment.overheatDamagePerSecond` (0.02).
 
 ### Integrity
 
@@ -37,8 +37,8 @@ so a cleared fault resumes without a command.
 
 ### Wear and fault draws
 
-While on, a machine wears (`wearPerSecond`) and accrues hazard, faster when hot or worn. Crossing the
-sampled threshold draws one absent fault by weight on the `failures` stream (D6); the narrator's
+While on, a machine wears (`wearPerSecond`) and accrues hazard, faster when hot or worn. Crossing
+the sampled threshold draws one absent fault by weight on the `failures` stream (D6); the narrator's
 `scheduleFault` fires a chosen one instead. A machine holds one fault per key.
 
 ## Faults and symptoms
@@ -54,8 +54,8 @@ scenario get the same problem: the tick opens one for any undiagnosed fault with
 
 Diagnosing a fault is an `inspect` task of 20 s at engineering 1, no tool, at the machine's repair
 positions (`DIAGNOSE_SECONDS`, `DIAGNOSE_SKILL`). It marks the fault diagnosed, resolves the symptom
-and opens `machineFault` (`faultDiagnosed`). Diagnosis needs no tool or part, so it is work aboard
-the departure gate waits for (see `travel.md`).
+and opens `machineFault` (`faultDiagnosed`). Needing no tool or part, it is work aboard the
+departure gate waits for (§repairs-out-of-reach).
 
 ### Repair
 
@@ -76,24 +76,23 @@ wanted of the most specific item providing it: fewest tool kinds, then id). Eith
 `partsNeeded {machineId, itemDefId, count}` problem (once per machine and item, public, essential,
 revised against truth every tick, resolved when covered). "Aboard" is on deck, in hands, worn, or on
 the dock beside the ship; freight on offer is nobody's. An undiagnosed fault needs nothing yet. The
-crew buy the shortfall at a port that sells it; see `commerce.md`. The narrator's `stockMarket`
-lever may make a part available at a port, but never buys, delivers or repairs (see
-`narrator-story.md`).
+crew buy the shortfall at a port that sells it (§buying-parts); the narrator can only stock a
+market (§market-lever).
 
 ### Tool shortfall
 
-Content validation requires every scenario to carry a tool of every kind that a repair or
-inspection recipe on its decks names. Why: a tool sold only at a far port leaves the repair
-impossible everywhere else. Markets may still sell tools as replacements; a lost welder makes
-`partsNeeded` like a part. Repair out of reach is `repairOutOfReach` (`supplies.ts`): a diagnosed
-fault whose shortfall the ship lacks and the port market cannot sell in full now (out of stock, or
-beyond the ship's money).
+Every scenario starts with a tool of every kind its recipes name (§scenario-tools). A lost tool
+(the welder) makes `partsNeeded` like a part, bought where a market sells it.
 
 ### Impairments out of reach
 
-The departure gate judges each impairment (see `travel.md`); equipment supplies what "out of reach"
-means. A fault-driven impairment is out of reach when its fault's repair is. An impairment with no
-fault of its own that another machine causes (a consumer starved on a bus whose generators are
+The departure gate judges each impairment (§repairs-out-of-reach); equipment supplies what "out of
+reach" means. A diagnosed fault's repair is out of reach (`repairOutOfReach`, `supplies.ts`) when
+its shortfall is not covered aboard and the market at the port the ship is at cannot sell it in
+full now (out of stock, or beyond the ship's money). An impairment is out of reach when a fault
+keeping the machine impaired (any `derate` or `inoperable` fault, or an `overheat` fault while the
+machine is blocked or low on output) has its repair out of reach. An impairment with no fault of
+its own that another machine causes (a consumer starved on a bus whose generators are
 impaired, a machine hot on a bus whose coolers are all impaired) is out of reach only if every cause
 is, and the reason named is the cause's fault. With no cause to point at (integrity alone, an
 overloaded bus), it counts as in reach.
@@ -119,6 +118,6 @@ ten-second task (tools and skill per def; skill 1, so every section has someone 
 restores `conditionRestored`. The stove is serviced from its front and the helm from its standby
 position, so neither cook nor stander is moved off. The planner uses the problem's own urgency;
 essential puts the service ahead of the on-duty engineer's chores and ends their game, but calls no
-one off watch (see `time-and-watches.md`). Why: with servicing only on the engine and generator,
+one off watch (§duty-and-the-sleep-watch). Why: with servicing only on the engine and generator,
 every other machine wore to 0%; letting routine watch work end a game at the bell doubled abandoned
 games and left wear unchanged.

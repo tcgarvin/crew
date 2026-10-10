@@ -66,8 +66,8 @@ shelf to the player's desk (the lounge without a cabin).
   `playedForMe`.
 - **Bond**: members who like the activity warm to each other.
 - All: skill gain, dirt, risk (a sparring knock is a thought and a line), and a product. Baking
-  puts treats on the counter tagged `treat`, never `meal`, so a treat never answers the mess call;
-  it is eaten as a snack above `galley.treatHungerAbove` (0.1) hunger.
+  puts treats on the counter tagged `treat`, never `meal`, so a treat never answers the mess call
+  (§eating).
 
 ### Rivalries
 
@@ -120,11 +120,12 @@ remember `sharedATable` and the crew member gets `satWithTheCaptain`.
 
 ### Private talk
 
-`privateTalk { warm | stern }` is a card side effect the player chooses (see `cards.md`) and a
+`privateTalk { warm | stern }` is a card side effect the player chooses (§private-talk-effect) and a
 player-authority command. It summons a crew member, through the planner (a summons the view carries,
 `essentialOperation`, never `pendingIntent`), to the command actor's cabin: the captain's, or the
 first officer's in the officers' cabin when standing in. The command is refused
-(`preconditionFailed`) for the command actor, a passenger, someone ashore, while a talk is pending, or without a cabin.
+(`preconditionFailed`) for the command actor, a passenger, someone ashore, while a talk is pending,
+or without a cabin.
 
 The talk counts `cabins.privateTalkSeconds` (20) while both are in the cabin on their `confer`
 steps. Warm: the crew member remembers `heardMeOut` and the caller `talkedItThrough`, thought

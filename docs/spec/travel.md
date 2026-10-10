@@ -29,8 +29,8 @@ docked`, run by `travel.ts`. Each stage but `transit` is a timer (`travel.prepar
 route progress at `travel.nominalSpeed` times the mean output of the engines wanted on; no engines
 in the content means unconstrained. Docking charges `commerce.dockingFee` and emits `arrived`.
 `approaching` and `docking` hold in place until the helm is manned, and so does the end of transit
-(see `time-and-watches.md`). The port's dock is grafted at the start of `docking` and cast off at
-the end of `undocking`; see `dockside.md`.
+(§helm-vacancy). The dock is alongside from the start of `docking` to the end of `undocking`
+(§dock-alongside).
 
 ### Voyages
 
@@ -57,13 +57,12 @@ With every engine impaired beyond repair aboard, the ship limps rather than drif
 
 ### Departure preconditions
 
-A planned course starts `preparingDeparture` the first tick none of these holds: open freight
-work (loading or unloading, or accepted freight still lying on the dock), a round-trip passenger
-ashore or one walking off, a card held for delivery in person, an unplotted course
-(§course-plotting)
-or an unanswered departure gate (§departure-gate). Prep then waits for someone at the helm, for
-everyone to be aboard, and for the ramps to be up before it ends. A course set with nothing
-holding the ship enters prep straight from `setCourse`.
+A planned course starts `preparingDeparture` the first tick none of these holds: open freight work
+(loading or unloading, or accepted freight still lying on the dock), a round-trip passenger ashore
+or one walking off, a card held for delivery in person, an unplotted course (§course-plotting) or an
+unanswered departure gate (§departure-gate). Prep then waits for someone at the helm, for everyone
+to be aboard, and for the ramps to be up before it ends. A course set with nothing holding the ship
+enters prep straight from `setCourse`.
 
 ### Calling the crew aboard
 
@@ -78,11 +77,8 @@ ramps" if the clock has run out with a ramp still moving.
 A departure is never held forever, and never silently. Someone on the dock who cannot walk back
 (unavailable, not crew, or their walk failed) is brought up the ramp by the dock crew at once, and
 everyone still out is once the call has run `travel.recallAboardSeconds` (60); both emit
-`broughtAboard`, shown on the ticker. Anything still lying on the dock when it goes is left in the
-port's warehouse (`leftOnDock`), except the ship's own hand truck, which the dock crew hand up the
-cargo ramp (`gearBroughtAboard`). Anyone still on the dock at cast-off is brought aboard as the
-last guard. `ashore.ts` holds all of this. A travel invariant (`travelViolations`) keeps the dock
-to exactly the window from `docking` to the end of `undocking`.
+`broughtAboard`, shown on the ticker. What is still on the dock at cast-off is §ramps-and-cast-off.
+`ashore.ts` holds all of this.
 
 ### Departure gate
 
@@ -100,7 +96,8 @@ alone. Why: owner, "careful that we don't bother the player every time a single 
   it answered (`acceptedImpairmentKey`) and carried through the whole voyage. It is asked again
   only when that set changes; a new fault or a repair does, and a machine that stops being
   impaired drops out.
-- Only one gate card is queued at a time. Both events are in the default `hookOnEvents`.
+- Only one gate card is queued at a time. `departureRiskAccepted` and `departureHoldLifted` are in
+  the default `hookOnEvents`.
 
 The key (`impairmentKey`) names each impaired machine with every fault on it
 (`machineId:faultA+faultB`), not why it counts as impaired this tick. Why: a machine hovering at
@@ -109,24 +106,19 @@ the reason raised the card again each time.
 
 ### Repairs out of reach
 
-The gate never waits on a repair the ship cannot do. An impairment is out of reach when a
-diagnosed fault keeping the machine impaired (any `derate` or `inoperable` fault, or an `overheat`
-fault while the machine is blocked or low on output) is short of a tool or parts that nothing
-aboard covers and the market at the port the ship is at cannot sell in full now (out of stock, or
-dearer than the ship can pay). One with no fault of its own, starved or overheating because of
-another machine's impairment, is out of reach only if every cause is, and names the cause's fault.
+The gate never waits on a repair the ship cannot do; what makes an impairment out of reach is
+§impairments-out-of-reach. The card is raised for the worst impairment in reach. With none in reach
+there is nothing to choose: no card, the departure goes ahead, any hold ends, and
+`departureRepairOutOfReach` (narrative, in the default `hookOnEvents`) says why per fault, for
+example "No welder torch aboard and none to be had at Kessler Drift: leaving with the fusion
+generator's electrical short unrepaired". It is remembered as "leave anyway" is, so it is said once.
+A hold whose last in-reach repair becomes impossible ends the same way. An undiagnosed fault is
+still work aboard, so the gate waits for the diagnosis before judging. Why: releasing every hold
+after a timeout would cut real repairs short, and a card with only "leave" would bother the player
+with no choice.
 
-The card is raised for the worst impairment in reach. With none in reach there is nothing to
-choose: no card, the departure goes ahead, any hold ends, and `departureRepairOutOfReach`
-(narrative, in the default `hookOnEvents`) says why per fault, for example "No welder torch aboard
-and none to be had at Kessler Drift: leaving with the fusion generator's electrical short
-unrepaired". It is remembered as "leave anyway" is, so it is said once. A hold whose last in-reach
-repair becomes impossible ends the same way. An undiagnosed fault is still work aboard, so the
-gate waits for the diagnosis before judging. Why: releasing every hold after a timeout would cut
-real repairs short, and a card with only "leave" would bother the player with no choice.
-
-A repair that is short only of tools and parts is a `partsNeeded` (see `equipment.md`), so the
-crew buy what a port sells and a voyage waits at such a waypoint for the purchase.
+A repair short only of tools and parts is a `partsNeeded` (§parts-and-tools-needed): the crew buy
+it where a port sells it, and a voyage waits at such a waypoint for the purchase.
 
 ## Plotting a course
 
@@ -145,16 +137,9 @@ needs no plot.
 
 ### Debris fields and ion storms
 
-The narrator's `scheduleHazard` lever (see `narrator-story.md`) places an instant hazard, kind
-`debrisField` or `ionStorm`, with a difficulty tier (`hazards.difficulty`: easy 3, hard 5, brutal
-7) and a fault window, and spends the hazard budget. It needs a leg with transit still ahead and
-fires at the first transit tick at or after its time. A hazard whose leg ends first, or whose
-course is given up in port, is dropped with `navHazardMissed`.
-
-The roll is the helm-stander's piloting against the difficulty: the chance of a clean pass is
-clamp((skill - difficulty + 5) / 10, 0.05, 0.95), and the rest splits evenly between a scrape and
-a delay. A scrape schedules one fault on a ship machine through the single fault path (D6); a
-delay sets the leg back `hazards.delaySeconds` (60) at nominal speed, never past its start. An
-empty helm is a scrape and a delay with no roll. The stander gets `helmCleanPass` or `helmScrape`;
-a delay gives none. The asteroid field is in `hull-and-field.md`; piloting checks at the helm are
-in `time-and-watches.md`.
+The narrator's `scheduleHazard` lever (§hazard-and-field-levers) places an instant hazard, kind
+`debrisField` or `ionStorm`, with a difficulty tier and a fault window, and spends the hazard
+budget. It needs a leg with transit still ahead and fires at the first transit tick at or after
+its time (`systems/travel/hazards.ts`), as a piloting check at the helm (§hazard-roll). A hazard
+whose leg ends first, or whose course is given up in port, is dropped with `navHazardMissed` and
+never carried to the next leg. The asteroid field is §the-asteroid-field.

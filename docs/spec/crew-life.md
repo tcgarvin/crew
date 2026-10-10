@@ -96,12 +96,10 @@ vacancy never notice. Why: a hungry stander otherwise called relief for dinner.
 
 A crate of `provisions` is one meal, a meal a watch. The galley counts days as crates (plus counter
 servings as a fraction of a meal) over `time.watchesPerDay`. Why: counting crates as servings read
-eight days for a six-day pantry and the ship ran dry without asking a market. Under
-`galley.lowBelowDays` (2), docked where a market stocks them, the crew buy up to `restockToDays`
-(5) through `reserveLow` (see `commerce.md`); `provisionsLow` is said once at the serve that
-crosses the mark. Rations keep their own days rule (`commerce.foodReserve`, `commerce.md`). Why:
-one number for both would let a hold of rations hide an empty pantry. The scenario stows 18 crates
-and 60 ration packs.
+eight days for a six-day pantry and the ship ran dry without asking a market. Below
+`galley.lowBelowDays` the crew restock through `reserveLow` (§reserve-kinds, where rations have
+their own rule); `provisionsLow` is said once at the serve that crosses the mark. The scenario
+stows 18 crates and 60 ration packs.
 
 ## Dirt and cleaning
 
@@ -129,8 +127,8 @@ distance, capped per visit by `airborneDustVisitCap`, reset on undocking).
 A room's dirt is its mean weighted toward its worst tile (`dirt.roomMaxWeight`). Tiers clean /
 untidy / dirty / filthy rise at `dirt.tiers` (0.12 / 0.3 / 0.55) and fall `tierHysteresis` (0.05)
 lower. Each change fires one event (`roomDirty`, `roomFilthy`, `roomTidied`); `roomFilthy` slows
-fast-forward. The renderer's tint rides its own tick-keyed `dirt` message every
-`host.dirtFrameEverySeconds`, applied at the view tick (D14); `client.md` covers the inspector.
+fast-forward. The renderer's tint rides its own tick-keyed `dirt` message (§run-ahead-loop),
+applied at the view tick (D14); the inspector shows a room's dirt (§items-places-and-locals).
 
 ### Room cleaning problem
 
@@ -169,8 +167,9 @@ by containment or above. Why: one sleep a day in the same window, taken whole.
 ### Sleeping places
 
 A person sleeps in their own berth, else a bed nobody is assigned, never another's assigned bed or
-the infirmary bed; no hot-bunking. A sleeper in a cabin is labelled by the cabin ("asleep in the
-captain's cabin"), since content gives people no pronouns. Berth assignment is in `ship.md`.
+the infirmary bed (§sleeping-in-a-berth); no hot-bunking. A sleeper in a cabin is labelled by the
+cabin ("asleep in the captain's cabin"), since content gives people no pronouns. Berth assignment is
+in `ship.md`.
 
 ### Cabin thoughts
 

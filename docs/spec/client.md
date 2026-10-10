@@ -32,20 +32,20 @@ show.
 
 ### Orientation and the portrait turn
 
-The bow is always east and the quay south (`render/orientation.ts`, the one place direction is
-written down). The world flows fore to aft past a ship that never moves on screen. On a viewport
-taller than wide the whole drawing turns a quarter counter-clockwise, bow up, quay to the right;
-text, dots and crates are drawn after the turn so they stay upright. The turn is decided by the
-window, not the canvas: on a phone the canvas is nearly square and a wrapped headline would flip
-the drawing.
+The bow is always east and the quay south (§orientation-and-size; `render/orientation.ts` is the one
+place direction is written down). The world flows fore to aft past a ship that never moves on
+screen. On a viewport taller than wide the whole drawing turns a quarter counter-clockwise, bow up,
+quay to the right; text, dots and crates are drawn after the turn so they stay upright. The turn is
+decided by the window, not the canvas: on a phone the canvas is nearly square and a wrapped headline
+would flip the drawing.
 
 ### Stars, plume and the animation loop
 
 Stars carry no meaning: their positions come from a fixed hash and they scroll on a client-side
 accumulator at real time times `starSpeed`, so they do not go faster at 8x and stop when paused.
 `DeckCanvas` runs its own animation loop and redraws only while stars or plume move or the frame,
-selection or size changed, so a paused game at the dock costs nothing. Playback interpolates travel
-progress within a stage so the berth slides smoothly between frames.
+selection or size changed, so a paused game at the dock costs nothing. Travel progress
+interpolates within a stage (§frame-playback), so the berth slides smoothly between frames.
 
 ### Dock drawing
 
@@ -71,10 +71,11 @@ slides in during `docking` and away during `undocking` and `departing`.
 ### Camera
 
 The camera frames the whole hull plus a tile in flight and ship plus dock map plus a quarter tile
-docked, and interpolates each edge by `cameraT` during `docking` and `undocking` (`render/camera.ts`;
-under reduced motion the slide becomes a fade but the zoom still eases). Machine names are not drawn
-below 14 px a tile, so on a docked phone the room plates stay and machine names hide. On a portrait
-phone the picture keeps nearly every pixel of the width: the padding is a hairline.
+docked, and interpolates each edge by `cameraT` during `docking` and `undocking`
+(`render/camera.ts`; under reduced motion the slide becomes a fade but the zoom still eases).
+Machine names are not drawn below 14 px a tile, so on a docked phone the room plates stay and
+machine names hide. On a portrait phone the picture keeps nearly every pixel of the width: the
+padding is a hairline.
 
 ## Drawing the ship
 
@@ -103,8 +104,8 @@ dock from content; none of this changes the sim.
   must not mistake a bystander for crew.
 - A dock hand carting pushes a trolley drawn like the hand truck; its crates are general freight's
   colour, since the frame carries only a count.
-- A prop is drawn as its item would be, muted 40% toward grey, as that many small crates on its tile,
-  never with a count tag or the offer outline, so set dressing does not read as cargo or as an
+- A prop is drawn as its item would be, muted 40% toward grey, as that many small crates on its
+  tile, never with a count tag or the offer outline, so set dressing does not read as cargo or as an
   offer.
 
 ### Asteroid field, scars and alert
@@ -154,12 +155,10 @@ The log is not saved and starts empty after a reload.
 
 ### Cards in the log
 
-A card is logged at `decisionShownTick` (its `deliveredTick`, set when a held card comes onto the
-queue, else `createdTick`), not when it was held; the card itself comes up at the same tick, so it
-never covers a captain still walking to the meeting. A card shows "waiting" until answered, and
-tapping it brings the card back up. Once answered it shows the choice and expands to the full text
-and the aftermath. A card that closed a story thread is marked. A held offer's `jobOffered` is trace:
-the card is the offer's first word in the log.
+A card is logged at `decisionShownTick` (§delivered-tick), not when it was held, the tick the card
+itself comes up. A card shows "waiting" until answered, and tapping it brings the card back up.
+Once answered it shows the choice and expands to the full text and the aftermath. A card that
+closed a story thread is marked (§closing-cards).
 
 ## Labels and plates
 
@@ -201,8 +200,8 @@ or prop that left the frame between the draw and the tap opens nothing.
 
 - An item is described by room, or by area or nearest post (within two tiles) when on the dock;
   freight shows issuer, route and contract status. Freight on offer says "freight on offer" and that
-  nobody loads it until the job is taken. A crate on a hand truck reads "on the hand truck, pushed by
-  <name>".
+  nobody loads it until the job is taken. A crate on a hand truck reads "on the hand truck, pushed
+  by <name>".
 - A local shows name, role, "Where" ("at the queue-board kiosk" within two tiles of their post, else
   the dock area or nearest post, with their post on its own line), "Doing" when labelled and a new
   face's look line.
@@ -213,12 +212,11 @@ or prop that left the frame between the draw and the tap opens nothing.
 
 A crew member's sheet shows activity (the full action label), watch and duty, mood word and heaviest
 thoughts, the five needs, interests, relationships, known problems and the roster. Under "Weighing"
-it shows what the planner is ranking (`weighOptions`, `packages/sim/src/planner/weigh.ts`, pure over
-the `AgentView`): every option best first with its urgency class and estimated seconds, which one the
-person is doing and which comes next, a one-line verdict, and a collapsed list of what was ruled out
-and why ("off watch: routine work waits for their watch"). It is worded in the worker
-(`worker/weighing.ts`, where the names are), computed on the tap and never stored. Passengers have no
-watch or weighing section.
+it shows what the planner is ranking (§what-a-crew-member-weighs, pure over the `AgentView`): every
+option best first with its urgency class and estimated seconds, which one the person is doing and
+which comes next, a one-line verdict, and a collapsed list of what was ruled out and why. It is
+worded in the worker, where the names are, on the tap. Passengers have no watch or weighing
+section.
 
 ## The phone
 

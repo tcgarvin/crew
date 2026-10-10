@@ -16,8 +16,8 @@ command) puts one field on the current leg. It carries `severity` (`light | heav
 set rate, large-rock share and length in `field.severities`), `detection` (`rolled` or `unseen`),
 `windowTicks` (sampled like `scheduleHazard`'s, never sooner than `field.warningSeconds`, 12, away)
 and up to `field.maxScripted` (3) scripted impacts `{ atSeconds, target, rock?, effect? }` aimed at
-a machine, a compartment or a deck tile. A person is refused as a target: nobody aboard is hurt by
-a rock.
+a machine, a compartment or a deck tile. A person is refused as a target until bodies exist:
+nobody aboard is hurt by a rock.
 
 One field a leg, no budget. The guard: scripted impacts alone, an unsized rock priced large, must
 leave the hull above zero. Random rocks can sink the ship; that is the danger.
@@ -48,10 +48,10 @@ captain's chair instead of walking rounds, and takes no damage work.
 ### Rock impacts
 
 Rocks arrive as a Poisson process at the severity's `impactsPerMinute` (brutal 4.5) times a helm
-factor: `1 − field.helmThreading × skill/10` (0.4) with someone at the helm, `field.unmannedRateFactor`
-(1.5) with nobody. A centre is uniform over every deck tile (walls are edges, not tiles); a large
-rock hits its tile and the eight around it. Scripted impacts thin the random rate by their share of
-the expected count, so a scripted field is no heavier.
+factor: `1 − field.helmThreading × skill/10` (0.4) with someone at the helm,
+`field.unmannedRateFactor` (1.5) with nobody. A centre is uniform over every deck tile (walls are
+edges, not tiles); a large rock hits its tile and the eight around it. Scripted impacts thin the
+random rate by their share of the expected count, so a scripted field is no heavier.
 
 Every rock costs the hull once (`field.hullDamage`: small 3, large 8) and leaves a scar on its
 centre tile. Anyone on a blast tile gets a `nearMiss` thought and ticker line. Code:
@@ -81,9 +81,9 @@ both freighters). Invariant: `integrity` is `max` minus every scar's damage not 
 field charges scars and damage response patches and plates them, all through `core/hull.ts`. This
 supersedes simulation-design §10.6.
 
-Hull zero is game over: `shipLost`, `lostAtTick`, and `advance` halts `{ kind: "lost" }` for good
-(a lost save restores lost); the web shows an end screen with a new-game button. Nothing gates
-departure on the hull: a clash between repairs and a departure, no money or no plating is the
+Hull zero is game over: `shipLost`, `lostAtTick`, and `advance` halts `{ kind: "lost" }` for good (a
+lost save restores lost); the web shows an end screen (§asteroid-field-scars-and-alert). Nothing
+gates departure on the hull: a clash between repairs and a departure, no money or no plating is the
 narrator's hook, not a check.
 
 ### Patching and plating
@@ -99,9 +99,8 @@ torch. Why: one patcher held the only welder while the engine waited.
 
 Docked where the market stocks plating, with fewer plates aboard than scars, `hullDamaged` (routine,
 public, at the port) names the shortfall and is bought through commerce's parts purchase
-(`buySpec`, see `commerce.md`). All six ports sell plating; Vesper Gate's line is at count 0.
-Spent kits are a store: docked where a market sells a `patchKit` item, fewer aboard than the
-scenario's `startingItems` is a `reserveLow` for the difference (`commerce/reserve.ts`).
+(§buying-parts). All six ports sell plating; Vesper Gate's line is at count 0. Spent kits are
+restocked as a reserve (§reserve-kinds).
 
 ### Machine damage
 
@@ -157,6 +156,5 @@ unless the compartment carries its own `phrase` (Engineering's is "engineering")
 
 ## Field hooks
 
-`fieldSighted`, `fieldEntered`, `fieldCleared` and `shipStuck` are narrator hooks (see
-`narrator-calls.md`); `fieldSighted`, `fieldEntered`, `shipStuck`, `machineKnockedOut` and
-`shipLost` also drop play speed (see `time-and-watches.md`).
+Which field events wake the narrator is §notable-event-hook. `fieldSighted`, `fieldEntered`,
+`shipStuck`, `machineKnockedOut` and `shipLost` drop play speed (§auto-slowdown).

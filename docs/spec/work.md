@@ -24,12 +24,12 @@ system never guesses.
 
 ### Tasks and claims
 
-The work system derives tasks from problems through `TaskDerivationTable`, one rule per kind;
-each owning system exports its rules and `derivation.ts` asserts every kind is covered. A task's
-identity is `(problemId, derivationKey)`; a revised problem updates its task in place or cancels
-tasks the problem stops deriving. A task is done when its completion predicate holds against truth, never
-when an animation ends; progress lives on the target (the fault, the item's location), so a task
-survives a change of worker.
+The work system derives tasks from problems through `TaskDerivationTable`, one rule per kind; each
+owning system exports its rules and `derivation.ts` asserts every kind is covered. A task's identity
+is `(problemId, derivationKey)`; a revised problem updates its task in place or cancels tasks the
+problem stops deriving. A task is done when its completion predicate holds against truth, never when
+an animation ends; progress lives on the target (the fault, the item's location), so a task survives
+a change of worker.
 
 A claim is a lease on a task slot, `work.claimLeaseSeconds` (4) long, renewed each tick the
 holder works. An incapacitated or stuck holder lets it expire (`claimExpired`) and the activity
@@ -57,9 +57,7 @@ actor's skill or tools are rejected and never compete. Each actor reconsiders ev
 
 A problem's urgency is the owner's `baseUrgency` unless `planner/candidates.ts` says otherwise
 (a fault on an engine or life support is containment; known heat escalates a repair).
-`maintenanceDue` takes the owner's urgency: routine below `equipment.maintenanceConditionBelow`
-(0.3), essential below `equipment.maintenanceEssentialBelow` (0.15). Essential service still
-respects the watch (an on-duty engineer's chores yield to it, nobody is called off watch).
+`maintenanceDue` takes the owner's urgency (§maintenance-due).
 
 ### Selector commitment
 
@@ -153,6 +151,6 @@ completed, the rest released. Nothing rides a truck nobody pushes (`workViolatio
 truck, only its pusher holds it). The crates are ordinary on-deck freight again, picked up by
 hand or by the next trip. A truck not where the actor believed turns the trip into a hand haul of
 the lead; a crate not where they believed drops that leg and the trip goes on. A truck still on
-the dock when it goes is handed up the cargo ramp by the dock crew (`gearBroughtAboard`, notable);
-anything else left there stays at the warehouse (`leftOnDock`). The call aboard never starts on a
+the dock at cast-off is handed up the cargo ramp (`gearBroughtAboard`, notable;
+§ramps-and-cast-off). The call aboard never starts on a
 pusher mid-trip, since it starts only once loading is done.

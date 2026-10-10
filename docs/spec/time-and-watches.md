@@ -46,11 +46,10 @@ Fast-forward drops to 1x when playback (not the run-ahead sim) reaches an event 
 `host.slowDownOnEvents`, naming it with the ticker's own text in a toast and a highlighted log
 line (cleared after 8 s or at the next slowdown). Nothing happens at 1x or while paused. The list
 is for news the player should stop for: hazards, an empty helm, drifting, limping, a filthy room,
-an argument, and the field events (see `hull-and-field.md`). Good news on a listed type (the
+an argument, and the field events (§field-hooks). Good news on a listed type (the
 engines coming back) does not slow, and nothing slows the game again within
 `SLOWDOWN_COOLDOWN_SECONDS` (120) of view time after a slowdown, so a fault and the drift it
 causes are one stop. Cards pause the game on their own and are not on the list.
-`apps/web/src/host/slowdown.ts`.
 
 ## The watch bill
 
@@ -129,14 +128,9 @@ machines. Rounds notice nothing themselves: perception does (`systems/watch/roun
 
 ### Hazard roll
 
-A narrator-scheduled hazard (kind, tier easy/hard/brutal mapped through `hazards.difficulty`
-(3, 5, 7), fault-window word; see `narrator-story.md`) lies on one leg and fires at the first
-transit tick at or after its time (`systems/travel/hazards.ts`). The stander's piloting is rolled
-against the difficulty: clean with p = clamp((skill - difficulty + 5) / 10, 0.05, 0.95), else
-evenly a scrape (one weighted fault through the single fault path, D6) or a delay (the leg set back
-`hazards.delaySeconds`, 60, never past its start). An empty helm is a scrape and a delay, unrolled.
-The stander gets `helmCleanPass` or `helmScrape`; a delay gives none.
-
-A hazard whose leg ends first, or whose course is given up in port, is dropped with
-`navHazardMissed` and never carried to the next leg. One can be placed only on a leg with transit
-ahead. Course plotting that precedes the leg is in `travel.md`.
+A hazard fires on its leg as §debris-fields-and-ion-storms places it. The stander's piloting is
+rolled against its tier's difficulty (`hazards.difficulty`: easy 3, hard 5, brutal 7): clean with
+p = clamp((skill - difficulty + 5) / 10, 0.05, 0.95), else evenly a scrape (one weighted fault on a
+ship machine through the single fault path, D6) or a delay (the leg set back
+`hazards.delaySeconds`, 60, at nominal speed, never past its start). An empty helm is a scrape and
+a delay, unrolled. The stander gets `helmCleanPass` or `helmScrape`; a delay gives none.

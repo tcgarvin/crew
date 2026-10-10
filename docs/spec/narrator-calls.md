@@ -63,12 +63,12 @@ only follows a real silence.
 
 ### Policy decision hook
 
-Every kernel-raised decision (the departure gate, repair and safety cards queued through
-`queuePolicyDecision`) raises `policyDecision` in the tick it reaches the head of the queue, and
-the world does not halt on the decision until that hook has been raised. The host therefore sees
-the hook halt first, calls the narrator, and has the card's prose before the modal opens. Job
-offers are not hooked: the offer card carries the issuer's pitch. Owner: "anything that requires
-a decision gets narrated." Template text is the card's fallback when no narrator answers (offline).
+Every kernel-raised decision (§policy-decision-cards) raises `policyDecision` in the tick it
+reaches the head of the queue, and the world does not halt on the decision until that hook has
+been raised. The host therefore sees the hook halt first, calls the narrator, and has the card's
+prose before the modal opens; template text is the fallback when no narrator answers. Job offers
+are not hooked: the offer card carries the issuer's pitch. Owner: "anything that requires a
+decision gets narrated."
 
 ### Staging hook and the hold
 
@@ -80,16 +80,14 @@ spent at `docking`. Transit holds at the end of the route until the hook has bee
 acknowledged, with or without a plan; the approach needs no engine, so a drift during the hold
 does not hold further. If another hook is pending at the lead point the record waits as `due`
 and is raised on the first tick none is. A port without a dock map has no hook and no hold.
-The only narrator command allowed while it is pending is `stageDock`, and `stageDock` is refused
-outside it (`preconditionFailed`; D57 is the owner's ruling for this vocabulary change). Dock
-contents and the command are in `dockside.md`.
+While it is pending only `stageDock` is accepted from the narrator (§staging-plan-command).
 
 ### Captain ashore ask
 
 `captainAshore { portId, actorId }` is raised once per docking, the tick the captain (or the
-command actor, D8) stands on dock floor while looking for work, retried every tick while another
-hook is pending. `narrator.captainAshoreLastAsk` records port, tick and who went, and clears when
-travel leaves `docked`. The walk and what follows are in `dockside.md`. A port with no dock map
+command actor, D8) stands on dock floor while looking for work (§looking-for-work), retried every
+tick while another hook is pending. `narrator.captainAshoreLastAsk` records port, tick and who
+went, and clears when travel leaves `docked`. A port with no dock map
 raises the ask on the first idle docked tick. It is a story hook, so raising it settles a
 `pendingNotable`; an owed `notableEvent` simply makes the ask retry the next tick.
 
@@ -118,9 +116,10 @@ The main thread, which holds the anonymous token, makes the call; the worker onl
 `/api/games/:id/narrator`, retargets the returned commands to hook tick + 1, and always follows
 them with `acknowledgeHook` so the sim resumes. `recentEvents` are the notable and narrative
 events since the last story answer (capped at 60, oldest dropped); a staging answer does not clear
-them. Card prose is kept on the main thread keyed by decision id; the modal shows template text
-(`@crew/content` `templateCard`) until prose arrives. `apps/web` may not import `@crew/narrator`
-(`web-no-secrets`), so the reply shape is restated there.
+them. Card prose is kept on the main thread keyed by decision id; it is presentation only, the sim
+holding the decision, and the modal shows template text (`@crew/content` `templateCard`) until
+prose arrives, or for good if none does. `apps/web` may not import `@crew/narrator` or
+`@crew/server` (`web-no-secrets`), so the reply shape is restated there.
 
 ### Narrator route
 
@@ -159,8 +158,8 @@ choice: no stream parsing, and the notes turn could move to a cheaper model.
 
 ### Staging call on the server
 
-A `stageDock` hook runs the staging prompt, schema and translator (`packages/narrator/src/staging/`;
-content in `narrator-story.md`) on `CREW_STAGING_MODEL` (default: the story model) at
+A `stageDock` hook runs the staging prompt, schema and translator (`packages/narrator/src/staging/`,
+§staging-prompt) on `CREW_STAGING_MODEL` (default: the story model) at
 `CREW_STAGING_REASONING_EFFORT` (default: the story effort), with its own timeout
 (§narrator-timeouts). It never writes notes, is never spaced, and is logged like a story call.
 In `null` mode the server answers a failed staging call with the floor set (an empty plan) and
@@ -234,9 +233,10 @@ Owner: "retry/delay or in the worst case pause the game with an error message."
 
 Staging never ends on the error panel (D57's exception to D43). A transient failure retries after
 2 s and 4 s (`STAGING_RETRY_DELAYS_MS`); when those run out, or the failure is fatal, the hook is
-acknowledged with no plan and the dock is the floor set, with `[narrator] staging fallback
-<reason>` in the console. Why: the sim is halted on the call, so the story schedule held the ship
-visibly at the end of transit.
+acknowledged with no plan and the dock is the floor set alone (§staging-plan-dressing), with
+`[narrator] staging fallback <reason>` in the console. Why: arrival is never held for a failing
+narrator; the sim is halted on the call, so the story schedule held the ship visibly at the end of
+transit.
 
 ### Live narrator tests
 
@@ -244,5 +244,6 @@ visibly at the end of transit.
 OpenRouter call per hook kind through the production transport, prompt and schema, and fails on
 any fallback, printing the provider's error text. It reads the key from `OPENROUTER_API_KEY` or
 `packages/narrator/.env.local`, is skipped without one, and is excluded from `pnpm test`. Run it
-before deploying prompt, schema or transport changes. Why: the unit suite cannot see a provider
-rejecting the request, and production once failed every call while `pnpm test` was green.
+before deploying prompt, schema or transport changes. Why: the unit suite fakes every transport, so
+a provider rejecting the real request left production failing while `pnpm test` was green. Owner:
+"a suite of LLM tests to use not all the time, but for these kinds of situations."
