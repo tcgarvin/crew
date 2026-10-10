@@ -1,6 +1,6 @@
 /**
- * The four problems damage response owns (D93, D94), raised, revised and resolved here so every
- * file of the stream agrees on their keys and shape:
+ * The four problems damage response owns (§machine-damage, §scouts), raised, revised and resolved
+ * here so every file of the stream agrees on their keys and shape:
  *
  * - `machineDamaged` (dedupe `machineDamaged:<machineId>`, discovered, located at the machine,
  *   essential), from `damageMachine`;

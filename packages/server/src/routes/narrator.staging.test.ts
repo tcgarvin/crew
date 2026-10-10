@@ -1,7 +1,7 @@
 /**
- * D67: the staging call through the route: its own model, its own budget, outside the story
- * spacing rule both ways, logged by kind, never writing notes, and falling back to the floor set
- * without an error panel.
+ * §staging-call-on-the-server: the staging call through the route: its own model, its own budget,
+ * outside the story spacing rule both ways, logged by kind, never writing notes, and falling back
+ * to the floor set without an error panel.
  */
 import { loadBundle } from "@crew/content";
 import {
@@ -111,7 +111,7 @@ const staged: ModelTransport = async (request) => ({
   reasoningDetails: [],
 });
 
-describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
+describe("POST /api/games/:id/narrator, stageDock (§staging-call-on-the-server)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -206,7 +206,7 @@ describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
     });
   });
 
-  it("gives a staging attempt CREW_STAGING_TIMEOUT_MS, not the story call's 25 s (D70)", async () => {
+  it("gives a staging attempt CREW_STAGING_TIMEOUT_MS, not the story call's 25 s (§narrator-timeouts)", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const hang: ModelTransport = (request) =>
       new Promise((_, reject) => {
@@ -233,7 +233,7 @@ describe("POST /api/games/:id/narrator, stageDock (D67)", () => {
     });
   });
 
-  it("gives a story call no staging timeout: it keeps the narrator's own (D70)", async () => {
+  it("gives a story call no staging timeout: it keeps the narrator's own (§narrator-timeouts)", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const seen: NarratorCtx[] = [];
     const { gameId, post } = await setup(

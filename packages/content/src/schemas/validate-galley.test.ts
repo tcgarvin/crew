@@ -21,7 +21,7 @@ function itemOf(items: Raw["items"], id: string): Raw["items"][string] {
   return found;
 }
 
-describe("galley items (D81)", () => {
+describe("galley items (§cooking-and-serving)", () => {
   it("accepts the authored items", () => {
     expect(messagesAfter(() => {})).toEqual([]);
   });

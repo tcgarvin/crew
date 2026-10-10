@@ -1,5 +1,5 @@
 /**
- * Kernel-raised ("policy") decisions and their narration (D37, 2026-10-01).
+ * Kernel-raised ("policy") decisions and their narration (§policy-decision-cards).
  *
  * Systems that put a card in front of the captain on their own (the departure gate, any future
  * repair or safety card) queue it through `queuePolicyDecision`. Before such a decision is
@@ -8,8 +8,8 @@
  * `world.ts` keeps a decision that still needs narration from halting the world on its own.
  *
  * Job offers are excluded: the offer card already carries the issuer's pitch in their own voice
- * (D25), and a narrator call per offer would spend a call on cards that are dressed
- * already.
+ * (§issuers-and-pitches), and a narrator call per offer would spend a call on cards that are
+ * dressed already.
  */
 import { raiseHookIfIdle } from "./hooks";
 import { allocateId } from "./ids";

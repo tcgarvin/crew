@@ -1,10 +1,10 @@
 /**
- * The reporting reflex's candidate (D94, slice 5 call 12) over a hand-built `AgentView`
- * (dependency-cruiser's `planner-boundary` rule covers tests here too): on alert, damage seen
- * first-hand since the alert sounded and not yet public sends the actor to the nearest panel they
- * believe working, at containment class; nothing off alert, for public or reported damage, for
- * damage from before the alert, or for a bare machine status; dead and backed-off panels are
- * passed over, and with none left the reflex is rejected.
+ * The reporting reflex's candidate (§reporting-damage, slice 5 call 12) over a hand-built
+ * `AgentView` (dependency-cruiser's `planner-boundary` rule covers tests here too): on alert,
+ * damage seen first-hand since the alert sounded and not yet public sends the actor to the nearest
+ * panel they believe working, at containment class; nothing off alert, for public or reported
+ * damage, for damage from before the alert, or for a bare machine status; dead and backed-off
+ * panels are passed over, and with none left the reflex is rejected.
  */
 import { describe, expect, it } from "vitest";
 import type { FactType, KnownFact } from "../core/types/actor";
@@ -143,7 +143,7 @@ const asCandidate = (result: Candidate | Rejection | undefined): Candidate => {
   return result;
 };
 
-describe("reportCandidate (D94)", () => {
+describe("reportCandidate (§reporting-damage)", () => {
   it("sends a witness to the nearest panel, at containment class", () => {
     const candidate = asCandidate(reportCandidate(view(), config));
     expect(candidate).toMatchObject({

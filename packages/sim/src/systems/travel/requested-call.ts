@@ -1,10 +1,10 @@
 /**
- * D99: raising the call the narrator asked for (`NarratorState.callBack`, the `requestCall`
- * command). `departure` comes due the tick the ship casts off on a leg begun after the request
- * (`departing`, when `departed` is emitted; asked during `departing`, the first `transit` tick of
- * that same leg); `midLeg` halfway through a transit begun after the request, or through the
- * transit it was asked in before its halfway point. Each is per hop, never the whole voyage.
- * `nextPort` raises nothing here: the first story hook docked elsewhere serves it
+ * §requested-call-back: raising the call the narrator asked for (`NarratorState.callBack`, the
+ * `requestCall` command). `departure` comes due the tick the ship casts off on a leg begun after
+ * the request (`departing`, when `departed` is emitted; asked during `departing`, the first
+ * `transit` tick of that same leg); `midLeg` halfway through a transit begun after the request, or
+ * through the transit it was asked in before its halfway point. Each is per hop, never the whole
+ * voyage. `nextPort` raises nothing here: the first story hook docked elsewhere serves it
  * (`core/hooks.ts`).
  *
  * Runs before `checkNotableEventHook`, so the requested call settles a notable owed from an

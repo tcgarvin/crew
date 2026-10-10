@@ -1,7 +1,7 @@
 /**
- * Mopping (D82) on the dirt fixture with the planner: who mops which room, a full trip (fetch the
- * mop, the dirty tiles nearest first, the mop back in the locker, `roomCleaned`), and cleaning
- * against rounds on and off duty.
+ * Mopping (§mop-trips) on the dirt fixture with the planner: who mops which room, a full trip
+ * (fetch the mop, the dirty tiles nearest first, the mop back in the locker, `roomCleaned`), and
+ * cleaning against rounds on and off duty.
  */
 import { describe, expect, it } from "vitest";
 import type { TestWorld } from "../../core/fixtures/test-world";
@@ -78,7 +78,7 @@ function moppers(test: TestWorld, ticks: number): ActorId[] {
   return seen;
 }
 
-describe("a mopping trip (D82)", () => {
+describe("a mopping trip (§mop-trips)", () => {
   it("the deckhand fetches the mop, works the dirty tiles nearest first, puts it back; roomCleaned", () => {
     const test = dirtWorld();
     soilSpots(test, HOLD_SPOTS);
@@ -149,7 +149,7 @@ function shortTripWorld(): TestWorld {
 
 const tileKey = (tile: TileCoord): string => `${tile.x},${tile.y}`;
 
-describe("back-to-back mopping trips (D82)", () => {
+describe("back-to-back mopping trips (§mop-trips)", () => {
   it("the next trip takes the dirtiest tiles now, not the ones the last trip mopped clean", () => {
     const test = shortTripWorld();
     soilSpots(test, LONG_HOLD_SPOTS);
@@ -216,7 +216,7 @@ function resolvedDirtProblems(world: TestWorld["world"]) {
   );
 }
 
-describe("who mops (D82)", () => {
+describe("who mops (§who-mops)", () => {
   it("the cook mops the galley, not the deckhand", () => {
     const test = dirtWorld();
     soilSpots(test, GALLEY_SPOTS);

@@ -1,7 +1,7 @@
 /**
- * D93 (call 13): the end screen's words. The hull gave way and the run is over; the screen gives
- * the ship's last day (the day, the port it was bound for, the last lines of the log) over a
- * New game button. Pure, no React; `ShipLost.tsx` renders it.
+ * §hull-scars-and-ship-loss (call 13): the end screen's words. The hull gave way and the run is
+ * over; the screen gives the ship's last day (the day, the port it was bound for, the last lines of
+ * the log) over a New game button. Pure, no React; `ShipLost.tsx` renders it.
  */
 import type { PortDef, PortDefId, RenderTravel, Tick } from "@crew/sim";
 import type { LogEntry } from "./log";

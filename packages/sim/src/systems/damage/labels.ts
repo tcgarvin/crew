@@ -1,10 +1,10 @@
 import { roomPhrase } from "../../core/rooms";
 /**
- * Labels for damage work (D93, D94), read by `systems/work/labels.ts`: "patching the hull in the
- * hold", "plating the hull in the hold", "fetching a patch kit", "fetching hull plating",
- * "fetching the welder torch", "repairing impact damage to the galley stove", "checking the hold"
- * (the scout's walk there and the look round alike), and "walking to the hold" on the way to a
- * scar or a machine. "holding the bridge" is the work system's hold label.
+ * Labels for damage work (§machine-damage, §scouts), read by `systems/work/labels.ts`: "patching
+ * the hull in the hold", "plating the hull in the hold", "fetching a patch kit", "fetching hull
+ * plating", "fetching the welder torch", "repairing impact damage to the galley stove", "checking
+ * the hold" (the scout's walk there and the look round alike), and "walking to the hold" on the way
+ * to a scar or a machine. "holding the bridge" is the work system's hold label.
  *
  * Owner: W2 of ship life slice 5.
  */

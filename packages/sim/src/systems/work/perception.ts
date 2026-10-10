@@ -11,8 +11,8 @@
  *   (symptoms are audible/visible on the spot), emitting `problemObserved` when new or revised;
  * - `actorStatus` (availability, asleep, tile, idle) for other people in the compartment.
  *
- * D61: someone on the dock alongside (in no compartment) looks around the dock instead: its items
- * and people, as above; there are no machines or problems on a dock.
+ * §living-on-the-dock: someone on the dock alongside (in no compartment) looks around the dock
+ * instead: its items and people, as above; there are no machines or problems on a dock.
  *
  * W4a decision ("ship familiarity"): an actor with an empty knowledge table (a freshly spawned
  * crew member) is briefed once with `reported` locations of every on-deck item, standing in for
@@ -40,8 +40,8 @@ function outwardStatus(machine: Machine): "ok" | "degraded" | "failed" | "off" {
 
 /**
  * Whether the actor has yet to have their first look, and so the ship-familiarity brief. Anyone
- * else writing facts for such an actor (D63's freight brief) must leave them to it: a single
- * fact makes the knowledge table non-empty and the brief would never run.
+ * else writing facts for such an actor (the freight brief, §crew-briefs) must leave them to it: a
+ * single fact makes the knowledge table non-empty and the brief would never run.
  */
 export function awaitsFamiliarityBrief(actor: Pick<Actor, "knowledge">): boolean {
   return Object.keys(actor.knowledge).length === 0;
@@ -65,7 +65,7 @@ function brief(ctx: StepCtx, actor: Actor, deckId: OnDeckLocation["deckId"]): vo
   }
 }
 
-/** What one look covers: a compartment, or (D61) the dock alongside. */
+/** What one look covers: a compartment, or (§living-on-the-dock) the dock alongside. */
 type InView = (x: number, y: number) => boolean;
 
 function seeItems(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, inView: InView): void {
@@ -150,7 +150,7 @@ function seePeople(ctx: StepCtx, actor: Actor, others: Iterable<ActorId>): void 
   }
 }
 
-/** D61: everyone standing on the dock floor of this deck's graft. */
+/** §living-on-the-dock: everyone standing on the dock floor of this deck's graft. */
 function peopleOnDock(ctx: StepCtx, geometry: DeckGeometry): ActorId[] {
   const out: ActorId[] = [];
   for (const other of Object.values(ctx.state.actors)) {
@@ -163,9 +163,10 @@ function peopleOnDock(ctx: StepCtx, geometry: DeckGeometry): ActorId[] {
 }
 
 /**
- * One actor's look around their compartment, or around the dock if they stand on it (D61): dock
- * floor is in no compartment, and the dock is one open region with no machines, so someone there
- * sees the items and people on it. The hull stands between the dock and the ship both ways.
+ * One actor's look around their compartment, or around the dock if they stand on it
+ * (§living-on-the-dock): dock floor is in no compartment, and the dock is one open region with no
+ * machines, so someone there sees the items and people on it. The hull stands between the dock and
+ * the ship both ways.
  */
 export function observe(ctx: StepCtx, actor: Actor): void {
   const location = actor.location;

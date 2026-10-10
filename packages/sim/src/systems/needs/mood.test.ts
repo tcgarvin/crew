@@ -11,7 +11,7 @@ function world() {
   return { tw, mara, jon };
 }
 
-describe("moodSystem (D79)", () => {
+describe("moodSystem (§mood-and-work-speed)", () => {
   it("lets thoughts wear off: drops the expired ones and recomputes mood from the rest", () => {
     const { tw, mara } = world();
     const now = tw.world.state.tick;

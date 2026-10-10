@@ -1,5 +1,5 @@
 /**
- * The staging call's prompt (Dockside §6.1, D67): its own system prompt, not the story
+ * The staging call's prompt (Dockside §6.1, §staging-prompt): its own system prompt, not the story
  * narrator's. Two static system blocks (both prompt-cached): `STAGING_RULES`, the same for every
  * call of every game, and the item catalogue, fixed for a game. Everything that changes (the
  * digest, with the dock being dressed and the floor set) is in the user turn. `PROMPT_VERSION`

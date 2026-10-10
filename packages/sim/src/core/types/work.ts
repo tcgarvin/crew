@@ -12,11 +12,12 @@
  * 1. The *owning system* detects a condition and creates or revises a `Problem` row in
  *    `state.work.problems`. Equipment creates `machineSymptom` / `machineFault` /
  *    `maintenanceDue` / `partsNeeded`; travel/commerce creates `cargoToLoad` / `cargoToUnload`,
- *    travel `courseToPlot` (D78); the watch creates `stationToStaff` (D77); commerce creates
- *    `reserveLow` (D80); damage creates `machineDamaged`, `hullScar`, `hullDamaged` and
- *    `compartmentToCheck` (D93, D94). Before creating, it looks up an open problem with the same
- *    `dedupeKey` and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs for
- *    one fault).
+ *    travel `courseToPlot` (§course-plotting); the watch creates `stationToStaff`
+ *    (§problem-ownership); commerce creates `reserveLow` (§reserve-low-problem); damage creates
+ *    `machineDamaged`, `hullScar`, `hullDamaged` and `compartmentToCheck`
+ *    (§hull-scars-and-ship-loss, §scouts). Before creating, it looks up an open problem with the
+ *    same `dedupeKey` and bumps `revision` instead of duplicating (SD §14.2: no twenty repair jobs
+ *    for one fault).
  * 2. The *work system* (W4) derives tasks from problems through the `TaskDerivationTable`: one
  *    rule per `ProblemKind`, each returning `TaskSpec`s. Each owning system exports the rules for
  *    the kinds it owns from `systems/<system>/tasks.ts` as a `Partial<TaskDerivationTable>`;
@@ -88,10 +89,10 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Which system created a problem and is responsible for resolving it. D77: the watch owns
- * `stationToStaff` (the helm's watch and relief posts); D81: the galley owns `mealToCook` and
- * `mealToCarry`; D82: dirt owns `compartmentDirty`; D93: damage owns `machineDamaged`, `hullScar`,
- * `hullDamaged` and `compartmentToCheck`.
+ * Which system created a problem and is responsible for resolving it. The watch owns
+ * `stationToStaff` (the helm's watch and relief posts), the galley owns `mealToCook` and
+ * `mealToCarry`, dirt owns `compartmentDirty`, and damage owns `machineDamaged`, `hullScar`,
+ * `hullDamaged` and `compartmentToCheck` (§problem-ownership).
  */
 export type ProblemOwner =
   | "equipment"
@@ -130,63 +131,68 @@ export interface ProblemPayloads {
     storeKey: LocalKey;
   };
   /**
-   * A station must be crewed (D77: the helm). `watch` is the section's post, open while a course
-   * is planned or the ship is underway; `relief` stands in for a stander away for a need.
+   * A station must be crewed (§who-has-the-helm: the helm). `watch` is the section's post, open
+   * while a course is planned or the ship is underway; `relief` stands in for a stander away for a
+   * need.
    */
   stationToStaff: { machineId: MachineId; post: "watch" | "relief" };
-  /** D78: a course to `toPortId` must be plotted at the nav terminal before departure. */
+  /**
+   * §course-plotting: a course to `toPortId` must be plotted at the nav terminal before departure.
+   */
   courseToPlot: { toPortId: PortDefId };
   /**
-   * D47: a diagnosed fault's remaining repair steps consume `count` more of `itemDefId` than the
-   * ship has aboard. Owner: equipment (it watches the shortfall); commerce derives the `buyParts`
-   * task while the ship is docked at a port whose market sells it and the ship can pay.
+   * §parts-and-tools-needed: a diagnosed fault's remaining repair steps consume `count` more of
+   * `itemDefId` than the ship has aboard. Owner: equipment (it watches the shortfall); commerce
+   * derives the `buyParts` task while the ship is docked at a port whose market sells it and the
+   * ship can pay.
    */
   partsNeeded: { machineId: MachineId; itemDefId: ItemDefId; count: number };
   /**
-   * D80: the ship's stores of `itemDefId` are below the reserve it keeps (food in days of the
-   * crew's hunger, spares in units), and the port it is docked at sells it: `count` more units
-   * bring it back up. Owner: commerce, which raises it only while docked at such a port and
-   * derives the same `buyParts` task `partsNeeded` does. Routine: nothing is broken yet.
+   * §reserve-low-problem: the ship's stores of `itemDefId` are below the reserve it keeps (food in
+   * days of the crew's hunger, spares in units), and the port it is docked at sells it: `count`
+   * more units bring it back up. Owner: commerce, which raises it only while docked at such a port
+   * and derives the same `buyParts` task `partsNeeded` does. Routine: nothing is broken yet.
    */
   reserveLow: { itemDefId: ItemDefId; count: number };
   /**
-   * D81: the meal for watch `watchIndex` (`watchIndexAt`) is to be cooked and served before its
-   * bell. Owner: galley (dedupe `meal:<watchIndex>`, public, routine); derives one `cookMeal`
-   * task at the stove; resolved at the serve, cancelled with `mealMissed` at the grace.
+   * §meal-problem: the meal for watch `watchIndex` (`watchIndexAt`) is to be cooked and served
+   * before its bell. Owner: galley (dedupe `meal:<watchIndex>`, public, routine); derives one
+   * `cookMeal` task at the stove; resolved at the serve, cancelled with `mealMissed` at the grace.
    */
   mealToCook: { watchIndex: number };
   /**
-   * D81: a serving is to be carried to `toActorId`, who holds the helm `machineId` and cannot
-   * leave the seat. Owner: galley; derives one `carryMeal` task to the helm's standby tile.
+   * §helm-plate: a serving is to be carried to `toActorId`, who holds the helm `machineId` and
+   * cannot leave the seat. Owner: galley; derives one `carryMeal` task to the helm's standby tile.
    */
   mealToCarry: { toActorId: ActorId; machineId: MachineId };
   /**
-   * D82: the room `key` (`CompartmentDef.key`, instance `compartmentId`) is at `tier` (`dirty` or
-   * `filthy`). Owner: dirt (dedupe `dirty:<key>`, public); `baseUrgency` routine, essential
-   * while `filthy` and the room is a galley or infirmary; revised on each tier change. Derives one
-   * `cleanCompartment` task over the room's dirtiest tiles; resolved below `untidy`.
+   * §room-cleaning-problem: the room `key` (`CompartmentDef.key`, instance `compartmentId`) is at
+   * `tier` (`dirty` or `filthy`). Owner: dirt (dedupe `dirty:<key>`, public); `baseUrgency`
+   * routine, essential while `filthy` and the room is a galley or infirmary; revised on each tier
+   * change. Derives one `cleanCompartment` task over the room's dirtiest tiles; resolved below
+   * `untidy`.
    */
   compartmentDirty: { compartmentId: CompartmentId; key: LocalKey; tier: DirtTier };
   /**
-   * D93 (slice 5 call 21): a rock took integrity off `machineId`. Owner: damage (dedupe
+   * §machine-damage (slice 5 call 21): a rock took integrity off `machineId`. Owner: damage (dedupe
    * `machineDamaged:<machineId>`, discovered, located at the machine, essential); derives one
    * `repairDamage` task; resolved when integrity is whole again. Faults are not this problem.
    */
   machineDamaged: { machineId: MachineId };
   /**
-   * D93: a scar on the hull at `tile` in `compartmentId`. Owner: damage (dedupe
-   * `hullScar:<scarId>`, discovered, located at the compartment; essential on alert, routine
-   * after); derives `patchHull` underway and `plateHull` at port; resolved when plated.
+   * §hull-scars-and-ship-loss: a scar on the hull at `tile` in `compartmentId`. Owner: damage
+   * (dedupe `hullScar:<scarId>`, discovered, located at the compartment; essential on alert,
+   * routine after); derives `patchHull` underway and `plateHull` at port; resolved when plated.
    */
   hullScar: { scarId: ScarId; compartmentId: CompartmentId; tile: TileCoord };
   /**
-   * D93 (call 23): docked at a port that sells hull plating (`itemDefId`, a `plating` item) with
-   * `count` more scars unplated than plates aboard. Owner: damage; routine; derives commerce's
-   * `buyParts` task through `buySpec`.
+   * §plating-and-kits-at-port (call 23): docked at a port that sells hull plating (`itemDefId`, a
+   * `plating` item) with `count` more scars unplated than plates aboard. Owner: damage; routine;
+   * derives commerce's `buyParts` task through `buySpec`.
    */
   hullDamaged: { itemDefId: ItemDefId; count: number };
   /**
-   * D94: on alert, nobody has reported `compartmentId` since the last impact. Owner: damage
+   * §scouts: on alert, nobody has reported `compartmentId` since the last impact. Owner: damage
    * (dedupe `check:<compartmentId>`, public, essential); derives one `checkCompartment` task (a
    * scout walks there and perception does the rest); resolved by a report or the scout's arrival.
    */
@@ -201,7 +207,10 @@ interface ProblemBase<K extends ProblemKind> {
   payload: ProblemPayloads[K];
   owner: ProblemOwner;
   visibility: ProblemVisibility;
-  /** Stable identity for dedupe, e.g. `machineFault:m4:wornBearing`. At most one open problem per key. */
+  /**
+   * Stable identity for dedupe, e.g. `machineFault:m4:wornBearing`. At most one open problem per
+   * key.
+   */
   dedupeKey: string;
   status: ProblemStatus;
   createdTick: Tick;
@@ -227,21 +236,21 @@ export const TASK_TYPES = [
   "haul",
   "staffStation",
   "buyParts",
-  /** D78: plot the planned course at the `navStation` machine (`courseToPlot`). */
+  /** §course-plotting: plot the planned course at the `navStation` machine (`courseToPlot`). */
   "plotCourse",
-  /** D81: cook and serve the watch's meal at the stove (`mealToCook`). */
+  /** §cooking-and-serving: cook and serve the watch's meal at the stove (`mealToCook`). */
   "cookMeal",
-  /** D81: carry a serving to the helm-stander's standby tile (`mealToCarry`). */
+  /** §helm-plate: carry a serving to the helm-stander's standby tile (`mealToCarry`). */
   "carryMeal",
-  /** D82: mop a room's dirtiest tiles with the mop (`compartmentDirty`). */
+  /** §mop-trips: mop a room's dirtiest tiles with the mop (`compartmentDirty`). */
   "cleanCompartment",
-  /** D93: weld impact damage on a machine back to whole (`machineDamaged`). */
+  /** §machine-damage: weld impact damage on a machine back to whole (`machineDamaged`). */
   "repairDamage",
-  /** D93: weld a patch kit over a hull scar, underway (`hullScar`). */
+  /** §patching-and-plating: weld a patch kit over a hull scar, underway (`hullScar`). */
   "patchHull",
-  /** D93: fit a hull plate over a scar, at port (`hullScar`). */
+  /** §patching-and-plating: fit a hull plate over a scar, at port (`hullScar`). */
   "plateHull",
-  /** D94: a scout's walk to a compartment nobody has reported (`compartmentToCheck`). */
+  /** §scouts: a scout's walk to a compartment nobody has reported (`compartmentToCheck`). */
   "checkCompartment",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
@@ -253,11 +262,20 @@ export type TaskTarget =
   | { kind: "machine"; machineId: MachineId }
   | { kind: "item"; itemId: ItemId }
   | { kind: "door"; doorId: DoorId }
-  /** D80: a purchase for the ship's stores, at this port's market (no machine waits on it). */
+  /**
+   * §reserve-low-problem: a purchase for the ship's stores, at this port's market (no machine waits
+   * on it).
+   */
   | { kind: "market"; portId: PortDefId }
-  /** D82: a room to be cleaned (`cleanCompartment`); its tiles are the task's `interactionTiles`. */
+  /**
+   * §room-cleaning-problem: a room to be cleaned (`cleanCompartment`); its tiles are the task's
+   * `interactionTiles`.
+   */
   | { kind: "compartment"; compartmentId: CompartmentId }
-  /** D93: a hull scar to patch or plate; the tiles beside it are the task's `interactionTiles`. */
+  /**
+   * §patching-and-plating: a hull scar to patch or plate; the tiles beside it are the task's
+   * `interactionTiles`.
+   */
   | { kind: "scar"; scarId: ScarId };
 
 /**
@@ -270,17 +288,25 @@ export type ProgressRef =
   | { kind: "itemCustody"; itemId: ItemId }
   /** Staffing has no accumulated progress; it is satisfied while occupied. */
   | { kind: "occupancy"; machineId: MachineId }
-  /** D47: a purchase has no accumulated progress; the units land aboard at the commit point. */
+  /**
+   * §buying-parts: a purchase has no accumulated progress; the units land aboard at the commit
+   * point.
+   */
   | { kind: "market"; portId: PortDefId; itemDefId: ItemDefId; count: number }
-  /** D81: a meal is served or not; the servings on the counter are the progress. */
+  /**
+   * §cooking-and-serving: a meal is served or not; the servings on the counter are the progress.
+   */
   | { kind: "meal"; watchIndex: number }
-  /** D82: a room's dirt is its own progress (`WorldState.dirt.cells`). */
+  /** §dirt-grid: a room's dirt is its own progress (`WorldState.dirt.cells`). */
   | { kind: "room"; compartmentId: CompartmentId }
-  /** D93: a scar's own `recovered`/`patched` are its progress (`WorldState.hull.scars`). */
+  /**
+   * §hull-scars-and-ship-loss: a scar's own `recovered`/`patched` are its progress
+   * (`WorldState.hull.scars`).
+   */
   | { kind: "scar"; scarId: ScarId }
-  /** D93: a damaged machine's integrity is the repair's progress. */
+  /** §machine-damage: a damaged machine's integrity is the repair's progress. */
   | { kind: "integrity"; machineId: MachineId }
-  /** D94: a check has no progress; the scout being there is the point. */
+  /** §scouts: a check has no progress; the scout being there is the point. */
   | { kind: "check"; compartmentId: CompartmentId };
 
 /** SD §14.7 structured blockage reasons. */
@@ -310,12 +336,15 @@ export type CompletionPredicate =
   | { kind: "itemInZone"; itemId: ItemId; zoneKey: LocalKey }
   | { kind: "itemInStore"; itemId: ItemId; portId: PortDefId; storeKey: LocalKey }
   /**
-   * D63: the item lies in the `area` of dock `dockId` while that dock is alongside (freight
-   * delivered to the delivery bay). Custody, like the other two item kinds.
+   * §offered-freight: the item lies in the `area` of dock `dockId` while that dock is alongside
+   * (freight delivered to the delivery bay). Custody, like the other two item kinds.
    */
   | { kind: "itemInDockArea"; itemId: ItemId; dockId: DockDefId; area: DockAreaKind }
   | { kind: "stageReached"; stageKey: LocalKey }
-  /** D47: done once the plan's last step commits (a purchase); the owner settles its problem. */
+  /**
+   * §buying-parts: done once the plan's last step commits (a purchase); the owner settles its
+   * problem.
+   */
   | { kind: "stepsDone" };
 
 export type ClaimState = { kind: "unclaimed" } | { kind: "claimed"; claimIds: ClaimId[] };
@@ -323,7 +352,9 @@ export type ClaimState = { kind: "unclaimed" } | { kind: "claimed"; claimIds: Cl
 export interface Task {
   id: TaskId;
   problemId: ProblemId;
-  /** Distinguishes multiple tasks derived from one problem; identity is (problemId, derivationKey). */
+  /**
+   * Distinguishes multiple tasks derived from one problem; identity is (problemId, derivationKey).
+   */
   derivationKey: string;
   type: TaskType;
   target: TaskTarget;
@@ -426,7 +457,7 @@ export interface ActionStages {
   recreate: "waiting" | "playing";
   /** Slice 4: a `privateTalk` in the captain's cabin. */
   confer: "talking";
-  /** D94: a report on the intercom. */
+  /** §reporting-damage: a report on the intercom. */
   report: "talking";
 }
 
@@ -438,7 +469,9 @@ export type RecipeActionsAreActions = RecipeActionKind extends ActionKind ? true
 interface ActionBase<K extends ActionKind> {
   kind: K;
   stage: ActionStages[K];
-  /** What the action touches (machine, item, door, other actor). Absent for `wait`/`sleep` on floor. */
+  /**
+   * What the action touches (machine, item, door, other actor). Absent for `wait`/`sleep` on floor.
+   */
   targetId?: MachineId | ItemId | DoorId | ActorId;
   /**
    * Personal progress in [0, 1] for actions whose progress belongs to the actor (eat, chat,
@@ -457,13 +490,13 @@ export type Action = { [K in ActionKind]: ActionBase<K> }[ActionKind];
 // ---------------------------------------------------------------------------------------------
 
 /**
- * `comeAboard` (D61) is never planned: departure prep gives it to someone on the dock, a walk
- * back up the nearest ramp, so a stroll on the quay cannot hold the ship.
+ * `comeAboard` (§calling-the-crew-aboard) is never planned: departure prep gives it to someone on
+ * the dock, a walk back up the nearest ramp, so a stroll on the quay cannot hold the ship.
  *
- * D70: neither are `lookForWork` (commerce gives it to the command actor once per docking: down
- * the personnel ramp, which raises `captainAshore`, then whatever the answer calls for) and
- * `meetSpeaker` (commerce gives it to the command actor for a card held for delivery in person:
- * over to the speaker, or out through the gate, and the card comes up when they meet).
+ * §looking-for-work: neither are `lookForWork` (commerce gives it to the command actor once per
+ * docking: down the personnel ramp, which raises `captainAshore`, then whatever the answer calls
+ * for) and `meetSpeaker` (commerce gives it to the command actor for a card held for delivery in
+ * person: over to the speaker, or out through the gate, and the card comes up when they meet).
  */
 export const PERSONAL_ACTIVITIES = [
   "eat",
@@ -474,17 +507,22 @@ export const PERSONAL_ACTIVITIES = [
   "comeAboard",
   "lookForWork",
   "meetSpeaker",
-  /** D77: the officer of the watch's rounds, and an idle on-duty engineer's machine round. */
+  /**
+   * §gangway-watch-and-rounds: the officer of the watch's rounds, and an idle on-duty engineer's
+   * machine round.
+   */
   "rounds",
-  /** D77: the section's helm-stander on gangway watch while docked. */
+  /** §gangway-watch-and-rounds: the section's helm-stander on gangway watch while docked. */
   "standWatch",
   /** Slice 4: an off-watch activity (`ActivityDef`), alone or in a group session. */
   "recreate",
   /** Slice 4: answering (or holding) a `privateTalk` summons in the captain's cabin. */
   "privateTalk",
-  /** D94: the reporting reflex: to the nearest working intercom panel, and a report. */
+  /**
+   * §reporting-damage: the reporting reflex: to the nearest working intercom panel, and a report.
+   */
   "report",
-  /** D94: the officer of the watch on alert, holding the bridge. */
+  /** §scouts: the officer of the watch on alert, holding the bridge. */
   "holdBridge",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
@@ -503,27 +541,30 @@ export type WorkStageKey =
   | "eat"
   /** A recipe stage owned by equipment (W5): progress lives on the fault/machine. */
   | "recipe"
-  /** D47: time at a port market's counter before the `buy` commit step. */
+  /** §buying-parts: time at a port market's counter before the `buy` commit step. */
   | "buy"
-  /** D77: taking over the helm at its standby position (counts only while someone holds the seat). */
+  /**
+   * §handover: taking over the helm at its standby position (counts only while someone holds the
+   * seat).
+   */
   | "handover"
-  /** D78: plotting a course at the nav terminal. */
+  /** §course-plotting: plotting a course at the nav terminal. */
   | "plot"
-  /** D77: a stop on a round. */
+  /** §gangway-watch-and-rounds: a stop on a round. */
   | "rounds"
-  /** D81: cooking at the stove (`galley/cook.ts` `runCook`). */
+  /** §cooking-and-serving: cooking at the stove (`galley/cook.ts` `runCook`). */
   | "cook"
-  /** D82: mopping one tile (`dirt/clean.ts` `runMop`). */
+  /** §mop-trips: mopping one tile (`dirt/clean.ts` `runMop`). */
   | "mop"
-  /** D93: welding a patch kit over a scar (`damage/steps.ts` `runPatch`). */
+  /** §patching-and-plating: welding a patch kit over a scar (`damage/steps.ts` `runPatch`). */
   | "patch"
-  /** D93: fitting a hull plate over a scar (`damage/steps.ts` `runPlate`). */
+  /** §patching-and-plating: fitting a hull plate over a scar (`damage/steps.ts` `runPlate`). */
   | "plate"
-  /** D93: repairing a machine's impact damage (`damage/steps.ts` `runMend`). */
+  /** §machine-damage: repairing a machine's impact damage (`damage/steps.ts` `runMend`). */
   | "mend"
-  /** D94: a scout's look round a compartment (`damage/steps.ts` `runCheck`). */
+  /** §scouts: a scout's look round a compartment (`damage/steps.ts` `runCheck`). */
   | "check"
-  /** D94: a report at an intercom panel (`intercom/report.ts` `runReport`). */
+  /** §reporting-damage: a report at an intercom panel (`intercom/report.ts` `runReport`). */
   | "report";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
@@ -544,23 +585,23 @@ export type ActivityStep =
   /** Put a carried item down here (deck floor, or a port store across the cargo ramp). */
   | { kind: "putDown"; itemId: ItemId }
   /**
-   * D81 commit point: the carried crate of provisions is consumed and the watch's servings spawn
-   * at the cook's feet (on the `serving` zone), each with `Item.meal`, and every crew member
-   * aboard is told where they are (the mess call); `mealToCook` resolves.
+   * §cooking-and-serving commit point: the carried crate of provisions is consumed and the watch's
+   * servings spawn at the cook's feet (on the `serving` zone), each with `Item.meal`, and every
+   * crew member aboard is told where they are (the mess call); `mealToCook` resolves.
    */
   | { kind: "serve" }
   /**
-   * D47 commit point: buy up to `count` of `itemDefId` from the market of `portId` (the ship must
-   * be docked there and the actor at the counter: a cargo transfer tile, or since D63 the dock's
-   * market stall or its gate); the ship's money drops by the price. The units land on the deck
-   * at the actor's feet, or with `intoHands` (D63, on the dock) in the buyer's hands, to be
-   * carried aboard by the plan's `stowBought` step.
+   * §buying-parts commit point: buy up to `count` of `itemDefId` from the market of `portId` (the
+   * ship must be docked there and the actor at the counter: a cargo transfer tile, or since
+   * §buying-parts the dock's market stall or its gate); the ship's money drops by the price. The
+   * units land on the deck at the actor's feet, or with `intoHands` (§buying-parts, on the dock) in
+   * the buyer's hands, to be carried aboard by the plan's `stowBought` step.
    */
   | { kind: "buy"; portId: PortDefId; itemDefId: ItemDefId; count: number; intoHands?: true }
   /**
-   * D63: a dock with no market stall has its market through the gate. Standing at the gate, the
-   * buyer goes out (`availability: offShip`, in the port's market store) for `ticksNeeded`, then
-   * comes back to the gate tile `gate`.
+   * §dock-market-and-passengers: a dock with no market stall has its market through the gate.
+   * Standing at the gate, the buyer goes out (`availability: offShip`, in the port's market store)
+   * for `ticksNeeded`, then comes back to the gate tile `gate`.
    */
   | {
       kind: "throughGate";
@@ -569,31 +610,35 @@ export type ActivityStep =
       ticksDone: number;
       ticksNeeded: number;
     }
-  /** D63: set down every carried unit of `itemDefId` here (bought parts, carried aboard). */
+  /**
+   * §buying-parts: set down every carried unit of `itemDefId` here (bought parts, carried aboard).
+   */
   | { kind: "stowBought"; itemDefId: ItemDefId }
   /**
-   * D65: take `itemId` (a crate within reach) onto the hand truck `truckId` in the actor's hands:
-   * it goes `inContainer` the truck. A crate that is not there drops its leg of the batch.
+   * §hand-truck-trips: take `itemId` (a crate within reach) onto the hand truck `truckId` in the
+   * actor's hands: it goes `inContainer` the truck. A crate that is not there drops its leg of the
+   * batch.
    */
   | { kind: "loadTruck"; itemId: ItemId; truckId: ItemId }
   /**
-   * D65: set `itemId` down off the truck here, and settle its haul task: completed if its custody
-   * predicate now holds, else released. The lead task (`Activity.taskId`) is settled at the end.
+   * §hand-truck-trips: set `itemId` down off the truck here, and settle its haul task: completed if
+   * its custody predicate now holds, else released. The lead task (`Activity.taskId`) is settled at
+   * the end.
    */
   | { kind: "unloadTruck"; itemId: ItemId; truckId: ItemId }
-  /** D65: set the (empty) hand truck down here, aboard. */
+  /** §hand-truck-trips: set the (empty) hand truck down here, aboard. */
   | { kind: "parkTruck"; truckId: ItemId }
   /**
-   * D70, `lookForWork`: standing on the dock, wait for the narrator's answer to this docking's
-   * `captainAshore` ask (raised by commerce the tick the actor first stands on dock floor). Then
-   * the plan goes on to whatever the answer calls for: the meeting for a card held for the
-   * captain, else the look round that follows it in the plan.
+   * §looking-for-work, `lookForWork`: standing on the dock, wait for the narrator's answer to this
+   * docking's `captainAshore` ask (raised by commerce the tick the actor first stands on dock
+   * floor). Then the plan goes on to whatever the answer calls for: the meeting for a card held for
+   * the captain, else the look round that follows it in the plan.
    */
   | { kind: "awaitWord"; portId: PortDefId }
   /**
-   * D70: talk with `withName` (a local on the dock, `localId`) for `ticksNeeded`, standing beside
-   * them; the card comes up at the following `deliverCard`. Fails if they are no longer within
-   * reach.
+   * §meetings-and-visitors: talk with `withName` (a local on the dock, `localId`) for
+   * `ticksNeeded`, standing beside them; the card comes up at the following `deliverCard`. Fails if
+   * they are no longer within reach.
    */
   | {
       kind: "talk";
@@ -604,8 +649,8 @@ export type ActivityStep =
       ticksNeeded: number;
     }
   /**
-   * D70 commit point: the held card `decisionId` comes up now (`deliverHeldCard`), and the step
-   * stays current for the tick it came up on, so the label still says who the captain is with
+   * §delivery commit point: the held card `decisionId` comes up now (`deliverHeldCard`), and the
+   * step stays current for the tick it came up on, so the label still says who the captain is with
    * while the card is on screen. A card already delivered some other way (given up waiting, the
    * dock leaving) makes this a no-op.
    */
@@ -644,8 +689,8 @@ export type ActivityStep =
 export type RecreateRole = "host" | "join" | "solo";
 
 /**
- * D65: one more haul task a hand-truck trip holds, besides the activity's own (`taskId`, the
- * lead, whose crate is set down last).
+ * §one-activity-several-claims: one more haul task a hand-truck trip holds, besides the activity's
+ * own (`taskId`, the lead, whose crate is set down last).
  */
 export interface HaulLeg {
   taskId: TaskId;
@@ -653,9 +698,10 @@ export interface HaulLeg {
 }
 
 /**
- * D65: a haul activity moving several crates on the hand truck `truckId`. `legs` are the other
- * tasks it holds claims on; each leaves when its crate is set down (or found missing). Using the
- * truck is this record: nobody else plans with a truck that some activity names.
+ * §one-activity-several-claims: a haul activity moving several crates on the hand truck `truckId`.
+ * `legs` are the other tasks it holds claims on; each leaves when its crate is set down (or found
+ * missing). Using the truck is this record: nobody else plans with a truck that some activity
+ * names.
  */
 export interface HaulBatch {
   truckId: ItemId;
@@ -687,7 +733,10 @@ export type Activity =
       sinceTick: Tick;
       label?: string;
       plan?: ActivityPlan;
-      /** D65: a hand-truck trip; absent for every other task, a one-crate haul included. */
+      /**
+       * §hand-truck-trips: a hand-truck trip; absent for every other task, a one-crate haul
+       * included.
+       */
       haul?: HaulBatch;
     }
   | {
@@ -726,7 +775,7 @@ export type Intent =
       itemId?: ItemId;
       /** W4a addition: where to go for rest/socialize (a floor tile in a mess or quarters). */
       tile?: TileCoord;
-      /** D70, `meetSpeaker`: the held card the meeting delivers. */
+      /** §meetings-and-visitors, `meetSpeaker`: the held card the meeting delivers. */
       decisionId?: DecisionId;
       /** Slice 4, `recreate`: the activity chosen. */
       activityId?: ActivityDefId;

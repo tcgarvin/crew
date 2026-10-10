@@ -1,5 +1,5 @@
 /**
- * D66: locals on the dock and the guaranteed staging call.
+ * §staging-hook-and-the-hold, §locals-table: locals on the dock and the guaranteed staging call.
  *
  * - A new game's dock has its posted regulars at their posts; locals are never actors.
  * - `stageDock` is raised `narrator.approachHookLeadSeconds` before the end of the route, and
@@ -127,7 +127,7 @@ const PLAN: StagingPlan = {
   ambience: "The shift horn sounds twice across the quay.",
 };
 
-describe("locals on the dock (D66)", () => {
+describe("locals on the dock (§locals-table)", () => {
   it("dresses a new game's dock with its posted regulars, who are not crew", () => {
     const { world } = stagingWorld();
     const locals = Object.values(world.state.dockside.locals);
@@ -142,7 +142,7 @@ describe("locals on the dock (D66)", () => {
   });
 });
 
-describe("the staging call (D66)", () => {
+describe("the staging call (§staging-hook-and-the-hold)", () => {
   it("is raised at the lead point and the dock comes alongside with the floor set", () => {
     const test = stagingWorld();
     setCourse(test, FAR);
@@ -180,8 +180,8 @@ describe("the staging call (D66)", () => {
     const { world } = test;
     const travel = world.state.travel;
     if (travel.stage !== "transit") throw new Error("not in transit");
-    // A save from before D66, or a leg already over its lead distance: the route is done and no
-    // call has been made.
+    // A save that predates the staging record, or a leg already over its lead distance: the route
+    // is done and no call has been made.
     travel.routeProgress = travel.routeDistance;
     const result = test.kernel.advance(world, 1);
     expect(result.halt).toEqual({ kind: "hook" });
@@ -264,11 +264,12 @@ describe("the staging call (D66)", () => {
 });
 
 /**
- * D69: a hookable narrative event committed in the tick a hook is raised (here the staging call)
- * keeps its `notableEvent`: it is raised once the call is answered, not dropped because the
- * check only looked one tick back. A story hook raised after the event covers it instead.
+ * §notable-event-hook: a hookable narrative event committed in the tick a hook is raised (here the
+ * staging call) keeps its `notableEvent`: it is raised once the call is answered, not dropped
+ * because the check only looked one tick back. A story hook raised after the event covers it
+ * instead.
  */
-describe("a notable event beside the staging call (D69)", () => {
+describe("a notable event beside the staging call (§notable-event-hook)", () => {
   function notableWorld(): TestWorld {
     const base = docksideConfig({});
     const config: ConfigDef = {
@@ -354,7 +355,7 @@ describe("a notable event beside the staging call (D69)", () => {
   });
 });
 
-describe("the stageDock command (D66)", () => {
+describe("the stageDock command (§staging-plan-command)", () => {
   it("places the plan's people and props with the floor set and logs the ambience", () => {
     const test = stagingWorld();
     setCourse(test, FAR);
@@ -459,7 +460,7 @@ describe("the stageDock command (D66)", () => {
   });
 });
 
-describe("locals go with the dock (D66)", () => {
+describe("locals go with the dock (§locals-come-and-go-with-the-dock)", () => {
   it("are gone at the end of undocking, and departure never waits for them", () => {
     const test = stagingWorld();
     const { world } = test;

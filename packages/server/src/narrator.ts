@@ -26,21 +26,27 @@ export interface NarratorCtx {
   readonly notes?: unknown;
   /** `CREW_NARRATOR_MODEL`; absent = the narrator's default. */
   readonly model?: string;
-  /** D70: the model timeout for this call (`CREW_STAGING_TIMEOUT_MS` for staging); absent = default. */
+  /**
+   * §narrator-timeouts: the model timeout for this call (`CREW_STAGING_TIMEOUT_MS` for staging);
+   * absent = default.
+   */
   readonly timeoutMs?: number;
-  /** D96: `CREW_NARRATOR_REASONING_EFFORT` (or the staging one for `stageDock`). */
+  /**
+   * §models-and-reasoning-effort: `CREW_NARRATOR_REASONING_EFFORT` (or the staging one for
+   * `stageDock`).
+   */
   readonly reasoningEffort: ReasoningEffort;
 }
 
 /**
  * What a narrator call hands the route: the response the client gets, plus, when the response
- * is the fallback (`response.fallback` set), why (D42: the route logs it; the message never
+ * is the fallback (`response.fallback` set), why (the route logs it; the message never
  * carries the API key or the request body).
  */
 export interface NarratorOutcome {
   readonly response: NarratorResponse;
   readonly error?: string;
-  /** D97: the model's notes turn, which the route runs after the response. */
+  /** §notes-turn: the model's notes turn, which the route runs after the response. */
   readonly notesTurn?: () => Promise<NotesRun>;
 }
 

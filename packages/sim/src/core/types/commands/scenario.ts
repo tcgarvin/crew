@@ -12,7 +12,10 @@ export type ScenarioSpawn =
       readonly tempRef: TempRef;
       readonly crewDefId: CrewDefId;
       readonly location: PhysicalLocation;
-      /** D77: their watch section from the scenario's bill; absent for a dayworker. */
+      /**
+       * §sections-and-dayworkers: their watch section from the scenario's bill; absent for a
+       * dayworker.
+       */
       readonly section?: WatchSection;
     }
   | {

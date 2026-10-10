@@ -37,8 +37,8 @@ export function rectContains(rect: DockRect, t: TileCoord): boolean {
 }
 
 /**
- * D72: the box each hull size class fits inside. Mirrors sim `HULL_SIZE_BOX`, which this package
- * may only import as a type; a CLI test holds the two together.
+ * §orientation-and-size: the box each hull size class fits inside. Mirrors sim `HULL_SIZE_BOX`,
+ * which this package may only import as a type; a CLI test holds the two together.
  */
 export const HULL_CLASS_BOX: Readonly<
   Record<HullSizeClass, { readonly w: number; readonly h: number }>
@@ -48,13 +48,16 @@ export const HULL_CLASS_BOX: Readonly<
   L: { w: 40, h: 24 },
 };
 
-/** D72: the dock-frame rectangle of `dock`'s berth box. */
+/** §berth-boxes: the dock-frame rectangle of `dock`'s berth box. */
 export function berthBox(dock: Pick<DockDef, "berth">): DockRect {
   const box = HULL_CLASS_BOX[dock.berth.sizeClass];
   return { x: dock.berth.origin.x, y: dock.berth.origin.y, w: box.w, h: box.h };
 }
 
-/** D72: whether a hull of class `hull` fits a berth box of class `berth` (S < M < L). */
+/**
+ * §orientation-and-size: whether a hull of class `hull` fits a berth box of class `berth` (S < M <
+ * L).
+ */
 export function hullFitsBerth(hull: HullSizeClass, berth: HullSizeClass): boolean {
   const own = HULL_CLASS_BOX[hull];
   const box = HULL_CLASS_BOX[berth];
@@ -62,9 +65,10 @@ export function hullFitsBerth(hull: HullSizeClass, berth: HullSizeClass): boolea
 }
 
 /**
- * D72: the dock tile under deck tile (0,0) when `deck` lies in `dock`'s berth box: flush to the
- * box's south edge and centred across it. Mirrors sim `berthPlacement` without its throws (the
- * validator reports a deck too big for the box instead); a CLI test holds the two together.
+ * §ship-placement: the dock tile under deck tile (0,0) when `deck` lies in `dock`'s berth box:
+ * flush to the box's south edge and centred across it. Mirrors sim `berthPlacement` without its
+ * throws (the validator reports a deck too big for the box instead); a CLI test holds the two
+ * together.
  */
 export function shipAtInBerth(
   dock: Pick<DockDef, "berth">,

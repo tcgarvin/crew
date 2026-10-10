@@ -1,5 +1,6 @@
 /**
- * Slice 4 (D84): where each off-watch activity can be held on a deck, checked at L3.
+ * Slice 4 (§activities-and-interests): where each off-watch activity can be held on a deck, checked
+ * at L3.
  *
  * An activity's `venue` is an ordered list of alternatives; the sim takes the first present on the
  * deck (ship life plan, slice 4 call 12). An alternative is **present** when the deck has a

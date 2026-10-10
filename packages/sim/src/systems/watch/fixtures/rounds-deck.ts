@@ -1,6 +1,7 @@
 /**
- * W2 test fixture (D77, D78): the W4a crew deck widened by a four-column bridge, so an officer's
- * round has every stop and a course has a nav terminal to be plotted at.
+ * W2 test fixture (§gangway-watch-and-rounds, §course-plotting): the W4a crew deck widened by a
+ * four-column bridge, so an officer's round has every stop and a course has a nav terminal to be
+ * plotted at.
  *
  *   x 0123456789ABCDEF
  *   0 AAAABBBBCCCCDDDN   N = nav terminal (15,0), its seat (14,0)
@@ -162,7 +163,8 @@ export function roundsWorld(options: RoundsWorldOptions = {}): TestWorld {
   registerSpatial(registry);
   if (options.travel === true) registerTravel(registry);
   registerNeeds(registry);
-  // D77: with travel the helm must be stood (its watch post and seat), so the watch runs too.
+  // §gangway-watch-and-rounds: with travel the helm must be stood (its watch post and seat), so the
+  // watch runs too.
   if (options.travel === true) registerWatch(registry);
   registerWork(registry, { derivations: ALL_DERIVATIONS });
   registerPlannerDefaults(registry);

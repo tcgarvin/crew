@@ -64,8 +64,8 @@ function setCourse(fixture: TestWorld): void {
 }
 
 /**
- * Set a course and plot it by hand (D78's plot is the nav terminal's story, not the helm's): the
- * helm watch opens at once.
+ * Set a course and plot it by hand (plotting, §course-plotting, is the nav terminal's story, not
+ * the helm's): the helm watch opens at once.
  */
 function setPlottedCourse(fixture: TestWorld): void {
   setCourse(fixture);
@@ -128,7 +128,7 @@ function setUnavailable(world: World, actorIds: readonly ActorId[], how = "incap
 
 const MANOEUVRES: readonly TravelStage[] = ["approaching", "docking"];
 
-describe("who stands the helm (D77)", () => {
+describe("who stands the helm (§who-has-the-helm)", () => {
   it("Noor stands Red's helm with Mara aboard, Jax White's, Dane Blue's; Mara is officer of the watch", () => {
     const fixture = bridgeWorld();
     const { world } = fixture;
@@ -170,7 +170,8 @@ describe("who stands the helm (D77)", () => {
     setUnavailable(world, [JAX, DANE], "offShip");
     expect(roleOf(world, PRIYA)).toBe("stander");
     expect(roleOf(world, BETTINA)).toBe("none");
-    // Nobody aboard can plot (D78 asks the helm's piloting), so the course is plotted by hand.
+    // Nobody aboard can plot (plotting asks the helm's piloting, §course-plotting), so the course
+    // is plotted by hand.
     setPlottedCourse(fixture);
     runUntil(fixture, 15, (w) => holder(w) === PRIYA);
     expect(labelOf(world, PRIYA)).toBe("at the helm");
@@ -244,7 +245,7 @@ describe("taking the helm (the slice 1 QA case)", () => {
   });
 });
 
-describe("handover at the bell (D77)", () => {
+describe("handover at the bell (§handover)", () => {
   it("the oncoming walks to standby 30 s before the bell, relieves in 5 s, and takes the seat at once", () => {
     const fixture = slowWorld(400);
     const { world } = fixture;
@@ -326,7 +327,7 @@ describe("handover at the bell (D77)", () => {
   });
 });
 
-describe("relief for needs (D77)", () => {
+describe("relief for needs (§relief)", () => {
   it("a hungry stander raises a relief, an off-watch pilot takes it, she eats, comes back, and the relief resolves", () => {
     const fixture = slowWorld(400);
     const { world } = fixture;
@@ -375,7 +376,7 @@ describe("relief for needs (D77)", () => {
   });
 });
 
-describe("vacancy is a gate, not a slowdown (D77)", () => {
+describe("vacancy is a gate, not a slowdown (§helm-vacancy)", () => {
   it("preparingDeparture stalls with nobody to take the helm, and goes once someone does", () => {
     const fixture = bridgeWorld();
     const { world } = fixture;
@@ -383,7 +384,8 @@ describe("vacancy is a gate, not a slowdown (D77)", () => {
     setUnavailable(world, everyone);
     setCourse(fixture);
     runFor(fixture, 0.1);
-    // Nobody is up to plot it either; plotted by hand, so only the helm holds the ship (D78).
+    // Nobody is up to plot it either; plotted by hand, so only the helm holds the ship
+    // (§course-plotting).
     const docked = world.state.travel;
     if (docked.stage !== "docked") throw new Error("left port");
     docked.coursePlotted = true;
@@ -426,7 +428,7 @@ describe("vacancy is a gate, not a slowdown (D77)", () => {
   });
 });
 
-describe("gangway watch (D77)", () => {
+describe("gangway watch (§gangway-watch-and-rounds)", () => {
   it("docked, the stander stands the gangway, and leaves it for the helm when a course is set", () => {
     const fixture = bridgeWorld();
     const { world } = fixture;
@@ -451,7 +453,7 @@ describe("gangway watch (D77)", () => {
   });
 });
 
-describe("the helm's stakes: hazards are rolled by whoever has it (D77, D78)", () => {
+describe("the helm's stakes: hazards are rolled by whoever has it (§hazard-roll)", () => {
   function scheduleHazardNow(world: World): void {
     const id = allocateId(world.state, "hazard") as HazardId;
     world.state.hazards.push({
@@ -489,7 +491,7 @@ describe("the helm's stakes: hazards are rolled by whoever has it (D77, D78)", (
   });
 });
 
-describe("the bell and the relief (D77 addendum, slice-2 QA)", () => {
+describe("the bell and the relief (§relief, slice-2 QA)", () => {
   const reliefOpen = (w: World) =>
     Object.values(w.state.work.problems).some(
       (p) => p.kind === "stationToStaff" && p.payload.post === "relief" && p.status === "open",
@@ -553,7 +555,7 @@ describe("the bell and the relief (D77 addendum, slice-2 QA)", () => {
   });
 });
 
-describe("one person walks up to an empty helm at a time (D77 addendum, slice-2 QA)", () => {
+describe("one person walks up to an empty helm at a time (§who-has-the-helm, slice-2 QA)", () => {
   it("the fallback already on her way keeps the designation until she sits; the stander, free again, relieves her", () => {
     const fixture = bridgeWorld();
     const { world } = fixture;
@@ -589,7 +591,7 @@ describe("one person walks up to an empty helm at a time (D77 addendum, slice-2 
   });
 });
 
-describe("gangway watch by a section's non-officer (D77 addendum)", () => {
+describe("gangway watch by a section's non-officer (§gangway-watch-and-rounds)", () => {
   it("Blue's cook, unqualified for the helm, stands the gangway in port while the first officer has the watch, and leaves it when a course is set", () => {
     const bill = {
       sections: [

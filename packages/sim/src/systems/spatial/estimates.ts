@@ -15,7 +15,7 @@ import { plannedDoorSeconds, schematicPolicy } from "./routing";
 /**
  * Route the schematic suggests from `from` to `to`, or null if the layout has none. With
  * `caches`, through the nav path cache (`cachedPath`, schematic key): the schematic changes only
- * with the geometry or a ramp, and both clear that cache. D63: the dock's long walks made these
+ * with the geometry or a ramp, and both clear that cache. The dock's long walks made these
  * uncached searches the planner's main cost.
  */
 export function knownRoute(

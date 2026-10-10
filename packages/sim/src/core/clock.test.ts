@@ -44,7 +44,7 @@ describe("clock", () => {
     expect(ticksToSeconds(50, 20)).toBe(2.5);
   });
 
-  describe("ship's day (D76)", () => {
+  describe("ship's day (§the-ships-day)", () => {
     // A 1200 s day of three watches (the default bundle's), 20 ticks per second.
     const config = tinyConfig({ daySeconds: 1200, watchesPerDay: 3 });
 
@@ -93,7 +93,7 @@ describe("clock", () => {
     it("rejects bad input rather than returning NaN", () => {
       expect(() => daysToSeconds(config, -1)).toThrow(RangeError);
       expect(() => daysToSeconds(config, Number.NaN)).toThrow(RangeError);
-      // A stale config without the key reads as undefined (D76's renames): loud, not NaN.
+      // A stale config without the key reads as undefined (the day-unit renames): loud, not NaN.
       expect(() => dayTicks(config, undefined as unknown as number)).toThrow(RangeError);
       expect(() => perDayToPerSecond(config, Number.POSITIVE_INFINITY)).toThrow(RangeError);
       expect(() => daysToSeconds(withTime({ daySeconds: 0 }), 1)).toThrow(RangeError);

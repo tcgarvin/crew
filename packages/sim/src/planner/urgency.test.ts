@@ -1,9 +1,9 @@
 /**
- * Task urgency for critical machines (slice-5 integration, D93) over a hand-built `AgentView`:
- * impact damage to the engine is containment, like a fault there; the generator's fault or
- * damage is containment while the ship is on alert and keeps its owner's class off it; on alert
- * a symptom on a critical machine is looked at as containment; a damaged galley stove keeps its
- * owner's class either way.
+ * Task urgency for critical machines (slice-5 integration, §urgency-of-damage-work) over a
+ * hand-built `AgentView`: impact damage to the engine is containment, like a fault there; the
+ * generator's fault or damage is containment while the ship is on alert and keeps its owner's class
+ * off it; on alert a symptom on a critical machine is looked at as containment; a damaged galley
+ * stove keeps its owner's class either way.
  */
 import { describe, expect, it } from "vitest";
 import type { MachineTag } from "../core/types/content";
@@ -53,7 +53,7 @@ const config = {
   urgency: { heatSurvivalAbove: 0.95, heatContainmentAbove: 0.8 },
 } as PlannerConfig;
 
-describe("critical machines (D93)", () => {
+describe("critical machines (§urgency-of-damage-work)", () => {
   it("rates impact damage to the engine as containment, on alert or off", () => {
     expect(taskUrgency(view(ALERT), problem("machineDamaged", "m1"), config)).toBe("containment");
     expect(taskUrgency(view(undefined), problem("machineDamaged", "m1"), config)).toBe(

@@ -1,7 +1,6 @@
 /**
  * Raising narrator hooks (D5). `NarratorHook` halts `advance()` (see `world.ts` `haltReason`);
- * only one hook may be pending at a time, so raising is a no-op while one already is. Lived in
- * `systems/travel/hooks.ts` until D37 made the kernel core raise `policyDecision` hooks itself.
+ * only one hook may be pending at a time, so raising is a no-op while one already is.
  *
  * Raising any hook is narrator contact, so it re-arms the quiet timer: `lastNarrativeTick` is
  * set to the raise tick and `quietTooLong` (`core/pipeline.ts`) needs another full
@@ -23,8 +22,8 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
   context: HookContexts[K],
 ): boolean {
   if (ctx.state.narrator.pendingHook !== undefined) return false;
-  // D69: a story call made after a hookable event reads it, so no `notableEvent` is owed for it
-  // any more. The staging call cannot tell the story, so it leaves the debt standing.
+  // §notable-event-hook: a story call made after a hookable event reads it, so no `notableEvent`
+  // is owed for it. The staging call cannot tell the story, so it leaves the debt standing.
   const owed = ctx.state.narrator.pendingNotable;
   if (kind !== "stageDock" && owed !== undefined && owed.tick < ctx.tick) {
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
@@ -45,9 +44,9 @@ export function raiseHookIfIdle<K extends NarratorHookKind>(
 }
 
 /**
- * D99: a `nextPort` call-back request is served by the first story hook raised while docked
- * at a port other than the one it was asked at (any port, if it was asked in flight); the
- * digest reads it back on that call, and acknowledging the hook spends it.
+ * §requested-call-back: a `nextPort` call-back request is served by the first story hook raised
+ * while docked at a port other than the one it was asked at (any port, if it was asked in flight);
+ * the digest reads it back on that call, and acknowledging the hook spends it.
  */
 function serveNextPortRequest(ctx: StepCtx, hookId: HookId): void {
   const request = ctx.state.narrator.callBack;

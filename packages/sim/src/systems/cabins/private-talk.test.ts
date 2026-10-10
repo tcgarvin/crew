@@ -253,7 +253,7 @@ describe("privateTalk: a talk not held (slice 4, call 15)", () => {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The D77 bridge deck with its north-east corner made the captain's cabin (no desk), reached from
+ * The watch bridge deck with its north-east corner made the captain's cabin (no desk), reached from
  * the bridge through an opening south of (11,0); a 900 s day, so Red's watch outlasts the wait,
  * and a ten-minute leg.
  *

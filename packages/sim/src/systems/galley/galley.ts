@@ -1,6 +1,6 @@
 /**
- * The galley system (D81), phase `needs`, every tick, registered after the watch (the bell
- * first, then the meal that follows it). In order:
+ * The galley system (§meal-problem), phase `needs`, every tick, registered after the watch (the
+ * bell first, then the meal that follows it). In order:
  *
  * 1. The meal problem: `mealToCook { watchIndex }` is raised `galley.mealLeadDays` before the
  *    coming watch's bell (once per watch: `state.galley.lastMealWatch`), only on a ship with a

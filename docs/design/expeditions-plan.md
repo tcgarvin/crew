@@ -5,7 +5,8 @@ Status: plan for phase A1, 2026-10-10. Design and rationale: `docs/design/expedi
 are planned here when the one before each lands, as `docs/design/ship-life-plan.md` did its
 slices. A1 ends with all four checks green (`pnpm typecheck && pnpm lint && pnpm depcruise &&
 pnpm test`), `crew content validate` clean, the `crew expeditions` numbers recorded, a phone
-playtest, and D104–D107 in `docs/DECISIONS.md`.
+playtest, the owner's rulings as the next `docs/DECISIONS.md` entry, and the A1 mechanics in
+`docs/spec/` (see the closing section).
 
 ## Phase A1: the fight, measured
 
@@ -68,9 +69,10 @@ Decisions the design left to the plan, each made after reading the code it lands
    command instead: `scenarioStartExpedition` moves a docked ship to the site in place.
 3. **The scenario command swaps the dock.** Apply, under scenario authority: `travel` becomes
    `{ stage: "docked", portId: siteId }`; the ramps are set shut, `detachDock` (which refuses
-   while a ramp is down or anyone is on the floor, D59; the command's precondition is nobody on
-   the dock and no dock hand errand), `attachDock` with the site's map, the ramps set open
-   (`syncRampPassability`); the hub's locals and props are cleared with the dock (D61); the
+   while a ramp is down or anyone is on the floor, §ramps-and-cast-off; the command's
+   precondition is nobody on the dock and no dock hand errand), `attachDock` with the site's
+   map, the ramps set open (`syncRampPassability`); the hub's locals and props are cleared with
+   the dock (§locals-come-and-go-with-the-dock); the
    cast is spawned on the site floor at their posts; `state.expedition` is written. The world's
    narrator bookkeeping is untouched (`captainAshoreLastAsk` stays spent at the hub, so no
    `captainAshore` fires at the site).
@@ -135,8 +137,9 @@ Decisions the design left to the plan, each made after reading the code it lands
 13. **Schema 13.** Every actor gains `body` (whole) and `skills.fighting` (from the crew def by
     `defId`, else 0); `expedition` is optional and absent; the Mk2's arms locker is instantiated
     into a save that lacks the placement (by `placementKey`, the `instantiateDeck` path for one
-    placement), and the scenario's weapons are stowed through `spawnScenarioStores` as D95's
-    patch kits were. Old saves play on with three blasters in the locker they never had.
+    placement), and the scenario's weapons are stowed through `spawnScenarioStores` as the
+    patch kits were (§save-migrations). Old saves play on with three blasters in the locker
+    they never had.
 
 ## Gate: contracts (one agent, serial)
 
@@ -554,7 +557,7 @@ dispatch line).
 - `render-dock.ts`: `cover` drawn as `c`/`n` by the legend's own character, site posts in the
   post list with their kinds, the default cast listed under the map.
 - `expeditions.ts`: the instrument (below), a generator drained with `yielding.ts` like
-  `runBeats`, so its test turns the event loop (D95).
+  `runBeats`, so its test turns the event loop.
 - Tests: the Boathouse validates; a site without an exit, with a flank post whose route shares
   a shed tile, with a cast of seven, with a target at a guard post, each fails with a readable
   message; a dock with a `bench` still validates; `render-dock` output for the Boathouse matches
@@ -568,10 +571,10 @@ gate's).
 - `render/dockArt.ts`: `cover` tiles drawn as net racks or crates by the legend character's
   palette (`n` dark lattice, `c` the crate glyph `crates.ts` already draws); a `kind: "site"`
   map gets no quay structure, clamps or bay walls (`dockShape.ts`, `scenery.ts`: the planet pad
-  look from D62 with the site's sky); site posts drawn as a small marker only when tapped.
+  look (§dock-drawing) with the site's sky); site posts drawn as a small marker only when tapped.
 - `render/shots.ts` (+ test): a tracer line per `RenderShot`, keyed by tick so it plays once at
   playback, 120 ms, a flash on `hit`. `render/draw.ts`: `actorDotColor` adds a rim for
-  `side: "them"` (never crew gold; the local-dot rule of D68), a dimmed dot for `down`, a cross
+  `side: "them"` (never crew gold; the local-dot rule of §locals-and-props), a dimmed dot for `down`, a cross
   for `dead`; the action label from `actionLabel` as now.
 - HUD: the shore header in `ui/Headline.tsx`'s row while `frame.expedition` is set: "Us: steady
   · Them: breaking"; the alert tint reused. `ui/Inspector.tsx`: a body line per person
@@ -659,10 +662,11 @@ The tuning loop (lead, integration step 6), one knob at a time, re-running the i
    the targets: party deaths per fight under 0.1 on the default cast and under 0.25 on `hard`;
    `assault` under 45 s, `hold` under 90 s; at least 60 % of fights ending by breaking on the
    default cast; `hold` versus `assault` differing by the CI margins with room; `creep` reaching
-   the target unnoticed in half the `shaky` fights. Numbers into D106.
-8. D-entries D104–D107, `README.md` line ("the ship can set down at a site and the crew go in
-   after someone, with blasters and a plan"), deploy via the `ops` agent (a preview: the default
-   game is unchanged, but the schema bump is live), and the playtest checklist below.
+   the target unnoticed in half the `shaky` fights. Numbers into the fight's spec section.
+8. The decision entry and spec sections (closing section), `README.md` line ("the ship can
+   set down at a site and the crew go in after someone, with blasters and a plan"), deploy via
+   the `ops` agent (a preview: the default game is unchanged, but the schema bump is live), and
+   the playtest checklist below.
 
 ## Risks and hidden coupling
 
@@ -693,7 +697,7 @@ The tuning loop (lead, integration step 6), one knob at a time, re-running the i
   walk per pair: under 2,000 cell reads a second. Shots add one walk each. Nothing is cached;
   if a phone profile shows the combat system above 1 ms a tick, cache LoS per (from, to) tile
   pair for the tick.
-- **Test-suite time** (D95): the Boathouse fixture is the real Mk2 and the real map, about 2 s a
+- **Test-suite time**: the Boathouse fixture is the real Mk2 and the real map, about 2 s a
   fight at 20 Hz; W2's seeded ten-fight tests give themselves `{ timeout: 15_000 }` and sum to
   under a minute in the sim project; the instrument's test is small-N and drained with yields.
 - **Stable tests without determinism as a goal**: seeds are fixed and assertions are bounds over
@@ -702,7 +706,7 @@ The tuning loop (lead, integration step 6), one knob at a time, re-running the i
 - **Counts and literals pinned in tests**: ports 6 → 7, docks 6 → 7, machines 21 → 22, items
   20 → 22, thoughts 27 → 32; `contracts.test.ts` authority; the narrator's "six ports" wording
   (the filter keeps it true); `fullSim.test.ts`'s seed if the locker's threshold draw shifts
-  the `failures` stream (as D94's intercoms did).
+  the `failures` stream (as the intercom panels did).
 - **`people.ts`'s `ports` record**: if `checkPeopleReferences` requires an entry per port,
   `port.boathouse` needs an empty one or the rule skips sites; the gate finds out.
 - **The arms locker's tile on Mk2**: the cross-passage is the busiest corridor; the locker's
@@ -737,20 +741,22 @@ The tuning loop (lead, integration step 6), one knob at a time, re-running the i
 7. The ship's log at the end tells the fight in under fifteen lines.
 8. Fast-forward drops to 1× at contact and at a death.
 
-## D-entries for A1 (D104–D107, provisioned)
+## Decision and spec for A1
 
-- **D104.** The owner's rulings on `docs/design/expeditions.md` (§13 items 1–4): a site is a
-  landing the ship sets down at; crew and the captain can die, rare, never scripted, command
-  to the first officer; kill jobs from the start, rare and dirty; the captain leads. The
-  delegated calls of §13 items 5–16 stand as the design's.
-- **D105.** Bodies and arms: `Actor.body` at SD §12's minimum with one damage entry point,
-  capacities from wounds composed with fatigue through one function, incapacitation and death
-  by threshold, stun as a wound type; weapons as items, the Mk2 arms locker, `fighting` as the
-  seventh skill; `PortDef.kind: "site"` and `DockDef.kind: "site"` with cover tiles and site
-  posts, and the Boathouse. Calls 1, 5, 7, 8 and 13 folded in.
-- **D106.** The fight: the combat system owns its combatants; the seven actions, lines of sight
+- **Decision (the next `D<n>` in `docs/DECISIONS.md`).** The owner's rulings on
+  `docs/design/expeditions.md` (§13 items 1–4): a site is a landing the ship sets down at; crew
+  and the captain can die, rare, never scripted, command to the first officer; kill jobs from
+  the start, rare and dirty; the captain leads. The delegated calls of §13 items 5–16 stand as
+  the design's.
+- **Spec, new `docs/spec/expeditions.md`.** Bodies and arms: `Actor.body` at SD §12's minimum
+  with one damage entry point, capacities from wounds composed with fatigue through one
+  function, incapacitation and death by threshold, stun as a wound type; weapons as items, the
+  Mk2 arms locker, `fighting` as the seventh skill; `PortDef.kind: "site"` and
+  `DockDef.kind: "site"` with cover tiles and site posts, and the Boathouse (calls 1, 5, 7, 8
+  and 13). The fight: the combat system owns its combatants; the seven actions, lines of sight
   and cover, hits and wounds; morale as the resolution currency; the five postures, fire and
-  squad rules; the plan menu written by the sim; `scenarioStartExpedition`. Calls 3, 6, 9, 11
-  and 12, and the tuning numbers from integration step 7.
-- **D107.** Save schema 13, the `crew expeditions` instrument and its CI bounds, the site look
-  and the fight on the phone, and the narrator's blindness to sites until A2 (call 4).
+  squad rules; the plan menu written by the sim; `scenarioStartExpedition` (calls 3, 6, 9, 11
+  and 12, with the tuning numbers from integration step 7).
+- **Spec, existing files.** Save schema 13 and the `crew expeditions` instrument with its CI
+  bounds in `architecture.md`; the site look and the fight on the phone in `client.md`; the
+  narrator's blindness to sites until A2 (call 4) in `narrator-story.md`.

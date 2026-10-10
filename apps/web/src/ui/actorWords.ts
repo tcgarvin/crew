@@ -93,7 +93,7 @@ export function problemLines(problems: readonly Pick<ProblemView, "kind">[]): Pr
 }
 
 // ---------------------------------------------------------------------------------------------
-// The watch, mood and thoughts (D77, D79)
+// The watch, mood and thoughts (§sections-and-dayworkers, §mood-and-work-speed)
 // ---------------------------------------------------------------------------------------------
 
 /** "red" → "Red". */
@@ -251,7 +251,7 @@ export function interestsLine(interests: DeepReadonly<Interests>): string {
 /**
  * Affinity at which someone counts as close, and its negative as at odds: the digest's bands
  * (slice 4 call 24), so the inspector and the narrator name the same people. Compatibility alone
- * reaches ±2 (D88), so naming someone takes something remembered about them as well.
+ * reaches ±2 (§affinity), so naming someone takes something remembered about them as well.
  */
 export const CLOSE_AFFINITY = 3;
 

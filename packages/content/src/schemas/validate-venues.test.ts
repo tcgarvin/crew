@@ -35,7 +35,7 @@ function authored(): ContentBundle {
   return result.bundle;
 }
 
-describe("activity rules (D84)", () => {
+describe("activity rules (§activities-and-interests)", () => {
   it("accepts the authored activities, thoughts and decks", () => {
     expect(messagesAfter(() => {})).toEqual([]);
   });

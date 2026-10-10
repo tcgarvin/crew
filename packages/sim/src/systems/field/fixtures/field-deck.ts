@@ -1,8 +1,8 @@
 /**
- * W1 test fixture (D92): a small ship for the asteroid field. Four rooms in a row joined by
- * doorless openings: an airlock with the ramp and the gangway post, a hold (the biggest room, for
- * the uniform-hit share), engineering with the engine, and the bridge with the helm and the nav
- * terminal. Every tile is hull (80 of them).
+ * W1 test fixture (§field-lifecycle): a small ship for the asteroid field. Four rooms in a row
+ * joined by doorless openings: an airlock with the ramp and the gangway post, a hold (the biggest
+ * room, for the uniform-hit share), engineering with the engine, and the bridge with the helm and
+ * the nav terminal. Every tile is hull (80 of them).
  *
  *   x 0123456789ABCDEF
  *   0 LLLHHHHHHEEEBNBB     N = nav terminal (13,0), operated from (13,1)

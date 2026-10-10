@@ -40,7 +40,7 @@ export const portDefSchema = z.strictObject({
       }),
     )
     .min(1),
-  /** D47: opening stock; `count` may be 0 so a port can price a part it is out of. */
+  /** §market-stock: opening stock; `count` may be 0 so a port can price a part it is out of. */
   market: z.array(
     z.strictObject({ itemDefId: itemDefIdSchema, count: nonNegativeInt, price: positiveInt }),
   ),

@@ -14,7 +14,7 @@ const feel = (world: World, from: ActorId, to: ActorId) =>
 const keysHeld = (world: World, from: ActorId, to: ActorId) =>
   world.state.social.relationships[from]?.[to]?.memories.map((m) => m.key) ?? [];
 
-describe("addMemory (D88)", () => {
+describe("addMemory (§memories)", () => {
   it("creates the entry on the first memory, and says how affinity moved (trace)", () => {
     const { world } = socialWorld();
     const { ctx, drafts } = galleyStepCtx(world);

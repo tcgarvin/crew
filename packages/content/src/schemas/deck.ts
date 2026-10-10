@@ -72,11 +72,14 @@ export const deckDefSchema = z.strictObject({
       tags: z.array(z.enum(["crew", "passenger", "cargo"])),
     }),
   ),
-  /** D72: bow east and ramps south are invariants, not fields; the hull contract checks them. */
+  /**
+   * §orientation-and-size: bow east and ramps south are invariants, not fields; the hull contract
+   * checks them.
+   */
   hull: z.strictObject({
     class: z.string().min(1),
     sizeClass: hullSizeClassSchema,
-    /** D93: the hull bar's full value in hull points. */
+    /** §hull-scars-and-ship-loss: the hull bar's full value in hull points. */
     max: positiveInt,
   }),
 }) satisfies z.ZodType<DeckDef>;

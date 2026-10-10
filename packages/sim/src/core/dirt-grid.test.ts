@@ -1,4 +1,4 @@
-/** The dirt grid's index arithmetic (D82). */
+/** The dirt grid's index arithmetic (§dirt-grid). */
 import { describe, expect, it } from "vitest";
 import { cellIndex, emptyCells, inGrid, roomCells } from "./dirt-grid";
 import { TINY, tinyContent } from "./fixtures/tiny-content";
@@ -6,7 +6,7 @@ import { TINY, tinyContent } from "./fixtures/tiny-content";
 const deck = tinyContent().decks[TINY.deck];
 if (deck === undefined) throw new Error("no tiny deck");
 
-describe("dirt grid (D82)", () => {
+describe("dirt grid (§dirt-grid)", () => {
   it("indexes row-major over the authored bounds", () => {
     expect(cellIndex(deck, { x: 0, y: 0 })).toBe(0);
     expect(cellIndex(deck, { x: 2, y: 1 })).toBe(deck.width + 2);

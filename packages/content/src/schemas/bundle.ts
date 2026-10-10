@@ -34,11 +34,14 @@ export const contentBundleSchema = z.strictObject({
   traits: z.record(traitDefIdSchema, traitDefSchema),
   ports: z.record(portDefIdSchema, portDefSchema),
   scenarios: z.record(scenarioDefIdSchema, scenarioDefSchema),
-  /** D25: required for authored content; the sim type is optional for hand-built test bundles. */
+  /**
+   * §issuers-and-pitches: required for authored content; the sim type is optional for hand-built
+   * test bundles.
+   */
   people: peopleTableDefSchema,
   /** Dockside §3: required for authored content (it may be empty); optional in the sim type. */
   docks: z.record(dockDefIdSchema, dockDefSchema),
-  /** D79: every thought key, each with its def (a missing one fails here). */
+  /** §thoughts: every thought key, each with its def (a missing one fails here). */
   thoughts: z.strictObject({
     stoodLongWatch: thoughtDefSchema,
     doubleWatch: thoughtDefSchema,

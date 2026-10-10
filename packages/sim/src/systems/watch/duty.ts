@@ -1,13 +1,13 @@
 /**
- * On and off duty (SD §11.4, D77): derived from the tick, never stored. A section has the watch
- * whose index within the day equals its place in the bill (no wrap over sections: a bill with
- * fewer sections than watches leaves those watches with nobody on). A dayworker (no section) is
- * on duty during `config.watches.dayworkerOnWatches`.
+ * On and off duty (SD §11.4, §duty-and-the-sleep-watch): derived from the tick, never stored. A
+ * section has the watch whose index within the day equals its place in the bill (no wrap over
+ * sections: a bill with fewer sections than watches leaves those watches with nobody on). A
+ * dayworker (no section) is on duty during `config.watches.dayworkerOnWatches`.
  *
- * The sleep watch (D77 addendum): the watch after one's own is when routine tiredness is slept
- * off, so each section turns in at the same bell every day ("Priya sleeps after her watch") and
- * the sleep window cannot drift with the fatigue rate. A dayworker's is the first watch off duty
- * after their last watch on; someone on duty every watch of the day has none.
+ * The sleep watch (§duty-and-the-sleep-watch): the watch after one's own is when routine tiredness
+ * is slept off, so each section turns in at the same bell every day ("Priya sleeps after her
+ * watch") and the sleep window cannot drift with the fatigue rate. A dayworker's is the first watch
+ * off duty after their last watch on; someone on duty every watch of the day has none.
  *
  * Owner: W1 of ship life slice 2.
  */

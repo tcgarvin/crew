@@ -138,18 +138,19 @@ function advanceRepair(ctx: RecipeCtx, task: Task, actorId: ActorId, ticks: numb
     if (fault.repairStepIndex >= steps.length) {
       machine.faults = machine.faults.filter((f) => f.faultKey !== faultKey);
       machine.condition = clamp(machine.condition + REPAIR_CONDITION_RESTORE, 0, 1);
-      // D35: a completed repair is the only path that restores integrity (overheat is the only
-      // thing that costs it), so a machine blocked on integrity can come back once it is fixed.
+      // §integrity: a completed repair is the only path that restores integrity (overheat is the
+      // only thing that costs it), so a machine blocked on integrity can come back once it is
+      // fixed.
       machine.integrity = clamp(
         Math.max(machine.integrity, ctx.config.equipment.integrityDerateBelow),
         0,
         1,
       );
-      // D100: the repair names what caused the fault, so the narrator's aftermath call comes
-      // for a fault it (or its hazard, or its field) caused, never for wear.
+      // §notable-event-hook: the repair names what caused the fault, so the narrator's aftermath
+      // call comes for a fault it (or its hazard, or its field) caused, never for wear.
       const causes = fault.causeCommandId === undefined ? [] : [fault.causeCommandId];
       events.push(machineEvent("faultRepaired", machineId, { machineId, faultKey }, causes));
-      // D82: a repair leaves its mess round the machine (its placement's origin tile).
+      // §dirt-deposits: a repair leaves its mess round the machine (its placement's origin tile).
       const origin = ctx.content.decks[machine.deckId]?.machines.find(
         (p) => p.key === machine.placementKey,
       )?.origin;

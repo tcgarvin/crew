@@ -1,11 +1,11 @@
 /**
- * D65: hauling freight to and from the dock with the hand truck. One crew member fetches it from
- * the hold, takes several hauls at once (one activity, several claims), loads the crates onto it,
- * pushes it to their destinations and parks it aboard; the truck carries at most its capacity
- * and is pushed by one person at a time; without it hauling is one crate in the hands. A trip
- * stopped on the dock sets the truck and its load down there, and the work is picked up again; a
- * truck still on the dock at departure is handed aboard, never left at the warehouse. A save made
- * mid-trip restores and finishes the trip.
+ * §hand-truck-trips: hauling freight to and from the dock with the hand truck. One crew member
+ * fetches it from the hold, takes several hauls at once (one activity, several claims), loads the
+ * crates onto it, pushes it to their destinations and parks it aboard; the truck carries at most
+ * its capacity and is pushed by one person at a time; without it hauling is one crate in the hands.
+ * A trip stopped on the dock sets the truck and its load down there, and the work is picked up
+ * again; a truck still on the dock at departure is handed aboard, never left at the warehouse. A
+ * save made mid-trip restores and finishes the trip.
  */
 import { describe, expect, it } from "vitest";
 import { isInDockArea, isOnDock } from "../../core/docks";
@@ -100,7 +100,7 @@ function tripLog() {
   return { log, each };
 }
 
-describe("loading with the hand truck (D65)", () => {
+describe("loading with the hand truck (§hand-truck-trips)", () => {
   it("fetches the truck, takes every crate up in one trip and parks the truck aboard", () => {
     const test = dockWorkWorld({ truck: 4 });
     const { world } = test;
@@ -213,7 +213,7 @@ describe("loading with the hand truck (D65)", () => {
   });
 });
 
-describe("unloading with the hand truck (D65)", () => {
+describe("unloading with the hand truck (§hand-truck-trips)", () => {
   it("takes the crates down to the bay together, is paid once, and brings the truck back aboard", () => {
     const test = dockWorkWorld({ truck: 4 });
     const { world } = test;
@@ -258,7 +258,7 @@ describe("unloading with the hand truck (D65)", () => {
   });
 });
 
-describe("a trip stopped part way (D65)", () => {
+describe("a trip stopped part way (§stopping-a-trip-early)", () => {
   /** Run until the pusher stands on the dock with `n` crates on the truck. */
   function loadedOnDock(test: TestWorld, n: number): Actor {
     run(test, 4 * MINUTE, (w) => {
@@ -381,7 +381,7 @@ describe("a trip stopped part way (D65)", () => {
   });
 });
 
-describe("a trip planned on a wrong belief (D65)", () => {
+describe("a trip planned on a wrong belief (§stopping-a-trip-early)", () => {
   /** Run until someone has set out on a trip but has not taken the truck yet. */
   function setOut(test: TestWorld): Actor {
     run(test, MINUTE, (w) => pusher(w) !== undefined);
@@ -465,7 +465,7 @@ describe("a trip planned on a wrong belief (D65)", () => {
   });
 });
 
-describe("a schema-3 save (D65)", () => {
+describe("a schema-3 save", () => {
   it("gets the hand truck stowed in the hold, once, and the crew take it up", () => {
     const test = dockWorkWorld();
     const { kernel, world } = test;
@@ -503,7 +503,7 @@ describe("a schema-3 save (D65)", () => {
   });
 });
 
-describe("hand-truck freight custody (D65)", () => {
+describe("hand-truck freight custody (§freight-hand-off-on-the-dock)", () => {
   it("never counts a crate on the truck as delivered or stowed", () => {
     const test = dockWorkWorld({ truck: 4 });
     const { world } = test;

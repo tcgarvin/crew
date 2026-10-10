@@ -61,7 +61,7 @@ describe("travel state machine", () => {
     });
 
     // transit: distance 25 / nominalSpeed 5 = 5s = 100 ticks, then the approach. A port with no
-    // dock map has no staging call (D66), so nothing halts on the way in.
+    // dock map has no staging call (§staging-hook-and-the-hold), so nothing halts on the way in.
     const untilApproach = kernel.advance(world, 100);
     expect(untilApproach).toMatchObject({ ticksAdvanced: 100, halt: { kind: "completed" } });
     expect(world.state.travel.stage).toBe("approaching");
@@ -132,7 +132,7 @@ describe("travel state machine", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// D36 departure gate
+// §departure-gate
 // ---------------------------------------------------------------------------------------------
 
 function addFault(world: GateWorld["world"], faultKey: string) {
@@ -174,8 +174,8 @@ function resolveGate(
 }
 
 /**
- * D37: a policy decision halts on its `policyDecision` hook first; once the host acknowledges it
- * the decision halt follows without another tick. Returns the hook-raising advance.
+ * §policy-decision-hook: a policy decision halts on its `policyDecision` hook first; once the host
+ * acknowledges it the decision halt follows without another tick. Returns the hook-raising advance.
  */
 function expectGateAsked(kernel: GateWorld["kernel"], world: GateWorld["world"], ticks = 10) {
   const halted = kernel.advance(world, ticks);
@@ -196,7 +196,7 @@ function expectGateAsked(kernel: GateWorld["kernel"], world: GateWorld["world"],
   return halted;
 }
 
-describe("departure gate (D36)", () => {
+describe("departure gate (§departure-gate)", () => {
   it("raises one policy decision for an engine with an unrepaired derating fault and stays put", () => {
     const { world, kernel } = freightTestWorld();
     addFault(world, "wornBearing");
@@ -205,7 +205,7 @@ describe("departure gate (D36)", () => {
     const halted = expectGateAsked(kernel, world, 200);
     expect(world.state.travel.stage).toBe("preparingDeparture");
     expect(halted.events.some((e) => e.type === "policyDecisionNeeded")).toBe(true);
-    // D37: the hook and the announcement are raised in the same tick, hook first.
+    // §policy-decision-hook: the hook and the announcement are raised in the same tick, hook first.
     const types = halted.events.map((e) => e.type);
     expect(types.indexOf("narratorHookRaised")).toBeGreaterThanOrEqual(0);
     expect(types.indexOf("narratorHookRaised")).toBeLessThan(types.indexOf("decisionPending"));
@@ -217,7 +217,7 @@ describe("departure gate (D36)", () => {
       machineId: theEngine(world).id,
       machine: "Main Engine",
       reason: "fault",
-      speaker: "First Officer Kade", // the crew member tagged engineer (D29)
+      speaker: "First Officer Kade", // the crew member tagged engineer (§spoken-cards)
     });
     expect(decision?.left.commands[0]?.kind).toBe("holdDepartureForRepairs");
     expect(decision?.right.commands[0]?.kind).toBe("acceptDepartureRisk");
@@ -233,7 +233,7 @@ describe("departure gate (D36)", () => {
     expect(world.state.travel.stage).toBe("docked");
   });
 
-  it("narrates the gate even when another hook was pending the tick it was raised (D37)", () => {
+  it("narrates the gate even when another hook was pending the tick it was raised", () => {
     const { world, kernel, registry } = freightTestWorld();
     addFault(world, "wornBearing");
     world.state.travel = { stage: "docked", portId: PORTS.a, plannedDestinationId: PORTS.b };
@@ -299,7 +299,8 @@ describe("departure gate (D36)", () => {
     const holding = kernel.advance(world, 200);
     expect(holding.halt).toEqual({ kind: "completed" });
     expect(holding.events.some((e) => e.type === "departureHeld")).toBe(true);
-    // D47: holding means waiting docked, course kept, so the crew can reach the port market.
+    // §departure-gate: holding means waiting docked, course kept, so the crew can reach the port
+    // market.
     expect(world.state.travel).toEqual({
       stage: "docked",
       portId: PORTS.a,
@@ -309,7 +310,7 @@ describe("departure gate (D36)", () => {
     expect(world.state.decisions.queue).toEqual([]); // no second ask while holding
 
     theEngine(world).faults = [];
-    // Docked again (D47), so the lift runs the whole prep/undock/depart sequence from the ramp.
+    // Docked again, so the lift runs the whole prep/undock/depart sequence from the ramp.
     const released = kernel.advance(world, 160);
     expect(released.halt).toEqual({ kind: "completed" });
     const lifted = released.events.find((e) => e.type === "departureHoldLifted");
@@ -660,7 +661,7 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     resolveGate(kernel, world, "right");
     advanceUntil(kernel, world, dockedAt(PORTS.c));
 
-    // The same fault now derating output is not news (D75): the answer stands.
+    // The same fault now derating output is not news (§departure-gate): the answer stands.
     theEngine(world).output = 0.5;
     kernel.advance(world, 1);
     expect(world.state.travel.departureRiskAccepted).toBe(true);
@@ -748,10 +749,10 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// D75: an engine hovering at its temperature limit is asked about once
+// §departure-gate: an engine hovering at its temperature limit is asked about once
 // ---------------------------------------------------------------------------------------------
 
-describe("departure gate at the temperature limit (D75)", () => {
+describe("departure gate at the temperature limit (§departure-gate)", () => {
   /**
    * Stand-in for the equipment system (not registered here): an overheat fault holds the engine
    * at its limit, so it is blocked one tick (temperature 1, off) and just under it the next

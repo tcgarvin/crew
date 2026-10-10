@@ -15,7 +15,7 @@ function game(seed: number) {
 
 const RAW_ID = /\b(task|actor|machine|item|problem):|\b[tpmia]\d+\b|undefined/;
 
-describe("weighingWords (D90)", () => {
+describe("weighingWords (§what-a-crew-member-weighs)", () => {
   it("words every crew member's options and rejections, best first, at most one next", () => {
     const { kernel, world, words } = game(7);
     // Into the first watch, past the first meal call, so there is work and leisure to weigh.

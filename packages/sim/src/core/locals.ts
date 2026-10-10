@@ -1,7 +1,8 @@
 /**
- * Placing locals and props on the dock alongside (Dockside §5, D66). Pure over state and content
- * apart from writing `state.dockside` (no nav cache), so world creation, the save migration and
- * the travel system share one implementation. Walking is `systems/travel/locals.ts`.
+ * Placing locals and props on the dock alongside (Dockside §5, §locals-come-and-go-with-the-dock).
+ * Pure over state and content apart from writing `state.dockside` (no nav cache), so world
+ * creation, the save migration and the travel system share one implementation. Walking is
+ * `systems/travel/locals.ts`.
  *
  * Tiles: a person stands on their post's tile, or (when someone is already there) the nearest
  * free dock floor tile to it; never on a freight area, a ramp landing or another post's tile, so
@@ -79,9 +80,9 @@ function rampLandings(
 }
 
 /**
- * D70: the dock tile at the foot of the personnel ramp (deck frame), where the captain steps off
- * to look for work and where people with word for the captain come to. Any ramp's foot when the
- * deck names no personnel ramp on this dock.
+ * §meetings-and-visitors: the dock tile at the foot of the personnel ramp (deck frame), where the
+ * captain steps off to look for work and where people with word for the captain come to. Any ramp's
+ * foot when the deck names no personnel ramp on this dock.
  */
 export function personnelRampFoot(
   content: ContentBundle,
@@ -94,8 +95,8 @@ export function personnelRampFoot(
 }
 
 /**
- * D70: where someone with word for the captain waits: the free dock floor nearest the foot of
- * the personnel ramp, off the landing itself so the way aboard stays clear.
+ * §meetings-and-visitors: where someone with word for the captain waits: the free dock floor
+ * nearest the foot of the personnel ramp, off the landing itself so the way aboard stays clear.
  */
 export function waitingSpotByRamp(
   state: Pick<WorldState, "dockside">,

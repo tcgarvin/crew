@@ -1,10 +1,10 @@
 /**
- * Auto-slowdown (D76, ship-life §9): fast-forward drops back to 1× when playback reaches an event
- * the config names (`host.slowDownOnEvents`), so 8× is a safe way to skip quiet stretches without
- * a hazard or a fault flying by. Keyed by view tick: the worker runs ahead (D14), so an event is
- * queued when it arrives and acted on only once the player sees its tick.
+ * Auto-slowdown (§auto-slowdown, ship-life §9): fast-forward drops back to 1× when playback reaches
+ * an event the config names (`host.slowDownOnEvents`), so 8× is a safe way to skip quiet stretches
+ * without a hazard or a fault flying by. Keyed by view tick: the worker runs ahead (D14), so an
+ * event is queued when it arrives and acted on only once the player sees its tick.
  *
- * D76 addendum (slice-2 QA): slowing is for what the player should stop and see, not for every
+ * §auto-slowdown: slowing is for what the player should stop and see, not for every
  * listed event. Good news on a listed type does not slow (`worthSlowingFor`: the engines coming
  * back), and once the game has slowed, nothing slows it again for `SLOWDOWN_COOLDOWN_SECONDS` of
  * view time, so a fault and the drift it causes are one stop, not two.

@@ -1,11 +1,11 @@
 /**
- * D70 (Dockside phase 4, design §6.2–6.3, §10) on the real authored bundle with every V1 system:
- * the captain goes ashore to look for work, the `captainAshore` ask is raised the tick they step
- * onto the dock (once per docking), and cards from the port's people are delivered in person: by
- * walking over to someone on the dock and talking, by going out through the gate to someone in the
- * port, or (with the captain aboard) by the speaker walking to the foot of the ramp. Nothing is
- * offered in flight, interruptions and a save mid-walk do not lose a card, and nothing waits
- * forever. Every invariant holds every tick.
+ * §looking-for-work (Dockside phase 4, design §6.2–6.3, §10) on the real authored bundle with every
+ * V1 system: the captain goes ashore to look for work, the `captainAshore` ask is raised the tick
+ * they step onto the dock (once per docking), and cards from the port's people are delivered in
+ * person: by walking over to someone on the dock and talking, by going out through the gate to
+ * someone in the port, or (with the captain aboard) by the speaker walking to the foot of the ramp.
+ * Nothing is offered in flight, interruptions and a save mid-walk do not lose a card, and nothing
+ * waits forever. Every invariant holds every tick.
  *
  * It lives here, not in `packages/sim`, for the same reason `dockside.test.ts` does: the kernel
  * package may not depend on `@crew/content`.
@@ -144,7 +144,7 @@ function localNamed(world: World, name: string) {
 const near = (a: { x: number; y: number }, b: { x: number; y: number }, reach: number) =>
   Math.abs(a.x - b.x) <= reach && Math.abs(a.y - b.y) <= reach;
 
-describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
+describe("the captain ashore (§looking-for-work)", { timeout: 30_000 }, () => {
   it("walks down the ramp and asks the narrator the tick they step onto the dock, once", () => {
     const { kernel, world } = newGame(SEED);
     const captain = captainOf(world);
@@ -284,9 +284,10 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
       );
     });
     expect(isOnDock(world.content, world.state, captainOf(world).location)).toBe(false);
-    // D77: she has the watch and, awake (tiredness waits for the watch's end), would walk her
-    // rounds, and her way to the hold runs out of the personnel ramp and along the dock to the
-    // cargo ramp while both are down. Hold her rounds so she stays aboard for this case.
+    // §duty-and-the-sleep-watch: she has the watch and, awake (tiredness waits for the watch's
+    // end), would walk her rounds, and her way to the hold runs out of the personnel ramp and along
+    // the dock to the cargo ramp while both are down. Hold her rounds so she stays aboard for this
+    // case.
     const captain = captainOf(world);
     captain.workBackoff = { ...(captain.workBackoff ?? {}), rounds: Number.MAX_SAFE_INTEGER };
     // A quiet check-in's offer, from someone beyond the gate: they walk in as a visitor.
@@ -346,9 +347,10 @@ describe("the captain ashore (D70)", { timeout: 30_000 }, () => {
     );
     expect(run.cards.length).toBeGreaterThan(0);
     expect(run.cards.every((c) => c.docked)).toBe(true);
-    // At the destination the command actor goes ashore while the crew unload, and the headline
-    // says so over the crate count until they are back. D77: on this seed the captain is asleep
-    // when the ship docks (her section's watch has ended), so it is the first officer (D8).
+    // At the destination the command actor goes ashore while the crew unload, and the headline says
+    // so over the crate count until they are back. §duty-and-the-sleep-watch: on this seed the
+    // captain is asleep when the ship docks (her section's watch has ended), so it is the first
+    // officer (D8).
     let seen = "";
     drive(kernel, world, 20 * 120, answerNothing, (w) => {
       const line = getRenderFrame(w).headline;

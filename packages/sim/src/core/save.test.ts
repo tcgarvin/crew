@@ -87,7 +87,7 @@ describe("serialize / restore", () => {
     ).toThrow(SaveCompatibilityError);
   });
 
-  it("refuses a schema-6 save rather than migrating its pre-ship-life geometry (D74)", () => {
+  it("refuses a schema-6 save rather than migrating its pre-ship-life geometry (§save-migrations)", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);
     const old = { ...envelope, schemaVersion: 6, state: { ...envelope.state, schemaVersion: 6 } };
@@ -95,7 +95,7 @@ describe("serialize / restore", () => {
     expect(() => restore(old, world.content, registry)).toThrow(/predates ship life/);
   });
 
-  it("migrates a schema-7 save to 8: sections from the scenario's bill, empty thoughts and hazards, the hazard budget (D77-D79)", () => {
+  it("migrates a schema-7 save to 8: sections from the scenario's bill, empty thoughts and hazards, the hazard budget (§sections-and-dayworkers, §thoughts)", () => {
     const { world, kernel, registry } = tinyTestWorld();
     kernel.advance(world, 40);
     const envelope = serialize(world);
@@ -159,7 +159,7 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(60);
   });
 
-  it("migrates a schema-8 save to 9: dirt zeroed, boots, the galley's bookkeeping, and the scenario's provisions and mop stowed (D81-D83)", () => {
+  it("migrates a schema-8 save to 9: dirt zeroed, boots, the galley's bookkeeping, and the scenario's provisions and mop stowed (§galley-provisions, §dirt-grid)", () => {
     const PROVISIONS = "item.tiny.provisions" as ItemDefId;
     const MOP = "item.tiny.mop" as ItemDefId;
     // The tiny content with a pantry and a cleaning locker stocked by the scenario.
@@ -394,7 +394,7 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(60);
   });
 
-  it("migrates a schema-10 save to 11: affinities dropped for memories, chat times kept (D88)", () => {
+  it("migrates a schema-10 save to 11: affinities dropped for memories, chat times kept (§affinity)", () => {
     const raw = {
       social: {
         relationships: {
@@ -497,7 +497,7 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(60);
   });
 
-  it("restores a schema-10 save's config with the memory table from content (D88)", () => {
+  it("restores a schema-10 save's config with the memory table from content (§memories)", () => {
     const { world, kernel, registry } = tinyTestWorld();
     kernel.advance(world, 20);
     const envelope = serialize(world);
@@ -526,7 +526,7 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(40);
   });
 
-  it("restores a save whose config has the pre-D76 seconds names: new names from content, old ones unread", () => {
+  it("restores a save whose config has the old seconds names (§the-ships-day): new names from content, old ones unread", () => {
     const { world, kernel, registry } = tinyTestWorld();
     const envelope = serialize(world);
     // A schema-7 save from before the day units: the same knobs under their seconds names.
@@ -557,7 +557,7 @@ describe("serialize / restore", () => {
     expect(restored.state.tick).toBe(world.state.tick + 20);
   });
 
-  it("fills aftermathHookOnEvents from content for a save from before D100, keeping its own hookOnEvents", () => {
+  it("fills aftermathHookOnEvents from content for a save without it (§notable-event-hook), keeping its own hookOnEvents", () => {
     const { world, registry } = tinyTestWorld();
     const envelope = serialize(world);
     const { aftermathHookOnEvents: _list, ...narrator } = envelope.config.narrator;

@@ -2,8 +2,8 @@
  * The full V1 kernel registry (Integration 2), shared by the worker and the headless tests so
  * both run exactly the same systems in the same order (W4a's order):
  *
- * spatial → power + equipment → dirt (D82) → travel + commerce → needs → watch (D77: the bell) →
- * galley (D81: the meal) → recreation, social, cabins (slice 4: off watch) → damage, intercom
+ * spatial → power + equipment → dirt (§dirt-grid) → travel + commerce → needs → watch (§the-bell) →
+ * galley (§meal-problem) → recreation, social, cabins (slice 4: off watch) → damage, intercom
  * (slice 5: the crew's answer to the rocks) → work (execution, perception, chat, derivation with
  * every system's rules, AgentView builder) → planner. The field (slice 5) registers after travel,
  * so it runs after travel's hazards in the equipment phase.

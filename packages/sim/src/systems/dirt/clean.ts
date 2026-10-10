@@ -1,5 +1,5 @@
 /**
- * Cleaning (D82): the `cleanCompartment` plan and its `mop` work stage.
+ * Cleaning (§mop-trips): the `cleanCompartment` plan and its `mop` work stage.
  *
  * `cleanPlan`: the mop (in hand already, or the nearest one the actor knows of), then for each of
  * the room's tiles to mop (`tilesToMop`, in the trip's order, `tasks.ts`) a `moveTo` and

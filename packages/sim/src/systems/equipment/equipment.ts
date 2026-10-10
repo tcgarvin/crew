@@ -32,7 +32,7 @@
  * a `ConfigDef.equipment.repairConditionRestore` addition; adding it now would require also
  * updating `packages/content`'s (W10-owned) Zod schema, out of scope here.
  *
- * D35 (2026-10-01): integrity counts. Output carries an integrity factor (1 above
+ * Integrity counts (§integrity). Output carries an integrity factor (1 above
  * `config.equipment.integrityDerateBelow`, linear to 0 at `integrityInoperableBelow`) and a
  * machine below the inoperable threshold is blocked like an inoperable fault until a completed
  * fault repair (`recipes.ts`) lifts its integrity back to at least `integrityDerateBelow`.
@@ -63,8 +63,8 @@ const COOLANT_OFFLINE_COOLING_FRACTION = 0.2;
 type EquipmentConfig = ConfigDef["equipment"];
 
 /**
- * D35: output factor from integrity: 1 at or above `integrityDerateBelow`, falling linearly to 0
- * at `integrityInoperableBelow` (and 0 below it, where the machine is blocked outright).
+ * §integrity: output factor from integrity: 1 at or above `integrityDerateBelow`, falling linearly
+ * to 0 at `integrityInoperableBelow` (and 0 below it, where the machine is blocked outright).
  */
 export function integrityOutputFactor(integrity: number, config: EquipmentConfig): number {
   const { integrityDerateBelow: derateBelow, integrityInoperableBelow: inoperableBelow } = config;
@@ -73,7 +73,7 @@ export function integrityOutputFactor(integrity: number, config: EquipmentConfig
   return clamp((integrity - inoperableBelow) / (derateBelow - inoperableBelow), 0, 1);
 }
 
-/** D35: integrity so low the machine will not run until repaired. */
+/** §integrity: integrity so low the machine will not run until repaired. */
 export function isIntegrityBlocked(integrity: number, config: EquipmentConfig): boolean {
   return integrity < config.integrityInoperableBelow;
 }
@@ -81,7 +81,8 @@ export function isIntegrityBlocked(integrity: number, config: EquipmentConfig): 
 /**
  * Whether `machine` is blocked from running regardless of power: an `inoperable` fault, its
  * temperature at the failure point, or integrity below the inoperable threshold. The same rule
- * `tickMachine` applies, exported so travel's departure gate (D36) asks the same question.
+ * `tickMachine` applies, exported so travel's departure gate (§departure-gate) asks the same
+ * question.
  */
 export function isMachineBlocked(
   machine: Pick<Machine, "faults" | "temperature" | "integrity">,
@@ -223,12 +224,12 @@ function ensureSymptomProblems(ctx: StepCtx, machine: Machine, def: MachineDef):
 }
 
 /**
- * D47: a repair stalls for good when a step consumes a part the ship does not have, so the
- * shortfall is a problem of its own (`partsNeeded`, one per machine and item) that commerce
- * answers from the port market while docked. Raised and revised against truth every tick:
+ * §parts-and-tools-needed: a repair stalls for good when a step consumes a part the ship does not
+ * have, so the shortfall is a problem of its own (`partsNeeded`, one per machine and item) that
+ * commerce answers from the port market while docked. Raised and revised against truth every tick:
  * aboard counts on deck and in hand, so a stack bought at the ramp or found in stores resolves
- * it, and a fault repaired or still undiagnosed never needs anything. D71: a tool kind the
- * repair names and nothing aboard provides is a shortfall too, of one supplying item
+ * it, and a fault repaired or still undiagnosed never needs anything. §tool-shortfall: a tool kind
+ * the repair names and nothing aboard provides is a shortfall too, of one supplying item
  * (`supplies.ts`), bought the same way.
  */
 function updatePartsNeeded(ctx: StepCtx, machine: Machine, def: MachineDef): void {
@@ -341,7 +342,7 @@ function heatOutputFactor(temperature: number, def: MachineDef): number {
 
 /** Power already set the baseline this tick; equipment may only push further toward off. */
 function updateMode(ctx: StepCtx, machine: Machine, def: MachineDef): void {
-  // D35: integrity after this tick's overheat damage, so a machine that just crossed the
+  // §integrity: integrity after this tick's overheat damage, so a machine that just crossed the
   // inoperable threshold stops now rather than next tick.
   const blocked = isMachineBlocked(machine, def, ctx.config.equipment);
   const wasMode = machine.actualMode;
@@ -414,9 +415,9 @@ function updateHazard(ctx: StepCtx, machine: Machine, def: MachineDef, dtSeconds
 }
 
 /**
- * D90: maintenance is due below `maintenanceConditionBelow` (routine) and pressing below
- * `maintenanceEssentialBelow` (essential); an open problem is raised to essential as the machine
- * wears on, never lowered, since only the service itself resolves it.
+ * §maintenance-due: maintenance is due below `maintenanceConditionBelow` (routine) and pressing
+ * below `maintenanceEssentialBelow` (essential); an open problem is raised to essential as the
+ * machine wears on, never lowered, since only the service itself resolves it.
  */
 function updateMaintenanceDue(ctx: StepCtx, machine: Machine, def: MachineDef): void {
   if (def.maintenance === undefined) return;

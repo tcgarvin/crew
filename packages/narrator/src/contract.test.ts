@@ -3,7 +3,7 @@ import { z } from "zod";
 import { buildNarratorPlanSchema, buildNotesSchema } from "./contract";
 
 const schema = buildNarratorPlanSchema();
-/** D99: every plan the model writes carries a call-back request. */
+/** §requested-call-back: every plan the model writes carries a call-back request. */
 const callBack = { when: "nextPort", why: "" };
 
 /** Walk a JSON Schema and collect every object node. */
@@ -114,7 +114,7 @@ describe("NarratorPlan structured-output schema", () => {
     );
   });
 
-  it("keeps notes out of the plan; the notes turn has its own schema (D97)", () => {
+  it("keeps notes out of the plan; the notes turn has its own schema (§notes-turn)", () => {
     const notes = {
       summary: "The crew took on seals at Port A.",
       threads: [
@@ -186,7 +186,7 @@ describe("NarratorPlan structured-output schema", () => {
     ).toBe(false);
   });
 
-  it("parses a privateTalk side with talkWith and a tone, empty for none, and requires both (D86)", () => {
+  it("parses a privateTalk side with talkWith and a tone, empty for none, and requires both (§private-talk)", () => {
     const base = {
       rationale: "",
       intents: [],
@@ -222,7 +222,7 @@ describe("NarratorPlan structured-output schema", () => {
     expect(withLeft(noTalkWith)).toBe(false);
   });
 
-  it("does not embed the vocabulary: ids are strings the translator checks (D45)", () => {
+  it("does not embed the vocabulary: ids are strings the translator checks (§narrator-authority)", () => {
     walk(json, (n) => {
       if (Array.isArray(n.enum)) expect(n.enum.length).toBeLessThanOrEqual(8);
     });
@@ -237,7 +237,7 @@ describe("NarratorPlan structured-output schema", () => {
     expect(text).toContain('from \\"What you can do\\"');
   });
 
-  it("accepts an empty or named speaker on the card, never a missing one (D29, D45)", () => {
+  it("accepts an empty or named speaker on the card, never a missing one (§spoken-cards, §narrator-authority)", () => {
     const card = {
       title: "Mara flags a problem",
       speaker: "",
@@ -259,11 +259,11 @@ describe("NarratorPlan structured-output schema", () => {
     );
     const { speaker: _omitted, ...withoutSpeaker } = card;
     expect(schema.safeParse({ ...plan, card: withoutSpeaker }).success).toBe(false);
-    // D45: null is a union type for the grammar compiler; empty means none.
+    // §plan-schema-in-the-prompt: null is a union type for the grammar compiler; empty means none.
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: null } }).success).toBe(false);
   });
 
-  it("requires callBack, with when one of nextPort, departure, midLeg (D99)", () => {
+  it("requires callBack, with when one of nextPort, departure, midLeg (§requested-call-back)", () => {
     const plan = { rationale: "", intents: [], card: null };
     expect(schema.safeParse(plan).success).toBe(false);
     const departure = { when: "departure", why: "A debris field on the junior pilot's watch." };

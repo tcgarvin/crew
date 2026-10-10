@@ -6,8 +6,8 @@ export interface DecisionModalProps {
   readonly onChoose: (side: "left" | "right") => void;
   readonly onInspect: () => void;
   /**
-   * D26: set once a side is chosen. The card stays up showing this caption with both buttons
-   * disabled, then the host closes it.
+   * §aftermath-caption: set once a side is chosen. The card stays up showing this caption with both
+   * buttons disabled, then the host closes it.
    */
   readonly aftermath?: { readonly side: "left" | "right"; readonly caption: string };
 }
@@ -23,7 +23,7 @@ export function DecisionModal({ card, onChoose, onInspect, aftermath }: Decision
       <div className="decision-card">
         <h1 className="decision-title">{card.title}</h1>
         {card.speaker === undefined ? null : (
-          // D29: who is speaking; the hook for a face later.
+          // §spoken-cards: who is speaking; the hook for a face later.
           <p className="decision-speaker">{card.speaker}</p>
         )}
         <p className="decision-prose">{card.situation}</p>

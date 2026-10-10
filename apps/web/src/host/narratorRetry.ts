@@ -4,7 +4,7 @@
  * without an answer (spacing rule only), or give up so the game pauses on the error panel.
  * The server spaces only the hooks the sim raises again on its own (`quietTooLong`,
  * `notableEvent`), so an unanswered one costs a check-in; a hook raised once (`captainAshore`,
- * one ask per docking; `policyDecision`) is never spaced (D70 addendum). Retrying a spaced hook
+ * one ask per docking; `policyDecision`) is never spaced (§call-spacing). Retrying a spaced hook
  * could not help anyway: the world is halted on it, so its tick never moves past the window.
  *
  * A model/transport failure backs off through `RETRY_DELAYS_MS` (about a minute in all, which
@@ -33,7 +33,10 @@ export type RetryAction =
     }
   | { readonly type: "fail"; readonly reason: string; readonly message: string }
   | { readonly type: "acknowledge" }
-  /** D67: give up on a staging call: acknowledge with no plan, so the dock is the floor set. */
+  /**
+   * §staging-retries-and-the-floor-set: give up on a staging call: acknowledge with no plan, so the
+   * dock is the floor set.
+   */
   | { readonly type: "floorSet"; readonly reason: string; readonly message: string };
 
 /** Attempts made so far, counting the first call. */
@@ -61,16 +64,16 @@ export function nextRetryAction(state: RetryState, failure: NarratorFailure): Re
 }
 
 /**
- * D69: the staging call's own, short schedule. The sim is halted on it and it only dresses the
- * dock, so a blip gets two quick retries and anything longer gets the floor set; D43's schedule
- * (a minute of waits) froze the ship at the end of transit.
+ * §staging-retries-and-the-floor-set: the staging call's own, short schedule. The sim is halted on
+ * it and it only dresses the dock, so a blip gets two quick retries and anything longer gets the
+ * floor set; D43's schedule (a minute of waits) froze the ship at the end of transit.
  */
 export const STAGING_RETRY_DELAYS_MS: readonly number[] = [2_000, 4_000];
 
 /**
- * D67 (D57's exception to D43): the staging call (`stageDock`) never ends on the error panel.
- * D69: it retries a transient failure on `STAGING_RETRY_DELAYS_MS`, and where that runs out, or
- * the failure is fatal, the hook is
+ * §staging-retries-and-the-floor-set (D57's exception to D43): the staging call (`stageDock`) never
+ * ends on the error panel. §staging-retries-and-the-floor-set: it retries a transient failure on
+ * `STAGING_RETRY_DELAYS_MS`, and where that runs out, or the failure is fatal, the hook is
  * acknowledged with no plan and the dock is the sim's floor set: staging is not story.
  */
 export function stagingRetryAction(state: RetryState, failure: NarratorFailure): RetryAction {

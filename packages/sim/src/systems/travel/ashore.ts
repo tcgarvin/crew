@@ -1,6 +1,6 @@
 /**
- * Dockside (D61): people and things on the dock alongside, as travel sees them when the ship
- * leaves.
+ * Dockside (§calling-the-crew-aboard): people and things on the dock alongside, as travel sees them
+ * when the ship leaves.
  *
  * - Departure prep keeps the ramps down while anyone is on the dock, or aboard and walking onto
  *   it (`peopleAshore`), and calls them aboard: a `comeAboard` walk to the top of the nearest
@@ -11,13 +11,14 @@
  *   once, and once the call has run `travel.recallAboardSeconds` everyone still on the dock is
  *   (`bringAboardStragglers`). Both emit `broughtAboard`, which the ticker shows.
  * - At the end of `undocking` the dock is cleared before it detaches (`clearDock`): anything
- *   still on it is left at the port's warehouse (`leftOnDock`), except the ship's own gear (D65:
- *   a hand truck dropped there mid-trip), which the dock crew hand up the cargo ramp
- *   (`gearBroughtAboard`); anyone still on it (prep makes that impossible; this is the last
- *   guard) is brought aboard.
- * - D63: a buyer out through the gate on a market errand (`throughGate`, off ship) counts as
- *   ashore: the ramps stay down for them and the call waits for them to come back on their own;
- *   only an overdue call (or the last guard) fetches them, ending the errand at the gate.
+ *   still on it is left at the port's warehouse (`leftOnDock`), except the ship's own gear
+ *   (§ramps-and-cast-off: a hand truck dropped there mid-trip), which the dock crew hand up the
+ *   cargo ramp (`gearBroughtAboard`); anyone still on it (prep makes that impossible; this is the
+ *   last guard) is brought aboard.
+ * - §dock-market-and-passengers: a buyer out through the gate on a market errand (`throughGate`,
+ *   off ship) counts as ashore: the ramps stay down for them and the call waits for them to come
+ *   back on their own; only an overdue call (or the last guard) fetches them, ending the errand at
+ *   the gate.
  */
 import { configTicks } from "../../core/clock";
 import { isDockPoint, isOnDock } from "../../core/docks";
@@ -63,7 +64,8 @@ function onDock(ctx: Ctx, actor: Actor): boolean {
 
 /**
  * Everyone the ramps must stay down for, in id order: on the dock, aboard and walking onto it,
- * or (D63) out through the gate on a market errand. Empty with no dock alongside.
+ * or out through the gate on a market errand (§dock-market-and-passengers). Empty with no dock
+ * alongside.
  */
 export function peopleAshore(ctx: Ctx): Actor[] {
   if (ctx.state.deck.dock === undefined) return [];
@@ -128,7 +130,7 @@ function callAboard(ctx: Ctx, ashore: readonly Actor[]): void {
 
 /**
  * The dock crew carry or walk someone up the nearest ramp: they stand at its top, idle. A buyer
- * out through the gate (D63) is fetched back first: their errand ends at the gate.
+ * out through the gate is fetched back first: their errand ends at the gate.
  */
 function bringAboard(ctx: Ctx, actor: Actor, portId: PortDefId): void {
   if (isOutThroughGate(actor)) abortActivity(ctx, actor, "interrupted");
@@ -167,7 +169,8 @@ export function recallAshore(ctx: Ctx, travel: InFlight, ashore: readonly Actor[
   const overdue = ctx.tick - travel.recallSinceTick >= limit;
   for (const actor of ashore) {
     if (actor.disembarking === true) continue;
-    // D63: a buyer out through the gate comes back on their own; only an overdue call fetches them.
+    // §dock-market-and-passengers: a buyer out through the gate comes back on their own; only an
+    // overdue call fetches them.
     if (isOutThroughGate(actor)) {
       if (overdue) bringAboard(ctx, actor, travel.fromPortId);
       continue;
@@ -185,14 +188,15 @@ export function endRecall(travel: InFlight): void {
   delete travel.recallSinceTick;
 }
 
-/** D65: the ship's own hand truck (equipment, not freight: no job owns it). */
+/** §ramps-and-cast-off: the ship's own hand truck (equipment, not freight: no job owns it). */
 function isShipsGear(ctx: Ctx, item: Item): boolean {
   return item.jobId === undefined && truckCapacity(ctx, item) > 0;
 }
 
 /**
- * D65: the ship's gear left lying on the dock (a hand truck set down by someone stopped mid-trip)
- * is handed up the cargo ramp by the dock crew, as people are, and set down at its top.
+ * §ramps-and-cast-off: the ship's gear left lying on the dock (a hand truck set down by someone
+ * stopped mid-trip) is handed up the cargo ramp by the dock crew, as people are, and set down at
+ * its top.
  */
 function handAboard(ctx: Ctx, item: Item, portId: PortDefId): void {
   const location = item.location;

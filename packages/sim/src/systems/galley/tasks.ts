@@ -1,6 +1,6 @@
 /**
- * Task derivation for the problem kinds the galley owns (D81), merged by `systems/work/` with the
- * other systems' rules:
+ * Task derivation for the problem kinds the galley owns (§meal-problem), merged by `systems/work/`
+ * with the other systems' rules:
  *
  * - `mealToCook` → one `cookMeal` task at the stove's `use` tile, `requiredSkills: [{ cooking,
  *   min: 1 }]`, `estimatedWorkSeconds: galley.cookSeconds`, progress `{ kind: "meal" }`. The plan

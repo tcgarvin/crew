@@ -1,8 +1,9 @@
 /**
- * The ship's log (D55): one feed of what happened, in playback order. Event lines and the cards
- * the captain was shown (with the answer) live here, each stamped with the sim tick it belongs to. The
- * worker runs ahead of the viewer (D14), so an entry is only shown once playback reaches its tick:
- * the log never tells the viewer about something the deck has not shown yet.
+ * The ship's log (§the-log-in-playback-order): one feed of what happened, in playback order. Event
+ * lines and the cards the captain was shown (with the answer) live here, each stamped with the sim
+ * tick it belongs to. The worker runs ahead of the viewer (D14), so an entry is only shown once
+ * playback reaches its tick: the log never tells the viewer about something the deck has not shown
+ * yet.
  *
  * Pure data and functions, no React; `Log.tsx` renders it.
  */
@@ -22,7 +23,7 @@ export interface EventEntry extends EntryBase {
   readonly kind: "event";
   readonly text: string;
   readonly significance: Significance;
-  /** D76: the line that slowed fast-forward to 1× (`host.slowDownOnEvents`). */
+  /** §auto-slowdown: the line that slowed fast-forward to 1× (`host.slowDownOnEvents`). */
   readonly highlight?: true;
 }
 
@@ -91,9 +92,9 @@ export function answerDecision(
 }
 
 /**
- * D76: mark the event line at `tick` reading `text` as the one that slowed the game down. The
- * first such line not already marked is marked (two identical lines in one tick are two events);
- * with no such line the log is returned unchanged, and the caller says so.
+ * §auto-slowdown: mark the event line at `tick` reading `text` as the one that slowed the game
+ * down. The first such line not already marked is marked (two identical lines in one tick are two
+ * events); with no such line the log is returned unchanged, and the caller says so.
  */
 export function highlightEvent(
   log: readonly LogEntry[],
@@ -112,7 +113,7 @@ export function highlightEvent(
 }
 
 /**
- * D76 addendum: the slowdown's mark is for the moment it happens. It is cleared when the next
+ * §auto-slowdown: the slowdown's mark is for the moment it happens. It is cleared when the next
  * slowdown marks its own lines and after `HIGHLIGHT_SECONDS` (the caller's timer), so old lines do
  * not stay lit for the rest of the session.
  */
@@ -131,7 +132,7 @@ export function clearHighlights(log: readonly LogEntry[]): LogEntry[] {
 /**
  * What playback has reached, newest first. Within one tick a highlighted line comes first: the
  * fault that slowed the game and the derating it caused share a tick, and on a phone the compact
- * log shows only its top line or two (D72 addendum), so the line the toast names leads.
+ * log shows only its top line or two, so the line the toast names leads.
  */
 export function visibleLog(log: readonly LogEntry[], viewTick: Tick): LogEntry[] {
   const shown: LogEntry[] = [];

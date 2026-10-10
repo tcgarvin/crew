@@ -1,6 +1,6 @@
 /**
- * D65: a hand truck being pushed is drawn beside its pusher with the crates riding on it (the
- * frame's `container` items), rather than as one carried square.
+ * §hand-truck-drawing: a hand truck being pushed is drawn beside its pusher with the crates riding
+ * on it (the frame's `container` items), rather than as one carried square.
  */
 import type {
   ActorId,
@@ -72,7 +72,7 @@ function frame(crates: number): RenderFrame {
 
 const view = { scale: 24, offsetX: 10, offsetY: 10 };
 
-describe("drawing the hand truck (D65)", () => {
+describe("drawing the hand truck (§hand-truck-drawing)", () => {
   it("draws each crate on a pushed truck, with a count tag", () => {
     const empty = mockCanvas();
     drawCarriedItems(empty.ctx, view, frame(0), false, 800);

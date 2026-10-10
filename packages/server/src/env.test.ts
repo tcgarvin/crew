@@ -25,7 +25,7 @@ describe("loadEnv", () => {
   });
 });
 
-describe("loadEnv staging model (D67)", () => {
+describe("loadEnv staging model (§staging-call-on-the-server)", () => {
   it("follows the story model unless CREW_STAGING_MODEL is set", () => {
     expect(loadEnv({}).stagingModel).toBe(DEFAULT_NARRATOR_MODEL);
     expect(loadEnv({ CREW_NARRATOR_MODEL: "a/story" }).stagingModel).toBe("a/story");
@@ -38,7 +38,7 @@ describe("loadEnv staging model (D67)", () => {
   });
 });
 
-describe("loadEnv reasoning effort (D96)", () => {
+describe("loadEnv reasoning effort (§models-and-reasoning-effort)", () => {
   it("defaults to the narrator's effort and lets staging follow the story call unless set", () => {
     expect(DEFAULT_NARRATOR_REASONING_EFFORT).toBe("low");
     expect(loadEnv({}).narratorReasoningEffort).toBe("low");
@@ -60,7 +60,7 @@ describe("loadEnv reasoning effort (D96)", () => {
   });
 });
 
-describe("loadEnv staging timeout (D70)", () => {
+describe("loadEnv staging timeout (§narrator-timeouts)", () => {
   it("defaults to the narrator's 10 s staging timeout and reads CREW_STAGING_TIMEOUT_MS", () => {
     expect(loadEnv({}).stagingTimeoutMs).toBe(STAGING_TIMEOUT_MS);
     expect(STAGING_TIMEOUT_MS).toBe(10_000);

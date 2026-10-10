@@ -60,32 +60,33 @@ export interface InventoryEntry {
 }
 
 /**
- * D77: who stands the helm, as the sim decides it (`systems/watch/helm.ts` `helmRoleOf`): this
- * section's `stander`, the next section's `oncoming` stander near the bell, a `relief` while a
- * relief post is open, or `none`. The planner's helm rule reads only this.
+ * §who-has-the-helm: who stands the helm, as the sim decides it (`systems/watch/helm.ts`
+ * `helmRoleOf`): this section's `stander`, the next section's `oncoming` stander near the bell, a
+ * `relief` while a relief post is open, or `none`. The planner's helm rule reads only this.
  */
 export type HelmRole = "stander" | "oncoming" | "relief" | "none";
 
-/** D77: the actor's place in the watch, from the bill and the tick. */
+/** §the-watch-bill: the actor's place in the watch, from the bill and the tick. */
 export interface WatchView {
   /** Their section's key; absent for a dayworker. */
   readonly section?: LocalKey;
   /** Their section has the watch now (always false for a dayworker). */
   readonly onWatch: boolean;
-  /** D81: their section stands the next watch of the day (always false for a dayworker). */
+  /** §mess-call: their section stands the next watch of the day (always false for a dayworker). */
   readonly nextOnWatch: boolean;
   readonly dayworker: boolean;
   readonly helmRole: HelmRole;
   /** Captain or first officer in the section on watch, and not its helm-stander. */
   readonly officerOfTheWatch: boolean;
   /**
-   * D77 addendum: this is their sleep watch (the one after their own), when routine tiredness
-   * is slept off; outside it only pressing tiredness sends them to bed. Present when true.
+   * §sleep-timing: this is their sleep watch (the one after their own), when routine
+   * tiredness is slept off; outside it only pressing tiredness sends them to bed. Present when
+   * true.
    */
   readonly sleepWatch?: true;
   /**
-   * D77 addendum: they stand gangway watch now: docked with no helm watch wanted, and the
-   * section on watch's gangway stander (`gangwayStanderOf`). Present when true.
+   * §gangway-watch-and-rounds: they stand gangway watch now: docked with no helm watch
+   * wanted, and the section on watch's gangway stander (`gangwayStanderOf`). Present when true.
    */
   readonly gangway?: true;
 }
@@ -106,11 +107,11 @@ export interface SelfView {
   readonly compartmentId?: CompartmentId;
   readonly activity: DeepReadonly<Activity>;
   readonly inventory: readonly InventoryEntry[];
-  /** D77: on duty now: their section has the watch, or a dayworker in working hours. */
+  /** §the-watch-bill: on duty now: their section has the watch, or a dayworker in working hours. */
   readonly onDuty: boolean;
-  /** D77: their place in the watch. */
+  /** §the-watch-bill: their place in the watch. */
   readonly watch: WatchView;
-  /** D79: what is on their mind (`Actor.thoughts`); mood is their clamped sum. */
+  /** §mood-and-work-speed: what is on their mind (`Actor.thoughts`); mood is their clamped sum. */
   readonly thoughts: readonly DeepReadonly<Thought>[];
   readonly lastPlannedTick: Tick;
   /** W4a addition: the actor's own retry backoff (`Actor.workBackoff`); refs → retry tick. */
@@ -119,16 +120,21 @@ export interface SelfView {
   readonly passenger?: true;
   /** Passengers §3.5: walking off the ship; the planner keeps out of the way. */
   readonly disembarking?: true;
-  /** D61: standing out on the dock alongside rather than aboard. Present when true. */
+  /**
+   * §living-on-the-dock: standing out on the dock alongside rather than aboard. Present when true.
+   */
   readonly onDock?: true;
-  /** D74: the bed assigned to this actor (`WorldState.berths`); absent while unberthed. */
+  /**
+   * §berth-assignment: the bed assigned to this actor (`WorldState.berths`); absent while
+   * unberthed.
+   */
   readonly berth?: { readonly machineId: MachineId };
   /** Slice 4: what they like doing off watch (`Actor.interests`). */
   readonly interests: DeepReadonly<Interests>;
   /** Slice 4: where they stand on the value axes (`Actor.values`). */
   readonly values: Readonly<Values>;
   /**
-   * Slice 4: what they feel about every other actor (D88: `affinityOf`, compatibility plus
+   * Slice 4: what they feel about every other actor (§affinity: `affinityOf`, compatibility plus
    * their memories), by actor. Nobody reads the other direction.
    */
   readonly affinity: Readonly<Record<ActorId, number>>;
@@ -172,8 +178,8 @@ export interface KnownItemView {
 export type SessionView = DeepReadonly<GroupSession> & { readonly label: string };
 
 /**
- * D94: the ship is on alert, as everyone aboard knows it (the klaxon): when it sounded and why.
- * Which compartments were reported is the intercom's to tell, through facts.
+ * §sighting-and-the-alert: the ship is on alert, as everyone aboard knows it (the klaxon): when it
+ * sounded and why. Which compartments were reported is the intercom's to tell, through facts.
  */
 export type AlertView = Readonly<Pick<AlertState, "sinceTick" | "cause">>;
 
@@ -243,9 +249,9 @@ export interface AgentView {
   knownTasks(): readonly TaskView[];
   roster(): readonly RosterEntry[];
   /**
-   * D74: every bed assigned to someone (`WorldState.berths`), this actor's included, ashore or
-   * aboard. Who sleeps where is common knowledge aboard, like the roster. The planner never
-   * sleeps in one of these but its own (`self.berth`).
+   * §berth-assignment: every bed assigned to someone (`WorldState.berths`), this actor's included,
+   * ashore or aboard. Who sleeps where is common knowledge aboard, like the roster. The planner
+   * never sleeps in one of these but its own (`self.berth`).
    */
   assignedBeds(): readonly MachineId[];
   /** W4a addition: items the actor holds a location belief about (plus what it carries). */
@@ -262,7 +268,10 @@ export interface AgentView {
    * has is common knowledge, like the schematic. The recreation candidate scores them.
    */
   activities(): readonly DeepReadonly<ActivityDef>[];
-  /** D94: the alert, while the ship is on one (common knowledge: the klaxon); else undefined. */
+  /**
+   * §sighting-and-the-alert: the alert, while the ship is on one (common knowledge: the klaxon);
+   * else undefined.
+   */
   alert(): AlertView | undefined;
   /**
    * W4a addition: schematic travel estimate in ticks from `from` (default: the actor's tile) to
@@ -285,7 +294,7 @@ export interface AgentViewSnapshot {
   readonly roster: readonly RosterEntry[];
   /** Slice 4: the sessions the view saw. */
   readonly sessions: readonly SessionView[];
-  /** D94: the alert the view saw; absent off alert. */
+  /** §sighting-and-the-alert: the alert the view saw; absent off alert. */
   readonly alert?: AlertView;
 }
 
@@ -299,13 +308,14 @@ export interface RenderActor {
   readonly deckId: DeckDefId;
   /**
    * Continuous tile-unit position (tile centre = x + 0.5), in the deck's frame. On the dock
-   * (D59, D61) it lies outside the deck's authored bounds, possibly negative.
+   * (D59, §dock-alongside) it lies outside the deck's authored bounds, possibly negative.
    */
   readonly x: number;
   readonly y: number;
   /**
-   * D61: standing on the dock alongside (`RenderFrame.dock`), not aboard, so the renderer can draw
-   * the person with the dock layer as it slides in and out. Always false with no dock.
+   * §living-on-the-dock: standing on the dock alongside (`RenderFrame.dock`), not aboard, so the
+   * renderer can draw the person with the dock layer as it slides in and out. Always false with no
+   * dock.
    */
   readonly onDock: boolean;
   /** Radians, 0 = east. */
@@ -336,8 +346,8 @@ export interface RenderDoor {
   readonly id: DoorId;
   readonly physicalState: DoorPhysicalState;
   /**
-   * Dockside (D58): how far open the leaf is, 0 shut to 1 fully open, so a ramp can be drawn
-   * extending. A jammed door reads 0: it is impassable, as if shut.
+   * Dockside (§dock-drawing): how far open the leaf is, 0 shut to 1 fully open, so a ramp can be
+   * drawn extending. A jammed door reads 0: it is impassable, as if shut.
    */
   readonly openFraction: number;
   /** Integration 1 addition: see `RenderMachine.placementKey`. */
@@ -345,13 +355,16 @@ export interface RenderDoor {
   readonly placementKey: LocalKey;
 }
 
-/** Polish A (D28): coarse display class of an item, for colour and inspector wording. */
+/**
+ * Polish A (§rooms-items-and-cargo): coarse display class of an item, for colour and inspector
+ * wording.
+ */
 export type RenderItemKind = "crate" | "tool" | "food" | "other";
 
 /**
  * Where a rendered item is. Only what is on the map reaches the frame: the deck, the dock
- * alongside (D61), and anyone's hands there. Port stores are off the map and installed
- * components are drawn as their machine.
+ * alongside (§living-on-the-dock), and anyone's hands there. Port stores are off the map and
+ * installed components are drawn as their machine.
  */
 export type RenderItemLocation =
   | {
@@ -360,7 +373,10 @@ export type RenderItemLocation =
       /** Continuous tile-unit position, as `OnDeckLocation`. */
       readonly x: number;
       readonly y: number;
-      /** D61: lying on the dock alongside rather than aboard, as `RenderActor.onDock`. */
+      /**
+       * §living-on-the-dock: lying on the dock alongside rather than aboard, as
+       * `RenderActor.onDock`.
+       */
       readonly onDock: boolean;
     }
   /** Carried or equipped: drawn riding the actor's dot. */
@@ -369,8 +385,8 @@ export type RenderItemLocation =
   | { readonly kind: "container"; readonly containerId: ItemId };
 
 /**
- * Polish A (D28): an item on the map, so cargo loading is visible. Since D61 that includes the
- * dock alongside; `location.onDock` (or the carrier's) tells it from cargo aboard.
+ * Polish A (§rooms-items-and-cargo): an item on the map, so cargo loading is visible. That
+ * includes the dock alongside; `location.onDock` (or the carrier's) tells it from cargo aboard.
  */
 export interface RenderItem {
   readonly id: ItemId;
@@ -382,9 +398,9 @@ export interface RenderItem {
   /** The contract this freight belongs to, if any. */
   readonly jobId?: JobId;
   /**
-   * D63: freight on offer, staged on the dock: its job is not taken yet, so it is nobody's.
-   * D66: also a closed offer's crates still on the dock while a dock hand fetches them back.
-   * Absent for anything else (accepted freight, stores, parts).
+   * §offered-freight: freight on offer, staged on the dock: its job is not taken yet, so it is
+   * nobody's. §dock-hand-errands: also a closed offer's crates still on the dock while a dock hand
+   * fetches them back. Absent for anything else (accepted freight, stores, parts).
    */
   readonly offered?: true;
   readonly location: RenderItemLocation;
@@ -415,11 +431,11 @@ export interface RenderTravel {
 }
 
 /**
- * D61: the dock alongside, from the start of `docking` to the end of `undocking`. The map itself
- * is content (`ContentBundle.docks[dockId]`, a `DockDef`): with the deck at `shipAt` in its berth
- * box (`berthPlacement`, D72), its tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y), so the
- * renderer draws it at `−shipAt` in deck coordinates plus the scenery's berth offset. Actors and items standing on it are in the frame's ordinary lists
- * with `onDock` set.
+ * §dock-alongside: the dock alongside, from the start of `docking` to the end of `undocking`. The
+ * map itself is content (`ContentBundle.docks[dockId]`, a `DockDef`): with the deck at `shipAt` in
+ * its berth box (`berthPlacement`, §ship-placement), its tile (x, y) is deck tile (x − shipAt.x, y
+ * − shipAt.y), so the renderer draws it at `−shipAt` in deck coordinates plus the scenery's berth
+ * offset. Actors and items standing on it are in the frame's ordinary lists with `onDock` set.
  */
 export interface RenderDock {
   readonly dockId: DockDefId;
@@ -428,8 +444,8 @@ export interface RenderDock {
 }
 
 /**
- * D66: a local on the dock alongside: not crew, never in `actors`. Always on the dock, so always
- * drawn with the dock layer (as `onDock` actors are). Drawn as a dot in its own style from
+ * §locals-table: a local on the dock alongside: not crew, never in `actors`. Always on the dock, so
+ * always drawn with the dock layer (as `onDock` actors are). Drawn as a dot in its own style from
  * `lookSeed`; tappable for name, role and post.
  */
 export interface RenderLocal {
@@ -456,8 +472,8 @@ export interface RenderLocal {
 }
 
 /**
- * D66: a staged prop on the dock: set dressing drawn like the item it names, never an item
- * (nobody can pick it up), so it has no id. Its tile, deck frame, as a tile centre.
+ * §staging-plan-dressing: a staged prop on the dock: set dressing drawn like the item it names,
+ * never an item (nobody can pick it up), so it has no id. Its tile, deck frame, as a tile centre.
  */
 export interface RenderDockProp {
   readonly defId: ItemDefId;
@@ -471,7 +487,7 @@ export interface RenderDockProp {
 }
 
 /**
- * D82: the dirt grid for the renderer's grime tint, on its own channel at its own cadence
+ * §dirt-grid: the dirt grid for the renderer's grime tint, on its own channel at its own cadence
  * (`host.dirtFrameEverySeconds`), keyed by tick so playback applies it at `viewTick`. One byte per
  * authored deck tile, row-major (`y × width + x`), 255 = 1.0 of dirt. Structured-clone safe but
  * not JSON: it never enters state (`WorldState.dirt.cells` holds plain integers).
@@ -501,7 +517,10 @@ export interface RenderSession {
   readonly running: boolean;
 }
 
-/** D93: a hull scar for the scar overlay: its tile (deck frame) and whether it is patched. */
+/**
+ * §hull-scars-and-ship-loss: a hull scar for the scar overlay: its tile (deck frame) and whether it
+ * is patched.
+ */
 export interface RenderScar {
   readonly id: ScarId;
   readonly x: number;
@@ -510,7 +529,7 @@ export interface RenderScar {
   readonly rock: RockSize;
 }
 
-/** D93: the hull bar and the scar overlay. `lost` once the hull has given way. */
+/** §the-hull-bar: the hull bar and the scar overlay. `lost` once the hull has given way. */
 export interface RenderHull {
   readonly integrity: number;
   readonly max: number;
@@ -519,8 +538,8 @@ export interface RenderHull {
 }
 
 /**
- * D92: a rock that hit since the previous frame (from the tick's `asteroidImpact` events), for
- * the flash: its centre tile and every tile its blast covered (deck frame).
+ * §rock-impacts: a rock that hit since the previous frame (from the tick's `asteroidImpact`
+ * events), for the flash: its centre tile and every tile its blast covered (deck frame).
  */
 export interface RenderImpact {
   readonly tick: Tick;
@@ -531,9 +550,9 @@ export interface RenderImpact {
 }
 
 /**
- * D92: the field as the rock layers draw it (truth, D7: the player sees rocks the crew may not
- * have noticed). `near` within `field.warningSeconds` of its start, `active` while the ship is in
- * it, `clearing` from its end until the alert stands down; absent otherwise.
+ * §the-asteroid-field: the field as the rock layers draw it (truth, D7: the player sees rocks the
+ * crew may not have noticed). `near` within `field.warningSeconds` of its start, `active` while the
+ * ship is in it, `clearing` from its end until the alert stands down; absent otherwise.
  */
 export interface RenderField {
   readonly phase: "near" | "active" | "clearing";
@@ -557,29 +576,32 @@ export interface RenderFrame {
   readonly tickerEvents: readonly TickerEntry[];
   readonly money: number;
   /**
-   * Polish A (D28): items on the map (on the deck or the dock, carried, or in a container that
-   * is). D61: dock items have `onDock` set.
+   * Polish A (§rooms-items-and-cargo): items on the map (on the deck or the dock, carried, or in a
+   * container that is). §living-on-the-dock: dock items have `onDock` set.
    */
   readonly items: readonly RenderItem[];
-  /** D61: the dock alongside; absent while no dock is (in flight, or at a port without one). */
+  /**
+   * §dock-alongside: the dock alongside; absent while no dock is (in flight, or at a port without
+   * one).
+   */
   readonly dock?: RenderDock;
-  /** D66: the locals on the dock alongside; empty with no dock. */
+  /** §locals-table: the locals on the dock alongside; empty with no dock. */
   readonly locals: readonly RenderLocal[];
-  /** D66: the staging plan's props on the dock alongside; empty with no dock. */
+  /** §staging-plan-dressing: the staging plan's props on the dock alongside; empty with no dock. */
   readonly dockProps: readonly RenderDockProp[];
   /**
-   * Polish A (D27): one plain-language line of what the ship is doing right now, e.g.
-   * "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".
+   * Polish A (§the-ship-headline): one plain-language line of what the ship is doing right now,
+   * e.g. "Docked at Green Meridian — loading cargo (2 of 3 crates aboard)".
    */
   readonly headline: string;
   /** Slice 4: open and running group sessions, one plate each. */
   readonly sessions: readonly RenderSession[];
-  /** D93: the hull bar and its scars. */
+  /** §the-hull-bar: the hull bar and its scars. */
   readonly hull: RenderHull;
-  /** D92: the ship is on alert (the HUD tints, the bell line reads "ALERT"). */
+  /** §sighting-and-the-alert: the ship is on alert (the HUD tints, the bell line reads "ALERT"). */
   readonly alert: boolean;
-  /** D92: the field near or around the ship; absent with none. */
+  /** §the-asteroid-field: the field near or around the ship; absent with none. */
   readonly field?: RenderField;
-  /** D92: impacts since the previous frame, for the flash. */
+  /** §rock-impacts: impacts since the previous frame, for the flash. */
   readonly impacts: readonly RenderImpact[];
 }

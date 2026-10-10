@@ -1,7 +1,7 @@
 /**
- * Live narrator tests (D44): real OpenRouter calls, one per hook kind. Not part of `pnpm test`;
- * run `pnpm test:live` by hand before deploying prompt, schema or transport changes. Files run
- * one at a time and tests in order, to stay inside OpenRouter's rate limits.
+ * Live narrator tests (§live-narrator-tests): real OpenRouter calls, one per hook kind. Not part of
+ * `pnpm test`; run `pnpm test:live` by hand before deploying prompt, schema or transport changes.
+ * Files run one at a time and tests in order, to stay inside OpenRouter's rate limits.
  */
 import { defineConfig } from "vitest/config";
 

@@ -1,5 +1,5 @@
 /**
- * Room dirt and tiers (D82), and the quantised arithmetic every dirt source shares.
+ * Room dirt and tiers (§room-tiers), and the quantised arithmetic every dirt source shares.
  *
  * `roomDirt = (1 − roomMaxWeight) × mean + roomMaxWeight × max` over the room's cells
  * (`core/dirt-grid.ts` `roomCells`), as a share of 1.0. Cells under a machine never take dirt

@@ -24,7 +24,10 @@ import {
   assertIdPrefix,
 } from "./types";
 
-/** D67: a staging call is a `stageDock` hook, D97 a notes turn `notes`; the rest are story. */
+/**
+ * A staging call is a `stageDock` hook (§staging-call-on-the-server), a notes turn is `notes`
+ * (§notes-turn); the rest are story.
+ */
 function kindCondition(kind: NarratorCallKind): SQL {
   if (kind === "staging") return eq(narratorCalls.hookKind, STAGING_HOOK_KIND);
   if (kind === "notes") return eq(narratorCalls.hookKind, NOTES_HOOK_KIND);

@@ -1,10 +1,10 @@
 /**
- * Social state helpers (slice 4, call 9; D88): the empty slice, compatibility, affinity, and the
- * rivalry key. Relationships are sparse and directed (`social.relationships[from][to]`) and hold
- * memories, not a running total: what `from` feels about `to` is the pair's compatibility plus
+ * Social state helpers (slice 4, call 9; §affinity): the empty slice, compatibility, affinity, and
+ * the rivalry key. Relationships are sparse and directed (`social.relationships[from][to]`) and
+ * hold memories, not a running total: what `from` feels about `to` is the pair's compatibility plus
  * the opinions of the memories `from` holds about `to`, clamped to `±affinityRange`. Memories
  * expire and stack only so far, so affinity settles where the pair's company keeps it instead of
- * climbing for as long as the game runs (D88, after RimWorld's social memories).
+ * climbing for as long as the game runs (§memories, after RimWorld's social memories).
  *
  * The social system drops expired memories every tick, so every memory held counts.
  *
@@ -27,7 +27,7 @@ export function emptySocial(): SocialState {
 const clamp = (value: number, range: number): number => Math.max(-range, Math.min(range, value));
 
 /**
- * How well two people get on by nature (D88): an integer in ±`compatibility.range`, the same
+ * How well two people get on by nature (§affinity): an integer in ±`compatibility.range`, the same
  * both ways (the formula is on `ConfigDef.social.compatibility`).
  */
 export function compatibility(

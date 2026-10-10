@@ -1,9 +1,9 @@
 /**
- * D66: dock hands do D63's carting on foot. An offer's crates come out of the warehouse door on a
- * dock hand's trolley and are set down on the staging area; a declined offer's are fetched back
- * in; a delivery's are taken in by the job's receiver, who is on the dock when it comes
- * alongside. A walk that takes too long gives up into the instant behaviour, with an event; the
- * dock being cast off finishes whatever is still open. Departure never waits on any of it.
+ * §dock-hand-errands: dock hands do the carting on foot. An offer's crates come out of the
+ * warehouse door on a dock hand's trolley and are set down on the staging area; a declined offer's
+ * are fetched back in; a delivery's are taken in by the job's receiver, who is on the dock when it
+ * comes alongside. A walk that takes too long gives up into the instant behaviour, with an event;
+ * the dock being cast off finishes whatever is still open. Departure never waits on any of it.
  */
 import { describe, expect, it } from "vitest";
 import { createDefLookup } from "../../core/defs";
@@ -51,7 +51,7 @@ function run(test: TestWorld, ticks: number, until?: (world: World) => boolean):
 
 const crates = (world: World, id: JobId) => world.state.jobs[id]?.cargoItemIds ?? [];
 
-describe("dock hands (D66)", () => {
+describe("dock hands (§dock-hand-errands)", () => {
   it("cart an offer's crates out of the warehouse door onto the staging area", () => {
     const test = hands();
     const { world } = test;

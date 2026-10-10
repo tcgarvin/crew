@@ -254,7 +254,7 @@ export function effectiveSpeed(
   );
   let trait = 1;
   for (const traitId of actor.traits) trait *= ctx.defs.trait(traitId).modifiers.walkSpeed ?? 1;
-  // D66: a local on the dock is a body in the way like anyone else.
+  // §local-behaviour: a local on the dock is a body in the way like anyone else.
   const crowded =
     isOverlapping(actor, location, actors) || nearLocal(location, ctx.state.dockside.locals);
   const overlap = crowded ? overlapSpeedFactor(ctx.config) : 1;
@@ -425,9 +425,10 @@ function arrive(ctx: StepCtx, actor: Actor, geometry: DeckGeometry, tile: TileCo
 }
 
 /**
- * D61: a finished step between ship floor and dock floor went down or up a ramp (the hull walls
- * every other edge between them). Movement is the only place that sees the crossing, so it says
- * so: `wentAshore` / `cameAboard`, for the narrator digest and the captain-ashore hook to come.
+ * §living-on-the-dock: a finished step between ship floor and dock floor went down or up a ramp
+ * (the hull walls every other edge between them). Movement is the only place that sees the
+ * crossing, so it says so: `wentAshore` / `cameAboard`, for the narrator digest and the
+ * captain-ashore hook to come.
  */
 function crossedRamp(
   ctx: StepCtx,
@@ -505,8 +506,8 @@ function advanceActor(
     const completed = movement.segmentDistanceTravelled >= length - EPS;
     if (completed) {
       if (geometry.dock !== undefined) crossedRamp(ctx, actor, geometry, a, b);
-      // D82: the step leaves footfall and boots' dirt (`systems/dirt/footfall.ts`), the one
-      // documented cross-system write from movement into the dirt grid.
+      // §footfall-and-boots: the step leaves footfall and boots' dirt (`systems/dirt/footfall.ts`),
+      // the one documented cross-system write from movement into the dirt grid.
       trackFootfall(ctx, actor, geometry, a, b);
       movement.segmentIndex += 1;
       movement.segmentDistanceTravelled = 0;

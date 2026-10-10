@@ -3,7 +3,7 @@
 Status: v2, 2026-09-30, after owner review of v1.
 Sources: `docs/design/game-design-document.md` (GDD), `docs/design/simulation-design.md` (SD),
 `docs/review/2026-09-30-architecture-review-opus.md` (design-partner critique of v1; parts of it
-are superseded by the owner decisions in `docs/DECISIONS.md`).
+are superseded by the owner decisions in `docs/DECISIONS.md`; current behaviour is in `docs/spec/`).
 
 ## 1. Goal of the V1 sprint
 
@@ -18,7 +18,7 @@ One thin vertical slice, deployed, that lets us judge both GDD §25 hypotheses a
 Every system is built to the depth needed to be *interesting to watch*, no deeper. Depth comes
 after the slice, driven by what playtesting shows is boring or broken.
 
-## 2. Decisions (see `docs/DECISIONS.md` for rationale)
+## 2. Decisions (see `docs/DECISIONS.md` for the rationale of the foundational ones, `docs/spec/` for how it works now)
 
 | Topic | Decision |
 |---|---|
@@ -57,7 +57,7 @@ after the slice, driven by what playtesting shows is boring or broken.
   deterministic job + template card so the game runs offline and in tests.
 - **Narrator digest** is projected server-side from the uploaded snapshot by a pure function in
   `packages/narrator` (truth section + recent events + Neon narrative state). Prompt-cached
-  static prefix. The plan schema rides in the prompt and the reply is validated (D53; was strict structured output, D45).
+  static prefix. The plan schema rides in the prompt and the reply is validated (D53).
 - **Decision** is sim state: `{origin, perspectiveActorId, left, right, nextDecisionId?}`; host
   pauses while one is pending; `ResolveDecision` applies the chosen side's commands.
 

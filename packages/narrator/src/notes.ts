@@ -1,8 +1,8 @@
 /**
  * The narrator's running notes (`games.narrative_notes`, jsonb). Rewritten in full by every call;
- * the digest feeds them back so the next call keeps continuity (GDD §18, §21). D103: each thread
- * carries its arc notes, and a thread that ends becomes a past arc, summarized by the model and
- * kept by the server for the rest of the game.
+ * the digest feeds them back so the next call keeps continuity (GDD §18, §21). §past-arcs: each
+ * thread carries its arc notes, and a thread that ends becomes a past arc, summarized by the model
+ * and kept by the server for the rest of the game.
  *
  * W9 decision: a small JSON object rather than free text, so the server can store it as jsonb and
  * the digest can bound each part separately. Dropped intents from the previous call are carried
@@ -14,9 +14,12 @@ export interface NarratorCastEntry {
   readonly name: string;
   /** Who they are and what they want, one line. */
   readonly note: string;
-  /** D25 (2026-09-30): the port where the captain can find them; null when they have none. */
+  /** §issuers-and-pitches: the port where the captain can find them; null when they have none. */
   readonly portId: string | null;
-  /** D25: hook tick of the call that last put them in front of the captain; -1 if unknown. */
+  /**
+   * §issuers-and-pitches: hook tick of the call that last put them in front of the captain; -1 if
+   * unknown.
+   */
   readonly lastSeenTick: number;
 }
 
@@ -28,29 +31,32 @@ export interface MetIssuer {
   readonly portId: string | null;
 }
 
-/** D32: how long a thread runs. An episode is one complete story, usually about a job's length; it need not involve a job. */
+/**
+ * §threads-and-scales: how long a thread runs. An episode is one complete story, usually about a
+ * job's length; it need not involve a job.
+ */
 export const THREAD_SCALES = ["beat", "episode", "season", "series"] as const;
 export type ThreadScale = (typeof THREAD_SCALES)[number];
 
-/** D32: a story thread the narrator keeps alive, TV-writers'-room style. */
+/** §threads-and-scales: a story thread the narrator keeps alive, TV-writers'-room style. */
 export interface Thread {
   readonly title: string;
   readonly scale: ThreadScale;
   /** Who is involved: crew names or cast names. */
   readonly people: readonly string[];
   /**
-   * D103: the arc so far, rewritten each call: what has happened in it (beats, complications,
-   * the captain's choices) and where it stands now. Was D32's one-sentence `stage`.
+   * §past-arcs: the arc so far, rewritten each call: what has happened in it (beats, complications,
+   * the captain's choices) and where it stands now. Replaces the old one-sentence `stage`.
    */
   readonly arcNotes: string;
   /** One sentence: what must be true before it returns, and roughly what happens then. */
   readonly nextBeat: string;
-  /** D103: server-kept, the hook tick of the call that first wrote this thread. */
+  /** §past-arcs: server-kept, the hook tick of the call that first wrote this thread. */
   readonly openedTick: number;
   /** Hook tick of the last call that put a card or an offer from this thread in front of the captain. */
   readonly lastBeatTick: number | null;
   /**
-   * D39: server-kept like `lastBeatTick`. True once a beat (foreshadowing) card has been
+   * §beat-cards: server-kept like `lastBeatTick`. True once a beat (foreshadowing) card has been
    * attributed to this thread; the model cannot clear it, and it stays true until the thread is
    * retired. One beat card per thread before its payoff.
    */
@@ -58,8 +64,8 @@ export interface Thread {
 }
 
 /**
- * D31: a card the captain has actually seen, kept by the server (never written by the model), so
- * the narrator knows what the captain knows and which way they went.
+ * §card-history: a card the captain has actually seen, kept by the server (never written by the
+ * model), so the narrator knows what the captain knows and which way they went.
  */
 export interface CardShown {
   readonly tick: number;
@@ -72,17 +78,20 @@ export interface CardShown {
   readonly leftLabel: string;
   readonly rightLabel: string;
   readonly chosen: "left" | "right" | null;
-  /** D56: the title of the thread this card closed (server-kept); null for any other card. */
+  /**
+   * §closing-cards: the title of the thread this card closed (server-kept); null for any other
+   * card.
+   */
   readonly closedThread: string | null;
 }
 
-/** D103: how a thread ended: on its closing card, or named in `retired` without one. */
+/** §past-arcs: how a thread ended: on its closing card, or named in `retired` without one. */
 export const ARC_ENDINGS = ["closingCard", "retired"] as const;
 export type ArcEnding = (typeof ARC_ENDINGS)[number];
 
 /**
- * D103: a thread that has ended, kept for the rest of the game so the narrator can see the shape
- * of every story it has told. The model writes `shape` and `summary` in the notes turn of the
+ * §past-arcs: a thread that has ended, kept for the rest of the game so the narrator can see the
+ * shape of every story it has told. The model writes `shape` and `summary` in the notes turn of the
  * call that ended it; the rest is the server's.
  */
 export interface PastArc {
@@ -101,11 +110,13 @@ export interface PastArc {
 export interface NarratorNotes {
   /** The story so far, a few sentences. */
   readonly summary: string;
-  /** D32: structured open threads (was `openThreads: string[]`). */
+  /** §threads-and-scales: structured open threads (was `openThreads: string[]`). */
   readonly threads: readonly Thread[];
-  /** D31: the most recent cards shown, oldest first; server-maintained. */
+  /** §card-history: the most recent cards shown, oldest first; server-maintained. */
   readonly cardsShown: readonly CardShown[];
-  /** D103: every thread that has ended this game, oldest first, up to `NOTES_LIMITS.pastArcs`. */
+  /**
+   * §past-arcs: every thread that has ended this game, oldest first, up to `NOTES_LIMITS.pastArcs`.
+   */
   readonly pastArcs: readonly PastArc[];
   /** Supporting characters the narrator has introduced (not the crew). */
   readonly cast: readonly NarratorCastEntry[];
@@ -145,14 +156,14 @@ const storedThreadSchema = z.object({
   title: z.string(),
   scale: z.enum(THREAD_SCALES),
   people: z.array(z.string()),
-  /** Notes stored before D103 have `stage` instead. */
+  /** Notes stored before arc notes (§past-arcs) have `stage` instead. */
   arcNotes: z.string().optional(),
   stage: z.string().optional(),
   nextBeat: z.string(),
-  /** Notes stored before D103 have no opening tick. */
+  /** Notes stored before opening ticks (§past-arcs) have none. */
   openedTick: z.number().int().optional(),
   lastBeatTick: z.number().int().nullable(),
-  /** Notes stored before D39 have no beat-card flag. */
+  /** Notes stored before beat cards (§beat-cards) have no beat-card flag. */
   beatCardShown: z.boolean().optional(),
 });
 
@@ -176,17 +187,17 @@ const storedCardSchema = z.object({
   leftLabel: z.string(),
   rightLabel: z.string(),
   chosen: z.enum(["left", "right"]).nullable(),
-  /** Cards stored before D56 closed nothing. */
+  /** Cards stored before closing cards (§closing-cards) closed nothing. */
   closedThread: z.string().nullable().optional(),
 });
 
 const storedNotesSchema = z.object({
   summary: z.string(),
-  /** Notes stored before D32. */
+  /** Notes stored before structured threads (§threads-and-scales). */
   openThreads: z.array(z.string()).optional(),
   threads: z.array(storedThreadSchema).optional(),
   cardsShown: z.array(storedCardSchema).optional(),
-  /** Notes stored before D103 have no past arcs. */
+  /** Notes stored before past arcs (§past-arcs) have none. */
   pastArcs: z.array(storedPastArcSchema).optional(),
   cast: z.array(
     z.object({
@@ -213,7 +224,10 @@ export function clipWords(text: string, max: number): string {
   return words.length <= max ? words.join(" ") : `${words.slice(0, max).join(" ")}…`;
 }
 
-/** D32: an `openThreads` string from before structured threads becomes an episode thread. */
+/**
+ * §threads-and-scales: an `openThreads` string from before structured threads becomes an episode
+ * thread.
+ */
 export function threadFromLegacy(text: string, tick: number): Thread {
   return {
     title: text,
@@ -281,9 +295,10 @@ function keepRecentCast(cast: readonly NarratorCastEntry[]): readonly NarratorCa
 }
 
 /**
- * The cast after a call (D25): the model's rewritten list, with `lastSeenTick` carried over from
- * the previous notes by name, and everyone who made an offer this call added or refreshed at the
- * hook tick, so the people the captain meets can recur even if the model forgot to list them.
+ * The cast after a call (§issuers-and-pitches): the model's rewritten list, with `lastSeenTick`
+ * carried over from the previous notes by name, and everyone who made an offer this call added or
+ * refreshed at the hook tick, so the people the captain meets can recur even if the model forgot to
+ * list them.
  */
 export function mergeCast(
   written: readonly {
@@ -349,8 +364,9 @@ export function parseNotes(raw: unknown): NarratorNotes {
   const lastTick = parsed.data.lastUpdatedTick;
   return boundNotes({
     ...rest,
-    // Notes stored before D32 have free-text threads; before D31 no card history; before D103
-    // a thread's `stage` stood for its arc notes, and nothing says when it opened.
+    // Notes stored before structured threads (§threads-and-scales) have free-text threads; before
+    // card history (§card-history) none; before past arcs (§past-arcs) a thread's `stage` stood for
+    // its arc notes, and nothing says when it opened.
     threads:
       threads?.map(({ stage, arcNotes, openedTick, ...t }) => ({
         ...t,
@@ -360,7 +376,8 @@ export function parseNotes(raw: unknown): NarratorNotes {
       })) ?? (openThreads ?? []).map((text) => threadFromLegacy(text, lastTick)),
     cardsShown: (cardsShown ?? []).map((c) => ({ ...c, closedThread: c.closedThread ?? null })),
     pastArcs: pastArcs ?? [],
-    // Notes stored before D25 have no port or sighting for their cast.
+    // Notes stored before cast ports (§issuers-and-pitches) have no port or sighting for their
+    // cast.
     cast: parsed.data.cast.map((c) => ({
       name: c.name,
       note: c.note,
@@ -375,27 +392,27 @@ export function parseNotes(raw: unknown): NarratorNotes {
 export type WrittenThread = Omit<Thread, "openedTick" | "lastBeatTick" | "beatCardShown">;
 
 /**
- * D32: the threads after a call. The model rewrites them in full; the server carries
- * `lastBeatTick` by title: it becomes the hook tick when this call put one of the thread's people
- * in front of the captain (as a card's speaker, named on a card, or as a job's issuer), else the
- * previous value, or null for a thread the model just started and did not use.
+ * §threads-and-scales: the threads after a call. The model rewrites them in full; the server
+ * carries `lastBeatTick` by title: it becomes the hook tick when this call put one of the thread's
+ * people in front of the captain (as a card's speaker, named on a card, or as a job's issuer), else
+ * the previous value, or null for a thread the model just started and did not use.
  *
- * D39: `beatCardShown` is carried by title too, and set when this call's beat card named the
- * thread (`beatCardThread`, the title as the translator matched it). A beat card is a card, so
+ * §beat-cards: `beatCardShown` is carried by title too, and set when this call's beat card named
+ * the thread (`beatCardThread`, the title as the translator matched it). A beat card is a card, so
  * it also stamps `lastBeatTick`.
  *
- * D56: a closed thread is retired by the server, whatever the model wrote: the one this call's
- * closing card ended, and any whose closing card is still in the card history (so a model that
- * keeps writing a finished thread cannot reopen it and close it again).
+ * §closing-cards: a closed thread is retired by the server, whatever the model wrote: the one this
+ * call's closing card ended, and any whose closing card is still in the card history (so a model
+ * that keeps writing a finished thread cannot reopen it and close it again).
  *
- * D101: a thread the captain has seen a beat of (`lastBeatTick` set) never vanishes before its
- * closing card. One the model left out is kept as it was and reported in `kept`, unless the model
- * named it in `retired` (reported in `retiredWithoutCard`). An omitted thread the captain never
- * saw is dropped silently. Over the thread limit, threads that are new this call and unseen go
- * first (`droppedForRoom`), so the limit never cuts a seen thread.
+ * §thread-keeping-and-retirement: a thread the captain has seen a beat of (`lastBeatTick` set)
+ * never vanishes before its closing card. One the model left out is kept as it was and reported in
+ * `kept`, unless the model named it in `retired` (reported in `retiredWithoutCard`). An omitted
+ * thread the captain never saw is dropped silently. Over the thread limit, threads that are new
+ * this call and unseen go first (`droppedForRoom`), so the limit never cuts a seen thread.
  *
- * D103: `openedTick` is carried by title, the hook tick for a new thread. A previous thread that
- * ends this call, by a closing card or named in `retired`, is returned in `ended` to become a
+ * §past-arcs: `openedTick` is carried by title, the hook tick for a new thread. A previous thread
+ * that ends this call, by a closing card or named in `retired`, is returned in `ended` to become a
  * past arc.
  */
 export interface MergedThreads {
@@ -406,7 +423,7 @@ export interface MergedThreads {
   readonly retiredWithoutCard: string[];
   /** Titles of new, unseen threads dropped to make room for seen ones. */
   readonly droppedForRoom: string[];
-  /** D103: previous threads that ended this call, and how. */
+  /** §past-arcs: previous threads that ended this call, and how. */
   readonly ended: { readonly thread: Thread; readonly ending: ArcEnding }[];
 }
 
@@ -420,7 +437,7 @@ export function mergeThreads(
   beatCardThread: string | undefined = undefined,
   /** Titles of threads closed by a card: this call's and those in the card history. */
   closedThreads: readonly string[] = [],
-  /** D101: titles the model ends without a closing card. */
+  /** §thread-keeping-and-retirement: titles the model ends without a closing card. */
   retired: readonly string[] = [],
 ): MergedThreads {
   const key = (s: string) => s.trim().toLowerCase();
@@ -477,7 +494,7 @@ export function mergeThreads(
   return { threads, kept, retiredWithoutCard, droppedForRoom, ended };
 }
 
-/** D103: what the model writes for a thread that ended this call. */
+/** §past-arcs: what the model writes for a thread that ended this call. */
 export interface WrittenArcSummary {
   readonly title: string;
   readonly shape: string;
@@ -485,7 +502,7 @@ export interface WrittenArcSummary {
 }
 
 /**
- * D103: the past arcs after a call: the previous ones, then each thread that ended this call
+ * §past-arcs: the past arcs after a call: the previous ones, then each thread that ended this call
  * with the summary the model wrote for it (matched by title). A thread the model wrote no summary
  * for keeps its arc notes as the summary, and `missing` names it so the next call is told.
  */

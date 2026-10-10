@@ -43,7 +43,7 @@ describe("buildCapabilities", () => {
     expect(text).toContain("One offer per call.");
   });
 
-  it("says under stockMarket that provisions are an item it may stock, by id (D81)", () => {
+  it("says under stockMarket that provisions are an item it may stock, by id (§galley-provisions)", () => {
     const stock = text.split("## 5. stockMarket")[1]?.split("## 6.")[0] ?? "";
     expect(stock).toContain(
       "- Provisions are an item like any other (item.provisions): stock them where the galley should restock",
@@ -58,7 +58,7 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the seven narrator levers (D47 added stockMarket, D78 scheduleHazard, D95 scheduleField)", () => {
+  it("names exactly the seven narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field)", () => {
     const levers = [...text.matchAll(/^## \d\. (\w+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
@@ -73,7 +73,7 @@ describe("buildCapabilities", () => {
     expect(text).not.toContain("six levers");
   });
 
-  it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (D78)", () => {
+  it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (§hazard-and-field-levers)", () => {
     const config = req.snapshot.config;
     expect(text).toContain(
       "## 6. scheduleHazard: a navigation hazard on the leg under way, a piloting check for whoever has the helm",
@@ -96,7 +96,7 @@ describe("buildCapabilities", () => {
     expect(text).toContain("With nobody at the helm it is a scrape and a delay both.");
   });
 
-  it("documents scheduleField: severities priced from config, detection, scripted hits, the guard, one per leg (D95)", () => {
+  it("documents scheduleField: severities priced from config, detection, scripted hits, the guard, one per leg (§scheduling-a-field)", () => {
     const config = req.snapshot.config;
     const lever = text.split("## 7. scheduleField")[1] ?? "";
     expect(lever).toContain(": an asteroid field on the leg, rocks that hit the ship");
@@ -121,7 +121,7 @@ describe("buildCapabilities", () => {
     expect(text).toContain("debrisField and ionStorm are the same check");
   });
 
-  it("lists every room aboard with its machines by id, as scripted targets (D95)", () => {
+  it("lists every room aboard with its machines by id, as scripted targets (§scheduling-a-field)", () => {
     const lever = text.split("## 7. scheduleField")[1] ?? "";
     const deckId = Object.keys(req.snapshot.state.deck.tiles)[0];
     const deck = Object.values(content().decks).find((d) => d.id === deckId);
@@ -143,7 +143,8 @@ describe("buildCapabilities", () => {
     const reach = Object.fromEntries(
       [...text.matchAll(/^- (port\.\w+) ".*\n.*\n {2}from here: (.*)$/gm)].map((m) => [m[1], m[2]]),
     );
-    // Distances come from content (D76 made the spur legs a watch long); the topology is pinned.
+    // Distances come from content (spur legs are a watch long, §the-ships-day); the topology is
+    // pinned.
     const far = (to: string) => pathBetween(content(), "port.green_meridian", to)?.distance;
     expect(reach).toEqual({
       "port.crossroads_hub": `1 hop, ${far("port.crossroads_hub")}s transit in all`,
@@ -185,7 +186,7 @@ describe("buildCapabilities", () => {
     expect(text).toContain("you never cause it");
   });
 
-  it("documents privateTalk as a card side effect, warm or stern, and not as a lever (D86)", () => {
+  it("documents privateTalk as a card side effect, warm or stern, and not as a lever (§private-talk)", () => {
     expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
     expect(text).toContain("the talk moves how they feel about the captain");
@@ -208,7 +209,7 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("lists each port's market as items, counts and price tier words, no prices (D47)", () => {
+  it("lists each port's market as items, counts and price tier words, no prices (§market-lever)", () => {
     for (const port of Object.values(content().ports)) {
       for (const line of port.market) {
         const name = content().items[line.itemDefId]?.name ?? "";
@@ -220,7 +221,7 @@ describe("buildCapabilities", () => {
     expect(text).toContain("The crew buy what a stalled repair needs themselves");
   });
 
-  it("points the hazard and field levers at the departure call (D99)", () => {
+  it("points the hazard and field levers at the departure call (§requested-call-back)", () => {
     const sentence =
       "The departure call you ask for with callBack (when: departure) is the natural moment: the ship has just cast off and the whole leg is ahead.";
     const hazard = text.slice(text.indexOf("## 6. scheduleHazard"), text.indexOf("## 7."));

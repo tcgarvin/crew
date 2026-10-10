@@ -11,7 +11,7 @@ import {
   unitInterval,
 } from "./primitives";
 
-/** D88: one memory kind's opinion (a whole number, never 0), duration and stack limit. */
+/** §memories: one memory kind's opinion (a whole number, never 0), duration and stack limit. */
 const memoryDefSchema = z.strictObject({
   label: z.string().min(1),
   opinion: z
@@ -26,7 +26,9 @@ const memoryDefSchema = z.strictObject({
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
 
-/** D92: one field severity: its mean impact rate, share of large rocks and length. */
+/**
+ * §scheduling-a-field: one field severity: its mean impact rate, share of large rocks and length.
+ */
 const severitySchema = z.strictObject({
   impactsPerMinute: positive,
   largeShare: unitInterval,
@@ -163,7 +165,9 @@ export const configDefSchema = z.strictObject({
     faultBudget: z.number().int().min(0),
     budgetRefillDays: positive,
     hookOnEvents: z.array(z.string().min(1)),
-    /** D100: events that raise the narrator's aftermath call, at any significance. */
+    /**
+     * §notable-event-hook: events that raise the narrator's aftermath call, at any significance.
+     */
     aftermathHookOnEvents: z.array(z.string().min(1)),
     hazardBudget: z.number().int().min(0),
   }),

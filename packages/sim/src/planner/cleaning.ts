@@ -1,5 +1,5 @@
 /**
- * The planner's cleaning rule (D82): who may take a `cleanCompartment` task.
+ * The planner's cleaning rule (§who-mops): who may take a `cleanCompartment` task.
  *
  * By the room's tags against the actor's roles (`ROOM_AFFINITY`: cook → galley, mess; deckhand →
  * cargo hold, corridor, gym, airlock; engineer → engineering; medic → infirmary; captain, first

@@ -17,7 +17,7 @@ import { stepChecked } from "./fixtures/helpers";
 import { registerSpatial } from "./index";
 import { requestMove } from "./movement";
 
-/** The 12×8 deck with powered `doorB` authored as a ramp (D58). */
+/** The 12×8 deck with powered `doorB` authored as a ramp (§dock-drawing). */
 function rampWorld() {
   const config = tinyConfig();
   const content = deck12Content(config);
@@ -173,7 +173,7 @@ describe("doors", () => {
     expect(requestMove(world.state, MARA, { x: 9, y: 2 }, world.caches, config)).toBe(false);
   });
 
-  it("a powered ramp travels open and shut in rampOpenSeconds (D58)", () => {
+  it("a powered ramp travels open and shut in rampOpenSeconds (§dock-drawing)", () => {
     const test = rampWorld();
     const { world } = test;
     const config = world.config.values;

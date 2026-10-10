@@ -67,7 +67,7 @@ function recordingCanvas(): { ctx: CanvasRenderingContext2D; rects: number[][] }
   return { ctx, rects };
 }
 
-describe("drawStars (D72: bow east)", () => {
+describe("drawStars (§orientation-and-size: bow east)", () => {
   const layers: StarLayer[] = [
     { parallax: 1, stars: [{ x: 0.5, y: 0.5, size: 2, brightness: 1 }] },
   ];

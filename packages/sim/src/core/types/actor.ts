@@ -114,19 +114,20 @@ export interface RouteFailure {
 }
 
 /**
- * Schedule (SD §11.4, D77). The watch section this person stands, from the scenario's watch bill
- * at spawn; absent for a dayworker (anyone not in a section, a narrator-spawned hand included).
- * On/off duty is derived from the tick (`systems/watch/duty.ts`), never stored. The bill itself
- * is not stored either: it is these sections, read off the actors (`watchBillOf`).
+ * Schedule (SD §11.4, §sections-and-dayworkers). The watch section this person stands, from the
+ * scenario's watch bill at spawn; absent for a dayworker (anyone not in a section, a
+ * narrator-spawned hand included). On/off duty is derived from the tick (`systems/watch/duty.ts`),
+ * never stored. The bill itself is not stored either: it is these sections, read off the actors
+ * (`watchBillOf`).
  */
 export interface Schedule {
   section?: WatchSection;
 }
 
 /**
- * D77: a section of the watch bill. `index` is the section's place in the bill, which is the
- * watch of the day it stands (`watchOfDay(tick) === index`); stored beside the key because a
- * generated bill (`core/watch-bill.ts`) exists nowhere else to look it up.
+ * §sections-and-dayworkers: a section of the watch bill. `index` is the section's place in the
+ * bill, which is the watch of the day it stands (`watchOfDay(tick) === index`); stored beside the
+ * key because a generated bill (`core/watch-bill.ts`) exists nowhere else to look it up.
  */
 export interface WatchSection {
   readonly key: LocalKey;
@@ -134,9 +135,9 @@ export interface WatchSection {
 }
 
 /**
- * D79: something on a person's mind. Mood is the clamped sum of live thoughts' `value`s; the
- * value is copied from the def when the thought is had, so a content retune never rewrites one
- * already held. `refId` names who or what it is about, when that matters.
+ * §mood-and-work-speed: something on a person's mind. Mood is the clamped sum of live thoughts'
+ * `value`s; the value is copied from the def when the thought is had, so a content retune never
+ * rewrites one already held. `refId` names who or what it is about, when that matters.
  */
 export interface Thought {
   key: ThoughtKey;
@@ -179,9 +180,9 @@ export interface FactValues {
     idle?: boolean;
   };
   /**
-   * D94: a rock hit the ship (the subject is the field). Everyone aboard feels it; only those in
-   * the hit compartment see where, and only for them is `compartmentId` present. `observedTick`
-   * is the impact's tick, so the latest belief is the latest impact.
+   * §felt-and-seen: a rock hit the ship (the subject is the field). Everyone aboard feels it; only
+   * those in the hit compartment see where, and only for them is `compartmentId` present.
+   * `observedTick` is the impact's tick, so the latest belief is the latest impact.
    */
   hullImpact: { fieldId: FieldId; compartmentId?: CompartmentId };
 }
@@ -233,7 +234,9 @@ export interface Actor {
    */
   location: PhysicalLocation;
   movement: MovementState;
-  /** Facing in radians (0 = east, clockwise positive), updated by movement; presentation hint only. */
+  /**
+   * Facing in radians (0 = east, clockwise positive), updated by movement; presentation hint only.
+   */
   facing: number;
   needs: Needs;
   capacities: Capacities;
@@ -241,14 +244,14 @@ export interface Actor {
   traits: TraitDefId[];
   /** Mood in [-1, 1]; bounded effects on work and willingness (SD §11.3). */
   mood: number;
-  /** D79: live thoughts, which mood sums (owner: `core/thoughts.ts` adds, needs prunes). */
+  /** §thoughts: live thoughts, which mood sums (owner: `core/thoughts.ts` adds, needs prunes). */
   thoughts: Thought[];
   /** Slice 4: soft character state, from the crew def or generated at spawn. */
   interests: Interests;
   values: Values;
   /**
-   * D82: dirt on the boots in [0, 1], loaded on dock floor and dirty tiles, shed on the deck as
-   * they walk (owner: dirt, written from movement through `trackFootfall`).
+   * §footfall-and-boots: dirt on the boots in [0, 1], loaded on dock floor and dirty tiles, shed on
+   * the deck as they walk (owner: dirt, written from movement through `trackFootfall`).
    */
   boots: number;
   schedule: Schedule;

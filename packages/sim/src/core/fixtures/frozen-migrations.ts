@@ -1,8 +1,8 @@
 /**
- * D74: every save older than schema 7 is refused (`migrations[6]` throws), so the frozen 1 → 6
- * migrations no longer run in play. Their tests still run them end to end, against states built
- * by today's world, by restoring with this registry: the same chain, with the refusal replaced by
- * a pass-through.
+ * §save-migrations: every save older than schema 7 is refused (`migrations[6]` throws), so the
+ * frozen 1 → 6 migrations no longer run in play. Their tests still run them end to end, against
+ * states built by today's world, by restoring with this registry: the same chain, with the refusal
+ * replaced by a pass-through.
  */
 import type { KernelRegistry } from "../registry";
 import { migrations, restore } from "../save";

@@ -12,7 +12,8 @@
  * higher class interrupts, except that an activity younger than `work.switchCooldownSeconds` is
  * only interrupted by containment or above (W4a decision: the cooldown damps flip-flopping when
  * a need crosses its seek threshold right after the actor committed to something else), and so
- * is a sleep at any age (D77 addendum: sleep is taken whole; essential work finds someone awake).
+ * is a sleep at any age (§sleep-timing: sleep is taken whole; essential work finds someone
+ * awake).
  *
  * Output: `continue` (keep going), `idle` (nothing to do and not doing anything), or a `task` /
  * `personal` intent carrying an SD §15.7 compact trace (the pipeline stores it in the bounded
@@ -102,8 +103,8 @@ export function selectIntent(view: AgentView, config: PlannerConfig): Intent {
     const age = view.tick - activity.sinceTick;
     const cooldown = config.work.switchCooldownSeconds * config.time.tickRate;
     if (age < cooldown) return { kind: "continue" };
-    // D77 addendum: a sleeper is woken for an emergency, not for essential work (a course to
-    // plot, the helm) while others are up; the sleep is then taken whole, not in fragments.
+    // §sleep-timing: a sleeper is woken for an emergency, not for essential work (a course
+    // to plot, the helm) while others are up; the sleep is then taken whole, not in fragments.
     if (activity.kind === "personal" && activity.activity === "sleep") return { kind: "continue" };
   }
   return toIntent(

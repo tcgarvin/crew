@@ -5,8 +5,8 @@ Status: spike done, 2026-10-03 (phase 2, item 1 of `docs/design/dockside-plan.md
 `pathfind.ts`, `routing.ts`, `estimates.ts`, `doors.ts`, `movement.ts`, `topology.ts`,
 `invariants.ts`), plus `requestRamps` in `systems/travel/travel.ts` and new optional fields in
 `core/types` (`ids.ts`, `content.ts`, `ship.ts`, `nav.ts`). Tests in `dock.test.ts` over the
-fixture `fixtures/dock.ts`. The D entry text is drafted in §9; it is not in `docs/DECISIONS.md`
-yet.
+fixture `fixtures/dock.ts`. The decision is D59 in `docs/DECISIONS.md`; the rules are in
+§the-graft-onto-the-deck-grid.
 
 ## 1. Answer
 
@@ -325,8 +325,8 @@ this change, so they are close to the timeout on main regardless.
   addressed by tile. Not needed until the stall (phase 2 item 7) or locals (phase 3).
   `detachDock`'s sweep of reservations on dock tiles exists for them; today it never finds any.
 - **Perception on the dock**, the **"aboard" sweep**, the **two-way ramp rule in travel** and the
-  **`wentAshore` event** (all §4). Done in D61, with the dock's lifetime, the travel invariant and
-  migration 3 → 4.
+**`wentAshore` event** (all §4). Done (§calling-the-crew-aboard), with the dock's lifetime, the
+  travel invariant and migration 3 → 4.
 - **Saves coupled to dock maps** (§4, save/migrations).
 - **Ramp timing.** Phase 1 adds `doors.rampOpenSeconds`. The door system's `opening` branch
   picks the seconds, right next to this spike's no-auto-close change in `doors.ts`; expect a

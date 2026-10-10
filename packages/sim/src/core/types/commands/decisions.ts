@@ -5,7 +5,10 @@ import type { TextRef } from "../common";
 import type { ActorId, DecisionId, HookId, JobId } from "../ids";
 import type { CommandDraft } from "./index";
 
-/** One side of a card. `aftermath` (D26, additive) is copied onto the `DecisionOption`. */
+/**
+ * One side of a card. `aftermath` (§aftermath-caption, additive) is copied onto the
+ * `DecisionOption`.
+ */
 export interface DecisionCardSide {
   readonly label: TextRef;
   readonly commands: readonly CommandDraft[];

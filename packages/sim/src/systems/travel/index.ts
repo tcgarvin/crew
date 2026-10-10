@@ -8,15 +8,16 @@ import { stageDock } from "./staging";
 import { travelSystem } from "./travel";
 
 /**
- * Travel, and with it the dock's lifetime: the locals on it walk in phase `actions` (D66) and
- * the staging call's `stageDock` answer is travel's to apply.
+ * Travel, and with it the dock's lifetime: the locals on it walk in phase `actions`
+ * (§local-behaviour) and the staging call's `stageDock` answer is travel's to apply.
  */
 export function registerTravel(registry: KernelRegistry): void {
   registry.registerSystem(localsSystem);
-  // D78: before the state machine, so a plotted course is seen the tick it is plotted.
+  // §course-plotting: before the state machine, so a plotted course is seen the tick it is plotted.
   registry.registerSystem(courseSystem);
   registry.registerSystem(travelSystem);
-  // D78: after the state machine, so a hazard fires on the tick transit is reached.
+  // §debris-fields-and-ion-storms: after the state machine, so a hazard fires on the tick transit
+  // is reached.
   registry.registerSystem(hazardsSystem);
   registry.registerCommandHandler("stageDock", stageDock);
   registry.registerCommandHandler("scheduleHazard", scheduleHazard);

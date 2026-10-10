@@ -1,5 +1,5 @@
 /**
- * D97: the notes turn through the route. The real narrator over a fake transport (never the
+ * §notes-turn: the notes turn through the route. The real narrator over a fake transport (never the
  * network) answers a story call with a plan; the route stores the notes as they stand, logs a
  * `notes` row, runs the notes turn (inline here: there is no Vercel request context) and stores
  * the model's notes. A call that arrives while a notes turn is pending waits for it.
@@ -29,7 +29,7 @@ function content(): ContentBundle {
   return bundle;
 }
 
-// D99: every plan the model writes carries its call-back request.
+// §requested-call-back: every plan the model writes carries its call-back request.
 const PLAN = {
   rationale: "Nothing yet.",
   intents: [],
@@ -88,7 +88,7 @@ async function setUp(runNarrator: RunNarrator) {
   return { db, gameId: game.id, post };
 }
 
-describe("POST /api/games/:id/narrator, the notes turn (D97)", () => {
+describe("POST /api/games/:id/narrator, the notes turn (§notes-turn)", () => {
   it("stores the model's notes and logs the notes turn as its own ok row", async () => {
     const { db, gameId, post } = await setUp(realNarrator(twoTurns(JSON.stringify(WRITTEN))));
     const res = await post(quietTooLongRequest(content()));

@@ -1,9 +1,9 @@
 /**
- * D80: a ship whose engine is down in transit with no repair possible aboard limps on at
- * `travel.limpSpeedFraction` of nominal speed instead of drifting for good, and says so once
+ * §limping-under-way: a ship whose engine is down in transit with no repair possible aboard limps
+ * on at `travel.limpSpeedFraction` of nominal speed instead of drifting for good, and says so once
  * (`shipLimping`). While a repair aboard can still bring the engine back (the part is aboard, or
- * the fault is not diagnosed yet) it drifts as before, and a repaired engine ends the limp.
- * Only travel and commerce run here, so the engine's mode, output and faults are set by hand.
+ * the fault is not diagnosed yet) it drifts as before, and a repaired engine ends the limp. Only
+ * travel and commerce run here, so the engine's mode, output and faults are set by hand.
  */
 import { describe, expect, it } from "vitest";
 import { createKernel } from "../../core/kernel";
@@ -126,7 +126,7 @@ function advance(kernel: ReturnType<typeof createKernel>, world: World, ticks: n
   return events;
 }
 
-describe("limping home (D80)", () => {
+describe("limping home (§limping-under-way)", () => {
   it("limps at the configured fraction once the repair is out of reach aboard, and says so once", () => {
     const { kernel, world } = limpWorld();
     seize(world, true);

@@ -1,6 +1,6 @@
 /**
- * Eating (D81): `consumeServing`'s hunger, thoughts and event; the eat plan's mess seat; the mess
- * call's hold on the gangway stander; the plate carried to the helm.
+ * Eating (§eating): `consumeServing`'s hunger, thoughts and event; the eat plan's mess seat; the
+ * mess call's hold on the gangway stander; the plate carried to the helm.
  */
 import { describe, expect, it } from "vitest";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
@@ -33,7 +33,7 @@ function actor(world: World, id: ActorId) {
   return found;
 }
 
-describe("consumeServing (D81 call 4)", () => {
+describe("consumeServing (§eating, call 4)", () => {
   const cases: [string, MealQuality | undefined, DirtTier, string[]][] = [
     ["a good meal: ate well", "good", "clean", ["ateWell"]],
     ["a plain meal: nothing", "plain", "clean", []],
@@ -70,7 +70,7 @@ describe("consumeServing (D81 call 4)", () => {
   });
 });
 
-describe("the eat plan's seat (D81 call 6)", () => {
+describe("the eat plan's seat (§eating, call 6)", () => {
   const moveTargets = (world: World, id: ActorId, itemId: ItemId) => {
     const { ctx } = galleyStepCtx(world);
     const plan = eatPlan(ctx, actor(world, id), itemId, MESS_FLOOR);
@@ -139,7 +139,7 @@ describe("the eat plan's seat (D81 call 6)", () => {
   });
 });
 
-describe("the mess call on the gangway (D81 call 1)", () => {
+describe("the mess call on the gangway (§eating, call 1)", () => {
   it("stands for a hungry stander who knows of a served meal, not for the helm's plate", () => {
     const { world } = galleyWorld();
     const noor = actor(world, NOOR);
@@ -155,7 +155,7 @@ describe("the mess call on the gangway (D81 call 1)", () => {
   });
 });
 
-describe("the plate for the helm (D81 call 5)", () => {
+describe("the plate for the helm (§eating, call 5)", () => {
   const carryTask = (world: World): Task => ({
     id: "t99" as Task["id"],
     problemId: "p99" as Task["problemId"],

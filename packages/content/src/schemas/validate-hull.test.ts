@@ -19,10 +19,10 @@ const position = (key: string, purposes: Position["purposes"], y = 0): Position 
   capacity: 1,
 });
 
-/** The helm's seat and, apart from it, the standby tile the oncoming waits on (D77). */
+/** The helm's seat and, apart from it, the standby tile the oncoming waits on (§handover). */
 const HELM_POSITIONS = [position("seat", ["operate", "repair"]), position("standby", ["use"])];
 
-/** Four seats at one table (D81). */
+/** Four seats at one table (§what-a-deck-must-offer). */
 const TABLE_SEATS = [0, 1, 2, 3].map((y) => position(`seat_${y}`, ["use"], y));
 
 const tagged = (tag: MachineTag, interactionPositions = [position("front", ["use"])]) => ({
@@ -147,7 +147,7 @@ function withoutTag(deck: RawDeck, tag: string): void {
   for (const c of deck.compartments) c.tags = c.tags.filter((t) => t !== tag);
 }
 
-describe("hull contract (D72)", () => {
+describe("hull contract (§what-a-deck-must-offer)", () => {
   it("accepts a deck that meets it", () => {
     expect(hullMessages()).toEqual([]);
   });
@@ -238,7 +238,7 @@ describe("hull contract (D72)", () => {
     expect(messages).toEqual([`${AT}.machines: needs exactly one pilotStation machine, found 2`]);
   });
 
-  it("requires the pilot station's standby position, apart from its seat (D77)", () => {
+  it("requires the pilot station's standby position, apart from its seat (§handover)", () => {
     const helmWith = (...positions: Position[]) => ({
       ...MACHINES,
       "machine.helm": tagged("pilotStation", positions),
@@ -287,7 +287,7 @@ describe("hull contract (D72)", () => {
     expect(messages).toEqual([`${AT}.spawnPoints: no spawn point tagged "${tag}"`]);
   });
 
-  describe("the galley loop (D81, D82)", () => {
+  describe("the galley loop (§what-a-deck-must-offer)", () => {
     it.each(["pantry", "serving", "cleaningLocker"])("requires a %s zone", (tag) => {
       const messages = hullMessages((deck) => {
         deck.zones = deck.zones.filter((z) => !z.tags.includes(tag));
@@ -385,7 +385,7 @@ describe("hull contract (D72)", () => {
   });
 });
 
-describe("per-scenario capacity (D72)", () => {
+describe("per-scenario capacity (§what-a-deck-must-offer)", () => {
   const scenarioWith = (crew: number) =>
     scenarioDefSchema.parse({
       id: "scenario.test.hull",

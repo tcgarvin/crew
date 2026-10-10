@@ -122,7 +122,7 @@ would put them, and no card appears on arrival.
 
 ## Phase 4: The captain ashore
 
-Save schema 5 → 6 (`jobBoardLastAsk` becomes `captainAshoreLastAsk`). Landed as D70 (playtest
+Save schema 5 → 6 (`jobBoardLastAsk` becomes `captainAshoreLastAsk`). Landed (playtest
 pending; `pnpm test:live` not yet run, the key being at its weekly limit).
 
 1. **`lookForWork` task** for the command actor when docked, idle (`captainIsIdleAt`), with a ramp
@@ -134,17 +134,17 @@ pending; `pnpm test:live` not yet run, the key being at its weekly limit).
 3. **Card delivery on meeting:** a card whose speaker is a local on the dock is held until the
    captain reaches them and talks for a few seconds; otherwise the captain goes through the gate,
    is `offShip` for a few seconds, and the card shows on return. The same mechanism serves
-   `quietTooLong` offers made while docked (the speaker walks in to the ramp). D42's
+   `quietTooLong` offers made while docked (the speaker walks in to the ramp). The earlier
    `surfaceWhenDocked` is migrated and retired.
 4. **Captain with nothing on offer:** wanders the dock, maybe steps through the gate, returns. No
    re-ask.
 5. **Headline and log lines:** "Mara Osei is ashore looking for work", "talking with Fenwick
    Adair".
-6. **Pacing:** re-run `crew pacing` and compare with D51; record the result in the phase's D
-   entry. Prompt v0.18 and `pnpm test:live`.
+6. **Pacing:** re-run `crew pacing` and compare with the last measurement (10 calls per round trip); record the result in the
+   phase's notes. Prompt v0.18 and `pnpm test:live`.
 
 Checkpoint: a full round trip where every offer arrives in person, nothing arrives in flight, and
-the call count per trip is within D51's budget.
+the call count per trip is within that measured budget.
 
 ## Risks and things to watch
 
@@ -153,9 +153,9 @@ the call count per trip is within D51's budget.
   deck's dimensions dynamic).
 - **Dock map authoring time:** six maps by hand. Keep them small. The first one sets the
   template; the rest are variations.
-- **Run-ahead and the `stageDock` hold:** at 8x the narrator is already the clock (D51), and a
-  guaranteed hook per docking adds calls at waypoints that were silent before. Watch the pacing
-  numbers.
+- **Run-ahead and the `stageDock` hold:** at 8x the narrator is already the clock
+(§the-pacing-instrument), and a guaranteed hook per docking adds calls at waypoints that were silent
+  before. Watch the pacing numbers.
 - **Phone legibility** when docked and zoomed out to ship plus dock. The size cap is the lever.
 - **Save migrations** across three bumps. Before players exist, wiping is allowed (PLAN §3), but
   the migrations are cheap enough to write.

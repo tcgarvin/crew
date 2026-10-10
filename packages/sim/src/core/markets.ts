@@ -1,6 +1,6 @@
 /**
- * Port markets (D47): pure helpers over `WorldState.markets` and `PortDef.market`, shared by
- * world creation, the commerce system, the render projection and the narrator (through the
+ * Port markets (§market-stock): pure helpers over `WorldState.markets` and `PortDef.market`, shared
+ * by world creation, the commerce system, the render projection and the narrator (through the
  * package exports). Nothing here moves money or items; `systems/commerce/market.ts` does that.
  *
  * A port with no entry in `state.markets` reads as its content seed, so a save from before the

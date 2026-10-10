@@ -1,7 +1,7 @@
 /**
- * D86: `privateTalk`, a card side effect, through the route. The real narrator over a fake
- * transport (never the network) answers a check-in with a card whose side calls a crew member to
- * the captain's cabin; the client gets the card with the player command on that side.
+ * §private-talk-effect: `privateTalk`, a card side effect, through the route. The real narrator
+ * over a fake transport (never the network) answers a check-in with a card whose side calls a crew
+ * member to the captain's cabin; the client gets the card with the player command on that side.
  */
 import { loadBundle } from "@crew/content";
 import { type ModelTransport, quietTooLongRequest, runNarratorWithTrace } from "@crew/narrator";
@@ -35,7 +35,7 @@ function cardCallingIn(talkWith: string): ModelTransport {
     beatOfThread: "",
     closesThread: "",
   };
-  // D97: the plan turn, then the notes turn (the one with a continuation).
+  // §notes-turn: the plan turn, then the notes turn (the one with a continuation).
   return async (request) => ({
     model: request.model,
     content: JSON.stringify(
@@ -45,7 +45,7 @@ function cardCallingIn(talkWith: string): ModelTransport {
             rationale: "The rivalry at the card table is souring; give the captain the call.",
             intents: [card],
             card: null,
-            // D99: every plan the model writes carries its call-back request.
+            // §requested-call-back: every plan the model writes carries its call-back request.
             callBack: { when: "nextPort", why: "" },
           },
     ),
@@ -87,7 +87,7 @@ async function post(transport: ModelTransport) {
   return { res, req };
 }
 
-describe("POST /api/games/:id/narrator, a privateTalk side (D86)", () => {
+describe("POST /api/games/:id/narrator, a privateTalk side (§private-talk-effect)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });

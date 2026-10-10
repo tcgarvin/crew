@@ -1,12 +1,12 @@
 import { blastTiles, hullFootprint } from "../../core/hull";
 /**
- * D92: the rocks (slice 5 calls 2, 5, 6, 8, 17, 20). While the ship is in an active field, rocks
- * arrive as a Poisson process on the `failures` stream, one draw a tick, at the severity's
- * `impactsPerMinute` times the helm's factor (`1 − helmThreading × skill/10` with someone at the
- * helm, `unmannedRateFactor` with nobody) times `stuckRateFactor` while stuck. A scripted impact
- * lands at its second; so that it replaces a random one rather than adding to them, the random
- * rate is thinned by the scripted impacts' share of the field's expected count (a light field
- * expects three rocks: three scripted ones leave no random ones).
+ * §rock-impacts: the rocks (slice 5 calls 2, 5, 6, 8, 17, 20). While the ship is in an active
+ * field, rocks arrive as a Poisson process on the `failures` stream, one draw a tick, at the
+ * severity's `impactsPerMinute` times the helm's factor (`1 − helmThreading × skill/10` with
+ * someone at the helm, `unmannedRateFactor` with nobody) times `stuckRateFactor` while stuck. A
+ * scripted impact lands at its second; so that it replaces a random one rather than adding to them,
+ * the random rate is thinned by the scripted impacts' share of the field's expected count (a light
+ * field expects three rocks: three scripted ones leave no random ones).
  *
  * An impact's centre is uniform over the deck's hull footprint (a scripted one: the tile, a tile
  * of the compartment, or a footprint tile of the machine); a `large` rock's blast is the centre

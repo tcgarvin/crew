@@ -1,8 +1,9 @@
 /**
- * The staging call's output schema (Dockside §6.1, D67). Its own schema, not the story plan's: a
- * rationale and a list of three intent kinds that together make one `stageDock` command. It rides
- * in the prompt as JSON Schema, like the story plan (D53), and follows the D45 rules: ids are plain
- * strings the translator checks, optional text is empty for none, only small fixed sets are enums.
+ * The staging call's output schema (Dockside §6.1, §staging-prompt). Its own schema, not the story
+ * plan's: a rationale and a list of three intent kinds that together make one `stageDock` command.
+ * It rides in the prompt as JSON Schema, like the story plan (D53), and follows the
+ * §narrator-authority rules: ids are plain strings the translator checks, optional text is empty
+ * for none, only small fixed sets are enums.
  *
  * `runStaging` parses the reply with `stagingEnvelopeSchema` (the intents unparsed), so a reply
  * that slips in a story intent still parses and the translator drops that intent with a reason
@@ -12,7 +13,10 @@ import { z } from "zod";
 
 /** Who a placement is (`StagedPersonSpec.kind` in the sim). */
 export const STAGED_PERSON_KINDS = ["seed", "cast", "newFace"] as const;
-/** A prop's unit count as the model writes it (D47's digit-string enum; 1..4 in the kernel). */
+/**
+ * A prop's unit count as the model writes it (a digit-string enum, as for `stockMarket`,
+ * §market-lever; 1..4 in the kernel).
+ */
 export const PROP_COUNTS = ["1", "2", "3", "4"] as const;
 /** `placeProp.at` for the dock's staging area; anything else is a post key. */
 export const STAGING_AREA_SPOT = "staging";

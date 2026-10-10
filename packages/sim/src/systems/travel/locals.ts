@@ -1,7 +1,7 @@
 /**
- * Locals on the dock (Dockside §5, D66): walking, the three scripted behaviours, and the dock's
- * dressing and clearing as it comes and goes. Placement is `core/locals.ts`; the dock-hand
- * errands that move freight are commerce's (`systems/commerce/dock-hands.ts`).
+ * Locals on the dock (Dockside §5, §local-behaviour): walking, the three scripted behaviours, and
+ * the dock's dressing and clearing as it comes and goes. Placement is `core/locals.ts`; the
+ * dock-hand errands that move freight are commerce's (`systems/commerce/dock-hands.ts`).
  *
  * Walking uses the crew's nav grid and A* (`cachedPath`) under a policy for which every door is
  * impassable. The only doors on the grafted dock's edge are the ramps, so a local's route never
@@ -205,7 +205,10 @@ function shuffleSpot(
   return undefined;
 }
 
-/** D70: an actor's meeting with this local (a `talk` step with them) is still ahead or under way. */
+/**
+ * §meetings-and-visitors: an actor's meeting with this local (a `talk` step with them) is still
+ * ahead or under way.
+ */
 function sought(ctx: Ctx, local: Local): boolean {
   return Object.values(ctx.state.actors).some((actor) => {
     const activity = actor.activity;
@@ -220,7 +223,8 @@ function shuffle(ctx: Ctx, local: Local, berth: BerthedDock): void {
   const behaviour = local.behaviour;
   if (behaviour.kind !== "atPost" || local.movement.kind !== "stationary") return;
   if (ctx.tick < behaviour.nextShuffleTick) return;
-  // D70: someone the captain is walking over to, or talking with, stands still for it.
+  // §meetings-and-visitors: someone the captain is walking over to, or talking with, stands still
+  // for it.
   if (sought(ctx, local)) return;
   const every = configTicks(ctx.config, ctx.config.travel.localShuffleSeconds);
   behaviour.nextShuffleTick = nextShuffleTick(local.id, ctx.tick, every);
@@ -326,7 +330,8 @@ export const localsSystem: System = {
   name: "travel.locals",
   phase: "actions",
   run(ctx) {
-    // A new game's dock is dressed at creation; one restored from before D66 is dressed here.
+    // A new game's dock is dressed at creation; one restored from before locals existed is dressed
+    // here.
     if (dockNeedsDressing(ctx.state)) dressDockAlongside(ctx, undefined);
     const berth = dockAlongside(ctx.content, ctx.state);
     if (berth === undefined) return;

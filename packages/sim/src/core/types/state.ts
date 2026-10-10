@@ -62,38 +62,40 @@ import type { Claim, Problem, Task } from "./work";
 
 /**
  * Bumped on any breaking change to this shape. Each bump ships a `Migration` from the previous
- * version (see save.ts). 2 (2026-09-30): jobs gained `issuerPerson`, `pitch` and `urgency` (D25).
- * 3 (2026-10-01): `markets` (D47), seeded lazily from content for a port a save never visited.
- * 4 (2026-10-03): `deck.dock` is set from the start of `docking` to the end of `undocking` at a
- * port with a dock map (D61), so a save docked at one gets it on load.
- * 5 (2026-10-03): `dockside` (locals and props on the dock alongside), `narrator.staging` and the
- * `stageDock` hook, which replaces `approachingPort` (D66).
- * 6 (2026-10-03): `captainAshore` replaces `jobBoard` (and `captainAshoreLastAsk` the board's
- * last ask), `decisions.held` holds cards waiting to be delivered in person, and D42's
- * `Job.surfaceWhenDocked` is gone (D70).
- * 7 (2026-10-04): ship life slice 1 (D72, D74): Freighter Mk1 is mirrored bow-east, dock maps
- * declare a berth box, `berths` assigns beds and items may have an `ownerId`. Older saves are
- * refused rather than migrated (their tile coordinates are in the old frames).
- * 8 (2026-10-04): ship life slice 2 (D77-D79): watches replace shifts (`Actor.schedule.section`
+ * version (see save.ts). 2 (2026-09-30): jobs gained `issuerPerson`, `pitch` and `urgency`
+ * (§issuers-and-pitches). 3 (2026-10-01): `markets` (§port-markets), seeded lazily from content for
+ * a port a save never visited. 4 (2026-10-03): `deck.dock` is set from the start of `docking` to
+ * the end of `undocking` at a port with a dock map (§dock-alongside), so a save docked at one gets
+ * it on load. 5 (2026-10-03): `dockside` (locals and props on the dock alongside),
+ * `narrator.staging` and the `stageDock` hook, which replaces `approachingPort`
+ * (§staging-hook-and-the-hold). 6 (2026-10-03): `captainAshore` replaces `jobBoard` (and
+ * `captainAshoreLastAsk` the board's last ask), `decisions.held` holds cards waiting to be
+ * delivered in person, and `Job.surfaceWhenDocked` is gone (§holding-a-card).
+ * 7 (2026-10-04): ship life slice 1 (§ship-placement, §berth-assignment): Freighter Mk1 is mirrored
+ * bow-east, dock maps declare a berth box, `berths` assigns beds and items may have an `ownerId`.
+ * Older saves are refused rather than migrated (their tile coordinates are in the old frames).
+ * 8 (2026-10-04): ship life slice 2: watches replace shifts (`Actor.schedule.section`
  * from the scenario's watch bill), `Actor.thoughts`, `watch`, `hazards` and `nextId.hazard`, the
  * narrator budget's hazard line and refill tick, `post` on `stationToStaff`. Migrated.
- * 9 (2026-10-04): ship life slice 3 (D81-D83): `dirt` (a cell grid per deck and room tiers),
+ * 9 (2026-10-04): ship life slice 3: `dirt` (a cell grid per deck and room tiers),
  * `galley` (the meal's bookkeeping), `Actor.boots`, `Item.meal`. Migrated; an old save also gets
  * the scenario's provisions and mop spawned so it cooks tonight.
- * 10 (2026-10-05): ship life slice 4 (D84-D87): `needs.recreation`, `Actor.interests` and
+ * 10 (2026-10-05): ship life slice 4: `needs.recreation`, `Actor.interests` and
  * `values`, `social` (relationships, rivalries, group sessions, the captain's table, a private
  * talk) and `nextId.session`. Migrated; an old save also gets the scenario's books on the shelf.
- * 11 (2026-10-05): D88, affinity from memories: `Relationship.affinity` is gone and
+ * 11 (2026-10-05): affinity from memories (§memories): `Relationship.affinity` is gone and
  * `Relationship.memories` holds what one remembers of the other. Migrated: affinities are dropped
  * (everyone starts at their compatibility), chat timing kept.
- * 12 (2026-10-06): ship life slice 5 (D92-D95): `hull` (integrity, max and scars), `field` and
+ * 12 (2026-10-06): ship life slice 5: `hull` (integrity, max and scars), `field` and
  * `alert`, `nextId.field` and `scar`; the `asteroidBelt` hazard kind is gone. Migrated: the hull
  * starts whole, a waiting `asteroidBelt` hazard becomes a `debrisField`, and an old save gets the
  * scenario's patch kits in the lockers.
  */
 export const SCHEMA_VERSION = 12;
 
-/** D88: one thing `from` remembers about `to`; its opinion is config's (`social.memories`). */
+/**
+ * §memories: one thing `from` remembers about `to`; its opinion is config's (`social.memories`).
+ */
 export interface SocialMemory {
   key: MemoryKey;
   /** First tick the memory no longer counts; the social system drops it then. */
@@ -102,8 +104,8 @@ export interface SocialMemory {
 
 /**
  * Slice 4: what one person holds about another (directed). An entry exists once a chat or a
- * memory names the pair. D88: affinity is not stored; it is compatibility plus the live memories
- * (`affinityOf`).
+ * memory names the pair. §affinity: affinity is not stored; it is compatibility plus the live
+ * memories (`affinityOf`).
  */
 export interface Relationship {
   memories: SocialMemory[];
@@ -180,10 +182,10 @@ export interface SocialState {
 }
 
 /**
- * D82: dirt. Owner: dirt (`systems/dirt/`). `cells[deckId]` is one row-major integer per authored
- * deck tile (`y × width + x`, `core/dirt-grid.ts`), 0..255 with 255 = 1.0 of dirt; dock floor has
- * no cell. `tiers` is the last tier written per room (`CompartmentDef.key`), so a transition is
- * seen once; `dustThisVisit` is the airborne dust settled since the ship last docked.
+ * §dirt-grid: dirt. Owner: dirt (`systems/dirt/`). `cells[deckId]` is one row-major integer per
+ * authored deck tile (`y × width + x`, `core/dirt-grid.ts`), 0..255 with 255 = 1.0 of dirt; dock
+ * floor has no cell. `tiers` is the last tier written per room (`CompartmentDef.key`), so a
+ * transition is seen once; `dustThisVisit` is the airborne dust settled since the ship last docked.
  */
 export interface DirtState {
   cells: Record<DeckDefId, number[]>;
@@ -192,8 +194,8 @@ export interface DirtState {
 }
 
 /**
- * D81: the galley's bookkeeping. Owner: galley (`systems/galley/`). `lastMealWatch` is the
- * `watchIndexAt` of the last watch a `mealToCook` was raised for; `helmMeal` is the stander's
+ * §meal-problem: the galley's bookkeeping. Owner: galley (`systems/galley/`). `lastMealWatch` is
+ * the `watchIndexAt` of the last watch a `mealToCook` was raised for; `helmMeal` is the stander's
  * plate being eaten in the seat (a meal run on the spot rather than planned).
  */
 export interface GalleyState {
@@ -202,7 +204,7 @@ export interface GalleyState {
 }
 
 /**
- * D77: the watch's bookkeeping. Owner: watch (`systems/watch/`).
+ * §the-bell: the watch's bookkeeping. Owner: watch (`systems/watch/`).
  */
 export interface WatchState {
   /** `watchIndexAt` of the last bell rung; the bell rings when the live index differs. */
@@ -219,8 +221,9 @@ export interface WatchState {
 }
 
 /**
- * D78: a navigation hazard placed by the narrator's `scheduleHazard`. It fires at the first
- * `transit` tick at or after `fireAtTick`. Owner: travel (`systems/travel/hazards.ts`).
+ * §debris-fields-and-ion-storms: a navigation hazard placed by the narrator's `scheduleHazard`. It
+ * fires at the first `transit` tick at or after `fireAtTick`. Owner: travel
+ * (`systems/travel/hazards.ts`).
  */
 export interface ScheduledHazard {
   id: HazardId;
@@ -232,9 +235,9 @@ export interface ScheduledHazard {
 }
 
 /**
- * D92: what a scripted impact is aimed at. A compartment is hit on one of its tiles, uniformly;
- * a machine on one of its footprint tiles. `actor` waits for bodies (slice 6): the command shape
- * carries it and the kernel rejects it.
+ * §scheduling-a-field: what a scripted impact is aimed at. A compartment is hit on one of its
+ * tiles, uniformly; a machine on one of its footprint tiles. `actor` waits for bodies (slice 6):
+ * the command shape carries it and the kernel rejects it.
  */
 export type ImpactTarget =
   | { readonly kind: "machine"; readonly machineId: MachineId }
@@ -243,9 +246,9 @@ export type ImpactTarget =
   | { readonly kind: "actor"; readonly actorId: ActorId };
 
 /**
- * D92: one impact the narrator chose (`scheduleField.scripted`). `atSeconds` counts sim seconds
- * from the field's start; an absent `rock` is drawn by the severity's large share, an absent
- * `effect` rolled. It replaces the random impact due at that moment, so the rate holds.
+ * §scheduling-a-field: one impact the narrator chose (`scheduleField.scripted`). `atSeconds` counts
+ * sim seconds from the field's start; an absent `rock` is drawn by the severity's large share, an
+ * absent `effect` rolled. It replaces the random impact due at that moment, so the rate holds.
  */
 export interface ScriptedImpactDraft {
   readonly atSeconds: number;
@@ -254,16 +257,16 @@ export interface ScriptedImpactDraft {
   readonly effect?: MachineEffect;
 }
 
-/** D92: a scripted impact on the field, with the tick it landed once it has. */
+/** §rock-impacts: a scripted impact on the field, with the tick it landed once it has. */
 export interface ScriptedImpact extends ScriptedImpactDraft {
   firedTick?: Tick;
 }
 
 /**
- * D92: where a field is in its life. `scheduled` until the first transit tick at or after its
- * start; `active` while the ship is in it (it spans route progress up to `endsAtProgress`;
- * `stuckSinceTick` while the engines are out); `ended` once crossed or drifted clear, kept until
- * the leg ends so a leg holds one field.
+ * §field-lifecycle: where a field is in its life. `scheduled` until the first transit tick at or
+ * after its start; `active` while the ship is in it (it spans route progress up to
+ * `endsAtProgress`; `stuckSinceTick` while the engines are out); `ended` once crossed or drifted
+ * clear, kept until the leg ends so a leg holds one field.
  */
 export type FieldPhase =
   | { kind: "scheduled" }
@@ -271,8 +274,8 @@ export type FieldPhase =
   | { kind: "ended"; enteredTick: Tick; endedTick: Tick; how: "crossed" | "drifted" };
 
 /**
- * D92: the leg's asteroid field, from `scheduleField` to the leg's end. Owner: field
- * (`systems/field/`).
+ * §the-asteroid-field: the leg's asteroid field, from `scheduleField` to the leg's end. Owner:
+ * field (`systems/field/`).
  */
 export interface ActiveField {
   id: FieldId;
@@ -294,9 +297,10 @@ export interface ActiveField {
 }
 
 /**
- * D92, D94: the ship is on alert. Raised and cleared by the field (`clearsAtTick` is set when
- * the field ends); `reports` is the last tick an intercom report covered each compartment
- * (written by the intercom, read by damage response for its scouts). Common knowledge.
+ * §sighting-and-the-alert, §reporting-damage: the ship is on alert. Raised and cleared by the field
+ * (`clearsAtTick` is set when the field ends); `reports` is the last tick an intercom report
+ * covered each compartment (written by the intercom, read by damage response for its scouts).
+ * Common knowledge.
  */
 export interface AlertState {
   sinceTick: Tick;
@@ -306,9 +310,9 @@ export interface AlertState {
 }
 
 /**
- * D93: one impact's mark on the hull, on its centre tile (ship deck frame). `damage` is the hull
- * points the impact actually cost; `recovered` what patching has given back (`patched` once a
- * kit is welded on). Plating clears the scar and the rest of its damage.
+ * §hull-scars-and-ship-loss: one impact's mark on the hull, on its centre tile (ship deck frame).
+ * `damage` is the hull points the impact actually cost; `recovered` what patching has given back
+ * (`patched` once a kit is welded on). Plating clears the scar and the rest of its damage.
  */
 export interface HullScar {
   id: ScarId;
@@ -323,7 +327,7 @@ export interface HullScar {
 }
 
 /**
- * D93: the hull bar. `integrity` is `max` less every scar's damage not yet recovered
+ * §the-hull-bar: the hull bar. `integrity` is `max` less every scar's damage not yet recovered
  * (`core/hull.ts`); at 0 the ship is lost (`lostAtTick`) and the kernel halts for good. Owners:
  * field (charges, loss), damage (patching, plating).
  */
@@ -334,13 +338,16 @@ export interface HullState {
   lostAtTick?: Tick;
 }
 
-/** D47: one item on a port's market: units in stock and the per-unit price in integer credits. */
+/**
+ * §port-markets: one item on a port's market: units in stock and the per-unit price in integer
+ * credits.
+ */
 export interface MarketLine {
   count: number;
   price: number;
 }
 
-/** D47: a port's live market, keyed by item def. Absent item = not sold here. */
+/** §port-markets: a port's live market, keyed by item def. Absent item = not sold here. */
 export type MarketStock = Record<ItemDefId, MarketLine>;
 
 /** Work slice (W4): problems are written by their owning systems, tasks/claims by work. */
@@ -385,27 +392,33 @@ export interface WorldState {
   /** Owner: inventory transfers (unique items and stacks share the table). */
   items: Record<ItemId, Item>;
   /**
-   * Owner: needs (D74). Each berthed actor's bed: the `MachinePlacementDef.key` of a `bed`-tagged
-   * machine on the ship's deck. No two actors share one; an actor without a berth has no key.
+   * Owner: needs (§berth-assignment). Each berthed actor's bed: the `MachinePlacementDef.key` of a
+   * `bed`-tagged machine on the ship's deck. No two actors share one; an actor without a berth has
+   * no key.
    */
   berths: Record<ActorId, LocalKey>;
   /** Owner: work (W4), problems by their owning systems. */
   work: WorkState;
   /** Owner: travel (W6). */
   travel: TravelState;
-  /** Owner: watch (D77): the bell and the helm's bookkeeping. */
+  /** Owner: watch (§the-bell): the bell and the helm's bookkeeping. */
   watch: WatchState;
-  /** Owner: travel (D78). Navigation hazards waiting to fire, in scheduling order. */
+  /**
+   * Owner: travel (§debris-fields-and-ion-storms). Navigation hazards waiting to fire, in
+   * scheduling order.
+   */
   hazards: ScheduledHazard[];
-  /** Owner: dirt (D82). */
+  /** Owner: dirt (§dirt-grid). */
   dirt: DirtState;
-  /** D93: the hull bar. Owners per `HullState`. */
+  /** §the-hull-bar: the hull bar. Owners per `HullState`. */
   hull: HullState;
-  /** D92: the leg's asteroid field, from scheduling to the leg's end. Owner: field. */
+  /**
+   * §the-asteroid-field: the leg's asteroid field, from scheduling to the leg's end. Owner: field.
+   */
   field?: ActiveField;
-  /** D92: the ship is on alert. Owners per `AlertState`. */
+  /** §sighting-and-the-alert: the ship is on alert. Owners per `AlertState`. */
   alert?: AlertState;
-  /** Owner: galley (D81). */
+  /** Owner: galley (§meal-problem). */
   galley: GalleyState;
   /** Slice 4: owners per `SocialState` (recreation, social, cabins). */
   social: SocialState;
@@ -414,15 +427,15 @@ export interface WorldState {
   /** Owner: commerce (W6). Integer credits. */
   money: MoneyState;
   /**
-   * Owner: commerce (D47). Per-port market stock, seeded from `PortDef.market` at world creation
-   * and changed by purchases and the narrator's `stockMarket`. A port with no entry reads as its
-   * content seed (`systems/commerce/market.ts` `effectiveMarket`), so an older save needs no
+   * Owner: commerce (§port-markets). Per-port market stock, seeded from `PortDef.market` at world
+   * creation and changed by purchases and the narrator's `stockMarket`. A port with no entry reads
+   * as its content seed (`systems/commerce/market.ts` `effectiveMarket`), so an older save needs no
    * backfill beyond the empty table.
    */
   markets: Record<PortDefId, MarketStock>;
   /**
    * Owner: travel (the dock's people and props come and go with it) and commerce (dock-hand
-   * errands). D66. Empty whenever no dock is alongside.
+   * errands; §locals-table). Empty whenever no dock is alongside.
    */
   dockside: DocksideState;
   /** Owner: decisions. */

@@ -1,6 +1,6 @@
 /**
- * The helm as the duty station (D77): who stands it, the plan to take it, the handover, the
- * hold, and gangway watch in port.
+ * The helm as the duty station (§who-has-the-helm): who stands it, the plan to take it, the
+ * handover, the hold, and gangway watch in port.
  *
  * Who has the helm is physical: the crew member in a `staff` hold on a helm task, on its seat
  * (`whoHasTheHelm`); standing beside the console is not having it. Who *should* have it is the
@@ -18,8 +18,8 @@
  *   back to the bridge. While someone has it nobody is re-designated for being busy: the
  *   off-going or a relief holds until the designated stander comes.
  * - Once someone is on their way to an empty helm on its watch post, they stay designated until
- *   they sit or drop it (D77 addendum, the slice-2 QA departure churn): a better-placed hand who
- *   becomes free meanwhile is not sent as well, but relieves them once they hold it, so one
+ *   they sit or drop it (§who-has-the-helm, the slice-2 QA departure churn): a better-placed hand
+ *   who becomes free meanwhile is not sent as well, but relieves them once they hold it, so one
  *   person walks up at a time and a departure sees one handover, not three.
  * - `oncoming`: the next section's stander, from `handoverLeadSeconds` before the bell. Once the
  *   oncoming has the helm, the off-going section has no stander.
@@ -175,7 +175,8 @@ function free(ctx: HelmReadCtx, helmId: MachineId, actor: DeepReadonly<Actor>): 
   const activity = actor.activity;
   if (activity.kind === "idle") return true;
   if (helmPostOf(ctx.state, helmId, actor) !== undefined) return true;
-  // Plotting the course the helm will steer (D78): they come straight on from the nav terminal.
+  // Plotting the course the helm will steer (§course-plotting): they come straight on from the nav
+  // terminal.
   if (activity.kind === "task" && ctx.state.work.tasks[activity.taskId]?.type === "plotCourse") {
     return true;
   }
@@ -364,7 +365,8 @@ export function helmRoleOf(ctx: HelmReadCtx, actorId: ActorId): HelmRole {
  * Who stands gangway watch at `ctx.tick`: docked with no helm watch wanted (its `watch` post
  * closed), the section on watch's non-officer aboard and awake: the helm's stander when that is
  * one, else the qualified by piloting, else anyone by piloting. Undefined otherwise, and for a
- * section of officers only (the captain goes ashore, D70; the first officer has the watch).
+ * section of officers only (the captain goes ashore, §looking-for-work; the first officer has the
+ * watch).
  */
 export function gangwayStanderOf(ctx: HelmReadCtx): ActorId | undefined {
   if (ctx.state.travel.stage !== "docked") return undefined;
@@ -471,7 +473,7 @@ export function helmPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const standby = positionFor(ctx, actor, machineId, "use");
   const seatTileNow = operateTiles(ctx, machineId)[0];
   const taken = (holder !== undefined && holder !== actor.id) || onTheirWay(ctx, actor, machineId);
-  // Changing posts in the seat (a relief whose section has come on, D77 addendum): the one who
+  // Changing posts in the seat (a relief whose section has come on, §relief): the one who
   // last took the helm, still on its seat (held, or between the old task and this one), simply
   // keeps it; no handover, and no "takes the helm" told for a helm that never changed hands.
   const resuming =
@@ -611,9 +613,9 @@ export function gangwayPlan(ctx: StepCtx, actor: Actor): PlanResult {
 
 /**
  * Does a `gangway` hold end? When they are no longer the gangway stander (the ship has left, the
- * helm watch has opened, or the bell has gone), or the mess call stands for them (D81: dinner is
- * served and they are hungry enough to go; the post waits). Its first tick says so in the trace
- * (`gangwayWatchSet`).
+ * helm watch has opened, or the bell has gone), or the mess call stands for them (§mess-call:
+ * dinner is served and they are hungry enough to go; the post waits). Its first tick says so in the
+ * trace (`gangwayWatchSet`).
  */
 export function gangwayHoldDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
   if (step.sinceTick === ctx.tick) {

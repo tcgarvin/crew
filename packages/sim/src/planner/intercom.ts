@@ -1,8 +1,8 @@
 /**
- * The reporting reflex (D94, slice 5 call 12), pure over the `AgentView`: on alert, someone who
- * has seen damage first-hand that the crew do not all know of walks to the nearest panel they
- * believe working and reports it (`report`, containment class: above the essential work it
- * reports, so a cook mid-repair goes to the panel first). Nothing off alert.
+ * The reporting reflex (§reporting-damage, slice 5 call 12), pure over the `AgentView`: on alert,
+ * someone who has seen damage first-hand that the crew do not all know of walks to the nearest
+ * panel they believe working and reports it (`report`, containment class: above the essential work
+ * it reports, so a cook mid-repair goes to the panel first). Nothing off alert.
  *
  * What counts as news: an open damage problem (`machineDamaged`, `hullScar`, `machineSymptom`)
  * raised since the alert sounded, still `discovered`, that the actor holds by direct sight. The

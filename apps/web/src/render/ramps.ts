@@ -1,7 +1,8 @@
 /**
- * Dockside §2.6 (D58): ramps drawn by how far open they are. The cargo ramp is a hinged plate that
- * lowers about two tiles out over the berth; the personnel ramp a narrow gangway. Passability is the
- * sim's business (only once fully open); this only shows the leaf travelling. Tile units.
+ * Dockside §2.6 (§dock-drawing): ramps drawn by how far open they are. The cargo ramp is a hinged
+ * plate that lowers about two tiles out over the berth; the personnel ramp a narrow gangway.
+ * Passability is the sim's business (only once fully open); this only shows the leaf travelling.
+ * Tile units.
  */
 import type { RenderFrame } from "@crew/sim";
 import type { DeckLayout, RampLayoutDoor } from "./deckLayout";

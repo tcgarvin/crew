@@ -1,9 +1,9 @@
 /**
- * D92, D93: the field's side of the hull bar (slice 5 calls 6, 10, 13, 24). Every impact costs
- * the hull once, recorded on a scar at its centre tile; the charge is clamped so the integrity
- * never goes below zero and the scar records what was actually lost, so the bar always equals
- * `max` less every scar's damage not recovered (`core/hull.ts`). At zero the ship is lost and the
- * kernel halts for good (`hull.lostAtTick`, `shipLost`).
+ * §rock-impacts, §hull-scars-and-ship-loss: the field's side of the hull bar (slice 5 calls 6, 10,
+ * 13, 24). Every impact costs the hull once, recorded on a scar at its centre tile; the charge is
+ * clamped so the integrity never goes below zero and the scar records what was actually lost, so
+ * the bar always equals `max` less every scar's damage not recovered (`core/hull.ts`). At zero the
+ * ship is lost and the kernel halts for good (`hull.lostAtTick`, `shipLost`).
  *
  * Owner: W1 of ship life slice 5.
  */

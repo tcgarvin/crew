@@ -8,7 +8,7 @@ import { registerWatch } from "./index";
 type Bell = Extract<SimEvent, { type: "bell" }>;
 const bells = (events: readonly SimEvent[]) => events.filter((e): e is Bell => e.type === "bell");
 
-describe("the bell (D77)", () => {
+describe("the bell (§the-bell)", () => {
   it("rings once at each change of watch, naming the section that has it", () => {
     const registry = createRegistry();
     registerWatch(registry);

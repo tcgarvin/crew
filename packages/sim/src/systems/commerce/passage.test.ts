@@ -670,7 +670,7 @@ describe("the board at the far port of a round trip", () => {
   });
 });
 
-describe("one job at a time (D16, D50)", () => {
+describe("one job at a time (§one-job-in-hand, D50)", () => {
   it("acceptContract refuses a second job while a passage is in hand; the offer itself can wait", () => {
     const { world, kernel } = offerAndAccept(60, { luggage: 1 });
     expect(
@@ -992,8 +992,8 @@ describe("the bridge while the ship waits for a passenger", () => {
     const registry = createRegistry();
     registerTravel(registry);
     registerCommerce(registry);
-    // D77: the helm watch is the watch's, and the helm is manned by someone holding its seat, so
-    // the crew must be able to walk up and take it.
+    // §who-has-the-helm: the helm watch is the watch's, and the helm is manned by someone holding
+    // its seat, so the crew must be able to walk up and take it.
     registerSpatial(registry);
     registerWatch(registry);
     registerWork(registry, {

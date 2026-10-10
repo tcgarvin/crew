@@ -1,5 +1,5 @@
 /**
- * Worker host: owns the kernel and the run-ahead loop (D14, D30, PLAN §6 W7).
+ * Worker host: owns the kernel and the run-ahead loop (D14, §run-ahead-loop, PLAN §6 W7).
  *
  * Depends only on the `Kernel` interface — never on a concrete kernel implementation, so
  * `sim.worker.ts` is the only file that wires one in. Runnable outside a worker (e.g. in a Vitest
@@ -44,31 +44,32 @@ export interface HostDeps {
   readonly content: ContentBundle;
   readonly config: EffectiveConfig;
   readonly postMessage: (message: FromWorker) => void;
-  /** D90: what an inspected actor is weighing, in words (`weighAgent`). */
+  /** §what-a-crew-member-weighs: what an inspected actor is weighing, in words (`weighAgent`). */
   readonly weigh: typeof weighAgent;
   /** Real-time loop tick, ms. Default 50 (20 Hz), matching `tickRate`. */
   readonly loopIntervalMs?: number;
   /** Sim-seconds of run-ahead allowed beyond the viewer (D14). Default 60. */
   readonly runAheadCapSeconds?: number;
   /**
-   * Ticks simulated per loop iteration while run-ahead budget remains (D30). The loop runs at
-   * least this many ticks (more if wall-clock × `speed` wants more) until the cap is reached, so
-   * the lead actually builds instead of tracking real time. Default 40: measured ~0.3 ms/tick on
-   * the default scenario (plus ~0.03 ms per frame), so 40 ticks keeps one iteration under ~15 ms
-   * of worker time — 2 sim-seconds per 50 ms loop, filling the 60 s lead in about 1.5 s.
+   * Ticks simulated per loop iteration while run-ahead budget remains (§run-ahead-loop). The loop
+   * runs at least this many ticks (more if wall-clock × `speed` wants more) until the cap is
+   * reached, so the lead actually builds instead of tracking real time. Default 40: measured ~0.3
+   * ms/tick on the default scenario (plus ~0.03 ms per frame), so 40 ticks keeps one iteration
+   * under ~15 ms of worker time — 2 sim-seconds per 50 ms loop, filling the 60 s lead in about 1.5
+   * s.
    */
   readonly burstTicksPerLoop?: number;
   /**
-   * A frame is emitted after every this-many ticks of a burst (D30), so playback interpolation
-   * has enough points to follow walking paths rather than cutting corners across a whole burst.
-   * Default 2 (a frame every 100 sim-ms at tickRate 20).
+   * A frame is emitted after every this-many ticks of a burst (§run-ahead-loop), so playback
+   * interpolation has enough points to follow walking paths rather than cutting corners across a
+   * whole burst. Default 2 (a frame every 100 sim-ms at tickRate 20).
    */
   readonly frameEveryTicks?: number;
   /** How often to snapshot into the view-time ring, in sim-seconds. Default 2. */
   readonly snapshotIntervalSeconds?: number;
   /**
-   * D82: how often, in sim-seconds, the dirt grid is posted (`host.dirtFrameEverySeconds`): on
-   * load, and whenever a burst's tick crosses a multiple of it. Default 5.
+   * §dirt-grid: how often, in sim-seconds, the dirt grid is posted (`host.dirtFrameEverySeconds`):
+   * on load, and whenever a burst's tick crosses a multiple of it. Default 5.
    */
   readonly dirtFrameEverySeconds?: number;
   readonly clock?: HostClock;
@@ -98,8 +99,9 @@ export function createHost(deps: HostDeps): Host {
   let speed = 1;
   let paused = false;
   /**
-   * Set while a hook or decision halts `advance()`; cleared once resolved. D93: `lost` never
-   * clears: the ship is gone and the world never steps again.
+   * Set while a hook or decision halts `advance()`; cleared once resolved.
+   * §hull-scars-and-ship-loss: `lost` never clears: the ship is gone and the world never steps
+   * again.
    */
   let haltedFor: "hook" | "decision" | "lost" | undefined;
   let lastViewTick: Tick | undefined;
@@ -146,7 +148,7 @@ export function createHost(deps: HostDeps): Host {
     deps.postMessage({ type: "frame", frame: deps.kernel.getRenderFrame(world) });
   }
 
-  /** D82: the grime tint's data, keyed by tick; the main thread applies it at `viewTick`. */
+  /** §dirt-grid: the grime tint's data, keyed by tick; the main thread applies it at `viewTick`. */
   function emitDirtFrame(): void {
     if (!world) return;
     deps.postMessage({ type: "dirt", frame: deps.kernel.getDirtFrame(world) });
@@ -178,11 +180,12 @@ export function createHost(deps: HostDeps): Host {
   function handleHalt(kind: "hook" | "decision" | "lost"): void {
     if (!world) return;
     haltedFor = kind;
-    // The halted tick is what the player inspects while a card waits (D63: an offer's crates
-    // appear on the dock on that very tick), so the ring must hold it, not the last due one.
+    // The halted tick is what the player inspects while a card waits (§offered-freight: an offer's
+    // crates appear on the dock on that very tick), so the ring must hold it, not the last due one.
     pushSnapshotIfDue(true);
     if (kind === "lost") {
-      // D93: posted once; the halt never lifts, so this branch is not reached again.
+      // §hull-scars-and-ship-loss: posted once; the halt never lifts, so this branch is not reached
+      // again.
       deps.postMessage({ type: "shipLost", tick: world.state.tick });
     } else if (kind === "hook") {
       const hook = world.state.narrator.pendingHook;
@@ -238,8 +241,8 @@ export function createHost(deps: HostDeps): Host {
       emitRunAheadStatus();
       return;
     }
-    // D30: burst ahead while budget remains; the burst only matters below the cap, where the
-    // accumulator alone would merely track wall-clock and never build a lead.
+    // §run-ahead-loop: burst ahead while budget remains; the burst only matters below the cap,
+    // where the accumulator alone would merely track wall-clock and never build a lead.
     const ticksToRun = Math.min(budget, Math.max(ticksWanted, burstTicksPerLoop));
     if (ticksToRun <= 0) {
       return;

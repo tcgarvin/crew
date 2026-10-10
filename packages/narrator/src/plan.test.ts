@@ -1,6 +1,7 @@
 /**
- * D45, D53: the schema rides in the cached system prefix of every call (no longer a grammar, so
- * no provider-side size cap), so it must stay small and game-independent: no per-game enums.
+ * §narrator-authority, D53: the schema rides in the cached system prefix of every call (no longer a
+ * grammar, so no provider-side size cap), so it must stay small and game-independent: no per-game
+ * enums.
  */
 import { describe, expect, it } from "vitest";
 import { buildNarratorPlanSchema } from "./contract";
@@ -22,7 +23,7 @@ function enumArrays(node: unknown, found: unknown[][] = []): unknown[][] {
   return found;
 }
 
-describe("plan JSON schema size (D45, D53)", () => {
+describe("plan JSON schema size (§narrator-authority, D53)", () => {
   it("stays under the prompt budget for the real content bundle and a fixture snapshot", () => {
     const req = approachRequest(content());
     expect(req.snapshot.state.machines).not.toEqual({});

@@ -1,8 +1,8 @@
 /**
- * The planner's helm rule (`planner/helm.ts`, D77) on the bridge fixture: only the sim's chosen
- * may claim a helm post, and helm tasks and the course plot skip `deferTo` and the off-duty rule.
- * Here rather than beside `planner/helm.ts` because the planner's boundary keeps its own tests off
- * the systems' fixtures.
+ * The planner's helm rule (`planner/helm.ts`, §who-has-the-helm) on the bridge fixture: only the
+ * sim's chosen may claim a helm post, and helm tasks and the course plot skip `deferTo` and the
+ * off-duty rule. Here rather than beside `planner/helm.ts` because the planner's boundary keeps its
+ * own tests off the systems' fixtures.
  */
 import { describe, expect, it } from "vitest";
 import { watchTicks } from "../../core/clock";
@@ -61,7 +61,7 @@ function noorSeesMaraIdle(fixture: TestWorld): void {
   );
 }
 
-describe("the planner's helm rule (D77)", () => {
+describe("the planner's helm rule (§who-has-the-helm)", () => {
   it("Noor takes Red's watch rather than defer to an idle, better-qualified Mara; Mara may not take it", () => {
     const fixture = bridgeWorld();
     placeOnBridgeDeck(fixture.world, NOOR, { x: 9, y: 1 });

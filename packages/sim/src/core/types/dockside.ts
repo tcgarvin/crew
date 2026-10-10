@@ -1,6 +1,6 @@
 /**
- * Dockside phase 3 (D66): the people and set dressing on the dock alongside, and the staging plan
- * that dresses it.
+ * Dockside phase 3 (§staging-plan-dressing): the people and set dressing on the dock alongside, and
+ * the staging plan that dresses it.
  *
  * Locals are not crew. They live in their own table (`WorldState.dockside.locals`), never in
  * `actors`, so needs, work, the planner, perception, the roster, the departure call and the
@@ -94,7 +94,7 @@ export type FloorSetReason =
   | { readonly kind: "regular" }
   /** The receiver for freight bound here: a generic dock hand from the name table. */
   | { readonly kind: "receiver"; readonly jobId: JobId }
-  /** A passenger left behind or put off here earlier (D52), on the bench. */
+  /** A passenger left behind or put off here earlier (§ending-a-passage-early), on the bench. */
   | { readonly kind: "passenger"; readonly actorId: ActorId };
 
 /** One person the sim places on its own. Pure function of state and content (`core/floor-set.ts`). */
@@ -117,8 +117,9 @@ export type LocalOrigin =
   /** Spawned at the warehouse door for one carting errand, gone when it is done. */
   | { readonly kind: "dockHand" }
   /**
-   * D70: someone from the port beyond the gate who walked in to the foot of the ramp with word
-   * for the captain (a held card's speaker); they go back out through the gate once it is given.
+   * §meetings-and-visitors: someone from the port beyond the gate who walked in to the foot of the
+   * ramp with word for the captain (a held card's speaker); they go back out through the gate once
+   * it is given.
    */
   | { readonly kind: "visitor" };
 
@@ -144,7 +145,7 @@ export type LocalBehaviour =
   | { kind: "leave"; exit: TileCoord; sinceTick: Tick };
 
 /**
- * A dock hand's carting job (D63's appear/vanish/move points, done on foot):
+ * A dock hand's carting job (§dock-hand-errands: the appear/vanish/move points, done on foot):
  * - `stageOffer`: out of the warehouse door with an offer's crates (`carrying`), set down on the
  *   staging area on arrival;
  * - `withdrawOffer`: out to the staging area for a closed or departed-from offer's crates, back

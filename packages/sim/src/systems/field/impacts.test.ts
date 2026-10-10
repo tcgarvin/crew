@@ -1,6 +1,6 @@
 /**
- * D92: the rocks (slice 5 calls 2, 5, 6, 8, 17). Impacts are uniform over the hull: every tile
- * is hit in time and each room takes its share of tiles. The helm threads the field: skill 10
+ * §rock-impacts: the rocks (slice 5 calls 2, 5, 6, 8, 17). Impacts are uniform over the hull: every
+ * tile is hit in time and each room takes its share of tiles. The helm threads the field: skill 10
  * takes rocks at 60 % of the rate, an empty helm at 150 %, and being stuck at 70 % of that.
  * Scripted impacts land at their second and stand in for random ones. A large rock covers nine
  * tiles (fewer at the hull's edge) and costs the hull once, with one scar. Someone standing where

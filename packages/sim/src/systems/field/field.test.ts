@@ -1,7 +1,7 @@
 /**
- * D92: the field's life (slice 5 calls 3 and 19). A field scheduled in port waits for transit,
- * with the helm's check on the first transit tick and the rocks from its start; it spans the
- * severity's length of route from where the ship enters it, never past the approach lead; it
+ * §field-lifecycle: the field's life (slice 5 calls 3 and 19). A field scheduled in port waits for
+ * transit, with the helm's check on the first transit tick and the rocks from its start; it spans
+ * the severity's length of route from where the ship enters it, never past the approach lead; it
  * ends when progress leaves it (`fieldCleared`, crossed) and stays, ended, until the leg ends,
  * so the leg takes no second one; a field due past the approach lead never begins.
  */
@@ -21,7 +21,7 @@ import {
   underWay,
 } from "./fixtures/field-deck";
 
-describe("the field's lifecycle (D92)", { timeout: 30_000 }, () => {
+describe("the field's lifecycle (§field-lifecycle)", { timeout: 30_000 }, () => {
   it("scheduled in port, waits for transit: the helm's check on the first transit tick, the rocks from its start", () => {
     const test = fieldWorld();
     setPlottedCourse(test);

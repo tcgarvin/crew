@@ -44,15 +44,15 @@ export interface DockPaint {
   readonly alpha: number;
   /** Docking clamps, 0 retracted to 1 engaged. */
   readonly clamps: number;
-  /** The dock's port is a station or a planet (D61: the setting is the port's, not the map's). */
+  /** The dock's port is a station or a planet (the setting is the port's, not the map's). */
   readonly setting: PortSetting;
   /** One CSS pixel in tile units. */
   readonly px: number;
   /** The visible area, deck tile units. */
   readonly view: Bounds;
   /**
-   * The docked ship's deck rectangle in dock tiles (D72: its place in the berth box, which may
-   * be larger), so the clamps grip the hull rather than the box's corners.
+   * The docked ship's deck rectangle in dock tiles (§ship-placement: its place in the berth box,
+   * which may be larger), so the clamps grip the hull rather than the box's corners.
    */
   readonly ship: Bounds;
   /**
@@ -81,7 +81,7 @@ function drawVoidAndBerth(
   px: number,
 ) {
   if (setting === "station") {
-    // The berth box is void too (D72), so an open berth is part of this pit.
+    // The berth box is void too (§berth-boxes), so an open berth is part of this pit.
     ctx.fillStyle = pitColor(dock);
     fillRuns(ctx, shape.runs.void, px);
   }
@@ -261,7 +261,7 @@ const CLAMP_ARM = 1.2;
 /**
  * The stretch of a quay edge that runs along the ship's side, as distances along the edge from
  * (x1, y1), or `undefined` where the edge does not touch the ship (the margin round a ship
- * smaller than the box, D72).
+ * smaller than the box, §berth-boxes).
  */
 function alongShip(edge: FloorEdge, ship: Bounds): { from: number; to: number } | undefined {
   const horizontal = edge.ny !== 0;

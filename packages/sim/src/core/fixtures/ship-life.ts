@@ -1,5 +1,5 @@
 /**
- * Ship life slice 2 (D77-D79), slice 3 (D81-D82), slice 4 and slice 5 content every hand-built
+ * Ship life slice 2, slice 3, slice 4 and slice 5 content every hand-built
  * fixture bundle needs: the twenty-seven thought defs (`ContentBundle.thoughts` is required), three of the
  * twelve activities and the seven topics (slice 4: `activities` and `topics` are required), and
  * the `watches`, `mood`, `hazards`, `galley`, `dirt`, `recreation`, `cabins`, slice 4 `social` and
@@ -278,7 +278,7 @@ export const FIXTURE_RECREATION: ConfigDef["recreation"] = {
   collapseBackoffDays: 0.1,
 };
 
-/** D88: the default bundle's memory table. */
+/** §memories: the default bundle's memory table. */
 export const FIXTURE_MEMORIES: ConfigDef["social"]["memories"] = {
   chatted: { label: "a good chat", opinion: 1, durationDays: 5, stackLimit: 2 },
   rubbedWrong: { label: "got on my nerves", opinion: -1, durationDays: 5, stackLimit: 2 },
@@ -296,8 +296,8 @@ export const FIXTURE_MEMORIES: ConfigDef["social"]["memories"] = {
 
 /**
  * Slice 4: the default bundle's affinity keys of the `social` block (each fixture keeps its chat).
- * D88: compatibility weighs nothing and no chat sours, so a fixture's pair starts at 0 and moves
- * only by the memories its test gives; a test of compatibility sets its own.
+ * §affinity: compatibility weighs nothing and no chat sours, so a fixture's pair starts at 0 and
+ * moves only by the memories its test gives; a test of compatibility sets its own.
  */
 export const FIXTURE_SOCIAL: Omit<
   ConfigDef["social"],
@@ -322,7 +322,10 @@ export const FIXTURE_CABINS: ConfigDef["cabins"] = {
   privateTalkWaitSeconds: 120,
 };
 
-/** D81: the default bundle's galley block. `lowBelowDays` 0 keeps the provisions reserve off. */
+/**
+ * §galley-provisions: the default bundle's galley block. `lowBelowDays` 0 keeps the provisions
+ * reserve off.
+ */
 export const FIXTURE_GALLEY: ConfigDef["galley"] = {
   mealLeadDays: 0.08,
   mealGraceDays: 0.1,
@@ -339,7 +342,7 @@ export const FIXTURE_GALLEY: ConfigDef["galley"] = {
   treatHungerAbove: 0.1,
 };
 
-/** D82: the default bundle's dirt block. */
+/** §dirt-grid: the default bundle's dirt block. */
 export const FIXTURE_DIRT: ConfigDef["dirt"] = {
   footfallPerStep: 0.004,
   bootsPickup: 0.15,
@@ -395,7 +398,7 @@ export const FIXTURE_HAZARDS: ConfigDef["hazards"] = {
   delaySeconds: 60,
 };
 
-/** Slice 5 (D92): the asteroid field at the default bundle's values. */
+/** Slice 5 (§the-asteroid-field): the asteroid field at the default bundle's values. */
 export const FIXTURE_FIELD: ConfigDef["field"] = {
   warningSeconds: 12,
   alertClearSeconds: 60,
@@ -415,7 +418,7 @@ export const FIXTURE_FIELD: ConfigDef["field"] = {
   maxScripted: 3,
 };
 
-/** Slice 5 (D93): damage work at the default bundle's values. */
+/** Slice 5 (§hull-scars-and-ship-loss): damage work at the default bundle's values. */
 export const FIXTURE_DAMAGE: ConfigDef["damage"] = {
   patchSeconds: 20,
   plateSeconds: 40,
@@ -423,5 +426,5 @@ export const FIXTURE_DAMAGE: ConfigDef["damage"] = {
   checkSeconds: 3,
 };
 
-/** Slice 5 (D94): the intercom at the default bundle's values. */
+/** Slice 5 (§intercom-and-reporting): the intercom at the default bundle's values. */
 export const FIXTURE_INTERCOM: ConfigDef["intercom"] = { reportSeconds: 3 };

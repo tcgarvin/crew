@@ -1,4 +1,7 @@
-/** Spatial events (W3): movement and doors; crossing a ramp to or from the dock (D61). */
+/**
+ * Spatial events (W3): movement and doors; crossing a ramp to or from the dock
+ * (§living-on-the-dock).
+ */
 import type { TileCoord } from "../common";
 import type { CompartmentId, DoorId } from "../ids";
 import type { DoorPhysicalState } from "../ship";
@@ -19,9 +22,9 @@ export interface SpatialEventPayloads {
   routeBlocked: { readonly tile: TileCoord; readonly doorId?: DoorId };
   /** W3 addition: a route completed; the actor stands at the centre of `tile`. */
   reachedTile: { readonly tile: TileCoord };
-  /** Dockside (D61): a step down `rampId` from the ship onto the dock alongside. */
+  /** Dockside (§living-on-the-dock): a step down `rampId` from the ship onto the dock alongside. */
   wentAshore: { readonly rampId: DoorId };
-  /** Dockside (D61): a step up `rampId` from the dock back aboard. */
+  /** Dockside (§living-on-the-dock): a step up `rampId` from the dock back aboard. */
   cameAboard: { readonly rampId: DoorId };
 }
 

@@ -1,6 +1,6 @@
 /**
- * D94: labels for the reporting reflex, read by `systems/work/labels.ts`: "going to the
- * intercom", "on the intercom".
+ * §reporting-damage: labels for the reporting reflex, read by `systems/work/labels.ts`: "going to
+ * the intercom", "on the intercom".
  *
  * Owner: W3 of ship life slice 5.
  */

@@ -84,11 +84,15 @@ interface RunLog {
    */
   readonly loadClaims: HaulClaim[];
   /**
-   * Ticks of `preparingDeparture` with someone on the dock: D61's call aboard (the last hauler
-   * walking back from the delivery bay), which holds prep but is not the pilot's walk.
+   * Ticks of `preparingDeparture` with someone on the dock: the call aboard
+   * (§calling-the-crew-aboard; the last hauler walking back from the delivery bay), which holds
+   * prep but is not the pilot's walk.
    */
   readonly prepAshoreTicks: Set<number>;
-  /** Ticks at which a `staffStation` task was claimed (the helm stander setting off, D77). */
+  /**
+   * Ticks at which a `staffStation` task was claimed (the helm stander setting off,
+   * §who-has-the-helm).
+   */
   readonly staffClaimTicks: Set<number>;
 }
 
@@ -188,14 +192,14 @@ const count = (log: RunLog, type: SimEvent["type"]) =>
   log.events.filter((e) => e.type === type).length;
 
 /**
- * D63: port work is physical, so a port call with freight both ways takes longer than when the
- * crates jumped aboard at the ramp; the crew's-day case runs until the ship has left its second
- * port (the pilot only gets up from the helm once it is under way again). D65: with the hand
- * truck the second call is shorter and the ship is at a third port by seven minutes, the pilot
- * back at the helm before anything else came up; by eight it has left that one too. D73: on
- * Freighter Mk2 with nine crew this seed draws an engine controller fault on the first leg, so the
- * ship drifts for about two minutes and reaches the third port at about 7.6 minutes; both dock
- * dressings (Green Meridian, Kessler Drift) still fall inside the eight.
+ * §offered-freight: port work is physical, so a port call with freight both ways takes longer than
+ * when the crates jumped aboard at the ramp; the crew's-day case runs until the ship has left its
+ * second port (the pilot only gets up from the helm once it is under way again). §hand-truck-trips:
+ * with the hand truck the second call is shorter and the ship is at a third port by seven minutes,
+ * the pilot back at the helm before anything else came up; by eight it has left that one too.
+ * §the-ships: on Freighter Mk2 with nine crew this seed draws an engine controller fault on the
+ * first leg, so the ship drifts for about two minutes and reaches the third port at about 7.6
+ * minutes; both dock dressings (Green Meridian, Kessler Drift) still fall inside the eight.
  */
 const EIGHT_MINUTES = TICK_RATE * 480;
 
@@ -257,7 +261,8 @@ describe(
       );
       expect(loadProblems.some((p) => p.status === "resolved")).toBe(true);
       expect([...log.stages].some((stage) => stage !== "docked")).toBe(true);
-      // One offer card per port call (three in eight minutes, D65) and at most the departure gate.
+      // One offer card per port call (three in eight minutes, §hand-truck-trips) and at most the
+      // departure gate.
       expect(log.decisions).toBeLessThanOrEqual(4);
 
       // Ship systems: the fault injected at 30 s is found and fixed.
@@ -272,8 +277,8 @@ describe(
       }
       expect(checkInvariants(world.state)).toEqual([]);
 
-      // D66: every dock came alongside with somebody on it, and no dock hand had to give up a
-      // walk (only the dock leaving may cut one short).
+      // §dock-hand-errands: every dock came alongside with somebody on it, and no dock hand had to
+      // give up a walk (only the dock leaving may cut one short).
       const dressed = log.events.filter(
         (e): e is Extract<SimEvent, { type: "dockDressed" }> => e.type === "dockDressed",
       );
@@ -298,15 +303,15 @@ describe(
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
       // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
       // began, so the pilot did not start walking to the console until every crate was aboard —
-      // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. The helm's
-      // post now opens the moment the course is plotted (D77, D78: it cannot open earlier, since
-      // a pilot in the seat could not plot it, and prep itself waits for the plot), so the
-      // stander leaves the gangway then, and the walk hides inside the loading whenever loading
-      // is the long pole. When the plot finishes within a walk of the last crate, or after it
-      // (this seed's second call since slice 4 sent idlers to the lounge: plotted at 326.1 s,
-      // prep over at 343.2 s), the walk shows, and that is the rule at work, not a stall: so the
-      // pin is that the stander claims the post within seconds of the plot, and that prep ends
-      // within the fixed time of the later of its start and that walk. The run goes well past
+      // adding the whole walk (observed 10-17 sim-s) on top of the fixed prep time. The helm's post
+      // now opens the moment the course is plotted (§who-has-the-helm, §course-plotting: it cannot
+      // open earlier, since a pilot in the seat could not plot it, and prep itself waits for the
+      // plot), so the stander leaves the gangway then, and the walk hides inside the loading
+      // whenever loading is the long pole. When the plot finishes within a walk of the last crate,
+      // or after it (this seed's second call since slice 4 sent idlers to the lounge: plotted at
+      // 326.1 s, prep over at 343.2 s), the walk shows, and that is the rule at work, not a stall:
+      // so the pin is that the stander claims the post within seconds of the plot, and that prep
+      // ends within the fixed time of the later of its start and that walk. The run goes well past
       // five minutes so the second call's prep ends inside it.
       const { world, log } = runFullSim(20260930, TICK_RATE * 380, autoAccept);
       const stageChanges = log.events.filter(
@@ -321,7 +326,8 @@ describe(
       const claims = log.events
         .filter((e) => e.type === "taskClaimed" && log.staffClaimTicks.has(e.tick))
         .map((e) => e.tick);
-      // The gangway is two rooms from the helm on Mk2 (D77): the walk up, with the planner's lag.
+      // The gangway is two rooms from the helm on Mk2 (§gangway-watch-and-rounds): the walk up,
+      // with the planner's lag.
       const WALK_UP_SECONDS = 20;
       const CLAIM_LAG_SECONDS = 5;
       for (const start of prepStarts) {
@@ -340,12 +346,13 @@ describe(
         const walkEnds = (claim ?? start.tick) + WALK_UP_SECONDS * tickRate;
         const elapsedSeconds = (end - Math.max(start.tick, walkEnds) - ashore) / tickRate;
         // The fixed prep time plus a small (≤ 2 s) allowance beyond the walk the plot left showing.
-        // D61's call aboard (someone still on the dock as prep begins) is not counted here.
+        // The call aboard (§calling-the-crew-aboard; someone still on the dock as prep begins) is
+        // not counted here.
         expect(elapsedSeconds).toBeLessThanOrEqual(prepSeconds + 2);
       }
     }, 60_000);
 
-    // D77, W1's "done when": a 400 s spur leg is a whole watch long, so the bell rings at sea
+    // §the-bell, W1's "done when": a 400 s spur leg is a whole watch long, so the bell rings at sea
     // and the oncoming stander relieves the helm in transit.
     it("hands over the helm at sea on the 400 s Kessler–Ossory leg", () => {
       const { kernel, world } = newGame(20261004);
@@ -369,7 +376,8 @@ describe(
         const spur = travel.stage === "transit" && travel.fromPortId === kessler;
         if (spur) atSea.push(...result.events);
         if (travel.stage === "docked" && travel.portId === ossory) break;
-        // D70: as a player would, set course once the captain's ask at the hub is answered.
+        // §looking-for-work: as a player would, set course once the captain's ask at the hub is
+        // answered.
         const narrator = world.state.narrator;
         if (!courseSet && narrator.captainAshoreLastAsk !== undefined && !narrator.pendingHook) {
           courseSet = true;
@@ -398,11 +406,12 @@ describe(
     });
 
     it("never lets one actor claim a multi-crate job's whole stack at once", () => {
-      // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`),
-      // a job with several units gives several crew independent haul tasks to claim, not one
-      // actor working through the whole stack alone. D65: with the hand truck one actor moves up
-      // to its capacity per trip, and what is beyond one trip's worth stays open for anyone free
-      // (on this seed nobody else is free while the first trip runs, so the pusher comes back).
+      // Owner feedback 2026-09-30 item 4: once freight spawns as individual crates (`acceptJob`), a
+      // job with several units gives several crew independent haul tasks to claim, not one actor
+      // working through the whole stack alone. §hand-truck-trips: with the hand truck one actor
+      // moves up to its capacity per trip, and what is beyond one trip's worth stays open for
+      // anyone free (on this seed nobody else is free while the first trip runs, so the pusher
+      // comes back).
       const { world, log } = runFullSim(20260930, FIVE_MINUTES, autoAccept);
       const bigJob = Object.values(world.state.jobs).find((j) => j.cargoItemIds.length >= 6);
       expect(bigJob).toBeDefined();

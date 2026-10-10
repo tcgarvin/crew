@@ -1,7 +1,7 @@
 /**
- * Dirt invariants that need content (D82): each deck's dirt row is `width × height` long, and
- * every stored tier names a room of a deck in state. `core/invariants.ts` checks the cells' range
- * without content.
+ * Dirt invariants that need content (§dirt-grid): each deck's dirt row is `width × height` long,
+ * and every stored tier names a room of a deck in state. `core/invariants.ts` checks the cells'
+ * range without content.
  *
  * Owner: W2 of ship life slice 3.
  */

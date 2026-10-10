@@ -1,7 +1,8 @@
 /**
- * The on-duty idle candidate (D77) over a hand-built `AgentView` (dependency-cruiser's
- * `planner-boundary` rule covers tests here too). The deck is one row: engineering, the hold,
- * the mess and the bridge, with a pump in engineering and the captain's chair on the bridge.
+ * The on-duty idle candidate (§gangway-watch-and-rounds) over a hand-built `AgentView`
+ * (dependency-cruiser's `planner-boundary` rule covers tests here too). The deck is one row:
+ * engineering, the hold, the mess and the bridge, with a pump in engineering and the captain's
+ * chair on the bridge.
  *
  *   x 0123456789
  *   0 EEEHHMMBBB    p = pump (1,0), repair from (2,0); c = chair (9,0), its seat (8,0)
@@ -135,7 +136,7 @@ function stubView(stub: Stub): AgentView {
 
 const BACKING_OFF = { rounds: 1_000 };
 
-describe("dutyIdleCandidate (D77)", () => {
+describe("dutyIdleCandidate (§gangway-watch-and-rounds)", () => {
   it("sends the officer of the watch on rounds, voluntary class, estimated by the walk to engineering", () => {
     expect(dutyIdleCandidate(stubView({ officer: true }), config)).toMatchObject({
       ref: "rounds",
@@ -145,7 +146,7 @@ describe("dutyIdleCandidate (D77)", () => {
     });
   });
 
-  it("walks no round from the dock: the officer out on the quay is sent to the chair first (D77 addendum)", () => {
+  it("walks no round from the dock: the officer out on the quay is sent to the chair first (§gangway-watch-and-rounds)", () => {
     expect(dutyIdleCandidate(stubView({ officer: true, onDock: true }), config)).toMatchObject({
       ref: "chair",
       choice: { kind: "personal", activity: "wander", tile: { x: 8, y: 0 } },

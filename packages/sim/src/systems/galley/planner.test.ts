@@ -1,5 +1,5 @@
 /**
- * The planner's galley rules (D81) over views of the galley fixture: the mess call, the eat
+ * The planner's galley rules (§mess-call) over views of the galley fixture: the mess call, the eat
  * candidate's choice of food, and who may take the galley's tasks.
  */
 import { describe, expect, it } from "vitest";
@@ -45,7 +45,7 @@ function setHunger(fixture: TestWorld, hunger: number): void {
   for (const actor of Object.values(fixture.world.state.actors)) actor.needs.hunger = hunger;
 }
 
-describe("the mess call (D81 call 1)", () => {
+describe("the mess call (§mess-call, call 1)", () => {
   it("calls the dayworker and the section off watch, not the section on watch", () => {
     const fixture = looked();
     setHunger(fixture, 0.3);
@@ -78,7 +78,7 @@ describe("the mess call (D81 call 1)", () => {
   });
 });
 
-describe("the eat candidate (D81)", () => {
+describe("the eat candidate (§mess-call)", () => {
   it("answers the call at routine class below the seek threshold", () => {
     const fixture = looked();
     setHunger(fixture, 0.3);
@@ -110,7 +110,7 @@ describe("the eat candidate (D81)", () => {
   });
 });
 
-describe("who takes the galley's tasks (D81 calls 3 and 5)", () => {
+describe("who takes the galley's tasks (§mess-call, calls 3 and 5)", () => {
   const task = (type: TaskType): TaskView => ({
     id: "t1" as TaskId,
     problemId: "p1" as ProblemId,

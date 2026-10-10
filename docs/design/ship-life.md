@@ -3,8 +3,8 @@
 Status: proposal revised after owner review, 2026-10-04. Not yet implemented. Drafted with Fable
 as design partner (first draft by Fable, one critique round), then revised with the owner's
 rulings (§13). Written against GDD §2/§4/§8/§17/§25/§26, SD §9.5/§11/§15, Dockside §3, the v1
-playtest note, and the deck/dock/config JSON. Decisions go into `docs/DECISIONS.md` as each
-slice lands.
+playtest note, and the deck/dock/config JSON. Behaviour goes into `docs/spec/` as each slice
+lands and real decisions into `docs/DECISIONS.md`.
 
 What exists today, briefly: four needs (hunger, fatigue, comfort, social), `mood` always 0; crew
 on duty with nothing to do stand idle at a role post; shifts only toggle on/off duty; the helm
@@ -145,7 +145,7 @@ cards + vids; Tomas: sparring + cards; Priya: tinkering + debate; Oyelaran: read
 Sunniva: exercise + gossip; Dane: boardgames + music). Interests are soft state the narrator may
 nudge (GDD §17).
 
-**Relationships.** Affinity in −10..10, directed, and derived rather than stored (D88, after
+**Relationships.** Affinity in −10..10, directed, and derived rather than stored (§affinity, after
 RimWorld's social memories and Dwarf Fortress's personality-driven bonds): a pair's
 *compatibility* (±2, fixed by how far apart their values sit and which likes they share or
 clash on) plus the *memories* one holds of the other (a good chat, a game, an argument, a private
@@ -271,7 +271,7 @@ a day: the single biggest visible change in this proposal.
   the idle post.
 - *Officer's rounds* — **yes** (§2): the officer of the watch's main on-duty activity.
 - *Course plotting* — **yes, mandatory** (owner: part of the routine, not a bonus). See §6.
-- *Drills* — **cut** (owner, 2026-10-06, D91). Was: every other day the FO calls a muster at
+- *Drills* — **cut** (owner, 2026-10-06). Was: every other day the FO calls a muster at
   the gym `muster` zone; everyone not on watch walks there; first-aid/firefighting skill ticks.
 - *Sparring injuries* — yes, minor only, so the medic finally has work.
 - *Reviewing the log at an ops terminal* — **cut** (owner). Too thin a mechanic.
@@ -295,9 +295,9 @@ bulkhead.
 **Course plotting is part of the departure routine.** Setting a destination raises a
 `courseToPlot` problem; a piloting-qualified crew member takes `plotCourse` at the nav terminal
 ("plotting a course to Kessler Drift"). Departure waits for a plotted course, in the same way it
-waits on the existing departure gate (D36). Skill sets how long it takes, not how good the result
-is. It runs in parallel with loading, so it delays departure only when no pilot is free, which
-is itself a small story ("waiting on a course"). A detour mid-hop raises it again.
+waits on the existing departure gate (§departure-gate). Skill sets how long it takes, not how good
+the result is. It runs in parallel with loading, so it delays departure only when no pilot is free,
+which is itself a small story ("waiting on a course"). A detour mid-hop raises it again.
 
 **Piloting checks** are the helm's stakes and the sim's first skill check. A `navHazard` (debris
 field, asteroid belt, a rough approach, later combat manoeuvres) is a timed transit event with a
@@ -523,7 +523,7 @@ change, and regressions are easiest to attribute while behaviour is otherwise un
    defs, group sessions, the twelve activities, rivalries and debates, own-cabin and bunkroom
    thoughts, narrator digest lines for interests/mood/rivalries/cabin and a `privateTalk`
    command for cards.
-5. **The asteroid field** (re-sequenced 2026-10-06, D91). A narrator-scheduled field with
+5. **The asteroid field** (re-sequenced 2026-10-06). A narrator-scheduled field with
    narrator-chosen hits, detection by the helm and an alert state, random impacts with blast,
    machine outages and damage, a global hull bar with patching and port repair, getting stuck,
    ship loss as game over, intercom panels and scouts. See the plan's slice 5.
@@ -532,7 +532,7 @@ change, and regressions are easiest to attribute while behaviour is otherwise un
 8. **Tactical and shields**: the `requiredWhen`/`alert` station framework, the alert bill and
    hold-until-relieved.
 
-Cut from all eight (drills too, D91): laundry, hygiene, stocktake, sick call, an ops-terminal
+Cut from all eight (drills too): laundry, hygiene, stocktake, sick call, an ops-terminal
 mechanic, multi-deck, the cat, lighting.
 
 ## 13. Owner rulings and open questions
@@ -557,7 +557,7 @@ Open:
    automatic re-forming of the watch bill, with a narrator card only when the shortfall will
    outlast a day.
 2. **Target play speed** — which speed should a quiet stretch be tuned for (1×, or 4× with
-   auto-slowdown)? Recommended at slice-5 integration (D95), for the owner to confirm: 2×, with
+   auto-slowdown)? Recommended at slice-5 integration, for the owner to confirm: 2×, with
    auto-slowdown to 1× for set pieces and 4×/8× as skip speeds; at 4× the narrator's run-ahead
    is shorter than its latency and every call stalls the ship (19 % of wall time over a round
    trip), and a watch's ~39 ticker lines come one every 2.6 s.

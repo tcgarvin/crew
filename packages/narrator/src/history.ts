@@ -1,7 +1,7 @@
 import { templateCard } from "@crew/content";
 /**
- * D31: the server's record of which cards the captain has seen (`NarratorNotes.cardsShown`). The
- * model never writes it. Two sources feed it:
+ * §card-history: the server's record of which cards the captain has seen
+ * (`NarratorNotes.cardsShown`). The model never writes it. Two sources feed it:
  *  - this call's own output (the policy `card` prose and every translated `surfaceDecision`);
  *  - the kernel's decision events since the previous call (`decisionPending` for cards the
  *    kernel surfaced itself, such as job offers; `decisionResolved` for the side chosen).
@@ -91,8 +91,9 @@ export function applyDecisionEvents(
   const next = [...cards];
   for (const event of events) {
     if (event.type === "decisionDropped") {
-      // D70: a card held for delivery in person that never came up (its offer closed first) was
-      // never seen: forget it, by ID or, for an entry still waiting for its ID, by title.
+      // §card-history: a card held for delivery in person that never came up (its offer closed
+      // first) was never seen: forget it, by ID or, for an entry still waiting for its ID, by
+      // title.
       const record = fromRecord(state, event.payload.decisionId, content);
       const byId = next.findIndex((c) => c.decisionId === event.payload.decisionId);
       const index =
@@ -169,7 +170,10 @@ export function recordCardsFromCall(
   tick: number,
   card: DecisionCardProse | undefined,
   commands: readonly NarratorCommand[],
-  /** D56: the thread this call's surfaced card closed; there is at most one surfaced card. */
+  /**
+   * §closing-cards: the thread this call's surfaced card closed; there is at most one surfaced
+   * card.
+   */
   closedThread: string | undefined = undefined,
 ): CardShown[] {
   const next = [...cards];

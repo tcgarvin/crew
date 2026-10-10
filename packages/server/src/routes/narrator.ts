@@ -4,14 +4,15 @@
  * spacing check), calls the injected `runNarrator`, logs the call, and persists `notesUpdate`.
  * There is no call cap in software (D102): the OpenRouter key's own limit guards spending.
  *
- * D67: a `stageDock` hook is a staging call. It runs on the staging model, is never spaced (in either direction: it is neither refused as too soon nor counted as
- * the last call when a story call is spaced), and never writes notes. A staging failure is
- * answered like a story failure in `error` mode (502/503, so the client retries per D43); the
- * client then acknowledges with the floor set instead of pausing the game (D57's exception to
- * D43). In `null` mode the server answers with the floor set itself and logs
- * `[narrator] staging fallback <reason>`.
+ * §staging-call-on-the-server: a `stageDock` hook is a staging call. It runs on the staging model,
+ * is never spaced (in either direction: it is neither refused as too soon nor counted as the last
+ * call when a story call is spaced), and never writes notes. A staging failure is answered like a
+ * story failure in `error` mode (502/503, so the client retries per D43); the client then
+ * acknowledges with the floor set instead of pausing the game (D57's exception to D43). In `null`
+ * mode the server answers with the floor set itself and logs `[narrator] staging fallback
+ * <reason>`.
  *
- * D97: a story call the model answered is followed by its notes turn, after the response: a
+ * §notes-turn: a story call the model answered is followed by its notes turn, after the response: a
  * `notes` row is logged `pending` before the plan goes out and finished when the notes are
  * stored. A call that arrives while that row is pending waits for it (up to `NOTES_WAIT_MS`), so
  * it always reads the notes the previous call wrote.
@@ -64,14 +65,16 @@ const MIN_TICKS_BETWEEN_NARRATOR_CALLS = 100;
  * unanswered, D43) would lose them for good. The spacing rule is
  * for the hooks the sim raises again on its own (`quietTooLong`, `notableEvent`): a refused one
  * costs one check-in.
- * - `policyDecision` (D37): a policy card can follow another hook within a few ticks (the
+ * - `policyDecision` (§call-spacing): a policy card can follow another hook within a few ticks (the
  *   departure gate right after an arrival), and refusing it would show the card undressed.
- * - `captainAshore` (D70): asked once per docking, the tick the captain steps onto the dock,
+ * - `captainAshore` (§call-spacing): asked once per docking, the tick the captain steps onto the
+ * dock,
  *   which can come a few ticks after another call (the delivery's `notableEvent` at a
  *   destination). Refused, the docking's one ask was spent on nothing and the ship looked for
  *   work for good (offline, the ask is the only source of work). The sim already spaces it: one
  *   per docking.
- * - `requestedCall` (D99): raised once, at the cast-off or mid-leg the narrator asked for; a
+ * - `requestedCall` (§call-spacing): raised once, at the cast-off or mid-leg the narrator asked
+ * for; a
  *   spacing refusal would lose it for good, and the sim raises it only for a request it holds.
  */
 const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set([
@@ -81,15 +84,15 @@ const SPACING_EXEMPT_HOOK_KINDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * D97: how long a call waits for the previous call's notes turn: its timeout plus slack for the
- * database writes. A pending row older than this is a notes turn that died (the function was cut
- * off): it is ignored.
+ * §notes-turn: how long a call waits for the previous call's notes turn: its timeout plus slack for
+ * the database writes. A pending row older than this is a notes turn that died (the function was
+ * cut off): it is ignored.
  */
 const NOTES_WAIT_MS = NOTES_TIMEOUT_MS + 5_000;
 const NOTES_POLL_MS = 500;
 
 /**
- * D97: the game's notes once no notes turn is pending, or, if one is still pending after
+ * §notes-turn: the game's notes once no notes turn is pending, or, if one is still pending after
  * `NOTES_WAIT_MS`, the notes as they stand (the plan's, without the model's rewrite).
  */
 async function settledNotes(db: Db, gameId: string): Promise<unknown> {
@@ -117,7 +120,10 @@ async function settledNotes(db: Db, gameId: string): Promise<unknown> {
   return game.narrativeNotes;
 }
 
-/** D97: runs a notes turn and finishes its pending row; never throws (it runs after the response). */
+/**
+ * §notes-turn: runs a notes turn and finishes its pending row; never throws (it runs after the
+ * response).
+ */
 async function finishNotesTurn(
   db: Db,
   gameId: string,
@@ -199,8 +205,8 @@ function warnAboutAnswer(
   const response = outcome.response;
   const failure = narratorFailure(outcome);
   if (stagingFloor && failure !== undefined) {
-    // D67: the server answers with the floor set (the null narrator's empty plan) and says
-    // so; never an error panel for staging.
+    // §staging-call-on-the-server: the server answers with the floor set (the null narrator's empty
+    // plan) and says so; never an error panel for staging.
     console.warn(`[narrator] staging fallback ${failure.reason}`, {
       gameId,
       model: response.model,
@@ -209,7 +215,7 @@ function warnAboutAnswer(
       error: failure.message,
     });
   } else if (response.fallback !== undefined) {
-    // D42: the fallback is otherwise only visible in the call log. Nothing here can carry
+    // The fallback is otherwise only visible in the call log. Nothing here can carry
     // the API key: `error` is the narrator's own failure text (for a transport failure,
     // `OpenRouter <status>: <response body>`), never the request or its headers.
     console.warn("[narrator] fallback", {
@@ -298,7 +304,8 @@ export function registerNarratorRoutes(
 
     // Spacing is measured from the last story call the model answered: a failed attempt narrated
     // nothing, so the client's retry of the same hook (D43) must not be refused as "too soon",
-    // and a staging call (D67) is not story, so it neither is spaced nor spaces the next one.
+    // and a staging call (§staging-call-on-the-server) is not story, so it neither is spaced nor
+    // spaces the next one.
     const [lastCall] =
       staging || SPACING_EXEMPT_HOOK_KINDS.has(reqBody.hook.kind)
         ? []
@@ -334,7 +341,8 @@ export function registerNarratorRoutes(
 
       // D43: in `error` mode a fallback is refused, never served. The call is logged as an
       // error with its reason; the client retries (the sim stays halted) or pauses the game, or
-      // for a staging call (D67) acknowledges the hook with the floor set once it gives up.
+      // for a staging call (§staging-call-on-the-server) acknowledges the hook with the floor set
+      // once it gives up.
       if (failure !== undefined && env.narratorFallback === "error") {
         await logCall({
           ...UNANSWERED,
@@ -351,8 +359,8 @@ export function registerNarratorRoutes(
         });
       }
 
-      // D97: written before the response, so the next call sees this one's notes or waits for
-      // them: the log row, the notes as they stand after the plan, and the pending notes row.
+      // §notes-turn: written before the response, so the next call sees this one's notes or waits
+      // for them: the log row, the notes as they stand after the plan, and the pending notes row.
       await logCall({
         // W9: the response carries model, prompt version and usage; `fallback` (null path and
         // why) is kept in the `response` jsonb.
@@ -365,8 +373,8 @@ export function registerNarratorRoutes(
         response,
         error: null,
       });
-      // D67: the staging call never writes notes (the narrator sends none for it; the route does
-      // not take its word for that).
+      // §staging-call-on-the-server: the staging call never writes notes (the narrator sends none
+      // for it; the route does not take its word for that).
       if (!staging && response.notesUpdate !== undefined) {
         await db.updateNotes(gameId, response.notesUpdate);
       }

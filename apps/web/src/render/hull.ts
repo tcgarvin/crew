@@ -1,8 +1,9 @@
 /**
- * Dockside §2.5 (D58): the ship's silhouette and engine plume, built from the deck's bounds alone,
- * so the deck reads as a ship. D72: the bow is always the high-x end (`orientation.ts`), so a
- * tapered nose sits fore of the deck and the engine bells aft of it whatever the compartments are
- * called. Geometry is in deck tile units; callers draw it under a tile-space transform.
+ * Dockside §2.5 (§stars-plume-and-the-animation-loop): the ship's silhouette and engine plume,
+ * built from the deck's bounds alone, so the deck reads as a ship. §orientation-and-size: the bow
+ * is always the high-x end (`orientation.ts`), so a tapered nose sits fore of the deck and the
+ * engine bells aft of it whatever the compartments are called. Geometry is in deck tile units;
+ * callers draw it under a tile-space transform.
  */
 import type { RenderFrame, RenderMachineState } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";

@@ -6,7 +6,7 @@ import { isOnDuty, isOnWatch, isSleepWatch, sleepWatchOf } from "./duty";
 const alpha = { section: { key: "alpha", index: 0 } };
 const beta = { section: { key: "beta", index: 1 } };
 
-describe("duty (D77)", () => {
+describe("duty (§duty-and-the-sleep-watch)", () => {
   // crewConfig: a 600 s day of two watches, so watch 0 is [0, 300) and watch 1 [300, 600).
   const config = crewConfig();
   const tickAt = (seconds: number) => seconds * config.time.tickRate;
@@ -42,7 +42,7 @@ describe("duty (D77)", () => {
   });
 });
 
-describe("the sleep watch (D77 addendum)", () => {
+describe("the sleep watch (§duty-and-the-sleep-watch)", () => {
   const config = crewConfig();
   const tickAt = (seconds: number) => seconds * config.time.tickRate;
 

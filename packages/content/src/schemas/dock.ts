@@ -72,14 +72,16 @@ export const dockDefSchema = z.strictObject({
     floor: hexColour,
     wall: hexColour,
     accent: hexColour,
-    /** Required when the port is a planet, absent for a station (L2; D61). */
+    /** Required when the port is a planet, absent for a station (L2; §dock-map-content). */
     sky: hexColour.exactOptional(),
   }),
   width: positiveInt,
   height: positiveInt,
   rows: z.array(z.string()).min(1),
   legend: z.record(z.string().length(1), dockTileKindSchema),
-  /** D72: the box a docked ship lies in; the box and the ship's place are checked at L3. */
+  /**
+   * §berth-boxes: the box a docked ship lies in; the box and the ship's place are checked at L3.
+   */
   berth: z.strictObject({
     origin: z.strictObject({ x: z.number().int().min(0), y: z.number().int().min(0) }),
     sizeClass: hullSizeClassSchema,
@@ -116,7 +118,10 @@ export const dockDefSchema = z.strictObject({
     }),
   ),
   ambience: z.string().min(1),
-  /** D82: how much the floor loads boots, and whether the air settles on the deck (L3: a station's is 0). */
+  /**
+   * §footfall-and-boots: how much the floor loads boots, and whether the air settles on the deck
+   * (L3: a station's is 0).
+   */
   grime: unitInterval,
   airborneDust: unitInterval,
 }) satisfies z.ZodType<DockDef>;

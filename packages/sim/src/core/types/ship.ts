@@ -113,7 +113,9 @@ export interface MachineFault {
   sinceTick: Tick;
   /** Set when a diagnosis completes; equipment then raises the `machineFault` problem. */
   diagnosed: boolean;
-  /** Repair progress belongs here (SD §14.4): index into `RepairRecipe.steps` and [0,1] within it. */
+  /**
+   * Repair progress belongs here (SD §14.4): index into `RepairRecipe.steps` and [0,1] within it.
+   */
   repairStepIndex: number;
   repairStepProgress: number;
   /** Command that caused it, for narrator audit (review §C.4 causeIds). */
@@ -168,9 +170,9 @@ export interface Machine {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D81: what the galley wrote on a served meal: its quality (from the cook and the galley's tier
- * at the serve), when it spoils, and who cooked it. Fixed at the serve, so a later retune never
- * rewrites a plate on the counter.
+ * §cooking-and-serving: what the galley wrote on a served meal: its quality (from the cook and the
+ * galley's tier at the serve), when it spoils, and who cooked it. Fixed at the serve, so a later
+ * retune never rewrites a plate on the counter.
  */
 export interface MealInfo {
   quality: MealQuality;
@@ -185,7 +187,7 @@ interface ItemBase {
   location: PhysicalLocation;
   /** Present on freight belonging to a contract. */
   jobId?: JobId;
-  /** D81: present on a served `meal`-tagged item; food without it is a ration. */
+  /** §cooking-and-serving: present on a served `meal`-tagged item; food without it is a ration. */
   meal?: MealInfo;
 }
 
@@ -195,7 +197,7 @@ export interface UniqueItem extends ItemBase {
   condition: number;
   /** Actor holding an exclusive reservation for pickup (e.g. the one tool kit). */
   reservedBy?: ActorId;
-  /** D74: whose belonging this is (a `personal` item). Absent = nobody's in particular. */
+  /** §lockers: whose belonging this is (a `personal` item). Absent = nobody's in particular. */
   ownerId?: ActorId;
 }
 

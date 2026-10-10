@@ -29,7 +29,7 @@ export const TRAVEL_STAGES = [
 export type TravelStage = (typeof TRAVEL_STAGES)[number];
 
 /**
- * D36 departure-gate flags, meaningful while a departure is planned (`docked` with a
+ * Departure-gate flags (§departure-gate), meaningful while a departure is planned (`docked` with a
  * `plannedDestinationId`, or `preparingDeparture`). `holdForRepairs` is dropped by the fresh
  * state object every later stage builds, so a hold never outlives the departure it held.
  * `departureRiskAccepted` is asked once per *voyage* (passengers-and-galaxy §2.3): it rides
@@ -67,9 +67,9 @@ export type TravelState =
       /** Set by `setCourse`; departure prep begins when cleared to go. */
       plannedDestinationId?: PortDefId;
       /**
-       * D78: the course to `plannedDestinationId` is plotted (the nav terminal's `plotCourse`
-       * commit). Departure prep waits for it; `setCourse` and a voyage's next hop clear it, and
-       * the `preparingDeparture` object is built without it, so it never carries.
+       * §course-plotting: the course to `plannedDestinationId` is plotted (the nav terminal's
+       * `plotCourse` commit). Departure prep waits for it; `setCourse` and a voyage's next hop
+       * clear it, and the `preparingDeparture` object is built without it, so it never carries.
        */
       coursePlotted?: true;
     } & DepartureGateFlags &
@@ -80,7 +80,9 @@ export type TravelState =
       toPortId: PortDefId;
       /** Progress in [0, 1] through timed stages (prep, undock, depart, approach, dock). */
       stageProgress: number;
-      /** Route distance covered in transit, same units as `PortDef.routes.distance`. Never resets. */
+      /**
+       * Route distance covered in transit, same units as `PortDef.routes.distance`. Never resets.
+       */
       routeProgress: number;
       routeDistance: number;
       /**
@@ -89,34 +91,34 @@ export type TravelState =
        */
       drifting: boolean;
       /**
-       * D80, `transit` only: the engines are below `travel.limpSpeedFraction` and no repair can
-       * bring them back with what is aboard, so the ship makes way at that fraction of
+       * §limping, `transit` only: the engines are below `travel.limpSpeedFraction` and no repair
+       * can bring them back with what is aboard, so the ship makes way at that fraction of
        * `nominalSpeed` (`shipLimping` said so when it began). Absent otherwise; every later
        * stage builds a fresh object without it.
        */
       limping?: true;
       stageStartedTick: Tick;
       /**
-       * D61, `preparingDeparture` only: the tick prep first called someone on the dock aboard.
-       * `travel.recallAboardSeconds` later, whoever is still there is brought aboard. Every
-       * later stage builds a fresh object without it.
+       * §calling-the-crew-aboard, `preparingDeparture` only: the tick prep first called someone on
+       * the dock aboard. `travel.recallAboardSeconds` later, whoever is still there is brought
+       * aboard. Every later stage builds a fresh object without it.
        */
       recallSinceTick?: Tick;
       /**
-       * D66, `transit` and `approaching` only: the staging call for `toPortId`'s dock, from the
-       * transit lead point until the dock comes alongside at the start of `docking`, where the
-       * plan is spent (the `docking` object is built without it). Absent before the lead point,
-       * and always at a port with no dock map.
+       * §staging-hook-and-the-hold, `transit` and `approaching` only: the staging call for
+       * `toPortId`'s dock, from the transit lead point until the dock comes alongside at the start
+       * of `docking`, where the plan is spent (the `docking` object is built without it). Absent
+       * before the lead point, and always at a port with no dock map.
        */
       staging?: DockStaging;
     } & DepartureGateFlags &
       VoyageFields);
 
 /**
- * D66: where the guaranteed `stageDock` hook stands. `due`: the lead point has passed while
- * another hook was pending, so travel raises it the first tick none is. `raised`: the hook was
- * raised as `hookId`; while it is still `narrator.pendingHook` a `stageDock` command may set
- * `plan`, and once it is not (acknowledged) the call is answered and transit may end.
+ * §staging-hook-and-the-hold: where the guaranteed `stageDock` hook stands. `due`: the lead point
+ * has passed while another hook was pending, so travel raises it the first tick none is. `raised`:
+ * the hook was raised as `hookId`; while it is still `narrator.pendingHook` a `stageDock` command
+ * may set `plan`, and once it is not (acknowledged) the call is answered and transit may end.
  */
 export type DockStaging =
   | { status: "due" }
@@ -144,8 +146,9 @@ export type JobStatus =
 export type JobOrigin = "portBoard" | "narrator" | "scenario";
 
 /**
- * D25: the person offering a job. `org` is who they work for, when they work for anyone.
- * Added 2026-09-30 (schema 2); saves from schema 1 are migrated from the old `issuer` string.
+ * §issuers-and-pitches: the person offering a job. `org` is who they work for, when they work for
+ * anyone. Added 2026-09-30 (schema 2); saves from schema 1 are migrated from the old `issuer`
+ * string.
  */
 export interface JobIssuer {
   name: string;
@@ -169,7 +172,9 @@ export interface CargoLine {
 /** Where a passage can end (passengers-and-galaxy §3). */
 export type PassageEndReason = "completed" | "leftBehind" | "putOff";
 
-/** Which stretch of the passage the passenger is on: outbound, ashore at `toPortId`, or homeward. */
+/**
+ * Which stretch of the passage the passenger is on: outbound, ashore at `toPortId`, or homeward.
+ */
 export type PassageLeg = "out" | "ashore" | "back";
 
 /**
@@ -192,8 +197,8 @@ export interface JobPassage {
 
 /**
  * A commercial job (SD §17.3). Its cargo is real items: staged on the origin's dock while on
- * offer there (D63), or spawned in the origin's warehouse store on acceptance at a port without
- * a dock. Accepting raises `cargoToLoad` problems; delivery checks actual custody (the
+ * offer there (§offered-freight), or spawned in the origin's warehouse store on acceptance at a
+ * port without a dock. Accepting raises `cargoToLoad` problems; delivery checks actual custody (the
  * destination's delivery bay, or its store), then pays exactly once (`paymentTransactionId`).
  */
 export interface Job {
@@ -201,13 +206,17 @@ export interface Job {
   origin: JobOrigin;
   /**
    * Display label of the issuer ("Ysolde Maren, Meridian Growers"), always
-   * `issuerLabel(issuerPerson)` (systems/commerce) for jobs created since schema 2. Kept a string so existing readers
-   * (the ticker, old saves) are unchanged; the structured person is `issuerPerson`.
+   * `issuerLabel(issuerPerson)` (systems/commerce) for jobs created since schema 2. Kept a string
+   * so existing readers (the ticker, old saves) are unchanged; the structured person is
+   * `issuerPerson`.
    */
   issuer: string;
-  /** D25 (schema 2): the person offering the job. */
+  /** §issuers-and-pitches (schema 2): the person offering the job. */
   issuerPerson: JobIssuer;
-  /** D25 (schema 2): one line of dialogue in the issuer's voice. Never mentions pay (D24). */
+  /**
+   * §issuers-and-pitches (schema 2): one line of dialogue in the issuer's voice. Never mentions pay
+   * (§cards-never-mention-pay).
+   */
   pitch: TextRef;
   /** Schema 2: presentation-only urgency, shown as a word on the offer card. */
   urgency: JobUrgency;
@@ -222,9 +231,9 @@ export interface Job {
   offeredTick: Tick;
   expiresAtTick: Tick;
   /**
-   * The job's freight items. D63: while `offered`, the crates staged on the origin's dock (owned
-   * by nobody: no work exists for them; empty whenever the offer is not staged); once accepted,
-   * the manifest. Empty for a closed offer and for a passage without luggage.
+   * The job's freight items. §offered-freight: while `offered`, the crates staged on the origin's
+   * dock (owned by nobody: no work exists for them; empty whenever the offer is not staged); once
+   * accepted, the manifest. Empty for a closed offer and for a passage without luggage.
    */
   cargoItemIds: ItemId[];
   paymentTransactionId?: TransactionId;

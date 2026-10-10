@@ -1,8 +1,8 @@
 /**
- * D65: hauling with the hand truck. A crew member starting a haul who knows where a free hand
- * truck is, and knows of other open hauls the same way (loading with loading, unloading with
- * unloading, to the same place), fetches the truck, loads up to its `capacityUnits` of crates onto
- * it, pushes it to their destinations, sets each crate down there and parks the truck aboard.
+ * §hand-truck-trips: hauling with the hand truck. A crew member starting a haul who knows where a
+ * free hand truck is, and knows of other open hauls the same way (loading with loading, unloading
+ * with unloading, to the same place), fetches the truck, loads up to its `capacityUnits` of crates
+ * onto it, pushes it to their destinations, sets each crate down there and parks the truck aboard.
  * One activity holds every claim: the planner's chosen task is the activity's own (the lead,
  * set down last) and the others are `Activity.haul.legs`.
  *

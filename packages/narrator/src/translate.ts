@@ -85,7 +85,7 @@ const TITLE_MAX_CHARS = 60;
 const ISSUER_MAX_CHARS = 80;
 const DESCRIPTION_MAX_CHARS = 300;
 
-/** D45: an id the model wrote that nothing in the game matches. */
+/** §narrator-authority: an id the model wrote that nothing in the game matches. */
 const unknownId = (what: string, id: string) =>
   `unknown ${what} "${id}"; use one listed under What you can do`;
 
@@ -148,7 +148,7 @@ export function secretPhrases(snapshot: Snapshot, content: ContentBundle): reado
 
 /**
  * Why player-facing text cannot go out (empty, a numeric consequence, a secret), or undefined.
- * Shared with the staging translator (D67).
+ * Shared with the staging translator (§staging-prompt).
  */
 export function textProblem(text: string, secrets: readonly string[]): string | undefined {
   if (text.trim() === "") return "empty text";
@@ -168,20 +168,20 @@ interface Tally {
   spawns: number;
   faults: number;
   hazards: number;
-  /** D95: fields placed this call (one per leg). */
+  /** §scheduling-a-field: fields placed this call (one per leg). */
   fields: number;
   cardUsed: boolean;
-  /** D39: the thread this call's beat card was attributed to. */
+  /** §beat-cards: the thread this call's beat card was attributed to. */
   beatCardThread: string | undefined;
-  /** D56: the stored thread this call's closing card ends. */
+  /** §closing-cards: the stored thread this call's closing card ends. */
   closedThread: string | undefined;
 }
 
-/** D39: what the translator needs to know about a thread to accept a beat card for it. */
+/** §beat-cards: what the translator needs to know about a thread to accept a beat card for it. */
 interface KnownThread {
   readonly title: string;
   readonly beatCardShown: boolean;
-  /** D56: in the stored notes (not started by this plan), so it can be closed. */
+  /** §closing-cards: in the stored notes (not started by this plan), so it can be closed. */
   readonly stored: boolean;
 }
 
@@ -190,20 +190,23 @@ interface Env {
   readonly content: ContentBundle;
   readonly hook: DeepReadonly<NarratorHook> | undefined;
   readonly secrets: readonly string[];
-  /** The stored threads (D97: the notes for this call are written after the plan). */
+  /** The stored threads (§notes-turn: the notes for this call are written after the plan). */
   readonly threads: readonly KnownThread[];
-  /** D98: titles of threads a shown card already closed, lowercased and trimmed. */
+  /** §closing-cards: titles of threads a shown card already closed, lowercased and trimmed. */
   readonly closedThreads: readonly string[];
-  /** D41: the player's avatar; never a card speaker. Undefined when nobody is tagged captain. */
+  /**
+   * §captain-never-speaks: the player's avatar; never a card speaker. Undefined when nobody is
+   * tagged captain.
+   */
   readonly captainName: string | undefined;
   readonly tally: Tally;
-  /** D41: non-fatal corrections, reported back to the model next call. */
+  /** §captain-never-speaks: non-fatal corrections, reported back to the model next call. */
   readonly notes: string[];
 }
 
 /**
- * D41: the captain's name, from the crew member tagged `captain` in the snapshot, or failing
- * that from the content crew defs (a scenario that has not spawned its crew yet).
+ * §captain-never-speaks: the captain's name, from the crew member tagged `captain` in the snapshot,
+ * or failing that from the content crew defs (a scenario that has not spawned its crew yet).
  */
 export function captainName(snapshot: Snapshot, content: ContentBundle): string | undefined {
   const actor = Object.values(snapshot.state.actors).find(
@@ -222,8 +225,8 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (here === undefined) {
     return no("the ship is not docked; offers are made in person at the dock");
   }
-  // D16/D50/D52: one job at a time. The kernel rejects `acceptContract` while a job is in hand,
-  // so an offer made now could only be declined; drop it here with the job it would collide
+  // §one-job-in-hand, D50: one job at a time. The kernel rejects `acceptContract` while a job is in
+  // hand, so an offer made now could only be declined; drop it here with the job it would collide
   // with. The kernel's own rule, so a job being finished at this port (freight unloading at its
   // destination, a passenger walking off) does not drop an offer made on the docked tick.
   const inHand = jobBlockingAcceptance(snapshot.state);
@@ -249,8 +252,8 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (intent.roundTrip && !intent.passenger) {
     return no("roundTrip needs passenger (freight has no return)");
   }
-  // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (D70: the card comes
-  // up when the captain meets them).
+  // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (§offer-lever: the
+  // card comes up when the captain meets them).
   const surface = intent.passenger || intent.surface;
   if (surface && env.hook?.kind === "policyDecision") {
     return no("cannot surface a new card while a policy decision is pending");
@@ -403,10 +406,10 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
 }
 
 /**
- * D78: why a hazard (D95: or a field) has no leg to lie on, or undefined. The kernel accepts one
- * while a course is planned or the ship is underway; it fires at the first `transit` tick at or
- * after its moment, so one placed after this leg's transit would wait for some later leg the
- * story did not choose (a field is dropped with its leg instead). The translator therefore also
+ * §hazard-and-field-levers: why a hazard or a field has no leg to lie on, or undefined. The kernel
+ * accepts one while a course is planned or the ship is underway; it fires at the first `transit`
+ * tick at or after its moment, so one placed after this leg's transit would wait for some later leg
+ * the story did not choose (a field is dropped with its leg instead). The translator therefore also
  * refuses the end of a leg (approach, docking) and a window that opens after the transit left at
  * nominal speed (a drift only lengthens it).
  */
@@ -429,9 +432,10 @@ function legProblem(env: Env, window: FaultWindow, what: "hazard" | "field"): st
 }
 
 /**
- * D78: `scheduleHazard`, the sixth lever. The tier becomes `config.hazards.difficulty`, the window
- * is the fault windows' (same kernel bound), it spends the hazard budget, and one hazard waits at
- * a time: a second on top of one not yet fired is the "never twice in a row" rule made firm.
+ * §hazard-and-field-levers: `scheduleHazard`, the sixth lever. The tier becomes
+ * `config.hazards.difficulty`, the window is the fault windows' (same kernel bound), it spends the
+ * hazard budget, and one hazard waits at a time: a second on top of one not yet fired is the "never
+ * twice in a row" rule made firm.
  */
 function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<NarratorDraft> {
   const { snapshot } = env;
@@ -459,25 +463,28 @@ function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<Na
   });
 }
 
-/** D95: a scripted moment as a share of the severity's length. */
+/** §scheduling-a-field: a scripted moment as a share of the severity's length. */
 export const FIELD_MOMENT_SHARE: Readonly<Record<FieldMoment, number>> = {
   early: 0.15,
   middle: 0.5,
   late: 0.85,
 };
-/** D95: scripted impacts at the same moment land this many seconds apart. */
+/** §scheduling-a-field: scripted impacts at the same moment land this many seconds apart. */
 export const FIELD_MOMENT_SPACING_SECONDS = 4;
 
-/** D95: is someone aboard (crew or passenger) called this? For the "not a target yet" drop. */
+/**
+ * §scheduling-a-field: is someone aboard (crew or passenger) called this? For the "not a target
+ * yet" drop.
+ */
 function personNamed(env: Env, name: string): boolean {
   const wanted = name.toLowerCase();
   return Object.values(env.snapshot.state.actors).some((a) => a.name.toLowerCase() === wanted);
 }
 
 /**
- * D95: a scripted impact's target by what the model wrote: a machine id aboard, a room's name,
- * or a machine's name when only one machine aboard has it. A person is refused by name (bodies
- * arrive in slice 6), anything else as unknown.
+ * §scheduling-a-field: a scripted impact's target by what the model wrote: a machine id aboard, a
+ * room's name, or a machine's name when only one machine aboard has it. A person is refused by name
+ * (bodies arrive in slice 6), anything else as unknown.
  */
 function fieldTarget(env: Env, written: string): Outcome<ImpactTarget> {
   const { snapshot, content } = env;
@@ -517,7 +524,9 @@ function fieldTarget(env: Env, written: string): Outcome<ImpactTarget> {
 
 type ScriptedIntent = Intent<"scheduleField">["scripted"][number];
 
-/** D95: the scripted impacts as the kernel takes them, moments turned into seconds. */
+/**
+ * §scheduling-a-field: the scripted impacts as the kernel takes them, moments turned into seconds.
+ */
 function scriptedDrafts(
   env: Env,
   scripted: readonly ScriptedIntent[],
@@ -546,10 +555,10 @@ function scriptedDrafts(
 }
 
 /**
- * D95: `scheduleField`, the seventh lever (D92). No budget: one field per leg is the limit, as
- * the kernel rules it. The window is the fault windows'; scripted hits are resolved by name and
- * capped at `field.maxScripted`; the guard is the kernel's (scripted hits alone, an unsized rock
- * priced large, must leave the hull above zero).
+ * §scheduling-a-field: `scheduleField`, the seventh lever. No budget: one field per leg is the
+ * limit, as the kernel rules it. The window is the fault windows'; scripted hits are resolved by
+ * name and capped at `field.maxScripted`; the guard is the kernel's (scripted hits alone, an
+ * unsized rock priced large, must leave the hull above zero).
  */
 function translateField(env: Env, intent: Intent<"scheduleField">): Outcome<NarratorDraft> {
   const { snapshot } = env;
@@ -637,9 +646,10 @@ function endPassageSide(env: Env, label: string, which: string): Outcome<SideCom
 }
 
 /**
- * D86: `privateTalk` calls a crew member to the captain's cabin for a word, warm or stern. The
- * name must be crew aboard (not a passenger, not ashore or on the dock), never the captain, and
- * no talk may be pending; the kernel checks the same again (and the cabin) when it is chosen.
+ * §private-talk: `privateTalk` calls a crew member to the captain's cabin for a word, warm or
+ * stern. The name must be crew aboard (not a passenger, not ashore or on the dock), never the
+ * captain, and no talk may be pending; the kernel checks the same again (and the cabin) when it is
+ * chosen.
  */
 function privateTalkSide(
   env: Env,
@@ -697,8 +707,9 @@ function translateSide(env: Env, side: Side, which: string): Outcome<SideCommand
 }
 
 /**
- * D26: an aftermath caption, clipped to `AFTERMATH_MAX_WORDS`. Blank means "none" (the card
- * closes without one) rather than a reason to drop the whole card; numbers or secrets do drop it.
+ * §aftermath-caption: an aftermath caption, clipped to `AFTERMATH_MAX_WORDS`. Blank means "none"
+ * (the card closes without one) rather than a reason to drop the whole card; numbers or secrets do
+ * drop it.
  */
 function aftermathText(env: Env, text: string, which: string): Outcome<string> {
   if (text.trim() === "") return ok("");
@@ -708,16 +719,16 @@ function aftermathText(env: Env, text: string, which: string): Outcome<string> {
 }
 
 /**
- * D29: the speaker's name, clipped; blank means an observed scene (no speaker). Numbers or
- * secrets in the name are a problem like in any other player-facing text.
+ * §spoken-cards: the speaker's name, clipped; blank means an observed scene (no speaker). Numbers
+ * or secrets in the name are a problem like in any other player-facing text.
  */
 function speakerName(env: Env, raw: string): Outcome<string | undefined> {
   if (raw.trim() === "") return ok(undefined);
   const name = clipChars(raw, ISSUER_MAX_CHARS);
   const problem = textProblem(name, env.secrets);
   if (problem !== undefined) return no(`speaker: ${problem}`);
-  // D41: the captain is the player; cards are brought to them. The card survives as an observed
-  // scene and the model is told why next call.
+  // §captain-never-speaks: the captain is the player; cards are brought to them. The card survives
+  // as an observed scene and the model is told why next call.
   if (env.captainName !== undefined && name.toLowerCase() === env.captainName.toLowerCase()) {
     env.notes.push(
       `speaker: "${name}" is the captain and cannot bring a card; name the crew member who does`,
@@ -728,10 +739,10 @@ function speakerName(env: Env, raw: string): Outcome<string | undefined> {
 }
 
 /**
- * D39: a beat card must name a thread that has not had its beat card yet, and both sides must be
- * effect none: the card records the captain's attitude, it does not set a course. D97: the notes
- * are written after the plan, so a title that matches no stored thread starts a new one; the
- * notes turn is told to write it.
+ * §beat-cards: a beat card must name a thread that has not had its beat card yet, and both sides
+ * must be effect none: the card records the captain's attitude, it does not set a course.
+ * §notes-turn: the notes are written after the plan, so a title that matches no stored thread
+ * starts a new one; the notes turn is told to write it.
  */
 function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string | undefined> {
   const raw = intent.beatOfThread;
@@ -750,15 +761,18 @@ function beatThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<string
   return ok(thread.title);
 }
 
-/** D98: what a card's closesThread named: nothing, a stored thread, or a title matching none. */
+/**
+ * §closing-cards: what a card's closesThread named: nothing, a stored thread, or a title matching
+ * none.
+ */
 type ClosingThread =
   | { readonly kind: "none" }
   | { readonly kind: "closes"; readonly title: string }
   | { readonly kind: "unmatched"; readonly written: string };
 
 /**
- * D56: a closing card names a stored thread (one the digest showed); the server retires it once
- * the card goes up. A second closing card for a thread a card already closed is dropped. D98: a
+ * §closing-cards: a closing card names a stored thread (one the digest showed); the server retires
+ * it once the card goes up. A second closing card for a thread a card already closed is dropped. A
  * title that matches neither (the model named the offer or the issuer, or the thread was lost in
  * a notes rewrite) no longer costs the captain the ending: the card goes up closing nothing, and
  * the model is told so next call. A card cannot both foreshadow and close.
@@ -779,8 +793,8 @@ function closingThread(env: Env, intent: Intent<"surfaceDecision">): Outcome<Clo
 }
 
 /**
- * D56: the closed thread's title as the card shows it. Thread titles are private notes, so one
- * that would give something away shows as a bare "story closed" (an empty label).
+ * §closing-cards: the closed thread's title as the card shows it. Thread titles are private notes,
+ * so one that would give something away shows as a bare "story closed" (an empty label).
  */
 function closedLabel(env: Env, title: string): string {
   return textProblem(title, env.secrets) === undefined ? title : "";
@@ -832,8 +846,8 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
     kind: "surfaceDecision",
     payload: {
       card: {
-        // W9 decision: `DecisionCardSpec` has no title field; it and the D29 speaker travel in
-        // the prompt params, where `templateCard` picks them up.
+        // W9 decision: `DecisionCardSpec` has no title field; it and the §spoken-cards speaker
+        // travel in the prompt params, where `templateCard` picks them up.
         prompt: {
           key: NARRATOR_TEXT_KEYS.situation,
           params: {
@@ -851,9 +865,9 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
 }
 
 /**
- * D47: `stockMarket`. Any existing item def (not only freight: spare parts are the point); count
- * clamped to `config.commerce.market.maxStockPerCommand`; the price is the content price for
- * that item at that port (or the dearest anywhere, or the config default) times the tier.
+ * §market-lever: `stockMarket`. Any existing item def (not only freight: spare parts are the
+ * point); count clamped to `config.commerce.market.maxStockPerCommand`; the price is the content
+ * price for that item at that port (or the dearest anywhere, or the config default) times the tier.
  */
 function translateStock(env: Env, intent: Intent<"stockMarket">): Outcome<NarratorDraft> {
   const { snapshot, content } = env;
@@ -935,7 +949,8 @@ function policyCard(
     situation: clipWords(plan.card.situation, CARD_SITUATION_MAX_WORDS),
     leftLabel: clipChars(plan.card.leftLabel, LABEL_MAX_CHARS),
     rightLabel: clipChars(plan.card.rightLabel, LABEL_MAX_CHARS),
-    // D26: a blank aftermath falls back to the decision's template one, if it has one.
+    // §aftermath-caption: a blank aftermath falls back to the decision's template one, if it has
+    // one.
     ...(leftAftermath === ""
       ? pick(fallback, "leftAftermath")
       : { leftAftermath: clipWords(leftAftermath, AFTERMATH_MAX_WORDS) }),
@@ -962,7 +977,10 @@ function policyCard(
 
 // ---------------------------------------------------------------------------------------------
 
-/** A story kind: the narrator vocabulary minus the staging call's (D66), which this never emits. */
+/**
+ * A story kind: the narrator vocabulary minus the staging call's (§staging-hook-and-the-hold),
+ * which this never emits.
+ */
 function isNarratorKind(kind: string): kind is NarratorCommand["kind"] {
   return (
     (NARRATOR_COMMAND_KINDS as readonly string[]).includes(kind) &&
@@ -975,16 +993,16 @@ export function commandIdFor(callId: string, n: number): CommandId {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Call-back request (D99)
+// Call-back request (§requested-call-back)
 // ---------------------------------------------------------------------------------------------
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to strip them.
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
 
 /**
- * D99: the plan's `callBack` as a `requestCall` command, after the intents. Absent (a plan built
- * in code) asks for nothing and leaves the standing request. `why` is private, so it has no
- * player-facing text rules; it is only made fit for the kernel's (control characters out,
+ * §requested-call-back: the plan's `callBack` as a `requestCall` command, after the intents. Absent
+ * (a plan built in code) asks for nothing and leaves the standing request. `why` is private, so it
+ * has no player-facing text rules; it is only made fit for the kernel's (control characters out,
  * clipped to `CALL_BACK_WHY_MAX`).
  */
 function translateCallBack(
@@ -1017,7 +1035,7 @@ function translateCallBack(
  * Translate a plan. The plan is treated as untrusted even though it passed the schema: each
  * intent is re-parsed against the intent schema, so a hand-built or partially valid plan cannot
  * smuggle through an unknown kind or an extra field; every id is then checked against the
- * snapshot and content (D45).
+ * snapshot and content (§narrator-authority).
  */
 export const translateIntents: TranslateIntents = (
   plan: NarratorPlan,
@@ -1039,7 +1057,7 @@ export const translateIntents: TranslateIntents = (
       faults: 0,
       hazards: 0,
       fields: 0,
-      // D70: a card on its way to the captain in person is as good as on screen.
+      // §offer-lever: a card on its way to the captain in person is as good as on screen.
       cardUsed:
         snapshot.state.decisions.queue.length > 0 || snapshot.state.decisions.held.length > 0,
       beatCardThread: undefined,

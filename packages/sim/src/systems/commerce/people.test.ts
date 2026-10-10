@@ -1,8 +1,9 @@
 /**
- * D25/D26/D24 on the kernel side: an offer from a person with a pitch makes a card that names
- * them, carries aftermaths and no pay; a bare string issuer is still accepted; and schema-1 saves
- * migrate to the person form. Who the person is comes from the narrator (D40; offline, the null
- * narrator draws from the content name table, tested in `@crew/narrator`).
+ * §issuers-and-pitches, §aftermath-caption, §cards-never-mention-pay on the kernel side: an offer
+ * from a person with a pitch makes a card that names them, carries aftermaths and no pay; a bare
+ * string issuer is still accepted; and schema-1 saves migrate to the person form. Who the person is
+ * comes from the narrator (D40; offline, the null narrator draws from the content name table,
+ * tested in `@crew/narrator`).
  */
 import { describe, expect, it } from "vitest";
 import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
@@ -39,8 +40,8 @@ function personOffer(): Command {
   } as Command;
 }
 
-describe("commerce: offers come from people (D25)", () => {
-  it("the offer card names the person, carries aftermaths and never the pay (D24, D26)", () => {
+describe("commerce: offers come from people (§issuers-and-pitches)", () => {
+  it("the offer card names the person, carries aftermaths and never the pay", () => {
     const { world, kernel } = freightTestWorld();
     const command = personOffer();
     expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
@@ -115,12 +116,12 @@ describe("commerce: offers come from people (D25)", () => {
   });
 });
 
-describe("save migration 1 → 2 (D25)", () => {
+describe("save migration 1 → 2", () => {
   function schemaOneState(): Record<string, unknown> {
     const { world } = freightTestWorld();
     const state = JSON.parse(JSON.stringify(world.state)) as Record<string, unknown>;
     state.schemaVersion = 1;
-    // A schema-1 save predates `markets` (D47, schema 3).
+    // A schema-1 save predates `markets` (schema 3).
     // biome-ignore lint/performance/noDelete: simulating an older save's shape.
     delete state.markets;
     state.jobs = {
@@ -157,7 +158,7 @@ describe("save migration 1 → 2 (D25)", () => {
       jobs: Record<string, Job>;
       markets: Record<string, unknown>;
     };
-    // D47 (schema 3) added `markets`; a 1 → 6 upgrade passes through every frozen migration.
+    // Schema 3 added `markets`; a 1 → 6 upgrade passes through every frozen migration.
     expect(migrated.schemaVersion).toBe(6);
     expect(migrated.markets).toEqual({});
     expect(migrated.jobs.j1).toMatchObject({

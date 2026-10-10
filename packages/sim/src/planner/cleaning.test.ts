@@ -1,5 +1,5 @@
 /**
- * The planner's cleaning rule (D82) over a hand-built `AgentView` (dependency-cruiser's
+ * The planner's cleaning rule (§who-mops) over a hand-built `AgentView` (dependency-cruiser's
  * `planner-boundary` rule covers tests here too): room affinity by role, anyone once the problem
  * ages, anyone while it is essential.
  */
@@ -95,7 +95,7 @@ const task = { id: "t1" as TaskId, type: "cleanCompartment" } as TaskView;
 const allowed = (roles: readonly RoleTag[], problem: ProblemView, tick = 1) =>
   cleanTaskAllowed(viewAs(roles, tick), config, task, problem);
 
-describe("cleanTaskAllowed (D82)", () => {
+describe("cleanTaskAllowed (§who-mops)", () => {
   it("decides only cleanCompartment tasks", () => {
     expect(isCleaningTask(task)).toBe(true);
     expect(isCleaningTask({ ...task, type: "haul" })).toBe(false);
@@ -128,7 +128,7 @@ describe("cleanTaskAllowed (D82)", () => {
   });
 });
 
-describe("cleaningRolesFor (D82)", () => {
+describe("cleaningRolesFor (§who-mops)", () => {
   it("names the roles that keep a room clean, none for a room nobody keeps", () => {
     expect(cleaningRolesFor(["cargoHold"])).toEqual(["deckhand"]);
     expect(cleaningRolesFor(["galley"])).toEqual(["cook"]);

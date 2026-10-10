@@ -7,8 +7,9 @@
  *
  * - hunger: rises at `hungerPerDay`; eating reduces it at the meal's commit point (work).
  * - fatigue: rises at `fatiguePerDayWorking` while on a task's hands-on steps,
- *   `fatiguePerDayAwake` otherwise (a watch stood at the helm or the gangway included, D77
- *   addendum); falls at `fatigueRecoveryPerDayAsleep` while asleep in a bunk.
+ *   `fatiguePerDayAwake` otherwise (a watch stood at the helm or the gangway included,
+ *   §need-rates-and-recovery addendum); falls at `fatigueRecoveryPerDayAsleep` while asleep in a
+ *   bunk.
  * - comfort: falls at `comfortRecoveryPerDayResting` while resting, socializing or asleep;
  *   rises at `comfortPerDay` otherwise.
  * - social: falls at `socialRecoveryPerDayChatting` while socializing; rises otherwise.
@@ -16,7 +17,7 @@
  *   `recreationRatesFor` gives the rates it sets (`systems/recreation/needs.ts`).
  * Rates are scaled by trait modifiers (`hungerRate`, `fatigueRate`, `comfortRate`, `socialRate`,
  * `recreationRate`).
- * They are authored per ship's day and converted to per second here, where read (D76).
+ * They are authored per ship's day and converted to per second here, where read (§the-ships-day).
  *
  * W4a decision: severe fatigue impairs capacities through existing config, no new fields: above
  * `urgency.needSurvivalAbove`, `capacities.movement` and `.manipulation` fall linearly from 1 to
@@ -62,9 +63,9 @@ function needRatesPerDay(ctx: StepCtx, actor: Actor): Record<NeedKey, number> {
   const hold = currentHold(actor.activity);
   const asleep = hold === "sleep";
   const resting = asleep || hold === "rest" || hold === "socialize";
-  // D77 addendum: standing a watch (a `staff` or `gangway` hold) tires at the awake rate; it is
-  // hands-on work that tires at the working rate. A stander's watch plus a day awake then stays
-  // below pressing tiredness, so the one sleep a day falls in their sleep watch.
+  // §need-rates-and-recovery: standing a watch (a `staff` or `gangway` hold) tires at the awake
+  // rate; it is hands-on work that tires at the working rate. A stander's watch plus a day awake
+  // then stays below pressing tiredness, so the one sleep a day falls in their sleep watch.
   const working = actor.activity.kind === "task" && hold === undefined;
   const fatigue = asleep
     ? -needs.fatigueRecoveryPerDayAsleep
@@ -143,11 +144,11 @@ export const needsSystem: System = {
   },
 };
 
-/** Needs, then the berth rule (D74), both in phase 5. */
+/** Needs, then the berth rule (§berth-assignment), both in phase 5. */
 export function registerNeeds(registry: KernelRegistry): Unregister {
   const unregister = [
     registry.registerSystem(needsSystem),
-    // D79: mood from live thoughts, after the needs it sits beside.
+    // §mood-and-work-speed: mood from live thoughts, after the needs it sits beside.
     registry.registerSystem(moodSystem),
     registry.registerSystem(berthsSystem),
   ];

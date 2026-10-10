@@ -71,7 +71,7 @@ const FULL_PLAN = [
   },
 ];
 
-describe("translateStaging (D67)", () => {
+describe("translateStaging (§staging-prompt)", () => {
   it("turns a staging plan into exactly one stageDock command, names as content has them", () => {
     const { commands, dropped } = translate(FULL_PLAN, { notes: CAST_NOTES });
     expect(dropped).toEqual([]);

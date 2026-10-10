@@ -1,7 +1,7 @@
 /**
- * D72: one dock, two footprints. The berth box takes a ship the size of the box and a smaller
- * one; the graft, the ramp landings, content validation's fit check, the dock's occupants and
- * its detaching all hold for both. See fixtures/berth-box.ts for the layout.
+ * §berth-boxes: one dock, two footprints. The berth box takes a ship the size of the box and a
+ * smaller one; the graft, the ramp landings, content validation's fit check, the dock's occupants
+ * and its detaching all hold for both. See fixtures/berth-box.ts for the layout.
  */
 import { describe, expect, it } from "vitest";
 import { berthDock, deckToDock, dockToDeck } from "../../core/docks";

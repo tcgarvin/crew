@@ -7,7 +7,10 @@ import type { CargoClass, RenderItem, RenderItemKind } from "@crew/sim";
 import { TEXT_COLOR } from "./screen";
 import { segment } from "./shapes";
 
-/** Polish A (D28): crate colour per freight class; other kinds get one colour each. */
+/**
+ * Polish A (§rooms-items-and-cargo): crate colour per freight class; other kinds get one colour
+ * each.
+ */
 export const CARGO_COLORS: Readonly<Record<CargoClass, string>> = {
   general: "#d8ab6c",
   fragile: "#8cc4f2",
@@ -48,7 +51,10 @@ export function drawBadge(
   ctx.fillText(text, x + 2, y - h / 2 + 0.5);
 }
 
-/** How strongly an offered crate (D63) is filled: enough to show its class, clearly not solid. */
+/**
+ * How strongly an offered crate (§offered-freight) is filled: enough to show its class, clearly not
+ * solid.
+ */
 const OFFERED_FILL_ALPHA = 0.3;
 
 export function drawCrate(
@@ -99,9 +105,9 @@ export function loadedTruckRise(size: number): number {
 }
 
 /**
- * D65: a hand truck (or, D68, a dock hand's trolley) beside the person pushing it: an upright
- * handle and a toe plate with the crates stacked on it, one colour each (two to a row, at most two
- * rows; a count tag says how many when there are more than one).
+ * §hand-truck-drawing: a hand truck (or a dock hand's trolley, §locals-and-props) beside the person
+ * pushing it: an upright handle and a toe plate with the crates stacked on it, one colour each (two
+ * to a row, at most two rows; a count tag says how many when there are more than one).
  */
 export function drawLoadedTruck(
   ctx: CanvasRenderingContext2D,
@@ -127,7 +133,7 @@ export function drawLoadedTruck(
   });
   if (crateColors.length > 1) {
     // Hung below the toe plate, not above the stack: above, it landed on the pusher's label
-    // ("Priya Kessler — ×3 hauling") on every trip (D68 visual check).
+    // ("Priya Kessler — ×3 hauling") on every trip.
     drawBadge(ctx, left + crate * 2 + 2, base + BADGE_HEIGHT + 1, crateColors.length);
   }
 }

@@ -4,8 +4,9 @@ The shared types and schemas every workstream builds against. Written in the W0 
 (2026-09-30) before parallel work starts. If you need to change one, read "Changing a contract"
 at the bottom first.
 
-Sources: `docs/DECISIONS.md` (wins on conflict), `docs/PLAN.md` §3–§6,
-`docs/design/simulation-design.md` (SD), `docs/review/2026-09-30-architecture-review-opus.md`.
+Sources: `docs/DECISIONS.md` (wins on conflict), `docs/spec/` (current behaviour), `docs/PLAN.md`
+§3–§6, `docs/design/simulation-design.md` (SD),
+`docs/review/2026-09-30-architecture-review-opus.md`.
 
 ## Index
 
@@ -60,15 +61,15 @@ These are the kernel rules from PLAN §5, made concrete.
    Every event carries `significance` and `causeIds`.
 7. **Planner sees `AgentView` only.** No truth tables, no `StepCtx`, no RNG. Claims by others
    are known only through facts. A few things are common knowledge aboard and read as truth
-   without facts: the roster (`roster()`), assigned beds (`assignedBeds()`, D74), and since slice 4
-   the open and running group sessions (`sessions()`: the intercom, `social.sessions`), the
-   travel stage (`travel()`) and the activity defs (`activities()`), and since slice 5 the
-   alert (`alert()`: the klaxon, D94). Where a rock hit is not common knowledge: everyone holds a
-   `hullImpact` fact about the field, with the compartment only for those who were in it, and
-   damage is learned by sight or by an intercom report (`report` evidence, original
+without facts: the roster (`roster()`), assigned beds (`assignedBeds()`, §berth-assignment), and
+since slice 4 the open and running group sessions (`sessions()`: the intercom, `social.sessions`),
+   the travel stage (`travel()`) and the activity defs (`activities()`), and since slice 5 the
+alert (`alert()`: the klaxon, §reporting-damage). Where a rock hit is not common knowledge: everyone
+holds a `hullImpact` fact about the field, with the compartment only for those who were in it, and
+    damage is learned by sight or by an intercom report (`report` evidence, original
    `observedTick`). The report also flips each damage problem it carries (`machineDamaged`,
-   `hullScar`, `machineSymptom`) from `discovered` to `public` (D94): once the whole ship has
-   heard it, it is ship-wide knowledge, and that marker is what stops a second witness
+`hullScar`, `machineSymptom`) from `discovered` to `public` (§reporting-damage): once the whole ship
+   has heard it, it is ship-wide knowledge, and that marker is what stops a second witness
    reporting it again. The intercom is the one system that changes another owner's problem's
    visibility.
 8. **Validate, then apply.** A command is validated when enqueued and again when applied;
@@ -80,10 +81,10 @@ These are the kernel rules from PLAN §5, made concrete.
     `Math.random`, no `Date` in the kernel.
 11. **Mutation model.** Systems mutate `WorldState` in place; entity types are mutable, value
     objects are `readonly` and replaced whole. Everyone else reads `ReadonlyWorldState`.
-12. **A lost ship halts the kernel** (D93). Once `hull.lostAtTick` is set, `advance` returns the
-    `AdvanceHalt` `{ kind: "lost" }` without stepping, every time; nothing un-loses a ship, and
-    a restored lost save halts at once. Every `switch` on `halt.kind` handles it: the worker
-    host posts `shipLost { tick }` once, `crew pacing` and `crew beats` end the run.
+12. **A lost ship halts the kernel** (§hull-scars-and-ship-loss). Once `hull.lostAtTick` is set,
+`advance` returns the `AdvanceHalt` `{ kind: "lost" }` without stepping, every time; nothing
+un-loses a ship, and a restored lost save halts at once. Every `switch` on `halt.kind` handles it:
+    the worker host posts `shipLost { tick }` once, `crew pacing` and `crew beats` end the run.
 
 ## How work is advertised
 
@@ -91,12 +92,13 @@ The one way a system asks the crew to do something (details in `core/types/work.
 
 1. The owning system creates or revises a `Problem` in `state.work.problems`, deduped by
    `dedupeKey`. Equipment owns `machineSymptom`, `machineFault`, `maintenanceDue`,
-   `partsNeeded`; travel owns `courseToPlot` (D78) and, with commerce, `cargoToLoad` and
-   `cargoToUnload`; commerce owns `reserveLow` (D80: the ship's stores, bought like a part; D81:
-   provisions are one of them, counted in days of meals); the watch owns `stationToStaff` (D77:
-   the helm's `watch` and `relief` posts); the galley owns `mealToCook` and `mealToCarry` (D81);
-   dirt owns `compartmentDirty` (D82); damage owns `machineDamaged`, `hullScar`, `hullDamaged`
-   and `compartmentToCheck` (D93, D94; `hullDamaged` derives commerce's `buyParts` through
+`partsNeeded`; travel owns `courseToPlot` (§course-plotting) and, with commerce, `cargoToLoad` and
+`cargoToUnload`; commerce owns `reserveLow` (§reserve-low-problem: the ship's stores, bought like a
+part; provisions are one of them, counted in days of meals, §reserve-kinds); the watch owns
+`stationToStaff` (§problem-ownership: the helm's `watch` and `relief` posts); the galley owns
+`mealToCook` and `mealToCarry` (§meal-problem); dirt owns `compartmentDirty`
+(§room-cleaning-problem); damage owns `machineDamaged`, `hullScar`, `hullDamaged` and
+`compartmentToCheck` (§machine-damage, §scouts; `hullDamaged` derives commerce's `buyParts` through
    `buySpec`).
 2. The work system derives `Task`s through the `TaskDerivationTable`, one rule per problem kind.
    Each owning system exports its rules from `systems/<system>/tasks.ts`; `systems/work/`
@@ -124,17 +126,18 @@ Commands and events are split one file per system under `core/types/commands/` a
   `CommandPayloadMap` / `EventPayloadMap` and one spread to `EVENT_SIGNIFICANCE` in the
   `index.ts`. That single line is the only shared edit.
 - **Narrator vocabulary** (`NARRATOR_COMMAND_KINDS`) is not extended by a workstream on its own:
-  it is an owner decision (D6, D11) and changes the narrator schema and tests together.
+  it is an owner decision (D6) and changes the narrator schema and tests together.
 
 ## Changing a contract
 
 - Additive changes (a new optional field, a new variant in your own file) need no coordination
   beyond keeping `pnpm typecheck` green.
-- Breaking changes to `WorldState` bump `SCHEMA_VERSION` (12 since slice 5, D95: `hull`,
+- Breaking changes to `WorldState` bump `SCHEMA_VERSION` (12 since slice 5: `hull`,
   `field`, `alert`, the `field` and `scar` id counters; 11 → 12 migrates). Before the slice is
   playable, wipe saves instead of writing a migration; after that, ship a `Migration`.
 - Changing a closed vocabulary in `content.ts` (skills, tags, tool kinds) requires the matching
   enum in `packages/content/src/schemas/primitives.ts`; the `VOCABULARY_IN_SYNC` check fails to
   compile until both match.
 - Shape decisions made in W0 are marked `// W0 decision:` in the source; the owner reviews
-  them. Record any rule change in `docs/DECISIONS.md`.
+  them. Record a rule change in the matching `docs/spec/` section, and a real decision in
+  `docs/DECISIONS.md`.

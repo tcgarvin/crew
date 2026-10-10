@@ -1,4 +1,7 @@
-/** D92 (call 16): the rock layers, their fade with the field's phase, and their stillness when stuck. */
+/**
+ * §asteroid-field-scars-and-alert (call 16): the rock layers, their fade with the field's phase,
+ * and their stillness when stuck.
+ */
 import type { RenderField } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {

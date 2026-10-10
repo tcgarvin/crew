@@ -12,11 +12,15 @@ import type { CargoLine, JobIssuer, JobUrgency } from "../travel";
  */
 export interface JobDraft {
   /**
-   * D25: the person offering the job. A bare string is still accepted (commands queued by an
-   * older build, hand-written scenarios) and normalised by the handler to `{name, role: "shipper"}`.
+   * §issuers-and-pitches: the person offering the job. A bare string is still accepted (commands
+   * queued by an older build, hand-written scenarios) and normalised by the handler to `{name,
+   * role: "shipper"}`.
    */
   readonly issuer: string | Readonly<JobIssuer>;
-  /** D25: one line in the issuer's voice; absent = a generic template line. No pay talk (D24). */
+  /**
+   * §issuers-and-pitches: one line in the issuer's voice; absent = a generic template line. No pay
+   * talk (§cards-never-mention-pay).
+   */
   readonly pitch?: TextRef;
   /** Absent = `"relaxed"`. */
   readonly urgency?: JobUrgency;
@@ -52,8 +56,8 @@ export interface CommerceCommandPayloads {
    */
   endPassage: { readonly jobId: JobId };
   /**
-   * D47: set what a port's market has of one item: `count` units (0 removes it from sale) at
-   * `price` integer credits per unit. The narrator's lever for "the part is here" or "not here";
+   * §market-lever: set what a port's market has of one item: `count` units (0 removes it from sale)
+   * at `price` integer credits per unit. The narrator's lever for "the part is here" or "not here";
    * it never moves money or puts anything aboard, so the "narrator cannot mint money" rule holds.
    * Bounded by `config.commerce.market.maxStockPerCommand`.
    */

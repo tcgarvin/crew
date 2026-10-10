@@ -1,12 +1,13 @@
 /**
  * `runNarrator`: one narrator call end to end (PLAN §3, D5). Loads content, builds the digest,
  * asks the model (through the injected `ModelTransport`) for a `NarratorPlan` with structured
- * output, Zod-validates and translates it, and returns commands and card prose. D97: the model
- * writes its notes in a second turn after the plan (`NarratorRun.notesTurn`), which the server
- * runs once the plan has been answered; the response carries the notes as they stand until then. Any failure (no transport, provider error, timeout, refusal, truncation, invalid
- * output) falls back to the deterministic null response with `fallback` set, so a hook never
- * blocks the game (review N3). D67: a `stageDock` hook goes to the staging call instead
- * (`staging/run.ts`), over the same digest, with its own prompt, schema and translator.
+ * output, Zod-validates and translates it, and returns commands and card prose. §notes-turn: the
+ * model writes its notes in a second turn after the plan (`NarratorRun.notesTurn`), which the
+ * server runs once the plan has been answered; the response carries the notes as they stand until
+ * then. Any failure (no transport, provider error, timeout, refusal, truncation, invalid output)
+ * falls back to the deterministic null response with `fallback` set, so a hook never blocks the
+ * game (review N3). §staging-call-on-the-server: a `stageDock` hook goes to the staging call
+ * instead (`staging/run.ts`), over the same digest, with its own prompt, schema and translator.
  */
 import { loadBundle } from "@crew/content";
 import {
@@ -62,7 +63,10 @@ import type { ModelTransport, ReasoningDetails, ReasoningEffort } from "./transp
  * `CREW_NARRATOR_MODEL` via `ctx.model`.
  */
 export const DEFAULT_NARRATOR_MODEL = "openai/gpt-6-luna";
-/** D102: the reasoning effort `DEFAULT_NARRATOR_MODEL` runs at (D96: luna at `low`). */
+/**
+ * D102: the reasoning effort `DEFAULT_NARRATOR_MODEL` runs at (§models-and-reasoning-effort: luna
+ * at `low`).
+ */
 export const DEFAULT_NARRATOR_REASONING_EFFORT: ReasoningEffort = "low";
 /**
  * Vercel's function budget is ~30 s; 25 s leaves time to log the call and answer. No retry: a
@@ -70,20 +74,20 @@ export const DEFAULT_NARRATOR_REASONING_EFFORT: ReasoningEffort = "low";
  */
 export const NARRATOR_TIMEOUT_MS = 25_000;
 /**
- * D70: the staging call's own default timeout. Its output is small, and a staging attempt that
- * runs long costs the player a held ship at the end of transit on every retry (D69's schedule is
- * 2 s, 4 s, then the floor set), so it gives up sooner than a story call. The server's
- * `CREW_STAGING_TIMEOUT_MS` overrides it.
+ * §narrator-timeouts: the staging call's own default timeout. Its output is small, and a staging
+ * attempt that runs long costs the player a held ship at the end of transit on every retry (the
+ * retry schedule is 2 s, 4 s, then the floor set; §staging-retries-and-the-floor-set), so it gives
+ * up sooner than a story call. The server's `CREW_STAGING_TIMEOUT_MS` overrides it.
  */
 export const STAGING_TIMEOUT_MS = 10_000;
 /** A plan is a few hundred tokens; the rest is headroom for the model's reasoning. */
 export const NARRATOR_MAX_TOKENS = 4_000;
 /**
- * D97: the notes turn runs after the plan has been answered, so the player never waits on it,
- * but the game's next call waits for it; it may take longer than a story call, not forever.
+ * §notes-turn: the notes turn runs after the plan has been answered, so the player never waits on
+ * it, but the game's next call waits for it; it may take longer than a story call, not forever.
  */
 export const NOTES_TIMEOUT_MS = 45_000;
-/** D97: notes are a few hundred tokens; the rest is headroom for reasoning. */
+/** §notes-turn: notes are a few hundred tokens; the rest is headroom for reasoning. */
 export const NOTES_MAX_TOKENS = 4_000;
 
 export interface RunNarratorCtx {
@@ -94,7 +98,7 @@ export interface RunNarratorCtx {
   readonly notes?: unknown;
   /**
    * The model for this call. The server passes its staging model for a `stageDock` hook and its
-   * story model otherwise (D67); absent = `DEFAULT_NARRATOR_MODEL`.
+   * story model otherwise (§staging-call-on-the-server); absent = `DEFAULT_NARRATOR_MODEL`.
    */
   readonly model?: string;
   /** Test/eval override; defaults to the validated bundle from `@crew/content`. */
@@ -102,7 +106,10 @@ export interface RunNarratorCtx {
   readonly callId?: string;
   /** Per-call model timeout; absent = `STAGING_TIMEOUT_MS` for `stageDock`, else `NARRATOR_TIMEOUT_MS`. */
   readonly timeoutMs?: number;
-  /** D96: the model's reasoning effort for this call; absent = `"default"` (nothing sent). */
+  /**
+   * §models-and-reasoning-effort: the model's reasoning effort for this call; absent = `"default"`
+   * (nothing sent).
+   */
   readonly reasoningEffort?: ReasoningEffort;
 }
 
@@ -112,11 +119,14 @@ export interface NarratorTrace {
   readonly capabilities: string;
   readonly prompt: NarratorPrompt;
   readonly rawContent?: string;
-  /** The story plan, or for a `stageDock` call the staging plan as parsed (D67). */
+  /**
+   * The story plan, or for a `stageDock` call the staging plan as parsed
+   * (§staging-call-on-the-server).
+   */
   readonly plan?: NarratorPlan | StagingEnvelope;
 }
 
-/** D97: the notes turn's result: the notes to store, or why the model wrote none. */
+/** §notes-turn: the notes turn's result: the notes to store, or why the model wrote none. */
 export type NotesRun =
   | {
       readonly ok: true;
@@ -138,8 +148,8 @@ export interface NarratorRun {
   /** Why the fallback was taken, for logs. */
   readonly error?: string;
   /**
-   * D97: present when the model answered a story call: asks it for its notes, continuing from the
-   * plan and its reasoning. `response.notesUpdate` holds the notes until this has run.
+   * §notes-turn: present when the model answered a story call: asks it for its notes, continuing
+   * from the plan and its reasoning. `response.notesUpdate` holds the notes until this has run.
    */
   readonly notesTurn?: () => Promise<NotesRun>;
 }
@@ -161,10 +171,10 @@ export function defaultContent(): ContentBundle {
 }
 
 /**
- * D67: live runs saw the model copy `surfaceDecision`'s `beatOfThread` and `closesThread` onto
- * `card` (the overdue-passenger policy card), which then failed the strict schema and fell back.
- * They mean nothing on a policy card, so they are taken off before validation and the correction
- * is fed back to the model with the drop reasons.
+ * §translation-and-drop-reasons: live runs saw the model copy `surfaceDecision`'s `beatOfThread`
+ * and `closesThread` onto `card` (the overdue-passenger policy card), which then failed the strict
+ * schema and fell back. They mean nothing on a policy card, so they are taken off before validation
+ * and the correction is fed back to the model with the drop reasons.
  */
 const CARD_STRAY_KEYS = ["beatOfThread", "closesThread"] as const;
 
@@ -196,9 +206,9 @@ function parsePlan(content: string, schema: NarratorPlanSchema): ParsedPlan {
 }
 
 /**
- * D25: the people who made the captain an offer this call, for the cast. Passengers-and-galaxy
- * §4.1: a passenger joins the cast placed aboard (no port) with where they are bound, so the
- * model keeps their name and purpose for the voyage and the port they end up at.
+ * §issuers-and-pitches: the people who made the captain an offer this call, for the cast.
+ * Passengers-and-galaxy §4.1: a passenger joins the cast placed aboard (no port) with where they
+ * are bound, so the model keeps their name and purpose for the voyage and the port they end up at.
  */
 function issuersMet(commands: readonly NarratorCommand[], content: ContentBundle): MetIssuer[] {
   return commands.flatMap((command): MetIssuer[] => {
@@ -291,7 +301,10 @@ function placeEndedPassengers(
   });
 }
 
-/** D32: every player-facing text this call produced, to tell which threads had a beat. */
+/**
+ * §threads-and-scales: every player-facing text this call produced, to tell which threads had a
+ * beat.
+ */
 function textsShown(translated: TranslationResult): string[] {
   const texts: string[] = [];
   const card = translated.card;
@@ -310,8 +323,8 @@ function textsShown(translated: TranslationResult): string[] {
 }
 
 /**
- * D45: a cast entry's `portId` is a plain string in the plan; empty, or a port that does not
- * exist, means nowhere in particular.
+ * §narrator-authority: a cast entry's `portId` is a plain string in the plan; empty, or a port that
+ * does not exist, means nowhere in particular.
  */
 function castWritten(written: WrittenNotes, content: ContentBundle) {
   return written.cast.map((entry) => ({
@@ -321,9 +334,9 @@ function castWritten(written: WrittenNotes, content: ContentBundle) {
 }
 
 /**
- * The notes after a call: the model's rewrite, plus everything the server carries for it (D25
- * cast sightings, D31 card history, D32 thread beats, D39 beat cards, D103 past arcs, and why
- * intents were dropped).
+ * The notes after a call: the model's rewrite, plus everything the server carries for it
+ * (§issuers-and-pitches cast sightings, §card-history card history, §threads-and-scales thread
+ * beats, §beat-cards beat cards, §past-arcs past arcs, and why intents were dropped).
  */
 function notesFrom(
   written: WrittenNotes,
@@ -362,7 +375,7 @@ function notesFrom(
       content,
     ),
     lastUpdatedTick: tick,
-    // D41: non-fatal corrections ride along with the drop reasons.
+    // §captain-never-speaks: non-fatal corrections ride along with the drop reasons.
     lastRejections: [
       ...dropped.map((d) => d.reason),
       ...translated.notes,
@@ -375,7 +388,10 @@ function notesFrom(
   });
 }
 
-/** D101: what the server did to the model's thread list, said back to it on the next call. */
+/**
+ * §thread-keeping-and-retirement: what the server did to the model's thread list, said back to it
+ * on the next call.
+ */
 function threadCorrections(merged: MergedThreads): string[] {
   return [
     ...merged.kept.map(
@@ -390,8 +406,8 @@ function threadCorrections(merged: MergedThreads): string[] {
 }
 
 /**
- * D97: the stored notes as the model would write them, so the notes stored with the plan (before
- * the notes turn) carry this call's server-kept changes over the model's previous notes.
+ * §notes-turn: the stored notes as the model would write them, so the notes stored with the plan
+ * (before the notes turn) carry this call's server-kept changes over the model's previous notes.
  */
 function writtenFrom(notes: NarratorNotes): WrittenNotes {
   return {
@@ -410,7 +426,7 @@ function writtenFrom(notes: NarratorNotes): WrittenNotes {
   };
 }
 
-/** D97: the notes turn's user message: what became of the plan, then the notes schema. */
+/** §notes-turn: the notes turn's user message: what became of the plan, then the notes schema. */
 function notesRequest(translated: TranslationResult, stored: NarratorNotes): string {
   const outcome =
     translated.dropped.length === 0
@@ -425,7 +441,7 @@ function notesRequest(translated: TranslationResult, stored: NarratorNotes): str
           `Your beat card foreshadows a new thread, "${beat}": write it into threads with that title.`,
         ]
       : [];
-  // D103: the thread this call's closing card ended needs its summary.
+  // §past-arcs: the thread this call's closing card ended needs its summary.
   const closed = translated.closedThread;
   const closedArc =
     closed === undefined
@@ -457,8 +473,8 @@ interface NotesTurnInputs {
 }
 
 /**
- * D97: the notes turn. The same system prefix as the plan (so it reads from the prompt cache),
- * the plan's user turn, the model's plan with its reasoning, then the request for notes.
+ * §notes-turn: the notes turn. The same system prefix as the plan (so it reads from the prompt
+ * cache), the plan's user turn, the model's plan with its reasoning, then the request for notes.
  */
 async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
   let rawContent: string | undefined;
@@ -502,7 +518,8 @@ async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
  * A snapshot from an older build (a client mid-deploy, a stored fixture) is upgraded with the
  * kernel's save migrations before anything reads it, so the digest and translator only ever see
  * the current state shape; its config gets any key it lacks from the loaded content, as `restore`
- * does (D76 renamed the day knobs within schema 7, so an older snapshot has the old names).
+ * does (the day knobs were renamed within schema 7, §the-ships-day, so an older snapshot has the
+ * old names).
  */
 function currentSnapshot(snapshot: SaveEnvelope, content: ContentBundle): SaveEnvelope {
   const config = fillConfig(snapshot.config, content.config).values;
@@ -523,7 +540,8 @@ export async function runNarratorWithTrace(
   const callId = ctx.callId ?? globalThis.crypto.randomUUID();
   const snapshot = currentSnapshot(req.snapshot, content);
   const stored = parseNotes(ctx.notes);
-  // D31: fold the kernel's decision events in before the digest, so the model sees what was chosen.
+  // §card-history: fold the kernel's decision events in before the digest, so the model sees what
+  // was chosen.
   const notes: NarratorNotes = {
     ...stored,
     cardsShown: applyDecisionEvents(stored.cardsShown, req.recentEvents, snapshot.state, content),
@@ -534,7 +552,8 @@ export async function runNarratorWithTrace(
   const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
   const reasoningEffort = ctx.reasoningEffort ?? DEFAULT_NARRATOR_REASONING_EFFORT;
   if (req.hook.kind === "stageDock") {
-    // D67: the staging call has its own prompt, schema and translator, over the same digest.
+    // §staging-call-on-the-server: the staging call has its own prompt, schema and translator, over
+    // the same digest.
     const staged = await runStaging({
       req,
       hook: req.hook,

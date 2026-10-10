@@ -136,7 +136,7 @@ function untilFired(test: Test, maxTicks = 500) {
 
 const debris: Payload = { kind: "debrisField", difficulty: 5, windowTicks: [0, 200] };
 
-describe("scheduleHazard (D78)", () => {
+describe("scheduleHazard (§debris-fields-and-ion-storms)", () => {
   it("needs a leg to lie on: a planned course or the ship under way", () => {
     const test = freightTestWorld();
     expect(codeOf(schedule(test, debris))).toBe("preconditionFailed");
@@ -199,7 +199,7 @@ describe("scheduleHazard (D78)", () => {
   });
 });
 
-describe("the piloting check (D78)", () => {
+describe("the piloting check (§hazard-roll)", () => {
   it("is an even chance at skill equal to difficulty, bounded to [0.05, 0.95]", () => {
     expect(cleanPassChance(5, 5)).toBe(0.5);
     expect(cleanPassChance(8, 5)).toBeCloseTo(0.8);
@@ -213,7 +213,7 @@ describe("the piloting check (D78)", () => {
   });
 });
 
-describe("hazardsSystem (D78)", () => {
+describe("hazardsSystem (§debris-fields-and-ion-storms)", () => {
   it("waits in port and through departure, and fires on the first tick of transit", () => {
     const test = freightTestWorld();
     planCourse(test);
@@ -382,7 +382,7 @@ describe("hazardsSystem (D78)", () => {
   });
 });
 
-describe("a hazard lies on its own leg only (D78)", () => {
+describe("a hazard lies on its own leg only (§debris-fields-and-ion-storms)", () => {
   it("is dropped the tick transit ends before it falls due, and never fires on a later leg", () => {
     const test = freightTestWorld();
     planCourse(test);
@@ -459,7 +459,7 @@ describe("a hazard lies on its own leg only (D78)", () => {
   });
 });
 
-describe("hazard invariants (D78)", () => {
+describe("hazard invariants (§debris-fields-and-ion-storms)", () => {
   it("flag an unknown kind, an off-scale difficulty, a fractional tick and one overdue in transit", () => {
     const test = freightTestWorld();
     inTransit(test);

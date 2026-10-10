@@ -6,7 +6,7 @@
  */
 import type { RenderFrame, RenderSession } from "@crew/sim";
 
-/** A session plate's longest text, a local's label's (D68). */
+/** A session plate's longest text, a local's label's (§person-labels). */
 export const SESSION_PLATE_CHARS = 34;
 
 /**

@@ -50,16 +50,17 @@ export function compartmentNameAt(
 }
 
 /**
- * Where someone is, as a phrase to append: " in Galley & Mess", " on the dock" (D61: dock floor is
- * in no compartment), "" on deck between rooms, " ashore at <port>" in a port store, or
- * " in <location kind>" anywhere else off the deck.
+ * Where someone is, as a phrase to append: " in Galley & Mess", " on the dock" (§dock-alongside:
+ * dock floor is in no compartment), "" on deck between rooms, " ashore at <port>" in a port store,
+ * or " in <location kind>" anywhere else off the deck.
  */
 export function placePhrase(
   content: ContentBundle,
   state: State,
   location: DeepReadonly<PhysicalLocation>,
 ): string {
-  // D63: a buyer out through the gate is in the port's market store for a few seconds.
+  // §dock-market-and-passengers: a buyer out through the gate is in the port's market store for a
+  // few seconds.
   if (location.kind === "inExternalStore")
     return ` ashore at ${portName(content, location.portId)}`;
   if (location.kind !== "onDeck") return ` in ${location.kind}`;
@@ -69,7 +70,7 @@ export function placePhrase(
 }
 
 /**
- * D95: the ship's deck: the one deck with tiles in state (the sim's `shipDeckId`, which hosts do
+ * The ship's deck: the one deck with tiles in state (the sim's `shipDeckId`, which hosts do
  * not import). A snapshot with none or several is broken, so it throws.
  */
 export function shipDeckOf(state: State): string {
@@ -81,7 +82,7 @@ export function shipDeckOf(state: State): string {
   return only;
 }
 
-/** D95: a compartment's name by its instance id (from its deck's def), or the id when unknown. */
+/** A compartment's name by its instance id (from its deck's def), or the id when unknown. */
 export function compartmentName(content: ContentBundle, state: State, id: string): string {
   const compartment = state.compartments[id as keyof State["compartments"]];
   if (compartment === undefined) return id;
@@ -89,7 +90,9 @@ export function compartmentName(content: ContentBundle, state: State, id: string
   return deck?.compartments.find((c) => c.key === compartment.key)?.name ?? id;
 }
 
-/** D94: a compartment as a sentence names it ("the cargo hold", "engineering"), or the id. */
+/**
+ * §naming-rooms: a compartment as a sentence names it ("the cargo hold", "engineering"), or the id.
+ */
 export function compartmentPhrase(content: ContentBundle, state: State, id: string): string {
   const compartment = state.compartments[id as keyof State["compartments"]];
   if (compartment === undefined) return id;
@@ -129,8 +132,8 @@ export function faultDiscovery(
 }
 
 /**
- * The port a job offer can originate from right now: the docked port. D70: offers are made in
- * person at the dock, so never in flight (D42's offer on approach is gone).
+ * The port a job offer can originate from right now: the docked port. §offer-lever: offers are made
+ * in person at the dock, so never in flight.
  */
 export function offerPortNow(state: State): PortDefId | undefined {
   const travel = state.travel;
@@ -172,8 +175,8 @@ export function portHereOrNext(state: State): PortDefId {
 }
 
 /**
- * D78: seconds of transit left on the current leg at nominal speed (a drift only lengthens it):
- * the whole leg before transit begins, zero once it is over. Zero while docked.
+ * §hazard-and-field-levers: seconds of transit left on the current leg at nominal speed (a drift
+ * only lengthens it): the whole leg before transit begins, zero once it is over. Zero while docked.
  */
 export function transitSecondsLeft(state: State, config: DeepReadonly<ConfigDef>): number {
   const travel = state.travel;
@@ -264,8 +267,9 @@ export function fareFor(
 
 /**
  * Passengers-and-galaxy §3.1: the one live passage, if the current job carries a person: a job
- * accepted or under way whose `passage` has not ended. D16 allows one job at a time, so at most
- * one exists; the first by offer tick wins if a fixture breaks that rule.
+ * accepted or under way whose `passage` has not ended. The one-job rule (§one-job-in-hand) allows
+ * one job at a time, so at most one exists; the first by offer tick wins if a fixture breaks that
+ * rule.
  */
 export function livePassage(state: State): DeepReadonly<Job> | undefined {
   const live = new Set(["accepted", "inTransit", "delivered"]);

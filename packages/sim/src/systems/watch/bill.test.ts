@@ -34,7 +34,7 @@ const NINE = [
 
 const piloting = new Map(NINE.map((d) => [d.id, d.skills.piloting ?? 0]));
 
-describe("generateWatchBill (D77)", () => {
+describe("generateWatchBill (§sections-and-dayworkers)", () => {
   it("gives nine crew three sections, each with a qualified stander, engineers spread, day roles on day hours", () => {
     const bill = generateWatchBill(NINE, 3, 3);
     expect(bill.sections.map((s) => s.key)).toEqual(["red", "white", "blue"]);

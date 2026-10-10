@@ -12,7 +12,7 @@ export interface NeedsEventPayloads {
   fellAsleep: Record<string, never>;
   wokeUp: Record<string, never>;
   /**
-   * Someone ate one unit. D81: `quality` is the served meal's (absent for food without a
+   * Someone ate one unit. §eating: `quality` is the served meal's (absent for food without a
    * `meal`); `ration` says it was that fallback.
    */
   ateMeal: { readonly nutrition: number; readonly quality?: MealQuality; readonly ration: boolean };

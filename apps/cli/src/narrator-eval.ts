@@ -81,7 +81,7 @@ export async function runNarratorEval(
     ...(transport === undefined ? {} : { transport }),
   });
   const { response, trace } = run;
-  // D97: the notes turn the server runs after the response.
+  // §notes-turn: the notes turn the server runs after the response.
   const notesRun = run.notesTurn === undefined ? undefined : await run.notesTurn();
   const notesTurn =
     notesRun === undefined

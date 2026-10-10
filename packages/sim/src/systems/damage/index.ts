@@ -1,6 +1,6 @@
 /**
- * Damage response (slice 5, D93, D94): what the crew do about the rocks. Register after
- * `registerCabins` (same phase); merge `damageTaskDerivations` into `registerWork`'s table.
+ * Damage response (slice 5, §machine-damage, §scouts): what the crew do about the rocks. Register
+ * after `registerCabins` (same phase); merge `damageTaskDerivations` into `registerWork`'s table.
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import { damageSystem } from "./damage";

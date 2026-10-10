@@ -1,8 +1,8 @@
 /**
  * D40: the null narrator is the only offline source of work. For `captainAshore` it answers with one
  * templated `offerJob` through the real translator; for other hooks it keeps its old behaviour
- * (no commands; a template card for a policy decision). D66: it stages nothing, so a dock is
- * the sim's floor set, and it never offers on the way in.
+ * (no commands; a template card for a policy decision). §staging-hook-and-the-hold: it stages
+ * nothing, so a dock is the sim's floor set, and it never offers on the way in.
  */
 import type { ActorId, ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
 import { describe, expect, it } from "vitest";
@@ -44,14 +44,14 @@ function offerOf(req: NarratorRequest) {
 }
 
 describe("null narrator offers work (D40)", () => {
-  it("answers stageDock with an empty plan and nothing else: the floor set alone (D66)", () => {
+  it("answers stageDock with an empty plan and nothing else: the floor set alone (§staging-hook-and-the-hold)", () => {
     const res = nullNarratorResponse(stageDockRequest(content()), { content: content() });
     expect(res.commands).toEqual([]);
     expect(res.card).toBeUndefined();
     expect(res.notesUpdate).toBeUndefined();
   });
 
-  it("offers nothing on the way in (D66: arrival is the staging call's)", () => {
+  it("offers nothing on the way in (§staging-hook-and-the-hold: arrival is the staging call's)", () => {
     const res = nullNarratorResponse(approachRequest(content()), { content: content() });
     expect(res.commands).toEqual([]);
   });
@@ -75,7 +75,7 @@ describe("null narrator offers work (D40)", () => {
     );
   });
 
-  it("gives the offer the D25 person and pitch shape from the name table, with no numbers", () => {
+  it("gives the offer an issuer person and a pitch from the name table, with no numbers (§issuers-and-pitches)", () => {
     const { command } = offerOf(captainAshoreRequest());
     const { job } = command.payload;
     const people = content().people;
@@ -193,7 +193,7 @@ describe("null narrator offers work (D40)", () => {
     ).toEqual([]);
   });
 
-  it("answers the call the narrator asked for with nothing, and asks for no call back (D99)", () => {
+  it("answers the call the narrator asked for with nothing, and asks for no call back (§requested-call-back)", () => {
     const res = nullNarratorResponse(requestedCallRequest(content()), {
       callId: "c",
       content: content(),

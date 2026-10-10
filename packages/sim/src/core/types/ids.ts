@@ -70,15 +70,21 @@ export type HookId = Brand<string, "HookId">;
 export type ClaimId = Brand<string, "ClaimId">;
 export type TransactionId = Brand<string, "TransactionId">;
 export type EventId = Brand<string, "EventId">;
-/** D66: a local on the dock alongside (`state.dockside.locals`): a presence, not a crew member. */
+/**
+ * §locals-table: a local on the dock alongside (`state.dockside.locals`): a presence, not a crew
+ * member.
+ */
 export type LocalId = Brand<string, "LocalId">;
-/** D78: a navigation hazard scheduled on the leg under way (`state.hazards`). */
+/**
+ * §debris-fields-and-ion-storms: a navigation hazard scheduled on the leg under way
+ * (`state.hazards`).
+ */
 export type HazardId = Brand<string, "HazardId">;
 /** Slice 4: a group recreation session (`state.social.sessions`). */
 export type SessionId = Brand<string, "SessionId">;
-/** D92: an asteroid field the narrator placed (`state.field`). */
+/** §the-asteroid-field: an asteroid field the narrator placed (`state.field`). */
 export type FieldId = Brand<string, "FieldId">;
-/** D93: one impact's mark on the hull (`state.hull.scars`). */
+/** §hull-scars-and-ship-loss: one impact's mark on the hull (`state.hull.scars`). */
 export type ScarId = Brand<string, "ScarId">;
 
 /**
@@ -100,13 +106,14 @@ export const ID_PREFIX = {
   claim: "l",
   transaction: "n",
   event: "e",
-  // D66: locals use `o` (onlooker); `l` is the claim lease.
+  // §locals-table: locals use `o` (onlooker); `l` is the claim lease.
   local: "o",
-  // D78: navigation hazards.
+  // §debris-fields-and-ion-storms: navigation hazards.
   hazard: "h",
   // Slice 4: group recreation sessions.
   session: "s",
-  // D92, D93: asteroid fields and hull scars (`r` for rent; `s` is the session).
+  // §the-asteroid-field, §hull-scars-and-ship-loss: asteroid fields and hull scars (`r` for rent;
+  // `s` is the session).
   field: "f",
   scar: "r",
 } as const;

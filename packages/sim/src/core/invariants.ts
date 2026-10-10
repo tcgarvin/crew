@@ -147,7 +147,7 @@ function itemViolations(state: ReadonlyWorldState): string[] {
     } else if (!(item.condition >= 0 && item.condition <= 1)) {
       out.push(`${where}.condition ${item.condition} is outside [0, 1]`);
     }
-    // D81: a served meal spoils on a whole tick and names its cook.
+    // §cooking-and-serving: a served meal spoils on a whole tick and names its cook.
     if (item.meal !== undefined) {
       if (!Number.isInteger(item.meal.spoilsAtTick)) {
         out.push(`${where}.meal.spoilsAtTick is ${item.meal.spoilsAtTick}`);
@@ -175,7 +175,7 @@ function itemViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
-/** D47: market stock is whole units at whole-credit prices, never negative. */
+/** §market-stock: market stock is whole units at whole-credit prices, never negative. */
 function marketViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
   for (const [portId, stock] of Object.entries(state.markets)) {
@@ -202,7 +202,7 @@ function actorViolations(state: ReadonlyWorldState): string[] {
     for (const [need, value] of Object.entries(actor.needs)) {
       if (!(value >= 0 && value <= 1)) out.push(`actors.${actor.id}.needs.${need} is ${value}`);
     }
-    // D79: a thought's value is a finite number and it expires on a whole tick.
+    // §thoughts: a thought's value is a finite number and it expires on a whole tick.
     actor.thoughts.forEach((thought, i) => {
       const where = `actors.${actor.id}.thoughts[${i}]`;
       if (!Number.isFinite(thought.value)) out.push(`${where}.value is ${thought.value}`);
@@ -211,11 +211,11 @@ function actorViolations(state: ReadonlyWorldState): string[] {
       }
     });
     out.push(...characterViolations(actor));
-    // D82: boots carry a share of dirt in [0, 1].
+    // §footfall-and-boots: boots carry a share of dirt in [0, 1].
     if (!(actor.boots >= 0 && actor.boots <= 1)) {
       out.push(`actors.${actor.id}.boots is ${actor.boots}`);
     }
-    // D77: a section has a key and a place in the bill.
+    // §sections-and-dayworkers: a section has a key and a place in the bill.
     const section = actor.schedule.section;
     if (
       section !== undefined &&
@@ -259,8 +259,8 @@ function characterViolations(
 
 /**
  * Slice 4: social state names actors that exist. Relationship rows and their entries are keyed by
- * actors, and every memory's expiry is a whole tick after the last (D88: the social system drops
- * them as they expire; keys and stack limits are config's, checked beside mood in
+ * actors, and every memory's expiry is a whole tick after the last (§memories: the social system
+ * drops them as they expire; keys and stack limits are config's, checked beside mood in
  * `systems/needs/invariants.ts`); every session's host and members are actors on deck, its
  * tick fields whole and `startedTick <= endsAtTick`; a private talk names two different actors.
  */
@@ -318,7 +318,7 @@ function socialViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
-/** D78: scheduled hazards carry allocated ids, once each. */
+/** §hazard-roll: scheduled hazards carry allocated ids, once each. */
 function hazardViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -338,9 +338,9 @@ function hazardViolations(state: ReadonlyWorldState): string[] {
 const HULL_EPSILON = 1e-9;
 
 /**
- * D93: the hull bar is `max` less every scar's damage left; a scar gives back no more than it
- * cost; scar ids are allocated and unique. (That a scar's tile is on the deck needs content: the
- * field system checks it.)
+ * §hull-scars-and-ship-loss: the hull bar is `max` less every scar's damage left; a scar gives back
+ * no more than it cost; scar ids are allocated and unique. (That a scar's tile is on the deck needs
+ * content: the field system checks it.)
  */
 function hullViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
@@ -377,7 +377,7 @@ function hullViolations(state: ReadonlyWorldState): string[] {
   return out;
 }
 
-/** D92: the field's id is allocated; the alert's reports name compartments. */
+/** §scheduling-a-field: the field's id is allocated; the alert's reports name compartments. */
 function fieldViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
   const field = state.field;
@@ -402,8 +402,8 @@ function fieldViolations(state: ReadonlyWorldState): string[] {
 }
 
 /**
- * D74: every berth belongs to an actor that exists, and no two actors share a bed. That each value
- * is a `bed` placement on the ship's deck needs content: `systems/needs` checks it.
+ * §berth-assignment: every berth belongs to an actor that exists, and no two actors share a bed.
+ * That each value is a `bed` placement on the ship's deck needs content: `systems/needs` checks it.
  */
 export function berthViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
@@ -418,9 +418,9 @@ export function berthViolations(state: ReadonlyWorldState): string[] {
 }
 
 /**
- * D82: every deck in `deck.tiles` has a dirt row of integers in [0, 255] (its length against the
- * deck def is `systems/dirt`'s check: core has no content); every tier is a room of some deck (a
- * key only, checked there too). D81: the helm meal names an actor and an item aboard.
+ * §dirt-grid: every deck in `deck.tiles` has a dirt row of integers in [0, 255] (its length against
+ * the deck def is `systems/dirt`'s check: core has no content); every tier is a room of some deck
+ * (a key only, checked there too). §helm-plate: the helm meal names an actor and an item aboard.
  */
 function dirtAndGalleyViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
@@ -486,7 +486,7 @@ function queueViolations(state: ReadonlyWorldState): string[] {
     if (record === undefined) out.push(`decisions.queue names missing decision ${id}`);
     else if (record.status !== "pending") out.push(`decisions.queue holds ${record.status} ${id}`);
   }
-  // D70: a held card is pending, held once, and never on the queue at the same time.
+  // §holding-a-card: a held card is pending, held once, and never on the queue at the same time.
   const held = new Set<string>();
   for (const card of state.decisions.held) {
     const id = card.decisionId;

@@ -1,8 +1,8 @@
 /**
- * The grime tint (D82, ship-life slice 3 call 14): a translucent square of one colour over each
- * floor tile's room fill, darker the dirtier the cell, so a path walked often shows as a darker
- * lane and a neglected room as a wash. Drawn from the latest `DirtFrame` playback has reached
- * (`host/dirtQueue.ts`), never from the run-ahead state.
+ * The grime tint (§dirt-grid, ship-life slice 3 call 14): a translucent square of one colour over
+ * each floor tile's room fill, darker the dirtier the cell, so a path walked often shows as a
+ * darker lane and a neglected room as a wash. Drawn from the latest `DirtFrame` playback has
+ * reached (`host/dirtQueue.ts`), never from the run-ahead state.
  */
 import type { ConfigDef, DirtFrame } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";

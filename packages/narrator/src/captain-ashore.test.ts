@@ -1,8 +1,8 @@
 /**
- * D70 on the narrator side: the `captainAshore` hook line, a card held to be delivered in person
- * (shown to the model as on its way, never as on screen, and counting as this call's card), the
- * null narrator still handing out work at the ask, and a held card that never came up leaving
- * "What the captain has seen".
+ * §captain-ashore-ask on the narrator side: the `captainAshore` hook line, a card held to be
+ * delivered in person (shown to the model as on its way, never as on screen, and counting as this
+ * call's card), the null narrator still handing out work at the ask, and a held card that never
+ * came up leaving "What the captain has seen".
  */
 import type { DecisionId, SaveEnvelope, SimEvent } from "@crew/sim";
 import { describe, expect, it } from "vitest";
@@ -68,7 +68,7 @@ function sectionOf(text: string, heading: string): string[] {
   return text.split(`## ${heading}\n`)[1]?.split("\n\n")[0]?.split("\n") ?? [];
 }
 
-describe("captainAshore on the narrator side (D70)", () => {
+describe("captainAshore on the narrator side (§captain-ashore-ask)", () => {
   it("says who walked ashore, where, and that nothing is on offer", () => {
     const req = captainAshoreRequest(content());
     const text = buildDigest(req.snapshot, [], EMPTY_NOTES, content()).text;

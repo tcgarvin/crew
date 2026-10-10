@@ -34,8 +34,8 @@ export interface DecisionOption {
   /** Binary tree: surface this decision next after applying the commands. */
   nextDecisionId?: DecisionId;
   /**
-   * D26 (additive, 2026-09-30): one line shown for a moment after this side is chosen, before
-   * the card closes, saying plainly what happens next. No numbers.
+   * §aftermath-caption (additive, 2026-09-30): one line shown for a moment after this side is
+   * chosen, before the card closes, saying plainly what happens next. No numbers.
    */
   aftermath?: TextRef;
 }
@@ -53,8 +53,8 @@ export interface Decision {
   status: DecisionStatus;
   createdTick: Tick;
   /**
-   * D70: the tick a card held for delivery in person came onto the queue (the meeting); the
-   * card is shown from then, not from `createdTick`. Absent for a card queued when created.
+   * §delivered-tick: the tick a card held for delivery in person came onto the queue (the meeting);
+   * the card is shown from then, not from `createdTick`. Absent for a card queued when created.
    */
   deliveredTick?: Tick;
   resolvedTick?: Tick;
@@ -62,15 +62,15 @@ export interface Decision {
   /** The job this decision is about, if any (job offers are decisions, review §D.6.7). */
   jobId?: JobId;
   /**
-   * D37: the `policyDecision` hook raised for a kernel-raised decision, set when it reached the
-   * head of the queue (`core/decisions.ts`). Absent on narrator cards and job offers, which
-   * carry their own prose.
+   * §policy-decision-hook: the `policyDecision` hook raised for a kernel-raised decision, set when
+   * it reached the head of the queue (`core/decisions.ts`). Absent on narrator cards and job
+   * offers, which carry their own prose.
    */
   narratorHookId?: HookId;
 }
 
 /**
- * D70 (replaces D42's `Job.surfaceWhenDocked`): a card from one of the port's people, waiting to
+ * §holding-a-card: a card from one of the port's people, waiting to
  * be delivered in person. Its decision record exists (status `pending`) but it is not in the
  * queue, so nothing halts until the meeting puts it there (`core/delivery.ts` `deliverHeldCard`).
  */
@@ -90,11 +90,11 @@ export interface HeldCard {
 }
 
 /**
- * D70: a held card's meeting, under way. `via` is who walks so that the speaker and the captain
- * meet. `captain`: the command actor goes to them (across the dock to a local, or out through the
- * gate to someone in the port beyond it), as they do when ashore looking for work. `speaker`:
- * they come to the foot of the personnel ramp (a local on the dock walks over; anyone else walks
- * in from the gate).
+ * §meetings-and-visitors: a held card's meeting, under way. `via` is who walks so that the speaker
+ * and the captain meet. `captain`: the command actor goes to them (across the dock to a local, or
+ * out through the gate to someone in the port beyond it), as they do when ashore looking for work.
+ * `speaker`: they come to the foot of the personnel ramp (a local on the dock walks over; anyone
+ * else walks in from the gate).
  */
 export type CardDelivery =
   | {
@@ -118,8 +118,8 @@ export interface DecisionsState {
    */
   queue: DecisionId[];
   /**
-   * D70: cards waiting to be delivered in person, oldest first. Never in `queue` at the same
-   * time; delivered (moved onto the queue) when the captain and the speaker meet, or after
+   * §holding-a-card: cards waiting to be delivered in person, oldest first. Never in `queue` at the
+   * same time; delivered (moved onto the queue) when the captain and the speaker meet, or after
    * `travel.cardDeliveryGiveUpSeconds`.
    */
   held: HeldCard[];
@@ -132,16 +132,16 @@ export interface DecisionsState {
 /** Per-kind context the kernel attaches so the narrator digest knows why it was called. */
 export interface HookContexts {
   /**
-   * D66 (replaces `approachingPort`): the staging call, raised `narrator.approachHookLeadSeconds`
-   * before transit ends at a port with a dock map, and guaranteed: travel holds at the end of the
-   * route until it is acknowledged. Its only story-free answer is one `stageDock` command
-   * (`STAGING_COMMAND_KINDS`); the kernel rejects every other narrator command while it is
-   * pending. `floorSet` is who the sim will place on its own (`core/floor-set.ts`), as it stands
-   * at the raise tick.
+   * §staging-hook-and-the-hold: the staging call, raised
+   * `narrator.approachHookLeadSeconds` before transit ends at a port with a dock map, and
+   * guaranteed: travel holds at the end of the route until it is acknowledged. Its only story-free
+   * answer is one `stageDock` command (`STAGING_COMMAND_KINDS`); the kernel rejects every other
+   * narrator command while it is pending. `floorSet` is who the sim will place on its own
+   * (`core/floor-set.ts`), as it stands at the raise tick.
    */
   stageDock: { portId: PortDefId; dockId: DockDefId; floorSet: FloorSetEntry[] };
   /**
-   * D70 (replaces `jobBoard`): the captain (or the command actor, D8) walked down the ramp
+   * §looking-for-work: the captain (or the command actor, D8) walked down the ramp
    * looking for work and stepped onto the dock this tick. Raised once per docking
    * (`NarratorState.captainAshoreLastAsk`).
    */
@@ -150,10 +150,10 @@ export interface HookContexts {
   notableEvent: { eventIds: EventId[] };
   policyDecision: { decisionId: DecisionId; machineId?: MachineId };
   /**
-   * D99: the call the narrator asked for (`NarratorState.callBack`), now due: the tick the ship
-   * cast off (`departure`) or halfway through a transit (`midLeg`). `why` is its own private line,
-   * read back to it; `requestedTick` is when it asked. A `nextPort` request raises nothing: it
-   * is served by the first story hook docked elsewhere.
+   * §requested-call-back: the call the narrator asked for (`NarratorState.callBack`), now due: the
+   * tick the ship cast off (`departure`) or halfway through a transit (`midLeg`). `why` is its own
+   * private line, read back to it; `requestedTick` is when it asked. A `nextPort` request raises
+   * nothing: it is served by the first story hook docked elsewhere.
    */
   requestedCall: { when: "departure" | "midLeg"; why: string; requestedTick: Tick };
 }
@@ -174,17 +174,20 @@ interface NarratorHookBase<K extends NarratorHookKind> {
  */
 export type NarratorHook = { [K in NarratorHookKind]: NarratorHookBase<K> }[NarratorHookKind];
 
-/** D99: when the narrator wants its next call. `nextPort` is the default and raises nothing. */
+/**
+ * §requested-call-back: when the narrator wants its next call. `nextPort` is the default and raises
+ * nothing.
+ */
 export const CALL_BACK_WHEN = ["nextPort", "departure", "midLeg"] as const;
 export type CallBackWhen = (typeof CALL_BACK_WHEN)[number];
 
-/** D99: the longest private `why` a call-back request may carry. */
+/** §requested-call-back: the longest private `why` a call-back request may carry. */
 export const CALL_BACK_WHY_MAX = 200;
 
 /**
- * D99: the narrator's standing request for its next call (the `requestCall` command). One at a
- * time; every story call's plan replaces it. It is deleted when the hook that served it is
- * acknowledged; a request that never comes due stands until the next one replaces it.
+ * §requested-call-back: the narrator's standing request for its next call (the `requestCall`
+ * command). One at a time; every story call's plan replaces it. It is deleted when the hook that
+ * served it is acknowledged; a request that never comes due stands until the next one replaces it.
  */
 export interface CallBackRequest {
   when: CallBackWhen;
@@ -222,20 +225,22 @@ export interface NarratorState {
    * `config.narrator.budgetRefillDays`, `core/pipeline.ts`).
    */
   budget: { spawnsRemaining: number; faultsRemaining: number; hazardsRemaining: number };
-  /** D78: the tick the budget was last refilled (world creation counts as one). */
+  /**
+   * §narrator-lever-budgets: the tick the budget was last refilled (world creation counts as one).
+   */
   budgetRefilledTick: Tick;
   /** Resolved hooks, most recent last, trimmed to a small tail (for the digest). */
   recentHookIds: HookId[];
   /**
    * The most recent `narrative`-significance event committed (phase 8, `core/pipeline.ts`),
-   * preferring within one tick an event whose type is in `config.narrator.hookOnEvents` (D100: or
-   * a hookable aftermath event, which may be of `notable` significance). Travel
-   * raises the `notableEvent` hook from it the following tick (events are stamped after the
+   * preferring within one tick an event whose type is in `config.narrator.hookOnEvents`
+   * (or a hookable aftermath event, which may be of `notable` significance; §notable-event-hook).
+   * Travel raises the `notableEvent` hook from it the following tick (events are stamped after the
    * systems run, so a hook cannot be raised in the same tick), by way of `pendingNotable`.
    */
   lastNarrativeEvent?: { tick: Tick; type: string; eventId?: EventId };
   /**
-   * D69: the latest hookable event (type in `config.narrator.hookOnEvents`, or D100's
+   * §notable-event-hook: the latest hookable event (type in `config.narrator.hookOnEvents`, or
    * `aftermathHookOnEvents` that passes its filter) still owed a
    * `notableEvent` hook. Set when it is committed (phase 8); travel raises the hook from it the
    * first tick no other hook is pending, so a staging call raised the tick after the event no
@@ -247,11 +252,11 @@ export interface NarratorState {
    * The `captainAshore` ask of the current docking (port, tick, and who walked ashore), so the
    * narrator is asked once per docking; cleared the moment travel leaves `docked`, so the next
    * docking at any port asks again. D46 briefly re-asked on a timer; the owner withdrew that
-   * (D46 amendment): pacing is the narrator's judgement, not a timer's. D70 renamed it from
-   * `jobBoardLastAsk` (same lifetime) and added `actorId`: whoever went ashore meets the people
-   * the answer names, for the rest of the docking, even if the command perspective (D8) moves.
+   * (D46 amendment): pacing is the narrator's judgement, not a timer's. `actorId` is whoever went
+   * ashore: they meet the people the answer names, for the rest of the docking, even if the
+   * command perspective (D8) moves.
    */
   captainAshoreLastAsk?: { portId: PortDefId; tick: Tick; actorId: ActorId };
-  /** D99: the narrator's standing call-back request; absent when none stands. */
+  /** §requested-call-back: the narrator's standing call-back request; absent when none stands. */
   callBack?: CallBackRequest;
 }

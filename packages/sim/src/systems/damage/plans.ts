@@ -1,5 +1,6 @@
 /**
- * Plans for damage work (D93, D94), built from what the actor believes about where things are:
+ * Plans for damage work (§machine-damage, §scouts), built from what the actor believes about where
+ * things are:
  *
  * - `repairDamagePlan`: the welder (in hand already, or the nearest one they know of) → the
  *   machine's `repair` position (any position on a machine with none, else a tile of the task) →

@@ -3,9 +3,9 @@
  *
  * `NarratorHook` halts `advance()` (see `world.ts` `haltReason`); only one hook may be pending
  * at a time, so every call here is a no-op while one already is. `raiseHookIfIdle` itself lives
- * in `core/hooks.ts` (D37).
+ * in `core/hooks.ts` (§policy-decision-hook).
  *
- * D70: the `captainAshore` ask (which replaced `jobBoard`) is raised by commerce when the captain
+ * §captain-ashore-ask: the `captainAshore` ask is raised by commerce when the captain
  * steps onto the dock looking for work (`systems/commerce/captain-ashore.ts`); whether there is
  * anything to look for is `captainIsIdleAt`, here.
  */
@@ -22,8 +22,8 @@ function somebodyDisembarking(ctx: Pick<StepCtx, "state">): boolean {
 /**
  * Whether the captain has nothing on at `portId`: no offer open here, no job in hand anywhere
  * (`jobInHand`), no passenger walking off, no job decision queued, no card waiting to be delivered
- * in person (D70), no course planned, no voyage under way, and no offer here declined or expired
- * within `config.commerce.reofferDays`.
+ * in person (§offers-in-person), no course planned, no voyage under way, and no offer here declined
+ * or expired within `config.commerce.reofferDays`.
  */
 export function captainIsIdleAt(
   ctx: Pick<StepCtx, "state" | "config" | "tick">,

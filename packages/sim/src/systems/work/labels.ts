@@ -4,24 +4,26 @@
  * `activity.label`; `core/render.ts` shows it verbatim.
  *
  * Vocabulary: "idle", "walking", "walking to <place>", "going ashore", "walking on the dock",
- * "coming aboard" (D61), "picking up <item>", "hauling <item>",
- * "stowing <item>", "buying <item>" (D47), "ashore buying <item>" (D63), "fetching the hand truck",
- * "loading <item>", "hauling <n> crates", "unloading <item>", "returning the hand truck",
- * "parking the hand truck" (D65), "eating", "asleep", "asleep in the <cabin>" (D74), "resting",
- * "chatting", "inspecting <machine>", "servicing <machine>", "fixing <machine>", "at the helm", "manning <machine>",
- * the watch (D77): "going to the helm", "relieving <name> at the helm" (or "taking the helm"),
- * "leaving the helm" (the step off the seat), "on the gangway", "doing rounds", and "plotting a course to <port>" (D78); and the captain
- * ashore (D70, `shoreLabel`): "going ashore to look for work", "looking for work", "looking round
- * the dock", "going to see <name>", "talking with <name>", "ashore to see <name>"; the galley
- * (D81): "fetching provisions", "cooking", "serving dinner", "taking a plate to the helm", "at the
- * helm, eating"; dirt (D82): "fetching the mop", "mopping <room>", "putting the mop away"; off watch
- * (slice 4, `recreationLabel`): the activity's `label` while playing ("playing cards"), its
+ * "coming aboard" (§calling-the-crew-aboard), "picking up <item>", "hauling <item>",
+ * "stowing <item>", "buying <item>" (§buying-parts), "ashore buying <item>" (§buying-parts),
+ * "fetching the hand truck", "loading <item>", "hauling <n> crates", "unloading <item>", "returning
+ * the hand truck", "parking the hand truck" (§hand-truck-trips), "eating", "asleep", "asleep in the
+ * <cabin>" (§sleeping-places), "resting", "chatting", "inspecting <machine>", "servicing
+ * <machine>", "fixing <machine>", "at the helm", "manning <machine>", the watch
+ * (§who-has-the-helm): "going to the helm", "relieving <name> at the helm" (or "taking the helm"),
+ * "leaving the helm" (the step off the seat), "on the gangway", "doing rounds", and "plotting a
+ * course to <port>" (§course-plotting); and the captain ashore (§looking-for-work, `shoreLabel`):
+ * "going ashore to look for work", "looking for work", "looking round the dock", "going to see
+ * <name>", "talking with <name>", "ashore to see <name>"; the galley (§cooking-and-serving):
+ * "fetching provisions", "cooking", "serving dinner", "taking a plate to the helm", "at the helm,
+ * eating"; dirt (§mop-trips): "fetching the mop", "mopping <room>", "putting the mop away"; off
+ * watch (slice 4, `recreationLabel`): the activity's `label` while playing ("playing cards"), its
  * `waitingLabel` while the session gathers, its `solo.label` after a collapse ("playing
  * solitaire"), "fetching the harmonica" / "fetching a book", "putting the harmonica away" /
  * "putting the book back"; a word in the cabin (`talkLabel`): "going to the captain's cabin" (or
- * "the first officer's cabin"), "having a word with <name>", "having a word with the captain". Names are
- * lower-cased content names; `<place>` is the destination compartment's name, or the machine's
- * name when the machine is in the actor's own compartment.
+ * "the first officer's cabin"), "having a word with <name>", "having a word with the captain".
+ * Names are lower-cased content names; `<place>` is the destination compartment's name, or the
+ * machine's name when the machine is in the actor's own compartment.
  */
 import { roomPhrase } from "../../core/rooms";
 import type { Actor } from "../../core/types/actor";
@@ -65,7 +67,7 @@ export function machineName(ctx: LabelCtx, machineId: MachineId): string {
   );
 }
 
-/** D94: the room as a sentence names it ("the galley", "engineering"). */
+/** §naming-rooms: the room as a sentence names it ("the galley", "engineering"). */
 function compartmentName(ctx: LabelCtx, compartmentId: CompartmentId): string {
   const compartment = ctx.state.compartments[compartmentId];
   if (compartment === undefined) return "somewhere";
@@ -94,7 +96,8 @@ function placeLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>, target: StepTarge
   if (location.kind !== "onDeck" || tile === undefined) return "walking";
   const geometry = ctx.caches.nav.decks[location.deckId];
   if (geometry === undefined) return "walking";
-  // D61: dock floor is in no compartment; say which way across the ramp the walk goes.
+  // §living-on-the-dock: dock floor is in no compartment; say which way across the ramp the walk
+  // goes.
   const toDock = isDockTile(geometry, tile.x, tile.y);
   const onDock = isDockTile(geometry, location.x, location.y);
   if (toDock) return onDock ? "walking on the dock" : "going ashore";
@@ -123,7 +126,7 @@ const RECIPE_VERB: Readonly<Record<string, string>> = {
   repair: "fixing",
 };
 
-/** D81: is the actor carrying a served meal (a `meal`-tagged item)? */
+/** §cooking-and-serving: is the actor carrying a served meal (a `meal`-tagged item)? */
 function carryingMeal(ctx: LabelCtx, actor: DeepReadonly<Actor>): boolean {
   return Object.values(ctx.state.items).some(
     (item) =>
@@ -133,14 +136,14 @@ function carryingMeal(ctx: LabelCtx, actor: DeepReadonly<Actor>): boolean {
   );
 }
 
-/** D82: "mopping the galley", from the task's room. */
+/** §mop-trips: "mopping the galley", from the task's room. */
 function mopLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
   if (task?.target.kind !== "compartment") return "mopping";
   return `mopping ${compartmentName(ctx, task.target.compartmentId)}`;
 }
 
 /**
- * D82: a mopper's step between tiles of the room they are mopping reads as mopping it, not
+ * §mop-trips: a mopper's step between tiles of the room they are mopping reads as mopping it, not
  * "walking to the cargo hold" from inside the hold.
  */
 function mopWalkWithin(
@@ -169,14 +172,20 @@ function isHelmTask(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): boolea
   return tags.includes("pilotStation");
 }
 
-/** D77: the handover step: "relieving Noor Haddad at the helm", or "taking the helm" if empty. */
+/**
+ * §handover: the handover step: "relieving Noor Haddad at the helm", or "taking the helm" if
+ * empty.
+ */
 function handoverLabel(ctx: LabelCtx): string {
   const holder = whoHasTheHelm(ctx.state, ctx.content);
   const name = holder === undefined ? undefined : ctx.state.actors[holder]?.name;
   return name === undefined ? "taking the helm" : `relieving ${name} at the helm`;
 }
 
-/** D78: "plotting a course to Kessler Drift", from the task's `courseToPlot` problem. */
+/**
+ * §course-plotting: "plotting a course to Kessler Drift", from the task's `courseToPlot`
+ * problem.
+ */
 function plotLabel(ctx: LabelCtx, task: DeepReadonly<Task> | undefined): string {
   const problem = task === undefined ? undefined : ctx.state.work.problems[task.problemId];
   if (problem?.kind !== "courseToPlot") return "plotting a course";
@@ -199,11 +208,11 @@ function taskStepLabel(
       ? `stowing ${itemName(ctx, task.target.itemId)}`
       : `hauling ${itemName(ctx, task.target.itemId)}`;
   }
-  // D81: a plate on its way up to the helm.
+  // §cooking-and-serving: a plate on its way up to the helm.
   if (task?.type === "carryMeal" && step.kind === "moveTo" && carryingMeal(ctx, actor)) {
     return "taking a plate to the helm";
   }
-  // D93, D94: damage work says what it is doing (`systems/damage/labels.ts`).
+  // §machine-damage, §scouts: damage work says what it is doing (`systems/damage/labels.ts`).
   if (
     task?.type === "repairDamage" ||
     task?.type === "patchHull" ||
@@ -254,7 +263,7 @@ function taskStepLabel(
       const machine = ctx.state.machines[task.target.machineId];
       const tags = machine === undefined ? [] : (ctx.content.machines[machine.defId]?.tags ?? []);
       if (tags.includes("pilotStation")) {
-        // D81: the stander's plate, eaten in the seat (`galley.helmMeal`).
+        // §cooking-and-serving: the stander's plate, eaten in the seat (`galley.helmMeal`).
         return ctx.state.galley.helmMeal?.actorId === actor.id
           ? "at the helm, eating"
           : "at the helm";
@@ -417,8 +426,9 @@ function talkLabel(
 }
 
 /**
- * D74: "asleep in the captain's cabin" when the bed is in a `cabin`-tagged compartment, else
- * "asleep". Content gives people no pronouns, so the cabin is named rather than "her cabin".
+ * §sleeping-places: "asleep in the captain's cabin" when the bed is in a `cabin`-tagged
+ * compartment, else "asleep". Content gives people no pronouns, so the cabin is named rather than
+ * "her cabin".
  */
 function sleepLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   const location = actor.location;
@@ -436,8 +446,8 @@ function sleepLabel(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
 }
 
 /**
- * D65: a hand-truck trip's walks say what is on the truck: fetching it, pushing a load, or taking
- * it back aboard empty; its other steps are labelled as any task's.
+ * §hand-truck-trips: a hand-truck trip's walks say what is on the truck: fetching it, pushing a
+ * load, or taking it back aboard empty; its other steps are labelled as any task's.
  */
 function truckWalkLabel(
   ctx: LabelCtx,
@@ -470,7 +480,7 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
       return truckWalkLabel(ctx, actor, haul.truckId, rest, step.target);
     }
     const task = ctx.state.work.tasks[activity.taskId];
-    // D77: the step off the seat once relieved (no hold left in the plan).
+    // §handover: the step off the seat once relieved (no hold left in the plan).
     const rest = activity.plan?.steps.slice(activity.plan.stepIndex) ?? [];
     if (step.kind === "moveTo" && isHelmTask(ctx, task) && !rest.some((s) => s.kind === "hold")) {
       return "leaving the helm";
@@ -480,7 +490,7 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   if (activity.activity === "lookForWork" || activity.activity === "meetSpeaker") {
     return shoreLabel(ctx, actor, activity.plan?.steps.slice(activity.plan.stepIndex) ?? [], step);
   }
-  // D77: a round reads as one activity, its walks between stops included.
+  // §gangway-watch-and-rounds: a round reads as one activity, its walks between stops included.
   if (activity.activity === "rounds") return "doing rounds";
   if (activity.activity === "recreate") {
     return recreationLabel(
@@ -491,7 +501,7 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
     );
   }
   if (activity.activity === "privateTalk") return talkLabel(ctx, actor, step);
-  // D94: the walk to the panel and the report read as one activity.
+  // §reporting-damage: the walk to the panel and the report read as one activity.
   if (activity.activity === "report") return reportLabel(ctx, actor, step);
   return personalStepLabel(ctx, actor, step);
 }
@@ -503,9 +513,9 @@ function meetingWith(rest: readonly DeepReadonly<ActivityStep>[]): string | unde
 }
 
 /**
- * D70: the captain ashore. "going ashore to look for work", "looking for work" (on the dock,
- * waiting for word), "looking round the dock", "going to see Fenwick Adair", "talking with
- * Fenwick Adair", "ashore to see Fenwick Adair" (through the gate), "looking round the port";
+ * §looking-for-work: the captain ashore. "going ashore to look for work", "looking for work" (on
+ * the dock, waiting for word), "looking round the dock", "going to see Fenwick Adair", "talking
+ * with Fenwick Adair", "ashore to see Fenwick Adair" (through the gate), "looking round the port";
  * the walk back aboard is "coming aboard".
  */
 function shoreLabel(

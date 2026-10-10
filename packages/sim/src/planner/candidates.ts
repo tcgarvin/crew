@@ -14,36 +14,42 @@ import {
  * - symptom inspection and fault work escalate from the actor's *known* machine temperature
  *   (`machineStatus` fact): ≥ `heatSurvivalAbove` → immediateSurvival, ≥ `heatContainmentAbove`
  *   → containment;
- * - `stationToStaff` → essentialOperation (D77: who may take the helm is `helm.ts`'s);
- * - `courseToPlot` (D78) → essentialOperation;
- * - `partsNeeded` (D47) → the owner's base urgency (the repair it unblocks);
- * - `reserveLow` (D80) → the owner's base urgency (routine: restocking, nothing broken);
- * - `mealToCook`, `mealToCarry` (D81) → routineObligation (who may take them is `galley.ts`'s);
- * - `compartmentDirty` (D82) → the owner's base urgency (routine, essential for a filthy galley or
- *   infirmary; who may take it is `cleaning.ts`'s);
+ * - `stationToStaff` → essentialOperation (§who-has-the-helm: who may take the helm is
+ *   `helm.ts`'s);
+ * - `courseToPlot` (§course-plotting) → essentialOperation;
+ * - `partsNeeded` (§parts-and-tools-needed) → the owner's base urgency (the repair it unblocks);
+ * - `reserveLow` (§reserve-low-problem) → the owner's base urgency (routine: restocking, nothing
+ *   broken);
+ * - `mealToCook`, `mealToCarry` (§meal-problem) → routineObligation (who may take them is
+ *   `galley.ts`'s);
+ * - `compartmentDirty` (§room-cleaning-problem) → the owner's base urgency (routine, essential for
+ *   a filthy galley or infirmary; who may take it is `cleaning.ts`'s);
  * - `cargoToLoad`/`cargoToUnload` and symptom inspection (`machineSymptom`) → routineObligation;
- * - `maintenanceDue` (D90) → the owner's base urgency (routine, essential once badly worn);
- * - `machineDamaged`, `hullScar`, `hullDamaged`, `compartmentToCheck` (D93, D94) → the owner's
- *   base urgency (damage raises them essential on alert; who may take them is `alert.ts`'s);
- * - the reporting reflex (D94, `intercom.ts`) → containment, on alert only; the officer of the
- *   watch's bridge hold (`alert.ts`) → essentialOperation;
+ * - `maintenanceDue` (§maintenance-due) → the owner's base urgency (routine, essential once badly
+ *   worn);
+ * - `machineDamaged`, `hullScar`, `hullDamaged`, `compartmentToCheck` (§hull-scars-and-ship-loss,
+ *   §scouts) → the owner's base urgency (damage raises them essential on alert; who may take them
+ * is `alert.ts`'s);
+ * - the reporting reflex (§reporting-damage, `intercom.ts`) → containment, on alert only; the
+ *   officer of the watch's bridge hold (`alert.ts`) → essentialOperation;
  * - personal needs: above `seekThreshold` → routineObligation, above `needEssentialAbove` →
  *   essentialOperation, above `needSurvivalAbove` → immediateSurvival;
  * - rest/socialize → the need's urgency as above, `voluntaryActivity` below the seek threshold
- *   (D84 tuning: a social or comfort need past the threshold is routine, so it ranks with a game
- *   off watch instead of always losing to it, and nobody comes on watch starved for company; the
- *   hold then ends when the need is met, `systems/work/steps.ts`);
+ *   (§choosing-recreation: a social or comfort need past the threshold is routine, so it ranks with
+ *   a game off watch instead of always losing to it, and nobody comes on watch starved for
+ *   company; the hold then ends when the need is met, `systems/work/steps.ts`);
  * - recreation (slice 4, `recreation.ts`) → routineObligation or voluntaryActivity off duty,
  *   voluntaryActivity on duty;
  * - a `privateTalk` summons (slice 4, `cabins.ts`) → essentialOperation.
  *
- * - on duty with nothing else to do (D77: `rounds.ts`, the post until rounds land) →
- *   voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
+ * - on duty with nothing else to do (§gangway-watch-and-rounds: `rounds.ts`, the post until
+ *   rounds land) → voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
  *
- * Duty (D77, the watch bill): off duty, routine and essential tasks are not candidates
- * (emergencies, containment and above, ignore duty, SD §11.4), except cargo in port, which is all
- * hands awake. Off-duty actors rest or socialize when nothing else applies; on-duty actors only
- * socialize/rest when the need is actually high. Routine sleep is taken in one's sleep watch.
+ * Duty (§duty-and-the-sleep-watch, the watch bill): off duty, routine and essential tasks are not
+ * candidates (emergencies, containment and above, ignore duty, SD §11.4), except cargo in port,
+ * which is all hands awake. Off-duty actors rest or socialize when nothing else applies; on-duty
+ * actors only socialize/rest when the need is actually high. Routine sleep is taken in one's sleep
+ * watch.
  */
 import type { DeepReadonly, TileCoord } from "../core/types/common";
 import type { MachineTag, ToolKind } from "../core/types/content";
@@ -177,27 +183,29 @@ export function taskUrgency(
       return higher(base, heatUrgency(view, machineId, config));
     }
     case "maintenanceDue":
-      // D90: routine, essential once the machine is badly worn; equipment says which.
+      // §maintenance-due: routine, essential once the machine is badly worn; equipment says which.
       return problem.baseUrgency;
     case "cargoToLoad":
     case "cargoToUnload":
       return "routineObligation";
     case "stationToStaff":
-      // D77: the watch post is essential and the relief post routine; the watch says which.
+      // §relief: the watch post is essential and the relief post routine; the watch says which.
       return problem.baseUrgency;
     case "courseToPlot":
       return "essentialOperation";
     case "partsNeeded":
-      // D47: the part gates a repair the owner already rated; buying it is as pressing as fixing.
+      // §parts-and-tools-needed: the part gates a repair the owner already rated; buying it is as
+      // pressing as fixing.
       return problem.baseUrgency;
     case "reserveLow":
       return problem.baseUrgency;
     case "mealToCook":
     case "mealToCarry":
-      // D81: a meal is routine; the call threshold decides who comes, not the class.
+      // §mess-call: a meal is routine; the call threshold decides who comes, not the class.
       return "routineObligation";
     case "compartmentDirty":
-      // D82: routine, essential while a galley or infirmary is filthy; dirt says which.
+      // §room-cleaning-problem: routine, essential while a galley or infirmary is filthy; dirt says
+      // which.
       return problem.baseUrgency;
     case "machineDamaged":
       // Slice-5 integration: impact damage to a critical machine is as pressing as a fault there
@@ -206,7 +214,7 @@ export function taskUrgency(
     case "hullScar":
     case "hullDamaged":
     case "compartmentToCheck":
-      // D93, D94: essential on alert, routine after; damage says which.
+      // §urgency-of-damage-work: essential on alert, routine after; damage says which.
       return problem.baseUrgency;
   }
 }
@@ -335,18 +343,20 @@ function taskCandidate(
   for (const need of task.requiredSkills) {
     if ((view.self.skills[need.skill] ?? 0) < need.min) return reject("insufficientCompetency");
   }
-  // D77: the helm's posts and the course plot are the watch's to hand out (`helm.ts`), which
-  // also decides whether they skip deference and the off-duty rule.
+  // §who-has-the-helm: the helm's posts and the course plot are the watch's to hand out
+  // (`helm.ts`), which also decides whether they skip deference and the off-duty rule.
   const helm = isHelmTask(task);
   if (helm && !helmTaskAllowed(view, task)) return reject("notMyHelm");
-  // D81, D82: the galley's and the dirt's tasks have their own rules (`galley.ts`, `cleaning.ts`).
+  // §mess-call, §who-mops: the galley's and the dirt's tasks have their own rules (`galley.ts`,
+  // `cleaning.ts`).
   if (isGalleyTask(task) && !galleyTaskAllowed(view, config, task, problem)) {
     return reject("notMyMeal");
   }
   if (isCleaningTask(task) && !cleanTaskAllowed(view, config, task, problem)) {
     return reject("notMyRoom");
   }
-  // D93, D94: damage work has its own rules (`alert.ts`): the bridge sends scouts, never goes.
+  // §urgency-of-damage-work: damage work has its own rules (`alert.ts`): the bridge sends scouts,
+  // never goes.
   if (isDamageTask(task) && !damageTaskAllowed(view, config, task, problem)) {
     return reject("notMyDamage");
   }
@@ -354,8 +364,9 @@ function taskCandidate(
   const betterQualified = exempt ? undefined : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
-  // D77 addendum: cargo in port is all hands awake, not the watch's: nobody off duty is turned
-  // away from a crate (the sleeping sleep on, since the hold is not interrupted for routine work).
+  // §duty-and-the-sleep-watch: cargo in port is all hands awake, not the watch's: nobody
+  // off duty is turned away from a crate (the sleeping sleep on, since the hold is not interrupted
+  // for routine work).
   const allHands = problem.kind === "cargoToLoad" || problem.kind === "cargoToUnload";
   if (
     !exempt &&
@@ -405,24 +416,24 @@ const betterBed = (a: BedChoice, b: BedChoice | undefined): boolean =>
   (a.own !== b.own ? a.own : a.quarters !== b.quarters ? a.quarters : a.ticks < b.ticks);
 
 /**
- * D74: sleep in one's own berth (`self.berth`) unless it is believed occupied, unreachable or
- * backing off; otherwise in the unassigned pool, a quarters bunk before a nearer bed elsewhere.
- * A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is for
- * patients).
+ * §sleeping-places: sleep in one's own berth (`self.berth`) unless it is believed occupied,
+ * unreachable or backing off; otherwise in the unassigned pool, a quarters bunk before a nearer bed
+ * elsewhere. A bed assigned to someone else is never chosen, nor a `medBed` (the infirmary bed is
+ * for patients).
  *
- * D77 (addendum): routine tiredness is slept off in one's sleep watch, the watch after one's own
- * (`watch.sleepWatch`), and there anyone past bedtime (fatigue above `needs.bedtimeAbove`) turns
- * in, so a sleep a day sits in the same window every day ("Priya sleeps after her watch") instead
- * of drifting with the fatigue rate. Outside it only pressing fatigue sends them, through relief
- * at the helm.
+ * §sleep-timing: routine tiredness is slept off in one's sleep watch, the watch after
+ * one's own (`watch.sleepWatch`), and there anyone past bedtime (fatigue above
+ * `needs.bedtimeAbove`) turns in, so a sleep a day sits in the same window every day ("Priya sleeps
+ * after her watch") instead of drifting with the fatigue rate. Outside it only pressing fatigue
+ * sends them, through relief at the helm.
  */
 function sleepCandidate(view: AgentView, config: PlannerConfig): Candidate | Rejection | undefined {
   const fatigue = view.self.needs.fatigue;
   const urgency = sleepUrgency(view, config, fatigue);
   if (urgency === undefined) return undefined;
-  // D81: dinner before bed. Bedtime (routine) waits while the mess call stands, so the off-going
-  // section eats the meal served before its bell instead of sleeping through the plate's life
-  // and waking to rations; pressing tiredness still sleeps.
+  // §mess-call: dinner before bed. Bedtime (routine) waits while the mess call stands, so the
+  // off-going section eats the meal served before its bell instead of sleeping through the plate's
+  // life and waking to rations; pressing tiredness still sleeps.
   if (urgency === "routineObligation" && mealCallFor(view, config) !== undefined) {
     return { ref: "sleep", reason: "mealCall" };
   }
@@ -512,7 +523,7 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   if (!passenger) {
     // Slice 4: a summons ranks with its class (essential), so it goes before the task loop.
     add(summonsCandidate(view, config));
-    // D94: the reporting reflex (containment) likewise.
+    // §reporting-damage: the reporting reflex (containment) likewise.
     add(reportCandidate(view, config));
     const problems = new Map(view.knownProblems().map((p) => [p.id as string, p]));
     const tasks = view.knownTasks();
@@ -523,12 +534,12 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   add(sleepCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
-  // D92: no recreation on alert (`alert.ts`).
+  // §sighting-and-the-alert: no recreation on alert (`alert.ts`).
   if (recreationOffered(view)) add(recreationCandidate(view, config));
   if (!passenger) {
     add(gangwayCandidate(view, config));
     add(dutyIdleCandidate(view, config));
-    // D94: the officer of the watch holds the bridge on alert.
+    // §scouts: the officer of the watch holds the bridge on alert.
     add(alertCandidate(view, config));
   }
   return { candidates, rejected };

@@ -1,5 +1,5 @@
 /**
- * `crew beats` (D76, ship-life §9 "Measure it"): the tuning instrument for the ship's day. Runs
+ * `crew beats` (ship-life §9 "Measure it"): the tuning instrument for the ship's day. Runs
  * the pacing voyage (`pacing.ts`'s `VoyageScript`, registry and content) round trip after round
  * trip until N ship's days have passed, with an instant narrator (every hook answered at once with
  * no commands) and every card answered by its left side, and reports:
@@ -7,25 +7,28 @@
  * - beats per watch by kind (bells, handovers, meals served, servings eaten hot and as rations,
  *   meals missed, servings spoiled, rooms turned filthy and mopped clean, faults, hazards, cards,
  *   conversations): the total and the mean, least and most over the run's watches;
- * - rooms at `dirty` and at `filthy` at the end of each watch (D82);
+ * - rooms at `dirty` and at `filthy` at the end of each watch (§room-tiers);
  * - how full the mess gets: for each meal served, how many ate it hot within
- *   `MESS_WINDOW_DAYS` (D83's target: at least `MESS_FULL_EATERS`, three times a day);
+ *   `MESS_WINDOW_DAYS` (target: at least `MESS_FULL_EATERS`, three times a day);
  * - per person, the share of sim time in each activity class (read from the canvas label, which
  *   is what the player sees), cooking and mopping among them, and the longest idle stretch;
- * - the provisions aboard at the end, in crates and days of meals (D81);
+ * - the provisions aboard at the end, in crates and days of meals (§galley-provisions);
  * - how long the helm stood empty while the ship was not docked;
  * - port calls by watch of the day: time docked, with cargo to move, with cargo to move and
  *   nobody hauling (a stall), and with someone on the gangway;
- * - each person's sleep starts, as seconds into each day (the rhythm's anchor, D77);
- * - off watch (D84-D87, slice 4 call 22): group sessions opened, started, collapsed and
+ * - each person's sleep starts, as seconds into each day (the rhythm's anchor, §sleep-timing);
+ * - off watch (§group-sessions, §rivalries, slice 4 call 22): group sessions opened, started,
+ * collapsed and
  *   abandoned per watch and by activity, contests, arguments, spirited talks, performances and
  *   rivalry streaks, solo activities started (by kind), and the ticker's notable-or-better lines
  *   per watch, all and the off-watch family's; per person, the share of time recreating, the days they recreated and the
  *   longest stretch bored (recreation above `seekThreshold`, and above `RECREATION_HIGH`); at the
  *   end, the affinity extremes and every rivalry;
- * - machine wear (D90): each wearing machine's condition at the end of each ship's day, the
+ * - machine wear (§maintenance-due): each wearing machine's condition at the end of each ship's
+ * day, the
  *   lowest it fell to, and how often it was serviced;
- * - the asteroid fields (D95, `beats-field.ts`): the run schedules one a leg (`--fields`), and
+ * - the asteroid fields (§scheduling-a-field, `beats-field.ts`): the run schedules one a leg
+ * (`--fields`), and
  *   the report gives each field's rocks, hull lost, time stuck, first intercom report and ticker
  *   lines, the totals per severity, scars patched and plated, and whether the ship was lost.
  *   `--seeds` runs several seeds and says how many ships were lost over them.
@@ -86,8 +89,8 @@ export type BeatEvent = SimEvent extends infer E
 
 /**
  * The beats per watch: the event that marks each, and how much one event counts (1 unless
- * said). Eating splits on the `ateMeal` payload's `ration` (D81: a hot meal or a ration pack);
- * a spoiled sweep counts its servings.
+ * said). Eating splits on the `ateMeal` payload's `ration` (§mess-call: a hot meal or a ration
+ * pack); a spoiled sweep counts its servings.
  */
 export const BEAT_EVENTS = {
   bells: { type: "bell" },
@@ -127,7 +130,7 @@ export const BEAT_EVENTS = {
  * Beats counted from samples rather than events: a solo activity begun (no event marks one,
  * call 18), a notable-or-better line on the ticker (what the player reads), and such a line from
  * the off-watch family (`OFF_WATCH_EVENT_TYPES`: recreation, social, cabins), whose count per
- * watch is call 22's twelve (D84 tuning: the twelve was meant for the slice's own lines, not the
+ * watch is call 22's twelve (the twelve was meant for the slice's own lines, not the
  * whole ticker's).
  */
 export const SAMPLED_BEATS = ["soloActivities", "tickerLines", "offWatchLines"] as const;
@@ -179,15 +182,21 @@ function sessionEndedBeats(
   }
 }
 
-/** Rooms counted at the end of each watch, by tier (D82). */
+/** Rooms counted at the end of each watch, by tier (§room-tiers). */
 export const ROOM_TIERS_COUNTED = ["dirty", "filthy"] as const;
 export type CountedTier = (typeof ROOM_TIERS_COUNTED)[number];
 
-/** D83: a meal "fills the mess" when this many eat it hot within `MESS_WINDOW_DAYS` of the serve. */
+/**
+ * §the-beats-instrument: a meal "fills the mess" when this many eat it hot within
+ * `MESS_WINDOW_DAYS` of the serve.
+ */
 export const MESS_FULL_EATERS = 6;
 export const MESS_WINDOW_DAYS = 0.05;
 
-/** D84: recreation at or above this is "very bored" (call 22: nobody above it for a day). */
+/**
+ * §activities-and-interests: recreation at or above this is "very bored" (call 22: nobody above it
+ * for a day).
+ */
 export const RECREATION_HIGH = 0.8;
 
 export const ACTIVITY_CLASSES = [
@@ -212,13 +221,13 @@ export type ActivityClass = (typeof ACTIVITY_CLASSES)[number];
 /**
  * Canvas labels (`systems/work/labels.ts`, `core/render.ts` `actionLabel`) to classes, first
  * match wins. "helm" is the bridge: the helm and plotting a course. "ashore" is the captain's
- * business on the dock and in the port (D70) and buying at the market (D47). Anything unmatched
- * is "other", and the report lists those labels so a new one is noticed. "cooking" is the galley's
- * work (D81: fetching provisions, at the stove, serving, a plate to the helm); "mopping" is a
- * cleaning trip (D82: the mop fetched, the rooms mopped, the mop put away). The stander eating in
- * the seat ("at the helm, eating") is still at the helm. "recreating" (D84) is any label in
- * `recreationLabels` (the activities' own, from content), checked first, or fetching and
- * putting back a book.
+ * business on the dock and in the port (§looking-for-work) and buying at the market
+ * (§buying-parts). Anything unmatched is "other", and the report lists those labels so a new one is
+ * noticed. "cooking" is the galley's work (§cooking-and-serving: fetching provisions, at the stove,
+ * serving, a plate to the helm); "mopping" is a cleaning trip (§mop-trips: the mop fetched, the
+ * rooms mopped, the mop put away). The stander eating in the seat ("at the helm, eating") is still
+ * at the helm. "recreating" (§activities-and-interests) is any label in `recreationLabels` (the
+ * activities' own, from content), checked first, or fetching and putting back a book.
  */
 const LABEL_CLASSES: readonly (readonly [RegExp, ActivityClass])[] = [
   [/^(fetching provisions|cooking|serving dinner|taking a plate to the helm)/, "cooking"],
@@ -294,15 +303,17 @@ export interface PersonBeats {
   readonly longestIdleSeconds: number;
   /** When they fell asleep, in sim time: the day (from 1) and the second of that day. */
   readonly sleepStarts: readonly SleepStart[];
-  /** D84: days (of the run's) with any time recreating. */
+  /** §activities-and-interests: days (of the run's) with any time recreating. */
   readonly daysRecreated: number;
-  /** D84: the longest stretch with recreation above `seekThreshold`. */
+  /** §activities-and-interests: the longest stretch with recreation above `seekThreshold`. */
   readonly longestBoredSeconds: number;
-  /** D84: the longest stretch with recreation at or above `RECREATION_HIGH`. */
+  /**
+   * §activities-and-interests: the longest stretch with recreation at or above `RECREATION_HIGH`.
+   */
   readonly longestVeryBoredSeconds: number;
 }
 
-/** D84: sessions by activity over the run. */
+/** §activities-and-interests: sessions by activity over the run. */
 export interface ActivitySessions {
   readonly opened: number;
   readonly started: number;
@@ -331,7 +342,7 @@ export interface PortWatchBeats {
   readonly gangwaySeconds: number;
 }
 
-/** How full the mess got at each meal served (D83). */
+/** How full the mess got at each meal served (§the-beats-instrument). */
 export interface MessFill {
   readonly serves: number;
   /** Hot servings eaten within `MESS_WINDOW_DAYS` of a serve, averaged over the serves. */
@@ -367,11 +378,11 @@ export interface BeatsTallyResult {
   readonly port: readonly PortWatchBeats[];
   /** Labels that matched no class, with the sim-seconds spent in each. */
   readonly otherLabels: Readonly<Record<string, number>>;
-  /** D84: sessions and solo stretches by activity id. */
+  /** §activities-and-interests: sessions and solo stretches by activity id. */
   readonly byActivity: Readonly<Record<string, ActivitySessions>>;
 }
 
-/** D84: what the tally needs to know about recreation. */
+/** §activities-and-interests: what the tally needs to know about recreation. */
 export interface RecreationTallyConfig {
   /** `config.needs.seekThreshold`: above it someone is bored. */
   readonly seekThreshold: number;
@@ -457,7 +468,7 @@ export class BeatsTally {
    * @param watchesPerDay from the config (`time.watchesPerDay`), for the port calls by watch.
    * @param messWindowTicks `MESS_WINDOW_DAYS` in ticks: how soon after a serve a hot meal
    *   eaten counts toward that serve's mess.
-   * @param recreation the boredom threshold and the recreation labels (D84).
+   * @param recreation the boredom threshold and the recreation labels (§activities-and-interests).
    */
   constructor(
     private readonly watches: number,
@@ -508,7 +519,10 @@ export class BeatsTally {
     }
   }
 
-  /** Lines that reached the ticker, notable or better, and which were off watch's (D84, call 22). */
+  /**
+   * Lines that reached the ticker, notable or better, and which were off watch's
+   * (§activities-and-interests, call 22).
+   */
   tickerLines(lines: readonly TickerSample[]): void {
     for (const line of lines) {
       this.count("tickerLines", line.tick, 1, "ticker line");
@@ -525,7 +539,7 @@ export class BeatsTally {
     counts[watch] = (counts[watch] ?? 0) + n;
   }
 
-  /** D84: sessions by activity. */
+  /** §activities-and-interests: sessions by activity. */
   private activityEvent(event: BeatEvent): void {
     switch (event.type) {
       case "sessionOpened":
@@ -606,7 +620,7 @@ export class BeatsTally {
     }
   }
 
-  /** D84: days recreated, bored stretches, solo activities begun. */
+  /** §activities-and-interests: days recreated, bored stretches, solo activities begun. */
   private sampleRecreation(
     tally: PersonTally,
     person: PersonSample,
@@ -735,7 +749,7 @@ export interface BeatsOptions {
   readonly scenario: PacingScenario;
   readonly days: number;
   readonly seed: number;
-  /** D95: which asteroid fields the run schedules, one a leg. */
+  /** §scheduling-a-field: which asteroid fields the run schedules, one a leg. */
   readonly fields: FieldPlan;
 }
 
@@ -748,25 +762,25 @@ export interface BeatsResult extends BeatsTallyResult {
   /** Voyages hub → Ossory → hub completed in the run. */
   readonly roundTrips: number;
   readonly hooksByKind: Readonly<Partial<Record<NarratorHook["kind"], number>>>;
-  /** D81: provisions aboard at the end of the run. */
+  /** §galley-provisions: provisions aboard at the end of the run. */
   readonly provisionsCratesAtEnd: number;
   readonly provisionsDaysAtEnd: number;
-  /** D85: the warmest and coldest directed affinities at the end, "A → B +4". */
+  /** §affinity: the warmest and coldest directed affinities at the end, "A → B +4". */
   readonly affinityExtremes: {
     readonly highest: readonly string[];
     readonly lowest: readonly string[];
   };
-  /** D85: every rivalry at the end, as the digest says it. */
+  /** §rivalries: every rivalry at the end, as the digest says it. */
   readonly rivalries: readonly string[];
-  /** D88: the spread of directed affinities between crew at the end of each ship's day. */
+  /** §affinity: the spread of directed affinities between crew at the end of each ship's day. */
   readonly affinityByDay: readonly AffinitySpread[];
-  /** D90: every machine that wears, in deck order. */
+  /** §maintenance-due: every machine that wears, in deck order. */
   readonly machineWear: readonly MachineWear[];
-  /** D95: the asteroid fields and what they cost. */
+  /** §field-lifecycle: the asteroid fields and what they cost. */
   readonly field: FieldTallyResult;
 }
 
-/** D90: how a wearing machine held up over the run. */
+/** §maintenance-due: how a wearing machine held up over the run. */
 export interface MachineWear {
   readonly name: string;
   /** Condition at the end of each ship's day. */
@@ -777,7 +791,7 @@ export interface MachineWear {
   readonly services: number;
 }
 
-/** D90: wear tracking over a run, sampled with everything else. */
+/** §maintenance-due: wear tracking over a run, sampled with everything else. */
 class WearTally {
   private readonly machines: { id: MachineId; name: string; byDay: number[]; lowest: number }[];
   private readonly services = new Map<string, number>();
@@ -821,7 +835,7 @@ class WearTally {
   }
 }
 
-/** D88: one day's directed crew affinities: the extremes and how many pairs stand out. */
+/** §affinity: one day's directed crew affinities: the extremes and how many pairs stand out. */
 export interface AffinitySpread {
   readonly day: number;
   readonly highest: number;
@@ -832,7 +846,7 @@ export interface AffinitySpread {
   readonly cold: number;
 }
 
-/** D88: the bands `AffinitySpread` counts: well past "close to", and "at odds with". */
+/** §affinity: the bands `AffinitySpread` counts: well past "close to", and "at odds with". */
 const WARM_AT_LEAST = 6;
 const COLD_AT_MOST = -3;
 
@@ -872,7 +886,7 @@ function crewSamples(world: World): PersonSample[] {
 
 /**
  * Is anyone at the helm, by the canvas labels? "at the helm, eating" is still at the helm (a plate
- * carried to the stander, D81; D84 tuning: it was counted as an empty helm).
+ * carried to the stander, §helm-plate).
  */
 export function helmStood(labels: readonly string[]): boolean {
   return labels.some((label) => label.startsWith("at the helm"));
@@ -884,7 +898,7 @@ export interface TickerSample {
   readonly offWatch: boolean;
 }
 
-/** D95: how many of the last advance's ticker lines were the field family's. */
+/** §field-hooks: how many of the last advance's ticker lines were the field family's. */
 function fieldTickerLines(world: World): number {
   return world.caches.diagnostics.lastEvents.filter(
     (event) =>
@@ -903,7 +917,7 @@ function tickerSamples(world: World): TickerSample[] {
   );
 }
 
-/** D88: every directed affinity between crew members (passengers come and go), by name. */
+/** §affinity: every directed affinity between crew members (passengers come and go), by name. */
 function crewAffinities(world: World): { text: string; affinity: number }[] {
   const { actors } = world.state;
   const crew = Object.values(actors).filter((a) => a.crew && a.passenger !== true);
@@ -918,7 +932,7 @@ function crewAffinities(world: World): { text: string; affinity: number }[] {
   );
 }
 
-/** D88: today's spread of crew affinities. */
+/** §affinity: today's spread of crew affinities. */
 function affinitySpread(world: World, day: number): AffinitySpread {
   const values = crewAffinities(world).map((a) => a.affinity);
   return {
@@ -931,7 +945,7 @@ function affinitySpread(world: World, day: number): AffinitySpread {
   };
 }
 
-/** D85: the warmest and coldest feelings aboard at the end, "Jax Okonkwo → Tomas Ruiz +4". */
+/** §affinity: the warmest and coldest feelings aboard at the end, "Jax Okonkwo → Tomas Ruiz +4". */
 function affinityExtremes(world: World): BeatsResult["affinityExtremes"] {
   const all = crewAffinities(world);
   const said = (a: { text: string; affinity: number }) =>
@@ -1071,7 +1085,8 @@ function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResu
         payload: { decisionId: head, side: "left" },
       });
     } else if (result.halt.kind === "lost") {
-      // D93: the hull gave way; the world never steps again, so the run ends here.
+      // §hull-scars-and-ship-loss: the hull gave way; the world never steps again, so the run ends
+      // here.
       break;
     } else if (advanced === 0) {
       stuckAdvances += 1;
@@ -1104,7 +1119,7 @@ function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResu
 
 export interface BeatsCliOptions {
   readonly days: number;
-  /** D95: one run per seed per scenario (`--seed 1`, or `--seeds 1-5`). */
+  /** §the-beats-instrument: one run per seed per scenario (`--seed 1`, or `--seeds 1-5`). */
   readonly seeds: readonly number[];
   readonly scenarios: readonly PacingScenario[];
   readonly fields: FieldPlan;
@@ -1253,7 +1268,7 @@ function scenarioSection(r: BeatsResult): string[] {
   return lines;
 }
 
-/** D90: each wearing machine's condition by day, its lowest and its services. */
+/** §maintenance-due: each wearing machine's condition by day, its lowest and its services. */
 function wearLines(r: BeatsResult): string[] {
   const days = r.machineWear[0]?.byDay.length ?? 0;
   const dayCols = Array.from({ length: days }, (_, i) => `Day ${i + 1}`);
@@ -1268,7 +1283,10 @@ function wearLines(r: BeatsResult): string[] {
   ];
 }
 
-/** D84-D85: sessions by activity, then the affinity extremes and the rivalries at the end. */
+/**
+ * §group-sessions, §affinity: sessions by activity, then the affinity extremes and the rivalries at
+ * the end.
+ */
 function offWatchLines(r: BeatsResult): string[] {
   const lines = [
     "",

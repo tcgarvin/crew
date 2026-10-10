@@ -1,7 +1,8 @@
 /**
  * The inspector's data for anything on the dock a tap can select without a snapshot from the
- * worker: a post or the dock itself (phase 2), one of the dock's own people or a staged prop
- * (phase 3, D68). All of it comes from the frame on screen and the content's dock map.
+ * worker: a post or the dock itself (phase 2), one of the dock's own people or a staged prop (phase
+ * 3, §items-places-and-locals). All of it comes from the frame on screen and the content's dock
+ * map.
  */
 import type { RenderFrame } from "@crew/sim";
 import type { DeckLayout } from "../render/deckLayout";

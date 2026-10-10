@@ -1,6 +1,7 @@
 /**
- * Departure gate (D36, 2026-10-01). A planned departure with an impaired `engine` or `generator`
- * raises one policy decision, "Hold for repairs" / "Leave anyway", instead of leaving quietly.
+ * Departure gate (§departure-gate, 2026-10-01). A planned departure with an impaired `engine` or
+ * `generator` raises one policy decision, "Hold for repairs" / "Leave anyway", instead of leaving
+ * quietly.
  *
  * Impaired means one of: blocked (`isMachineBlocked`: inoperable fault, temperature at the limit,
  * integrity below `equipment.integrityInoperableBelow`), an unrepaired fault whose effect is
@@ -12,27 +13,28 @@
  * Asked at most once per voyage (passengers-and-galaxy §2.3; once per docking with no voyage):
  * not while `departureRiskAccepted` is set for the impairment set that is live now
  * (`impairmentKey`), nor while a gate decision is already queued. The set is keyed on each
- * impaired machine and its faults, not on why it counts as impaired this tick (D75), so a new
+ * impaired machine and its faults, not on why it counts as impaired this tick, so a new
  * fault or a repair changes the key, drops the answer and asks again, while a machine hovering at
  * its temperature limit (blocked one tick, low on output the next) does not. The decision is
- * queued through `queuePolicyDecision` (D37: the kernel narrates it before showing it); the
- * chosen side's command (`holdDepartureForRepairs` / `acceptDepartureRisk`,
+ * queued through `queuePolicyDecision` (§policy-decision-hook: the kernel narrates it before
+ * showing it); the chosen side's command (`holdDepartureForRepairs` / `acceptDepartureRisk`,
  * `command-handlers.ts`) sets the travel flag the gate reads next tick.
  *
- * D71: the gate never waits on a repair that cannot finish. An impairment is *out of reach* when
- * one of the machine's diagnosed faults that keeps it impaired is short of a tool or parts that
- * nothing aboard supplies and the market at the port the ship is at cannot sell
+ * §repairs-out-of-reach: the gate never waits on a repair that cannot finish. An impairment is *out
+ * of reach* when one of the machine's diagnosed faults that keeps it impaired is short of a tool or
+ * parts that nothing aboard supplies and the market at the port the ship is at cannot sell
  * (`repairOutOfReach`, `equipment/supplies.ts`). The card offers a hold only for impairments in
  * reach; when none is left, there is nothing to choose: the departure goes ahead, any hold ends,
- * and `departureRepairOutOfReach` says why, per machine ("No welder torch aboard and none to be
- * had at Kessler Drift: leaving with the fusion generator's electrical short unrepaired"). It is
- * remembered as "leave anyway" is, against the live impairment set, so it is said once, and a
- * new fault or a repair asks again. An undiagnosed fault is still work aboard (diagnosis needs no
+ * and `departureRepairOutOfReach` says why, per machine ("No welder torch aboard and none to be had
+ * at Kessler Drift: leaving with the fusion generator's electrical short unrepaired"). It is
+ * remembered as "leave anyway" is, against the live impairment set, so it is said once, and a new
+ * fault or a repair asks again. An undiagnosed fault is still work aboard (diagnosis needs no
  * tool), so the gate waits for the diagnosis before it judges.
  *
- * D80: an impairment with no fault of its own that another machine's impairment causes (an
- * engine starved of power by a derated generator, a machine overheating with every coolant pump
- * on its bus down) is in reach only if its cause is; the reason told is the cause's fault, once.
+ * §impairments-out-of-reach: an impairment with no fault of its own that another machine's
+ * impairment causes (an engine starved of power by a derated generator, a machine overheating with
+ * every coolant pump on its bus down) is in reach only if its cause is; the reason told is the
+ * cause's fault, once.
  */
 import { queuePolicyDecision } from "../../core/decisions";
 import type { Actor } from "../../core/types/actor";
@@ -63,7 +65,7 @@ interface Impairment {
   readonly machineName: string;
   readonly reason: ImpairmentReason;
   readonly output: number;
-  /** Every fault on the machine, whatever its effect: what `impairmentKey` remembers (D75). */
+  /** Every fault on the machine, whatever its effect: what `impairmentKey` remembers. */
   readonly faultKeys: readonly LocalKey[];
 }
 
@@ -119,7 +121,7 @@ function impairments(ctx: GateCtx): Impairment[] {
 /**
  * The impaired set as one string (`machineId:faultKey+faultKey`, faults sorted, machines sorted,
  * comma-joined; "" when nothing is impaired). "Leave anyway" is remembered against this, so a new
- * fault or a repair re-asks. D75: it names every fault on the machine, not the momentary reason
+ * fault or a repair re-asks. It names every fault on the machine, not the momentary reason
  * nor `heldForFaults` (which depends on the reason): an overheat fault at its temperature limit
  * flips the reason between `blocked` and `lowOutput` or `faultDerated` every few ticks, and a key
  * that followed it dropped the answer and raised the card again each time.
@@ -163,10 +165,10 @@ function departureBound(travel: TravelState): PortDefId | undefined {
 }
 
 /**
- * D71: why `machineId`'s impairment cannot be cleared by a repair the crew can do with what is
- * aboard and what the market at `portId` sells now (`undefined`: no market, as under way), or
- * `undefined` when it can, or when the machine is not impaired. The gate asks it of the port the
- * ship is at; D80's limp asks it under way.
+ * §repairs-out-of-reach: why `machineId`'s impairment cannot be cleared by a repair the crew can do
+ * with what is aboard and what the market at `portId` sells now (`undefined`: no market, as under
+ * way), or `undefined` when it can, or when the machine is not impaired. The gate asks it of the
+ * port the ship is at; the limp (§limping-under-way) asks it under way.
  */
 export function impairmentOutOfReach(
   ctx: GateCtx,
@@ -192,9 +194,10 @@ function outOfReach(
   if (faultKeys.size > 0) {
     return repairOutOfReach(ctx.state, ctx.content, machine, def, faultKeys, portId);
   }
-  // D80: no fault of its own. Starved by another machine's impairment, it is in reach only if
-  // that cause is: every cause out of reach puts it out of reach, naming the first cause's fault.
-  // No cause found (integrity alone, an overloaded bus, a cycle) keeps D71's answer: in reach.
+  // §impairments-out-of-reach: no fault of its own. Starved by another machine's impairment, it is
+  // in reach only if that cause is: every cause out of reach puts it out of reach, naming the first
+  // cause's fault. No cause found (integrity alone, an overloaded bus, a cycle) keeps the plain
+  // answer: in reach.
   const causes = impairedCauses(ctx, machine, def);
   let first: RepairOutOfReach | undefined;
   for (const cause of causes) {
@@ -206,11 +209,11 @@ function outOfReach(
 }
 
 /**
- * D80: the impaired machines a fault-free impairment comes from. Power: a consumer allocated less
- * than its draw is starved by its domain's impaired generators. Coolant: a machine hot enough to
- * derate (or blocked at its limit) on a domain whose `"cooling"` machines are all off is
- * overheating for want of them (equipment's coolant rule), so the impaired ones among them are
- * its causes. In machine id order.
+ * §impairments-out-of-reach: the impaired machines a fault-free impairment comes from. Power: a
+ * consumer allocated less than its draw is starved by its domain's impaired generators. Coolant: a
+ * machine hot enough to derate (or blocked at its limit) on a domain whose `"cooling"` machines are
+ * all off is overheating for want of them (equipment's coolant rule), so the impaired ones among
+ * them are its causes. In machine id order.
  */
 function impairedCauses(ctx: GateCtx, machine: Machine, def: MachineDef): Machine[] {
   const domain = domainKeyOf(ctx, machine);
@@ -263,7 +266,9 @@ function gateDecisionPending(ctx: Pick<StepCtx, "state">): boolean {
   });
 }
 
-/** D29: the card is spoken by the crew member tagged `engineer`, when the ship has one. */
+/**
+ * §spoken-cards: the card is spoken by the crew member tagged `engineer`, when the ship has one.
+ */
 function engineerName(ctx: Pick<StepCtx, "state">): string | undefined {
   const actors = Object.values(ctx.state.actors) as Actor[];
   return actors.find((a) => a.crew && a.roleTags.includes("engineer"))?.name;
@@ -299,7 +304,7 @@ function raiseDepartureGate(ctx: StepCtx, impairment: Impairment): void {
 /**
  * May the planned departure go ahead this tick? Raises the gate card (once per docking) when an
  * engine/generator is impaired, waits while a hold is in force, and lifts the hold (with a
- * `departureHoldLifted` event) the tick nothing is impaired any more. D71: the card is raised
+ * `departureHoldLifted` event) the tick nothing is impaired any more. The card is raised
  * for the worst impairment whose repair is in reach, and with none in reach the departure goes
  * ahead (ending any hold) with a `departureRepairOutOfReach` per machine instead.
  */
@@ -350,9 +355,9 @@ export function departureCleared(ctx: StepCtx): boolean {
 }
 
 /**
- * D71: every impairment left is out of reach here, so the departure goes ahead: a hold ends,
- * each machine's reason is told (`departureRepairOutOfReach`, narrative, a narrator hook in the
- * default config), and the gate remembers the set as answered so it is told once.
+ * §repairs-out-of-reach: every impairment left is out of reach here, so the departure goes ahead: a
+ * hold ends, each machine's reason is told (`departureRepairOutOfReach`, narrative, a narrator hook
+ * in the default config), and the gate remembers the set as answered so it is told once.
  */
 function leaveWithRepairsOutOfReach(
   ctx: StepCtx,
@@ -367,8 +372,8 @@ function leaveWithRepairsOutOfReach(
   travel.departureRiskAccepted = true;
   travel.acceptedImpairmentKey = impairmentKey(ctx);
   if (portId === undefined || toPortId === undefined) return;
-  // D80: told per fault out of reach, so an engine starved by the generator's burnt-out coil is
-  // the generator's story, told once.
+  // §impairments-out-of-reach: told per fault out of reach, so an engine starved by the generator's
+  // burnt-out coil is the generator's story, told once.
   const told = new Set<string>();
   for (const why of outOfReach.values()) {
     const key = `${why.machineId}:${why.faultKey}`;

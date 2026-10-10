@@ -18,7 +18,7 @@ import { content, emptyPlan } from "./test-support";
 import { translateIntents } from "./translate";
 
 describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
-  it("accepts a translated stockMarket and applies it to the port's market (D47)", () => {
+  it("accepts a translated stockMarket and applies it to the port's market (§market-lever)", () => {
     const bundle = content();
     const registry = createRegistry();
     registerCommerce(registry);
@@ -164,7 +164,7 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     }
   });
 
-  it("accepts a translated scheduleHazard once a course is set, and spends the hazard budget (D78)", () => {
+  it("accepts a translated scheduleHazard once a course is set, and spends the hazard budget (§hazard-and-field-levers)", () => {
     const bundle = content();
     const registry = createRegistry();
     registerTravel(registry);
@@ -202,7 +202,7 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     expect(world.state.narrator.budget.hazardsRemaining).toBe(budget - 1);
   });
 
-  it("accepts a translated scheduleField with scripted hits by name, and the field waits on the leg (D95)", () => {
+  it("accepts a translated scheduleField with scripted hits by name, and the field waits on the leg (§scheduling-a-field)", () => {
     const bundle = content();
     const registry = createRegistry();
     registerTravel(registry);

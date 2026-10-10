@@ -1,8 +1,8 @@
 /**
- * Rounds (D77): the officer of the watch's walk (engineering, the hold, the mess, the helm's
- * standby position) and an idle on-duty engineer's machine round (every machine in engineering
- * with a `repair` position, at that position), `watches.roundsStopSeconds` of `rounds` work at
- * each stop.
+ * Rounds (§gangway-watch-and-rounds): the officer of the watch's walk (engineering, the hold, the
+ * mess, the helm's standby position) and an idle on-duty engineer's machine round (every machine in
+ * engineering with a `repair` position, at that position), `watches.roundsStopSeconds` of `rounds`
+ * work at each stop.
  *
  * Rounds do their noticing through perception, not code of their own: someone standing in a
  * compartment sees its machines' outward status and hears their symptoms (`work/perception.ts`),

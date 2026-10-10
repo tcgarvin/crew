@@ -1,7 +1,7 @@
 /**
- * D93: the inspector's view of a hull scar (a tap on its tile) and the line a room's inspection
- * gives its scars. Read from the snapshot at the view tick, like the room and the machine, so it
- * agrees with the overlay on screen (D14).
+ * §hull-scars-and-ship-loss: the inspector's view of a hull scar (a tap on its tile) and the line a
+ * room's inspection gives its scars. Read from the snapshot at the view tick, like the room and the
+ * machine, so it agrees with the overlay on screen (D14).
  */
 import type {
   CompartmentId,

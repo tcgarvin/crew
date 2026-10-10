@@ -1,7 +1,7 @@
 /**
- * D92, D93: the hull as rocks see it. The footprint is every authored tile of the deck (walls are
- * edges, so none is excluded), a large rock's blast is its 3×3 clipped to the hull, and the bar
- * is `max` less what the scars still cost.
+ * §rock-impacts, §hull-scars-and-ship-loss: the hull as rocks see it. The footprint is every
+ * authored tile of the deck (walls are edges, so none is excluded), a large rock's blast is its 3×3
+ * clipped to the hull, and the bar is `max` less what the scars still cost.
  */
 import { describe, expect, it } from "vitest";
 import { FIELD, fieldConfig, fieldContent } from "../systems/field/fixtures/field-deck";

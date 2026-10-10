@@ -6,8 +6,8 @@ export function clamp(value: number, lo: number, hi: number): number {
 }
 
 /**
- * A sim-sourced event about `machineId`, located at it, with `causeIds` (none by default; D100:
- * a repair carries the command that caused its fault).
+ * A sim-sourced event about `machineId`, located at it, with `causeIds` (none by default;
+ * §notable-event-hook: a repair carries the command that caused its fault).
  */
 export function machineEvent<T extends EventType>(
   type: T,

@@ -1,6 +1,6 @@
 /**
- * Dock hands (Dockside §4, D66): D63's appear, vanish and move points for freight, done on foot
- * by a local.
+ * Dock hands (Dockside §4, §dock-hand-errands): the appear, vanish and move points for freight,
+ * done on foot by a local.
  *
  * - An offer staged on the dock: a dock hand comes out of the warehouse door with its crates and
  *   sets them down on the staging area; until then the job is offered with no crates.
@@ -12,7 +12,7 @@
  *
  * Scripted and robust: commerce dispatches and drives the errands (this file); travel walks the
  * locals (`travel/locals.ts`). An errand with no route, or one running past
- * `travel.dockHandGiveUpSeconds`, does the instant D63 behaviour at once and says so
+ * `travel.dockHandGiveUpSeconds`, does the instant behaviour at once and says so
  * (`dockHandGaveUp`); the dock being cast off does the same for whatever is still open
  * (`travel/locals.ts` `dismissLocals`). A dock with no warehouse-door post (hand-built test docks)
  * has no dock hands: the instant behaviour runs as before. Departure never waits on a dock hand:
@@ -153,7 +153,7 @@ function carryBackIn(ctx: Ctx, local: Local, berth: BerthedDock, label: string):
 }
 
 /**
- * Do what the errand was for, now, without the walk (the D63 behaviour). Used when the walk
+ * Do what the errand was for, now, without the walk (the instant behaviour). Used when the walk
  * cannot be made: no route, or past the give-up time.
  */
 function finishNow(
@@ -339,8 +339,9 @@ function driveErrand(ctx: Ctx, local: Local, berth: BerthedDock, giveUpTicks: nu
 }
 
 /**
- * Every tick, after the job sweep: the dock's freight is where D63 says it should be, by way of
- * a dock hand where the dock has a warehouse door (D66) and at once where it has none.
+ * Every tick, after the job sweep: the dock's freight is where §offered-freight says it should be,
+ * by way of a dock hand where the dock has a warehouse door (§dock-hand-errands) and at once where
+ * it has none.
  */
 export function syncDockFreight(ctx: Ctx): void {
   const berth = dockAlongside(ctx.content, ctx.state);

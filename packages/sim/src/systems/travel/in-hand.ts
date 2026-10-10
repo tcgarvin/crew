@@ -1,8 +1,8 @@
 /**
- * One job at a time (D16, D50): what "the job in hand" means to the board, to `acceptContract`
- * and to `setCourse`. Pure readers of `state.jobs` and `state.travel`; they live in travel (not
- * commerce) because travel's hook and course code need them and commerce already depends on
- * travel.
+ * One job at a time (§one-job-in-hand, D50): what "the job in hand" means to the board, to
+ * `acceptContract` and to `setCourse`. Pure readers of `state.jobs` and `state.travel`; they live
+ * in travel (not commerce) because travel's hook and course code need them and commerce already
+ * depends on travel.
  */
 import type { DeepReadonly } from "../../core/types/common";
 import type { PortDefId } from "../../core/types/ids";
@@ -43,19 +43,19 @@ function passageBound(
 }
 
 /**
- * The job that stops the captain taking another one (D16/D50): freight that has not left its
- * origin (`accepted`) or is still on the way (`inTransit` anywhere but its destination), or a
- * passage that still has a port to reach (`passageBound`). A job being finished at this port
- * (freight unloading, a passenger walking off) does not block, so an offer surfaced on approach
- * can be taken the moment the ship docks instead of deadlocking on a card the captain cannot
- * accept until the sim runs.
+ * The job that stops the captain taking another one (§one-job-in-hand, D50): freight that has not
+ * left its origin (`accepted`) or is still on the way (`inTransit` anywhere but its destination),
+ * or a passage that still has a port to reach (`passageBound`). A job being finished at this port
+ * (freight unloading, a passenger walking off) does not block, so an offer surfaced on approach can
+ * be taken the moment the ship docks instead of deadlocking on a card the captain cannot accept
+ * until the sim runs.
  */
 export function jobBlockingAcceptance(state: JobsAndTravel): ReadonlyJob | undefined {
   return Object.values(state.jobs).find((job) => {
     if (job.status === "accepted") return true;
     if (job.passage !== undefined) return passageBound(state, job) !== undefined;
-    // Freight under way blocks until the ship is at its destination (D52); `jobInHand` counts
-    // only passages once they leave, so it is not the test here.
+    // Freight under way blocks until the ship is at its destination (§one-job-in-hand); `jobInHand`
+    // counts only passages once they leave, so it is not the test here.
     return job.status === "inTransit" && !dockedAt(state, job.toPortId);
   });
 }

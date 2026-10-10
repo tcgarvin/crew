@@ -5,12 +5,12 @@
  *  2. expires stale offers,
  *  3. sends the captain ashore to look for work when docked with nothing to do, raising the
  *     `captainAshore` hook the tick they step onto the dock, and delivers held cards in person
- *     (D70, `captain-ashore.ts`; this replaced `jobBoard` and D42's wait for the dock),
+ *     (§looking-for-work, `captain-ashore.ts`),
  *  4. walks passengers off and on, times their stay ashore and raises the overdue card
  *     (passengers-and-galaxy §3, `passage.ts`); it runs before the job sweep so a passage that
  *     completes this tick is paid this tick,
- *  5. keeps the ship's stores (D80, `reserve.ts`): docked at a port that sells what is low, it
- *     raises `reserveLow` for the shortfall, which the crew buy as they buy a part.
+ *  5. keeps the ship's stores (§reserve-low-problem, `reserve.ts`): docked at a port that sells
+ *     what is low, it raises `reserveLow` for the shortfall, which the crew buy as they buy a part.
  *
  * D40 (2026-10-01): the narrator is the only source of work. The deterministic job source that
  * used to live beside this system (posting template offers while docked) is gone; `captainAshore`
@@ -42,8 +42,8 @@ function sweepJobs(ctx: StepCtx): void {
     }
   }
   expireStaleOffers(ctx);
-  // D63, D66: after payment, so the bay is what is paid on; dock hands then cart the delivered
-  // crates in, and an offer's crates out or back.
+  // §delivery-and-pay, §dock-hand-errands: after payment, so the bay is what is paid on; dock hands
+  // then cart the delivered crates in, and an offer's crates out or back.
   syncDockFreight(ctx);
 }
 

@@ -1,6 +1,6 @@
 /**
- * Cooking (D81): the meal's quality, the cook's plan, the serve's count, and the galley's task
- * derivations.
+ * Cooking (§cooking-and-serving): the meal's quality, the cook's plan, the serve's count, and the
+ * galley's task derivations.
  */
 import { describe, expect, it } from "vitest";
 import type { DirtTier } from "../../core/types/content";
@@ -25,7 +25,7 @@ import {
 import { mealQuality, positionTiles, stoveOf } from "./kitchen";
 import { deriveMealToCarry, deriveMealToCook } from "./tasks";
 
-describe("meal quality (D81 call 4)", () => {
+describe("meal quality (§cooking-and-serving, call 4)", () => {
   const config = galleyConfig();
   const cases: [number, DirtTier, string][] = [
     [8, "clean", "good"],
@@ -84,7 +84,7 @@ function cookTask(world: World): Task {
   };
 }
 
-describe("the galley's task derivations (D81)", () => {
+describe("the galley's task derivations (§cooking-and-serving)", () => {
   it("mealToCook derives one cookMeal at the stove: cooking 1, the crate set down if given up", () => {
     const { world } = galleyWorld();
     const stove = stoveOf(world.state, world.content);
@@ -138,7 +138,7 @@ describe("the galley's task derivations (D81)", () => {
   });
 });
 
-describe("the cook's plan (D81 call 2)", () => {
+describe("the cook's plan (§cooking-and-serving, call 2)", () => {
   it("splits one crate off the nearest pantry stack, cooks at the stove, serves on the counter", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -177,7 +177,7 @@ describe("the cook's plan (D81 call 2)", () => {
   });
 });
 
-describe("the serve (D81 call 2)", () => {
+describe("the serve (§cooking-and-serving, call 2)", () => {
   it("serves the crew aboard plus the spare, never more than a crate makes", () => {
     const fixture = galleyWorld({ config: galleyConfig({ servingsPerCrate: 4 }) });
     const events = runToSecond(fixture, GALLEY_WATCH);

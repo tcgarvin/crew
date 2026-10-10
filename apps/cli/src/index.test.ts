@@ -60,7 +60,7 @@ describe("crew content validate", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("lists the activities Mk1 has no venue for as notes, still OK (D84)", () => {
+  it("lists the activities Mk1 has no venue for as notes, still OK (§activities-and-interests)", () => {
     const result = runContentValidate();
     expect(result.exitCode).toBe(0);
     const notes = result.output.split("\n").filter((line) => line.startsWith("  [note] "));
@@ -163,7 +163,7 @@ describe("dock maps: content validation and the sim's nav graft agree", () => {
     }
   });
 
-  it("place every deck in every berth box alike (D72)", () => {
+  it("place every deck in every berth box alike (§berth-boxes)", () => {
     expect(HULL_CLASS_BOX).toEqual(HULL_SIZE_BOX);
     const bundle = authoredBundle();
     for (const dock of Object.values(bundle.docks ?? {})) {
@@ -244,7 +244,7 @@ const mk2Footprint: DeckDef = {
   hull: { class: "light_freighter", sizeClass: "M", max: 100 },
 };
 
-describe("dock maps take both M-class footprints (D72)", () => {
+describe("dock maps take both M-class footprints (§berth-boxes)", () => {
   const authored = authoredBundle();
   const withMk2: ContentBundle = {
     ...authored,

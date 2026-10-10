@@ -45,7 +45,7 @@ function frameOf(items: RenderItem[]): RenderFrame {
   return { items } as unknown as RenderFrame;
 }
 
-describe("offered freight (D63)", () => {
+describe("offered freight (§offered-freight)", () => {
   it("never piles a crate on offer with taken freight of the same kind on one tile", () => {
     const piles = deckPiles(
       frameOf([crate("a", 0.5, true), crate("b", 0.5, true), crate("c", 0.5, false)]),
@@ -70,7 +70,7 @@ describe("offered freight (D63)", () => {
   });
 });
 
-describe("person labels (D72)", () => {
+describe("person labels", () => {
   const t: ViewTransform = { scale: 12, offsetX: 0, offsetY: 0 };
   const mara = {
     id: "a1",
@@ -166,7 +166,7 @@ describe("person labels (D72)", () => {
   });
 });
 
-describe("compartment labels (D72)", () => {
+describe("compartment labels", () => {
   /**
    * A 10×6 deck: a roomy hold, a galley one tile deep beside it, and a corridor whose bounding
    * box's top-left corner lies in the hold.

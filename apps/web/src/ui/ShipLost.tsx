@@ -1,7 +1,7 @@
 /**
- * D93 (call 13): the end screen. Hull at zero is game over: no partial survival, nothing to
- * continue. It shows the ship's last day (`lastDay`) and the one way on, a new game through the
- * same path as the top bar's button.
+ * §hull-scars-and-ship-loss (call 13): the end screen. Hull at zero is game over: no partial
+ * survival, nothing to continue. It shows the ship's last day (`lastDay`) and the one way on, a new
+ * game through the same path as the top bar's button.
  */
 import type { LastDay } from "./shipLost";
 

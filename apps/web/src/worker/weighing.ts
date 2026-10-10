@@ -1,7 +1,7 @@
 /**
- * D90: an actor's `weighOptions` in words for the inspector. Worded here, in the worker, because
- * the names (machines, rooms, items, people, activities) are in the world state and the content
- * bundle, which the main thread does not hold at the tapped tick.
+ * §what-a-crew-member-weighs: an actor's `weighOptions` in words for the inspector. Worded here, in
+ * the worker, because the names (machines, rooms, items, people, activities) are in the world state
+ * and the content bundle, which the main thread does not hold at the tapped tick.
  */
 import type {
   ActorId,
@@ -125,7 +125,8 @@ function candidateWords(names: Names, view: AgentView, candidate: Candidate): st
     case "socialize":
       return "chatting";
     case "wander":
-      // D77: on duty with nothing to do, the officer goes to the chair and others to their post.
+      // §who-has-the-helm: on duty with nothing to do, the officer goes to the chair and others to
+      // their post.
       return candidate.ref === "chair" ? "going to the captain's chair" : "going to their post";
     case "comeAboard":
       return "coming aboard";
@@ -236,7 +237,9 @@ function verdict(view: AgentView, weighing: Weighing, next: string): string {
   return view.self.activity.kind === "idle" ? `next: ${next}` : `switching to ${next}`;
 }
 
-/** D90: weigh an actor's options (`weighOptions`) on `world` and word them. */
+/**
+ * §what-a-crew-member-weighs: weigh an actor's options (`weighOptions`) on `world` and word them.
+ */
 export function weighAgent(view: AgentView, world: World, content: ContentBundle): WeighingWords {
   const config = world.config.values;
   return weighingWords(

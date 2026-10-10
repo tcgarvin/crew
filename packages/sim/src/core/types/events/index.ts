@@ -96,7 +96,7 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
 };
 
 /**
- * The asteroid-field family (slice 5, D92-D94): the field, the crew's damage work and the
+ * The asteroid-field family (slice 5): the field, the crew's damage work and the
  * intercom. The beats report counts their ticker lines per field.
  */
 export const FIELD_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
@@ -106,7 +106,7 @@ export const FIELD_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
 ]);
 
 /**
- * The off-watch family (slice 4, D84-D87): recreation, social and cabin events. The beats report
+ * The off-watch family (slice 4): recreation, social and cabin events. The beats report
  * counts their ticker lines per watch against call 22's twelve.
  */
 export const OFF_WATCH_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([

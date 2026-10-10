@@ -6,20 +6,22 @@
  *
  * What the actor sees:
  * - `self`: body, needs, skills, carried items (truth: they know their own hands), duty and their
- *   place in the watch (D77), thoughts (D79), retry backoff;
+ *   place in the watch (§the-watch-bill), thoughts (§thoughts), retry backoff;
  * - facts: their latest-belief table;
  * - problems: open problems that are `public`, or `discovered` ones they hold a `problem` fact for;
  * - tasks: live tasks of those problems. Claims are public in V1 (W4a decision, see
  *   `systems/work/claims.ts`): `knownClaimantId` is another actor holding a claim;
  * - items: `itemLocation` beliefs joined with the item's static definition;
  * - schematic + roster: static layout and who is aboard with trained skills;
- * - berths (D74): the actor's own bed (`self.berth`) and every assigned bed (`assignedBeds`);
+ * - berths (§berth-assignment): the actor's own bed (`self.berth`) and every assigned bed
+ *   (`assignedBeds`);
  * - slice 4: their interests, values and what they feel about others (`self.affinity`, their own
  *   side only), a pending `privateTalk` they are part of (`self.summons`), every group session
  *   (`sessions()`, the intercom: common knowledge like the roster), the travel stage
  *   (`travel()`), the activity defs (`activities()`), and whose a personal item is
  *   (`KnownItemView.ownerId`);
- * - slice 5 (D94): the alert while the ship is on one (`alert()`, the klaxon: common knowledge).
+ * - slice 5 (§sighting-and-the-alert): the alert while the ship is on one (`alert()`, the klaxon:
+ *   common knowledge).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
@@ -83,8 +85,8 @@ function inventoryOf(state: ReadonlyWorldState, actorId: ActorId): InventoryEntr
 }
 
 /**
- * D74: the machine of the actor's berth (`state.berths`), on the deck the view is built for.
- * Throws if the key names no machine there, which the needs invariants rule out.
+ * §berth-assignment: the machine of the actor's berth (`state.berths`), on the deck the view is
+ * built for. Throws if the key names no machine there, which the needs invariants rule out.
  */
 function berthOf(
   state: World["state"],
@@ -109,8 +111,9 @@ function bedMachine(
 }
 
 /**
- * D74: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`): one pass
- * over the machines rather than one per berth, with `bedMachine`'s first match and its error.
+ * §berth-assignment: the machines of every berth in `state.berths` (see `AgentView.assignedBeds`):
+ * one pass over the machines rather than one per berth, with `bedMachine`'s first match and its
+ * error.
  */
 function assignedBeds(state: World["state"], deckId: DeckGeometry["deckId"]): MachineId[] {
   const byKey = new Map<string, MachineId>();
@@ -163,7 +166,7 @@ function interactionsByMachine(
   return byMachine;
 }
 
-/** D77: the actor's place in the watch at the planning tick. */
+/** §the-watch-bill: the actor's place in the watch at the planning tick. */
 function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["watch"] {
   const config = world.config.values;
   const section = actor.schedule.section;
@@ -171,7 +174,7 @@ function watchOf(world: World, actor: ReadonlyActor, tick: number): SelfView["wa
   return {
     ...(section === undefined ? {} : { section: section.key }),
     onWatch: isOnWatch(actor.schedule, tick, config),
-    // D81: the section that stands the next watch eats first at the mess call.
+    // §mess-call: the section that stands the next watch eats first at the mess call.
     nextOnWatch:
       section !== undefined &&
       section.index === (watchOfDay(config, tick) + 1) % config.time.watchesPerDay,

@@ -1,6 +1,6 @@
 /**
- * The asteroid field (slice 5, D92): `scheduleField` and the field system. Register after
- * `registerTravel` (the field runs after travel's hazards in the `equipment` phase).
+ * The asteroid field (slice 5, §field-lifecycle): `scheduleField` and the field system. Register
+ * after `registerTravel` (the field runs after travel's hazards in the `equipment` phase).
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import { scheduleField } from "./command";

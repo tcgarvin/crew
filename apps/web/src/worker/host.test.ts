@@ -231,7 +231,8 @@ describe("createHost run-ahead accumulator", () => {
 
     const lastFrameTick = () => frameTicks(messages).at(-1);
 
-    // One 50 ms loop at speed 1 wants 1 tick; the burst runs 40 (D30), far ahead of real time.
+    // One 50 ms loop at speed 1 wants 1 tick; the burst runs 40 (§run-ahead-loop), far ahead of
+    // real time.
     advance(50);
     expect(lastFrameTick()).toBe(40);
 
@@ -291,8 +292,9 @@ describe("createHost run-ahead accumulator", () => {
 });
 
 /**
- * D37: a kernel that raises a `policyDecision` hook for a queued decision at `hookAtTick`; the
- * decision halt only shows once the hook is acknowledged (as `haltReason` orders it).
+ * §policy-decision-hook: a kernel that raises a `policyDecision` hook for a queued decision at
+ * `hookAtTick`; the decision halt only shows once the hook is acknowledged (as `haltReason` orders
+ * it).
  */
 function makePolicyKernel(hookAtTick: number): Kernel {
   const base = makeFakeKernel(Number.POSITIVE_INFINITY).kernel;
@@ -344,7 +346,7 @@ function makePolicyKernel(hookAtTick: number): Kernel {
   };
 }
 
-describe("createHost dirt channel (D82)", () => {
+describe("createHost dirt channel (§dirt-grid)", () => {
   it("posts a dirt frame on load and whenever a burst crosses a multiple of the cadence", () => {
     const { kernel } = makeFakeKernel(10_000);
     // 40 ticks a loop, 2 s of sim; the cadence is 3 s (60 ticks), so frames at 0, 60, 120, …
@@ -364,7 +366,7 @@ describe("createHost dirt channel (D82)", () => {
   });
 });
 
-describe("createHost policy decision (D37)", () => {
+describe("createHost policy decision (§policy-decision-hook)", () => {
   it("posts hookRaised for the policy hook, then decisionPending only once it is acknowledged", () => {
     const { host, messages, advance } = startHost(makePolicyKernel(5), { runAheadCapSeconds: 60 });
 
@@ -456,7 +458,10 @@ describe("createHost hook halt", () => {
   });
 });
 
-/** D93: a kernel whose hull gives way at `lostAtTick`; from then `advance` halts `lost` for good. */
+/**
+ * §hull-scars-and-ship-loss: a kernel whose hull gives way at `lostAtTick`; from then `advance`
+ * halts `lost` for good.
+ */
 function makeLosingKernel(lostAtTick: number): Kernel {
   const base = makeFakeKernel(Number.POSITIVE_INFINITY).kernel;
   type FakeState = { tick: number; lost?: true };
@@ -484,7 +489,7 @@ function makeLosingKernel(lostAtTick: number): Kernel {
   };
 }
 
-describe("createHost ship lost (D93)", () => {
+describe("createHost ship lost (§hull-scars-and-ship-loss)", () => {
   it("posts shipLost once at the loss and never steps the world again", () => {
     const { messages, advance } = startHost(makeLosingKernel(7), { runAheadCapSeconds: 60 });
     for (let i = 0; i < 30; i++) advance(50);

@@ -1,11 +1,12 @@
 # Ship Life: Implementation Plan
 
 Status: plan, 2026-10-04. Design and rationale: `docs/design/ship-life.md` (section references
-below are to that file unless marked Dockside). Eight slices, as §12 (re-sequenced 2026-10-06, D91). Each slice ends deployed,
-with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
+below are to that file unless marked Dockside). Eight slices, as §12 (re-sequenced 2026-10-06). Each
+slice ends deployed, with all checks green (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), a phone
 playtest, and a pause to take stock. Slices 1–4 are planned in full below; slice 5 was
-re-planned around the asteroid field on 2026-10-06 (D91) and slices 6–8 are sequenced after it. Each slice adds its own `D<n>` entries.
-Slice 2 was planned on 2026-10-04 after slice 1 landed (D72–D74); slices 3 and 4 were planned
+re-planned around the asteroid field on 2026-10-06 and slices 6–8 are sequenced after it. Each slice puts its behaviour
+into `docs/spec/` and any real decision into `docs/DECISIONS.md`.
+Slice 2 was planned on 2026-10-04 after slice 1 landed; slices 3 and 4 were planned
 the same day against slice 2's gate and plan, before its workstreams merged, slice 4 also
 against slice 3's plan.
 
@@ -248,8 +249,8 @@ Owns `packages/content/data/decks/freighter-mk2.json` + README, `freighter-mk1.j
   (`workbench`), `engineering-console.json` (`console`). Power `none` except the terminals and
   screen (small `domestic` consumers); no faults, no maintenance.
 - Items: `harmonica.json` and `old-photograph.json` gain the `personal` tag.
-- `crew/noor-haddad.json` (call 11): bio and voice in D38's style, piloting 3, cargo 2, the rest
-  1, no starting inventory.
+- `crew/noor-haddad.json` (call 11): bio and voice as for the other crew (§crew-lines), piloting 3,
+  cargo 2, the rest 1, no starting inventory.
 - `scenarios/default.json`: `deckId: deck.freighter_mk2`, Noor appended to `crew` (Mara stays
   first: `fixtures.ts` `departureGateRequest` takes `actors[0]` as the captain; the scenario id
   stays), stores unchanged in `cargo_stow`. Mk1 keeps no scenario; the CLI and tests prove it
@@ -425,17 +426,18 @@ timings; re-run `crew pacing` and record the numbers for the D-entry.
 - **Phone legibility with a 36-wide ship plus margins**: the docked camera scale drops; the
   `camera.test.ts` threshold is the tripwire, Tern's Rest the likely offender.
 
-### D-entries for slice 1 (next after D71)
+### Decisions for slice 1
 
-- **D72.** The hull contract: bow east and quay south are invariants the validator enforces;
-  `hull.sizeClass` boxes (S/M/L); dock maps declare a `berth` box and the sim derives the ship's
-  place; `shipAt` and `berth` tiles are gone; the renderer's only directional knowledge is
-  `FORE = +1` and the counter-clockwise portrait turn.
-- **D73.** Freighter Mk2 is the default ship: the §8 layout, every room and inert furniture
+- The hull contract (§orientation-and-size, §ship-placement): bow east and quay south are invariants
+the validator enforces; `hull.sizeClass` boxes (S/M/L); dock maps declare a `berth` box and the sim
+derives the ship's place; `shipAt` and `berth` tiles are gone; the renderer's only directional
+  knowledge is `FORE = +1` and the counter-clockwise portrait turn.
+- Freighter Mk2 is the default ship (§the-ships): the §8 layout, every room and inert furniture
   placed, Mk1 mirrored and kept as a second footprint; `bridge_console` is `helm`; the medbay bed
   is not a bunk; Noor Haddad is the ninth crew member.
-- **D74.** Berths are assigned by rank as a standing rule, lockers belong to beds, personal items
-  live in them; schema 7 refuses older saves rather than migrating mirrored geometry.
+- Berths are assigned by rank as a standing rule (§berth-assignment), lockers belong to beds,
+personal items live in them (§lockers); schema 7 refuses older saves rather than migrating mirrored
+  geometry.
 
 ## Slice 2: The watch and the helm
 
@@ -448,10 +450,10 @@ Save schema 7 → 8 (migrated, not refused). Prompt v0.21 (`pnpm test:live` once
 playtest complaints (idle at post, "idle beside the console", the engineer at the helm).
 
 Built as two serial gate commits by one agent, then six parallel workstreams, then a tuning
-commit by the lead. (Lead's note at adoption: the D75 gate fix and the equipment perf work this
-plan treated as concurrent have both landed on `ship-life-1`; nothing is off limits for that
-reason. The calls below that leave `maxFaultWindowSeconds` alone stand, to keep the gate small;
-`faultsRemaining` is fixed by W3, see call 12.)
+commit by the lead. (Lead's note at adoption: the departure-gate fix (§departure-gate) and the
+equipment perf work this plan treated as concurrent have both landed on `ship-life-1`; nothing is
+off limits for that reason. The calls below that leave `maxFaultWindowSeconds` alone stand, to keep
+the gate small; `faultsRemaining` is fixed by W3, see call 12.)
 
 ### Calls made
 
@@ -521,10 +523,10 @@ reason. The calls below that leave `maxFaultWindowSeconds` alone stand, to keep 
    `helmUnattendedSeconds` empty in transit, `helmUnattended` fires once per vacancy (narrative,
    so it reaches the digest and the ticker; not in `hookOnEvents`: the narrator reads it at its
    next call rather than being woken for it).
-9. **Gangway watch is a personal activity, and D70 delivery does not change.** While docked the
-   section's stander holds `standWatch` at the airlock `gangway` zone (routine class, so an
-   essential need interrupts it and the course plan's helm problem outranks it). Cards still come
-   up when the captain meets the speaker; the gangway stander is the dot at the ramp, nothing
+9. **Gangway watch is a personal activity, and in-person delivery (§delivery) does not change.**
+While docked the section's stander holds `standWatch` at the airlock `gangway` zone (routine class,
+so an essential need interrupts it and the course plan's helm problem outranks it). Cards still come
+    up when the captain meets the speaker; the gangway stander is the dot at the ramp, nothing
    more this slice.
 10. **Rounds are personal activities, not tasks.** `rounds` for the officer of the watch
     (engineering → hold → mess → bridge standby, `roundsStopSeconds` at each) and for an idle
@@ -548,7 +550,8 @@ reason. The calls below that leave `maxFaultWindowSeconds` alone stand, to keep 
     unattended is scrape and delay. `navHazard` is narrative, not hooked. Hazards have their own
     budget (`narrator.hazardBudget`, `budget.hazardsRemaining`) because `scheduleFault` never
     decrements `faultsRemaining` today; W3 also fixes that one line in
-    `equipment/commands.ts` (lead's change at adoption) with a test. `budgetRefillDays` is read by nothing today; Gate B adds the refill.
+`equipment/commands.ts` (lead's change at adoption) with a test. `budgetRefillDays` is read by
+    nothing today; Gate B adds the refill.
 13. **Thoughts are a closed key set in the sim and a required content table.** `ThoughtKey =
     "stoodLongWatch" | "doubleWatch" | "helmCleanPass" | "helmScrape"`; `ContentBundle.thoughts:
     Record<ThoughtKey, ThoughtDef>` (every key required, so a missing def fails validation, and
@@ -657,7 +660,7 @@ file its stream owns, called from the shared file, so no stream edits `candidate
   `schedule: { section }`). The `budgetRefillSystem` in `core/pipeline.ts` `coreSystems`
   (finalize phase): every `budgetRefillDays`, reset the three budgets to config and stamp
   `budgetRefilledTick`; `pipeline.test.ts` covers it.
-- `core/migrations.ts` `7:` (D79): `schedule.shiftKey` → `{ section }` from
+- `core/migrations.ts` `7:`: `schedule.shiftKey` → `{ section }` from
   `content.scenarios[raw.scenarioId]?.watchBill` by `defId` (absent bill or unknown def: a
   dayworker); `thoughts: []`; `watch: { lastBellWatch: watchIndexAt(tick), helm: {} }`;
   `hazards: []`; `nextId.hazard = 1`; `budget.hazardsRemaining = config.narrator.hazardBudget`,
@@ -961,11 +964,11 @@ drops to 1× on the first fault.
   call site; W1 owns five of them; W2 and W3 reach them only through their own files
   (`course.ts`, `rounds.ts`, `hazards.ts`, `core/thoughts.ts`). A stream that finds it needs a
   line in another's file asks the lead, who adds it at integration.
-- **Concurrent edits elsewhere**: `systems/travel/departure-gate.ts` (D75) and
+- **Concurrent edits elsewhere**: `systems/travel/departure-gate.ts` (§departure-gate) and
   `systems/equipment/**`. `travel.ts` calls `departureCleared` unchanged; the scrape writes only
   `machine.scheduledFaults` (the inbox `scheduleFault` already writes from outside the
   equipment tick); `maxFaultWindowSeconds` keeps its name because `equipment/commands.ts` reads
-  it. If D75 lands after Gate B, the gate's `travel.ts` diff is a three-line merge.
+  it. If that fix lands after Gate B, the gate's `travel.ts` diff is a three-line merge.
 - **`deferTo` and the off-duty rule would silently defeat the bill**: a helm task with a skill
   requirement makes Noor defer to a visible idle Mara, and an off-duty oncoming cannot claim
   before the bell. Both exemptions live in `planner/helm.ts` and have named tests.
@@ -1009,27 +1012,27 @@ drops to 1× on the first fault.
   rounds do not change that, and a reader expecting rounds to service machines is wrong until
   slice 5's diagnostics.
 
-### D-entries for slice 2 (D76 onward; D75 is the departure-gate fix)
+### Decisions for slice 2
 
-- **D76.** Time is counted in fractions of the ship's day: `time.daySeconds` and
+- Time is counted in fractions of the ship's day (§the-ships-day): `time.daySeconds` and
   `watchesPerDay` are the two knobs, every need rate, meal, sleep, offer, passage and narrator
   cadence is authored in days and converted where read; physical motion, work at a machine,
   dockside timings and host real time stay in seconds (the list); the spur legs are one watch
   long; fast-forward drops to 1× on a config list of events, when the player sees them;
   `crew beats` measures beats per watch and is the tuning instrument.
-- **D77.** Watches replace shifts: three sections on a watch bill in the scenario, the bell in
-  the ticker, dayworkers; the helm is the duty station (the sim designates the stander by the
-  bill and skill, the captain never stands while a hand qualifies; handover at the standby
+- Watches replace shifts (§sections-and-dayworkers): three sections on a watch bill in the scenario,
+the bell in the ticker, dayworkers; the helm is the duty station (the sim designates the stander by
+  the bill and skill, the captain never stands while a hand qualifies; handover at the standby
   position; relief for needs; vacancy gates manoeuvres and nothing else; `helmUnattended`);
   gangway watch in port; the officer of the watch walks rounds and idles at the chair;
   engineers do maintenance rounds; piloting is learned at the helm.
-- **D78.** Course plotting is part of departure (`courseToPlot` at the nav terminal, per hop);
-  piloting checks: narrator `scheduleHazard` is the sixth lever, kinds and tiers, fired in
+- Course plotting (§course-plotting) is part of departure (`courseToPlot` at the nav terminal, per
+  hop); piloting checks: narrator `scheduleHazard` is the sixth lever, kinds and tiers, fired in
   transit, rolled by the sim against whoever has the helm, outcomes clean, scrape (through the
   fault path), delay; its own budget, and the budget refill that D6 promised now runs.
-- **D79.** Thoughts and mood: a closed key set, content defs with values and durations, mood the
-  clamped sum, work speed the only effect yet; the first four thoughts; save schema 8 migrates
-  schema 7 (sections from the bill, empty thoughts and hazards).
+- Thoughts and mood (§thoughts, §mood-and-work-speed): a closed key set, content defs with values
+and durations, mood the clamped sum, work speed the only effect yet; the first four thoughts; save
+  schema 8 migrates schema 7 (sections from the bill, empty thoughts and hazards).
 
 ## Slice 3: Mess call and dirt
 
@@ -1089,7 +1092,7 @@ Built as one serial gate commit, then five parallel workstreams, then a tuning c
    good, `burntDinner` (−0.1, 0.3 day) for poor, nothing for plain; `ateRationPack` (−0.05, 0.3
    day) for any `food` without a `meal`; `ateInDirtyMess` (−0.1, 0.5 day) and `ateInFilthyMess`
    (−0.2, 0.5 day) by the room the eater is in: two keys rather than a doubled value, because a
-   thought's value is copied from its def (D79). Five new `THOUGHT_KEYS`, all non-stacking.
+   thought's value is copied from its def (§thoughts). Five new `THOUGHT_KEYS`, all non-stacking.
 5. **Meals go to the helm, and the stander eats in the seat.** When a meal is served, someone
    holds the helm (`whoHasTheHelm`) and no serving lies within reach of the seat, the galley
    raises `mealToCarry { toActorId, machineId }` → one `carryMeal` task (routine; the cook or a
@@ -1112,10 +1115,10 @@ Built as one serial gate commit, then five parallel workstreams, then a tuning c
    `mealSpoiled` and deposits `dirt.deposits.spoiledMeal` on its tile. Ration packs never spoil.
    With `spareServings: 1` one plate spoils per meal, which is the galley's steady trickle of dirt
    and the reason the cook mops it.
-8. **Provisions are a stackable crate, bought like parts, through the parts code.** `item.provisions`
-   (tag `provisions`, mass 2, `maxStack` 20; `galley.servingsPerCrate` 12), eighteen in the
-   `pantry` zone at the start (six days for nine with waste). `provisionsLow { itemDefId, count }`
-   (owner galley, public, routine; dedupe `provisionsLow`) is open while the servings aboard
+8. **Provisions are a stackable crate, bought like parts, through the parts code.**
+`item.provisions` (tag `provisions`, mass 2, `maxStack` 20; `galley.servingsPerCrate` 12), eighteen
+in the `pantry` zone at the start (six days for nine with waste). `provisionsLow { itemDefId, count
+   }` (owner galley, public, routine; dedupe `provisionsLow`) is open while the servings aboard
    cover under `galley.lowBelowDays` (1) of `crewAboard × watchesPerDay`; `count` is the crates
    that bring it to `restockToDays` (4). Commerce derives the same `buyParts` task spec it derives
    for `partsNeeded` (one `buySpec` helper; target the galley compartment; label "buying
@@ -1195,7 +1198,7 @@ Built as one serial gate commit, then five parallel workstreams, then a tuning c
     the view tick and shows the room's name, its tier as the subtitle, the mean and worst cell,
     and who is mopping it. Rooms come from `state.dirt.tiers` and `cells`, so the frame carries
     nothing new.
-16. **Units.** Days (D76): `mealLeadDays`, `mealGraceDays`, `mealSpoilDays`,
+16. **Units.** Days (§the-ships-day): `mealLeadDays`, `mealGraceDays`, `mealSpoilDays`,
     `substituteAfterDays`, `lowBelowDays`, `restockToDays`, `airborneDustPerDay`. Seconds:
     `cookSeconds` and `mopSecondsPerTile` (work at a machine or a tile), `updateEverySeconds`
     (a cadence of the sim, not of ship life) and `host.dirtFrameEverySeconds` (host real time).
@@ -1465,7 +1468,7 @@ gate's zones, if the validator objects), `README`s under `data/`.
 - Hull contract: zones tagged `pantry`, `serving` and `cleaningLocker` (one or more tiles each);
   some `serving` tile is adjacent to a `stove`'s `use` position (the cook sets plates down
   within reach); `messTable` seats (`use` positions) ≥ 4. Dock L3: `grime` and `airborneDust`
-  in [0, 1]; a station's dock has `airborneDust` 0 (D61: a station has no sky). L2: the gate's
+  in [0, 1]; a station's dock has `airborneDust` 0 (a station has no sky). L2: the gate's
   `meal`/`provisions` tag rules get failing tests.
 - Ports: a `provisions` market line at every port (hub 8 at 50, Kessler 6 at 55, Ossory 6 at
   60, Vesper 6 at 50, Green Meridian 12 at 35, Tern's Rest 4 at 70); `loader.test.ts` route
@@ -1603,24 +1606,24 @@ columns, and the lead runs `pnpm test:live` once.
   .grime`; a fixture with a dock graft but no `docks` table in its bundle reads grime 0, which
   the footfall test must not rely on by accident.
 
-### D-entries for slice 3 (D80 onward, provisional; the lead renumbers at integration)
+### Decisions for slice 3
 
-- **D80.** Mess call: the galley serves a hot meal before each bell from a crate of provisions
+- Mess call (§mess-call): the galley serves a hot meal before each bell from a crate of provisions
   and tells the crew; the oncoming watch eats first at the mess tables and the off-going after
   the bell; the cook cooks every meal and anyone with cooking ≥ 1 substitutes after a wait;
   quality is the cook's skill, lowered by a dirty galley, and gives a thought; the helm-stander's
   plate is carried up and eaten in the seat; servings spoil; ration packs are the fallback with
   a thought; `provisionsLow` is bought at port through the parts code; provisions on every
   market.
-- **D81.** Dirt: one quantised grid per deck in state; footfall and boots in movement, port
-  grime and airborne dust from the dock map with a per-visit cap, deposits from cooking,
-  eating, spoilage, repair and cargo; rooms are the unit of tiers (clean, untidy, dirty,
+- Dirt (§dirt-grid, §room-tiers): one quantised grid per deck in state; footfall and boots in
+movement, port grime and airborne dust from the dock map with a per-visit cap, deposits from
+  cooking, eating, spoilage, repair and cargo; rooms are the unit of tiers (clean, untidy, dirty,
   filthy, with hysteresis), of the `compartmentDirty` problem and of the eating thoughts;
   cleaning is a mop task by role affinity, by anyone once aged, essential for a filthy galley
   or infirmary, routine class so on-duty idle crew clean before rounds and off-duty crew never
   do; the renderer's tint rides its own tick-keyed channel at a low cadence; the inspector
   shows a room's tier; filthy slows fast-forward.
-- **D82.** Save schema 9 migrates 8 (dirt zeroed, boots, the galley's bookkeeping, and the
+- Save schema 9 migrates 8 (dirt zeroed, boots, the galley's bookkeeping, and the
   scenario's provisions and mop spawned so an old save eats tonight); the digest's galley and
   dirt lines and prompt v0.22; `crew beats` counts meals, spoilage, missed meals, dirty rooms
   and mopping, and is the instrument the tuning commit answers to.
@@ -1843,7 +1846,7 @@ Built as one serial gate commit, then six parallel workstreams, then a tuning co
     line at all. The beats report counts notable-or-better lines per watch (call 22) and the
     target is twelve.
 19. **Thought keys stay a closed set; activities reference them.** `ActivityDef.thoughts` names
-    keys from `THOUGHT_KEYS`, never new ids (D79 made the set closed and the table required;
+    keys from `THOUGHT_KEYS`, never new ids (the set is closed and the table required, §thoughts;
     per-activity thought ids would reopen it). Seventeen new keys: `wonContest` (+0.1, 0.3 day,
     stacks), `lostContest` (−0.05, 0.3, stacks), `keepsBeatingMe` (−0.15, 1, refId),
     `goodCompany` (+0.05, 0.3), `spiritedTalk` (+0.1, 0.5), `argued` (−0.15, 0.5, refId),
@@ -1856,13 +1859,13 @@ Built as one serial gate commit, then six parallel workstreams, then a tuning co
     L2-checked against the key set.
 20. **Topics are a content table with a weight vector; stance is a dot product.** `TopicDef {
     id; label; weights: { orderFreedom; faithReason; loyaltyAmbition } }` (weights in [−1, 1]),
-    seven authored: `the_guild` (orderFreedom −1, loyaltyAmbition +0.5), `politics` (orderFreedom +1, loyaltyAmbition −0.5), `faith`
-    (faithReason −1), `philosophy` (faithReason +0.5, orderFreedom +0.5), `the_league`
-    (loyaltyAmbition +1), `old_captains` (loyaltyAmbition −0.5, orderFreedom −0.5), `the_vid`
-    (all 0: watching together always agrees, which is the bond). Debate names its topics; vids
-    name `the_vid` and resolve as `bond`, so a vid is never an argument. `seedTopic` (slice 5)
+seven authored: `the_guild` (orderFreedom −1, loyaltyAmbition +0.5), `politics` (orderFreedom +1,
+loyaltyAmbition −0.5), `faith` (faithReason −1), `philosophy` (faithReason +0.5, orderFreedom +0.5),
+`the_league` (loyaltyAmbition +1), `old_captains` (loyaltyAmbition −0.5, orderFreedom −0.5),
+`the_vid` (all 0: watching together always agrees, which is the bond). Debate names its topics; vids
+     name `the_vid` and resolve as `bond`, so a vid is never an argument. `seedTopic` (slice 5)
     adds to the same table at run time.
-21. **Units.** Days (D76): `recreationPerDay`, `durationDays` and `solo.durationDays`,
+21. **Units.** Days (§the-ships-day): `recreationPerDay`, `durationDays` and `solo.durationDays`,
     `collapseBackoffDays`, `chatAffinityEveryDays`, `skillGain.perDay`. Seconds (a wait at a
     place, a real-time feel): `gatherSeconds` (30), `lateJoinSeconds` (20), `noisySeconds`,
     `checkEverySeconds`, `privateTalkSeconds`, `privateTalkWaitSeconds`. Unitless: scores,
@@ -1883,7 +1886,7 @@ Built as one serial gate commit, then six parallel workstreams, then a tuning co
     emptySocial()`; `nextId.session: 1`; `item.book × 3` spawned on the `bookShelf` zone's tiles
     the way slice 3 spawns provisions (ids from `nextId.item`, `warnings` says so); the sleep
     hold step's `disturbedTicks` absent means 0. The harmonica already lies in Bettina's locker
-    (D74). Narrator fixtures regenerated, never hand-edited.
+    (§lockers). Narrator fixtures regenerated, never hand-edited.
 24. **The digest sees off-watch life; the prompt gets an off-watch paragraph.** Ship section
     gains `off watch: cards in the lounge (Jax Okonkwo, Tomas Ruiz, Dane Whitcross); Bettina
     Solheim playing the harmonica in the lounge` (sessions and solo recreation now) and
@@ -2260,9 +2263,9 @@ Owns `packages/narrator/**`, `packages/server/src/routes/narrator*.test.ts`, `ap
   crew `likes`/`dislikes`, `close to`/`at odds with` from `social.relationships`, `berth` from
   `berths` and the bed's compartment tags), `{ref}` in thought labels filled from `refId`;
   `contract.ts`: `decisionSide.effect` + `privateTalk`, `talkWith: idOf("crew member name,
-  or empty")`, `tone: z.enum(["warm", "stern", ""])` (empty for none, D45); `translate.ts`:
-  `privateTalkSide` resolving the name to an aboard crew member (dropped with a reason for the
-  captain, a passenger, someone ashore, a pending talk) through `playerSide`;
+or empty")`, `tone: z.enum(["warm", "stern", ""])` (empty for none, §narrator-authority);
+`translate.ts`: `privateTalkSide` resolving the name to an aboard crew member (dropped with a reason
+  for the captain, a passenger, someone ashore, a pending talk) through `playerSide`;
   `capabilities.ts`: the side effect under `## 4. surfaceDecision` ("a private word in the
   captain's cabin, warm or stern; the crew member walks there and the talk moves how they
   feel about the captain") and `likes:` in the crew lines it writes; `prompts/system.ts` v0.23
@@ -2391,10 +2394,10 @@ gathering, and a tap on Jax shows his likes and who he is close to.
   for a meal, and the treat rule fires only below the meal call's threshold, so a treat never
   replaces dinner. The galley's sweep spoils both.
 - **`privateTalk` is the first player command that moves people.** It writes an intent through
-  the planner (a summons the view carries), never `pendingIntent` directly (D70's shore walk
-  does that from commerce; the cabin keeps to the planner so the helm rule stands). A captain
-  at the helm never answers her own summons: the command actor is never the stander while a
-  hand qualifies (D77), and the FO case is tested.
+  the planner (a summons the view carries), never `pendingIntent` directly (the shore walk of
+§looking-for-work does that from commerce; the cabin keeps to the planner so the helm rule stands).
+A captain at the helm never answers her own summons: the command actor is never the stander while a
+   hand qualifies (§who-has-the-helm), and the FO case is tested.
 - **Save size**: `social` is under 4 KB of JSON at nine people and grows with the square of
   the crew; at the legibility ceiling of nine that is the design's bound. Sessions are at most
   three or four rows. Nothing typed-array, nothing in caches.
@@ -2410,37 +2413,37 @@ gathering, and a tap on Jax shows his likes and who he is close to.
   the mess): it has no lounge, gym, book shelf or viewport. Mk1 keeps no scenario, so nothing
   depends on it; the validator's notes say which activities it lacks.
 
-### D-entries for slice 4 (D83 onward, provisional; the lead renumbers at integration)
+### Decisions for slice 4
 
-- **D83.** Off watch: a fifth need, recreation, met by activities from a content table
-  (`ActivityDef`: venue tags, participants, duration, restores, outcome, thoughts, affinity,
-  topics, skill gain, risk, dirt, a required item, a product); interests and value axes per
-  person, authored for the nine and generated for the rest; one planner candidate per person,
-  the best-scored activity by interest, mood and company; group sessions are common knowledge
-  (the intercom), opened by a host at the venue, joined by whoever walks over, started at the
-  gather timer or when full, collapsed to the solo variant, ended by the bell or an essential
+- Off watch (§activities-and-interests, §group-sessions): a fifth need, recreation, met by
+activities from a content table (`ActivityDef`: venue tags, participants, duration, restores,
+outcome, thoughts, affinity, topics, skill gain, risk, dirt, a required item, a product); interests
+and value axes per person, authored for the nine and generated for the rest; one planner candidate
+per person, the best-scored activity by interest, mood and company; group sessions are common
+knowledge (the intercom), opened by a host at the venue, joined by whoever walks over, started at
+  the gather timer or when full, collapsed to the solo variant, ended by the bell or an essential
   task; the rest and chat candidates move to the lounge; a session renders as one plate at the
   venue and the ticker says who won.
-- **D84.** Relationships: directed affinity in `WorldState.social`, sparse, ±10, moved by
-  ambient chat once a day per pair, by outcomes (contest, bond, debate on a topic by the dot
+- Relationships (§affinity, §outcomes): directed affinity in `WorldState.social`, sparse, ±10, moved
+  by ambient chat once a day per pair, by outcomes (contest, bond, debate on a topic by the dot
   product of values and weights, perform for whoever is in the room), by seats (friends
   beside, enemies apart; the captain's table once a day) and by `privateTalk`; a per-pair
   per-activity tally with a streak that becomes a rivalry thought and a ticker line; a
   sparring injury is a thought and a line this slice, the medic's work waits for slice 5;
   baking makes treats eaten as snacks.
-- **D85.** Cabins: own-cabin and noisy-bunkroom thoughts at waking, no-bunk daily; personal
+- Cabins (§cabin-thoughts): own-cabin and noisy-bunkroom thoughts at waking, no-bunk daily; personal
   items are fetched from lockers and put back (the harmonica), books from the shelf;
   `privateTalk` is a card side effect the player chooses, a player-authority command that
   summons a crew member to the command actor's cabin for a warm or stern word with an affinity
   outcome; the lever count stays six.
-- **D86.** Save schema 10 migrates 9 (recreation, interests, `social`, books on the shelf);
+- Save schema 10 migrates 9 (recreation, interests, `social`, books on the shelf);
   the digest's off-watch, rivalry, likes, relationship and berth lines and prompt v0.23;
   `crew beats` counts sessions, outcomes, solo recreation and ticker lines per watch and is
   the instrument the tuning commit answers to.
 
 ## Slice 5: The asteroid field
 
-Re-planned 2026-10-06 with the owner, after slice 4 landed (D89, D90). The slice first sequenced
+Re-planned 2026-10-06 with the owner, after slice 4 landed. The slice first sequenced
 here (engineering-console diagnostics, drills, a station framework with tactical and shields
 on an `alert` state nothing raised, `seedTopic`) built machinery with nothing to do. This slice
 builds the threat first: a narrator-scheduled **asteroid field** that the ship crosses in
@@ -2514,7 +2517,7 @@ the code.
    rolls once on `field.machineEffects`, a weighted table:
    - `none`: the rock glanced off;
    - `graze`: integrity −0.2;
-   - `damage`: integrity −0.5, so a whole machine is derated (D35: below 0.5);
+   - `damage`: integrity −0.5, so a whole machine is derated (§integrity: below 0.5);
    - `knockout`: integrity to 0, inoperable from full in one hit;
    - `fault`: one of the machine's fault defs, through the existing fault path.
    Integrity damage is restored by the existing repair path (a damage repair raises the
@@ -2537,13 +2540,14 @@ the code.
     (discovered; seen in the room), a `patchHull` task (fetch a kit, walk to the scar, weld,
     engineering ≥ 1) that restores `field.patchRecovers` (half) of that scar's damage and marks it
     patched. At port the crew repair the rest themselves (owner): if the port sells
-    `hull_plating`, a `hullDamaged` problem buys it on the parts-buying pattern (D47, from ship's
-    money) and `plateHull` tasks install a plate at each scar, restoring the rest of its damage
-    and clearing it. Nothing gates departure on the hull: a conflict between repairs and something
+`hull_plating`, a `hullDamaged` problem buys it on the parts-buying pattern (§buying-parts, from
+ship's money) and `plateHull` tasks install a plate at each scar, restoring the rest of its damage
+     and clearing it. Nothing gates departure on the hull: a conflict between repairs and something
     else (a departure, short money, no plating at this port) is the narrator's hook, not a check.
     Kits: two per locker zone across the ship (`patch_kit`, stackable), also bought at port
-    (integration: D80's `reserveLow` buys back to the scenario's stocked count where a market sells
-    kits, and they come aboard at the top of the ramp like any purchase, not into the lockers).
+(integration: `reserveLow`, §reserve-low-problem, buys back to the scenario's stocked count where a
+market sells kits, and they come aboard at the top of the ramp like any purchase, not into the
+    lockers).
 11. **The officer of the watch holds the bridge and sends scouts** (owner). Every impact is felt
     by everyone aboard ("the ship shudders"): a `hullImpact` fact with no place, except that
     whoever is in the compartment sees where. The officer of the watch, on alert, raises a
@@ -2620,8 +2624,8 @@ the code.
     the integrity missing, standing at a `repair` position) that restores integrity to 1 and
     resolves the problem. It is independent of faults: a `fault` effect takes the fault path
     (D6) and its repair is the fault's recipe. Only impacts raise it (W2's `damageMachine`);
-    overheat keeps D35 (its fault repair restores integrity), so a game with no field is
-    unchanged.
+overheat keeps the §integrity rule (its fault repair restores integrity), so a game with no field is
+     unchanged.
 22. **Kits and plates by tag, welded** (gate). Two item tags, `patchKit` (`item.patch_kit`,
     stackable 10, 2 kg) and `plating` (`item.hull_plating`, stackable 5, 12 kg); the sim finds them
     by tag, never by def id. `patchHull` and `plateHull` both need engineering ≥ 1 and the
@@ -2635,7 +2639,7 @@ the code.
     port whose market lists `plating` and some scar is unplated with fewer plates aboard than
     unplated scars; payload `{ itemDefId, count }`; routine; derives commerce's `buyParts` task
     through `buySpec` (exported from `systems/commerce/tasks.ts` at the gate), target the market,
-    so the purchase, the counter walk and the stowing are D47/D63's unchanged.
+    so the purchase, the counter walk and the stowing are unchanged (§buying-parts).
 24. **A lost ship halts the kernel** (gate). `WorldState.hull.lostAtTick` is set (with
     `shipLost`) the tick integrity reaches 0; from then `advance` returns `{ kind: "lost" }`
     without stepping (a new `AdvanceHalt`), the worker posts `shipLost { tick }` once, and the
@@ -3045,7 +3049,7 @@ section, and the lead runs `pnpm test:live` once.
    empty helm or a stuck ship, time stuck under a field's length, impact to first report under
    thirty seconds, field ticker lines per field under twenty (or `asteroidImpact` lines go
    null for misses); the target play speed ruled (open question 2).
-7. D-entries D91–D95, `README.md` note ("in transit the ship can cross an asteroid field: the
+7. Spec sections for the field, `README.md` note ("in transit the ship can cross an asteroid field: the
    helm threads it, rocks hit, the crew report and patch, and a lost hull ends the game"), deploy
    via the `ops` agent, and the checkpoint: a 1× phone run where a heavy field is sighted by the
    helm, the alert tints the HUD, rocks pass over the ship, a hit takes the galley stove out,
@@ -3076,9 +3080,9 @@ section, and the lead runs `pnpm test:live` once.
   and W2's to read. A field that ends while scouts are walking leaves `compartmentToCheck` open
   until the alert clears; W2 resolves every open check when it does.
 - **Essential work on alert against the watch.** Damage problems are essential, which respects
-  the watch (D77): the off-watch sleep on unless the impact is in their room, which is the design
-  (call 4). If the beats show scars unpatched for a watch, the fix is the alert calling all hands
-  (rating patching containment while on alert), not lowering the off-duty rule.
+the watch (§duty-and-the-sleep-watch): the off-watch sleep on unless the impact is in their room,
+which is the design (call 4). If the beats show scars unpatched for a watch, the fix is the alert
+  calling all hands (rating patching containment while on alert), not lowering the off-duty rule.
 - **The report reflex is containment class**, above essential work, so a cook mid-repair walks to
   the panel first. The reflex must end (the facts it carries become public at the broadcast);
   W3's test that a second witness does not report again is the guard against a loop.
@@ -3087,9 +3091,9 @@ section, and the lead runs `pnpm test:live` once.
   (`stageDock`) holds transit at the leg's end: a field clamped to the leg's end must end before
   the hold, or the ship sits in rocks waiting for the narrator. W1 ends the field at the
   approach lead (`narrator.approachHookLeadSeconds`) at the latest.
-- **`machineDamaged` and the departure gate.** D36's gate asks `isMachineBlocked`; a knocked-out
-  engine holds departure for repairs like a faulted one, which is wanted. A damaged (derated,
-  not blocked) machine does not.
+- **`machineDamaged` and the departure gate.** The departure gate (§departure-gate) asks
+`isMachineBlocked`; a knocked-out engine holds departure for repairs like a faulted one, which is
+  wanted. A damaged (derated, not blocked) machine does not.
 - **The intercom placements are content the validator checks** (floor, compartment, reachability,
   off spawn points). Sixteen new machines on Mk2 shift machine instance ids (`m34`…): any test
   that pins a machine id by number is a literal to fix, and the narrator fixtures are regenerated.
@@ -3112,26 +3116,26 @@ section, and the lead runs `pnpm test:live` once.
 - **Save size**: a scar is about 150 bytes; a brutal field leaves twenty, plated away at port.
   `field` is one row; `alert.reports` at most sixteen keys.
 
-### D-entries for slice 5 (D91–D95, provisioned)
+### Decisions for slice 5
 
-Already numbered: the gate commit cites D92, the streams cite the entry their work falls under
-(W1 D92, W2 D93, W3 D94, W4 and W5 D95), and the lead writes all five into `docs/DECISIONS.md`
-at integration, with calls 18–28 folded into the entry each belongs to.
+The behaviour goes into `docs/spec/hull-and-field.md` (and the client and time sections it
+touches) at integration, with calls 18–28 folded into the section each belongs to.
 
-- **D91.** Ship Life is re-sequenced around the asteroid field: slice 5 is the field, damage
+- Ship Life is re-sequenced around the asteroid field: slice 5 is the field, damage
   and comms; 6 atmosphere and breaches with bodies and the medic; 7 fire; 8 tactical, shields
   and the station framework. Drills are cut; `seedTopic` and diagnostics move to later. PLAN §7's
   deferral of atmosphere, fire, breaches and bodies is lifted in that order.
-- **D92.** The asteroid field: `scheduleField` with severity, detection and scripted impacts;
-  detection by the helm and the alert state; impacts uniform over the deck with a blast radius;
-  rolled machine effects up to a one-hit knockout; the helm threads the field; stuck is a clock.
-- **D93.** A global hull bar and ship loss, superseding simulation-design §10.6: scars patched
-  underway for half, plated by the crew at port in full when the port sells plating; no
-  departure check, conflicts are the narrator's; hull zero is game over.
-- **D94.** Intercom panels and reporting: impacts are felt everywhere and seen only in the room;
-  the officer of the watch holds the bridge and sends scouts; whoever finds damage reports at
-  the nearest panel, which tells everyone; the bridge has no hull sensors.
-- **D95.** Save schema 12, prompt v0.24, the beats report's field section and the play-speed
+- The asteroid field (§scheduling-a-field, §rock-impacts): `scheduleField` with severity, detection
+and scripted impacts; detection by the helm and the alert state; impacts uniform over the deck with
+a blast radius; rolled machine effects up to a one-hit knockout; the helm threads the field; stuck
+  is a clock.
+- A global hull bar and ship loss (§hull-scars-and-ship-loss), superseding simulation-design §10.6:
+scars patched underway for half, plated by the crew at port in full when the port sells plating; no
+   departure check, conflicts are the narrator's; hull zero is game over.
+- Intercom panels and reporting (§reporting-damage): impacts are felt everywhere and seen only in
+the room; the officer of the watch holds the bridge and sends scouts; whoever finds damage reports
+  at the nearest panel, which tells everyone; the bridge has no hull sensors.
+- Save schema 12, prompt v0.24, the beats report's field section and the play-speed
   ruling.
 
 ## Later slices

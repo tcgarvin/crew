@@ -1,7 +1,7 @@
 /**
- * Mood (D79), phase `needs`, every tick: drop every actor's expired thoughts and write
- * `actor.mood` from the live ones (`core/thoughts.ts` `moodOf`). `addThought` keeps mood current
- * between runs; this is where thoughts wear off.
+ * Mood (§mood-and-work-speed), phase `needs`, every tick: drop every actor's expired thoughts and
+ * write `actor.mood` from the live ones (`core/thoughts.ts` `moodOf`). `addThought` keeps mood
+ * current between runs; this is where thoughts wear off.
  */
 import { moodOf, thoughtLive } from "../../core/thoughts";
 import type { System } from "../../core/types/pipeline";

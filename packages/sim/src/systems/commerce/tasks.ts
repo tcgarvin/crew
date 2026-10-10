@@ -1,11 +1,12 @@
 /**
- * Task derivation for the problem kinds commerce owns (`cargoToLoad`, `cargoToUnload`, D80's
- * `reserveLow`, and D47's `partsNeeded`, which equipment raises and commerce answers from the
- * port market; CONTRACTS "How work is advertised"). Exported as a `Partial<TaskDerivationTable>`
- * for `systems/work/` (W4) to merge. The cargo kinds derive one `haul` task, the market kinds one
- * `buyParts` task (`buySpec`); `interactionTiles` come from geometry: the
- * manifest's stowage zone, the deck's cargo transfer tiles, or (D63) the dock alongside, read
- * from `DerivationCtx.state` (which dock is grafted) and content (its areas and posts).
+ * Task derivation for the problem kinds commerce owns (`cargoToLoad`, `cargoToUnload`,
+ * `reserveLow` (§reserve-low-problem), and `partsNeeded` (§buying-parts), which equipment raises
+ * and commerce answers from the port market; CONTRACTS "How work is advertised"). Exported as a
+ * `Partial<TaskDerivationTable>` for `systems/work/` (W4) to merge. The cargo kinds derive one
+ * `haul` task, the market kinds one `buyParts` task (`buySpec`); `interactionTiles` come from
+ * geometry: the manifest's stowage zone, the deck's cargo transfer tiles, or the dock alongside
+ * (§delivery-and-pay), read from `DerivationCtx.state` (which dock is grafted) and content (its
+ * areas and posts).
  */
 import { dockAlongsideAt, dockAreaTiles, marketCounter } from "../../core/docks";
 import { affordableUnits } from "../../core/markets";
@@ -75,8 +76,8 @@ function rotated<T>(tiles: readonly T[], start: number): T[] {
 }
 
 /**
- * D63: with the destination's dock alongside, a crate is unloaded by carrying it down to the
- * delivery bay (custody is checked there); each crate of the job aims at its own bay tile
+ * §delivery-and-pay: with the destination's dock alongside, a crate is unloaded by carrying it down
+ * to the delivery bay (custody is checked there); each crate of the job aims at its own bay tile
  * first. Without a dock it goes across a cargo transfer tile into the port's store, as before.
  */
 const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
@@ -106,14 +107,15 @@ const deriveCargoToUnload: DeriveTasks<"cargoToUnload"> = (problem, ctx) => {
 };
 
 /**
- * D47: one `buyParts` task for `count` of `itemDefId`, only while the ship is docked at a port
- * whose market has the item and the ship can pay for at least one unit; otherwise nothing (the
+ * §buying-parts: one `buyParts` task for `count` of `itemDefId`, only while the ship is docked at a
+ * port whose market has the item and the ship can pay for at least one unit; otherwise nothing (the
  * problem stays open and the digest says why). The task carries the units to buy in its
  * `progressRef`; any crew member may take it (no skill, no tool), the planner ranks it at the
- * problem's urgency, and the buyer walks to the market's counter (`marketCounter`, D63): the
- * dock's stall, its gate when it has no stall, or with no dock a cargo transfer tile. Shared by
- * `partsNeeded` and D80's `reserveLow`, which differ only in what the task names as its target;
- * exported for D93's `hullDamaged` (hull plating, `systems/damage/tasks.ts`).
+ * problem's urgency, and the buyer walks to the market's counter (`marketCounter`,
+ * §dock-market-and-passengers): the dock's stall, its gate when it has no stall, or with no dock a
+ * cargo transfer tile. Shared by `partsNeeded` and `reserveLow`, which differ only in what the task
+ * names as its target; exported for `hullDamaged` (§plating-and-kits-at-port; hull plating,
+ * `systems/damage/tasks.ts`).
  */
 export function buySpec(
   problem: { readonly baseUrgency: TaskSpec["baseUrgency"] },
@@ -149,13 +151,13 @@ export function buySpec(
   return [spec];
 }
 
-/** D47: the part a stalled repair needs; the task names the machine it unblocks. */
+/** §buying-parts: the part a stalled repair needs; the task names the machine it unblocks. */
 const derivePartsNeeded: DeriveTasks<"partsNeeded"> = (problem, ctx) => {
   const { itemDefId, count, machineId } = problem.payload;
   return buySpec(problem, ctx, itemDefId, count, () => ({ kind: "machine", machineId }));
 };
 
-/** D80: restocking the ship's stores; the task names the market it buys from. */
+/** §reserve-low-problem: restocking the ship's stores; the task names the market it buys from. */
 const deriveReserveLow: DeriveTasks<"reserveLow"> = (problem, ctx) => {
   const { itemDefId, count } = problem.payload;
   return buySpec(problem, ctx, itemDefId, count, (portId) => ({ kind: "market", portId }));

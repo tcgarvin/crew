@@ -1,5 +1,5 @@
 /**
- * Eating (D81): the `eat` plan, the `consume` commit point, the mess call's hold on the gangway
+ * Eating (§eating): the `eat` plan, the `consume` commit point, the mess call's hold on the gangway
  * stander, and the `carryMeal` plan.
  *
  * - `eatPlan`: the food in hand, else one unit split off the stack the planner chose; then a free

@@ -7,9 +7,9 @@
 import type { NarratorUsage } from "./contract";
 
 /**
- * D96: how hard a reasoning model thinks before it answers (OpenRouter's `reasoning.effort`).
- * `default` sends nothing, so the model keeps its own default and a model that does not reason
- * by default (Sonnet) is not switched into extended thinking.
+ * §models-and-reasoning-effort: how hard a reasoning model thinks before it answers (OpenRouter's
+ * `reasoning.effort`). `default` sends nothing, so the model keeps its own default and a model that
+ * does not reason by default (Sonnet) is not switched into extended thinking.
  */
 export const REASONING_EFFORTS = [
   "default",
@@ -23,14 +23,14 @@ export const REASONING_EFFORTS = [
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 /**
- * D97: the model's reasoning as the provider returned it (OpenRouter's `reasoning_details`; for
- * OpenAI an encrypted blob). Opaque here: it is only ever handed back to the same model.
+ * §notes-turn: the model's reasoning as the provider returned it (OpenRouter's `reasoning_details`;
+ * for OpenAI an encrypted blob). Opaque here: it is only ever handed back to the same model.
  */
 export type ReasoningDetails = readonly unknown[];
 
 /**
- * D97: a turn after the first user turn: the model's earlier reply, with its reasoning so the
- * model keeps it, or a further user turn.
+ * §notes-turn: a turn after the first user turn: the model's earlier reply, with its reasoning so
+ * the model keeps it, or a further user turn.
  */
 export type ContinuationMessage =
   | {
@@ -45,7 +45,7 @@ export interface ModelRequest {
   /** System content parts in order; the last one is the prompt-cache breakpoint. */
   readonly system: readonly string[];
   readonly user: string;
-  /** D97: turns after `user`; empty for a single-turn call. */
+  /** §notes-turn: turns after `user`; empty for a single-turn call. */
   readonly continuation: readonly ContinuationMessage[];
   readonly schemaName: string;
   /** Closed JSON Schema for the plan (all properties required, no recursion). */
@@ -64,7 +64,7 @@ export interface ModelResult {
   readonly finish: ModelFinish;
   readonly refusal?: string;
   readonly usage: NarratorUsage;
-  /** D97: empty when the provider returned none. */
+  /** §notes-turn: empty when the provider returned none. */
   readonly reasoningDetails: ReasoningDetails;
 }
 

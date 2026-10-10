@@ -2,10 +2,10 @@
 
 Status: proposal for the owner, 2026-10-01, revised the same day by a second design partner.
 Each substantive change from the first draft is marked "(revised: reason)" so the owner can see
-what moved. Decisions taken from this doc get recorded in `docs/DECISIONS.md`; this file stays
-as the design rationale. It builds on GDD §10 (ports), §11 (jobs and economy) and the canon rule
-in GDD §7 ("if a passenger is secretly smuggling a diamond, the diamond must actually exist in
-the simulation").
+what moved. Behaviour taken from this doc goes into `docs/spec/` and real decisions into
+`docs/DECISIONS.md`; this file stays as the design rationale. It builds on GDD §10 (ports), §11
+(jobs and economy) and the canon rule in GDD §7 ("if a passenger is secretly smuggling a diamond,
+the diamond must actually exist in the simulation").
 
 ## 1. Why
 
@@ -104,13 +104,14 @@ one, and when something does, the narrator already has a lever for it.)
 - **Intermediate stops are real dockings.** The fee is charged, ramps open, the market is open,
   `approachingPort` fires as today. The ship continues to the next hop on its own when nothing
   holds it: no cargo work, no `buyParts` task that can run here (revised: otherwise a stalled
-  repair could not buy parts at a waypoint, D47), no departure hold, no pending card.
+  repair could not buy parts at a waypoint, §buying-parts), no departure hold, no pending card.
 - **Detours use the existing lever.** A card side with `setCourse` to a neighbouring port while
   a voyage is set is a detour: the voyage destination stays and the sim routes on from wherever
   the ship ends up. "The long way round is safer" is a narrator card, not a sim prompt.
 - **The departure gate is asked once per voyage, not per docking** (revised: with
-  auto-continue a degraded engine would raise D36's card at every waypoint). "Leave anyway"
-  persists until the voyage ends or the impairment changes (a new fault, or a repair).
+auto-continue a degraded engine would raise the departure gate's card (§departure-gate) at every
+waypoint). "Leave anyway" persists until the voyage ends or the impairment changes (a new fault, or
+  a repair).
 - **Headline:** "Under way to Kessler Drift, bound for Ossory Station"; docked at a waypoint,
   "Stopping at Kessler Drift on the way to Ossory Station".
 - **Pay** for freight and fares uses path distance (sum of legs) in the existing price band
@@ -120,7 +121,7 @@ one, and when something does, the narrator already has a lever for it.)
 
 Each port gets two or three sentences of character in content (`description` exists; add
 `character`: what kind of people are here, what they want, what the place is known for) and a
-few named recurring locals in the narrator's cast seed. Markets differ by port (D47). The
+few named recurring locals in the narrator's cast seed. Markets differ by port (§market-stock). The
 capabilities block lists the graph with leg lengths and hop counts from the current port, so
 distances and detours are facts the narrator can use.
 
@@ -136,7 +137,7 @@ fares, its own status machine and a cabin. Almost all of that already exists on 
 person, pitch, description, from and to ports, urgency, pay in a price band, offer card, accept
 and decline, expiry, delivery check, one payment, `contractCompleted`. SD §17.3 already says
 jobs record "manifest/passengers". A second entity would duplicate the lifecycle, the offer
-card path, the digest's Jobs section and the D16 one-job rule.)
+card path, the digest's Jobs section and the one-job rule, §one-job-in-hand.)
 
 ```
 Job (existing) + {
@@ -158,8 +159,8 @@ Job (existing) + {
   (revised: no general itinerary. The owner's shape is "go a few hops, do something, come
   back"; multi-stop itineraries add arrays to the plan schema and states to the sim for stories
   a detour card already tells.)
-- **One passage at a time, and it is the job** (D16 unchanged). A passenger competes with
-  freight for the ship, not merely for the route; the fare is sized for that.
+- **One passage at a time, and it is the job** (§one-job-in-hand, unchanged). A passenger competes
+  with freight for the ship, not merely for the route; the fare is sized for that.
 
 ### 3.2 Aboard
 
@@ -184,8 +185,9 @@ but departure **waits for them**, like a departure hold: course kept, ramps open
 
 `returnsAtTick` is drawn by the sim from `config.commerce.passage.ashoreSeconds` (say 60 to
 180) on a seeded stream. If they are not back by `passage.overdueSeconds` (say 120), the kernel
-queues a policy decision through `queuePolicyDecision`, brought by the first officer (D29) and
-narrated through the `policyDecision` hook (D37): **"Wait for her" / "Leave without her."**
+queues a policy decision through `queuePolicyDecision`, brought by the first officer (§spoken-cards)
+and narrated through the `policyDecision` hook (§policy-decision-hook): **"Wait for her" / "Leave
+without her."**
 
 (revised: the first draft's abandon card could only happen if the narrator claimed lateness the
 sim did not show, since the dwell was fixed and only a captain card could move the ship. Now
@@ -201,9 +203,9 @@ which is why it should not be the only failure mode (§4.2).
 
 ### 3.4 Money
 
-(revised: one payment on completion, not three stages. Pay never appears on a card (D24); the
-staging would be visible only as three small top-bar ticks, and all-or-nothing makes "leave
-without her" and "put him off" weigh more, not less.)
+(revised: one payment on completion, not three stages. Pay never appears on a card
+(§cards-never-mention-pay); the staging would be visible only as three small top-bar ticks, and
+all-or-nothing makes "leave without her" and "put him off" weigh more, not less.)
 
 The fare uses the job price band machinery with a passenger band
 (`config.commerce.priceBands.passenger`, per distance unit) over path distance, doubled for a
@@ -229,7 +231,7 @@ the hourly cap.)
 ### 4.1 Offer: two booleans on `offerJob`
 
 (revised: the first draft added a sixth intent with an itinerary array of objects, a three-value
-dwell enum and its own copies of payTier, urgency and surface. D45 showed that the grammar pays
+dwell enum and its own copies of payTier, urgency and surface. Earlier grammar-size work showed that the grammar pays
 for every union member, enum and nesting level; an array of objects inside a new union member is
 the expensive kind. Two booleans on the existing member cost almost nothing.)
 
@@ -241,10 +243,10 @@ offerJob { ...existing fields...,
 ```
 
 Translator rules: `toPort` may be any reachable port (path checked); a passenger offer is
-always surfaced, since it is a person at the ramp (`surface` is forced true, D42 waits for the
-dock); `roundTrip` without `passenger` is dropped with a reason; quantity is ignored for a
-passage beyond one luggage line; the passenger joins the narrator's cast automatically, placed
-aboard. The stated purpose is `description`; the truth can differ in notes.
+always surfaced, since it is a person at the ramp (`surface` is forced true; offer cards wait for
+the dock, §offer-cards); `roundTrip` without `passenger` is dropped with a reason; quantity is
+ignored for a passage beyond one luggage line; the passenger joins the narrator's cast
+automatically, placed aboard. The stated purpose is `description`; the truth can differ in notes.
 
 ### 4.2 Putting a passenger off: one effect on a card side
 
@@ -260,7 +262,7 @@ it seemed.
 ### 4.3 What already composes
 
 `surfaceDecision` with the passenger as speaker carries the middle of the episode; beat cards
-(D39) are their foreboding, one per thread as now; `setCourse` is the detour they ask for;
+(§beat-cards) are their foreboding, one per thread as now; `setCourse` is the detour they ask for;
 `stockMarket` makes the thing they came for scarce or dear at the far port; `scheduleFault` is
 the complication on the long leg.
 
@@ -282,12 +284,12 @@ Passengers are a social fact. v1 makes them one with what already exists:
   digest's recent events, so they are true things a crew card can open from.
 - **Opinion lives in threads.** (revised: no per-crew-per-passenger opinion table in notes. It
   grows the notes schema and the digest for something a thread already carries: a thread's
-  `people` list and `stage` can say "Sunniva doesn't trust him", and the crew voice (D38) carries
-  it onto the card.) Mood effects on crew from passengers are deferred.
+`people` list and `stage` can say "Sunniva doesn't trust him", and the crew voice (§crew-lines)
+  carries it onto the card.) Mood effects on crew from passengers are deferred.
 
 ## 6. Cards this produces
 
-The same card grammar as today (D29), with new true things to say:
+The same card grammar as today (§spoken-cards), with new true things to say:
 
 - **Offer** (jobBoard, the passenger at the ramp): "Welcome aboard." / "Not this trip."
 - **Waypoint or long-leg beat**: the passenger finds the captain. A beat card, attitude recorded.
@@ -298,8 +300,9 @@ The same card grammar as today (D29), with new true things to say:
 - **Overdue** (sim policy card): "Wait for her." / "Leave without her."
 - **Payoff** (`contractCompleted`): their last word at the ramp; what the captain learns.
 
-Each is grounded in state the digest shows (the D47 test). Each is the call's one card, so a
-passenger beat competes with whatever else is due under the arc selection rule (D39).
+Each is grounded in state the digest shows (§market-and-parts-lines). Each is the call's one card,
+so a passenger beat competes with whatever else is due under the arc selection rule
+(§threads-and-scales).
 
 ## 7. Phasing
 
@@ -331,7 +334,7 @@ Each changes what gets built. Recommendation first.
    card and a narrator call per waypoint.
 3. **Passage as a job, or a new entity.** Recommend a job with a `passage` block and two
    booleans on `offerJob` (§3.1, §4.1). The first draft's `Passage` entity and `offerPassage`
-   intent duplicate the job lifecycle and cost grammar budget (D45).
+   intent duplicate the job lifecycle and cost grammar budget.
 4. **Failure modes.** Recommend two: sim-drawn lateness with a "wait or leave" policy card, and
    an `endPassage` card effect the narrator can set up (§3.3, §4.2). The first draft had only
    abandonment, which the sim could not produce on its own.

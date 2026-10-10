@@ -1,6 +1,6 @@
 /**
- * Task derivation for the problems damage response owns (D93, D94). Merged by `systems/work/`
- * with the other systems' rules.
+ * Task derivation for the problems damage response owns (§machine-damage, §scouts). Merged by
+ * `systems/work/` with the other systems' rules.
  *
  * - `machineDamaged` → one `repairDamage`: engineering ≥ 1 and a `welder`, at the machine's
  *   `repair` positions (any position on a machine with none, else the floor beside it),

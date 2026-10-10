@@ -7,7 +7,7 @@
  *
  * `attachDock`/`detachDock` are the only writers of `state.deck.dock` once a world is running
  * (world creation and the 3 → 4 save migration set it directly, before any cache exists). The
- * travel system calls them at the start of `docking` and the end of `undocking` (D61).
+ * travel system calls them at the start of `docking` and the end of `undocking` (§travel-stages).
  */
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";

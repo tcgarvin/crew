@@ -3,11 +3,11 @@
  * given moment, and what the camera frames. Pure geometry; the drawing is in `dockArt.ts`.
  *
  * Frames. The sim grafts the dock onto the deck's grid at `shipAt` (D59), the ship's place in the
- * map's berth box (`berthPlacement`, D72; `berthInView` here), so dock tile (x, y) is deck tile
- * (x − shipAt.x, y − shipAt.y) and a person on the dock is an ordinary deck position,
+ * map's berth box (`berthPlacement`, §ship-placement; `berthInView` here), so dock tile (x, y) is
+ * deck tile (x − shipAt.x, y − shipAt.y) and a person on the dock is an ordinary deck position,
  * possibly at negative coordinates. The renderer adds one thing: the scene's berth offset, so the
- * dock (and everyone on it) slides in from the fore (+x, `orientation.ts`) while docking and
- * drifts aft while undocking, exactly as the phase 1 berth did. The ship's own tiles never move.
+ * dock (and everyone on it) slides in from the fore (+x, `orientation.ts`) while docking and drifts
+ * aft while undocking, exactly as the phase 1 berth did. The ship's own tiles never move.
  */
 import {
   type BerthedDock,
@@ -28,10 +28,11 @@ export type DockTable = Readonly<Record<DockDefId, DockDef>>;
 
 /**
  * Which dock map the frame shows. From the start of `docking` to the end of `undocking` the sim
- * names the dock alongside (`RenderFrame.dock`, D61) and that is the one drawn. Either side of that
- * window (`approaching`, `departing`) nothing is alongside, but the port's dock is still in view,
- * sliding in or falling astern, so it comes from content: the dock whose `portId` is the port in
- * view. During `transit` that is the destination's, drawn nowhere (the scene's `portAlpha` is 0).
+ * names the dock alongside (`RenderFrame.dock`, §dock-alongside) and that is the one drawn. Either
+ * side of that window (`approaching`, `departing`) nothing is alongside, but the port's dock is
+ * still in view, sliding in or falling astern, so it comes from content: the dock whose `portId` is
+ * the port in view. During `transit` that is the destination's, drawn nowhere (the scene's
+ * `portAlpha` is 0).
  *
  * `undefined` means the port has no dock map: the caller draws the phase 1 stand-in berth. Throws
  * if the frame names a dock the content lacks: the worker runs the same bundle, so that is a bug.
@@ -48,7 +49,7 @@ export function dockInView(
   return dockForPort({ docks }, portInView(frame.travel));
 }
 
-/** `dock` with the layout's deck in its berth box, as the sim grafts it (D72). */
+/** `dock` with the layout's deck in its berth box, as the sim grafts it (§ship-placement). */
 export function berthInView(
   dock: DockDef,
   layout: Pick<DeckLayout, "deckId" | "width" | "height" | "hull">,
@@ -79,7 +80,7 @@ export function dockSlide(scene: Pick<Scene, "portOffset">, deckWidth: number): 
   return aftOf(scene.portOffset * deckWidth);
 }
 
-/** The ship's deck rectangle in dock tiles: its place in the berth box (D72). */
+/** The ship's deck rectangle in dock tiles: its place in the berth box (§ship-placement). */
 export function shipInDock(
   { shipAt }: Pick<BerthedDock, "shipAt">,
   layout: Pick<DeckLayout, "width" | "height">,
@@ -115,10 +116,10 @@ export function isShipTile(
 }
 
 /**
- * The frame as drawn: people and loose items on the dock (`onDock`, D61) move with it while it
- * slides (their positions are in the grafted frame, so they already assume it is alongside);
- * everyone aboard stays put. The dock's own people and props (D66) are always on it, so they all
- * move. Carried items ride their carrier, so they follow. Returns the frame
+ * The frame as drawn: people and loose items on the dock (`onDock`, §living-on-the-dock) move with
+ * it while it slides (their positions are in the grafted frame, so they already assume it is
+ * alongside); everyone aboard stays put. The dock's own people and props (§locals-table) are always
+ * on it, so they all move. Carried items ride their carrier, so they follow. Returns the frame
  * itself when nothing slides, which is every docked frame.
  *
  * Nobody crosses a ramp while the dock slides (ramps open only once `docked` and are up again

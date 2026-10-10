@@ -31,7 +31,7 @@ const hazard = (tick: number) =>
     lostSeconds: 0,
   });
 
-describe("auto-slowdown queue (D76)", () => {
+describe("auto-slowdown queue (§auto-slowdown)", () => {
   it("queues only the listed event types", () => {
     const queue = queueOf(LIST);
     queue.add([event("bell", 10), hazard(20), event("conversation", 30)]);
@@ -63,7 +63,7 @@ describe("auto-slowdown queue (D76)", () => {
   });
 });
 
-describe("whether to slow down (D76)", () => {
+describe("whether to slow down (§auto-slowdown)", () => {
   const due = [{ event: hazard(5) }];
 
   it("drops fast-forward to 1× when an event falls due", () => {
@@ -103,7 +103,7 @@ describe("whether to slow down (D76)", () => {
   });
 });
 
-describe("only news worth stopping for (D76 addendum)", () => {
+describe("only news worth stopping for (§auto-slowdown)", () => {
   it("slows for the engines going down, not for them coming back", () => {
     expect(worthSlowingFor(event("driftingChanged", 1, { drifting: true }))).toBe(true);
     expect(worthSlowingFor(event("driftingChanged", 2, { drifting: false }))).toBe(false);

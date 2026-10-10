@@ -1,8 +1,8 @@
 /**
- * Deposits (D82): everything but footfall dirties the deck through this one function, with the
- * amount from `config.dirt.deposits` (`cooking` at the stove, `serving` and `spoiledMeal` on the
- * counter, `eating` where the eater stands, `repair` round a machine when its recipe completes,
- * `cargo` where a crate is set down).
+ * Deposits (§dirt-deposits): everything but footfall dirties the deck through this one function,
+ * with the amount from `config.dirt.deposits` (`cooking` at the stove, `serving` and `spoiledMeal`
+ * on the counter, `eating` where the eater stands, `repair` round a machine when its recipe
+ * completes, `cargo` where a crate is set down).
  *
  * `amount` (of 1.0 = 255) is shared evenly over the floor cells (`dirtFloor`: no dock floor, no
  * machine footprint) within `dirt.depositRadiusTiles` (a square) of `tile` that lie in the same

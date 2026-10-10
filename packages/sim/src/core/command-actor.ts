@@ -1,8 +1,9 @@
 /**
  * Command perspective (D8): the captain, or the first officer when the captain is asleep or
  * incapacitated. Lives in core so the kernel's own decision code (`surfaceDecision`'s default
- * perspective, D70's in-person delivery) and the systems (`systems/travel/roster.ts` re-exports
- * it) share one rule; it used to be written out twice because core may not import systems.
+ * perspective, the in-person delivery of §delivery) and the systems (`systems/travel/roster.ts`
+ * re-exports it) share one rule; it used to be written out twice because core may not import
+ * systems.
  */
 import type { Actor } from "./types/actor";
 import type { DeepReadonly } from "./types/common";
@@ -17,8 +18,8 @@ function isAsleepNow(activity: DeepReadonly<Actor["activity"]>): boolean {
 }
 
 /**
- * D63/D70: out through the dock's gate on an errand (a `throughGate` step): off ship, but only
- * just. Mirrors `systems/work/activity.ts` `isOutThroughGate` (core may not import systems).
+ * §looking-for-work: out through the dock's gate on an errand (a `throughGate` step): off ship, but
+ * only just. Mirrors `systems/work/activity.ts` `isOutThroughGate` (core may not import systems).
  */
 function outThroughGate(actor: DeepReadonly<Pick<Actor, "availability" | "activity">>): boolean {
   const activity = actor.activity;
@@ -29,8 +30,8 @@ function outThroughGate(actor: DeepReadonly<Pick<Actor, "availability" | "activi
 
 /**
  * D8: an actor cannot act as the command perspective while incapacitated, off ship or asleep.
- * D70: a captain out through the gate (to see someone, or on a market errand) is still fit for
- * command: going ashore does not hand the ship to the first officer (dockside §6.2).
+ * §looking-for-work: a captain out through the gate (to see someone, or on a market errand) is
+ * still fit for command: going ashore does not hand the ship to the first officer (dockside §6.2).
  */
 export function isFitForCommand(
   actor: DeepReadonly<Pick<Actor, "availability" | "activity">>,

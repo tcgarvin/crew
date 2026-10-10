@@ -28,7 +28,7 @@ describe("narrator", () => {
     vi.restoreAllMocks();
   });
 
-  it("logs a fallback reply as one structured warn line, without the API key (D42)", async () => {
+  it("logs a fallback reply as one structured warn line, without the API key", async () => {
     const env = loadEnv({ CREW_DB: "memory", OPENROUTER_API_KEY: "sk-or-secret-key" });
     const fallbackNarrator: RunNarrator = async () => ({
       response: {
@@ -182,7 +182,7 @@ describe("narrator", () => {
     }
   });
 
-  it("429s a call too soon after the last one, but not a policyDecision hook (D37)", async () => {
+  it("429s a call too soon after the last one, but not a policyDecision hook (§call-spacing)", async () => {
     const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);
@@ -202,7 +202,7 @@ describe("narrator", () => {
     expect((await db.getLastNarratorCall(game.id))?.hookKind).toBe("policyDecision");
   });
 
-  it("answers a captainAshore ask however soon after the last call, since it is never asked twice (D70)", async () => {
+  it("answers a captainAshore ask however soon after the last call, since it is never asked twice (§captain-ashore-ask)", async () => {
     // Browser QA: delivered at Kessler Drift (t20003, a `notableEvent` the model answered), the
     // captain stepped onto the dock 29 ticks later; the ask was refused as too soon, the client
     // acknowledged it unanswered, and the sim (one ask per docking) never asked again.
@@ -223,7 +223,7 @@ describe("narrator", () => {
     expect((await readJson(quiet)).error).toMatchObject({ reason: "spacing" });
   });
 
-  it("answers a requestedCall however soon after the last call, since it is raised once (D99)", async () => {
+  it("answers a requestedCall however soon after the last call, since it is raised once (§requested-call-back)", async () => {
     const env = loadEnv({ CREW_DB: "memory" });
     const { app, db } = buildTestApp({ env, runNarrator: echoNarrator });
     const { token } = await mintUser(app);

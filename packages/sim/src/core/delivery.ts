@@ -1,6 +1,6 @@
 /**
- * D70: cards delivered in person (dockside §6.2, §6.3). While the ship is docked at a port with a
- * dock map, a card whose speaker is one of the port's people (an offer's issuer, a narrator
+ * §delivery: cards delivered in person (dockside §6.2, §6.3). While the ship is docked at a port
+ * with a dock map, a card whose speaker is one of the port's people (an offer's issuer, a narrator
  * card's `speaker` who is neither crew nor a passenger) is not put in front of the captain at
  * once: it is held (`DecisionsState.held`), and comes up when the captain and the speaker meet.
  * Commerce runs the meetings (`systems/commerce/delivery.ts`); this module is the part the kernel's
@@ -11,8 +11,8 @@
  * by `deliverHeldCard`: onto the queue, or dropped when it is an offer whose job closed first.
  *
  * Crew and passengers bring their cards as before (immediately), and so do observed scenes (no
- * speaker), kernel-raised policy cards (D37: brought by crew), anything in flight, and anything at
- * a port without a dock map.
+ * speaker), kernel-raised policy cards (§policy-decision-cards: brought by crew), anything in
+ * flight, and anything at a port without a dock map.
  */
 import { dockAlongsideAt, dockPost } from "./docks";
 import type { DeepReadonly, Tick } from "./types/common";
@@ -72,8 +72,8 @@ function holdingPort(
 }
 
 /**
- * Put a freshly created pending decision in front of the captain: on the queue, or (D70) held for
- * delivery in person when its speaker is one of the port's people.
+ * Put a freshly created pending decision in front of the captain: on the queue, or held
+ * (§holding-a-card) for delivery in person when its speaker is one of the port's people.
  */
 export function queueOrHold(ctx: Ctx, decisionId: DecisionId, speaker: string | undefined): void {
   const portId = holdingPort(ctx.state, ctx.content, speaker);

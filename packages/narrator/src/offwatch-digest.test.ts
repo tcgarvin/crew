@@ -1,5 +1,5 @@
 /**
- * D87 in the digest: the off-watch and rivalry lines under "Ship", the crew line's likes,
+ * §ship-life-lines: the off-watch and rivalry lines under "Ship", the crew line's likes,
  * relationships and berth after `good at`, and `{ref}` in thought labels. The world comes from
  * the in-code fixtures (the default scenario's Mk2); sessions, rivalries, relationships, steps
  * and thoughts are written by hand, so these hold whatever the recreation and social systems do.
@@ -122,7 +122,7 @@ function cardsAtTheTable(state: State, members: readonly ActorId[], started: boo
   };
 }
 
-describe("the off-watch line (D87)", () => {
+describe("the off-watch line (§ship-life-lines)", () => {
   it("names a running game with its players and someone playing on their own", () => {
     const snap = snapshot();
     const state = snap.state;
@@ -169,7 +169,7 @@ describe("the off-watch line (D87)", () => {
   });
 });
 
-describe("the rivalries line (D87)", () => {
+describe("the rivalries line (§ship-life-lines)", () => {
   it("names a rivalry in the key's order with its tally and the current run", () => {
     const snap = snapshot();
     const state = snap.state;
@@ -213,7 +213,7 @@ describe("the rivalries line (D87)", () => {
   });
 });
 
-describe("the crew line's off-watch clauses (D87)", () => {
+describe("the crew line's off-watch clauses (§ship-life-lines)", () => {
   it("follows good at with likes, dislikes and the berth, keeping the line's shape", () => {
     const text = digest(snapshot());
     const jax = crewLine(text, "Jax Okonkwo");
@@ -228,8 +228,8 @@ describe("the crew line's off-watch clauses (D87)", () => {
     const state = snap.state;
     const jax = actorNamed(state, "Jax Okonkwo").id;
     const id = (name: string) => actorNamed(state, name).id;
-    // D88: compatibility from the authored crew (Jax with Noor and Tomas +1, Dane −2, Priya 0),
-    // plus the memories each side holds.
+    // §affinity: compatibility from the authored crew (Jax with Noor and Tomas +1, Dane −2, Priya
+    // 0), plus the memories each side holds.
     const remembers = (...keys: MemoryKey[]) => ({
       memories: keys.map((key) => ({ key, expiresAtTick: state.tick + 1000 })),
     });
@@ -265,7 +265,7 @@ describe("the crew line's off-watch clauses (D87)", () => {
   });
 });
 
-describe("{ref} in thought labels (D87)", () => {
+describe("{ref} in thought labels (§ship-life-lines)", () => {
   it("fills the placeholder with the refId's name in the mood clause", () => {
     const snap = snapshot();
     const state = snap.state;

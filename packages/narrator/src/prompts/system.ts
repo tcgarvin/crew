@@ -1,33 +1,33 @@
 /**
  * The static system prefix (prompt-cached). Principles from GDD §15–§22. Bump `PROMPT_VERSION`
  * whenever any prompt text changes, so `narrator_calls.prompt_version` identifies what ran.
- * v0.2 (2026-09-30): people not companies and a pitch per offer (D25), no pay talk (D24),
- * aftermaths on every card side (D26); per-hook instructions moved into the static prefix.
- * v0.3 (2026-10-01): cards are spoken by a named person (D29), 70-word cap.
- * v0.4 (2026-10-01): the captain only knows what the cards showed (D31: "What the captain has
- * seen", a new card must bring something new), threads are structured TV-style at four scales
- * (D32), quietTooLong prefers a due thread, then a minor crew card, then nothing.
- * v0.5 (2026-10-01): every crew member has a voice line and is written in it, the stage is
- * shared across the crew (D38); when several threads are due the oldest beat goes first unless
- * an episode is at its climax, and beat cards foreshadow a thread without a decision, one per
- * thread (D39).
+ * v0.2 (2026-09-30): people not companies and a pitch per offer (§issuers-and-pitches), no pay talk
+ * (§cards-never-mention-pay), aftermaths on every card side (§aftermath-caption); per-hook
+ * instructions moved into the static prefix. v0.3 (2026-10-01): cards are spoken by a named person
+ * (§spoken-cards), 70-word cap. v0.4 (2026-10-01): the captain only knows what the cards showed
+ * (§card-history: "What the captain has seen", a new card must bring something new), threads are
+ * structured TV-style at four scales (§threads-and-scales), quietTooLong prefers a due thread, then
+ * a minor crew card, then nothing. v0.5 (2026-10-01): every crew member has a voice line and is
+ * written in it, the stage is shared across the crew (§crew-lines); when several threads are due
+ * the oldest beat goes first unless an episode is at its climax, and beat cards foreshadow a thread
+ * without a decision, one per thread (§beat-cards).
  * v0.6 (2026-10-01): the narrator is the only source of work (D40): approachingPort and captainAshore
  * say that offering nothing leaves the port without work until the next call, so it must be a
  * deliberate, rare story choice; captainAshore is the captain looking for work and is usually answered
  * with an offer from someone who fits the port and the threads.
  * v0.7 (2026-10-01): the captain is the player and never speaks on a card; cards are brought to
- * them, and the captain's voice line is only how others react to or quote them (D41).
- * v0.8 (2026-10-01): an offer surfaced on approach is shown once the ship has docked (D42).
- * v0.9 (2026-10-01): vocabulary enforced by the translator, not the schema (D45): ids are
- * copied exactly from "What you can do", and optional strings are empty rather than null.
- * v0.10 (2026-10-01): the narrator runs the pace (D46): a "Pacing" block reads the card history
- * for the rhythm (work, a breath, forward motion), an idle docked captain gets work first,
- * faults are pressure and never filler; quietTooLong chooses forward motion, a breath or
- * nothing by those rules.
+ * them, and the captain's voice line is only how others react to or quote them
+ * (§captain-never-speaks). v0.8 (2026-10-01): an offer surfaced on approach is shown once the ship
+ * has docked (§offer-cards). v0.9 (2026-10-01): vocabulary enforced by the translator, not the
+ * schema (§narrator-authority): ids are copied exactly from "What you can do", and optional strings
+ * are empty rather than null. v0.10 (2026-10-01): the narrator runs the pace (D46): a "Pacing"
+ * block reads the card history for the rhythm (work, a breath, forward motion), an idle docked
+ * captain gets work first, faults are pressure and never filler; quietTooLong chooses forward
+ * motion, a breath or nothing by those rules.
  * v0.11 (2026-10-01): parts come only from a port's market and the crew buy them themselves while
- * docked (D47): a fifth lever, stockMarket, puts a part on sale (or withdraws it) at any port;
- * the narrator never narrates a repair, purchase, delivery or payment the digest does not show,
- * and scarcity is a story (the part is at the next port). quietTooLong reworded as a neutral
+ * docked (§market-lever): a fifth lever, stockMarket, puts a part on sale (or withdraws it) at any
+ * port; the narrator never narrates a repair, purchase, delivery or payment the digest does not
+ * show, and scarcity is a story (the part is at the next port). quietTooLong reworded as a neutral
  * check-in, not a request for work (D46 as amended): pacing is the narrator's judgement, not a
  * timer's.
  * v0.12 (2026-10-02): the galaxy has far ports (passengers-and-galaxy §2): offers and courses may
@@ -41,68 +41,70 @@
  * the sim raises the overdue card itself. The narrator never decides a passenger's fate and
  * never narrates what they did ashore as fact; the stated purpose is the description, the truth
  * may differ in notes. The six passenger card kinds are guidance.
- * v0.14 (2026-10-02): one job at a time is enforced (D16, D50): every hook asks for one offer,
- * none while a job is in hand or at a waypoint, and the capability list says such offers are
- * dropped; a passenger offer whose card is taken is dropped rather than posted quietly.
+ * v0.14 (2026-10-02): one job at a time is enforced (§one-job-in-hand, D50): every hook asks for
+ * one offer, none while a job is in hand or at a waypoint, and the capability list says such offers
+ * are dropped; a passenger offer whose card is taken is dropped rather than posted quietly.
  * v0.15 (2026-10-03): arcs end on a card (D54): the captain only knows a story is over if a card
  * says so, so a finished thread gets a closing card (an ordinary card that reads as an ending)
  * before it leaves the notes, and a finished job's episode closes on contractCompleted.
- * v0.16 (2026-10-03): a closing card names its thread (closesThread, D56); the server retires
- * the thread when the card goes up, so the narrator no longer waits for it to show, and a thread
- * cannot be closed twice.
- * v0.17 (2026-10-03): `approachingPort` is retired (D66): arrival is the staging call's, which
- * sets the stage and never moves the plot, so offers no longer arrive in flight; the story
- * narrator is called when the captain is looking for work at a port instead.
- * v0.18 (2026-10-03): the staging call gets its own prompt (`staging/prompt.ts`, D67): who and
- * what is on the dock when the ship lands, set before she comes alongside, never moving the plot.
- * The story narrator reads the result under "On the dock" (people at their posts, set dressing,
- * the arrival line), may use those people as issuers and speakers, and decides whether a new face
- * joins the cast; the capability list no longer says the narrator is called on approach.
- * v0.19 (2026-10-03): the captain goes ashore to look for work (D70): `jobBoard` becomes
- * `captainAshore`, called the moment the captain steps onto the dock, and its text says who is
- * out there and that the port lies beyond the gate. Cards from the port's people are delivered in
- * person while docked (the captain walks over or goes out through the gate; with the captain
- * aboard, the speaker walks to the ramp), so the issuer or speaker named is who the captain
- * meets; offers are made only while docked.
- * v0.20 (2026-10-04): the ship is a Freighter Mk2 run by nine people (D73): the showrunner and
- * set-dresser openings say "nine", not "eight".
- * v0.21 (2026-10-04): the watch and the helm (D77-D79): a watch paragraph (three watches, the
- * bell and the handover, who has the helm is in the digest, an empty helm is the ship's own
- * failing and a reason, mood and thoughts are the sim's), and a sixth lever, scheduleHazard, the
- * helm's stakes: placed when the leg and the person at the helm make it a story, never twice in
- * a row, never while another fault is unrepaired, rolled by the sim. "Five levers" become six.
- * v0.22 (2026-10-04): the galley and dirt (D81-D83): a galley-and-dirt paragraph (the cook's
- * meals before each bell, a burnt dinner or a missed meal are the crew's story, provisions run
- * out and are bought at ports, stockMarket may stock provisions, a filthy room is the ship's own
- * failing; never invent food the sim has not cooked); quietTooLong may make a meal the beat.
- * v0.23 (2026-10-05): off watch (D84-D87): an off-watch paragraph (cards, vids, sparring,
- * arguments and rivalries are the sim's and the crew's story, never invented; an argument or a
- * rivalry is what a card is made of; each crew line's likes are who they are and the narrator
- * writes to them), and privateTalk, a card side effect the captain's cabin makes possible, warm
- * or stern, whose outcome shows in affinity next call. quietTooLong may make a rivalry or an
- * argument the beat; notableEvent says the same of one in recent events. Levers stay six.
- * v0.24 (2026-10-06): the asteroid field (D92-D95): a seventh lever, scheduleField, with
- * severity, detection (rolled or unseen) and up to three scripted hits on machines or rooms; a
- * field paragraph (the narrator shapes the field, the sim throws the rocks and the crew answer),
- * a hull paragraph (weigh the hull before placing one, never a field the hull cannot survive
- * unless the ship left port damaged; scars nobody has seen and repairs left unfinished at port
- * are story hooks, nothing holds the ship for her hull but a card), and pacing (a field is the
- * biggest pressure, never right after a fault, a hazard or another field). "Six levers" become
- * seven; notableEvent says what fieldSighted, fieldEntered, shipStuck and fieldCleared are.
- * v0.25 (2026-10-07): notes after the plan (D97): the plan no longer carries notes; a "Your
- * notes" section says they are asked for in a second turn, written as they stand after the plan.
- * v0.26 (2026-10-07): thread titles are listed on their own under "Open threads" (D98):
- * closesThread and beatOfThread are copied from there, never a card title or a person's name.
- * v0.27 (2026-10-07): the call-back hint, aftermath calls, seen threads kept (D99-D101): the plan
+ * v0.16 (2026-10-03): a closing card names its thread (closesThread, §closing-cards); the server
+ * retires the thread when the card goes up, so the narrator no longer waits for it to show, and a
+ * thread cannot be closed twice.
+ * v0.17 (2026-10-03): `approachingPort` is retired (§staging-hook-and-the-hold): arrival is the
+ * staging call's, which sets the stage and never moves the plot, so offers no longer arrive in
+ * flight; the story narrator is called when the captain is looking for work at a port instead.
+ * v0.18 (2026-10-03): the staging call gets its own prompt (`staging/prompt.ts`,
+ * §staging-call-on-the-server): who and what is on the dock when the ship lands, set before she
+ * comes alongside, never moving the plot. The story narrator reads the result under "On the dock"
+ * (people at their posts, set dressing, the arrival line), may use those people as issuers and
+ * speakers, and decides whether a new face joins the cast; the capability list no longer says the
+ * narrator is called on approach. v0.19 (2026-10-03): the captain goes ashore to look for work
+ * (§captain-ashore-ask): `jobBoard` becomes `captainAshore`, called the moment the captain steps
+ * onto the dock, and its text says who is out there and that the port lies beyond the gate. Cards
+ * from the port's people are delivered in person while docked (the captain walks over or goes out
+ * through the gate; with the captain aboard, the speaker walks to the ramp), so the issuer or
+ * speaker named is who the captain meets; offers are made only while docked.
+ * v0.20 (2026-10-04): the ship is a Freighter Mk2 run by nine people (§the-ships): the showrunner
+ * and set-dresser openings say "nine", not "eight".
+ * v0.21 (2026-10-04): the watch and the helm (§who-has-the-helm, §hazard-roll,
+ * §mood-and-work-speed): a watch paragraph (three watches, the bell and the handover, who has the
+ * helm is in the digest, an empty helm is the ship's own failing and a reason, mood and thoughts
+ * are the sim's), and a sixth lever, scheduleHazard, the helm's stakes: placed when the leg and the
+ * person at the helm make it a story, never twice in a row, never while another fault is
+ * unrepaired, rolled by the sim. "Five levers" become six. v0.22 (2026-10-04): the galley and dirt
+ * (§galley-provisions, §room-tiers): a galley-and-dirt paragraph (the cook's meals before each
+ * bell, a burnt dinner or a missed meal are the crew's story, provisions run out and are bought at
+ * ports, stockMarket may stock provisions, a filthy room is the ship's own failing; never invent
+ * food the sim has not cooked); quietTooLong may make a meal the beat. v0.23 (2026-10-05): off
+ * watch (§activities-and-interests, §ship-life-lines): an off-watch paragraph (cards, vids,
+ * sparring, arguments and rivalries are the sim's and the crew's story, never invented; an argument
+ * or a rivalry is what a card is made of; each crew line's likes are who they are and the narrator
+ * writes to them), and privateTalk, a card side effect the captain's cabin makes possible, warm or
+ * stern, whose outcome shows in affinity next call. quietTooLong may make a rivalry or an argument
+ * the beat; notableEvent says the same of one in recent events. Levers stay six. v0.24
+ * (2026-10-06): the asteroid field (§scheduling-a-field, §hull-scars-and-ship-loss): a seventh
+ * lever, scheduleField, with severity, detection (rolled or unseen) and up to three scripted hits
+ * on machines or rooms; a field paragraph (the narrator shapes the field, the sim throws the rocks
+ * and the crew answer), a hull paragraph (weigh the hull before placing one, never a field the hull
+ * cannot survive unless the ship left port damaged; scars nobody has seen and repairs left
+ * unfinished at port are story hooks, nothing holds the ship for her hull but a card), and pacing
+ * (a field is the biggest pressure, never right after a fault, a hazard or another field). "Six
+ * levers" become seven; notableEvent says what fieldSighted, fieldEntered, shipStuck and
+ * fieldCleared are. v0.25 (2026-10-07): notes after the plan (§notes-turn): the plan no longer
+ * carries notes; a "Your notes" section says they are asked for in a second turn, written as they
+ * stand after the plan. v0.26 (2026-10-07): thread titles are listed on their own under "Open
+ * threads" (§open-threads-list): closesThread and beatOfThread are copied from there, never a card
+ * title or a person's name. v0.27 (2026-10-07): the call-back hint, aftermath calls, seen threads
+ * kept (§requested-call-back, §notable-event-hook, §thread-keeping-and-retirement): the plan
  * carries callBack (nextPort, departure or midLeg, and a private why), restated every call; an
- * offer is the moment to ask for a departure call, and a new requestedCall hook says what to do
- * on it; notableEvent names the aftermath calls (alertCleared, which replaces fieldCleared,
- * navHazard, faultRepaired); a thread the captain has seen a beat of is kept until its closing
- * card, and notes gain retired for one whose ending events already made plain.
- * v0.28 (2026-10-09): arcs remembered, variety expected (D103): a thread's stage becomes its arc
- * notes, a thread that ends gets a summary in endedArcs, and "Past arcs" lists every story told
- * this game; a new principle asks for variety and excitement read against it, and "Quiet is
- * fine" is narrowed to a breath after something happened rather than the default.
+ * offer is the moment to ask for a departure call, and a new requestedCall hook says what to do on
+ * it; notableEvent names the aftermath calls (alertCleared, which replaces fieldCleared, navHazard,
+ * faultRepaired); a thread the captain has seen a beat of is kept until its closing card, and notes
+ * gain retired for one whose ending events already made plain. v0.28 (2026-10-09): arcs remembered,
+ * variety expected (§past-arcs): a thread's stage becomes its arc notes, a thread that ends gets a
+ * summary in endedArcs, and "Past arcs" lists every story told this game; a new principle asks for
+ * variety and excitement read against it, and "Quiet is fine" is narrowed to a breath after
+ * something happened rather than the default.
  */
 export const PROMPT_VERSION = "v0.28";
 

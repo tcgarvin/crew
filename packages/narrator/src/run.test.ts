@@ -169,7 +169,7 @@ describe("runNarrator", () => {
     expect(res.usage?.cacheReadInputTokens).toBe(900);
     expect(res.notesUpdate).toEqual({
       summary: "Arrived at the Drift.",
-      // D32: Halla made an offer this call, so her thread's last beat is now.
+      // §threads-and-scales: Halla made an offer this call, so her thread's last beat is now.
       threads: [
         {
           ...assayThread,
@@ -180,7 +180,8 @@ describe("runNarrator", () => {
       ],
       cardsShown: [],
       pastArcs: [],
-      // D25: whoever made an offer joins the cast at their port, even if the model forgot them.
+      // §issuers-and-pitches: whoever made an offer joins the cast at their port, even if the model
+      // forgot them.
       cast: [
         {
           name: "Halla Iyer",
@@ -423,7 +424,7 @@ describe("runNarrator", () => {
     expect(res.fallback).toBe("timeout");
   });
 
-  it("gives the staging call its own, shorter default timeout (D70)", async () => {
+  it("gives the staging call its own, shorter default timeout (§narrator-timeouts)", async () => {
     const timeouts = vi.spyOn(AbortSignal, "timeout");
     const transport = fakeTransport(okResult(JSON.stringify({ rationale: "bare", intents: [] })));
     await runBothTurns(stageDockRequest(content()), ctx(transport));
@@ -465,7 +466,7 @@ describe("runNarrator", () => {
     expect(res.card).toEqual({ decisionId: "d1", ...card });
   });
 
-  it("ignores surfaceDecision's beat and closing fields copied onto card, and says so (D67)", async () => {
+  it("ignores surfaceDecision's beat and closing fields copied onto card, and says so (§staging-call-on-the-server)", async () => {
     const card = {
       title: "Hub Co-op wants a runner",
       speaker: "Noor Sadler",
@@ -495,7 +496,7 @@ describe("runNarrator", () => {
   });
 });
 
-describe("policy decisions are narrated (D37)", () => {
+describe("policy decisions are narrated (§policy-decision-hook)", () => {
   it("dresses a departure-gate card in the engineer's voice, keyed to its decision", async () => {
     const card = {
       title: "Priya on the engine",
@@ -539,7 +540,7 @@ describe("policy decisions are narrated (D37)", () => {
   });
 });
 
-describe("what the captain has seen (D31)", () => {
+describe("what the captain has seen (§card-history)", () => {
   it("records a surfaced card and stamps the thread it belongs to", async () => {
     const plan = emptyPlan({
       intents: [stranger] as never,
@@ -572,7 +573,7 @@ describe("what the captain has seen (D31)", () => {
     expect(res.notesUpdate?.threads[0]?.lastBeatTick).toBe(req.hook.tick);
   });
 
-  it("nulls the captain as a speaker, keeps the card and says why next call (D41)", async () => {
+  it("nulls the captain as a speaker, keeps the card and says why next call (§captain-never-speaks)", async () => {
     const plan = emptyPlan({
       intents: [{ ...stranger, speaker: "Mara Osei" }] as never,
       notes: { summary: "s", threads: [], cast: [], retired: [], endedArcs: [] },
@@ -592,7 +593,7 @@ describe("what the captain has seen (D31)", () => {
     );
   });
 
-  it("sets beatCardShown on the thread a beat card foreshadows (D39)", async () => {
+  it("sets beatCardShown on the thread a beat card foreshadows (§beat-cards)", async () => {
     const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
     const beat = { ...stranger, beatOfThread: "the stranger" };
     const plan = emptyPlan({
@@ -618,7 +619,7 @@ describe("what the captain has seen (D31)", () => {
     expect(again.notesUpdate?.threads[0]?.beatCardShown).toBe(true);
   });
 
-  it("retires the thread a closing card ends and refuses to close it again (D56)", async () => {
+  it("retires the thread a closing card ends and refuses to close it again (§closing-cards)", async () => {
     const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
     const closing = { ...stranger, closesThread: "the stranger" };
     // The model keeps writing the thread; the server retires it anyway.
@@ -646,7 +647,7 @@ describe("what the captain has seen (D31)", () => {
     expect(again.notesUpdate?.threads).toEqual([]);
   });
 
-  it("keeps the closed thread as a past arc with the summary the notes turn wrote (D103)", async () => {
+  it("keeps the closed thread as a past arc with the summary the notes turn wrote (§past-arcs)", async () => {
     const thread = { ...assayThread, title: "The stranger", people: ["Dane Whitcross"] };
     const closing = { ...stranger, closesThread: "the stranger" };
     const endedArcs = [
@@ -851,7 +852,7 @@ describe("what the captain has seen (D31)", () => {
   });
 });
 
-describe("prompt text (D29, D31, D32)", () => {
+describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", () => {
   it("tells the model cards are spoken by a named person and capped at 70 words", () => {
     expect(STATIC_RULES).toContain("never more than 70");
     expect(STATIC_RULES).toContain("firstOfficer");
@@ -865,7 +866,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).not.toContain("openThreads");
   });
 
-  it("tells the model to write crew in their voice, share the stage, pick the oldest beat, and foreshadow once (D38, D39)", () => {
+  it("tells the model to write crew in their voice, share the stage, pick the oldest beat, and foreshadow once (§crew-lines, §beat-cards)", () => {
     expect(STATIC_RULES).toContain("the voice line is how they sound, every time");
     expect(STATIC_RULES).toContain("A crew member never sounds like another");
     expect(STATIC_RULES).toContain("Share the stage");
@@ -875,7 +876,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("at most one beat card before its payoff");
   });
 
-  it("tells the model it is the only source of work when the captain goes ashore (D40, D70), never on arrival (D66)", () => {
+  it("tells the model it is the only source of work when the captain goes ashore (D40, §offer-lever), never on arrival (§staging-hook-and-the-hold)", () => {
     expect(STATIC_RULES).not.toContain("approachingPort");
     expect(STATIC_RULES).not.toContain("stageDock");
     expect(STATIC_RULES).not.toContain("jobBoard:");
@@ -894,7 +895,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).not.toContain("the port board is empty");
   });
 
-  it("asks for variety and excitement, read against the past arcs (D103)", () => {
+  it("asks for variety and excitement, read against the past arcs (§past-arcs)", () => {
     expect(STATIC_RULES).toContain("Variety and excitement are the job.");
     expect(STATIC_RULES).toContain('read "Past arcs"');
     expect(STATIC_RULES).toContain("never twice running");
@@ -906,7 +907,7 @@ describe("prompt text (D29, D31, D32)", () => {
     );
   });
 
-  it("tells the model the captain is the player and never speaks on a card (D41)", () => {
+  it("tells the model the captain is the player and never speaks on a card (§captain-never-speaks)", () => {
     expect(STATIC_RULES).toContain("The captain is the player and never speaks on a card");
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
@@ -936,7 +937,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain("the left side waits, the right side leaves without them");
   });
 
-  it("tells the model to end each arc on a closing card that names it (D54, D56)", () => {
+  it("tells the model to end each arc on a closing card that names it (D54, §closing-cards)", () => {
     expect(STATIC_RULES).toContain("Arcs end on a card.");
     expect(STATIC_RULES).toContain("Set closesThread to that thread's exact title");
     expect(STATIC_RULES).toContain("A thread is closed once");
@@ -968,7 +969,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(quiet).not.toContain("offer work if the captain is idle");
   });
 
-  it("tells the model parts come only from a port market and it never narrates a repair the digest does not show (D47)", () => {
+  it("tells the model parts come only from a port market and it never narrates a repair the digest does not show (§market-lever)", () => {
     expect(STATIC_RULES).toContain("Parts come only from a port's market");
     expect(STATIC_RULES).toContain("the crew buy it themselves, from the ship's money");
     expect(STATIC_RULES).toContain("Your lever is stockMarket");
@@ -981,7 +982,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).not.toContain("five levers");
   });
 
-  it("tells the model about the watch, the empty helm and the hazard lever (D77-D79, v0.21)", () => {
+  it("tells the model about the watch, the empty helm and the hazard lever (§who-has-the-helm, §hazard-roll, §mood-and-work-speed, v0.21)", () => {
     expect(STATIC_RULES).toContain("The ship keeps watches. The day is three watches");
     expect(STATIC_RULES).toContain("who has the helm (and since when)");
     expect(STATIC_RULES).toContain("You never set moods or thoughts");
@@ -993,7 +994,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleHazard on a long leg");
   });
 
-  it("tells the model about the galley and dirt, and never to invent food (D81-D83, v0.22)", () => {
+  it("tells the model about the galley and dirt, and never to invent food (§galley-provisions, §room-tiers, v0.22)", () => {
     expect(STATIC_RULES).toContain("The ship eats from her galley.");
     expect(STATIC_RULES).toContain("these are the crew's story to tell");
     expect(STATIC_RULES).toContain("Provisions run out and are bought at ports like parts");
@@ -1003,7 +1004,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("a meal can be that beat");
   });
 
-  it("tells the model off-watch life and rivalries are the crew's, and how privateTalk works (D84-D87, v0.23)", () => {
+  it("tells the model off-watch life and rivalries are the crew's, and how privateTalk works (§activities-and-interests, §ship-life-lines, v0.23)", () => {
     expect(STATIC_RULES).toContain("The crew have lives off watch.");
     expect(STATIC_RULES).toContain(
       "These are the sim's and the crew's story to tell, never yours to invent",
@@ -1023,7 +1024,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
   });
 
-  it("tells the model it shapes a field the sim plays, weighs the hull first, and uses damage as hooks (D95, v0.24)", () => {
+  it("tells the model it shapes a field the sim plays, weighs the hull first, and uses damage as hooks (§scheduling-a-field, v0.24)", () => {
     expect(STATIC_RULES).toContain("You shape it and the sim plays it.");
     expect(STATIC_RULES).toContain("unseen means nobody does, whatever the helm");
     expect(STATIC_RULES).toContain("Aim them at a machine or a room, never a person");
@@ -1037,7 +1038,8 @@ describe("prompt text (D29, D31, D32)", () => {
     );
     expect(STATIC_RULES).toContain("A field is the biggest pressure of all");
     expect(STATIC_RULES).toContain("stockMarket, scheduleHazard, scheduleField. An empty list");
-    // D100: the field's end calls at alertCleared, with the crew reported in, not fieldCleared.
+    // §notable-event-hook: the field's end calls at alertCleared, with the crew reported in, not
+    // fieldCleared.
     for (const type of ["fieldSighted", "fieldEntered", "shipStuck", "alertCleared"]) {
       expect(HOOK_INSTRUCTIONS.notableEvent).toContain(type);
     }
@@ -1045,7 +1047,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleField on a leg");
   });
 
-  it("tells the model to ask for its next call, and what to do on it (D99, v0.27)", () => {
+  it("tells the model to ask for its next call, and what to do on it (§requested-call-back, v0.27)", () => {
     expect(STATIC_RULES).toContain(
       "- callBack: when you want to be called next (when: nextPort, departure or midLeg) and why",
     );
@@ -1064,7 +1066,7 @@ describe("prompt text (D29, D31, D32)", () => {
     expect(STATIC_RULES).toContain(`- requestedCall: ${HOOK_INSTRUCTIONS.requestedCall}`);
   });
 
-  it("tells the model about the aftermath calls (D100, v0.27)", () => {
+  it("tells the model about the aftermath calls (§notable-event-hook, v0.27)", () => {
     expect(STATIC_RULES).toContain(
       "You are also called in the aftermath: when the alert stands down after a field, when a hazard has been rolled, and when a fault you caused is repaired.",
     );
@@ -1073,7 +1075,7 @@ describe("prompt text (D29, D31, D32)", () => {
     );
   });
 
-  it("tells the model a seen thread is kept until its closing card, and what retired is for (D101, v0.27)", () => {
+  it("tells the model a seen thread is kept until its closing card, and what retired is for (§thread-keeping-and-retirement, v0.27)", () => {
     expect(STATIC_RULES).toContain(
       "A thread the captain has seen a beat of stays in your notes until its closing card: leave it out of threads and it is kept for you, and you are told.",
     );
@@ -1111,7 +1113,7 @@ describe("fixtures and kernel authority (N6)", () => {
     }
   });
 
-  it("migrates a stored schema-7 snapshot to 8 with the scenario's watch bill (D77)", () => {
+  it("migrates a stored schema-7 snapshot to 8 with the scenario's watch bill (§save-migrations)", () => {
     // A frozen copy of the schema-7 `approach.json`: the fixtures under `fixtures/` are
     // regenerated with the kernel, so they stop being schema 7.
     const stored = JSON.parse(
@@ -1130,10 +1132,11 @@ describe("fixtures and kernel authority (N6)", () => {
     expect(restored.state.hazards).toEqual([]);
   });
 
-  it("reads a stored snapshot whose config predates the day units (D76) with the loaded values", async () => {
-    // Stored before D76: `commerce.passage.overdueSeconds`, no `overdueDays`. The digest's
-    // OVERDUE line needs the window, so a missing key would throw rather than render. The
-    // config is put back to its pre-D76 shape by hand, so this holds however the fixtures move.
+  it("reads a stored snapshot whose config predates the day units (§the-ships-day) with the loaded values", async () => {
+    // Stored before the day units: `commerce.passage.overdueSeconds`, no `overdueDays`. The
+    // digest's OVERDUE line needs the window, so a missing key would throw rather than render. The
+    // config is put back to its pre-day-units shape by hand, so this holds however the fixtures
+    // move.
     const stored = structuredClone(passengerOverdueRequest(content()));
     const passage = stored.snapshot.config.commerce.passage as unknown as Record<string, unknown>;
     passage.overdueSeconds = 150;
@@ -1165,7 +1168,7 @@ describe("fixtures and kernel authority (N6)", () => {
   });
 });
 
-describe("the notes turn (D97)", () => {
+describe("the notes turn (§notes-turn)", () => {
   const storedNotes = {
     summary: "Docked at the Drift.",
     threads: [{ ...assayThread, lastBeatTick: null, beatCardShown: false }],
@@ -1261,7 +1264,7 @@ describe("the notes turn (D97)", () => {
   });
 });
 
-describe("threads the captain has seen survive the rewrite (D101)", () => {
+describe("threads the captain has seen survive the rewrite (§thread-keeping-and-retirement)", () => {
   const seenThread = { ...assayThread, openedTick: 10, lastBeatTick: 30, beatCardShown: false };
   const stored = { ...EMPTY_NOTES, threads: [seenThread] };
   const omitting = (retired: string[] = []) =>

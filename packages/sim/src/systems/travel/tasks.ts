@@ -1,8 +1,8 @@
 /**
- * Task derivation for `stationToStaff` (the watch's since D77, derived here beside the helm's
- * other travel wiring) and `courseToPlot` (travel's, D78; its rule is in `course.ts`). CONTRACTS
- * "How work is advertised", PLAN §6 W6. Exported as a `Partial<TaskDerivationTable>` for
- * `systems/work/` (W4) to merge.
+ * Task derivation for `stationToStaff` (the watch's, §problem-ownership, derived here beside the
+ * helm's other travel wiring) and `courseToPlot` (travel's, §course-plotting; its rule is in
+ * `course.ts`). CONTRACTS "How work is advertised", PLAN §6 W6. Exported as a
+ * `Partial<TaskDerivationTable>` for `systems/work/` (W4) to merge.
  *
  * Integration 2: `interactionTiles` are the station's `operate` positions resolved from the
  * machine's placement (origin + rotated offset) now that `DerivationCtx` carries `state`.
@@ -35,8 +35,8 @@ export function operateTiles(
 
 /**
  * The skill a station's stander needs on the task: the def's `operatorSkill` at a floor of 1
- * (D77 call 6: anyone with the skill at all may stand it as the unqualified fallback; who stands
- * it is the sim's, `helmRoleOf`, not this requirement's).
+ * (§who-has-the-helm: anyone with the skill at all may stand it as the unqualified fallback; who
+ * stands it is the sim's, `helmRoleOf`, not this requirement's).
  */
 function stationSkills(ctx: Pick<DerivationCtx, "state" | "content">, machineId: MachineId) {
   const machine = ctx.state.machines[machineId];
@@ -49,10 +49,10 @@ function stationSkills(ctx: Pick<DerivationCtx, "state" | "content">, machineId:
 
 // W6 decision: `stationToStaff` derives one `staffStation` task with no accumulated work
 // (occupancy is binary); `estimatedWorkSeconds` uses `config.travel.staffEstimateSeconds`.
-// D77: one task per post (`staff:watch`, `staff:relief`). The watch post has two slots, so the
-// oncoming stander can claim it beside the one they relieve; only the stander and the oncoming
-// may (`planner/helm.ts`, from the sim's `helmRoleOf`), so the second slot never sends an idle
-// hand to the helm.
+// §problem-ownership: one task per post (`staff:watch`, `staff:relief`). The watch post has two
+// slots, so the oncoming stander can claim it beside the one they relieve; only the stander and the
+// oncoming may (`planner/helm.ts`, from the sim's `helmRoleOf`), so the second slot never sends an
+// idle hand to the helm.
 const deriveStationToStaff: DeriveTasks<"stationToStaff"> = (problem, ctx) => {
   const { machineId, post } = problem.payload;
   const spec: TaskSpec = {

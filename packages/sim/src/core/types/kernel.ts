@@ -46,7 +46,9 @@ export type AdvanceHalt =
   | { readonly kind: "hook" }
   /** A decision is pending; host pauses until `resolveDecision`. */
   | { readonly kind: "decision" }
-  /** D93: the hull gave way (`hull.lostAtTick`); the world never steps again. */
+  /**
+   * §hull-scars-and-ship-loss: the hull gave way (`hull.lostAtTick`); the world never steps again.
+   */
   | { readonly kind: "lost" };
 
 /**
@@ -80,7 +82,10 @@ export interface Kernel {
   /** Planner-boundary view for one actor, e.g. for tests and the inspector. */
   getAgentView(world: World, actorId: ActorId): AgentView;
   getRenderFrame(world: World): RenderFrame;
-  /** D82: the ship deck's dirt grid for the grime tint; posted by the host at its own cadence. */
+  /**
+   * §dirt-grid: the ship deck's dirt grid for the grime tint; posted by the host at its own
+   * cadence.
+   */
   getDirtFrame(world: World): DirtFrame;
   serialize(world: World): SaveEnvelope;
   /**

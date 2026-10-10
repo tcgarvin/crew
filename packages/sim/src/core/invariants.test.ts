@@ -70,7 +70,7 @@ describe("checkInvariants", () => {
     expect(violations).toContain("work.tasks has a dependency cycle through t1");
   });
 
-  it("flags bad thoughts, a bad section and an unallocated hazard (D77-D79)", () => {
+  it("flags bad thoughts, a bad section and an unallocated hazard (§sections-and-dayworkers, §thoughts, §hazard-roll)", () => {
     const state = exampleWorldState();
     const actor = state.actors["a1" as ActorId];
     if (actor === undefined) throw new Error("fixture changed");

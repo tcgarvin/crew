@@ -1,8 +1,9 @@
 /**
- * Slice 5 (D93, calls 16 and 25): hull scars on the deck, one per impact, drawn per tile on the
- * grime layer's pattern (over the floor, under the people) from `RenderFrame.hull.scars` at the
- * tick playback has reached. An unpatched scar is a charred hole with glowing cracks; a patched one
- * is a dull plate over it, dimmer, so the eye goes to the work still to do.
+ * Slice 5 (§hull-scars-and-ship-loss, calls 16 and 25): hull scars on the deck, one per impact,
+ * drawn per tile on the grime layer's pattern (over the floor, under the people) from
+ * `RenderFrame.hull.scars` at the tick playback has reached. An unpatched scar is a charred hole
+ * with glowing cracks; a patched one is a dull plate over it, dimmer, so the eye goes to the work
+ * still to do.
  */
 import type { RenderScar } from "@crew/sim";
 import { hash } from "./stars";

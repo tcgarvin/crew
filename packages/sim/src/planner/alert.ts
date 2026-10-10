@@ -1,5 +1,5 @@
 /**
- * The alert in the planner (D93, D94), pure over the `AgentView`:
+ * The alert in the planner (§urgency-of-damage-work, §scouts), pure over the `AgentView`:
  *
  * - `alertCandidate`: the officer of the watch, on alert, holds the bridge (`holdBridge`,
  *   essential) at the captain's chair's `use` tile on the bridge (a chair anywhere on a ship with

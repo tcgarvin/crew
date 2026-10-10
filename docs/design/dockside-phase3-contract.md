@@ -1,8 +1,8 @@
-# Dockside phase 3: the sim's contract (D66)
+# Dockside phase 3: the sim's contract
 
 What the sim side of phase 3 gives the narrator/server agent and the renderer agent. Types live in
 `packages/sim/src/core/types/dockside.ts` (all exported from `@crew/sim`); this file is the
-short version. Design: `dockside.md` §5, §6.1; decision: D66.
+short version. Design: `dockside.md` §5, §6.1; spec: §staging-plan-command.
 
 ## 1. The `stageDock` hook
 
@@ -17,7 +17,7 @@ interface FloorSetEntry {
   reason:
     | { kind: "regular" }                           // castSeed entry with a post
     | { kind: "receiver"; jobId: JobId }            // dock hand for freight bound here
-    | { kind: "passenger"; actorId: ActorId };      // left behind / put off here (D52), on the bench
+    | { kind: "passenger"; actorId: ActorId };      // left behind / put off here (§ending-a-passage-early), on the bench
   label?: string;
 }
 ```
@@ -147,11 +147,12 @@ Locals are always on the dock, so draw them with the dock layer (as `onDock` act
 already interpolates `locals` by id (`apps/web/src/host/playback.ts`). `RenderItem.offered` now
 also marks a closed offer's crates still waiting for a dock hand.
 
-## 7. Interim server behaviour (replaced by D67)
+## 7. Interim server behaviour (replaced by the staging call)
 
-*Replaced:* the staging call now runs (D67): its own prompt, schema and translator in
-`packages/narrator/src/staging/`, the route's staging model, budget and call log, and the
-client's fallback to the floor set. What follows is the interim behaviour as the sim side left it.
+*Replaced:* the staging call now runs (§staging-call-on-the-server): its own prompt, schema and
+translator in `packages/narrator/src/staging/`, the route's staging model, budget and call log, and
+the client's fallback to the floor set. What follows is the interim behaviour as the sim side left
+it.
 
 `POST /api/games/:id/narrator` answers a `stageDock` hook at once with `{ commands: [] }` (model
 `staging-floor-set`), skipping the budget, the spacing rule (both ways), the call log and notes;

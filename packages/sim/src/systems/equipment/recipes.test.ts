@@ -186,7 +186,7 @@ describe("machineSymptom -> inspect -> machineFault -> repair -> repaired", () =
   });
 });
 
-describe("integrity restore on repair (D35)", () => {
+describe("integrity restore on repair (§integrity)", () => {
   it("lifts a blocked machine's integrity back to the derate threshold when the repair completes", () => {
     const { kernel, world } = w5TestWorld();
     const techId = Object.keys(world.state.actors)[0] as ActorId;
@@ -221,7 +221,7 @@ describe("integrity restore on repair (D35)", () => {
   });
 });
 
-describe("a repair carries its fault's cause (D100)", () => {
+describe("a repair carries its fault's cause (§notable-event-hook)", () => {
   function repairedEvent(outcome: RecipeOutcome) {
     if (outcome.status !== "recipeComplete") throw new Error(`repair is ${outcome.status}`);
     const event = outcome.events.find((e) => e.type === "faultRepaired");

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /**
- * One-off (ship life slice 1, D72): mirror a deck JSON in x so a bow-west deck faces east, the
- * hull contract's orientation. Rewrites the file in place.
+ * One-off (ship life slice 1, §orientation-and-size): mirror a deck JSON in x so a bow-west deck
+ * faces east, the hull contract's orientation. Rewrites the file in place.
  *
  *   npx tsx scripts/mirror-deck.mts packages/content/data/decks/freighter-mk1.json
  *

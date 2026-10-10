@@ -87,12 +87,12 @@ function validateCtxOf(world: World, tick: Tick): ValidateCtx {
 }
 
 /**
- * D66: the staging call's window. A staging-only kind (`STAGING_COMMAND_KINDS`) from the
- * narrator is valid only while a `stageDock` hook is pending, and while one is, no other
- * narrator kind is: the staging call sets the stage and never moves the plot (D57). Narrator
- * commands are applied at the hook tick + 1, ahead of the host's `acknowledgeHook` in the same
- * tick, so both enqueue and apply see the hook still pending. A timing rule, so
- * `preconditionFailed`, not `unauthorized`.
+ * §staging-hook-and-the-hold: the staging call's window. A staging-only kind
+ * (`STAGING_COMMAND_KINDS`) from the narrator is valid only while a `stageDock` hook is pending,
+ * and while one is, no other narrator kind is: the staging call sets the stage and never moves the
+ * plot (D57). Narrator commands are applied at the hook tick + 1, ahead of the host's
+ * `acknowledgeHook` in the same tick, so both enqueue and apply see the hook still pending. A
+ * timing rule, so `preconditionFailed`, not `unauthorized`.
  */
 function hookWindowRejection(
   state: ReadonlyWorldState,

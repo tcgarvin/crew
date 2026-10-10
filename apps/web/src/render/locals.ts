@@ -1,7 +1,7 @@
 /**
- * Dockside phase 3 (D66, D68): the dock's own people (`RenderFrame.locals`) and the staging call's
- * set dressing (`RenderFrame.dockProps`), drawn in screen space like the crew and the ship's items
- * so they stay upright under the portrait rotation.
+ * Dockside phase 3 (§locals-table, §locals-and-props): the dock's own people (`RenderFrame.locals`)
+ * and the staging call's set dressing (`RenderFrame.dockProps`), drawn in screen space like the
+ * crew and the ship's items so they stay upright under the portrait rotation.
  *
  * A local is a dot like a crew member's, but in a muted colour picked from their look seed, with a
  * darker rim of the same hue: never crew gold, never the passenger's pale fill and blue rim
@@ -71,8 +71,9 @@ export function drawLocalDots(
 }
 
 /**
- * The trolley a dock hand carts crates on, beside their dot as the crew's hand truck is (D65). The
- * frame carries only how many crates ride on it, so they are drawn as general freight.
+ * The trolley a dock hand carts crates on, beside their dot as the crew's hand truck is
+ * (§hand-truck-drawing). The frame carries only how many crates ride on it, so they are drawn as
+ * general freight.
  */
 export function drawLocalTrolleys(
   ctx: CanvasRenderingContext2D,
@@ -93,9 +94,9 @@ export function drawLocalTrolleys(
 
 /**
  * The text over a local's dot, or `undefined` for none. A local is labelled only while doing
- * something (D68): the docked phone view is already crowded with the crew's labels, and a regular
- * standing at their post says nothing a tap does not. Like the crew's, the label is the first
- * name alone (slice-4 playtest); what they are doing is in the inspector.
+ * something (§person-labels): the docked phone view is already crowded with the crew's labels, and
+ * a regular standing at their post says nothing a tap does not. Like the crew's, the label is the
+ * first name alone (slice-4 playtest); what they are doing is in the inspector.
  */
 export function localLabelText(local: Pick<RenderLocal, "name" | "label">): string | undefined {
   if (local.label === undefined) return undefined;
@@ -103,9 +104,9 @@ export function localLabelText(local: Pick<RenderLocal, "name" | "label">): stri
 }
 
 /**
- * A dock prop's tap and selection key. Props are presentation records with no id (D66), set once
- * when the dock is dressed and gone with it, so their order in the frame is stable for as long as
- * they are drawn; a position would not be, since the dock slides.
+ * A dock prop's tap and selection key. Props are presentation records with no id (§locals-table),
+ * set once when the dock is dressed and gone with it, so their order in the frame is stable for as
+ * long as they are drawn; a position would not be, since the dock slides.
  */
 export function dockPropKey(prop: Pick<RenderDockProp, "defId">, index: number): string {
   return `${index}/${prop.defId}`;

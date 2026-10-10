@@ -1,7 +1,7 @@
 /**
- * W1 test fixture (D77): a small ship with a bridge, for the watch and the helm. Three rooms in a
- * row joined by doorless openings: an airlock with the ramp and the gangway post, a mess with
- * rations, and the bridge with the helm (seat and standby) and a nav terminal.
+ * W1 test fixture (§who-has-the-helm): a small ship with a bridge, for the watch and the helm.
+ * Three rooms in a row joined by doorless openings: an airlock with the ramp and the gangway post,
+ * a mess with rations, and the bridge with the helm (seat and standby) and a nav terminal.
  *
  *   x 0123456789ABCD
  *   0 LLLMMMMMBNBBBB     N = nav terminal (9,0), operated from (9,1)

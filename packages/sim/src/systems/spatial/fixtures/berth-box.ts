@@ -1,7 +1,7 @@
 /**
- * D72 test fixture: one hand-built dock whose M berth box takes two footprints, a 36×20 deck
- * (the box exactly, Freighter Mk2's size) and a 32×18 deck (Mk1's). Both decks are a room over a
- * two-row corridor, with the ramps in the corridor's south hull at Mk2's and Mk1's ramp columns:
+ * §berth-boxes test fixture: one hand-built dock whose M berth box takes two footprints, a 36×20
+ * deck (the box exactly, Freighter Mk2's size) and a 32×18 deck (Mk1's). Both decks are a room over
+ * a two-row corridor, with the ramps in the corridor's south hull at Mk2's and Mk1's ramp columns:
  *
  *   big   36×20: cargo ramp under (13,19), personnel under (34,19)
  *   small 32×18: cargo ramp under (13,17), personnel under (29,17)

@@ -154,7 +154,7 @@ export interface DamageContentOptions {
   readonly kits?: boolean;
   /** Hull plating on the home port's market. */
   readonly plating?: { readonly count: number; readonly price: number };
-  /** Patch kits on the home port's market (D93's restock). */
+  /** Patch kits on the home port's market (§plating-and-kits-at-port). */
   readonly kitStock?: { readonly count: number; readonly price: number };
 }
 

@@ -83,10 +83,10 @@ export function runStep(world: World, registry: KernelRegistry): SimEvent[] {
 
 /**
  * Does `event` call the narrator (a `notableEvent` hook)? A `narrative` event whose type is in
- * `narrator.hookOnEvents`, or (D100) an aftermath event of any significance whose type is in
- * `narrator.aftermathHookOnEvents` and that passes its type's filter: `faultRepaired` only for
- * a fault something caused (a scheduled fault, a hazard scrape, a field impact; never wear) and
- * not while a field is on, when the field's own calls cover it.
+ * `narrator.hookOnEvents`, or (§notable-event-hook) an aftermath event of any significance whose
+ * type is in `narrator.aftermathHookOnEvents` and that passes its type's filter: `faultRepaired`
+ * only for a fault something caused (a scheduled fault, a hazard scrape, a field impact; never
+ * wear) and not while a field is on, when the field's own calls cover it.
  */
 export function hooksNarrator(
   event: SimEvent,
@@ -108,7 +108,8 @@ export function hooksNarrator(
 /**
  * Bookkeeping over the committed events: the quiet timer's input (`narrative` events only), the
  * last narrative event (a hookable one, `hooksNarrator`, wins within a tick, whatever its
- * significance), the `notableEvent` owed for a hookable one (D69) and the trace ring.
+ * significance), the `notableEvent` owed for a hookable one (§notable-event-hook) and the trace
+ * ring.
  */
 function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void {
   const { state, caches } = world;
@@ -125,7 +126,8 @@ function recordFinalizedEvents(world: World, events: readonly SimEvent[]): void 
     hookableSeen ||= isHookable;
     if (event.significance === "trace") caches.diagnostics.traceEvents.push(event);
   }
-  // D69: owed a `notableEvent` until travel raises it (or a later story hook covers it).
+  // §notable-event-hook: owed a `notableEvent` until travel raises it (or a later story hook covers
+  // it).
   const last = state.narrator.lastNarrativeEvent;
   if (hookableSeen && last !== undefined) state.narrator.pendingNotable = { ...last };
   const ring = caches.diagnostics.traceEvents;
@@ -221,10 +223,10 @@ const quietTimerSystem: System = {
  * state; after a restore the halted world does not step, so nothing is re-announced until the
  * queue head changes.
  *
- * D37: a kernel-raised (policy) head gets its `policyDecision` hook here first, in the tick it
- * reaches the head, so the world halts on the hook before the decision (`world.ts`) and the
- * narrator dresses the card before it is shown. If another hook is pending the raise waits for
- * the next tick, which `haltReason` lets run once that hook is acknowledged.
+ * §policy-decision-hook: a kernel-raised (policy) head gets its `policyDecision` hook here first,
+ * in the tick it reaches the head, so the world halts on the hook before the decision (`world.ts`)
+ * and the narrator dresses the card before it is shown. If another hook is pending the raise waits
+ * for the next tick, which `haltReason` lets run once that hook is acknowledged.
  */
 export const decisionPendingSystem: System = {
   name: "core.decisionPending",
@@ -251,10 +253,10 @@ export const decisionPendingSystem: System = {
 };
 
 /**
- * D78: the narrator budget refills (D6 promised it; nothing ran it before) every
- * `narrator.budgetRefillDays`: spawns, faults and hazards back to their config values, from the
- * tick of the last refill (world creation, for a fresh game). Phase 8, before the quiet timer, so
- * a hook raised this tick sees the refilled budget.
+ * §narrator-lever-budgets: the narrator budget (D6) refills every `narrator.budgetRefillDays`:
+ * spawns, faults and hazards back to their config values, from the tick of the last refill (world
+ * creation, for a fresh game). Phase 8, before the quiet timer, so a hook raised this tick sees the
+ * refilled budget.
  */
 const budgetRefillSystem: System = {
   name: "core.budgetRefill",

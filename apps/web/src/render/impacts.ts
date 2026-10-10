@@ -1,6 +1,6 @@
 /**
- * Slice 5 (D92, call 16): a rock strike on screen, a short flash over every tile the blast
- * covered and a ring at its centre. Impacts reach the canvas in the frames playback shows
+ * Slice 5 (§rock-impacts, call 16): a rock strike on screen, a short flash over every tile the
+ * blast covered and a ring at its centre. Impacts reach the canvas in the frames playback shows
  * (`RenderFrame.impacts`, accumulated over frames playback skipped), so the same impact can be in
  * several frames in a row; each is keyed by its tick and centre and flashes once, from the moment
  * playback first shows it.

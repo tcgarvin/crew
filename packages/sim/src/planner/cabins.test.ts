@@ -185,7 +185,7 @@ describe("summonsCandidate (slice 4, call 15)", () => {
     });
   });
 
-  it("is rejected atTheHelm for the helm's stander and oncoming, not for a relief (D77)", () => {
+  it("is rejected atTheHelm for the helm's stander and oncoming, not for a relief", () => {
     for (const helmRole of ["stander", "oncoming"] as const) {
       expect(summonsCandidate(stubView({ summons: SUMMONED, helmRole }), config)).toEqual({
         ref: "privateTalk",

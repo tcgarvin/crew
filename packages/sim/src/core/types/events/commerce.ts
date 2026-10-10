@@ -31,15 +31,15 @@ export interface CommerceEventPayloads {
     readonly jobId?: JobId;
   };
   /**
-   * D63: an offer's crates were set out on the staging area of its origin's dock (on offer, or
-   * when the dock came alongside). Nobody's until the job is accepted.
+   * §offered-freight: an offer's crates were set out on the staging area of its origin's dock (on
+   * offer, or when the dock came alongside). Nobody's until the job is accepted.
    */
   freightStaged: { readonly jobId: JobId; readonly portId: PortDefId; readonly count: number };
-  /** D63: a declined, expired or departed-from offer's staged crates went back in. */
+  /** §offered-freight: a declined, expired or departed-from offer's staged crates went back in. */
   freightWithdrawn: { readonly jobId: JobId; readonly portId: PortDefId };
   /**
-   * D66: a dock hand's carting errand could not be walked (no route, or it ran past
-   * `travel.dockHandGiveUpSeconds`, or the dock was cast off first), so the D63 instant
+   * §dock-hand-errands: a dock hand's carting errand could not be walked (no route, or it ran past
+   * `travel.dockHandGiveUpSeconds`, or the dock was cast off first), so the instant
    * behaviour did it: crates set out, withdrawn or taken in at once.
    */
   dockHandGaveUp: {
@@ -51,8 +51,8 @@ export interface CommerceEventPayloads {
   /** Anything created by a spawn command (boundary or scenario). */
   entitySpawned: { readonly entityId: EntityId; readonly defId: string };
   /**
-   * D47: the crew bought `count` of `itemDefId` from the market at `portId` for `cost` credits in
-   * all. Subjects: the buyer, then the item(s) that landed aboard.
+   * §buying-parts: the crew bought `count` of `itemDefId` from the market at `portId` for `cost`
+   * credits in all. Subjects: the buyer, then the item(s) that landed aboard.
    */
   partsBought: {
     readonly portId: PortDefId;
@@ -60,7 +60,9 @@ export interface CommerceEventPayloads {
     readonly count: number;
     readonly cost: number;
   };
-  /** D47: a `stockMarket` command set a port's stock of one item (count 0 = withdrawn). */
+  /**
+   * §market-lever: a `stockMarket` command set a port's stock of one item (count 0 = withdrawn).
+   */
   marketStocked: {
     readonly portId: PortDefId;
     readonly itemDefId: ItemDefId;
@@ -93,12 +95,13 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   contractCompleted: "narrative",
   paymentMade: "notable",
   entitySpawned: "trace",
-  // D63: the offer and its card already carry the story; the crates appearing is scenery.
+  // §offered-freight: the offer and its card already carry the story; the crates appearing is
+  // scenery.
   freightStaged: "trace",
   freightWithdrawn: "trace",
   dockHandGaveUp: "trace",
-  // D47: a purchase is a story beat the narrator may react to; stocking is the narrator's own
-  // quiet hand and never reaches the ticker.
+  // §buying-parts: a purchase is a story beat the narrator may react to; stocking is the narrator's
+  // own quiet hand and never reaches the ticker.
   partsBought: "narrative",
   marketStocked: "trace",
   // Passengers §3.5: boarding follows the offer card by seconds and going ashore is already

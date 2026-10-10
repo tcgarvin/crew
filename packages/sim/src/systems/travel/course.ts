@@ -1,11 +1,11 @@
 /**
- * Course plotting (D78): a planned course must be plotted at the nav terminal before departure
- * prep begins. `courseSystem` raises `courseToPlot` while a course is planned and not yet
+ * Course plotting (§course-plotting): a planned course must be plotted at the nav terminal before
+ * departure prep begins. `courseSystem` raises `courseToPlot` while a course is planned and not yet
  * plotted; it derives one `plotCourse` task at the `navStation` machine; the plot's commit
  * (`runPlot`) sets `travel.coursePlotted` and emits `coursePlotted`.
  *
  * A ship with no nav terminal aboard (the hand-built test decks) needs no plot: every course
- * counts as plotted, as before D78.
+ * counts as plotted.
  *
  * Owner: travel (W2 of ship life slice 2).
  */
@@ -141,7 +141,7 @@ export const courseSystem: System = {
   },
 };
 
-/** The helm's operator skill: who may plot is who may stand the helm (D78). */
+/** The helm's operator skill: who may plot is who may stand the helm (§course-plotting). */
 function plotSkills(ctx: CourseCtx): SkillRequirement[] {
   const helm = helmMachine(ctx.state, ctx.content);
   const skill =
@@ -200,10 +200,10 @@ export function plotCoursePlan(ctx: StepCtx, actor: Actor, task: Task): PlanResu
 
 /**
  * The `plot` work step: `workRate` ticks of progress per tick (skill above the helm's minimum
- * plots faster, D78: skill sets how long, not how good), then the commit: the course is plotted,
- * its problem resolved and `coursePlotted` emitted. A course that changed under the plotter
- * fails the step (`dependencyPending`); `courseSystem` has already cancelled its problem, so
- * this only guards the tick in between.
+ * plots faster: skill sets how long, not how good; §course-plotting), then the commit: the course
+ * is plotted, its problem resolved and `coursePlotted` emitted. A course that changed under the
+ * plotter fails the step (`dependencyPending`); `courseSystem` has already cancelled its problem,
+ * so this only guards the tick in between.
  */
 export function runPlot(
   ctx: StepCtx,

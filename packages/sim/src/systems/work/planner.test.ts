@@ -72,7 +72,7 @@ describe("selectIntent", () => {
     withoutRounds(world);
     const view = kernel.getAgentView(world, MARA);
     expect(selectIntent(view, plannerConfig(tw))).toEqual({ kind: "idle" });
-    actorOf(tw, MARA).needs.fatigue = 0.75; // pressing: she is on watch (D77)
+    actorOf(tw, MARA).needs.fatigue = 0.75; // pressing: she is on watch (§duty-and-the-sleep-watch)
     run(tw, 25);
     expect(world.state.actors[MARA]?.activity.kind).toBe("personal");
     actorOf(tw, MARA).needs.hunger = 0.75; // same class as sleep: keep sleeping
@@ -81,7 +81,7 @@ describe("selectIntent", () => {
     });
   });
 
-  it("routine tiredness is slept off in the sleep watch, from bedtime on; pressing tiredness anywhere (D77)", () => {
+  it("routine tiredness is slept off in the sleep watch, from bedtime on; pressing tiredness anywhere", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
     withoutRounds(world);
@@ -109,7 +109,7 @@ describe("selectIntent", () => {
     expect(sleepClass()).toBe("essentialOperation");
   });
 
-  it("outside the sleep watch, routine tiredness waits even off duty (D77 addendum)", () => {
+  it("outside the sleep watch, routine tiredness waits even off duty", () => {
     const tw = crewWorld();
     const config = plannerConfig(tw);
     const view = (sleepWatch: boolean) =>
@@ -122,7 +122,7 @@ describe("selectIntent", () => {
     expect(sleepUrgency(view(true), config, 0.2)).toBeUndefined();
   });
 
-  it("a sleeper is woken for an emergency, not for essential work or a meal (D77 addendum)", () => {
+  it("a sleeper is woken for an emergency, not for essential work or a meal", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
     withoutRounds(world);
@@ -144,7 +144,7 @@ describe("selectIntent", () => {
     });
   });
 
-  it("rest and chat take the need's urgency past the seek threshold, voluntary below (D84 tuning)", () => {
+  it("rest and chat take the need's urgency past the seek threshold, voluntary below", () => {
     const tw = crewWorld();
     const { world, kernel } = tw;
     withoutRounds(world);
@@ -165,7 +165,7 @@ describe("selectIntent", () => {
     expect(urgencyOf("rest")).toBe("essentialOperation");
   });
 
-  it("a chat taken because the need pressed ends when it is met, off duty too (D84 tuning)", () => {
+  it("a chat taken because the need pressed ends when it is met, off duty too", () => {
     const tw = crewWorld();
     const { world } = tw;
     withoutRounds(world);

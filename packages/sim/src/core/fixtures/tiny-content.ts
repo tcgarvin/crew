@@ -46,9 +46,9 @@ export const TINY = {
 } as const;
 
 /**
- * The fixture's default ship's day (D76): 600 s of two watches, so the scenario's one section
- * (`alpha`) stands `[0, 300)` of every 600 s, the duty window the tests were written against
- * (D77), and dayworkers keep the same hours.
+ * The fixture's default ship's day (§the-ships-day): 600 s of two watches, so the scenario's one
+ * section (`alpha`) stands `[0, 300)` of every 600 s, the duty window the tests were written
+ * against (§sections-and-dayworkers), and dayworkers keep the same hours.
  */
 export const TINY_DAY = 600;
 
@@ -141,7 +141,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       nominalSpeed: 1,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
-      // D80: no limp unless a test turns it on.
+      // §limping: no limp unless a test turns it on.
       limpSpeedFraction: 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
@@ -166,7 +166,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
         ashoreDaysMax: 3 / day,
         overdueDays: 10 / day,
       },
-      // D80: off unless a test turns them on.
+      // §reserve-kinds: off unless a test turns them on.
       sparesReserve: 0,
       foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {

@@ -1,7 +1,7 @@
 /**
- * The watch bill as it stands aboard (D77). Not stored: it is the crew's sections
- * (`Actor.schedule.section`), read off the actors. The generator for a scenario without a bill
- * is `core/watch-bill.ts` (world creation needs it, and core does not import systems).
+ * The watch bill as it stands aboard (§sections-and-dayworkers). Not stored: it is the crew's
+ * sections (`Actor.schedule.section`), read off the actors. The generator for a scenario without a
+ * bill is `core/watch-bill.ts` (world creation needs it, and core does not import systems).
  *
  * Owner: W1 of ship life slice 2.
  */

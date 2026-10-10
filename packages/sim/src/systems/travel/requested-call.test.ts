@@ -1,8 +1,8 @@
 /**
- * D99: the narrator's call-back request (`requestCall`, `NarratorState.callBack`) and the
- * `requestedCall` hook it raises; D100: travel raising `notableEvent` for an aftermath event.
- * The freight fixture's legs: prepare, undock and depart 1 s (20 ticks) each, then 25 route
- * units at 5 a second (100 ticks) from alpha to beta.
+ * §requested-call-back: the narrator's call-back request (`requestCall`, `NarratorState.callBack`)
+ * and the `requestedCall` hook it raises; §notable-event-hook: travel raising `notableEvent` for an
+ * aftermath event. The freight fixture's legs: prepare, undock and depart 1 s (20 ticks) each, then
+ * 25 route units at 5 a second (100 ticks) from alpha to beta.
  */
 import { describe, expect, it } from "vitest";
 import { raiseHookIfIdle } from "../../core/hooks";
@@ -83,7 +83,7 @@ function inFlight(world: World) {
   return travel;
 }
 
-describe("requestCall (D99)", () => {
+describe("requestCall (§requested-call-back)", () => {
   it("records the request, the port it was asked at, and no service", () => {
     const { world, kernel } = freightTestWorld();
     expect(requestCall(kernel, world, "departure", "spring a field on the pilot").status).toBe(
@@ -131,7 +131,7 @@ describe("requestCall (D99)", () => {
   });
 });
 
-describe("the requestedCall hook (D99)", () => {
+describe("the requestedCall hook (§requested-call-back)", () => {
   it("raises a departure call the tick the ship casts off, and the ack spends it", () => {
     const { world, kernel } = freightTestWorld();
     requestCall(kernel, world, "departure", "a field on the leg");
@@ -298,7 +298,7 @@ describe("the requestedCall hook (D99)", () => {
   });
 });
 
-describe("aftermath events raise notableEvent from travel (D100)", () => {
+describe("aftermath events raise notableEvent from travel (§notable-event-hook)", () => {
   it("raises notableEvent the tick after a listed aftermath event of notable significance", () => {
     const overrides: FixtureConfigOverrides = { aftermathHookOnEvents: ["alertCleared"] };
     const { world, kernel, registry } = freightTestWorld(overrides);

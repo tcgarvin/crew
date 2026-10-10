@@ -1,6 +1,6 @@
 /**
- * D42: a rejected player command raises a toast instead of vanishing into the console. The
- * kernel's rejection reasons are written for logs ("acceptContract: not docked at
+ * §decision-queue-and-halts: a rejected player command raises a toast instead of vanishing into the
+ * console. The kernel's rejection reasons are written for logs ("acceptContract: not docked at
  * \"port.kessler_drift\""); the known `preconditionFailed` cases get a friendlier line, and
  * anything else shows the raw reason so the player at least sees that nothing happened.
  */

@@ -1,16 +1,19 @@
 /**
- * The floor set (Dockside §5.2, D66): who is on a port's dock without the narrator putting them
- * there. Pure over state and content, with no draw on the rng streams (names come from a hash of
- * the save's seed and the job), so the `stageDock` hook's context can show the narrator exactly
- * the people the sim will place when the dock comes alongside, and a reload computes the same.
+ * The floor set (Dockside §5.2, §floor-set-rule): who is on a port's dock without the narrator
+ * putting them there. Pure over state and content, with no draw on the rng streams (names come from
+ * a hash of the save's seed and the job), so the `stageDock` hook's context can show the narrator
+ * exactly the people the sim will place when the dock comes alongside, and a reload computes the
+ * same.
  *
  * 1. Regulars: every `castSeed` entry with a `post` on this dock, at that post.
  * 2. The job in hand: the receiver for freight bound here, a dock hand named from the content
  *    name table, by the warehouse door; they cart the crates in once they are delivered. (The
  *    issuer of a job finishing here is never at the destination: freight is issued at its
  *    origin, and a round trip's issuer is the passenger, aboard.)
- * 3. A passenger due back appears at the gate as an actor (D63), so is not a local.
- * 4. A passenger left behind or put off here earlier (D52), on the bench if the dock has one.
+ * 3. A passenger due back appears at the gate as an actor (§dock-market-and-passengers), so is not
+ *    a local.
+ * 4. A passenger left behind or put off here earlier (§ending-a-passage-early), on the bench if the
+ *    dock has one.
  */
 import { dockForPort, dockPost } from "./docks";
 import { byId } from "./ids";
@@ -47,7 +50,9 @@ export function dockHandName(
   return family === undefined || family === given ? given : `${given} ${family}`;
 }
 
-/** Freight bound for `portId` and still to be delivered there (the job in hand, D52). */
+/**
+ * Freight bound for `portId` and still to be delivered there (the job in hand, §one-job-in-hand).
+ */
 function freightBoundHere(job: DeepReadonly<Job>, portId: PortDefId): boolean {
   if (job.passage !== undefined || job.toPortId !== portId) return false;
   if (job.status !== "accepted" && job.status !== "inTransit") return false;
@@ -85,7 +90,10 @@ function receivers(
     }));
 }
 
-/** D52: a passenger whose passage ended at this port and who is still here, off ship. */
+/**
+ * §ending-a-passage-early: a passenger whose passage ended at this port and who is still here, off
+ * ship.
+ */
 function benchPassenger(state: FloorSetState, dock: DockDef, portId: PortDefId): FloorSetEntry[] {
   const bench = dockPost(dock, "bench");
   if (bench === undefined) return [];

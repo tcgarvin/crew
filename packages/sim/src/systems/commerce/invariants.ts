@@ -1,12 +1,13 @@
 /**
- * Commerce invariants for tests (SD §19.4 style). D63: an offer's freight exists only while it is
- * staged: on the staging area of its origin's dock, alongside in `docking` or `docked`
- * (`offerStagingDock`), and nowhere else; a declined or expired offer has none. Pure over state
- * and content.
+ * Commerce invariants for tests (SD §19.4 style). §offered-freight: an offer's freight exists only
+ * while it is staged: on the staging area of its origin's dock, alongside in `docking` or `docked`
+ * (`offerStagingDock`), and nowhere else; a declined or expired offer has none. Pure over state and
+ * content.
  *
- * D66: the carting takes a walk, so the rule holds up to a dock hand on the way: an offer due on
- * the staging area may have no crates while one is bringing them out (`stageOffer`), and one that
- * should have none may keep them on the dock while one is coming for them (`withdrawOffer`).
+ * §dock-hand-errands: the carting takes a walk, so the rule holds up to a dock hand on the way: an
+ * offer due on the staging area may have no crates while one is bringing them out (`stageOffer`),
+ * and one that should have none may keep them on the dock while one is coming for them
+ * (`withdrawOffer`).
  */
 import { isInDockArea } from "../../core/docks";
 import type { DockHandErrand } from "../../core/types/dockside";

@@ -24,8 +24,8 @@ export function isAsleep(activity: DeepReadonly<Activity>): boolean {
 }
 
 /**
- * D63: out through the gate on a market errand (a `throughGate` step, off ship). Such a buyer
- * comes back on their own; travel waits for them before casting the dock off.
+ * §buying-parts: out through the gate on a market errand (a `throughGate` step, off ship). Such a
+ * buyer comes back on their own; travel waits for them before casting the dock off.
  */
 export function isOutThroughGate(
   actor: DeepReadonly<Pick<Actor, "activity" | "availability">>,

@@ -1,9 +1,9 @@
 /**
- * D92: the asteroid field's lifecycle (slice 5 calls 3, 4, 8, 9, 19): scheduled → active at the
- * first transit tick at or after its start → ended when progress leaves it or it drifts clear
- * while stuck; dropped with its leg. Detection and the alert (`detection.ts`), arrivals and the
- * hull (`impacts.ts`, `hull.ts`), machine effects (`effects.ts`) and the stuck clock
- * (`stuck.ts`) are this system's, phase `equipment` after travel's hazards.
+ * §field-lifecycle: the asteroid field's lifecycle (slice 5 calls 3, 4, 8, 9, 19): scheduled →
+ * active at the first transit tick at or after its start → ended when progress leaves it or it
+ * drifts clear while stuck; dropped with its leg. Detection and the alert (`detection.ts`),
+ * arrivals and the hull (`impacts.ts`, `hull.ts`), machine effects (`effects.ts`) and the stuck
+ * clock (`stuck.ts`) are this system's, phase `equipment` after travel's hazards.
  *
  * Timing. The helm's check falls `field.warningSeconds` before the start, in transit. A field
  * whose check would fall outside transit (scheduled in port, or still departing) is held: its

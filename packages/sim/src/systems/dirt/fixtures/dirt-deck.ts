@@ -1,7 +1,7 @@
 /**
- * Dirt test fixture (D82): the W4a crew deck with the dockside ramps, a quay that loads boots
- * (`grime` 0.8) and settles dust (`airborneDust` 1), a cleaning locker in the corridor with the
- * mop, and a crew of four by role. The dirt system runs; no equipment, travel or watch systems.
+ * Dirt test fixture (§dirt-grid): the W4a crew deck with the dockside ramps, a quay that loads
+ * boots (`grime` 0.8) and settles dust (`airborneDust` 1), a cleaning locker in the corridor with
+ * the mop, and a crew of four by role. The dirt system runs; no equipment, travel or watch systems.
  *
  *   x 0123456789AB
  *   0 AbbbBBBBCCCC    A = quarters, B = galley and mess, C = engineering

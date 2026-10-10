@@ -38,7 +38,7 @@ describe("parseNotes", () => {
     expect(parseNotes(JSON.parse(JSON.stringify(notes)))).toEqual(notes);
   });
 
-  it("reads cast stored before D25 with no port and an unknown sighting", () => {
+  it("reads cast stored with no port and an unknown sighting (§issuers-and-pitches)", () => {
     const notes = parseNotes({
       summary: "s",
       openThreads: [],
@@ -50,7 +50,7 @@ describe("parseNotes", () => {
     ]);
   });
 
-  it("migrates notes stored before D31/D32: openThreads become threads, no card history", () => {
+  it("migrates old notes (§card-history, §threads-and-scales): openThreads become threads, no card history", () => {
     const notes = parseNotes({
       summary: "s",
       openThreads: ["Who is the stranger?"],
@@ -96,7 +96,7 @@ describe("parseNotes", () => {
   });
 });
 
-describe("mergeThreads (D32)", () => {
+describe("mergeThreads (§threads-and-scales)", () => {
   const written = [
     {
       title: "The assay office",
@@ -134,7 +134,7 @@ describe("mergeThreads (D32)", () => {
     expect(merged.map((t) => t.lastBeatTick)).toEqual([30, null, null]);
   });
 
-  it("sets beatCardShown on the thread a beat card foreshadowed and keeps it afterwards (D39)", () => {
+  it("sets beatCardShown on the thread a beat card foreshadowed and keeps it afterwards (§beat-cards)", () => {
     const merged = mergeThreads(written, [thread], 90, [], "jax's debt").threads;
     expect(merged.map((t) => t.beatCardShown)).toEqual([false, true, false]);
     // A beat card is a card: the thread's last beat is now.
@@ -143,14 +143,14 @@ describe("mergeThreads (D32)", () => {
     expect(later.map((t) => t.beatCardShown)).toEqual([false, true, false]);
   });
 
-  it("reads a stored thread without the flag as not foreshadowed (pre-D39)", () => {
+  it("reads a stored thread without the flag as not foreshadowed (§beat-cards)", () => {
     const { beatCardShown: _omitted, ...stored } = thread;
     const notes = parseNotes({ summary: "s", threads: [stored], cast: [], lastUpdatedTick: 1 });
     expect(notes.threads[0]?.beatCardShown).toBe(false);
   });
 });
 
-describe("mergeThreads keeps threads the captain has seen (D101)", () => {
+describe("mergeThreads keeps threads the captain has seen (§thread-keeping-and-retirement)", () => {
   const write = (title: string) => ({
     title,
     scale: "episode" as const,
@@ -221,14 +221,14 @@ describe("mergeThreads keeps threads the captain has seen (D101)", () => {
   });
 });
 
-describe("parseNotes without retired (D101)", () => {
+describe("parseNotes without retired (§thread-keeping-and-retirement)", () => {
   it("still loads stored notes, which never held a retired list", () => {
     const notes = parseNotes({ summary: "s", threads: [thread], cast: [], lastUpdatedTick: 1 });
     expect(notes.threads).toHaveLength(1);
   });
 });
 
-describe("arcs remembered (D103)", () => {
+describe("arcs remembered (§past-arcs)", () => {
   const write = (title: string) => ({
     title,
     scale: "episode" as const,
@@ -306,7 +306,7 @@ describe("arcs remembered (D103)", () => {
     expect(notes.pastArcs[0]?.closedTick).toBe(3);
   });
 
-  it("reads a thread stored before D103: its stage becomes its arc notes", () => {
+  it("reads a stored thread with a stage: it becomes its arc notes (§past-arcs)", () => {
     const { arcNotes: _a, openedTick: _o, ...rest } = thread;
     const notes = parseNotes({
       summary: "s",

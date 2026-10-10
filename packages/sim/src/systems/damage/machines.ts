@@ -1,6 +1,6 @@
 /**
- * D93: what a rock does to the crew's world beyond the hull: the two points where the field (W1)
- * calls into damage response.
+ * §machine-damage: what a rock does to the crew's world beyond the hull: the two points where the
+ * field (W1) calls into damage response.
  *
  * - `damageMachine`, for every graze, damage and knockout (call 7): integrity down, clamped to
  *   [0, 1], and the machine's `machineDamaged` problem raised (discovered, located at the

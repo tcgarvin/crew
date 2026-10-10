@@ -1,6 +1,6 @@
 /**
- * Damage events (D93, D94): the crew's answer to the rocks: scouts sent, scars patched and
- * plated, impact damage repaired.
+ * Damage events (§patching-and-plating, §scouts): the crew's answer to the rocks: scouts sent,
+ * scars patched and plated, impact damage repaired.
  */
 import type { ActorId, CompartmentId, MachineId, ScarId } from "../ids";
 import type { SignificanceCatalog } from "./significance";

@@ -13,7 +13,7 @@ function walk(node: unknown, visit: (n: Record<string, unknown>) => void): void 
   }
 }
 
-describe("the staging plan schema (D67, in the D53 style)", () => {
+describe("the staging plan schema (§staging-prompt, in the D53 style)", () => {
   const json = planJsonSchema(buildStagingPlanSchema());
 
   it("closes every object and requires every property", () => {

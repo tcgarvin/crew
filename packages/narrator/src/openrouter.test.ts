@@ -142,7 +142,7 @@ describe("OpenRouter plan schema (D53)", () => {
   });
 });
 
-describe("OpenRouter reasoning effort (D96)", () => {
+describe("OpenRouter reasoning effort (§models-and-reasoning-effort)", () => {
   it("sends the default model's effort when none is given (D102: luna at low)", async () => {
     const { bodies, fetch } = recordingFetch();
     await runNarrator(approachRequest(content()), {
@@ -176,7 +176,7 @@ describe("OpenRouter reasoning effort (D96)", () => {
   });
 });
 
-describe("OpenRouter continuation (D97)", () => {
+describe("OpenRouter continuation (§notes-turn)", () => {
   const base = {
     model: "openai/gpt-6-luna",
     system: ["rules"],

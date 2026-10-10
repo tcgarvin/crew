@@ -1,7 +1,8 @@
 /**
- * D80: the stores the ship keeps aboard, bought at port like a part (D47) when they run low.
+ * §reserve-kinds: the stores the ship keeps aboard, bought at port like a part (§buying-parts) when
+ * they run low.
  *
- * Provisions (D81) are reckoned in days of meals (`systems/galley/provisions.ts`
+ * Provisions (§reserve-kinds) are reckoned in days of meals (`systems/galley/provisions.ts`
  * `provisionsDays`: a crate a meal, a meal a watch, so crates over `time.watchesPerDay`). Under
  * `galley.lowBelowDays`, while docked at a port whose market sells a `provisions`-tagged item,
  * the crates that bring it to `galley.restockToDays` are a `reserveLow` problem for that item.
@@ -18,13 +19,13 @@
  *
  * Spares are reckoned in units: each `spare`-tagged item the market sells is kept at
  * `commerce.sparesReserve` units aboard, so a fault far from port finds its part in the hold.
- * A repair short of a part right now is `partsNeeded` (D47) and is bought on top of this.
+ * A repair short of a part right now is `partsNeeded` (§buying-parts) and is bought on top of this.
  *
- * Patch kits (D93) are reckoned in units against what the scenario stocked: the `patchKit`-tagged
- * `startingItems` of `state.scenarioId` (two per locker, 24 on Mk2). With fewer kits aboard, a
- * market that sells a `patchKit` item (the first by id) is asked for the difference. Bought kits
- * come aboard like any purchase, set down at the top of the cargo ramp (`market.ts`), where a
- * patcher fetches them from as readily as from a locker.
+ * Patch kits (§plating-and-kits-at-port) are reckoned in units against what the scenario stocked:
+ * the `patchKit`-tagged `startingItems` of `state.scenarioId` (two per locker, 24 on Mk2). With
+ * fewer kits aboard, a market that sells a `patchKit` item (the first by id) is asked for the
+ * difference. Bought kits come aboard like any purchase, set down at the top of the cargo ramp
+ * (`market.ts`), where a patcher fetches them from as readily as from a locker.
  *
  * Raised, revised and settled against truth every tick, and only while docked at a port whose
  * market has the item in stock: underway, or where nothing is for sale, the crew can do nothing
@@ -63,8 +64,8 @@ function hungerPerDay(ctx: ReserveCtx): number {
 }
 
 /**
- * D80: days of food aboard at the current mouths (nutrition aboard over the day's hunger);
- * `Infinity` with nobody aboard to feed.
+ * §reserve-kinds: days of food aboard at the current mouths (nutrition aboard over the day's
+ * hunger); `Infinity` with nobody aboard to feed.
  */
 export function foodDaysAboard(ctx: ReserveCtx): number {
   const perDay = hungerPerDay(ctx);
@@ -105,8 +106,8 @@ function foodShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveSho
 }
 
 /**
- * D81: the provisions to buy here, if the galley's days of meals are low and the market sells a
- * `provisions` item (the first by id): the crates that bring the days to `restockToDays`, a
+ * §reserve-kinds: the provisions to buy here, if the galley's days of meals are low and the market
+ * sells a `provisions` item (the first by id): the crates that bring the days to `restockToDays`, a
  * crate a meal (`galley/provisions.ts`).
  */
 function provisionsShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
@@ -138,7 +139,10 @@ function spareShortfalls(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveS
 const isPatchKit = (ctx: ReserveCtx, defId: ItemDefId): boolean =>
   ctx.content.items[defId]?.tags.includes("patchKit") === true;
 
-/** D93: the patch kits the scenario stocked the ship with (none when the scenario is unknown). */
+/**
+ * §plating-and-kits-at-port: the patch kits the scenario stocked the ship with (none when the
+ * scenario is unknown).
+ */
 export function stockedPatchKits(ctx: ReserveCtx): number {
   const scenario = ctx.content.scenarios[ctx.state.scenarioId];
   if (scenario === undefined) return 0;
@@ -147,7 +151,10 @@ export function stockedPatchKits(ctx: ReserveCtx): number {
     .reduce((sum, line) => sum + line.count, 0);
 }
 
-/** D93: the kits that bring the ship back to its stocked count, if a market here sells them. */
+/**
+ * §plating-and-kits-at-port: the kits that bring the ship back to its stocked count, if a market
+ * here sells them.
+ */
 function patchKitShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
   const stocked = stockedPatchKits(ctx);
   if (stocked <= 0) return [];
@@ -161,8 +168,8 @@ function patchKitShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): Reserv
 }
 
 /**
- * D80: what the ship should buy at `portId` to keep its reserves, among what the market there has
- * in stock. Empty when nothing is low or nothing that would help is for sale.
+ * §reserve-low-problem: what the ship should buy at `portId` to keep its reserves, among what the
+ * market there has in stock. Empty when nothing is low or nothing that would help is for sale.
  */
 export function reserveShortfalls(ctx: ReserveCtx, portId: PortDefId): ReserveShortfall[] {
   const stock = inStock(ctx, portId);
@@ -220,7 +227,7 @@ export function sweepReserves(ctx: StepCtx): void {
       continue;
     }
     // Resolved whether the stores are back up or the market here sold out: either way nothing is
-    // left to buy, and (D63) a buyer still carrying a purchase aboard keeps their task.
+    // left to buy, and (§buying-parts) a buyer still carrying a purchase aboard keeps their task.
     const event = resolveProblem(ctx.state, problem.dedupeKey);
     if (event !== undefined) ctx.emit(event);
   }

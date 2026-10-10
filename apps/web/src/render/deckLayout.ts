@@ -35,8 +35,8 @@ export interface InteriorLayoutDoor extends LayoutDoorBase {
 }
 
 /**
- * Dockside §2.6 (D58): a ramp knows which one it is (the cargo ramp is a plate, the personnel
- * ramp a gangway) and which way is out of the hull, so it can be drawn extending.
+ * Dockside §2.6 (§dock-drawing): a ramp knows which one it is (the cargo ramp is a plate, the
+ * personnel ramp a gangway) and which way is out of the hull, so it can be drawn extending.
  */
 export interface RampLayoutDoor extends LayoutDoorBase {
   readonly kind: "ramp";
@@ -51,7 +51,10 @@ export interface LayoutMachine {
   readonly placementKey: LocalKey;
   readonly defId: MachineDefId;
   readonly name: string;
-  /** D58: the def's tags, so the hull can find the engines for the plume. */
+  /**
+   * §stars-plume-and-the-animation-loop: the def's tags, so the hull can find the engines for the
+   * plume.
+   */
   readonly tags: readonly MachineTag[];
   readonly footprint: readonly TileCoord[];
   readonly center: { readonly x: number; readonly y: number };
@@ -79,7 +82,10 @@ export interface DeckLayout {
   readonly deckId: DeckDef["id"];
   readonly width: number;
   readonly height: number;
-  /** D72: the deck's hull class; with a dock's berth box it places the ship (`berthInView`). */
+  /**
+   * §ship-placement: the deck's hull class; with a dock's berth box it places the ship
+   * (`berthInView`).
+   */
   readonly hull: HullDef;
   readonly tiles: readonly LayoutTile[];
   readonly compartmentNames: Readonly<Record<string, string>>;

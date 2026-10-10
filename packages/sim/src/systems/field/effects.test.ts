@@ -1,10 +1,10 @@
 /**
- * D92: what a rock does to a machine (slice 5 call 7). The effect table's weights are the shares
- * a thousand rolls come out at. A graze takes 0.2 of integrity and a damage 0.5 (derated, still
- * running); a knockout takes it all, so one hit takes a whole machine out (`machineKnockedOut`);
- * a fault is one of the machine's own through the fault path, and a machine with none takes
- * damage instead. Until damage response lands (W2) a hit raises no problem: the stub only lowers
- * integrity.
+ * §machines-in-the-blast: what a rock does to a machine (slice 5 call 7). The effect table's
+ * weights are the shares a thousand rolls come out at. A graze takes 0.2 of integrity and a damage
+ * 0.5 (derated, still running); a knockout takes it all, so one hit takes a whole machine out
+ * (`machineKnockedOut`); a fault is one of the machine's own through the fault path, and a machine
+ * with none takes damage instead. Until damage response lands (W2) a hit raises no problem: the
+ * stub only lowers integrity.
  */
 import { describe, expect, it } from "vitest";
 import { createRngApi } from "../../core/rng";
@@ -49,7 +49,7 @@ const hitOn = (
   machineId: MachineId,
 ): MachineEffect | undefined => impact?.payload.hits.find((h) => h.machineId === machineId)?.effect;
 
-describe("machine effects (D92, call 7)", { timeout: 30_000 }, () => {
+describe("machine effects (§machines-in-the-blast, call 7)", { timeout: 30_000 }, () => {
   it("rolls the effect table at its weights over a thousand rolls", () => {
     const { world } = fieldWorld({ seed: 3 });
     const rng = createRngApi(world.state);

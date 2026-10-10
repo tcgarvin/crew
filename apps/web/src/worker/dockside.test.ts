@@ -1,23 +1,23 @@
 /**
- * D61 kernel integration on the real authored bundle and every V1 system: a new game starts with
- * the Hub's dock alongside, and a schema-3 save made docked mid-loading (freight still in the
- * warehouse store) restores with its dock and its freight moved to the staging area (D63),
- * finishes loading, leaves with the dock cast off, and arrives with the next port's dock
- * alongside. The travel invariant holds every tick.
+ * Kernel integration (§dock-alongside) on the real authored bundle and every V1 system: a new game
+ * starts with the Hub's dock alongside, and a schema-3 save made docked mid-loading (freight still
+ * in the warehouse store) restores with its dock and its freight moved to the staging area
+ * (§offered-freight), finishes loading, leaves with the dock cast off, and arrives with the next
+ * port's dock alongside. The travel invariant holds every tick.
  *
- * D63 (Dockside §10): a full Hub → Kessler run with freight: staged on offer, loaded by the crew
- * from the staging area (in hand or on the hand truck, D65), delivered to the delivery bay, paid
- * once. Every invariant, the commerce one included, holds every tick.
+ * §offered-freight (Dockside §10): a full Hub → Kessler run with freight: staged on offer, loaded
+ * by the crew from the staging area (in hand or on the hand truck, §hand-truck-trips), delivered to
+ * the delivery bay, paid once. Every invariant, the commerce one included, holds every tick.
  *
- * D66 (Dockside phase 3): locals. A new game's Hub dock has its regulars at their posts (Hal
- * Petrosyan at the queue kiosk); the offer's crates are carted out by a dock hand; the staging
+ * §locals-table (Dockside phase 3): locals. A new game's Hub dock has its regulars at their posts
+ * (Hal Petrosyan at the queue kiosk); the offer's crates are carted out by a dock hand; the staging
  * call is raised before every docking and no card comes up on the way in; Kessler's dock comes
- * alongside with its regulars and the delivery's receiver, who carts the crates in; and back at
- * the Hub, Hal is at his kiosk again.
+ * alongside with its regulars and the delivery's receiver, who carts the crates in; and back at the
+ * Hub, Hal is at his kiosk again.
  *
- * D70 (Dockside phase 4): the same run with the work offered in person: the captain walks ashore,
- * is asked about once, walks over to Hal at his kiosk, and his card comes up there; loaded,
- * delivered, paid once, and no card ever comes up in flight. The rest of D70 is
+ * §offers-in-person (Dockside phase 4): the same run with the work offered in person: the captain
+ * walks ashore, is asked about once, walks over to Hal at his kiosk, and his card comes up there;
+ * loaded, delivered, paid once, and no card ever comes up in flight. The rest is
  * `captain-ashore.test.ts`.
  *
  * It lives here, not in `packages/sim`, for the same reason `fullSim.test.ts` does: the kernel
@@ -53,12 +53,14 @@ import { assertInvariants, captainOf, newGame } from "./testGame";
 const HUB = "port.crossroads_hub" as PortDefId;
 const HUB_DOCK = "dock.crossroads_hub";
 
-/** D66: the locals on the dock in the frame, by name, with their posts. */
+/** §locals-table: the locals on the dock in the frame, by name, with their posts. */
 function localsByName(world: World): Map<string, { postKey: string; x: number; y: number }> {
   return new Map(getRenderFrame(world).locals.map((l) => [l.name, l]));
 }
 
-/** D66: is this local standing at (or beside, when it was taken) that post on the dock? */
+/**
+ * §locals-table: is this local standing at (or beside, when it was taken) that post on the dock?
+ */
 function nearPost(world: World, local: { x: number; y: number }, postKey: string): boolean {
   const berth = dockAlongside(world.content, world.state);
   const post = berth?.dock.posts.find((p) => p.key === postKey);
@@ -144,8 +146,9 @@ function drive(
 
 /**
  * The envelope as schema 3 wrote it: no `deck.dock`, the ramps shut as they used to shut, and no
- * freight on a dock (D63): a taken job's crates still waiting to load are in the port's warehouse
- * store, where schema 3 spawned them, and the crew believe them there; an offer has none.
+ * freight on a dock (§offered-freight): a taken job's crates still waiting to load are in the
+ * port's warehouse store, where schema 3 spawned them, and the crew believe them there; an offer
+ * has none.
  */
 function asSchema3(envelope: SaveEnvelope, content: ContentBundle): SaveEnvelope {
   const state = structuredClone(envelope.state);
@@ -174,7 +177,7 @@ function asSchema3(envelope: SaveEnvelope, content: ContentBundle): SaveEnvelope
       }
     }
   }
-  // Schema 3 had no locals (D66).
+  // Schema 3 had no locals.
   const raw = state as unknown as Record<string, unknown>;
   // biome-ignore lint/performance/noDelete: a schema-3 save has no such key.
   delete raw.dockside;
@@ -189,7 +192,7 @@ const loadingOpen = (world: World) =>
     (p) => p.kind === "cargoToLoad" && p.status === "open",
   );
 
-describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => {
+describe("the dock alongside on real content (§dock-alongside)", { timeout: 20_000 }, () => {
   it("starts a new game with the Hub's dock alongside and its ramps down", () => {
     const { world } = newGame(20261003);
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: HUB });
@@ -199,7 +202,7 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
     const ramps = Object.values(world.state.doors).filter((d) => d.kind === "ramp");
     expect(ramps.map((d) => d.physicalState)).toEqual(["open", "open"]);
     expect(travelViolations(world)).toEqual([]);
-    // D66: the regulars are at their posts from tick 0, and none of them is crew.
+    // §locals-table: the regulars are at their posts from tick 0, and none of them is crew.
     const locals = localsByName(world);
     const hal = locals.get("Hal Petrosyan");
     expect(hal?.postKey).toBe("queue_kiosk");
@@ -218,16 +221,16 @@ describe("the dock alongside on real content (D61)", { timeout: 20_000 }, () => 
       (i) => i.jobId !== undefined && i.location.kind === "inExternalStore",
     );
     expect(inStore.length).toBeGreaterThan(0);
-    // D74: the game refuses every save older than schema 7; the frozen 3 → 6 migrations are run
-    // here with that refusal passed through.
+    // §save-migrations: the game refuses every save older than schema 7; the frozen 3 → 6
+    // migrations are run here with that refusal passed through.
     const restored = restore(old, bundle, createFullRegistry(), {
       migrations: { ...migrations, 6: (raw: unknown) => raw },
     });
     expect(restored.state.deck.dock?.dockId).toBe(HUB_DOCK);
-    // D66: migrated with an empty dockside; its first tick dresses the dock alongside.
+    // Migrated with an empty dockside; its first tick dresses the dock alongside.
     expect(restored.state.dockside.locals).toEqual({});
-    // D63: the freight waiting in the warehouse store is on the staging area now, and the crew
-    // know it is there.
+    // §offered-freight: the freight waiting in the warehouse store is on the staging area now, and
+    // the crew know it is there.
     for (const item of inStore) {
       const location = restored.state.items[item.id]?.location;
       if (location === undefined) throw new Error(`lost ${item.id}`);
@@ -270,7 +273,7 @@ interface CrateLog {
   firstInBayTick: number | undefined;
 }
 
-describe("port work is physical on real content (D63)", { timeout: 20_000 }, () => {
+describe("port work is physical on real content (§offered-freight)", { timeout: 20_000 }, () => {
   it("runs Hub → Kessler freight: staged on offer, carried aboard, delivered to the bay, paid once", () => {
     const { bundle, kernel, world } = newGame(20261003);
     const send = (command: Omit<Command, "id">) => {
@@ -299,8 +302,8 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
       },
     });
 
-    // D66: the offer is applied on the first tick and a dock hand comes out of the warehouse
-    // door with its crates; they are on the staging area once the hand has walked there.
+    // §dock-hand-errands: the offer is applied on the first tick and a dock hand comes out of the
+    // warehouse door with its crates; they are on the staging area once the hand has walked there.
     const events: SimEvent[] = [];
     const first = kernel.advance(world, 1);
     events.push(...first.events);
@@ -344,7 +347,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
     send({ source: "player", kind: "acceptContract", payload: { jobId: job.id } });
     send({ source: "player", kind: "setCourse", payload: { destinationPortId: KESSLER } });
 
-    // D66: every hook on the way, every card, and what was on the dock as each one came in.
+    // Every hook on the way, every card, and what was on the dock as each one came in.
     const hooksRaised: { kind: string; tick: number }[] = [];
     const cardsQueued: number[] = [];
     let kesslerLocals: Map<string, { postKey: string; x: number; y: number }> | undefined;
@@ -386,7 +389,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
         const location = world.state.items[itemId]?.location;
         if (location === undefined) throw new Error(`crate ${itemId} vanished`);
         if (location.kind === "inExternalStore" && !delivered) log.inStoreBeforeDelivery = true;
-        // In someone's hands, or (D65) on the hand truck someone is pushing.
+        // In someone's hands, or (§hand-truck-trips) on the hand truck someone is pushing.
         const container =
           location.kind === "inContainer" ? world.state.items[location.containerId] : undefined;
         const held = container?.location ?? location;
@@ -397,8 +400,9 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
           }
         }
       }
-      // D65: off the hand truck a crate lies in the bay before its haul completes (the trip's own
-      // haul settles once the truck is parked), so the bay is read off positions too.
+      // §hand-truck-trips: off the hand truck a crate lies in the bay before its haul completes
+      // (the trip's own haul settles once the truck is parked), so the bay is read off positions
+      // too.
       for (const [itemId, log] of crates) {
         const location = world.state.items[itemId]?.location;
         if (location === undefined || log.firstInBayTick !== undefined) continue;
@@ -473,7 +477,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
     );
     expect(pay.map((t) => t.amount)).toEqual([done?.pay]);
 
-    // D66: the staging call came before Kessler's dock did, and no card on the way in.
+    // The staging call came before Kessler's dock did, and no card on the way in.
     const kesslerArrival = events.find(
       (e) => e.type === "arrived" && e.payload.portId === KESSLER,
     )?.tick;
@@ -516,7 +520,7 @@ describe("port work is physical on real content (D63)", { timeout: 20_000 }, () 
   });
 });
 
-describe("the captain ashore on real content (D70)", { timeout: 30_000 }, () => {
+describe("the captain ashore on real content (§looking-for-work)", { timeout: 30_000 }, () => {
   it("runs Hub → Kessler with the offer made in person on the dock: loaded, delivered, paid once", () => {
     const { bundle, kernel, world } = newGame(20261003);
     const send = (command: Omit<Command, "id">) => {

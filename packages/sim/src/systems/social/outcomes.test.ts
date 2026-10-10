@@ -102,7 +102,7 @@ describe("contest (call 5)", () => {
     ]);
     const beaten = actorOf(world, TOMAS).thoughts.filter((t) => t.key === "keepsBeatingMe");
     expect(beaten.map((t) => t.refId)).toEqual([JAX]);
-    // D88: beatMe stacks to two, so the third loss holds it at −2; the rivalry adds its −1.
+    // §memories: beatMe stacks to two, so the third loss holds it at −2; the rivalry adds its −1.
     expect(feel(world, TOMAS, JAX)).toBe(-3);
     expect(
       world.state.social.relationships[TOMAS]?.[JAX]?.memories.map((m) => m.key).sort(),
@@ -307,7 +307,7 @@ describe("perform and bond (call 5)", () => {
     ] as const) {
       expect(feel(world, a, b)).toBe(1);
     }
-    // D85 tuning: Tomas, neutral on vids, sat through it and does not warm to anyone.
+    // §outcomes: Tomas, neutral on vids, sat through it and does not warm to anyone.
     expect(feel(world, TOMAS, JAX)).toBe(0);
     expect(feel(world, TOMAS, NOOR)).toBe(0);
     expect(ofType(drafts, "argument")).toEqual([]);

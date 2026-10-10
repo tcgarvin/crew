@@ -93,7 +93,7 @@ import dockVesperGate from "../data/docks/vesper-gate.json";
 
 import scenarioDefault from "../data/scenarios/default.json";
 
-// Thoughts (D79, D81, D82, slice 4)
+// Thoughts (§thoughts, slice 4)
 import thoughtArgued from "../data/thoughts/argued.json";
 import thoughtAteATreat from "../data/thoughts/ate-a-treat.json";
 import thoughtAteInDirtyMess from "../data/thoughts/ate-in-dirty-mess.json";
@@ -143,12 +143,13 @@ import topicTheGuild from "../data/topics/the-guild.json";
 import topicTheLeague from "../data/topics/the-league.json";
 import topicTheVid from "../data/topics/the-vid.json";
 
-// People (D25)
+// People (§issuers-and-pitches)
 import peopleNameTable from "../data/people/name-table.json";
 
 import configDefault from "../data/config/default.json";
 
-// The scenario names its deck; Mk1 stays as a second footprint the docks must also fit (D73).
+// The scenario names its deck; Mk1 stays as a second footprint the docks must also fit
+// (§the-ships).
 const DECKS = [deckFreighterMk2, deckFreighterMk1];
 const MACHINES = [
   machineEngine,
@@ -307,7 +308,9 @@ function keyById<T extends { id: string }>(defs: readonly unknown[]): Record<str
   return out;
 }
 
-/** D79: thought defs are keyed by their `key` (a closed sim vocabulary), not a namespaced id. */
+/**
+ * §thoughts: thought defs are keyed by their `key` (a closed sim vocabulary), not a namespaced id.
+ */
 function keyByKey<T extends { key: string }>(defs: readonly unknown[]): Record<string, T> {
   const out: Record<string, T> = {};
   for (const raw of defs) {

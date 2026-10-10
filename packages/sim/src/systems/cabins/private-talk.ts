@@ -260,7 +260,10 @@ export function bothConferring(
   });
 }
 
-/** The outcome of call 15 (D88): memories (the caller's only when warm), the crew member's thought. */
+/**
+ * The outcome of call 15 (§memories): memories (the caller's only when warm), the crew member's
+ * thought.
+ */
 const OUTCOME = {
   warm: { toCaller: "heardMeOut", toCrew: "talkedItThrough", thought: "heardOut" },
   stern: { toCaller: "dressedMeDown", toCrew: undefined, thought: "dressedDown" },

@@ -12,10 +12,10 @@ export interface LogProps {
 }
 
 /**
- * D55: the ship's log, one feed newest on top: event lines, and the cards the captain was shown
- * with how they answered. D72: on a portrait screen it is a compact strip under the canvas, so the
- * ship stays legible, with a toggle to open it out (the stylesheet hides the toggle in landscape,
- * where the log is a full-height column).
+ * §the-log-in-playback-order: the ship's log, one feed newest on top: event lines, and the cards
+ * the captain was shown with how they answered. On a portrait screen it is a compact strip under
+ * the canvas, so the ship stays legible, with a toggle to open it out (the stylesheet hides the
+ * toggle in landscape, where the log is a full-height column).
  */
 export function Log({ entries, cardText, onOpenDecision }: LogProps) {
   const [expanded, setExpanded] = useState(false);
@@ -74,7 +74,7 @@ function LoggedCard({
       <span className="log-card-kicker">{card.speaker ?? "Card"}</span>
       <span className="log-card-title">{card.title}</span>
       {card.closesThread === undefined ? null : (
-        // D56: the narrator ended a story thread with this card.
+        // §closing-cards: the narrator ended a story thread with this card.
         <span className="log-card-closed">
           ✓ Story closed{card.closesThread === "" ? "" : `: ${card.closesThread}`}
         </span>

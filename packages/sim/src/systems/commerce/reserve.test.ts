@@ -1,9 +1,9 @@
 /**
- * D80: the ship's stores, kept through the port market. Food is reckoned in days of the crew's
- * hunger; below the reserve, docked at a port that sells food, commerce raises `reserveLow`
- * (owner commerce, routine) and the crew buy the shortfall through D47's `buyParts` task, in
- * stacks no bigger than the item's `maxStack`. Underway, or where nothing is for sale, there is
- * no problem to show.
+ * §reserve-kinds: the ship's stores, kept through the port market. Food is reckoned in days of the
+ * crew's hunger; below the reserve, docked at a port that sells food, commerce raises `reserveLow`
+ * (owner commerce, routine) and the crew buy the shortfall through the `buyParts` task
+ * (§buying-parts), in stacks no bigger than the item's `maxStack`. Underway, or where nothing is
+ * for sale, there is no problem to show.
  */
 import { describe, expect, it } from "vitest";
 import { type TestWorld, cmd } from "../../core/fixtures/test-world";
@@ -165,7 +165,7 @@ function rationStacks(world: World): number[] {
 
 const TWO_MINUTES = 20 * 120;
 
-describe("food reserve (D80): days of the crew's hunger aboard", () => {
+describe("food reserve (§reserve-kinds): days of the crew's hunger aboard", () => {
   it("counts the nutrition aboard over the eaters' hunger per day", () => {
     const { world } = reserveWorld({ rationStock: 40 });
     const ctx = { state: world.state, content: world.content, config: world.config.values };
@@ -235,7 +235,7 @@ describe("food reserve (D80): days of the crew's hunger aboard", () => {
   });
 });
 
-describe("spares reserve (D80): units of each spare kept aboard", () => {
+describe("spares reserve (§reserve-kinds): units of each spare kept aboard", () => {
   function sparesAboard(world: World): number {
     return Object.values(world.state.items)
       .filter((i) => i.defId === SPARES && i.location.kind !== "inExternalStore")
@@ -282,7 +282,7 @@ describe("spares reserve (D80): units of each spare kept aboard", () => {
   });
 });
 
-describe("patch kits (D93): bought back to the scenario's stocked count", () => {
+describe("patch kits: bought back to the scenario's stocked count", () => {
   function kitWorld(options: Parameters<typeof damageWorld>[0]) {
     const { world } = damageWorld(options);
     const ctx = { state: world.state, content: world.content, config: world.config.values };

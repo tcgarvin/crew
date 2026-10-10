@@ -1,4 +1,4 @@
-/** Room dirt, tiers with hysteresis, and deposits (D82). */
+/** Room dirt, tiers with hysteresis, and deposits (§room-tiers). */
 import { describe, expect, it } from "vitest";
 import { FIXTURE_DIRT } from "../../core/fixtures/ship-life";
 import type { TileCoord } from "../../core/types/common";
@@ -23,7 +23,7 @@ function engineeringCells(values: Record<string, number>): number[] {
   return cells;
 }
 
-describe("roomDirt (D82)", () => {
+describe("roomDirt (§room-tiers)", () => {
   it("is the mean, weighted towards the worst tile", () => {
     if (deck === undefined) throw new Error("no deck");
     // 20 cells in room C; one at 255 and the rest clean.
@@ -45,7 +45,7 @@ describe("roomDirt (D82)", () => {
   });
 });
 
-describe("tierOf (D82)", () => {
+describe("tierOf (§room-tiers)", () => {
   const { untidy, dirty, filthy } = FIXTURE_DIRT.tiers;
   const h = FIXTURE_DIRT.tierHysteresis;
 
@@ -66,7 +66,7 @@ describe("tierOf (D82)", () => {
   });
 });
 
-describe("depositDirt (D82)", () => {
+describe("depositDirt (§dirt-deposits)", () => {
   it("lands round the machine on floor in its room, never under a machine or through a wall", () => {
     const test = dirtWorld({ bare: true });
     const { world } = test;

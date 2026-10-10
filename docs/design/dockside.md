@@ -1,8 +1,9 @@
 # Dockside: Arrivals, the Dock, and the Captain Ashore
 
 Status: design agreed with the owner, 2026-10-03. Owner inputs are marked **(owner)**; everything
-else is a design-partner call the owner delegated. Decisions get recorded in `docs/DECISIONS.md`
-as each phase lands (D57 records the rulings); this file stays as the rationale. The
+else is a design-partner call the owner delegated. Behaviour goes into `docs/spec/` as each
+phase lands and real decisions into `docs/DECISIONS.md` (D57 records the rulings); this file
+stays as the rationale. The
 implementation plan is `docs/design/dockside-plan.md`.
 
 ## 1. Why
@@ -214,10 +215,10 @@ there: the job is delivered when every crate is in the delivery bay. `contractCo
 payment are unchanged. A dock hand (or the narrator's named receiver) then carts the crates through
 the warehouse door, and they leave the world into the store as today.
 
-**Parts.** `buyParts` (D47) walks to the dock's market stall instead of a transfer tile. Bought
-units are handed over at the stall and carried aboard like freight. A dock with no stall means
-the market is through the gate: the buyer walks out, is off ship for `buySeconds`, and walks back
-with the part. The market's stock and prices are unchanged.
+**Parts.** `buyParts` (§buying-parts) walks to the dock's market stall instead of a transfer tile.
+Bought units are handed over at the stall and carried aboard like freight. A dock with no stall
+means the market is through the gate: the buyer walks out, is off ship for `buySeconds`, and walks
+back with the part. The market's stock and prices are unchanged.
 
 **Passengers.** Boarding passengers walk from the gate across the dock and up the personnel
 ramp. Going ashore, they walk down and out through the gate. Returning, they appear at the gate.
@@ -260,7 +261,8 @@ Computed by the sim when `docking` begins, before the narrator dresses the dock:
    finished here.
 3. **A passenger due back** stands at the gate at their return tick (passage logic unchanged; only
    where they appear changes).
-4. **A passenger left behind or put off at this port earlier** (D52) may appear on the bench.
+4. **A passenger left behind or put off at this port earlier** (§ending-a-passage-early) may appear
+   on the bench.
 
 The floor set alone is a complete, correct dock. It is what the dock looks like when the staging
 call fails (§6.1).
@@ -329,7 +331,7 @@ should trigger narration."
   Adair", about 3 s), and the card comes up then. If the speaker is not on the dock, the captain
   walks out through the gate, is off ship for a short while, and the card comes up when they
   return aboard. A narrator who gives nothing gets a captain who wanders the dock, perhaps steps
-  through the gate, and comes back. This replaces D42's "offer cards wait for the dock": in-person
+  through the gate, and comes back. This replaces the earlier "offer cards wait for the dock" rule: in-person
   delivery falls out of the walk without being built separately.
 - **The captain off ship** is an actor walking around like any other. Perspective (D8) does not
   change: the captain ashore is still fit for command.
@@ -348,7 +350,7 @@ should trigger narration."
 
 ### 6.4 Budget
 
-Per round trip (D51 measured 10 calls), approach calls become staging calls (4, possibly on a
+Per round trip (the earlier pacing run measured 10 calls), approach calls become staging calls (4, possibly on a
 cheaper model) and `jobBoard` calls become `captainAshore` calls (2). Quiet and notable calls are
 unchanged. `crew pacing` is re-run at the end of phase 4 to confirm. A staging call adds no stall
 when it lands inside the run-ahead lead, which is the normal case.
@@ -390,8 +392,8 @@ Delegated, taken here:
 11. Locals are scripted presences, not simulated people.
 12. `stageDock` is guaranteed and gates arrival; its failure falls back to the floor set instead
     of pausing the game (an exception to D43).
-13. Cards are delivered where the captain meets the speaker; D42's wait-for-dock rule is
-    superseded.
+13. Cards are delivered where the captain meets the speaker; the earlier wait-for-dock
+    rule is superseded.
 
 ## 9. Deferred
 
@@ -422,5 +424,5 @@ Delegated, taken here:
   offer delivered on the dock, loaded by hand, delivered to the bay, paid once.
 - **Live:** one `stageDock` call (asserts staging-only output that names a real post) and one
   `captainAshore` call (asserts an offer or a stated reason).
-- **Pacing:** `crew pacing` after phase 4, compared with D51.
+- **Pacing:** `crew pacing` after phase 4, compared with the earlier pacing run (10 calls per round trip).
 - **Playtest:** a phone playtest at the end of each phase.

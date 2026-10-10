@@ -1,4 +1,6 @@
-/** D82: the room inspector reads the snapshot's dirt grid, tiers and who holds the mop task. */
+/**
+ * §room-tiers: the room inspector reads the snapshot's dirt grid, tiers and who holds the mop task.
+ */
 import type { ClaimId, LocalKey, Task, TaskId, Tick, WorldState } from "@crew/sim";
 import { roomCells } from "@crew/sim";
 import { describe, expect, it } from "vitest";

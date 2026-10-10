@@ -1,7 +1,8 @@
 /**
  * ASCII rendering for a `DockDef` with every deck in the bundle composited in its berth box, one
- * map per deck, each where `berthPlacement` puts it (D72; used by `crew content render-dock`,
- * which writes it into the README next to each dock file under `packages/content/data/docks/`).
+ * map per deck, each where `berthPlacement` puts it (§ship-placement; used by `crew content
+ * render-dock`, which writes it into the README next to each dock file under
+ * `packages/content/data/docks/`).
  */
 import { dockRampLandings } from "@crew/content";
 import {

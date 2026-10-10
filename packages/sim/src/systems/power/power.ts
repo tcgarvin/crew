@@ -6,7 +6,7 @@
  *
  * // W5 decision: recomputes every domain every tick instead of gating on `ctx.dirty.power` /
  * mode-change detection (the perf optimisation asked for in the brief). V1 ships are small
- * (D12 thin slice) so the full recompute is cheap and avoids adding a new derived-cache field
+ * (thin slice) so the full recompute is cheap and avoids adding a new derived-cache field
  * just to remember "did anything change". `ctx.dirty.power` is still cleared at the end so a
  * future gate can be layered on without another contract change.
  *

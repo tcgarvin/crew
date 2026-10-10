@@ -1,4 +1,4 @@
-/** Dirt events (D82): a room's tier changing, and a room mopped clean. */
+/** Dirt events (§room-tiers): a room's tier changing, and a room mopped clean. */
 import type { ActorId, CompartmentId, LocalKey } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 

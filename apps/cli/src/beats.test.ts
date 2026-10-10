@@ -69,7 +69,7 @@ describe("activity classes from canvas labels", () => {
     ["mopping the Galley", "mopping"],
     ["putting the mop away", "mopping"],
     ["on station", "other"],
-    // D84: the activities' own labels, the fetch and the putting back.
+    // §activities-and-interests: the activities' own labels, the fetch and the putting back.
     ["playing cards", "recreating"],
     ["waiting for a game of cards", "recreating"],
     ["playing solitaire", "recreating"],
@@ -85,7 +85,7 @@ describe("activity classes from canvas labels", () => {
 });
 
 describe("the helm stood", () => {
-  it("counts the stander eating in the seat as at the helm (D84 tuning)", () => {
+  it("counts the stander eating in the seat as at the helm (§helm-plate)", () => {
     expect(helmStood(["idle", "at the helm, eating"])).toBe(true);
     expect(helmStood(["at the helm"])).toBe(true);
   });
@@ -131,7 +131,7 @@ describe("the beats tally", () => {
     expect(beats.faults.total).toBe(0);
   });
 
-  it("counts the galley and dirt beats: hot and ration meals apart, spoiled servings by count (D83)", () => {
+  it("counts the galley and dirt beats: hot and ration meals apart, spoiled servings by count (§the-beats-instrument)", () => {
     const t = tally();
     t.events([
       ev("mealServed", 50, { servings: 10, quality: "good" }),
@@ -248,7 +248,7 @@ describe("the beats tally", () => {
     });
   });
 
-  it("counts sessions, outcomes and rivalry streaks per watch and sessions by activity (D84)", () => {
+  it("counts sessions, outcomes and rivalry streaks per watch and sessions by activity (§group-sessions)", () => {
     const t = tally();
     t.events([
       ev("sessionOpened", 10, { sessionId: "s1", activityId: "activity.cards", hostId: "a1" }),
@@ -290,7 +290,7 @@ describe("the beats tally", () => {
     );
   });
 
-  it("counts the off-watch family's ticker lines apart, and among all lines (D84 tuning)", () => {
+  it("counts the off-watch family's ticker lines apart, and among all lines (§the-beats-instrument)", () => {
     const t = tally();
     t.tickerLines([
       { tick: 5, offWatch: true },
@@ -357,7 +357,7 @@ describe("crew beats arguments", () => {
     });
   });
 
-  it("takes a seed range and a field plan (D95)", () => {
+  it("takes a seed range and a field plan (§the-beats-instrument)", () => {
     expect(parseBeatsArgs(["--seeds", "1-5", "--fields", "brutal"])).toMatchObject({
       seeds: [1, 2, 3, 4, 5],
       fields: "brutal",
@@ -397,7 +397,7 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(report).toContain("# Beats: 1 day, 3 watches of 400 s (seed 1,");
     expect(report).toContain("Fields: none scheduled (--fields none).");
     expect(report).toContain("| bells | 3 | 1.00 | 1 | 1 |");
-    // D81/D83: the cook serves a meal before each bell, so a day is three meals, none missed.
+    // §mess-call: the cook serves a meal before each bell, so a day is three meals, none missed.
     expect(result.beats.mealsServed).toMatchObject({ total: 3, perWatchMin: 1, perWatchMax: 1 });
     expect(result.beats.mealsMissed.total).toBe(0);
     expect(report).toContain("| mealsServed | 3 | 1.00 | 1 | 1 |");
@@ -411,11 +411,11 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(Number.isFinite(result.provisionsDaysAtEnd)).toBe(true);
   }, 90_000);
 
-  it("reports at least one handover at the helm in a one-day run (D77)", async () => {
+  it("reports at least one handover at the helm in a one-day run (§handover)", async () => {
     expect((await oneDay()).beats.handovers.total).toBeGreaterThanOrEqual(1);
   }, 90_000);
 
-  it("prints the off-watch columns and lines (D84-D87)", async () => {
+  it("prints the off-watch columns and lines (§activities-and-interests, §the-beats-instrument)", async () => {
     const result = await oneDay();
     const report = formatBeatsReport([result]);
     for (const row of [
@@ -445,7 +445,7 @@ describe("crew beats: one ship's day of the pacing voyage (real content, every s
     expect(result.beats.offWatchLines.total).toBeGreaterThanOrEqual(1);
   }, 90_000);
 
-  it("reports each wearing machine's condition by day, its lowest and its services (D90)", async () => {
+  it("reports each wearing machine's condition by day, its lowest and its services (§maintenance-due)", async () => {
     const result = await oneDay();
     const names = result.machineWear.map((m) => m.name);
     expect(names).toContain("Coolant Pump");

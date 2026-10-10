@@ -1,6 +1,6 @@
 /**
- * Social life (slice 4): relationships (memories, D88), outcomes and rivalries, ambient chat, seats and the
- * captain's table. Register after `registerRecreation` (same phase).
+ * Social life (slice 4): relationships (§memories), outcomes and rivalries, ambient chat, seats and
+ * the captain's table. Register after `registerRecreation` (same phase).
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import { socialSystem } from "./social";

@@ -1,5 +1,5 @@
 /**
- * The staging call's translator (Dockside §6.1, D67). Pure.
+ * The staging call's translator (Dockside §6.1, §staging-prompt). Pure.
  *
  * It turns the staging plan's intents into at most one `stageDock` command, and nothing else: an
  * intent of any other kind (a story lever, or anything made up) is dropped with a reason, and the

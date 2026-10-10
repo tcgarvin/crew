@@ -1,7 +1,7 @@
 /**
  * World creation and `advance` (SD §19.1). `createWorld` builds an empty `WorldState`,
  * instantiates the scenario deck, then spawns crew, stores and faults through the command path,
- * then assigns berths and sets personal belongings down in lockers (D74).
+ * then assigns berths and sets personal belongings down in lockers (§lockers).
  */
 import { assignBerths, stowPersonalItems } from "./berths";
 import { emptyCaches, rebuildCaches } from "./caches";
@@ -112,7 +112,7 @@ export function shipDeckId(state: { readonly deck: Pick<WorldState["deck"], "til
  */
 function instantiateDeck(state: WorldState, deck: DeckDef, content: ContentBundle, rng: RngApi) {
   state.deck.tiles[deck.id] = {};
-  // D82: a clean deck; the dirt system writes the cells from here on.
+  // §dirt-grid: a clean deck; the dirt system writes the cells from here on.
   state.dirt.cells[deck.id] = emptyCells(deck);
   for (const def of deck.compartments) {
     const id = allocateId(state, "compartment");
@@ -182,8 +182,8 @@ const centre = (tile: TileCoord) => ({ x: tile.x + 0.5, y: tile.y + 0.5 });
  * The scenario's setup commands. W2 decision: crew take `crew` spawn points in order, wrapping if
  * there are more crew than points; starting inventory is carried; loose stores are placed on
  * their zone's tiles round-robin, stackables split into `maxStack` chunks and uniques one each.
- * D77: each crew member spawns with their section of the watch bill (the scenario's, or one
- * generated for a fixture without), or none as a dayworker.
+ * §sections-and-dayworkers: each crew member spawns with their section of the watch bill (the
+ * scenario's, or one generated for a fixture without), or none as a dayworker.
  */
 function scenarioSetupCommands(
   scenario: ScenarioDef,
@@ -308,7 +308,10 @@ function seedInitialNeeds(
   for (const actor of crew) actor.needs.recreation = draw("recreation");
 }
 
-/** D47: every port's market opens at its content position; purchases and `stockMarket` move it. */
+/**
+ * §market-stock: every port's market opens at its content position; purchases and `stockMarket`
+ * move it.
+ */
 function seedMarkets(state: WorldState, content: ContentBundle): void {
   for (const port of Object.values(content.ports)) {
     state.markets[port.id] = marketSeed(port);
@@ -332,7 +335,7 @@ export function createWorld(
   if (!Number.isInteger(scenario.startingMoney) || scenario.startingMoney < 0) {
     throw new Error(`Scenario "${scenarioId}": startingMoney must be a nonnegative integer`);
   }
-  // D79: thoughts are raised by sim code by key, so content must define every one.
+  // §thoughts: thoughts are raised by sim code by key, so content must define every one.
   const missingThoughts = THOUGHT_KEYS.filter((key) => content.thoughts?.[key] === undefined);
   if (missingThoughts.length > 0) {
     throw new Error(`Content has no thought def for ${missingThoughts.join(", ")}`);
@@ -377,11 +380,13 @@ export function createWorld(
   for (const command of scenarioSetupCommands(scenario, deck, content, state, values)) {
     applyCommandNow(registry, ctx, command);
   }
-  // D74: berths by rank from tick 0, and each crew member's belongings in their locker.
+  // §berth-assignment: berths by rank from tick 0, and each crew member's belongings in their
+  // locker.
   assignBerths(state, deck, content);
   stowPersonalItems(state, deck, content);
   seedInitialNeeds(state, values.needs.initialRange, rng);
-  // D66: the dock a game starts alongside has its regulars at their posts from tick 0.
+  // §locals-come-and-go-with-the-dock: the dock a game starts alongside has its regulars at their
+  // posts from tick 0.
   if (state.deck.dock !== undefined) {
     dressDock(state, content, undefined, 0, configTicks(values, values.travel.localShuffleSeconds));
   }
@@ -390,9 +395,9 @@ export function createWorld(
 }
 
 /**
- * D61: a scenario starts docked, so its port's dock (if content has one) is alongside from tick
- * 0, ramps already down, since docked means ramps down (D59). Set in state before any cache
- * exists; the nav cache builder grafts it.
+ * §dock-alongside: a scenario starts docked, so its port's dock (if content has one) is alongside
+ * from tick 0, ramps already down, since docked means ramps down (D59). Set in state before any
+ * cache exists; the nav cache builder grafts it.
  */
 function startAlongside(
   state: WorldState,
@@ -421,13 +426,13 @@ const COMPLETED: AdvanceHalt = { kind: "completed" };
  * hook/decision halts unless its `acknowledgeHook`/`resolveDecision` is already queued for the
  * next tick; that tick then runs and phase 1 applies it. A hook outranks a decision.
  *
- * D37: a policy decision that has not had its `policyDecision` hook yet does not halt the world
- * by itself; the next tick runs so phase 8 can raise the hook (the only way the head can lack
- * one is that another hook was pending when it reached the head), and the hook halt comes
+ * §policy-decision-hook: a policy decision that has not had its `policyDecision` hook yet does not
+ * halt the world by itself; the next tick runs so phase 8 can raise the hook (the only way the head
+ * can lack one is that another hook was pending when it reached the head), and the hook halt comes
  * first. The host therefore always sees `hook` before `decision` for a policy card.
  */
 export function haltReason(state: WorldState): AdvanceHalt | null {
-  // D93: a lost ship never steps again; nothing queued can lift it.
+  // §hull-scars-and-ship-loss: a lost ship never steps again; nothing queued can lift it.
   if (state.hull.lostAtTick !== undefined) return { kind: "lost" };
   const nextTick = state.tick + 1;
   const queuedDue = (predicate: (command: Command) => boolean) =>
@@ -450,7 +455,10 @@ export function haltReason(state: WorldState): AdvanceHalt | null {
   return null;
 }
 
-/** Halt after a completed tick: anything pending stops the run (D37: a hook first). */
+/**
+ * Halt after a completed tick: anything pending stops the run (§policy-decision-hook: a hook
+ * first).
+ */
 function haltAfterStep(state: WorldState): AdvanceHalt | null {
   if (state.hull.lostAtTick !== undefined) return { kind: "lost" };
   if (state.narrator.pendingHook !== undefined) return { kind: "hook" };

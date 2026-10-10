@@ -1,14 +1,14 @@
 /**
- * Dockside §2.3–2.4 (D58): port scenery around the dock map. Everything here draws in deck tile
- * units (the caller sets a tile-space transform inside the portrait rotation) from a `Scene`, so
- * it is a pure picture of the stage and progress. Where a port has a dock map (phase 2,
- * `dockArt.ts`), the map replaces the stand-in berth and bay walls here; ports without one keep
- * the stand-in.
+ * Dockside §2.3–2.4 (§the-scene-outside-the-hull): port scenery around the dock map. Everything
+ * here draws in deck tile units (the caller sets a tile-space transform inside the portrait
+ * rotation) from a `Scene`, so it is a pure picture of the stage and progress. Where a port has a
+ * dock map (phase 2, `dockArt.ts`), the map replaces the stand-in berth and bay walls here; ports
+ * without one keep the stand-in.
  *
  * - Far: the station's outer structure, or the planet's disc, growing ahead and receding astern.
  *
- * Ahead is +x (D72, `orientation.ts`); the scene's berth offset (positive astern) becomes deck x
- * through `dockSlide`, as the dock map's does.
+ * Ahead is +x (§orientation-and-size, `orientation.ts`); the scene's berth offset (positive astern)
+ * becomes deck x through `dockSlide`, as the dock map's does.
  * - Berth (behind the hull): the station bay's floor, or the planet's fields and landing pad.
  * - Foreground (over the deck): bay walls and gantries, or clouds and dust, translucent where they
  *   cross the deck so the crew stay legible.

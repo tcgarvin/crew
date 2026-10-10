@@ -1,13 +1,14 @@
 /**
- * Dock maps as the kernel reads them (Dockside §3, D59, D60): pure over content and state, with
- * no nav cache, so core (world creation, migrations, the render projection) and every system
- * share one implementation. `systems/spatial` grafts the walkable floor this module defines onto
- * the deck's nav grid (`geometry.ts`, `dock.ts`).
+ * Dock maps as the kernel reads them (Dockside §3, D59, §dock-map-content): pure over content and
+ * state, with no nav cache, so core (world creation, migrations, the render projection) and every
+ * system share one implementation. `systems/spatial` grafts the walkable floor this module defines
+ * onto the deck's nav grid (`geometry.ts`, `dock.ts`).
  *
- * Frames: a dock map has its own tile frame. The ship lies in the map's berth box (D72), at the
- * place `berthPlacement` derives from the box and the deck: the ship's deck tile (0,0) sits on
- * dock tile `shipAt`, so dock tile (x, y) is deck tile (x − shipAt.x, y − shipAt.y). A
- * `BerthedDock` carries a map with that place; everything in state is in the deck frame.
+ * Frames: a dock map has its own tile frame. The ship lies in the map's berth box
+ * (§ship-placement), at the place `berthPlacement` derives from the box and the deck: the ship's
+ * deck tile (0,0) sits on dock tile `shipAt`, so dock tile (x, y) is deck tile (x − shipAt.x, y −
+ * shipAt.y). A `BerthedDock` carries a map with that place; everything in state is in the deck
+ * frame.
  */
 import type { EdgeSide, PhysicalLocation, TileCoord } from "./types/common";
 import {
@@ -29,7 +30,9 @@ type DockHost = { readonly deck: { readonly dock?: DockPresence } };
 /** The content a dock's frame needs: the maps, and the decks whose footprint places the ship. */
 type DockContent = Pick<ContentBundle, "docks" | "decks">;
 
-/** D72: a dock map with the ship's place in it, derived from the berth box and the deck. */
+/**
+ * §ship-placement: a dock map with the ship's place in it, derived from the berth box and the deck.
+ */
 export interface BerthedDock {
   readonly dock: DockDef;
   /** Dock tile under deck tile (0,0). */
@@ -40,9 +43,9 @@ export interface BerthedDock {
 export type BerthingDeck = Pick<DeckDef, "id" | "width" | "height" | "hull">;
 
 /**
- * D72: where `deck` lies in `dock`'s berth box (the dock tile under deck tile (0,0)): flush to
- * the box's south edge, the quay side, and centred across it (a remainder tile goes east). Throws
- * if the deck is larger than its own size class, or its class larger than the box's, which
+ * §ship-placement: where `deck` lies in `dock`'s berth box (the dock tile under deck tile (0,0)):
+ * flush to the box's south edge, the quay side, and centred across it (a remainder tile goes east).
+ * Throws if the deck is larger than its own size class, or its class larger than the box's, which
  * content validation rules out for authored content.
  */
 export function berthPlacement(dock: Pick<DockDef, "id" | "berth">, deck: BerthingDeck): TileCoord {
@@ -161,9 +164,9 @@ export function dockForPort(
 }
 
 /**
- * The port whose dock is alongside at this travel stage (D61): from the start of `docking` to
- * the end of `undocking`. `docking` is at the port being made for, `docked` at its own port,
- * `preparingDeparture` and `undocking` still at the port being left. Undefined in flight.
+ * The port whose dock is alongside at this travel stage (§dock-alongside): from the start of
+ * `docking` to the end of `undocking`. `docking` is at the port being made for, `docked` at its own
+ * port, `preparingDeparture` and `undocking` still at the port being left. Undefined in flight.
  */
 export function dockedPortOf(travel: TravelState): PortDefId | undefined {
   switch (travel.stage) {
@@ -181,7 +184,9 @@ export function dockedPortOf(travel: TravelState): PortDefId | undefined {
   }
 }
 
-/** The dock content says should be alongside right now (D61's lifetime rule), if any. */
+/**
+ * The dock content says should be alongside right now (the §dock-alongside lifetime rule), if any.
+ */
 export function expectedDock(
   content: Pick<ContentBundle, "docks">,
   travel: TravelState,
@@ -213,7 +218,7 @@ export function isOnDock(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Posts and areas (D63): where port work happens on the dock, in the deck frame
+// Posts and areas (§dock-map-content): where port work happens on the dock, in the deck frame
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -268,7 +273,7 @@ function inDockArea(berth: BerthedDock, kind: DockAreaKind, x: number, y: number
 
 /**
  * Is this location in the `kind` area of the dock alongside? Pure over state and content: the
- * delivery bay's custody check (D63) and the narrator's "On the dock" lines read it.
+ * delivery bay's custody check (§offered-freight) and the narrator's "On the dock" lines read it.
  */
 export function isInDockArea(
   content: DockContent,
@@ -324,7 +329,7 @@ export function gateTileAt(
 }
 
 /**
- * Where a port's market is dealt with (D47, D63):
+ * Where a port's market is dealt with (§buying-parts, §dock-market-and-passengers):
  * - `stall`: the dock's market stall, standing at its counter (`tile`); the units are handed over
  *   there and carried aboard;
  * - `gate`: a dock with no stall has its market through the gate (`tile`): the buyer walks out,

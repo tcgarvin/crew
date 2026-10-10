@@ -1,7 +1,8 @@
 /**
- * `crew beats`' field section (D95, slice 5 W5): the asteroid fields a run crosses and what they
- * cost. The run schedules them itself, as a scenario would (`FieldScript`: one per leg, as the
- * kernel allows, at the start of each leg's transit), and `FieldTally` reads the events:
+ * `crew beats`' field section (§the-beats-instrument, slice 5 W5): the asteroid fields a run
+ * crosses and what they cost. The run schedules them itself, as a scenario would (`FieldScript`:
+ * one per leg, as the kernel allows, at the start of each leg's transit), and `FieldTally` reads
+ * the events:
  *
  * - per field: its severity, rocks, hull lost, time stuck, seconds from its first rock to the
  *   first intercom report, its field-family ticker lines (`FIELD_EVENT_TYPES`), and how it ended;
@@ -38,7 +39,7 @@ type FieldEvent = SimEvent extends infer E
   : never;
 
 /**
- * Schedules one field on each leg of the run, as a scenario (D92's authority), when the leg's
+ * Schedules one field on each leg of the run, as a scenario (§scheduling-a-field), when the leg's
  * transit begins: `light`, `heavy` or `brutal` every time, or the three in turn for `cycle`.
  * Detection is `rolled`, so the helm's check plays; no scripted hits, so the dice decide.
  *

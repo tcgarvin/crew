@@ -1,11 +1,11 @@
 /**
- * D92: detection and the alert (slice 5 call 4). `field.warningSeconds` before a `rolled` field
- * starts, whoever has the helm rolls piloting against the severity on the nav-hazard curve
- * (`cleanPassChance` at `hazards.difficulty` easy / hard / brutal for light / heavy / brutal):
- * a pass is `fieldSighted`, the crew know (`noticedAtTick`) and the ship goes on alert. A failed
- * roll, an empty helm or an `unseen` field leave nobody the wiser until the first impact, which
- * notices the field, raises the alert and is `fieldEntered` (narrative then; notable when the helm
- * had sighted it, so it hooks only the first knowledge).
+ * §sighting-and-the-alert: detection and the alert (slice 5 call 4). `field.warningSeconds` before
+ * a `rolled` field starts, whoever has the helm rolls piloting against the severity on the
+ * nav-hazard curve (`cleanPassChance` at `hazards.difficulty` easy / hard / brutal for light /
+ * heavy / brutal): a pass is `fieldSighted`, the crew know (`noticedAtTick`) and the ship goes on
+ * alert. A failed roll, an empty helm or an `unseen` field leave nobody the wiser until the first
+ * impact, which notices the field, raises the alert and is `fieldEntered` (narrative then; notable
+ * when the helm had sighted it, so it hooks only the first knowledge).
  *
  * The alert is the field's to raise and clear: `field.alertClearSeconds` after the field ends it
  * stands down (`alertCleared`, `state.alert` deleted), whether or not the leg (and the field

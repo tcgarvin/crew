@@ -5,9 +5,9 @@ import { schemaInstruction } from "./plan";
  * One OpenAI-compatible chat completion. D53: the plan schema rides in the prompt as the last
  * system block (`schemaInstruction`), not as `response_format: json_schema`: strict structured
  * output compiles the schema into a grammar whose provider-side size cap the plan outgrew three
- * times (D45, D47, passengers), and OpenRouter sends a json_schema to Anthropic as a grammar even
- * with `strict: false`. `runNarrator` validates the reply against the zod schema either way. The
- * system parts are sent as separate text content parts with Anthropic-style `cache_control`
+ * times (§plan-schema-in-the-prompt), and OpenRouter sends a json_schema to Anthropic as a grammar
+ * even with `strict: false`. `runNarrator` validates the reply against the zod schema either way.
+ * The system parts are sent as separate text content parts with Anthropic-style `cache_control`
  * (`systemContentParts`); OpenRouter forwards that to providers that support prompt caching and
  * ignores it elsewhere. `fetch` is injectable so tests never touch the network.
  *
@@ -76,7 +76,7 @@ export function systemContentParts(system: readonly string[]) {
 }
 
 /**
- * D97: the turns after the first user turn. An earlier reply goes back with its
+ * §notes-turn: the turns after the first user turn. An earlier reply goes back with its
  * `reasoning_details`, so a reasoning model continues from its own reasoning rather than
  * re-deriving it.
  */
@@ -95,8 +95,8 @@ function continuationMessages(request: ModelRequest) {
 }
 
 /**
- * OpenRouter's `reasoning` object: absent at the default effort. D97: with reasoning handed back,
- * `context: "all_turns"` asks an OpenAI model to read it (its default may drop earlier turns'
+ * OpenRouter's `reasoning` object: absent at the default effort. §notes-turn: with reasoning handed
+ * back, `context: "all_turns"` asks an OpenAI model to read it (its default may drop earlier turns'
  * reasoning); other providers ignore the field.
  */
 function reasoningField(request: ModelRequest) {

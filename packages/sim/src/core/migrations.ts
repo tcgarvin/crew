@@ -18,9 +18,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * 1 → 2 (D25): a job's `issuer` was a bare string (usually a company). It stays as the display
- * label; the person becomes that name with the role "shipper", the pitch a generic template
- * line, and the urgency "relaxed". The literals mirror `LEGACY_ISSUER_ROLE` and
+ * 1 → 2 (§issuers-and-pitches): a job's `issuer` was a bare string (usually a company). It stays as
+ * the display label; the person becomes that name with the role "shipper", the pitch a generic
+ * template line, and the urgency "relaxed". The literals mirror `LEGACY_ISSUER_ROLE` and
  * `DEFAULT_PITCH_KEY` in `systems/commerce/jobs.ts` (core may not import systems); a migration
  * is frozen once shipped, so they must not follow later changes to those constants anyway.
  */
@@ -38,8 +38,8 @@ export function migrateJobsToPeople(raw: unknown): unknown {
 }
 
 /**
- * 2 → 3 (D47): `markets` is a new slice. An empty table is enough: a port with no entry reads
- * as its content seed (`core/markets.ts` `effectiveMarket`), so a save from before the market
+ * 2 → 3 (§market-stock): `markets` is a new slice. An empty table is enough: a port with no entry
+ * reads as its content seed (`core/markets.ts` `effectiveMarket`), so a save from before the market
  * existed opens every port at its authored stock the first time anyone looks.
  */
 function addMarkets(raw: unknown): unknown {
@@ -48,7 +48,10 @@ function addMarkets(raw: unknown): unknown {
   return raw;
 }
 
-/** The port whose dock is alongside at a saved travel stage (D61), read from untrusted JSON. */
+/**
+ * The port whose dock is alongside at a saved travel stage (§dock-alongside), read from untrusted
+ * JSON.
+ */
 function portAlongside(travel: Record<string, unknown>): string | undefined {
   const field =
     travel.stage === "docked"
@@ -63,14 +66,14 @@ function portAlongside(travel: Record<string, unknown>): string | undefined {
 }
 
 /**
- * 3 → 4 (D61): the dock alongside is state (`deck.dock`) from the start of `docking` to the end
- * of `undocking`. A save in one of those stages at a port whose dock map is in the content it is
- * restored against gets it set, with the geometry revision bumped; restore's cache build then
- * grafts it. A docked save also has its ramps asked down (docked means ramps down, D59; saves
- * from before D59 had them close by themselves), and the door system lowers them. Anyone on the
+ * 3 → 4 (§dock-alongside): the dock alongside is state (`deck.dock`) from the start of `docking` to
+ * the end of `undocking`. A save in one of those stages at a port whose dock map is in the content
+ * it is restored against gets it set, with the geometry revision bumped; restore's cache build then
+ * grafts it. A docked save also has its ramps asked down (docked means ramps down, D59; older saves
+ * had them close by themselves), and the door system lowers them. Anyone on the
  * old personnel-ramp transfer tile is still on ship floor. Freight waiting in the port store is
- * moved onto the dock by `stageLoadingFreightOnLoad` (D63), which runs next. A port with no dock
- * map, or a save already carrying a dock, is left alone.
+ * moved onto the dock by `stageLoadingFreightOnLoad` (§loading), which runs next. A port with no
+ * dock map, or a save already carrying a dock, is left alone.
  */
 function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.travel) || !isRecord(raw.deck)) return raw;
@@ -95,8 +98,8 @@ function attachDockOnLoad(raw: unknown, { content }: MigrationContext): unknown 
 }
 
 /**
- * 3 → 4, second half (D63): with the dock alongside, freight is physical on it. A save docked (or
- * preparing to depart) mid-loading at a port with a dock map has its accepted freight still in
+ * 3 → 4, second half (§loading): with the dock alongside, freight is physical on it. A save docked
+ * (or preparing to depart) mid-loading at a port with a dock map has its accepted freight still in
  * that port's store, where schema 3 spawned it; it moves to the dock's staging area, one crate per
  * tile in order, and every actor who believed it in the store now believes it there. A save
  * mid-unloading has its open `cargoToUnload` problems at that port revised, so their tasks
@@ -158,10 +161,11 @@ function stageLoadingFreightOnLoad(raw: unknown, { content }: MigrationContext):
 }
 
 /**
- * 3 → 4, third part (D65): the ship carries a hand truck (the default scenario stows one in the
- * cargo stowage zone). A save from before has none, so one is set down on the zone's first tile:
- * the content's hand-truck item (a `handTruck` tool with a capacity), unless the save already
- * has one. Its id comes from the save's own item counter. Crew learn where it is by looking.
+ * 3 → 4, third part (§hand-truck-trips): the ship carries a hand truck (the default scenario stows
+ * one in the cargo stowage zone). A save from before has none, so one is set down on the zone's
+ * first tile: the content's hand-truck item (a `handTruck` tool with a capacity), unless the save
+ * already has one. Its id comes from the save's own item counter. Crew learn where it is by
+ * looking.
  */
 function stowHandTruckOnLoad(raw: unknown, { content }: MigrationContext): unknown {
   if (!isRecord(raw) || !isRecord(raw.items) || !isRecord(raw.nextId) || !isRecord(raw.deck)) {
@@ -192,23 +196,23 @@ function stowHandTruckOnLoad(raw: unknown, { content }: MigrationContext): unkno
   return raw;
 }
 
-/** 3 → 4 (D61, D63, D65): the dock alongside, then the freight on it, then the hand truck. */
+/** 3 → 4: the dock alongside (§dock-alongside), the freight on it (§loading), the hand truck. */
 function migrateToDockside(raw: unknown, context: MigrationContext): unknown {
   const docked = stageLoadingFreightOnLoad(attachDockOnLoad(raw, context), context);
   return stowHandTruckOnLoad(docked, context);
 }
 
 /**
- * 4 → 5 (D66): locals and the staging call.
+ * 4 → 5 (§locals-come-and-go-with-the-dock): locals and the staging call.
  * - `dockside` is a new slice, empty; a save with a dock alongside has it dressed with the floor
  *   set on its first tick (`systems/travel/locals.ts`), so the migration places nobody.
  * - `nextId.local` starts at 1.
  * - `approachingPort` is retired. A save halted on one has it dropped as answered (its id joins
  *   `recentHookIds`), so the game runs on: a save past the transit lead point simply docks
  *   without staging, and one before it raises `stageDock` as usual.
- * - D69: a narrative event committed in the save's last tick has not been checked for a
- *   `notableEvent` yet; it becomes `narrator.pendingNotable` (travel checks its type against
- *   `hookOnEvents` when it raises the hook).
+ * - §notable-event-hook: a narrative event committed in the save's last tick has not been
+ *   checked for a `notableEvent` yet; it becomes `narrator.pendingNotable` (travel checks its
+ *   type against `hookOnEvents` when it raises the hook).
  */
 function addDockside(raw: unknown): unknown {
   if (!isRecord(raw)) return raw;
@@ -244,16 +248,16 @@ function captainIdOf(raw: Record<string, unknown>): string | undefined {
 }
 
 /**
- * 5 → 6 (D70): the captain goes ashore to look for work.
+ * 5 → 6 (§looking-for-work): the captain goes ashore to look for work.
  * - `jobBoard` is now `captainAshore`, whose context also names who went ashore: a save halted
  *   on a `jobBoard` hook keeps it as a `captainAshore` hook from the captain (the narrator answers
  *   it the same way), and `jobBoardLastAsk` becomes `captainAshoreLastAsk` with the captain as the
  *   one who asked.
  * - `decisions.held` is new and empty: nothing was held before.
- * - D42's `surfaceWhenDocked` is retired: an offer surfaced in flight whose card was waiting for
- *   the dock never had a decision record, and offers are now only made at the dock, so it is
- *   withdrawn as expired at the save's tick (the narrator is asked again when the captain goes
- *   ashore). An offer no longer open just loses the flag.
+ * - `surfaceWhenDocked` is retired: an offer surfaced in flight whose card was waiting for
+ *   the dock never had a decision record, and offers are only made at the dock (§offer-cards), so
+ *   it is withdrawn as expired at the save's tick (the narrator is asked again when the captain
+ *   goes ashore). An offer no longer open just loses the flag.
  */
 export function captainAshore(raw: unknown): unknown {
   if (!isRecord(raw)) return raw;
@@ -287,17 +291,18 @@ export function captainAshore(raw: unknown): unknown {
 }
 
 /**
- * 6 → 7 (D72, D74): refused. Freighter Mk1 was mirrored bow-east and every dock map changed
- * shape, so every tile-bearing field of an older save (locations, paths, plan steps, facts,
- * claims) is in a frame that no longer exists; migrating them all is the change the compiler
- * cannot check (D59). Saves predate players (PLAN §3); the host starts a new game.
+ * 6 → 7 (§ship-placement, §berth-assignment): refused. Freighter Mk1 was mirrored bow-east and
+ * every dock map changed shape, so every tile-bearing field of an older save (locations, paths,
+ * plan steps, facts, claims) is in a frame that no longer exists; migrating them all is the change
+ * the compiler cannot check (D59). Saves predate players (PLAN §3); the host starts a new game.
  */
 function refuseBeforeShipLife(): never {
   throw new SaveCompatibilityError("save predates ship life (schema 6); start a new game");
 }
 
 /**
- * 7 → 8 (D77-D79): watches replace shifts; thoughts, hazards and the hazard budget.
+ * 7 → 8 (§sections-and-dayworkers, §thoughts): watches replace shifts; thoughts, hazards and the
+ * hazard budget.
  * - `schedule.shiftKey` becomes `{ section }`: the actor's crew def's section in the watch bill
  *   of the save's scenario in the content restored against, its index the section's place in the
  *   bill. A scenario without a bill, or a def in no section (a narrator-spawned hand, a passenger),
@@ -362,7 +367,7 @@ function watchesAndThoughts(raw: unknown, { content, config }: MigrationContext)
 }
 
 /**
- * 8 → 9 (D81-D83): the galley and dirt.
+ * 8 → 9 (§galley-provisions, §dirt-grid): the galley and dirt.
  * - `dirt`: a zeroed cell row for each deck in `deck.tiles` the content knows, no tiers, no dust
  *   this visit; `boots: 0` on every actor; `galley.lastMealWatch` the save's watch, so the first
  *   meal raised after load is the coming watch's.
@@ -485,7 +490,7 @@ function spawnScenarioStores(
  * - a sleep hold's `disturbedTicks` absent means 0, so held steps need nothing;
  * - the scenario's `book`-tagged `startingItems` (the shelf) spawned as 8 → 9 spawns provisions,
  *   unless the save holds one; the owner is told through `warn`. The harmonica already lies in
- *   Bettina's locker (D74).
+ *   Bettina's locker (§lockers).
  */
 function offWatch(raw: unknown, { content, warn }: MigrationContext): unknown {
   if (!isRecord(raw)) return raw;
@@ -523,9 +528,9 @@ function offWatch(raw: unknown, { content, warn }: MigrationContext): unknown {
 }
 
 /**
- * 10 → 11 (D88): affinity from memories. Every relationship entry loses its `affinity` and gains
- * an empty `memories`; `lastChatTick` is kept. Nobody remembers anything yet, so everyone stands
- * at their compatibility: a running total from before cannot be split into memories.
+ * 10 → 11 (§affinity): affinity from memories. Every relationship entry loses its `affinity` and
+ * gains an empty `memories`; `lastChatTick` is kept. Nobody remembers anything yet, so everyone
+ * stands at their compatibility: a running total from before cannot be split into memories.
  */
 function affinityFromMemories(raw: unknown): unknown {
   if (!isRecord(raw) || !isRecord(raw.social) || !isRecord(raw.social.relationships)) return raw;
@@ -541,7 +546,7 @@ function affinityFromMemories(raw: unknown): unknown {
 }
 
 /**
- * 11 → 12 (slice 5, D92-D95): the asteroid field.
+ * 11 → 12 (slice 5, §scheduling-a-field, §hull-scars-and-ship-loss): the asteroid field.
  * - `hull`: whole, at the save's deck's `hull.max` (`HullDef.max`); no scars;
  * - no `field` and no `alert` (nothing was scheduled before the lever existed);
  *   `nextId.field` and `nextId.scar` start at 1;

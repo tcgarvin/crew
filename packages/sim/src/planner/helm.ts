@@ -1,7 +1,7 @@
 /**
- * The planner's helm rule (D77): who may claim the helm's posts and the course plot, and gangway
- * watch in port. The sim decides who stands the helm (`SelfView.watch.helmRole`); this file only
- * reads it.
+ * The planner's helm rule (§who-has-the-helm): who may claim the helm's posts and the course plot,
+ * and gangway watch in port. The sim decides who stands the helm (`SelfView.watch.helmRole`); this
+ * file only reads it.
  *
  * - The `watch` post is the stander's and the oncoming's, the `relief` post the relief's; nobody
  *   else's, however idle or skilled.
@@ -51,8 +51,9 @@ export function helmTaskExempt(_view: AgentView, task: TaskView): boolean {
 
 /**
  * Gangway watch for the one the sim names its stander (`watch.gangway`: docked with no helm
- * watch, the section's non-officer, never the captain who goes ashore to look for work, D70),
- * routine class. Not offered while already standing it, so the hold is simply kept.
+ * watch, the section's non-officer, never the captain who goes ashore to look for work,
+ * §looking-for-work), routine class. Not offered while already standing it, so the hold is simply
+ * kept.
  */
 export function gangwayCandidate(
   view: AgentView,
@@ -62,7 +63,7 @@ export function gangwayCandidate(
   if (self.watch.gangway !== true) return undefined;
   const activity = self.activity;
   if (activity.kind === "personal" && activity.activity === "standWatch") return undefined;
-  // D81: dinner first; the hold ends for the call (`gangwayHoldDone`) and the post waits.
+  // §mess-call: dinner first; the hold ends for the call (`gangwayHoldDone`) and the post waits.
   if (mealCallFor(view, _config) !== undefined) return undefined;
   const tile = view.schematic.deck.zones.find((zone) => zone.tags.includes("gangway"))?.tiles[0];
   if (tile === undefined) return undefined;

@@ -9,9 +9,10 @@
  * hauled cargo where the actor stands, and leaves the actor idle for the planner to pick
  * something else.
  *
- * D65: a haul may start as a hand-truck trip (`truck.ts`), one activity holding the claims of
- * several hauls (`Activity.haul.legs`); renewal, expiry, validation and every way of stopping
- * cover all of them, and a stopped trip sets the truck and its load down where the pusher is.
+ * §stopping-a-trip-early: a haul may start as a hand-truck trip (`truck.ts`), one activity holding
+ * the claims of several hauls (`Activity.haul.legs`); renewal, expiry, validation and every way of
+ * stopping cover all of them, and a stopped trip sets the truck and its load down where the pusher
+ * is.
  */
 import type { Actor } from "../../core/types/actor";
 import type { TaskReleaseReason } from "../../core/types/events";
@@ -71,8 +72,8 @@ const TASK_LEVEL: ReadonlySet<BlockageReason> = new Set([
 /** Put hauled cargo down exactly where the actor is (SD §14.6: no teleporting). */
 function dropHaulCargo(ctx: StepCtx, actor: Actor, task: Task): void {
   if (actor.location.kind !== "onDeck") return;
-  // D63: a buyer stopped while carrying bought units aboard sets them down where they stand
-  // (possibly on the dock, where they still count as within reach while docked).
+  // §buying-parts: a buyer stopped while carrying bought units aboard sets them down where they
+  // stand (possibly on the dock, where they still count as within reach while docked).
   if (task.type === "buyParts" && task.progressRef.kind === "market") {
     setDownBought(ctx, actor, task.progressRef.itemDefId);
   }
@@ -87,10 +88,10 @@ function dropHaulCargo(ctx: StepCtx, actor: Actor, task: Task): void {
 
 /**
  * Set down the tools and consumables the actor picked up for a task they are giving up or have
- * finished (D64, D69), where they stand: carried on, the ship's only spares (or wrench) would be
- * out of everyone else's reach until this actor happened to take the task up again. D69: they
- * say where they left them, so the rest of the crew, whose last belief was "in their hands" or
- * "not where it was", can fetch them for the next repair.
+ * finished (§setting-down-supplies), where they stand: carried on, the ship's only spares (or
+ * wrench) would be out of everyone else's reach until this actor happened to take the task up
+ * again. They say where they left them, so the rest of the crew, whose last belief was "in their
+ * hands" or "not where it was", can fetch them for the next repair.
  */
 function dropTaskSupplies(ctx: StepCtx, actor: Actor, task: Task): void {
   if (task.consumables.length === 0 && task.requiredTools.length === 0) return;
@@ -110,7 +111,10 @@ function dropTaskSupplies(ctx: StepCtx, actor: Actor, task: Task): void {
   if (dropped) touchInventory(ctx);
 }
 
-/** D69: the rest of the crew hear where `item` was left (a report, like D63's freight brief). */
+/**
+ * §setting-down-supplies: the rest of the crew hear where `item` was left (a report, like the
+ * freight brief, §crew-briefs).
+ */
 function tellCrew(ctx: StepCtx, teller: Actor, item: Item): void {
   const source = {
     tick: ctx.tick,
@@ -141,7 +145,7 @@ function leaveHold(ctx: StepCtx, actor: Actor, completed: boolean): void {
 export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseReason): void {
   const activity = actor.activity;
   if (activity.kind === "idle") return;
-  // D63: nobody is left out through the gate by an errand that stopped.
+  // §buying-parts: nobody is left out through the gate by an errand that stopped.
   endGateErrand(ctx, actor);
   if (actor.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, actor.id);
   else releaseReservations(ctx.caches, actor.id);
@@ -151,7 +155,8 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
   leaveRecreation(ctx, actor);
   leaveTalk(ctx, actor);
   if (activity.kind === "task" && activity.haul !== undefined) {
-    // D65: the truck and its load go down here; each held task is settled on where its crate is.
+    // §stopping-a-trip-early: the truck and its load go down here; each held task is settled on
+    // where its crate is.
     if (dropTruckLoad(ctx, actor, activity.haul.truckId)) touchInventory(ctx);
     for (const held of heldTasks(activity)) settleHeld(ctx, actor, held.taskId, reason);
   } else if (activity.kind === "task") {
@@ -190,14 +195,15 @@ function blockTask(ctx: StepCtx, actor: Actor, task: Task, reason: BlockageReaso
 function finishActivity(ctx: StepCtx, actor: Actor): void {
   const activity = actor.activity;
   if (activity.kind === "task") {
-    // D65: every leg settled as its crate came off the truck; anything left is settled now.
+    // §stopping-a-trip-early: every leg settled as its crate came off the truck; anything left is
+    // settled now.
     for (const leg of activity.haul?.legs ?? []) settleHeld(ctx, actor, leg.taskId, "failed");
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined && !isTerminal(task)) {
       if (isCompletionMet(ctx.state, ctx.content, task)) completeTask(ctx, task);
       else releaseActorClaim(ctx, actor.id, task, "failed");
-      // D69: done or not, what is left of its tools and parts goes down here, as when it is
-      // given up (D64); kept in hand, the ship's only spares went to meals and bed with them.
+      // §setting-down-supplies: done or not, what is left of its tools and parts goes down here, as
+      // when it is given up; kept in hand, the ship's only spares went to meals and bed with them.
       dropTaskSupplies(ctx, actor, task);
     }
   }
@@ -209,8 +215,8 @@ function finishActivity(ctx: StepCtx, actor: Actor): void {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D65: the truck was not where the actor thought. The trip becomes a hand haul of the lead's
- * crate and the legs are let go. Returns false when even that cannot be planned.
+ * §stopping-a-trip-early: the truck was not where the actor thought. The trip becomes a hand haul
+ * of the lead's crate and the legs are let go. Returns false when even that cannot be planned.
  */
 function singleHaulFallback(ctx: StepCtx, actor: Actor): boolean {
   const activity = actor.activity;
@@ -315,7 +321,8 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
     return;
   }
   abortActivity(ctx, actor, "interrupted");
-  // D65: a haul goes on the hand truck when the actor knows of a free one and of more to move.
+  // §stopping-a-trip-early: a haul goes on the hand truck when the actor knows of a free one and of
+  // more to move.
   const truck = buildTruckPlan(ctx, actor, task);
   const plan: PlanResult =
     truck === undefined ? buildTaskPlan(ctx, actor, task) : { ok: true, plan: truck.plan };
@@ -349,7 +356,8 @@ function startTask(ctx: StepCtx, actor: Actor, intent: Extract<Intent, { kind: "
 
 function samePersonal(activity: Activity, intent: Extract<Intent, { kind: "personal" }>): boolean {
   if (activity.kind !== "personal" || activity.activity !== intent.activity) return false;
-  // D70: a meeting for another card (this one's delivered, they are walking back) is not the same.
+  // §looking-for-work: a meeting for another card (this one's delivered, they are walking back) is
+  // not the same.
   if (intent.activity === "recreate") return recreateActivityOf(activity) === intent.activityId;
   return intent.activity !== "meetSpeaker" || meetingAhead({ activity }) === intent.decisionId;
 }
@@ -442,7 +450,8 @@ function validateTaskActivity(ctx: StepCtx, actor: Actor): void {
   } else if (ctx.state.work.claims[activity.claimId] === undefined) {
     abortActivity(ctx, actor, "failed");
   } else if (activity.haul?.legs.some((leg) => !legLive(ctx, leg))) {
-    // D65: a leg's task went away under the trip; set it all down and plan afresh.
+    // §stopping-a-trip-early: a leg's task went away under the trip; set it all down and plan
+    // afresh.
     abortActivity(ctx, actor, "cancelled");
   }
 }
@@ -450,7 +459,8 @@ function validateTaskActivity(ctx: StepCtx, actor: Actor): void {
 /** One crew actor's tick of work. */
 export function stepActor(ctx: StepCtx, deps: WorkDeps, actor: Actor): void {
   pruneBackoff(ctx, actor);
-  // D63: a buyer out through the gate is off ship but still on the errand, which brings them back.
+  // §buying-parts: a buyer out through the gate is off ship but still on the errand, which brings
+  // them back.
   if (actor.availability !== "available" && !isOutThroughGate(actor)) {
     abortActivity(ctx, actor, "incapacitated");
     // biome-ignore lint/performance/noDelete: state must omit the key (CONTRACTS rule 2).

@@ -1,7 +1,7 @@
 /**
- * Where the galley is and what its meals are (D81): the stove, the serving counter, the room a
- * tile is in, the meal items and their quality. Pure reads over state and content, shared by the
- * galley system, its plans and its task derivation.
+ * Where the galley is and what its meals are (§cooking-and-serving): the stove, the serving
+ * counter, the room a tile is in, the meal items and their quality. Pure reads over state and
+ * content, shared by the galley system, its plans and its task derivation.
  *
  * Owner: W1 of ship life slice 3.
  */

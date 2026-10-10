@@ -1,5 +1,5 @@
 /**
- * The watch system (D77), phase `needs`, every tick:
+ * The watch system (§duty-and-the-sleep-watch), phase `needs`, every tick:
  *
  * - the bell when the watch changes, naming the section that has it;
  * - the helm's `watch` post: open while a course is planned (and no passenger keeps the ship in)
@@ -54,8 +54,9 @@ function ringBell(ctx: StepCtx): void {
 }
 
 /**
- * Is the helm wanted: underway, or in port with a course planned and plotted (D78: prep cannot
- * begin before, and a pilot in the seat could not plot it) and nobody ashore to wait for?
+ * Is the helm wanted: underway, or in port with a course planned and plotted (§course-plotting:
+ * prep cannot begin before, and a pilot in the seat could not plot it) and nobody ashore to wait
+ * for?
  */
 function helmWanted(ctx: StepCtx): boolean {
   const travel = ctx.state.travel;

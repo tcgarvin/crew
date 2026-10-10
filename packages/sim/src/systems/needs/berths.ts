@@ -1,7 +1,8 @@
 /**
- * D74: the berth rule as a needs-stage system. `assignBerths` (`core/berths.ts`) runs every tick
- * so that a passenger coming aboard, a crew member the narrator adds, a death or a departure is
- * settled within a tick, with no event to hook. It is a no-op once everyone is berthed.
+ * §berth-assignment: the berth rule as a needs-stage system. `assignBerths` (`core/berths.ts`) runs
+ * every tick so that a passenger coming aboard, a crew member the narrator adds, a death or a
+ * departure is settled within a tick, with no event to hook. It is a no-op once everyone is
+ * berthed.
  */
 import { assignBerths } from "../../core/berths";
 import type { System } from "../../core/types/pipeline";

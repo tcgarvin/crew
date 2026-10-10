@@ -1,8 +1,8 @@
 /**
- * Live narrator tests (D44): one real OpenRouter call per hook kind, through the production
- * transport, prompt and schema. The unit suite never touches the network, so it cannot see a
- * provider rejecting the request; this one does. Run by hand before deploying prompt, schema or
- * transport changes:
+ * Live narrator tests (§live-narrator-tests): one real OpenRouter call per hook kind, through the
+ * production transport, prompt and schema. The unit suite never touches the network, so it cannot
+ * see a provider rejecting the request; this one does. Run by hand before deploying prompt, schema
+ * or transport changes:
  *
  *   pnpm test:live
  *
@@ -50,9 +50,15 @@ function loadApiKey(): string | undefined {
 
 const apiKey = loadApiKey();
 const model = process.env.CREW_NARRATOR_MODEL ?? DEFAULT_NARRATOR_MODEL;
-/** D67: the staging call can run on its own (cheaper) model, as the server's `CREW_STAGING_MODEL`. */
+/**
+ * §staging-call-on-the-server: the staging call can run on its own (cheaper) model, as the server's
+ * `CREW_STAGING_MODEL`.
+ */
 const stagingModel = process.env.CREW_STAGING_MODEL ?? model;
-/** D96: as the server's `CREW_NARRATOR_REASONING_EFFORT` (staging uses the same here). */
+/**
+ * §models-and-reasoning-effort: as the server's `CREW_NARRATOR_REASONING_EFFORT` (staging uses the
+ * same here).
+ */
 const reasoningEffort = REASONING_EFFORTS.find(
   (e) => e === (process.env.CREW_NARRATOR_REASONING_EFFORT ?? DEFAULT_NARRATOR_REASONING_EFFORT),
 );
@@ -71,7 +77,7 @@ const skipReason =
     : "";
 
 /**
- * One live call. D97: a story call the model answered is followed by its notes turn, as the
+ * One live call. §notes-turn: a story call the model answered is followed by its notes turn, as the
  * server runs it; the notes it writes replace the response's, and both latencies are logged.
  */
 async function liveRun(
@@ -103,8 +109,8 @@ async function liveRun(
 }
 
 /**
- * D67: notes for the staging case, so the story gives the set dresser something to stage for: a
- * thread due at Kessler Drift and a cast member placed there.
+ * §staging-call-on-the-server: notes for the staging case, so the story gives the set dresser
+ * something to stage for: a thread due at Kessler Drift and a cast member placed there.
  */
 const STAGING_NOTES = {
   summary:
@@ -135,8 +141,8 @@ const STAGING_NOTES = {
 };
 
 /**
- * D99: notes for the requested departure call: the Meridian run taken at the Hub, and the leg
- * the model meant to test the junior pilot on.
+ * §requested-call-back: notes for the requested departure call: the Meridian run taken at the Hub,
+ * and the leg the model meant to test the junior pilot on.
  */
 const REQUESTED_CALL_NOTES = {
   summary:
@@ -166,7 +172,7 @@ const REQUESTED_CALL_NOTES = {
   lastRejections: [],
 };
 
-/** D99: the call-back request the model wrote, for the run log. */
+/** §requested-call-back: the call-back request the model wrote, for the run log. */
 function callBackOf(run: NarratorRun): string {
   const plan = run.trace.plan;
   if (plan === undefined || !("callBack" in plan)) return "none";
@@ -197,7 +203,7 @@ suite(
   `live narrator (${model}; staging ${stagingModel}; effort ${reasoningEffort})${skipReason}`,
   () => {
     it(
-      "stageDock: a staging-only plan that names a real post of the dock (D67)",
+      "stageDock: a staging-only plan that names a real post of the dock (§staging-call-on-the-server)",
       async () => {
         const request = stageDockRequest(content());
         if (request.hook.kind !== "stageDock") throw new Error("fixture hook kind");
@@ -235,7 +241,7 @@ suite(
     );
 
     it(
-      "captainAshore: the captain on the dock gets an offer, or the model says why not (D70)",
+      "captainAshore: the captain on the dock gets an offer, or the model says why not (§captain-ashore-ask)",
       async () => {
         const request = captainAshoreRequest(content());
         const run = await liveRun(request);
@@ -265,7 +271,7 @@ suite(
     );
 
     it(
-      "requestedCall at departure: the model carries out its plan for the leg, or says why not, and asks again (D99)",
+      "requestedCall at departure: the model carries out its plan for the leg, or says why not, and asks again (§requested-call-back)",
       async () => {
         const request = requestedCallRequest(content());
         const run = await liveRun(request, { notes: REQUESTED_CALL_NOTES });

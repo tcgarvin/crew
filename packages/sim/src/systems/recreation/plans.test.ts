@@ -121,7 +121,7 @@ describe("the harmonica (call 13)", () => {
   });
 });
 
-describe("a solo performance (D84 tuning)", () => {
+describe("a solo performance (§group-sessions)", () => {
   it("the harmonica ends with one sessionEnded, a performance on the ticker; a book with none", () => {
     const fixture = redOffWatch();
     const { world } = fixture;

@@ -1,9 +1,9 @@
 /**
- * The two ways freight leaves the dock into the port (D63, D66), shared by commerce (a dock hand
- * picking crates up, or the instant behaviour at a dock with no warehouse door) and travel (the
- * dock being cast off with a dock hand's errand still open).
+ * The two ways freight leaves the dock into the port (§dock-hand-errands), shared by commerce (a
+ * dock hand picking crates up, or the instant behaviour at a dock with no warehouse door) and
+ * travel (the dock being cast off with a dock hand's errand still open).
  *
- * - `withdrawJobCrates`: an offer's crates go back in: they leave the world, as D63 had it.
+ * - `withdrawJobCrates`: an offer's crates go back in: they leave the world.
  * - `takeCratesIntoStore`: delivered crates go through the warehouse door into its store, the
  *   custody `deliveryComplete` already accepted on the bay.
  */

@@ -1,7 +1,7 @@
 /**
- * Footfall and boots (D82), called by spatial's `advanceActor` when a segment completes (the one
- * documented cross-system write into `state.dirt` and `actor.boots` from movement, like the hazard
- * scrape writing `scheduledFaults`). The tile is the one stepped onto.
+ * Footfall and boots (§footfall-and-boots), called by spatial's `advanceActor` when a segment
+ * completes (the one documented cross-system write into `state.dirt` and `actor.boots` from
+ * movement, like the hazard scrape writing `scheduledFaults`). The tile is the one stepped onto.
  *
  * - On dock floor the boots gain the dock's `grime × dockGrimePerStep`
  *   (`content.docks[state.deck.dock.dockId].grime`; a fixture dock graft with no `docks` table

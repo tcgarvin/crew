@@ -1,9 +1,9 @@
 /**
- * D92: detection and the alert (slice 5 call 4). The helm-stander's piloting check falls twelve
- * seconds before a `rolled` field: a pass sights it and raises the alert, and the first impact
- * that follows is only notable. With nobody at the helm, or an `unseen` field, nobody knows
- * until the first rock: that impact is a narrative `fieldEntered` and raises the alert. The alert
- * stands down `field.alertClearSeconds` after the field ends.
+ * §sighting-and-the-alert: detection and the alert (slice 5 call 4). The helm-stander's piloting
+ * check falls twelve seconds before a `rolled` field: a pass sights it and raises the alert, and
+ * the first impact that follows is only notable. With nobody at the helm, or an `unseen` field,
+ * nobody knows until the first rock: that impact is a narrative `fieldEntered` and raises the
+ * alert. The alert stands down `field.alertClearSeconds` after the field ends.
  */
 import { describe, expect, it } from "vitest";
 import { cmd } from "../../core/fixtures/test-world";
@@ -37,7 +37,7 @@ const light = (detection: FieldPayload["detection"]): FieldPayload => ({
   scripted: [],
 });
 
-describe("detection and the alert (D92)", { timeout: 30_000 }, () => {
+describe("detection and the alert (§sighting-and-the-alert)", { timeout: 30_000 }, () => {
   it("checks a field at the nav-hazard difficulty of its severity", () => {
     const { world } = fieldWorld();
     const ctx = { config: world.config.values };

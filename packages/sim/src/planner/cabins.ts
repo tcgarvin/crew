@@ -2,10 +2,10 @@
  * The summons candidate (slice 4, call 15): a pending `privateTalk` (`self.summons`) makes a
  * `privateTalk` personal candidate at `essentialOperation` for both the caller and the one called
  * in: it interrupts cards, rounds and rest, not the helm. Rejected `atTheHelm` for the helm's
- * stander and oncoming (D77's `helmRole`): being the same class, the summons would otherwise
- * compete with the helm task on the walk whenever they choose afresh (leaving gangway watch as
- * the departure opens the helm watch, or between holds), and a cabin nearer than the seat would
- * win; so they stand the helm and the talk times out. Rejected `notAboard` when the summons
+ * stander and oncoming (`helmRole`, §who-has-the-helm): being the same class, the summons would
+ * otherwise compete with the helm task on the walk whenever they choose afresh (leaving gangway
+ * watch as the departure opens the helm watch, or between holds), and a cabin nearer than the seat
+ * would win; so they stand the helm and the talk times out. Rejected `notAboard` when the summons
  * names someone not on the roster, `backoff` after a failed walk, and `unreachableTarget` when
  * the schematic has no way into the cabin.
  *

@@ -21,13 +21,13 @@ describe("loadBundle", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("calls the narrator in the aftermath on alertCleared, navHazard and faultRepaired, and no longer on fieldCleared (D100)", () => {
+  it("calls the narrator in the aftermath on alertCleared, navHazard and faultRepaired, and no longer on fieldCleared (§notable-event-hook)", () => {
     const narrator = authoredBundle().config.narrator;
     expect(narrator.aftermathHookOnEvents).toEqual(["alertCleared", "navHazard", "faultRepaired"]);
     expect(narrator.hookOnEvents).not.toContain("fieldCleared");
   });
 
-  it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (D71)", () => {
+  it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (§scenario-tools)", () => {
     const raw = rawBundle() as { scenarios: Record<string, { startingItems: unknown[] }> };
     const scenario = raw.scenarios["scenario.default_freighter_run"];
     expect(scenario?.startingItems).toContainEqual(
@@ -58,7 +58,7 @@ describe("loadBundle", () => {
     expect(rawBundle().hash).toBe(rawBundle().hash);
   });
 
-  it("gives every crew member a voice of their own (D38)", () => {
+  it("gives every crew member a voice of their own (§crew-lines)", () => {
     const bundle = authoredBundle();
     const voices = Object.values(bundle.crew).map((c) => c.voice);
     expect(voices).toHaveLength(10);
@@ -76,7 +76,7 @@ describe("loadBundle", () => {
     expect(passenger?.traits ?? []).toEqual([]);
   });
 
-  it("gives every port a market, well stocked at the Hub and bare at Green Meridian (D47)", () => {
+  it("gives every port a market, well stocked at the Hub and bare at Green Meridian (§market-stock)", () => {
     const bundle = authoredBundle();
     const parts = (portId: string) =>
       bundle.ports[portId as keyof typeof bundle.ports]?.market.find(
@@ -141,7 +141,7 @@ describe("loadBundle", () => {
     ]);
   });
 
-  it("stands the default scenario's watch in three sections, Blue with a deckhand for the gangway, and two dayworkers (D77)", () => {
+  it("stands the default scenario's watch in three sections, Blue with a deckhand for the gangway, and two dayworkers (§sections-and-dayworkers)", () => {
     const bundle = authoredBundle();
     const bill =
       bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios]
@@ -157,7 +157,7 @@ describe("loadBundle", () => {
     expect(bill?.dayworkers).toEqual(["crew.bettina_solheim", "crew.oyelaran_abiodun"]);
   });
 
-  it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (D73)", () => {
+  it("sails the default scenario on Freighter Mk2 with nine crew, the captain first (§the-ships)", () => {
     const bundle = authoredBundle();
     const scenario =
       bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios];
@@ -167,12 +167,12 @@ describe("loadBundle", () => {
     expect(scenario?.crew).toContain("crew.noor_haddad");
   });
 
-  it("keeps Mk1 loadable as a second footprint beside Mk2 (D73)", () => {
+  it("keeps Mk1 loadable as a second footprint beside Mk2 (§the-ships)", () => {
     const bundle = authoredBundle();
     expect(Object.keys(bundle.decks).sort()).toEqual(["deck.freighter_mk1", "deck.freighter_mk2"]);
   });
 
-  it("gives Mk2 a bed for every crew member and a spare, and every bunk a locker (D73)", () => {
+  it("gives Mk2 a bed for every crew member and a spare, and every bunk a locker (§what-a-deck-must-offer)", () => {
     const bundle = authoredBundle();
     const deck = bundle.decks["deck.freighter_mk2" as keyof typeof bundle.decks];
     if (deck === undefined) throw new Error("no Mk2");
@@ -184,7 +184,7 @@ describe("loadBundle", () => {
     expect(lockerOwners.sort()).toEqual(beds.map((b) => b.key).sort());
   });
 
-  it("puts no crew spawn point of either deck on a machine or its interaction tile (D73)", () => {
+  it("puts no crew spawn point of either deck on a machine or its interaction tile (§what-a-deck-must-offer)", () => {
     const bundle = authoredBundle();
     for (const deck of Object.values(bundle.decks)) {
       const taken = new Set<string>();
@@ -264,7 +264,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     ]);
   });
 
-  it("puts every far port on a single long spur off one core port, a watch long (D76)", () => {
+  it("puts every far port on a single long spur off one core port, a watch long (§the-ships-day)", () => {
     const spur = (id: string) => ports[id as keyof typeof ports]?.routes;
     expect(spur("port.ossory_station")).toEqual([
       { toPortId: "port.kessler_drift", distance: 400 },
@@ -310,7 +310,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     expect(planets.sort()).toEqual(["port.green_meridian", "port.terns_rest"]);
   });
 
-  it("puts every dock's warehouse door a short walk from its delivery bay (D69)", () => {
+  it("puts every dock's warehouse door a short walk from its delivery bay (§dock-map-validation)", () => {
     // The delivery's receiver waits at the warehouse door and is sent for the crates only once
     // the hand truck is parked, which is when departure prep begins: a long walk (Kessler's was
     // 27 steps round the conveyor) loses the race to the cast-off.
@@ -347,7 +347,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
-  it("sells patch kits wherever it sells hull plating, so a scarred ship restocks both (D93)", () => {
+  it("sells patch kits wherever it sells hull plating, so a scarred ship restocks both (§plating-and-kits-at-port)", () => {
     const all = Object.values(ports);
     const sells = (port: (typeof all)[number], itemDefId: string) =>
       port.market.some((line) => line.itemDefId === itemDefId);
@@ -356,7 +356,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
-  it("stocks each port differently (D47)", () => {
+  it("stocks each port differently (§market-stock)", () => {
     const stock = Object.values(ports).map((p) =>
       p.market.map((l) => `${l.itemDefId}:${l.count}:${l.price}`).join(","),
     );

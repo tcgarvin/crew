@@ -1,4 +1,7 @@
-/** Watch events (D77, D79): the bell, the helm's handovers and vacancies, gangway watch, thoughts. */
+/**
+ * Watch events (§the-bell, §thoughts): the bell, the helm's handovers and vacancies, gangway watch,
+ * thoughts.
+ */
 import type { ThoughtKey } from "../content";
 import type { ActorId, LocalKey, MachineId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
@@ -26,7 +29,7 @@ export interface WatchEventPayloads {
 export const WATCH_EVENT_SIGNIFICANCE = {
   bell: "notable",
   helmRelieved: "notable",
-  // The ship's own failing: a fact for the narrator's next call, not a hook (D77).
+  // The ship's own failing: a fact for the narrator's next call, not a hook (§helm-vacancy).
   helmUnattended: "narrative",
   gangwayWatchSet: "trace",
   thoughtAdded: "trace",

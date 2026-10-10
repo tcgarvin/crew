@@ -1,8 +1,8 @@
 /**
  * Handlers for the kernel-owned command kinds: scenario setup (`scenarioSpawn`,
- * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `requestCall` (D99),
- * `surfaceDecision` and `resolveDecision`. Other kinds belong to their systems and register through the same
- * `registerCommandHandler` path.
+ * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `requestCall`
+ * (§requested-call-back), `surfaceDecision` and `resolveDecision`. Other kinds belong to their
+ * systems and register through the same `registerCommandHandler` path.
  */
 import { commandActor, isFitForCommand } from "./command-actor";
 import {
@@ -174,8 +174,8 @@ function validateSpawn(
  * a trait-count knob that `ConfigDef` does not have yet. Exported for `spawnAtBoundary` (commerce),
  * the other command kind that can spawn an actor at a boundary.
  *
- * D77: `section` is their watch section from the scenario's bill; without one they are a
- * dayworker (as is anyone spawned after world creation).
+ * §sections-and-dayworkers: `section` is their watch section from the scenario's bill; without one
+ * they are a dayworker (as is anyone spawned after world creation).
  *
  * Slice 4: `character` is their interests and values; absent, the def's, else a keyed hash of
  * the id (`interestsFromSeed`). The spawn handler passes one drawn on the `setup` stream for a def
@@ -396,9 +396,9 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
     const hookId = command.payload.hookId;
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined` (CONTRACTS rule 2).
     delete narrator.pendingHook;
-    // D99: the call-back request this hook served is spent. A fresh one applied earlier in the
-    // same tick (the plan's `requestCall` runs before the ack) has no `servedByHookId`, so it
-    // stands.
+    // §requested-call-back: the call-back request this hook served is spent. A fresh one applied
+    // earlier in the same tick (the plan's `requestCall` runs before the ack) has no
+    // `servedByHookId`, so it stands.
     if (narrator.callBack?.servedByHookId === hookId) {
       // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
       delete narrator.callBack;
@@ -415,7 +415,7 @@ const acknowledgeHook: CommandHandler<"acknowledgeHook", null> = {
 };
 
 // ---------------------------------------------------------------------------------------------
-// requestCall (D99)
+// requestCall (§requested-call-back)
 // ---------------------------------------------------------------------------------------------
 
 /** Why `why` is not a private line a call-back request can carry, or undefined. */
@@ -428,9 +428,10 @@ function whyProblem(why: unknown): string | undefined {
 }
 
 /**
- * D99: replace the narrator's standing call-back request. The whole request is replaced, so a
- * new one is never already served. It remembers the port it was asked at (a `nextPort` request
- * is served elsewhere) and, for `midLeg` asked before a transit's halfway point, that transit.
+ * §requested-call-back: replace the narrator's standing call-back request. The whole request is
+ * replaced, so a new one is never already served. It remembers the port it was asked at (a
+ * `nextPort` request is served elsewhere) and, for `midLeg` asked before a transit's halfway point,
+ * that transit.
  */
 const requestCall: CommandHandler<"requestCall", null> = {
   validate(ctx, command) {
@@ -476,7 +477,10 @@ const requestCall: CommandHandler<"requestCall", null> = {
 // surfaceDecision
 // ---------------------------------------------------------------------------------------------
 
-/** A card side as a decision option; `aftermath` (D26) only when the side has one (JSON-safe). */
+/**
+ * A card side as a decision option; `aftermath` (§aftermath-caption) only when the side has one
+ * (JSON-safe).
+ */
 function optionFromSide(side: DecisionCardSide): DecisionOption {
   return {
     label: side.label,
@@ -587,7 +591,7 @@ function surfaceDecisionHandler(
         ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),
       };
       ctx.state.decisions.records[decisionId] = record;
-      // D70: a card from one of the port's people waits to be delivered in person.
+      // §delivery: a card from one of the port's people waits to be delivered in person.
       queueOrHold(ctx, decisionId, cardSpeaker(ctx.state, record));
       return NO_TEMP_REFS;
     },

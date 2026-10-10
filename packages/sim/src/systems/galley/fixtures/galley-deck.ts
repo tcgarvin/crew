@@ -1,9 +1,9 @@
 import { createDefLookup } from "../../../core/defs";
 /**
- * W1 test fixture (D81): a small ship with a galley, for the meal rhythm. Five rooms in a row
- * joined by doorless openings: an airlock with the ramp and the gangway post, the galley (stove,
- * serving counter, pantry), the mess (one four-seat table and a ration stack), a bunkroom, and the
- * bridge with the helm (seat and standby).
+ * W1 test fixture (§meal-problem): a small ship with a galley, for the meal rhythm. Five rooms in a
+ * row joined by doorless openings: an airlock with the ramp and the gangway post, the galley
+ * (stove, serving counter, pantry), the mess (one four-seat table and a ration stack), a bunkroom,
+ * and the bridge with the helm (seat and standby).
  *
  *   x 0123456789ABCDEFG
  *   0 LLLSGGMssMMbbbBBB    S = stove (3,0), worked from u (3,1); c = serving counter (4,1)
@@ -583,7 +583,10 @@ export function galleyStepCtx(world: World): { ctx: StepCtx; drafts: EventDraft[
   return { ctx, drafts };
 }
 
-/** Set a course to the next port; with no nav terminal aboard it counts as plotted (D78). */
+/**
+ * Set a course to the next port; with no nav terminal aboard it counts as plotted
+ * (§course-plotting).
+ */
 export function setCourseAway(fixture: TestWorld): void {
   fixture.kernel.enqueueCommand(
     fixture.world,

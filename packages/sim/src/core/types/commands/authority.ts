@@ -7,12 +7,13 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
 
 /**
  * The V1 narrator vocabulary, exactly (PLAN §6 W9). Nothing here can set a body, need, position,
- * knowledge or money directly; no such command exists. D47 (owner-approved vocabulary change,
- * D6/D11): `stockMarket` sets what a port sells, never what the ship has or owes. D78: the sixth
- * lever, `scheduleHazard`, places a piloting check the sim rolls; it never decides the outcome.
- * D92: the seventh, `scheduleField`, places an asteroid field; the sim rolls the impacts, and the
- * narrator's scripted ones can never alone sink the ship. D99: the eighth, `requestCall`, asks
- * when the narrator is called next; it changes nothing in the world.
+ * knowledge or money directly; no such command exists. §market-lever (owner-approved vocabulary
+ * change, D6): `stockMarket` sets what a port sells, never what the ship has or owes.
+ * §debris-fields-and-ion-storms: the sixth lever, `scheduleHazard`, places a piloting check the sim
+ * rolls; it never decides the outcome. §hazard-and-field-levers: the seventh, `scheduleField`,
+ * places an asteroid field; the sim rolls the impacts, and the narrator's scripted ones can never
+ * alone sink the ship. §requested-call-back: the eighth, `requestCall`, asks when the narrator is
+ * called next; it changes nothing in the world.
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
@@ -29,10 +30,11 @@ export const NARRATOR_COMMAND_KINDS = [
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
 
 /**
- * D66 (owner ruling D57, Dockside §6.1): the staging call sets the stage and never moves the
- * plot. These kinds are valid from the narrator only while a `stageDock` hook is pending, and
- * while one is, they are the only narrator kinds the kernel accepts (`hookWindowRejection`,
- * `core/commands.ts`). A staging-only kind is never valid in answer to a story hook.
+ * §staging-plan-command (owner ruling D57, Dockside §6.1): the staging call sets the stage and
+ * never moves the plot. These kinds are valid from the narrator only while a `stageDock` hook is
+ * pending, and while one is, they are the only narrator kinds the kernel accepts
+ * (`hookWindowRejection`, `core/commands.ts`). A staging-only kind is never valid in answer to a
+ * story hook.
  */
 export const STAGING_COMMAND_KINDS = [
   "stageDock",

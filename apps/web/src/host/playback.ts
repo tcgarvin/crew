@@ -24,15 +24,17 @@ export function lerpAngle(a: number, b: number, t: number): number {
  * Interpolate between two frames at `t` in [0, 1]. Actors are matched by id; an actor present in
  * only one of the two frames (spawned/despawned) is passed through unchanged rather than
  * interpolated. Non-positional fields (machines, doors, ticker, money, items, headline, and the
- * dock alongside, D61) snap to `next` at t > 0, matching D7 (truth, not a smoothed guess). Travel
- * progress is positional for the scenery (D58), so it is interpolated within one stage of one leg
- * and snaps otherwise. D92/D93: the hull, the alert and the field snap to `next` too; impacts are
+ * dock alongside, §dock-alongside) snap to `next` at t > 0, matching D7 (truth, not a smoothed
+ * guess). Travel progress is positional for the scenery (§stars-plume-and-the-animation-loop), so
+ * it is interpolated within one stage of one leg and snaps otherwise. Per §field-lifecycle and
+ * §hull-scars-and-ship-loss, the hull, the alert and the field snap to `next` too; impacts are
  * events, not state, so both frames' are kept (`mergeImpacts`) and none is lost to the blend.
  */
 export function interpolateFrame(prev: RenderFrame, next: RenderFrame, t: number): RenderFrame {
   const clamped = Math.max(0, Math.min(1, t));
-  // D61: the dock comes and goes with a stage change, so it snaps to `next` like the doors; an
-  // optional field cannot ride the base spread, which would keep `prev`'s dock for a frame.
+  // §travel-stages: the dock comes and goes with a stage change, so it snaps to `next` like the
+  // doors; an optional field cannot ride the base spread, which would keep `prev`'s dock for a
+  // frame.
   const { dock: _prevDock, field: _prevField, ...base } = clamped >= 1 ? next : prev;
   const prevById = new Map(prev.actors.map((a) => [a.id, a] as const));
   const actors: RenderActor[] = next.actors.map((na) => {
@@ -83,7 +85,9 @@ export function mergeImpacts(
   return [...a, ...b.filter((i) => !seen.has(`${i.tick}:${i.x},${i.y}`))];
 }
 
-/** D66: locals walk too, so they glide between frames like the crew; newcomers snap in. */
+/**
+ * §local-behaviour: locals walk too, so they glide between frames like the crew; newcomers snap in.
+ */
 function interpolateLocals(
   prev: readonly RenderLocal[],
   next: readonly RenderLocal[],
@@ -103,9 +107,9 @@ function interpolateLocals(
 }
 
 /**
- * D58: the berth slides with stage progress, and frames come every 100 sim-ms, so a snapped
- * progress would step the scenery visibly. Interpolate only between two frames of the same stage
- * and leg; across a stage change the next frame's value is the truth.
+ * §stars-plume-and-the-animation-loop: the berth slides with stage progress, and frames come every
+ * 100 sim-ms, so a snapped progress would step the scenery visibly. Interpolate only between two
+ * frames of the same stage and leg; across a stage change the next frame's value is the truth.
  */
 export function interpolateTravel(prev: RenderTravel, next: RenderTravel, t: number): RenderTravel {
   const sameStretch =
@@ -141,7 +145,8 @@ export class FramePlayback {
 
   push(frame: RenderFrame): void {
     // Frames arrive in tick order from the worker, so the common case is a plain append; with
-    // hundreds of frames buffered (D30 bursts) a sort per push would be O(n log n) per frame.
+    // hundreds of frames buffered (§run-ahead-loop bursts) a sort per push would be O(n log n) per
+    // frame.
     const last = this.buffer[this.buffer.length - 1];
     if (last === undefined || last.tick <= frame.tick) {
       this.buffer.push(frame);
@@ -188,7 +193,8 @@ export class FramePlayback {
     const msPerTick = 1000 / this.tickRate;
 
     // Drop fully-consumed leading intervals (handles a burst of buffered frames or a speed jump).
-    // D92: a dropped frame's impacts ride on to the frame shown, so a flash is never skipped.
+    // §rock-impacts: a dropped frame's impacts ride on to the frame shown, so a flash is never
+    // skipped.
     let skipped: readonly RenderImpact[] = [];
     while (this.buffer.length > 2) {
       const first = this.buffer[0];

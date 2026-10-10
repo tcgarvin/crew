@@ -1,5 +1,6 @@
 /**
- * D70: the captain ashore (dockside §6.2, §6.3), run once a tick by commerce after its job sweep.
+ * §looking-for-work: the captain ashore (dockside §6.2, §6.3), run once a tick by commerce after
+ * its job sweep.
  *
  * **Looking for work.** Docked at a port with a dock map, with nothing on (`captainIsIdleAt`) and
  * the personnel ramp down, the command actor (D8) is handed `lookForWork` at essential-operation
@@ -274,7 +275,7 @@ function advanceMeeting(ctx: Ctx, held: HeldCard, berth: BerthedDock): void {
     if (meetingUnderWay(ctx, held.decisionId)) return;
     const walker = walkerFor(ctx, held.portId);
     if (walker === undefined || !freeForMeeting(ctx, walker)) return;
-    // Handed out every tick until it starts, as `comeAboard` is (D61).
+    // Handed out every tick until it starts, as `comeAboard` is (§calling-the-crew-aboard).
     walker.pendingIntent = {
       kind: "personal",
       activity: "meetSpeaker",
@@ -315,7 +316,7 @@ function sweepHeldCards(ctx: Ctx): void {
   if (berth !== undefined) advanceMeeting(ctx, head, berth);
 }
 
-/** The captain ashore: looking for work, and cards delivered in person (D70). */
+/** The captain ashore: looking for work, and cards delivered in person (§offers-in-person). */
 export function sweepCaptainAshore(ctx: Ctx): void {
   sweepHeldCards(ctx);
   sweepLookingForWork(ctx);

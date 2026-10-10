@@ -14,9 +14,9 @@ export type InspectorData =
       readonly kind: "actor";
       readonly view: AgentViewSnapshot;
       readonly label?: string;
-      /** D77/D79: their watch, mood and thoughts in words (`personWords`). */
+      /** §mood-and-work-speed: their watch, mood and thoughts in words (`personWords`). */
       readonly person: PersonWords;
-      /** D90: what they are weighing and what they will do next. */
+      /** §what-a-crew-member-weighs: what they are weighing and what they will do next. */
       readonly weighing: WeighingWords;
     }
   | {
@@ -27,9 +27,12 @@ export type InspectorData =
       readonly gathering?: string;
     }
   | { readonly kind: "item"; readonly item: ItemInspection }
-  /** Dockside phase 2: a dock post, or the dock itself; phase 3 (D68): a staged prop. */
+  /**
+   * Dockside phase 2: a dock post, or the dock itself; phase 3 (§items-places-and-locals): a staged
+   * prop.
+   */
   | { readonly kind: "place"; readonly place: PlaceInspection }
-  /** Dockside phase 3 (D68): one of the dock's own people. */
+  /** Dockside phase 3 (§items-places-and-locals): one of the dock's own people. */
   | { readonly kind: "local"; readonly local: LocalInspection }
   | { readonly kind: "loading" };
 
@@ -193,7 +196,7 @@ function ActorInspector({
   );
 }
 
-/** D90: urgency classes in the inspector's words, most pressing first. */
+/** §what-a-crew-member-weighs: urgency classes in the inspector's words, most pressing first. */
 const URGENCY_WORDS: Readonly<Record<UrgencyClass, string>> = {
   immediateSurvival: "emergency",
   containment: "urgent",
@@ -203,8 +206,9 @@ const URGENCY_WORDS: Readonly<Record<UrgencyClass, string>> = {
 };
 
 /**
- * D90: the options the planner is weighing, best first. It takes the most pressing class, then
- * the quickest within it; a current activity is kept against anything of the same class or lower.
+ * §what-a-crew-member-weighs: the options the planner is weighing, best first. It takes the most
+ * pressing class, then the quickest within it; a current activity is kept against anything of the
+ * same class or lower.
  */
 function WeighingSection({ weighing }: { weighing: WeighingWords }) {
   return (
@@ -325,7 +329,10 @@ function LocalInspector({ local }: { local: LocalInspection }) {
   );
 }
 
-/** D63: freight on offer is staged on the dock but belongs to nobody until the job is taken. */
+/**
+ * §offered-freight: freight on offer is staged on the dock but belongs to nobody until the job is
+ * taken.
+ */
 function itemSubtitle(item: ItemInspection): string {
   if (item.job === undefined) return "ship's stores";
   return item.job.status === "offered" ? "freight on offer" : "freight";

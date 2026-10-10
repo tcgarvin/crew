@@ -1,6 +1,6 @@
 /**
- * The staging call (Dockside §6.1, D66): the guaranteed `stageDock` hook and the transit hold,
- * and the `stageDock` command that answers it.
+ * The staging call (Dockside §6.1, §staging-hook-and-the-hold): the guaranteed `stageDock` hook and
+ * the transit hold, and the `stageDock` command that answers it.
  *
  * At a port with a dock map, travel raises `stageDock` once the ship is within
  * `narrator.approachHookLeadSeconds` of the end of its route (as a distance at
@@ -192,10 +192,10 @@ function normalised(plan: StagingPlan): StagingPlan {
 }
 
 /**
- * `stageDock` (D66): the staging plan for the dock the ship is about to come alongside. Valid
- * only while a `stageDock` hook is pending for the leg in flight and its plan is not yet set
- * (one plan per call); every person, post, prop and line is checked against content and the
- * dock map, and any problem rejects the whole plan (the translator drops bad parts first, with
+ * `stageDock` (§staging-plan-command): the staging plan for the dock the ship is about to come
+ * alongside. Valid only while a `stageDock` hook is pending for the leg in flight and its plan is
+ * not yet set (one plan per call); every person, post, prop and line is checked against content and
+ * the dock map, and any problem rejects the whole plan (the translator drops bad parts first, with
  * reasons; the kernel never applies half a plan).
  */
 export const stageDock: CommandHandler<"stageDock", StagingPlan> = {

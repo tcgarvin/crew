@@ -1,6 +1,6 @@
 /**
- * D94: the reporting reflex's plan: the chosen panel's `operate` position, then a `report` work
- * step of `intercom.reportSeconds`. Whether the panel works is found out on arrival
+ * §reporting-damage: the reporting reflex's plan: the chosen panel's `operate` position, then a
+ * `report` work step of `intercom.reportSeconds`. Whether the panel works is found out on arrival
  * (`runReport`), not here: the reporter cannot know a far panel is dead until they see it.
  *
  * Owner: W3 of ship life slice 5.

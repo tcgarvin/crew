@@ -81,9 +81,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /**
  * The saved config with every key it lacks taken from `defaults` (the loaded content's config),
  * recursing into objects; `filled` collects the paths taken. A save keeps the config it was made
- * with (SD §20.1), but a key added since (D58's `doors.rampOpenSeconds`, D61's
+ * with (SD §20.1), but a key added since (`doors.rampOpenSeconds`,
  * `travel.recallAboardSeconds`) would otherwise read as `undefined` and turn timers into NaN.
- * Values the save does have always win. A key renamed since (D76's day units:
+ * Values the save does have always win. A key renamed since (the day units, §the-ships-day:
  * `needs.mealSeconds` → `needs.mealDays`) is a missing key here, so the new name takes the loaded
  * value and the stale one is carried along unread.
  */

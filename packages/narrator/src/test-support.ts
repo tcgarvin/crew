@@ -19,8 +19,8 @@ export function content(): ContentBundle {
 }
 
 /**
- * D97: a test fixture's whole answer, plan and notes together, as the model gave it before the
- * notes moved to their own turn. `fakeTransport` splits it between the two turns.
+ * §notes-turn: a test fixture's whole answer, plan and notes together, as the model gave it before
+ * the notes moved to their own turn. `fakeTransport` splits it between the two turns.
  */
 export type PlanWithNotes = NarratorPlan & { readonly notes: WrittenNotes };
 
@@ -50,9 +50,9 @@ export function okResult(content: string): ModelResult {
 }
 
 /**
- * D97: a story fixture answer with `notes` goes to the plan turn without them (D99: and with
- * `FIXTURE_CALL_BACK` if it has no callBack) and to the notes turn as just the notes; any other
- * answer (and every staging answer) is returned as given.
+ * §notes-turn: a story fixture answer with `notes` goes to the plan turn without them
+ * (§requested-call-back: and with `FIXTURE_CALL_BACK` if it has no callBack) and to the notes turn
+ * as just the notes; any other answer (and every staging answer) is returned as given.
  */
 function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): ModelResult {
   if (result.content === null || request.schemaName !== "narrator_plan") return result;
@@ -69,8 +69,8 @@ function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): M
 }
 
 /**
- * D99: the model always writes `callBack` (the schema requires it); a fixture plan built without
- * one answers with the plain request, nextPort, so it still parses.
+ * §requested-call-back: the model always writes `callBack` (the schema requires it); a fixture plan
+ * built without one answers with the plain request, nextPort, so it still parses.
  */
 export const FIXTURE_CALL_BACK = { when: "nextPort", why: "" } as const;
 
@@ -79,8 +79,8 @@ function withCallBack(plan: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * D97: both turns, as the server runs them: the plan, then the notes turn, whose notes replace
- * the response's. A failed notes turn leaves the notes stored with the plan.
+ * §notes-turn: both turns, as the server runs them: the plan, then the notes turn, whose notes
+ * replace the response's. A failed notes turn leaves the notes stored with the plan.
  */
 export async function runBothTurns(
   req: NarratorRequest,

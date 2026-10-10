@@ -27,7 +27,7 @@ function chatAt(world: World, tick: number, social?: Partial<ConfigDef["social"]
   onConversation({ ...ctx, config }, actorOf(world, JAX), actorOf(world, TOMAS));
 }
 
-describe("ambient chat (call 10; D88)", () => {
+describe("ambient chat (call 10; §ambient-chat)", () => {
   it("leaves `chatted` each way once, not again within the window, and again after", () => {
     const { world } = socialWorld();
     const day = dayTicks(world.config.values, 1);

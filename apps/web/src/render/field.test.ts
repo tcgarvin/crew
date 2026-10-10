@@ -1,6 +1,6 @@
 /**
- * D92/D93: a whole frame in an asteroid field draws: both rock layers, a flash and the scars, on
- * the real deck in transit, landscape and portrait.
+ * §rock-impacts, §hull-scars-and-ship-loss: a whole frame in an asteroid field draws: both rock
+ * layers, a flash and the scars, on the real deck in transit, landscape and portrait.
  */
 import type { PortDefId, RenderFrame, RenderScar, ScarId, Tick } from "@crew/sim";
 import { describe, expect, it } from "vitest";

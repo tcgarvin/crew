@@ -166,7 +166,7 @@ function acknowledge(
   expect(ack.status).toBe("accepted");
 }
 
-describe("narrator budget refill (D78)", () => {
+describe("narrator budget refill (§narrator-lever-budgets)", () => {
   it("refills spawns, faults and hazards to config every budgetRefillDays, from the last refill", () => {
     const { world, kernel } = tinyTestWorld();
     const config = world.config.values;
@@ -328,7 +328,7 @@ describe("quiet-too-long timer", () => {
   });
 });
 
-describe("aftermath hooks (D100)", () => {
+describe("aftermath hooks (§notable-event-hook)", () => {
   function aftermathWorld(hookOnEvents: string[], aftermathHookOnEvents: string[]) {
     const registry = createRegistry();
     const kernel = createKernel(registry);

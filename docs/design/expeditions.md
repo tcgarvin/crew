@@ -1,8 +1,9 @@
 # Expeditions: Landing Sites, the Away Party, and Person-to-Person Combat
 
 Status: design agreed with the owner, 2026-10-10. Owner inputs are marked **(owner)**; everything
-else is a design-partner call the owner delegated. Decisions get recorded in `docs/DECISIONS.md`
-as each phase lands (D104 records the rulings); this file stays as the rationale. The
+else is a design-partner call the owner delegated. The owner's rulings become a `docs/DECISIONS.md`
+entry and each phase's mechanics go into `docs/spec/` as it lands; this file stays as the
+rationale. The
 implementation plan for each phase is written when the phase before it lands, in the style of
 `docs/design/ship-life-plan.md`.
 
@@ -33,18 +34,19 @@ That asks for four things this doc designs together:
 1. **A place the ship goes.** A site is a landing somewhere that is not a port: its own
    destination, its own map, the ship set down beside it, no market and no gate.
 2. **A job with a person or a thing at the end of it.** An errand: bring someone back (alive, or
-   not), or bring something back. One job at a time, like every job (D52).
+   not), or bring something back. One job at a time, like every job (§one-job-in-hand).
 3. **A fight that plays itself,** on the site's tiles, with bodies that can be hurt, arms that
    are scarce, and morale that ends most fights before the wounds do.
 4. **A narrator with range and a captain with choices,** inside the rules that already hold:
    the narrator sets things up and never decides outcomes (GDD §16; the system prompt's first
-   principle), cards are binary and brought by someone (GDD §22, D29), and the crew act on their
-   own (GDD §2.1).
+principle), cards are binary and brought by someone (GDD §22, §spoken-cards), and the crew act on
+   their own (GDD §2.1).
 
 The design principle throughout is the one the project has already settled three times: the
 sim owns the verbs, the narrator owns the nouns and the prose, and the kernel checks (D6
-allow-list, D11/D45 capability list, D92's scripted impacts behind a guard). "Lots of
-strategies" is a large menu of things the sim can really do, framed well, chosen two at a time.
+allow-list, the §narrator-authority capability list, the scripted impacts of §scheduling-a-field
+behind a guard). "Lots of strategies" is a large menu of things the sim can really do, framed
+well, chosen two at a time.
 
 ## 2. The shape of an expedition
 
@@ -99,10 +101,11 @@ the behaviour lives rather than by a flag on each system: no docking fee; no `st
 `stageSite` call stands in, §9.2); no `captainAshore` and no offers (the prompt is told, and the
 translator drops an `offerJob` whose `fromPort` is a site); never a voyage waypoint
 (`shortestPath` never routes through a site); no `buyParts`, provisions or plating purchases (the
-D47/D80/D93 problems stay open and say "not available here", which they already can); no
-passengers boarding or going ashore; no dock hands. Everything else is ordinary: watches and the
-bell, the gangway watch at the ramp (D77, who now has something to watch), meals, dirt, sleep,
-repairs with what is aboard, the departure gate.
+§buying-parts, §reserve-low-problem and §plating-and-kits-at-port problems stay open and say "not
+available here", which they already can); no passengers boarding or going ashore; no dock hands.
+Everything else is ordinary: watches and the bell, the gangway watch at the ramp
+(§gangway-watch-and-rounds, who now has something to watch), meals, dirt, sleep, repairs with what
+is aboard, the departure gate.
 
 ### 3.2 How a site becomes reachable
 
@@ -110,7 +113,7 @@ A site is on the map only while something points at it. `knownSites(state)` is t
 `siteId`s of every job with an `errand` whose status is `accepted` or `inTransit`, plus the site
 the ship is at. `shortestPath` adds a known site's edge in both directions (to it from
 `nearPortId`, and back). Accepting an errand therefore sets course to the site exactly as
-accepting freight sets course to `toPortId` (D16): if the ship is not at `nearPortId`, the
+accepting freight sets course to `toPortId` (§offer-card): if the ship is not at `nearPortId`, the
 voyage runs there first (D49) and then makes the short hop. When the errand ends, the site drops
 off the graph; the ship can always leave it because the edge back stays while the ship is there.
 
@@ -122,39 +125,40 @@ items already can be, wait for phase C.
 ### 3.3 Landing reuses docking
 
 `TRAVEL_STAGES` are unchanged. `approaching` and `docking` at a site *are* the landing: the scene
-is a pure function of stage, progress and the two ports (D58), and a site's `setting` is
-`planet`, so the descent (`altitude`, the ground scaling up, dust off the pad) is already drawn.
-`undocking` and `departing` are the lift-off. Two small changes in `sceneAt` and the dock drawing
-(`apps/web/src/render/dock.ts`): a site has no quay structure (no clamps, no bay walls, no
-terminal edge; the map's `foreground` is rock, scrub and buildings), and the ground is drawn from
-the site map's palette the way an open planet berth is drawn as a pier (D62). The headline reads
-"Setting down at the Boathouse" / "Lifting off from the Boathouse".
+is a pure function of stage, progress and the two ports (§the-scene-outside-the-hull), and a site's
+`setting` is `planet`, so the descent (`altitude`, the ground scaling up, dust off the pad) is
+already drawn. `undocking` and `departing` are the lift-off. Two small changes in `sceneAt` and the
+dock drawing (`apps/web/src/render/dock.ts`): a site has no quay structure (no clamps, no bay walls,
+no terminal edge; the map's `foreground` is rock, scrub and buildings), and the ground is drawn from
+the site map's palette the way an open planet berth is drawn as a pier (§dock-drawing). The headline
+reads "Setting down at the Boathouse" / "Lifting off from the Boathouse".
 
 The site map takes the dock map's place: it is the same content type (§4), so `attachDock` at
 the start of `docking` grafts it onto the deck's grid (D59), `berthPlacement` puts the ship in
-its pad box (D72), the ramps come down when `docked` (D61) and the camera zooms to hull plus map
-(D62). A person who walks down the ramp is on site floor at a negative coordinate like anyone on
-a dock; `isOnDock` already means "ashore".
+its pad box (§ship-placement), the ramps come down when `docked` (§ramps-and-cast-off) and the
+camera zooms to hull plus map (§camera). A person who walks down the ramp is on site floor at a
+negative coordinate like anyone on a dock; `isOnDock` already means "ashore".
 
-The `stageDock` hold at the end of transit (D66) is kept for sites and answered by `stageSite`
-instead; the floor set is the site's `defaultCast` (§5.3). Nothing lands at an empty site.
+The `stageDock` hold at the end of transit (§staging-hook-and-the-hold) is kept for sites and
+answered by `stageSite` instead; the floor set is the site's `defaultCast` (§5.3). Nothing lands at
+an empty site.
 
 ### 3.4 The ship is exposed **(owner)**
 
 Owner: no market or warehouse; the ship is exposed; can the cast come to the ship?
 
 Yes, and that is the point of landing rather than walking in from a gate. The ramp foot is on
-the site floor; a cast member can walk to it (D70's `visitor` behaviour, already written for a
-local who brings word to the ramp), stand there and be the speaker of the arrival card. In a
-fight, hostiles who break toward the ship are advancing on the ramp, and the gangway watch at
-the ramp head is the last person between them and the deck; the party's `hold` posture is a
-hold *at the ramp*. Travel owns the ramps (D59): a plan may ask for the cargo ramp up and only
-the personnel ramp down (`rampsUp` is a phase C knob; in A1/A2 both ramps stay down while the
-party is out, as at a dock). The crew aboard are not spectators: someone on the deck who sees a
-fight through the ramp door reports it on the intercom (D94's reflex, with a new fact), and the
-ship goes on `alert` (`WorldState.alert`, cause `fight`) with everything that already follows
-from alert: recreation ends, the officer of the watch holds the bridge, sleepers in the hit room
-wake.
+the site floor; a cast member can walk to it (the `visitor` behaviour of §meetings-and-visitors,
+already written for a local who brings word to the ramp), stand there and be the speaker of the
+arrival card. In a fight, hostiles who break toward the ship are advancing on the ramp, and the
+gangway watch at the ramp head is the last person between them and the deck; the party's `hold`
+posture is a hold *at the ramp*. Travel owns the ramps (D59): a plan may ask for the cargo ramp up
+and only the personnel ramp down (`rampsUp` is a phase C knob; in A1/A2 both ramps stay down while
+the party is out, as at a dock). The crew aboard are not spectators: someone on the deck who sees a
+fight through the ramp door reports it on the intercom (the reflex of §reporting-damage, with a new
+fact), and the ship goes on `alert` (`WorldState.alert`, cause `fight`) with everything that already
+follows from alert: recreation ends, the officer of the watch holds the bridge, sleepers in the hit
+room wake.
 
 The ship does not take damage from small arms in this design (misses that reach a hull tile are
 absorbed); hull damage from a site is phase C at the earliest, and only if a site cast carries
@@ -163,16 +167,17 @@ something heavier than a blaster.
 ### 3.5 Leaving
 
 Lift-off is departure prep as at a dock: the ramps stay down while anyone is on the site floor
-(D61), `comeAboard` calls the party in, a casualty is carried (`carriedBy`), the target walks or
-is carried, and `detachDock` refuses until the floor is clear. Nobody is "brought aboard by the
-dock crew" at a site: the D61 last-guard rule becomes a hard wait (a dead or unconscious person
-on the floor is carried by the nearest fit party member, the `rescue` action, §8.3).
+(§ramps-and-cast-off), `comeAboard` calls the party in, a casualty is carried (`carriedBy`), the
+target walks or is carried, and `detachDock` refuses until the floor is clear. Nobody is "brought
+aboard by the dock crew" at a site: the last-guard rule (§ramps-and-cast-off) becomes a hard wait (a
+dead or unconscious person on the floor is carried by the nearest fit party member, the `rescue`
+action, §8.3).
 
 What sets the course home: when the expedition resolves (§8.6) the sim sets `returnTo` as the
 voyage destination on its own, the way a voyage continues from a waypoint (D49); the captain has
-already chosen, on the lull card, whether to press on or go. The departure gate (D36) asks as
-usual if the engines are impaired. A party that withdraws without resolving (the target got away,
-or the captain pulled back) leaves the same way with `errand.outcome: "failed"` and the job
+already chosen, on the lull card, whether to press on or go. The departure gate (§departure-gate)
+asks as usual if the engines are impaired. A party that withdraws without resolving (the target got
+away, or the captain pulled back) leaves the same way with `errand.outcome: "failed"` and the job
 `failed`; the narrator is called on it like any other resolution.
 
 ## 4. The site map
@@ -200,7 +205,7 @@ ramp foot's shortest route, which is what makes the `flank` plan available; `bys
 for people who are not in it. The L3 checks (`validate-dock.ts`): every post reachable from the
 personnel ramp's landing; at least one `target`, one `exit`; a `flank` post passes the
 disjoint-route test; the berth box as for any dock; size under the dock cap so the phone camera
-still fits (D62: 12.8–14.4 px a tile docked).
+still fits (§camera: 12.8–14.4 px a tile docked).
 
 Phase A1 authors one site: **the Boathouse**, a planet pad on the coast below Tern's Rest (its
 `nearPortId`), a long shed with a door at each end, net racks for cover, a jetty as the exit.
@@ -224,12 +229,12 @@ template, and the combat planner class (§8) is the only one that takes them.
 
 ### 5.2 Dispositions
 
-A cast member's disposition is the narrator's main instrument. Written in tiers (D45: words, not
+A cast member's disposition is the narrator's main instrument. Written in tiers (words, not
 numbers), mapped to numbers by the translator from `config.expedition`:
 
 ```
 SiteCastEntry {
-  name, role, look                      // as a staged new face (D66)
+  name, role, look                      // as a staged new face (§staging-plan-command)
   part: "target" | "guard" | "bystander" | "ally"
   arms: "none" | "melee" | "blaster"
   resolve: "shaky" | "steady" | "hard"  // how much it takes to break them
@@ -275,12 +280,12 @@ JobErrand {
 `fromPortId` is where it was offered, `toPortId` is `returnToPortId`, so the pay band, the
 receiver at the warehouse door and `contractCompleted` all work as for freight once the ship is
 back. Pay is banded by path distance to the site and back plus a `config.commerce.priceBands.
-errand` premium; `wants: "dead"` pays no more (D24: nobody talks pay; the premium would only
-show in the balance). The job carries no cargo until the expedition resolves: a `fetchItem` then
-holds the thing as its one `CargoLine` (it is a real `Item`, carried aboard by hand and delivered
-to the bay like a crate, D63), and a `fetchPerson` brought alive gains a `passage`
-(`captive: true`, `roundTrip: false`, `leg: "back"`) so the passenger machinery houses, feeds and
-walks them: they board from where they stood, sleep in a spare bunk, never work, and are a
+errand` premium; `wants: "dead"` pays no more (§cards-never-mention-pay: nobody talks pay; the
+premium would only show in the balance). The job carries no cargo until the expedition resolves: a
+`fetchItem` then holds the thing as its one `CargoLine` (it is a real `Item`, carried aboard by hand
+and delivered to the bay like a crate, §delivery-and-pay), and a `fetchPerson` brought alive gains a
+`passage` (`captive: true`, `roundTrip: false`, `leg: "back"`) so the passenger machinery houses,
+feeds and walks them: they board from where they stood, sleep in a spare bunk, never work, and are a
 natural speaker on the way home. A target brought dead is a `body` item in the hold; the crew
 notice it (a `sawTheBody` thought for whoever carries it).
 
@@ -291,7 +296,7 @@ moralise: the captain chooses, the people in it react.
 
 Failure: a target who reaches the `exit` while nobody holds it, or who dies when `wants:
 "alive"`, or a party that withdraws, fails the errand (`status: "failed"`, no pay); the narrator
-is told and the arc closes on a card like any other (D54, D103 `shape: "snatch job gone wrong"`).
+is told and the arc closes on a card like any other (D54, §past-arcs `shape: "snatch job gone wrong"`).
 
 ## 7. Bodies, arms and the damage path
 
@@ -333,7 +338,7 @@ with `causeIds` naming the shooter and the expedition.
 
 Weapons are items (`ItemDef.weapon: { kind: "blaster" | "baton"; range; aimSeconds; hit;
 damage; stun?: true }`, tag `weapon`); fists are the absence of one. Mk2 gets an **arms locker**
-in the officers' passage (`machine.arms_locker`, a lockable zone like the bunk lockers of D74)
+in the officers' passage (`machine.arms_locker`, a lockable zone like the bunk lockers of §lockers)
 holding three blasters with a stun setting and two batons. Scarcity is the design: with three
 blasters for nine people, "only those with blasters go in" is a real squad rule and a plan that
 sends six people in sends three of them unarmed. A new skill, `fighting`, joins `SKILLS` (a code
@@ -362,9 +367,9 @@ movement system untouched. Everything it does is one of SD §18.1's list, no mor
 Lines of sight are a tile walk on the grafted grid: `wall` blocks; `cover` blocks when the target
 is adjacent behind it; people never block. Hit chance = weapon base × a `fighting` curve × range
 falloff × cover penalty × posture (a mover is harder to hit; someone firing from cover is
-hardest), clamped to [0.05, 0.95] like the piloting check (D78). A miss ends on the first wall
-tile along the line (no equipment damage in A1). A hit picks a part from a weighted table (torso
-45, legs 25, arms 20, head 10), limbs only on `stun`. A blaster hit is `serious` by default,
+hardest), clamped to [0.05, 0.95] like the piloting check (§hazard-roll). A miss ends on the first
+wall tile along the line (no equipment damage in A1). A hit picks a part from a weighted table
+(torso 45, legs 25, arms 20, head 10), limbs only on `stun`. A blaster hit is `serious` by default,
 `grave` on the head or a torso crit, `graze` at long range; a baton is `blunt`, `graze` or
 `serious`, never bleeding.
 
@@ -376,9 +381,9 @@ than friends, the target gone (for guards) or taken; up for an ally landing a hi
 cover, the leader within three tiles. Thresholds with hysteresis: `steady` → `wavering` →
 `breaking`; a breaking person `retreats` if an exit is reachable, else `surrenders` (drops the
 weapon, kneels, out of the fight) — unarmed people surrender at once. A `turned` ally fights for
-the party. The crew have resolve too: from `fighting`, mood (D79) and affinity to the leader
-(D85): an unarmed cook sent in on `assault` wavers at the first shot, which is why the squad rule
-matters, and why a captain the crew are at odds with leads a worse fight.
+the party. The crew have resolve too: from `fighting`, mood (§mood-and-work-speed) and affinity to
+the leader (§affinity): an unarmed cook sent in on `assault` wavers at the first shot, which is why
+the squad rule matters, and why a captain the crew are at odds with leads a worse fight.
 
 The owner's "convince some of them to run and take just the guy you want" is this system doing
 its job: two `paid` guards `breaking` after the first exchange, and `parley(safePassage, "the
@@ -433,7 +438,7 @@ only with `bait` and `creep`, and the menu shows at most eight with handles the 
 `assault`, both `lethal`, `armedOnly`, with `targetMustLive` from the errand.
 
 Who writes plans was the sketch's weakest point. The model in production is luna at `low`
-(D96, D102) and D45's history is the model getting ids wrong; a plan composed from parts would be
+(§models-and-reasoning-effort, D102) and the grammar-size history is the model getting ids wrong; a plan composed from parts would be
 infeasible often enough that a dropped side leaves a one-option card. So the sim writes the
 plans, the narrator picks two by id and voices them, and the kernel falls back to the default
 pair. Range comes from the size of the menu and the framing, not from free composition.
@@ -442,21 +447,21 @@ pair. Range comes from the size of the menu and the framing, not from free compo
 
 The captain leads by default **(owner)**: it is a captain's job, and the cards at the site need a
 perspective actor there (D8). The squad rule picks who else goes from the crew who are fit and
-aboard, in rank order, never the helm stander or the gangway watch (D77: the ship keeps her
-watch). The party musters at the arms locker (blasters by `fighting`, then batons), walks down the
-personnel ramp and stands at its foot: that is `approach`, and nothing has been decided yet. If
-the leader falls, the senior fit party member (the first officer when present, else highest
-`fighting`) leads, and D8 moves the card's perspective with command.
+aboard, in rank order, never the helm stander or the gangway watch (§gangway-watch-and-rounds: the
+ship keeps her watch). The party musters at the arms locker (blasters by `fighting`, then batons),
+walks down the personnel ramp and stands at its foot: that is `approach`, and nothing has been
+decided yet. If the leader falls, the senior fit party member (the first officer when present, else
+highest `fighting`) leads, and D8 moves the card's perspective with command.
 
 ### 8.6 Legibility and ending
 
 Everything surfaces through what exists: the action label on each dot ("in cover", "firing",
 "wavering", "running", "down", "dragging Priya"); a brief tracer line per shot and a flash on a
-hit (the field's impact flash, D95); the alert banner; one word a side in the shore header ("Us:
-steady · Them: breaking"); ship's-log lines only at the moments that matter (first shot, first
-down, someone breaks, surrender, the target taken or gone); and `host.slowDownOnEvents` gaining
-`expeditionContact` so fast play drops to 1× when the shooting starts (D76). No numbers anywhere
-player-facing (GDD §22).
+hit (the field's impact flash, §asteroid-field-scars-and-alert); the alert banner; one word a side
+in the shore header ("Us: steady · Them: breaking"); ship's-log lines only at the moments that
+matter (first shot, first down, someone breaks, surrender, the target taken or gone); and
+`host.slowDownOnEvents` gaining `expeditionContact` so fast play drops to 1× when the shooting
+starts (§auto-slowdown). No numbers anywhere player-facing (GDD §22).
 
 The fight resolves when one side is all down, fled or surrendered, when the objective is held
 (the target in hand or carried, the item picked up, and the party back at the ramp foot), or when
@@ -478,16 +483,17 @@ target's stance when the target is addressed, and the leader's `fighting` for `t
 `p = clamp(base + terms, 0.05, 0.95)`. Answers are per person: `walks` (leaves by the exit),
 `turns` (fights for you; allies and `paid` guards only), `holds`, `attacks` (the fight starts,
 and that person fires first). `money` costs the ship a banded sum from its balance when accepted
-(the only place an errand spends; never on a card, D24) and is unavailable when the balance
-cannot cover it (the capability block says so). The narrator loads the dice; the sim throws them.
+(the only place an errand spends; never on a card, §cards-never-mention-pay) and is unavailable when
+the balance cannot cover it (the capability block says so). The narrator loads the dice; the sim
+throws them.
 
 ### 9.2 What the staging call writes
 
-`stageSite` is a staging-class call (D66's rules: guaranteed, story-free, its own schema and
-translator, failure falls back to the default cast, the hook window admits only it). It is raised
-when the ship reaches the transit lead point before the site, exactly where `stageDock` is
-raised for a port, so the narrator knows the leg's events when it casts the site. It writes a
-`SitePlan`:
+`stageSite` is a staging-class call (the rules of §staging-call-on-the-server: guaranteed,
+story-free, its own schema and translator, failure falls back to the default cast, the hook window
+admits only it). It is raised when the ship reaches the transit lead point before the site, exactly
+where `stageDock` is raised for a port, so the narrator knows the leg's events when it casts the
+site. It writes a `SitePlan`:
 
 ```
 SitePlan {
@@ -500,8 +506,8 @@ SitePlan {
 
 ### 9.3 Scripted turns, under a guard
 
-Owner-aligned: a capped form of scripted turns is in the first narrator phase, the way D92's
-scripted impacts gave the narrator real control of the field.
+Owner-aligned: a capped form of scripted turns is in the first narrator phase, the way the scripted
+impacts of §scheduling-a-field gave the narrator real control of the field.
 
 ```
 ScriptedTurn {
@@ -515,23 +521,24 @@ ScriptedTurn {
 party; `arrive` spawns up to two more cast at an `exit` post (armed as the turn's cast entry
 says, counted against the three-armed cap); `comeToTheRamp` walks a cast member to the ramp foot,
 which is how "a cast member approaches the ship on landing" happens, and makes them the speaker
-of the arrival card in person (D70's delivery, unchanged). The kernel guard, the sibling of the
-field's hull guard (D92): **a turn may change who is on the floor and which way they face; it may
-never wound, kill, move or remove the target, and never leave more armed people on the site than
-`SITE_LIMITS.armed`.** A turn that would is dropped with a reason the narrator reads next call.
+of the arrival card in person (§delivery, unchanged). The kernel guard, the sibling of the
+field's hull guard (§scheduling-a-field): **a turn may change who is on the floor and which way they
+face; it may never wound, kill, move or remove the target, and never leave more armed people on the
+site than `SITE_LIMITS.armed`.** A turn that would is dropped with a reason the narrator reads next
+call.
 
 ### 9.4 The approach effect, before landing
 
-The narrator asked for its departure call (D99) sets the leg's beat; on this leg that beat is
-usually a card about the job ahead, and its sides may carry `approach: "sendWordAhead" |
-"comeInQuiet" | "showForce"`, stored on the expedition and applied to the cast at landing:
+The narrator asked for its departure call (§requested-call-back) sets the leg's beat; on this leg
+that beat is usually a card about the job ahead, and its sides may carry `approach: "sendWordAhead"
+| "comeInQuiet" | "showForce"`, stored on the expedition and applied to the cast at landing:
 `sendWordAhead` moves the target's stance one step toward `bargaining` and sets every guard
 `steady` or better (they know you are coming); `comeInQuiet` halves `noticeRadius` for `creep`
 and leaves dispositions alone; `showForce` moves `paid` guards one step toward `shaky` and
 `devoted` ones toward `hard`. The captain chooses with the first officer's or the deckhand's
 word on the card ("Send word we're coming." / "Go in quiet."), and the approach card at the site
-shows the result in the cast's bearing. It is a card side effect like `privateTalk` (D86): a
-player-authority command, never the narrator's alone.
+shows the result in the cast's bearing. It is a card side effect like `privateTalk`
+(§private-talk-effect): a player-authority command, never the narrator's alone.
 
 ### 9.5 What stays the narrator's
 
@@ -554,21 +561,21 @@ after landing except through the player's card sides.
 | `stageSite` | staging | transit lead point before the site | the `SitePlan` |
 | `expeditionArrived` | story, guaranteed | the party stands at the ramp foot, the cast in sight | one card: two of `adoptPlan`, `parley`, `wait`, `withdraw` |
 | `expeditionTurn` | story, at most once a fight | first side to `breaking`, a `lull` turn, or `withdrawWhen` met; the sim holds fire | one card: two of `pressOn`, `acceptSurrender`, `letThemRun`, `adoptPlan`, `parley`, `withdraw` |
-| `notableEvent` (`expeditionResolved`) | aftermath (D100 list) | the fight over, the party aboard | the people in it, or nothing |
+| `notableEvent` (`expeditionResolved`) | aftermath (§notable-event-hook list) | the fight over, the party aboard | the people in it, or nothing |
 | `notableEvent` (`contractCompleted` / job `failed`) | story | delivery at `returnTo` | the closing card (D54) |
 
-Four calls more than a freight job (one of them staging), inside D102's regime and D99's
-cadence. `expeditionArrived` and `expeditionTurn` are spacing-exempt like `requestedCall` (D99):
-each is raised once and the sim is waiting on it. If `expeditionArrived` fails after D43's
-retries, the default pair goes up as a template card (the only non-staging exception to D43 in
-this design, because the party is standing in the open and the alternative is a frozen fight);
-`expeditionTurn` failing lets the fight run on.
+Four calls more than a freight job (one of them staging), inside D102's regime and the cadence of
+§requested-call-back. `expeditionArrived` and `expeditionTurn` are spacing-exempt like
+`requestedCall`: each is raised once and the sim is waiting on it. If `expeditionArrived` fails
+after D43's retries, the default pair goes up as a template card (the only non-staging exception to
+D43 in this design, because the party is standing in the open and the alternative is a frozen
+fight); `expeditionTurn` failing lets the fight run on.
 
 ### 10.2 Contract changes
 
 `packages/narrator/src/contract.ts`: `offerJob` gains `errandKind`, `site`, `targetName`,
-`targetItem`, `wants`, `returnTo` (empty strings for freight and passages, D45; the translator
-checks the site is authored, the item exists, and `wants` is empty for a thing).
+`targetItem`, `wants`, `returnTo` (empty strings for freight and passages, §narrator-authority; the
+translator checks the site is authored, the item exists, and `wants` is empty for a thing).
 `decisionSide.effect` gains `adoptPlan` (`planId`), `parley` (`offer`, `to`), `wait`,
 `withdraw`, `pressOn`, `acceptSurrender`, `letThemRun`, `approach` (`how`). `AUTHORITY.player`
 gains the matching commands (`adoptPlan`, `parley`, `withdrawParty`, `acceptSurrender`,
@@ -579,9 +586,9 @@ one line, its posts that matter, its default cast's shape) and, while an expedit
 site": the map in words (approaches, cover, exits), each cast member with role, arms, where they
 stand and their *visible* bearing (a word from `state`, never the number), the target's stance
 as the crew can see it, the party and their arms and fitness, and the plan menu with `available`
-and `why`. Threads need nothing: the episode is a job-shaped thread (D32), `arcNotes` and
-`endedArcs` carry it (D103), and a cast member who survives is a cast entry with the site's
-near port as `portId`.
+and `why`. Threads need nothing: the episode is a job-shaped thread (§threads-and-scales),
+`arcNotes` and `endedArcs` carry it (§past-arcs), and a cast member who survives is a cast entry
+with the site's near port as `portId`.
 
 ### 10.3 Prompt
 
@@ -598,7 +605,7 @@ follow the table above.
 
 Thoughts (`THOUGHT_KEYS`, with content rows): `killedSomeone` (long, heavy), `sawCrewHurt`,
 `heldTheLine`, `ranFromAFight`, `wounded` (while any wound is open, stacking by `refId`),
-`broughtOneBackAlive`, `sawTheBody`. Memories (D88's `social.memories`): `foughtBeside`,
+`broughtOneBackAlive`, `sawTheBody`. Memories (`social.memories`, §memories): `foughtBeside`,
 `carriedMeOut`, `leftMeBehind`, with the affinity moves config gives them. Lasting wounds persist
 across voyages and slow work and the helm (SD §12.8), which is the first thing the crew will
 notice about a bad fight. Cast: every surviving cast member stays in the narrator's cast with

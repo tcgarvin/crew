@@ -1,4 +1,7 @@
-/** D93 (calls 16, 25): hull scars drawn per tile, patched ones dimmer; and found by tile for a tap. */
+/**
+ * §hull-scars-and-ship-loss (calls 16, 25): hull scars drawn per tile, patched ones dimmer; and
+ * found by tile for a tap.
+ */
 import type { RenderScar, ScarId } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { drawScars, scarAt } from "./scars";

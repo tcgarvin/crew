@@ -89,7 +89,7 @@ const REMOTE_SAVE_EVERY_MS = 60_000;
 /** How long startup waits for the server before loading the local save on its own. */
 const SERVER_OPEN_GRACE_MS = 3_000;
 
-/** D72: the portrait chrome heights, which the stylesheet reads from these properties. */
+/** The portrait chrome heights, which the stylesheet reads from these properties. */
 const APP_STYLE = portraitCssVars() as CSSProperties;
 
 let requestCounter = 0;
@@ -148,30 +148,38 @@ export function App() {
   const connectionRef = useRef<SimConnection | undefined>(undefined);
   const playbackRef = useRef(new FramePlayback(tickRate));
   const pendingRequests = useRef(new Map<string, (message: FromWorker) => void>());
-  /** D42: player commands in flight, by request id, so a rejection can be shown as a toast. */
+  /**
+   * §decision-queue-and-halts: player commands in flight, by request id, so a rejection can be
+   * shown as a toast.
+   */
   const playerCommands = useRef(new Map<string, Command["kind"]>());
   const lastSaveTickRef = useRef(0);
   const serverRef = useRef<ServerSaves | undefined>(undefined);
   const recentEventsRef = useRef<SimEvent[]>([]);
   const staleRef = useRef(false);
   const pausedRef = useRef(false);
-  /** The playback speed, for the playback loop's auto-slowdown check (D76). */
+  /** The playback speed, for the playback loop's auto-slowdown check (§auto-slowdown). */
   const speedRef = useRef(1);
-  /** D76: events on `host.slowDownOnEvents`, queued by tick until playback reaches them. */
+  /**
+   * §auto-slowdown: events on `host.slowDownOnEvents`, queued by tick until playback reaches them.
+   */
   const slowdownRef = useRef(
     new SlowdownQueue(config.values.host.slowDownOnEvents, SLOWDOWN_COOLDOWN_SECONDS * tickRate),
   );
-  /** D82: dirt frames from the worker, queued by tick until playback reaches them (D14). */
+  /** §room-tiers: dirt frames from the worker, queued by tick until playback reaches them (D14). */
   const dirtQueueRef = useRef(new DirtQueue());
   const sections = useMemo(() => clockSections(bundle, scenarioId), [bundle, scenarioId]);
 
   const [frame, setFrame] = useState<RenderFrame>();
-  /** D82: the newest dirt frame playback has reached, for the grime tint. */
+  /** §dirt-grid: the newest dirt frame playback has reached, for the grime tint. */
   const [dirt, setDirt] = useState<DirtFrame>();
   const [speed, setSpeedState] = useState(1);
   const [paused, setPausedState] = useState(false);
   const [runAhead, setRunAhead] = useState({ simTick: 0, viewTick: 0, buffered: 0 });
-  /** D55: everything received, stamped by tick; shown only as far as playback has reached. */
+  /**
+   * §the-log-in-playback-order: everything received, stamped by tick; shown only as far as playback
+   * has reached.
+   */
   const [log, setLog] = useState<LogEntry[]>([]);
   const [selection, setSelection] = useState<Selection>();
   const [inspectorData, setInspectorData] = useState<InspectorData>();
@@ -188,7 +196,10 @@ export function App() {
   const health = useApiHealth();
   const [toast, showToast] = useToast();
   const [stale, setStale] = useState(false);
-  /** D26: the card just answered, kept up with its aftermath caption until the timer closes it. */
+  /**
+   * §aftermath-caption: the card just answered, kept up with its aftermath caption until the timer
+   * closes it.
+   */
   const [closingCard, setClosingCard] = useState<{
     readonly card: DecisionCardText;
     readonly side: "left" | "right";
@@ -247,7 +258,7 @@ export function App() {
     connectionRef.current = connection;
     const playback = playbackRef.current;
     let disposed = false;
-    /** D76 addendum: clears a slowdown's highlighted lines a few seconds after it. */
+    /** §auto-slowdown: clears a slowdown's highlighted lines a few seconds after it. */
     let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     /** Ask the worker for a save envelope (the current, possibly run-ahead, state). */
@@ -309,9 +320,10 @@ export function App() {
     /**
      * D5/D43: call the narrator for a hook and apply its answer. On failure the hook stays
      * unacknowledged (the sim stays halted) while the client retries with backoff; when the
-     * scheduler gives up, the game pauses on the error panel, whose Retry calls this again.
-     * Only the spacing rule acknowledges a hook without an answer, and (D67) a staging call the
-     * scheduler gave up on, which leaves the dock to the sim's floor set instead of pausing.
+     * scheduler gives up, the game pauses on the error panel, whose Retry calls this again. Only
+     * the spacing rule acknowledges a hook without an answer, and
+     * (§staging-retries-and-the-floor-set) a staging call the scheduler gave up on, which leaves
+     * the dock to the sim's floor set instead of pausing.
      */
     async function answerHook(hook: NarratorHook, tick: Tick): Promise<void> {
       const staging = hook.kind === "stageDock";
@@ -323,10 +335,11 @@ export function App() {
         const outcome = await attemptNarrator(hook);
         if (disposed) return;
         if (outcome.ok) {
-          // D67: the staging call is not story; the next story call still needs these events.
+          // §staging-retries-and-the-floor-set: the staging call is not story; the next story call
+          // still needs these events.
           if (!staging) recentEventsRef.current.length = 0;
-          // D37: a `policyDecision` hook halts before its decision does, so this prose is in
-          // the map before `decisionPending` arrives and the modal opens dressed.
+          // §policy-decision-hook: a `policyDecision` hook halts before its decision does, so this
+          // prose is in the map before `decisionPending` arrives and the modal opens dressed.
           const card = outcome.reply.card;
           if (card !== undefined) setProse((prev) => ({ ...prev, [card.decisionId]: card }));
           for (const command of hookAnswer(hook, tick, outcome.reply)) send(command);
@@ -403,8 +416,9 @@ export function App() {
           void answerHook(message.hook, message.tick);
           return;
         case "shipLost":
-          // D93: the world never steps again; keep the lost run, so a reload shows the end screen
-          // (the frame's `hull.lost` brings it up once playback reaches the loss).
+          // §hull-scars-and-ship-loss: the world never steps again; keep the lost run, so a reload
+          // shows the end screen (the frame's `hull.lost` brings it up once playback reaches the
+          // loss).
           save("milestone");
           return;
         case "decisionPending":
@@ -418,7 +432,7 @@ export function App() {
           playerCommands.current.delete(message.requestId);
           if (message.result.status === "rejected") {
             console.warn("[sim worker] command rejected", message.result.rejection);
-            // D42: a player's own command failing is shown, not just logged.
+            // §decision-queue-and-halts: a player's own command failing is shown, not just logged.
             if (kind !== undefined) showToast(rejectionMessage(kind, message.result.rejection));
           }
           return;
@@ -436,10 +450,10 @@ export function App() {
     });
 
     /**
-     * D76: playback reached events on `host.slowDownOnEvents` while fast-forwarding. Drop to 1×
-     * at once; then name each event with `describeEvent` against the view-time snapshot (the main
-     * thread holds no state), which is the text the ticker gave it, so its log line can be found
-     * and highlighted, and the first one says why in a toast.
+     * §auto-slowdown: playback reached events on `host.slowDownOnEvents` while fast-forwarding.
+     * Drop to 1× at once; then name each event with `describeEvent` against the view-time snapshot
+     * (the main thread holds no state), which is the text the ticker gave it, so its log line can
+     * be found and highlighted, and the first one says why in a toast.
      */
     function slowDown(due: readonly SlowdownMark[]): void {
       onSetSpeed(1);
@@ -663,8 +677,8 @@ export function App() {
         kind: "resolveDecision",
         payload: { decisionId: decision.id, side },
       });
-      // D26: keep the answered card up for a moment with a line on what happens next. The sim
-      // resumes behind it straight away; only the card lingers.
+      // §aftermath-caption: keep the answered card up for a moment with a line on what happens
+      // next. The sim resumes behind it straight away; only the card lingers.
       const narrated = prose[decision.id];
       const caption = aftermathCaption(decision, side, narrated, bundle);
       setClosingCard({ card: narrated ?? templateCard(decision, bundle), side, caption });
@@ -685,7 +699,8 @@ export function App() {
   const viewTick = frame?.tick ?? 0;
   // D14: the worker may be ahead of the viewer; show hook/decision UI once playback reaches it.
   const thinking = pendingHook !== undefined && viewTick >= pendingHook.tick;
-  // D70: a card held for delivery in person is due when it was delivered, not when it was made.
+  // §delivered-tick: a card held for delivery in person is due when it was delivered, not when it
+  // was made.
   const decisionDue = decision !== undefined && viewTick >= decisionShownTick(decision);
   const card = useMemo(() => {
     if (decision === undefined) return undefined;
@@ -693,14 +708,14 @@ export function App() {
   }, [decision, prose, bundle]);
 
   const money = frame?.money ?? 0;
-  // D93: before the first frame the hull is whole, as a new game's is.
+  // §hull-scars-and-ship-loss: before the first frame the hull is whole, as a new game's is.
   const hull = frame?.hull ?? { integrity: deck.hull.max, max: deck.hull.max };
   const clock = shipClock(viewTick, config.values, sections);
   const travelState = frame?.travel.state ?? "docked";
   const showCard = card !== undefined && decisionDue && !decisionHidden && !thinking;
   const runAheadSeconds = runAhead.buffered / tickRate;
 
-  // D55: the log follows playback, not the worker.
+  // §the-log-in-playback-order: the log follows playback, not the worker.
   const visible = useMemo(() => visibleLog(log, viewTick), [log, viewTick]);
   const logCardText = useCallback(
     (entry: CardEntry) => prose[entry.decision.id] ?? templateCard(entry.decision, bundle),
@@ -780,8 +795,8 @@ export function App() {
       {decisionDue && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
       <Toast message={toast} />
       {frame?.hull.lost === true && (
-        // D93: the hull gave way; nothing goes on but a new game. A save that loads already lost
-        // shows this from its first frame.
+        // §hull-scars-and-ship-loss: the hull gave way; nothing goes on but a new game. A save that
+        // loads already lost shows this from its first frame.
         <ShipLost
           lastDay={lastDay(frame.travel, clock.day, visible, frame.tick, bundle.ports)}
           onNewGame={onNewGame}

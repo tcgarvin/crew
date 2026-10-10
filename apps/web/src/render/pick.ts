@@ -1,9 +1,9 @@
 /**
- * Tap-to-select (D68): what a tap at a deck-frame point selects in the picture as drawn. People
- * first, crew and the dock's locals alike, the nearest within reach; then the ship's items, the
- * staging call's props, machines, a hull scar (D93), bare deck floor (its room, D82), and last a
- * dock post or bare dock floor. A person standing at a post is what a tap there means, so the post never takes the
- * tap from them.
+ * Tap-to-select (§what-a-tap-selects): what a tap at a deck-frame point selects in the picture as
+ * drawn. People first, crew and the dock's locals alike, the nearest within reach; then the ship's
+ * items, the staging call's props, machines, a hull scar (§hull-scars-and-ship-loss), bare deck
+ * floor (its room, §room-tiers), and last a dock post or bare dock floor. A person standing at a
+ * post is what a tap there means, so the post never takes the tap from them.
  */
 import type { DockDef, RenderFrame } from "@crew/sim";
 import type { DeckLayout } from "./deckLayout";
@@ -74,7 +74,7 @@ function machineAt(
   return undefined;
 }
 
-/** D82: the room whose floor tile (x, y) is on, or `undefined` off the ship or on void. */
+/** §room-tiers: the room whose floor tile (x, y) is on, or `undefined` off the ship or on void. */
 export function roomAt(
   layout: Pick<DeckLayout, "width" | "height" | "tiles">,
   x: number,

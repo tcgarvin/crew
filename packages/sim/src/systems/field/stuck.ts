@@ -1,11 +1,11 @@
 /**
- * D92: stuck is a clock, not a cliff (slice 5 call 9). With the engines out the ship makes no
- * way, stays in the rocks at `field.stuckRateFactor` of the rate, and after
+ * §stuck-in-the-rocks: stuck is a clock, not a cliff (slice 5 call 9). With the engines out the
+ * ship makes no way, stays in the rocks at `field.stuckRateFactor` of the rate, and after
  * `field.stuckDriftImpacts` impacts taken while stuck it drifts clear and the field ends. Engines
  * back, it is under way again and leaves by progress.
  *
  * The field reads travel and never writes it: travel already halts progress when propulsion is
- * lost (`drifting`), unless the ship limps on (D80), so "stuck" is "drifting and not limping"
+ * lost (`drifting`), unless the ship limps on (§limping), so "stuck" is "drifting and not limping"
  * in transit. A ship with its engines switched off by choice is as stuck as one with them shot
  * away, which is the design: stopping is never the safe play.
  *

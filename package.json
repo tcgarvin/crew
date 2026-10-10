@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:watch": "vitest",
-    "lint": "biome check .",
+    "lint": "biome check . && node scripts/check-refs.mjs",
     "format": "biome format --write .",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages apps"
   },

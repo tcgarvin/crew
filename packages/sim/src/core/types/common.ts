@@ -26,9 +26,9 @@ export type Tick = number;
 export type Seconds = number;
 
 /**
- * D76: a duration authored in (fractional) ship's days, `config.time.daySeconds` long. Only in
- * config; converted where read by `core/clock.ts` (`daysToSeconds`, `dayTicks`), never at load,
- * because the config is embedded in every save as authored.
+ * §the-ships-day: a duration authored in (fractional) ship's days, `config.time.daySeconds` long.
+ * Only in config; converted where read by `core/clock.ts` (`daysToSeconds`, `dayTicks`), never at
+ * load, because the config is embedded in every save as authored.
  */
 export type Days = number;
 

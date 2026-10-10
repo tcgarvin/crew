@@ -36,14 +36,14 @@ export interface SaveRow {
   readonly seq: number;
 }
 
-/** D97: `pending` is a notes turn still running after its plan was answered. */
+/** §notes-turn: `pending` is a notes turn still running after its plan was answered. */
 export type NarratorCallStatus = "ok" | "error" | "budgetExceeded" | "pending";
 
 /**
- * D67: the kinds of narrator call. A staging call is exactly a `stageDock` hook, so the kind is
- * read from `hook_kind` rather than stored twice: no column, no migration. D97: a notes turn is
- * logged as its own row with hook kind `notes`; it is not a story call, so it does not space
- * the next story call.
+ * The kinds of narrator call (§staging-call-on-the-server). A staging call is exactly a `stageDock`
+ * hook, so the kind is read from `hook_kind` rather than stored twice: no column, no migration. A
+ * notes turn (§notes-turn) is logged as its own row with hook kind `notes`; it is not a story call,
+ * so it does not space the next story call.
  */
 export type NarratorCallKind = "story" | "staging" | "notes";
 export const STAGING_HOOK_KIND = "stageDock";
@@ -98,7 +98,7 @@ export interface LogNarratorCallInput {
   readonly error: string | null;
 }
 
-/** D97: what a finished notes turn writes over its `pending` row. */
+/** §notes-turn: what a finished notes turn writes over its `pending` row. */
 export interface FinishNarratorCallInput {
   readonly model: string;
   readonly inputTokens: number | null;
@@ -114,7 +114,7 @@ export interface NarratorCallFilter {
   readonly gameId?: string;
   readonly hookKind?: string;
   readonly status?: NarratorCallStatus;
-  /** D67: story calls only, or staging calls only. */
+  /** §staging-call-on-the-server: story calls only, or staging calls only. */
   readonly kind?: NarratorCallKind;
   /** Upper bound on rows returned; newest first. */
   readonly limit: number;
@@ -150,7 +150,7 @@ export interface Db {
   updateNotes(gameId: string, narrativeNotes: unknown): Promise<void>;
 
   logNarratorCall(input: LogNarratorCallInput): Promise<NarratorCallRow>;
-  /** D97: completes a `pending` notes-turn row; throws if there is no such row. */
+  /** §notes-turn: completes a `pending` notes-turn row; throws if there is no such row. */
   finishNarratorCall(id: string, input: FinishNarratorCallInput): Promise<void>;
   /** Most recent narrator call for a game, if any, for the min-ticks-between-calls check. */
   getLastNarratorCall(gameId: string): Promise<NarratorCallRow | undefined>;

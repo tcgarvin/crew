@@ -67,10 +67,11 @@ describe("nextRetryAction (D43)", () => {
   });
 });
 
-describe("stagingRetryAction (D67, D69)", () => {
+describe("stagingRetryAction (§staging-retries-and-the-floor-set)", () => {
   it("retries a staging call twice, quickly, then falls back to the floor set, never the panel", () => {
-    // D69: the sim is halted on the call, so D43's minute-long schedule froze the ship in
-    // transit (27 s in the playthrough with fast failures); staging is dressing, not story.
+    // §staging-retries-and-the-floor-set: the sim is halted on the call, so D43's minute-long
+    // schedule froze the ship in transit (27 s in the playthrough with fast failures); staging is
+    // dressing, not story.
     const actions: RetryAction[] = [];
     let state = INITIAL_RETRY_STATE;
     for (let i = 0; i < 100; i += 1) {

@@ -1,12 +1,12 @@
 /**
- * The planner's galley rules (D81): the eat candidate, the mess call, and who may take the
+ * The planner's galley rules (§mess-call): the eat candidate, the mess call, and who may take the
  * galley's tasks. Pure over the `AgentView`.
  *
  * - The mess call (`mealCallFor`): a served meal the actor knows of (not the helm-stander's plate,
  *   which lies within reach of a helm seat) and hunger above `galley.mealCallHungerAbove` make a
  *   routine eat candidate for anyone not on watch: a dayworker, the section off watch, and the
  *   section that stands the next watch, before its bell. The section on watch waits for the bell
- *   and eats as the off-going; its gangway stander comes (the hold ends for the call, D81) and the
+ *   and eats as the off-going; its gangway stander comes (the hold ends for the call) and the
  *   gangway candidate waits until they have eaten (`helm.ts`). Same-class commitment does the
  *   rest: nobody is pulled off a crate, a plot or a sleep for dinner; they eat when it is done.
  * - `eatCandidate`: need-driven eating as before (past `needs.seekThreshold`, by need urgency),
@@ -16,8 +16,8 @@
  * - `galleyTaskAllowed`: `cookMeal` is the cook's, and anyone's with cooking ≥ 1 once the problem
  *   is `galley.substituteAfterDays` old; `carryMeal` is the cook's or a dayworker's, anyone's after
  *   `urgency.routineAgingDays`, and never the stander's own. `galleyTaskExempt`: the cook on
- *   `cookMeal` skips the off-duty rule and `deferTo` (the helm's pattern, D77): she cooks the
- *   third watch's meal off duty, sleeping in between.
+ *   `cookMeal` skips the off-duty rule and `deferTo` (the helm's pattern, §who-has-the-helm): she
+ *   cooks the third watch's meal off duty, sleeping in between.
  *
  * Owner: W1 of ship life slice 3.
  */
@@ -46,7 +46,10 @@ function galleyKnobs(config: PlannerConfig): ConfigDef["galley"] {
   return config.galley;
 }
 
-/** A `Days` duration in ticks, inline because the planner may not import `core/clock` (D76). */
+/**
+ * A `Days` duration in ticks, inline because the planner may not import `core/clock`
+ * (§the-ships-day).
+ */
 function dayTicksOf(config: PlannerConfig, days: number): number {
   return Math.ceil(days * config.time.daySeconds * config.time.tickRate);
 }
@@ -206,8 +209,8 @@ function treatCandidate(view: AgentView, config: PlannerConfig): Candidate | und
 
 /**
  * W4a decision: people carry their food to the mess to eat when the ship has one (and they are
- * not already in it); otherwise they eat where they picked it up. D81: the eat plan takes a free
- * mess seat over this spot when the ship has mess tables (`systems/galley/eat.ts`).
+ * not already in it); otherwise they eat where they picked it up. §eating: the eat plan takes a
+ * free mess seat over this spot when the ship has mess tables (`systems/galley/eat.ts`).
  */
 function messTile(view: AgentView): TileCoord | undefined {
   const here = view.self.tile;

@@ -1,4 +1,7 @@
-/** D68: the inspector's words for the dock's own people and the staging call's props. */
+/**
+ * §items-places-and-locals: the inspector's words for the dock's own people and the staging call's
+ * props.
+ */
 import type {
   DockDef,
   ItemDefId,
@@ -25,7 +28,7 @@ const scenario = bundle.scenarios[scenarioId];
 const scenarioDeck = scenario === undefined ? undefined : bundle.decks[scenario.deckId];
 if (scenarioDeck === undefined) throw new Error("no scenario deck");
 const layout = buildDeckLayout(scenarioDeck, bundle);
-/** The Hub with the scenario deck in its berth box (D72). */
+/** The Hub with the scenario deck in its berth box (§ship-placement). */
 const berth = berthInView(dock, layout);
 
 function onDeck(x: number, y: number) {

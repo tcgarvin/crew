@@ -1,4 +1,4 @@
-/** `ThoughtDef` schema (D79). */
+/** `ThoughtDef` schema (§thoughts). */
 import type { ThoughtDef } from "@crew/sim";
 import { z } from "zod";
 import { positive, thoughtKeySchema } from "./primitives";

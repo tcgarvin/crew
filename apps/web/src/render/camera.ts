@@ -8,7 +8,7 @@ import type { BerthedDock } from "@crew/sim";
 import { dockRectOnDeck } from "./dock";
 import type { Bounds, HullGeometry } from "./hull";
 
-/** Margin around the hull in flight, tiles: room for scenery to show past the ship (D58). */
+/** Margin around the hull in flight, tiles: room for scenery to show past the ship (§camera). */
 export const FLIGHT_MARGIN_TILES = 1;
 /** Margin around ship plus dock when docked: the map's own edges frame it. */
 export const DOCKED_MARGIN_TILES = 0.25;

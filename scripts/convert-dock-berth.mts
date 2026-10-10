@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /**
- * One-off (ship life slice 1, D72): convert a dock map from drawn `berth` tiles and `shipAt` to
- * an M-class `berth` box. Rewrites the file in place.
+ * One-off (ship life slice 1, §orientation-and-size): convert a dock map from drawn `berth` tiles
+ * and `shipAt` to an M-class `berth` box. Rewrites the file in place.
  *
  *   npx tsx scripts/convert-dock-berth.mts packages/content/data/docks/crossroads-hub.json
  *

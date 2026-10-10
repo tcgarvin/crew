@@ -4,8 +4,9 @@ import type { ActorId, DecisionId, HookId, LocalId, PortDefId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 
 /**
- * D70: why a held card came up: the meeting, the give-up clock, the ship no longer docked where it
- * was held, or no way for anyone to meet (no gate to walk through, nobody fit to walk).
+ * §holding-a-card: why a held card came up: the meeting, the give-up clock, the ship no longer
+ * docked where it was held, or no way for anyone to meet (no gate to walk through, nobody fit to
+ * walk).
  */
 export type CardDeliveryReason = "met" | "gaveUp" | "leaving" | "noWayToMeet";
 
@@ -15,31 +16,36 @@ export interface DecisionEventPayloads {
   decisionPending: { readonly decisionId: DecisionId };
   decisionResolved: { readonly decisionId: DecisionId; readonly side: "left" | "right" };
   /**
-   * A queued decision failed revalidation on presentation; D70: or a held offer card whose job
-   * closed before it could be delivered.
+   * A queued decision failed revalidation on presentation, or (§stale-held-cards) a held offer card
+   * whose job closed before it could be delivered.
    */
   decisionDropped: { readonly decisionId: DecisionId; readonly reason: string };
   narratorHookRaised: { readonly hookId: HookId; readonly kind: NarratorHookKind };
   narratorHookResolved: { readonly hookId: HookId };
-  /** D70: a card from one of the port's people is held, to be delivered in person. */
+  /** §holding-a-card: a card from one of the port's people is held, to be delivered in person. */
   cardHeld: {
     readonly decisionId: DecisionId;
     readonly speaker: string;
     readonly portId: PortDefId;
   };
-  /** D70: a held card came up (onto the decision queue). */
+  /** §delivery: a held card came up (onto the decision queue). */
   cardDelivered: { readonly decisionId: DecisionId; readonly reason: CardDeliveryReason };
-  /** D70: the captain stepped onto the dock looking for work (the `captainAshore` tick). */
+  /**
+   * §looking-for-work: the captain stepped onto the dock looking for work (the `captainAshore`
+   * tick).
+   */
   lookingForWork: {
     readonly actorId: ActorId;
     readonly name: string;
     readonly portId: PortDefId;
   };
-  /** D70: the captain is talking with someone on the dock; their card follows. */
+  /**
+   * §meetings-and-visitors: the captain is talking with someone on the dock; their card follows.
+   */
   talkingWith: { readonly actorId: ActorId; readonly name: string; readonly withName: string };
-  /** D70: the captain went out through the gate to see someone in the port. */
+  /** §meetings-and-visitors: the captain went out through the gate to see someone in the port. */
   wentToSee: { readonly actorId: ActorId; readonly name: string; readonly withName: string };
-  /** D70: someone is walking over to the ship with word for the captain. */
+  /** §meetings-and-visitors: someone is walking over to the ship with word for the captain. */
   cameToSee: { readonly localId: LocalId; readonly name: string; readonly fromGate: boolean };
 }
 

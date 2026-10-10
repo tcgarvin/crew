@@ -1,8 +1,8 @@
 /**
  * Work-slice invariants for tests (SD §19.4 style): claims point at live tasks and at owners who
- * are actually working them; single-slot tasks have at most one claim; plans are in range. D65: a
- * hand truck is on one trip at most, pushed by that trip's actor, and nothing rides on a truck
- * nobody is pushing.
+ * are actually working them; single-slot tasks have at most one claim; plans are in range.
+ * §one-activity-several-claims: a hand truck is on one trip at most, pushed by that trip's actor,
+ * and nothing rides on a truck nobody is pushing.
  */
 import type { Actor } from "../../core/types/actor";
 import type { ClaimId, ItemId } from "../../core/types/ids";

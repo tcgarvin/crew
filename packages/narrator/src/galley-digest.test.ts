@@ -1,8 +1,8 @@
 /**
- * D81-D83 in the digest: the galley line, the dirt line and their problem lines. The world comes
- * from the in-code fixtures (the default scenario's Mk2 and its stores); the counter, the cook's
- * task, the room tiers and the problems are written by hand, so these hold whatever the galley
- * and dirt systems do.
+ * §ship-life-lines: the galley line, the dirt line and their problem lines in the digest. The world
+ * comes from the in-code fixtures (the default scenario's Mk2 and its stores); the counter, the
+ * cook's task, the room tiers and the problems are written by hand, so these hold whatever the
+ * galley and dirt systems do.
  */
 import {
   type ActorId,
@@ -128,7 +128,7 @@ function openProblemWithTask(
   return problemId;
 }
 
-describe("the galley line (D81, D83)", () => {
+describe("the galley line (§galley-provisions, §ship-life-lines)", () => {
   it("says the counter is empty, when the next meal is due and the provisions in crates and days", () => {
     const snap = snapshot();
     const state = snap.state;
@@ -202,7 +202,7 @@ describe("the galley line (D81, D83)", () => {
   });
 });
 
-describe("the dirt line (D82, D83)", () => {
+describe("the dirt line (§room-tiers, §ship-life-lines)", () => {
   it("is absent while every room is below dirty", () => {
     const snap = snapshot();
     snap.state.dirt.tiers = { galley: "untidy", mess: "clean" } as Record<LocalKey, DirtTier>;
@@ -223,7 +223,7 @@ describe("the dirt line (D82, D83)", () => {
   });
 });
 
-describe("galley and dirt problem lines (D80-D83)", () => {
+describe("galley and dirt problem lines (§reserve-low-problem, §galley-provisions, §room-tiers)", () => {
   it("words a provisions reserveLow as the galley running low, in days, with why it is open", () => {
     const snap = snapshot();
     const state = snap.state;

@@ -112,7 +112,8 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
-    // D61: the sim names the dock alongside from the start of docking to the end of undocking.
+    // §dock-alongside: the sim names the dock alongside from the start of docking to the end of
+    // undocking.
     ...(ALONGSIDE.has(t.state) ? { dock: { dockId: dock.id, deckId: layout.deckId } } : {}),
   };
 }
@@ -241,7 +242,7 @@ describe("dock layers on their own", () => {
     }
   });
 
-  it("draws the ore conveyor with nothing that reads as a person's dot (D69)", () => {
+  it("draws the ore conveyor with nothing that reads as a person's dot", () => {
     // Round gold lumps on Kessler's belt read as crew dots at phone scale: the ore is drawn as
     // angular chunks (no arcs), in colours well away from crew gold.
     const kessler = allDocks.find((d) => d.props.some((p) => p.kind === "conveyor"));
@@ -311,7 +312,7 @@ describe("dock layers on their own", () => {
 });
 
 describe("dockShape", () => {
-  it("finds the berth as the map's berth box in every map (D72)", () => {
+  it("finds the berth as the map's berth box in every map (§berth-boxes)", () => {
     for (const dock of allDocks) {
       const { berth } = dockShape(dock);
       const { origin, sizeClass } = dock.berth;
@@ -372,7 +373,7 @@ describe("dockShape", () => {
     };
   }
 
-  it("reads the berth box as a pad when ground surrounds it, open otherwise (D72)", () => {
+  it("reads the berth box as a pad when ground surrounds it, open otherwise (§berth-boxes)", () => {
     // The quay along the south edge is always floor: only the other three sides decide.
     expect(dockShape(ringedDock(".")).berthStyle).toBe("pad");
     expect(dockShape(ringedDock("#")).berthStyle).toBe("open");

@@ -1,6 +1,6 @@
 /**
- * D68: a tap picks people first, crew and locals alike, then things, then the ship's rooms (D82),
- * then the dock's places.
+ * §what-a-tap-selects: a tap picks people first, crew and locals alike, then things, then the
+ * ship's rooms (§room-tiers), then the dock's places.
  */
 import type {
   ActorId,
@@ -169,7 +169,7 @@ describe("pickAt", () => {
     });
   });
 
-  it("picks the room on bare deck floor (D82)", () => {
+  it("picks the room on bare deck floor (§room-tiers)", () => {
     const galley = deck.compartments.find((c) => c.tags.includes("galley"));
     if (galley === undefined) throw new Error("the deck has a galley");
     const floor = bareFloor(galley.key);
@@ -196,7 +196,7 @@ describe("pickAt", () => {
     expect(pickAt(shown, layout, dock, 0, x, y)?.kind).toBe("actor");
   });
 
-  it("picks a hull scar over the room's floor, and a person over the scar (D93)", () => {
+  it("picks a hull scar over the room's floor, and a person over the scar", () => {
     const galley = deck.compartments.find((c) => c.tags.includes("galley"));
     if (galley === undefined) throw new Error("the deck has a galley");
     const floor = bareFloor(galley.key);

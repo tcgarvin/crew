@@ -1,8 +1,9 @@
 /**
- * The reporting reflex end to end (D94, slice 5 call 12) on the intercom fixture: whoever sees
- * damage on alert walks to the nearest working panel and reports it; the whole crew then hold it
- * as `report` evidence with the witness's observation tick, the problem is public, and nobody
- * reports it again. A dead panel sends the reporter on to the next; off alert nobody reports.
+ * The reporting reflex end to end (§reporting-damage, slice 5 call 12) on the intercom fixture:
+ * whoever sees damage on alert walks to the nearest working panel and reports it; the whole crew
+ * then hold it as `report` evidence with the witness's observation tick, the problem is public, and
+ * nobody reports it again. A dead panel sends the reporter on to the next; off alert nobody
+ * reports.
  */
 import { describe, expect, it } from "vitest";
 import type { SimEvent } from "../../core/types/events";
@@ -64,7 +65,7 @@ function untilReport(fixture: Fixture, seconds: number): SimEvent[] {
   return seen;
 }
 
-describe("the reporting reflex (D94)", () => {
+describe("the reporting reflex (§reporting-damage)", () => {
   it(
     "sends the cook who sees the stove go out to the galley panel, and tells the ship",
     SLOW,

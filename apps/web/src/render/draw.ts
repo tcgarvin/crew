@@ -68,7 +68,7 @@ export function shouldRotate(
 /** Screen padding around the framed bounds, CSS pixels. */
 export const FIT_PADDING_PX = 12;
 /**
- * D72: a portrait phone keeps every pixel of its width for the ship: the flight margin and the
+ * A portrait phone keeps every pixel of its width for the ship: the flight margin and the
  * dock map's own edges frame the picture, so the padding is a hairline.
  */
 export const PORTRAIT_FIT_PADDING_PX = 4;
@@ -100,9 +100,9 @@ export function computeFitTransform(
 const DEFAULT_ROOM = { fill: "#1b2430", label: "#a9b8c8" } as const;
 
 /**
- * Polish A (D28): one fill per compartment kind, keyed by the first matching tag. Dark enough for
- * the yellow crew dots and white labels to stay readable, different enough in hue to tell rooms
- * apart on a phone.
+ * Polish A (§rooms-items-and-cargo): one fill per compartment kind, keyed by the first matching
+ * tag. Dark enough for the yellow crew dots and white labels to stay readable, different enough in
+ * hue to tell rooms apart on a phone.
  */
 const ROOM_PALETTE: Readonly<Record<string, { fill: string; label: string }>> = {
   bridge: { fill: "#1c2d4d", label: "#9dbdff" },
@@ -160,7 +160,10 @@ function drawCompartments(
   }
 }
 
-/** Polish A (D28): 2px walls along compartment and hull boundaries (doors/openings are gaps). */
+/**
+ * Polish A (§rooms-items-and-cargo): 2px walls along compartment and hull boundaries
+ * (doors/openings are gaps).
+ */
 function drawWalls(ctx: CanvasRenderingContext2D, t: ViewTransform, layout: DeckLayout) {
   ctx.lineCap = "square";
   for (const hull of [false, true]) {
@@ -188,7 +191,7 @@ interface RoomPlate {
 
 /**
  * Compartment names in each room's top-left corner (as seen on screen), each only where its plate
- * fits inside its own room on screen (D72). Measured in the plate font, which is left set.
+ * fits inside its own room on screen. Measured in the plate font, which is left set.
  */
 function roomPlates(
   ctx: CanvasRenderingContext2D,
@@ -215,7 +218,7 @@ function roomPlates(
     if (label === "") continue;
     const w = ctx.measureText(label).width + 8;
     const h = fontPx + 4;
-    // D72: the plate stays inside its own room. In a room shorter than the plate on screen, or
+    // The plate stays inside its own room. In a room shorter than the plate on screen, or
     // one whose bounding-box corner lies in a neighbour, it would cover the neighbour's label.
     const corners = [
       [x + 3, y + 3],
@@ -526,7 +529,8 @@ export function deckPiles(frame: RenderFrame, deckId: string): ItemPile[] {
       byDef = new Map();
       tiles.set(tileKey, byDef);
     }
-    // D63: crates on offer never pile with taken freight of the same kind, so each reads as itself.
+    // §offered-freight: crates on offer never pile with taken freight of the same kind, so each
+    // reads as itself.
     const pileKey = item.offered === true ? `${item.defId}/offered` : item.defId;
     const pile = byDef.get(pileKey);
     if (pile === undefined) byDef.set(pileKey, { top: item, count: item.count });
@@ -552,8 +556,8 @@ export function deckPiles(frame: RenderFrame, deckId: string): ItemPile[] {
 }
 
 /**
- * Items on deck (Polish A, D28), in screen space so badges stay upright: one filled square per
- * tile pile with a count badge.
+ * Items on deck (Polish A, §rooms-items-and-cargo), in screen space so badges stay upright: one
+ * filled square per tile pile with a count badge.
  */
 export function drawDeckItems(
   ctx: CanvasRenderingContext2D,
@@ -586,7 +590,10 @@ export function drawDeckItems(
   }
 }
 
-/** D65: what rides on each container in the frame (crates on a hand truck), by container id. */
+/**
+ * §hand-truck-drawing: what rides on each container in the frame (crates on a hand truck), by
+ * container id.
+ */
 function containerLoads(frame: RenderFrame): Map<string, RenderItem[]> {
   const loads = new Map<string, RenderItem[]>();
   for (const item of frame.items) {
@@ -599,8 +606,8 @@ function containerLoads(frame: RenderFrame): Map<string, RenderItem[]> {
 
 /**
  * A carried crate or tool as a smaller square riding its carrier's dot, up and to the right on
- * screen; a hand truck with crates on it (D65) as the truck and its load. Pocketed rations and
- * the like are not drawn.
+ * screen; a hand truck with crates on it (§hand-truck-drawing) as the truck and its load. Pocketed
+ * rations and the like are not drawn.
  */
 export function drawCarriedItems(
   ctx: CanvasRenderingContext2D,
@@ -664,13 +671,15 @@ interface PersonLabel {
   /** Preferred first. */
   readonly texts: readonly string[];
   readonly rank: (typeof LABEL_RANK)[keyof typeof LABEL_RANK];
-  /** The dock's own people (D68) are labelled in a dimmer colour, so the crew read first. */
+  /**
+   * The dock's own people (§person-labels) are labelled in a dimmer colour, so the crew read first.
+   */
   readonly local: boolean;
   /** Pushing a loaded hand truck or trolley, drawn beside the dot: the label clears its handle. */
   readonly pushing: boolean;
 }
 
-/** Ids of the people pushing a hand truck with something on it (D65). */
+/** Ids of the people pushing a hand truck with something on it (§hand-truck-drawing). */
 function truckPushers(frame: RenderFrame): Set<string> {
   const loads = containerLoads(frame);
   const pushers = new Set<string>();
@@ -739,9 +748,9 @@ function personFontPx(t: ViewTransform): number {
 }
 
 /**
- * Where each visible person's label goes (`placeLabels`), clear of each other and, where it can,
- * of people's dots and of `obstacles` (room plates, machine names). Crew first, bottom of the
- * screen first, so a crowd's labels fan upward from the lowest; locals (D68) after the crew.
+ * Where each visible person's label goes (`placeLabels`), clear of each other and, where it can, of
+ * people's dots and of `obstacles` (room plates, machine names). Crew first, bottom of the screen
+ * first, so a crowd's labels fan upward from the lowest; locals (§label-placement) after the crew.
  */
 function placePersonLabels(
   ctx: CanvasRenderingContext2D,
@@ -755,11 +764,12 @@ function placePersonLabels(
   const radius = dotRadius(t);
   const fontPx = personFontPx(t);
   ctx.font = `${fontPx}px system-ui, sans-serif`;
-  // A label sits radius + 6 above the dot's centre; a truck's handle rises higher (D68 check).
+  // A label sits radius + 6 above the dot's centre; a truck's handle rises higher
+  // (§label-placement).
   const truckLift = Math.max(0, loadedTruckRise(carriedSize(t)) + fontPx / 2 + 4 - radius - 6);
   const shown = personLabels(frame)
     .map((entry) => ({ entry, at: toScreenPx(t, entry.x, entry.y, rotated, viewportHeight) }))
-    // D72: a label names a dot the player can see. While the dock slides in, its people are still
+    // A label names a dot the player can see. While the dock slides in, its people are still
     // off the canvas, and a label clamped onto the edge would float there on its own.
     .filter(({ at: [x, y] }) => x >= 0 && x <= viewportWidth && y >= 0 && y <= viewportHeight)
     .sort((a, b) => a.entry.rank - b.entry.rank || b.at[1] - a.at[1] || a.at[0] - b.at[0]);
@@ -809,9 +819,10 @@ const LEADER_COLOR = "rgba(231, 237, 243, 0.55)";
 
 /**
  * Name/action labels for the crew and passengers, and for the dock's locals while they are doing
- * something (D68), drawn in real screen space (after any rotation is undone) so text always reads
- * upright, per task item 5. Crowded labels move around their dots and shorten (`placeLabels`).
- * Slice 4: a group session is one plate at its venue in place of its members' labels.
+ * something (§person-labels), drawn in real screen space (after any rotation is undone) so text
+ * always reads upright, per task item 5. Crowded labels move around their dots and shorten
+ * (`placeLabels`). Slice 4: a group session is one plate at its venue in place of its members'
+ * labels.
  */
 export function drawActorLabels(
   ctx: CanvasRenderingContext2D,
@@ -825,7 +836,10 @@ export function drawActorLabels(
   drawPersonPlates(ctx, t, plates);
 }
 
-/** Dockside (D58): what `drawFrame` needs for everything outside the deck itself. */
+/**
+ * Dockside (§the-scene-outside-the-hull): what `drawFrame` needs for everything outside the deck
+ * itself.
+ */
 export interface Scenery {
   readonly scene: Scene;
   readonly hull: HullGeometry;
@@ -844,28 +858,30 @@ export interface Scenery {
   /** Docking clamps, 0 retracted to 1 engaged (`clampEngagement`). */
   readonly clamps: number;
   /**
-   * D82: the deck's grime tint, from the dirt frame playback has reached; absent until the first
-   * frame arrives, which draws the deck clean.
+   * §dirt-grid: the deck's grime tint, from the dirt frame playback has reached; absent until the
+   * first frame arrives, which draws the deck clean.
    */
   readonly grime?: GrimePaint;
   /**
-   * D92: the asteroid field's rock layers, absent while no field is near or fading out (the
-   * canvas's `RockFade` is at zero).
+   * §asteroid-field-scars-and-alert: the asteroid field's rock layers, absent while no field is
+   * near or fading out (the canvas's `RockFade` is at zero).
    */
   readonly rocks?: RockPaint;
-  /** D92: impact flashes under way (`ImpactFlashes.active`); absent or empty with none. */
+  /**
+   * §rock-impacts: impact flashes under way (`ImpactFlashes.active`); absent or empty with none.
+   */
   readonly flashes?: readonly Flash[];
 }
 
 /**
  * What a tap can select: the frame's people, items and machines, the dock's own people (`local`,
- * by id) and staged props (`dockProp`, by `dockPropKey`), a room (D82: bare deck floor, by
+ * by id) and staged props (`dockProp`, by `dockPropKey`), a room (§room-tiers: bare deck floor, by
  * compartment key), or a dock post or the dock.
  */
 export type DrawSelection =
   | { readonly kind: "actor" | "machine" | "item"; readonly id: string }
   | { readonly kind: "room"; readonly id: string }
-  /** D93: a hull scar, by scar id. */
+  /** §hull-scars-and-ship-loss: a hull scar, by scar id. */
   | { readonly kind: "scar"; readonly id: string }
   | { readonly kind: "local"; readonly id: string }
   | { readonly kind: "dockProp"; readonly id: string }
@@ -899,10 +915,12 @@ function inTileSpace(ctx: CanvasRenderingContext2D, t: ViewTransform, draw: () =
 }
 
 /**
- * One canvas frame, back to front (dockside §2.3): sky, stars, the far rocks (D92), far scenery,
- * the dock map (or the stand-in berth), plume and hull, the deck (rooms, walls, ramps, doors,
- * machines, hull scars and impact flashes), the foreground and the near rocks; then, upright in screen space, labels, items and people, those on the dock moved
- * with it while it slides (`withDockSlide`). The portrait rotation applies to every layer.
+ * One canvas frame, back to front (dockside §2.3): sky, stars, the far rocks
+ * (§asteroid-field-scars-and-alert), far scenery, the dock map (or the stand-in berth), plume and
+ * hull, the deck (rooms, walls, ramps, doors, machines, hull scars and impact flashes), the
+ * foreground and the near rocks; then, upright in screen space, labels, items and people, those on
+ * the dock moved with it while it slides (`withDockSlide`). The portrait rotation applies to every
+ * layer.
  */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
@@ -933,9 +951,9 @@ export function drawFrame(
   ctx.save();
   if (rotated) {
     // Draw the deck in its own landscape ("fit") space, then turn the whole thing a quarter
-    // counter-clockwise to fill the portrait canvas (task item 5), so the bow points up (D72,
-    // `orientation.ts`). See `toScreenPx` for the matching mapping used to place upright text
-    // afterwards, and `screenToWorld` for its inverse used for tap-to-select.
+    // counter-clockwise to fill the portrait canvas (task item 5), so the bow points up
+    // (§orientation-and-size, `orientation.ts`). See `toScreenPx` for the matching mapping used to
+    // place upright text afterwards, and `screenToWorld` for its inverse used for tap-to-select.
     ctx.translate(0, viewportHeight);
     ctx.rotate(-Math.PI / 2);
   }
@@ -983,8 +1001,8 @@ export function drawFrame(
   drawDoors(ctx, t, layout, frame);
   drawMachines(ctx, t, layout, frame, selectedIdOf(selected, "machine"));
   inTileSpace(ctx, t, () => {
-    // D93: scars on the grime layer's terms (over the floor, under the people), after the
-    // machines so a hit machine shows its wound; the flash over both.
+    // §hull-scars-and-ship-loss: scars on the grime layer's terms (over the floor, under the
+    // people), after the machines so a hit machine shows its wound; the flash over both.
     drawScars(ctx, frame.hull.scars, sceneryFrame.px, selectedIdOf(selected, "scar"));
     drawImpactFlashes(ctx, scenery.flashes ?? [], sceneryFrame.px);
     if (dock !== undefined && dockPaint !== undefined) {

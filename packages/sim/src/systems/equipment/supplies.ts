@@ -1,16 +1,19 @@
 /**
- * What a repair still needs that is not aboard (D47, D71), and whether this port can supply it.
+ * What a repair still needs that is not aboard (§parts-and-tools-needed, §tool-shortfall), and
+ * whether this port can supply it.
  *
  * A diagnosed fault's repair needs two kinds of supply: the parts its remaining steps consume, and
  * a tool of every kind its recipe names (the repair task asks for every step's tools, so a tool is
  * needed until the fault is fixed). A part is short by however many units are missing; a tool kind
  * is short when nothing aboard provides it, and is then wanted as one unit of the item def that
  * supplies it (`toolSupplyDefId`). Both shortfalls become `partsNeeded` problems that commerce
- * buys from a port market (`equipment.ts`), and the departure gate (D36) asks the same question
- * of the port the ship is at, so it never holds for a repair nothing aboard or for sale can finish.
+ * buys from a port market (`equipment.ts`), and the departure gate (§departure-gate) asks the same
+ * question of the port the ship is at, so it never holds for a repair nothing aboard or for sale
+ * can finish.
  *
- * "Aboard" is on deck, in someone's hands or worn, and, D61, on the dock alongside: the ship's own
- * gear within reach while docked. Freight on offer is nobody's (D63, D66).
+ * "Aboard" is on deck, in someone's hands or worn, and, on the dock alongside
+ * (§living-on-the-dock): the ship's own gear within reach while docked. Freight on offer is
+ * nobody's (§offered-freight).
  */
 import { isNobodysFreight } from "../../core/freight";
 import { affordableUnits } from "../../core/markets";
@@ -117,9 +120,9 @@ export interface RepairOutOfReach extends SupplyShortfall {
 }
 
 /**
- * D71: the first of `faultKeys` (diagnosed faults on `machine`) whose repair is short of a supply
- * that neither the ship has nor the market at `portId` can sell it in full right now (out of
- * stock there, or more than the ship can pay). `portId` undefined: no market is in reach.
+ * §tool-shortfall: the first of `faultKeys` (diagnosed faults on `machine`) whose repair is short
+ * of a supply that neither the ship has nor the market at `portId` can sell it in full right now
+ * (out of stock there, or more than the ship can pay). `portId` undefined: no market is in reach.
  */
 export function repairOutOfReach(
   state: Pick<ReadonlyWorldState, "items" | "jobs" | "markets" | "money">,

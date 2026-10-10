@@ -1,5 +1,5 @@
 /**
- * The portrait screen's chrome (D72): fixed heights for the top bar and headline, and a compact
+ * The portrait screen's chrome: fixed heights for the top bar and headline, and a compact
  * log that the player can expand, so a phone gives the canvas most of its height. The stylesheet
  * takes these numbers from the CSS custom properties `portraitCssVars` sets on `.app`, so the
  * canvas size `portraitCanvasSize` models (and the camera tests check legibility against) is the

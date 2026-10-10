@@ -21,9 +21,9 @@ import type {
  * The text of a decision card. Structurally identical to `@crew/narrator`'s `DecisionCardProse`
  * (the narrator's `card` response), so either can be shown by the same modal.
  *
- * D26 (additive, 2026-09-30): `leftAftermath`/`rightAftermath` are the one-line captions shown
- * for a moment after that side is chosen, before the card closes. Absent when the decision's
- * option carries none.
+ * §aftermath-caption (additive, 2026-09-30): `leftAftermath`/`rightAftermath` are the one-line
+ * captions shown for a moment after that side is chosen, before the card closes. Absent when the
+ * decision's option carries none.
  */
 export interface DecisionCardText {
   readonly decisionId: string;
@@ -34,13 +34,13 @@ export interface DecisionCardText {
   readonly leftAftermath?: string;
   readonly rightAftermath?: string;
   /**
-   * D29 (additive, 2026-10-01): who is speaking on the card, full name as the digest lists them;
-   * absent for an observed scene.
+   * §spoken-cards (additive, 2026-10-01): who is speaking on the card, full name as the digest
+   * lists them; absent for an observed scene.
    */
   readonly speaker?: string;
   /**
-   * D56 (additive, 2026-10-03): present on a narrator card that closes a story thread; the
-   * thread's title, or empty when the title is not fit to show the captain.
+   * §closing-cards (additive, 2026-10-03): present on a narrator card that closes a story thread;
+   * the thread's title, or empty when the title is not fit to show the captain.
    */
   readonly closesThread?: string;
 }
@@ -58,7 +58,7 @@ export const NARRATOR_TEXT_KEYS = {
 /** The pitch key the kernel gives a job whose draft carried no pitch (`systems/commerce`). */
 const DEFAULT_PITCH_KEY = "job.pitch.default";
 
-/** GDD §22 card budget, as in `@crew/narrator`'s `CARD_SITUATION_MAX_WORDS` (D29: 70). */
+/** GDD §22 card budget, as in `@crew/narrator`'s `CARD_SITUATION_MAX_WORDS` (§spoken-cards: 70). */
 const SITUATION_MAX_WORDS = 70;
 
 type Params = Readonly<Record<string, string | number>>;
@@ -96,9 +96,9 @@ function clipWords(text: string, max: number): string {
 }
 
 /**
- * D25 offer card: the issuer's pitch in quotes, then one line of context (cargo kind, route,
- * urgency). Decisions from before schema 2 carry only `issuer`/`from`/`to` and get the old line.
- * D24: never prints pay.
+ * Offer card (§issuers-and-pitches): the issuer's pitch in quotes, then one line of context (cargo
+ * kind, route, urgency). Decisions from before schema 2 carry only `issuer`/`from`/`to` and get the
+ * old line. §cards-never-mention-pay: never prints pay.
  */
 function offerSituation(p: Params, c: ContentBundle | undefined): string {
   if (p.name === undefined) {
@@ -133,7 +133,10 @@ const PASSAGE_SIDE_TEXT: Readonly<Record<string, string>> = {
   "job.decline.aftermath": "You pass. They go looking for another ship.",
 };
 
-/** D36: the gate card's reason, in plain words (no numbers, D24). Keyed by `ImpairmentReason`. */
+/**
+ * §departure-gate: the gate card's reason, in plain words (no numbers, §cards-never-mention-pay).
+ * Keyed by `ImpairmentReason`.
+ */
 const GATE_REASONS: Readonly<Record<string, string>> = {
   blocked: "won't run at all until it's repaired",
   faultDerated: "is running below full power with an unrepaired fault",
@@ -141,7 +144,7 @@ const GATE_REASONS: Readonly<Record<string, string>> = {
   lowOutput: "is putting out well below full power",
 };
 
-/** D36: "The main engine is running below full power with an unrepaired fault. ..." */
+/** §departure-gate: "The main engine is running below full power with an unrepaired fault. ..." */
 function departureGateSituation(p: Params): string {
   const machine =
     p.machine === undefined ? "A machine we need" : `The ${String(p.machine).toLowerCase()}`;
@@ -156,7 +159,7 @@ const PASSENGER_OVERDUE_KEY = "commerce.passengerOverdue";
 
 /**
  * Passengers §3.3: "Halla Thorne went ashore at Ossory Station and hasn't come back. ..." The
- * name table has no pronouns, so the card says "them". No numbers (D24).
+ * name table has no pronouns, so the card says "them". No numbers (§cards-never-mention-pay).
  */
 function passengerOverdueSituation(p: Params, c: ContentBundle | undefined): string {
   const name = p.name === undefined ? "Our passenger" : String(p.name);
@@ -165,7 +168,7 @@ function passengerOverdueSituation(p: Params, c: ContentBundle | undefined): str
 
 const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefined) => string>> = {
   "job.offer": offerSituation,
-  // D36 departure gate.
+  // Departure gate (§departure-gate).
   [DEPARTURE_GATE_KEY]: departureGateSituation,
   "travel.departureGate.hold": () => "Hold for repairs",
   "travel.departureGate.leave": () => "Leave anyway",
@@ -183,11 +186,11 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
     "We close up and go. Whatever kept them, it's their problem now, and there's no fare.",
   "job.offer.accept": () => "Take the job",
   "job.offer.decline": () => "Pass on it",
-  // D26 aftermaths for the offer card.
+  // Aftermaths for the offer card (§aftermath-caption).
   "job.accept.aftermath": () => "Taken. The crew start loading — we leave once the hold is full.",
   "job.decline.aftermath": () =>
     "You pass. Word gets around the board; another offer usually turns up.",
-  // D25: a pitch without prose (old saves, drafts that carried none).
+  // §issuers-and-pitches: a pitch without prose (old saves, drafts that carried none).
   [DEFAULT_PITCH_KEY]: () => "Got freight that needs moving, if you've got the room.",
   "job.pitch": () => "Got freight that needs moving, if you've got the room.",
   "job.template": () => "A routine freight contract.",
@@ -200,7 +203,8 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
 
 /** Title per prompt key; anything else gets a generic heading. */
 const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
-  // D25: the offer card is titled with the person, "Ysolde Maren, Meridian Growers Collective".
+  // §issuers-and-pitches: the offer card is titled with the person, "Ysolde Maren, Meridian Growers
+  // Collective".
   "job.offer": (p) =>
     p.name !== undefined
       ? `${p.name}, ${p.org ?? p.role ?? "shipper"}`
@@ -209,7 +213,7 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
         : String(p.issuer),
   // Narrator cards carry their heading in the prompt params (`translate.ts`).
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.title === undefined ? undefined : String(p.title)),
-  // D36: "Before we leave: Main Engine".
+  // §departure-gate: "Before we leave: Main Engine".
   [DEPARTURE_GATE_KEY]: (p) =>
     p.machine === undefined ? "Before we leave" : `Before we leave: ${String(p.machine)}`,
   // Passengers §3.3: "Overdue: Halla Thorne".
@@ -218,13 +222,15 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
 
 const speakerParam = (p: Params) => (p.speaker === undefined ? undefined : String(p.speaker));
 
-/** D29: who is speaking, per prompt key; the offer card's issuer, or the narrator's param. */
+/**
+ * §spoken-cards: who is speaking, per prompt key; the offer card's issuer, or the narrator's param.
+ */
 const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
   "job.offer": (p) => (p.name === undefined ? undefined : String(p.name)),
   [NARRATOR_TEXT_KEYS.situation]: speakerParam,
-  // D36: the engineer brings the gate card (D29), when the ship has one.
+  // §departure-gate: the engineer brings the gate card (§spoken-cards), when the ship has one.
   [DEPARTURE_GATE_KEY]: speakerParam,
-  // Passengers §3.3: the first officer brings the overdue card (D29).
+  // Passengers §3.3: the first officer brings the overdue card (§spoken-cards).
   [PASSENGER_OVERDUE_KEY]: speakerParam,
 };
 

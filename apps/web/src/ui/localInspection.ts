@@ -1,7 +1,7 @@
 /**
- * Dockside phase 3 (D68): what the inspector shows for one of the dock's own people (a local) or a
- * prop the staging call set out. Both come from the render frame and the dock map alone, so, like
- * a post, they need no snapshot from the worker.
+ * Dockside phase 3 (§items-places-and-locals): what the inspector shows for one of the dock's own
+ * people (a local) or a prop the staging call set out. Both come from the render frame and the dock
+ * map alone, so, like a post, they need no snapshot from the worker.
  */
 import type { BerthedDock, RenderDockProp, RenderLocal } from "@crew/sim";
 import { dockWhere } from "./itemInspection";
@@ -27,7 +27,7 @@ const AT_POST_TILES = 2;
 /**
  * The inspector's view of a local. Positions are the frame's, in the grafted deck frame (not the
  * slid one the canvas draws). Throws if their post is not on this dock: the sim only places locals
- * at posts of the dock alongside (D66).
+ * at posts of the dock alongside (§local-behaviour).
  */
 export function inspectLocal(berth: BerthedDock, local: RenderLocal): LocalInspection {
   const { dock, shipAt } = berth;

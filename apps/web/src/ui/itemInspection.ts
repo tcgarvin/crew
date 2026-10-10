@@ -1,6 +1,7 @@
 /**
  * Polish A: build the inspector's view of a tapped item from a state snapshot — its name, count,
- * where it is in plain words, and, for freight, whose it is and where it is going (D28).
+ * where it is in plain words, and, for freight, whose it is and where it is going
+ * (§rooms-items-and-cargo).
  *
  * Dockside phase 2: the dock is grafted onto the deck's grid (D59), so an `onDeck` item may be on
  * the dock, at coordinates outside the ship (negative ones included); it is described by the
@@ -48,7 +49,10 @@ export function dockWhere({ dock, shipAt }: BerthedDock, deckX: number, deckY: n
   return nearest === undefined ? "on the dock" : `on the dock by ${nearest.name}`;
 }
 
-/** Where an `onDeck` item is: on the dock alongside (from the snapshot's truth, D61), or a room. */
+/**
+ * Where an `onDeck` item is: on the dock alongside (from the snapshot's truth, §dock-alongside), or
+ * a room.
+ */
 function whereOnDeck(
   state: DeepReadonly<WorldState>,
   location: { readonly x: number; readonly y: number },
@@ -85,7 +89,7 @@ function where(
     case "equippedBy":
       return `carried by ${state.actors[location.actorId]?.name ?? "someone"}`;
     case "inContainer": {
-      // D65: freight rides on the hand truck while someone pushes it.
+      // §items-places-and-locals: freight rides on the hand truck while someone pushes it.
       const container = state.items[location.containerId];
       const def = container === undefined ? undefined : content.items[container.defId];
       if (container === undefined || def?.toolKinds.includes("handTruck") !== true) {

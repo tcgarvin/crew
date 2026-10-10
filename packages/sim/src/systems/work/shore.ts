@@ -1,6 +1,6 @@
 /**
- * D70: the plans of the captain ashore (dockside §6.2). Both are personal activities that only
- * commerce hands out (`systems/commerce/ashore.ts`), never the planner:
+ * §looking-for-work: the plans of the captain ashore (dockside §6.2). Both are personal activities
+ * that only commerce hands out (`systems/commerce/ashore.ts`), never the planner:
  *
  * - `lookForWork`: down the personnel ramp onto the dock (commerce raises `captainAshore` the tick
  *   they stand on it), wait there for the narrator's answer (`awaitWord`), then, when the answer
@@ -114,7 +114,10 @@ function lookRoundTile(ctx: StepCtx, actor: Actor, shore: Shore): TileCoord | un
   return post === undefined ? undefined : postServiceTile(shore.berth, post);
 }
 
-/** D70 `lookForWork`: ashore, wait for the narrator's word, then a look round and back aboard. */
+/**
+ * `lookForWork` (§looking-for-work): ashore, wait for the narrator's word, then a look round and
+ * back aboard.
+ */
 export function lookForWorkPlan(ctx: StepCtx, actor: Actor): ShorePlan {
   const shore = shoreHere(ctx);
   if (shore === undefined) return blocked("rampClosed");
@@ -144,8 +147,9 @@ function besideTile(geometry: DeckGeometry, tile: TileCoord): TileCoord {
 }
 
 /**
- * D70 `meetSpeaker`: the steps that deliver held card `decisionId`, then back aboard. Blocked when
- * the card is no longer held, or neither the speaker is on the dock nor a gate leads to them.
+ * §looking-for-work `meetSpeaker`: the steps that deliver held card `decisionId`, then back aboard.
+ * Blocked when the card is no longer held, or neither the speaker is on the dock nor a gate leads
+ * to them.
  */
 export function meetingPlan(ctx: StepCtx, decisionId: DecisionId | undefined): ShorePlan {
   const held = decisionId === undefined ? undefined : heldCard(ctx.state, decisionId);

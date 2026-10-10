@@ -9,13 +9,15 @@
  *   first skill requirement)` ticks of recipe progress.
  * - Eating takes one unit off the believed stack at pickup (split into a carried unit of 1) and
  *   consumes it at the end of `mealDays`: the stack on the floor drops by exactly one. Hunger
- *   falls by the item's `nutrition` (food without one fully satisfies). D81: the consume step and
- *   the galley's `cook`/`serve` are `systems/galley/`'s; D82: the `mop` stage is `systems/dirt/`'s.
- * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (D77:
- *   their watch, or a dayworker's hours) and fatigue is below `seekThreshold`. Rest/socialize holds end when their need is
- *   fully met while on duty, or when taken because the need pressed (D84 tuning); otherwise, off
- *   duty, they last until the planner finds something more urgent.
- * - A helm hold (`staff`) ends when the stander is relieved or the watch post closes (D77,
+ *   falls by the item's `nutrition` (food without one fully satisfies). The consume step (§eating)
+ *   and the galley's `cook`/`serve` are `systems/galley/`'s; the `mop` stage (§mop-trips) is
+ *   `systems/dirt/`'s.
+ * - Sleep ends after `sleepDays` once fatigue ≤ `wakeBelow`, or once the actor is on duty (their
+ *   watch, or a dayworker's hours; §duty-and-the-sleep-watch) and fatigue is below `seekThreshold`.
+ *   Rest/socialize holds end when their need is fully met while on duty, or when taken because the
+ *   need pressed (§choosing-recreation); otherwise, off duty, they last until the planner finds
+ *   something more urgent.
+ * - A helm hold (`staff`) ends when the stander is relieved or the watch post closes (§relief,
  *   `systems/watch/helm.ts`); while it lasts the stander learns piloting (`skillGainPerDay`,
  *   capped at 10). A gangway hold ends when the ship sails or they are no longer the stander.
  * - A route that ended early (`movement.routeFailure`, W3's "replan now") fails the step:
@@ -107,7 +109,7 @@ function dockedAt(ctx: StepCtx, portId: string): boolean {
   return ctx.state.travel.stage === "docked" && ctx.state.travel.portId === portId;
 }
 
-/** D47/D63: is the actor where `portId`'s market is dealt with (`marketCounter`)? */
+/** §buying-parts: is the actor where `portId`'s market is dealt with (`marketCounter`)? */
 function atMarketCounter(ctx: StepCtx, actor: Actor, portId: PortDefId): boolean {
   const counter = marketCounter(ctx.content, ctx.state, portId);
   if (counter.kind === "transferTile") return onTransferTile(ctx, actor);
@@ -122,13 +124,13 @@ function countTick(step: { ticksDone: number; readonly ticksNeeded: number }): b
 }
 
 // ---------------------------------------------------------------------------------------------
-// The gate (D63)
+// The gate (§buying-parts)
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D63: out through the gate on a market errand. The buyer leaves the map into the port's market
- * store and is off ship (so the planner, needs and the dock leave them be) until the step brings
- * them back.
+ * §buying-parts: out through the gate on a market errand. The buyer leaves the map into the port's
+ * market store and is off ship (so the planner, needs and the dock leave them be) until the step
+ * brings them back.
  */
 function stepOutThroughGate(ctx: StepCtx, actor: Actor, portId: PortDefId): void {
   releaseReservations(ctx.caches, actor.id);
@@ -160,9 +162,9 @@ export function endGateErrand(ctx: StepCtx, actor: Actor): void {
 }
 
 /**
- * D63: the market is through the gate. Standing at the gate, step out (off ship) and spend the
- * counter time there; then come back to the gate tile. Fails `rampClosed` if the ship is no longer
- * docked at the port before stepping out, and `unreachableTarget` away from the gate.
+ * §buying-parts: the market is through the gate. Standing at the gate, step out (off ship) and
+ * spend the counter time there; then come back to the gate tile. Fails `rampClosed` if the ship is
+ * no longer docked at the port before stepping out, and `unreachableTarget` away from the gate.
  */
 function runThroughGate(ctx: StepCtx, actor: Actor, step: StepOf<"throughGate">): StepResult {
   if (actor.location.kind === "onDeck") {
@@ -177,7 +179,7 @@ function runThroughGate(ctx: StepCtx, actor: Actor, step: StepOf<"throughGate">)
   return "done";
 }
 
-/** D70: out through the gate to see a held card's speaker: say so in the log. */
+/** §looking-for-work: out through the gate to see a held card's speaker: say so in the log. */
 function noteGoingToSee(ctx: StepCtx, actor: Actor): void {
   const decisionId = meetingAhead(actor);
   const held = decisionId === undefined ? undefined : heldCard(ctx.state, decisionId);
@@ -258,8 +260,8 @@ function takeItem(ctx: StepCtx, actor: Actor, item: Item, split: boolean): ItemI
       // key off `job.cargoItemIds`, which already names this new id, not `jobId` on the item, but
       // other freight-aware code — inspection, the crate renderer — reads `item.jobId`).
       ...(item.jobId === undefined ? {} : { jobId: item.jobId }),
-      // A serving split off a served stack is the same dinner (D81): the plate keeps its quality
-      // and spoils when the stack does.
+      // A serving split off a served stack is the same dinner (§cooking-and-serving): the plate
+      // keeps its quality and spoils when the stack does.
       ...(item.meal === undefined ? {} : { meal: { ...item.meal } }),
     };
     return id;
@@ -317,7 +319,7 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
   } else {
     const tile = tileOf(location);
     item.location = { kind: "onDeck", deckId: location.deckId, x: tile.x + 0.5, y: tile.y + 0.5 };
-    // D82: a crate set down leaves its mark on the deck.
+    // §dirt-deposits: a crate set down leaves its mark on the deck.
     if (ctx.content.items[item.defId]?.tags.includes("cargo") === true) {
       depositDirt(
         ctx.state,
@@ -340,7 +342,8 @@ function runPutDown(ctx: StepCtx, actor: Actor, step: StepOf<"putDown">): StepRe
 
 /**
  * How fast `actor` works `task`: manipulation, trait `workSpeed`, levels above the task's first
- * skill requirement, and (D79) mood. Exported for timed work outside recipes (D78's plot).
+ * skill requirement, and mood (§mood-and-work-speed). Exported for timed work outside recipes (the
+ * plot, §course-plotting).
  */
 export function workRate(ctx: StepCtx, actor: Actor, task: Task): number {
   const requirement = task.requiredSkills[0];
@@ -392,13 +395,14 @@ function runRecipe(ctx: StepCtx, deps: WorkDeps, actor: Actor): StepResult {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Buying (D47, D63)
+// Buying (§buying-parts)
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D47 commit point: the purchase. Fails `rampClosed` if the ship is no longer docked at the
- * market's port, `unreachableTarget` off the transfer tile, and `inaccessibleSupply` (task-level,
- * so every candidate backs off) when the stock or the money ran out since the plan was made.
+ * Commit point (§buying-parts): the purchase. Fails `rampClosed` if the ship is no longer docked at
+ * the market's port, `unreachableTarget` off the transfer tile, and `inaccessibleSupply`
+ * (task-level, so every candidate backs off) when the stock or the money ran out since the plan was
+ * made.
  */
 function runBuy(ctx: StepCtx, actor: Actor, step: StepOf<"buy">): StepResult {
   if (!dockedAt(ctx, step.portId)) return { fail: "rampClosed" };
@@ -409,7 +413,10 @@ function runBuy(ctx: StepCtx, actor: Actor, step: StepOf<"buy">): StepResult {
   return "done";
 }
 
-/** D63: the bought units are aboard; set them down here. Nothing in hand is a lost purchase. */
+/**
+ * §buying-parts: the bought units are aboard; set them down here. Nothing in hand is a lost
+ * purchase.
+ */
 function runStowBought(ctx: StepCtx, actor: Actor, step: StepOf<"stowBought">): StepResult {
   if (actor.location.kind !== "onDeck") return { fail: "unreachableTarget" };
   const set = setDownBought(ctx, actor, step.itemDefId);
@@ -417,7 +424,7 @@ function runStowBought(ctx: StepCtx, actor: Actor, step: StepOf<"stowBought">): 
 }
 
 // ---------------------------------------------------------------------------------------------
-// The hand truck (D65)
+// The hand truck (§hand-truck-trips)
 // ---------------------------------------------------------------------------------------------
 
 /** The activity's hand-truck trip, if it is one. */
@@ -494,15 +501,15 @@ function runParkTruck(ctx: StepCtx, actor: Actor, step: StepOf<"parkTruck">): St
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ashore (D70)
+// Ashore (§looking-for-work)
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D70 `lookForWork`: on the dock, waiting for the answer to this docking's `captainAshore` ask.
- * Commerce raises the ask the tick the actor stands on dock floor; the world halts on it, so the
- * first tick this sees it recorded the answer is in. A card the answer held for the captain ends
- * the activity here (commerce sends them to the speaker next, `meetSpeaker`); otherwise the look
- * round that follows in the plan goes ahead.
+ * `lookForWork` (§looking-for-work): on the dock, waiting for the answer to this docking's
+ * `captainAshore` ask. Commerce raises the ask the tick the actor stands on dock floor; the world
+ * halts on it, so the first tick this sees it recorded the answer is in. A card the answer held for
+ * the captain ends the activity here (commerce sends them to the speaker next, `meetSpeaker`);
+ * otherwise the look round that follows in the plan goes ahead.
  */
 function runAwaitWord(ctx: StepCtx, actor: Actor, step: StepOf<"awaitWord">): StepResult {
   if (ctx.state.narrator.captainAshoreLastAsk?.portId !== step.portId) return "wait";
@@ -517,8 +524,8 @@ function runAwaitWord(ctx: StepCtx, actor: Actor, step: StepOf<"awaitWord">): St
 }
 
 /**
- * D70: talking with someone on the dock before their card comes up. The first tick says so in the
- * log; the talk runs its course even if they shuffle a step away.
+ * §looking-for-work: talking with someone on the dock before their card comes up. The first tick
+ * says so in the log; the talk runs its course even if they shuffle a step away.
  */
 function runTalk(ctx: StepCtx, actor: Actor, step: StepOf<"talk">): StepResult {
   if (step.ticksDone === 0) {
@@ -538,7 +545,10 @@ function runTalk(ctx: StepCtx, actor: Actor, step: StepOf<"talk">): StepResult {
 /** Skills are levels in [0, 10] (W0); learning at the helm stops at the top. */
 const SKILL_CAP = 10;
 
-/** D77: a tick at the helm teaches piloting, `work.skillGainPerDay` a day, up to the cap. */
+/**
+ * §who-has-the-helm: a tick at the helm teaches piloting, `work.skillGainPerDay` a day, up to the
+ * cap.
+ */
 function learnAtTheHelm(ctx: StepCtx, actor: Actor): void {
   if (!holdsTheHelm(ctx, actor)) return;
   const now = actor.skills.piloting ?? 0;
@@ -549,9 +559,9 @@ function learnAtTheHelm(ctx: StepCtx, actor: Actor): void {
 }
 
 /**
- * D84 tuning: a rest or chat taken because the need pressed (above voluntary class, the planner's
- * `leisureCandidate`) ends when the need is met, off duty too, so the person replans: otherwise
- * the routine hold outlasted every routine game and the off watch was one long chat.
+ * §choosing-recreation: a rest or chat taken because the need pressed (above voluntary class, the
+ * planner's `leisureCandidate`) ends when the need is met, off duty too, so the person replans:
+ * otherwise the routine hold outlasted every routine game and the off watch was one long chat.
  */
 const leisurePressed = (actor: Actor): boolean =>
   actor.activity.kind === "personal" && actor.activity.urgency !== "voluntaryActivity";
@@ -582,8 +592,8 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
 }
 
 /**
- * A `work` step by stage: recipes are equipment's, the helm's handover the watch's (D77), the
- * plot travel's (D78); the rest are personal timers.
+ * A `work` step by stage: recipes are equipment's, the helm's handover the watch's (§handover), the
+ * plot travel's (§course-plotting); the rest are personal timers.
  */
 function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work">): StepResult {
   switch (step.stage) {
@@ -597,7 +607,7 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
       return runCook(ctx, actor, step);
     case "mop":
       return runMop(ctx, actor, step);
-    // D93, D94: damage work's stages, and the intercom's report.
+    // §machine-damage, §scouts: damage work's stages, and the intercom's report.
     case "patch":
       return runPatch(ctx, actor, step);
     case "plate":

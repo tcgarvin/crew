@@ -145,7 +145,7 @@ describe("movement", () => {
   });
 });
 
-describe("footfall (D82)", () => {
+describe("footfall (§footfall-and-boots)", () => {
   it("a walk across a clean corridor leaves footfallPerStep on each tile stepped onto", () => {
     const test = deck12World();
     const { world } = test;

@@ -1,4 +1,7 @@
-/** D93: a tapped hull scar, and a room's inspection listing its scars, read from the snapshot. */
+/**
+ * §hull-scars-and-ship-loss: a tapped hull scar, and a room's inspection listing its scars, read
+ * from the snapshot.
+ */
 import type {
   ClaimId,
   FieldId,

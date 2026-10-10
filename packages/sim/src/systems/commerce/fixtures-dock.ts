@@ -1,8 +1,8 @@
 /**
- * D63 test fixture: the D61 dockside world (`travel/fixtures-dock.ts`: the crew deck with two
- * south ramps and the spike's quay at both `TINY.port` and `TINY.port2`) with the quays furnished
- * for port work, and commerce, equipment and travel registered alongside spatial, needs, work
- * and the planner.
+ * §offered-freight test fixture: the dockside world (`travel/fixtures-dock.ts`: the crew deck with
+ * two south ramps and the spike's quay at both `TINY.port` and `TINY.port2`) with the quays
+ * furnished for port work, and commerce, equipment and travel registered alongside spatial, needs,
+ * work and the planner.
  *
  * Both quays, in the dock's own frame (shipAt (2,1), so deck = dock − (2,1)):
  *
@@ -55,7 +55,10 @@ import { commerceViolations } from "./invariants";
 import { PASSENGER_CREW_DEF_ID } from "./passage";
 
 export const PARTS = "item.test.parts" as ItemDefId;
-/** D65: the test hand truck, stowed in the hold zone (deck (10,6)) when `truck` is set. */
+/**
+ * §hand-truck-trips: the test hand truck, stowed in the hold zone (deck (10,6)) when `truck` is
+ * set.
+ */
 export const TRUCK = "item.test.hand_truck" as ItemDefId;
 export const PARTS_PRICE = 120;
 
@@ -80,7 +83,7 @@ export const QUAY_WORK = {
   cargoRampTop: { x: 2, y: 6 },
 } as const satisfies Record<string, TileCoord | readonly TileCoord[]>;
 
-/** The quay's warehouse door: where dock hands come and go (D66). */
+/** The quay's warehouse door: where dock hands come and go (§dock-hand-errands). */
 export const WAREHOUSE_DOOR = { x: 15 - 2, y: 11 - 1 } as const;
 
 function furnished(dock: DockDef, stall: boolean, door: boolean): DockDef {
@@ -123,18 +126,20 @@ export interface DockWorkOptions {
   readonly homeStall?: boolean;
   readonly money?: number;
   readonly partsStock?: number;
-  /** D65: put a hand truck of this capacity in the hold (default: no truck). */
+  /** §hand-truck-trips: put a hand truck of this capacity in the hold (default: no truck). */
   readonly truck?: number;
   /**
-   * D66: give both quays a warehouse door, so dock hands cart the freight on foot (default
-   * false: no door, so the D63 instant carting these tests were written against).
+   * §dock-hand-errands: give both quays a warehouse door, so dock hands cart the freight on foot
+   * (default false: no door, so the instant carting these tests were written against).
    */
   readonly dockHands?: boolean;
-  /** D66: regulars per port (`castSeed`, with posts on the quay: "gate", "door", "stall"). */
+  /**
+   * §locals-table: regulars per port (`castSeed`, with posts on the quay: "gate", "door", "stall").
+   */
   readonly castSeed?: Readonly<Record<string, readonly CastSeedDef[]>>;
 }
 
-/** A misfire whose repair consumes one `PARTS`, as the D47 market test has it. */
+/** A misfire whose repair consumes one `PARTS`, as the market test has it. */
 function hungryEngine(engine: MachineDef): MachineDef {
   return {
     ...engine,

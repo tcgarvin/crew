@@ -1,9 +1,9 @@
 /**
- * Dockside §2.2 (D58): the star field. Stars carry no meaning, so their positions come from a
- * fixed hash and they scroll from a client-side accumulator (`StarScroll`) at the scene's
- * `starSpeed`; a reload re-scatters nothing that matters. Drawn in the deck's own ("fit") pixel
- * space, so they stream fore to aft (toward −x, D72 `orientation.ts`) and the portrait rotation
- * carries them with the deck.
+ * Dockside §2.2 (§stars-plume-and-the-animation-loop): the star field. Stars carry no meaning, so
+ * their positions come from a fixed hash and they scroll from a client-side accumulator
+ * (`StarScroll`) at the scene's `starSpeed`; a reload re-scatters nothing that matters. Drawn in
+ * the deck's own ("fit") pixel space, so they stream fore to aft (toward −x, `orientation.ts`,
+ * §orientation-and-size) and the portrait rotation carries them with the deck.
  */
 import { aftOf, spanAlongShip } from "./orientation";
 

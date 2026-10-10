@@ -11,7 +11,8 @@
  *    travel system holds departure for them (`waitingForPassenger`, travel.ts).
  *  - leg `ashore`: at `returnsAtTick` they walk back aboard (leg `back`). Not back
  *    `config.commerce.passage.overdueDays` after going ashore, the first officer brings one
- *    policy card, "Wait for them" / "Leave without them" (D29, D37); leaving is `endPassage`.
+ *    policy card, "Wait for them" / "Leave without them" (§spoken-cards, §policy-decision-hook);
+ *    leaving is `endPassage`.
  *  - leg `back`, docked at `fromPortId`: they walk off, despawn, `completed`, paid once.
  *
  * `endPassage` (§4.2) ends a passage early: `leftBehind` for a passenger already ashore,
@@ -22,10 +23,10 @@
  * cannot be planned (no nav cache, no route, a failed move) they step off at once, so the
  * lifecycle never stalls on the deck.
  *
- * D63, with the port's dock alongside: a booked passenger appears at the dock's gate and walks
- * across the dock and up the personnel ramp (`walkAboard`, a `comeAboard` walk to the passenger
- * spawn point); one walking off walks down and out through the gate, where they step off; one
- * coming back from ashore appears at the gate and walks aboard the same way.
+ * §passage-job, with the port's dock alongside: a booked passenger appears at the dock's gate and
+ * walks across the dock and up the personnel ramp (`walkAboard`, a `comeAboard` walk to the
+ * passenger spawn point); one walking off walks down and out through the gate, where they step off;
+ * one coming back from ashore appears at the gate and walks aboard the same way.
  */
 import { configTicks, dayTicks, daysToSeconds } from "../../core/clock";
 import { newActor } from "../../core/command-handlers";
@@ -96,8 +97,8 @@ function theDeck(ctx: Pick<StepCtx, "content" | "state">): DeckDef {
 }
 
 /**
- * D63: a ramp travel has asked down is not down yet (still lowering on the first docked ticks).
- * A walk across it waits rather than fail: the planner would find no route and back off.
+ * §passage-job: a ramp travel has asked down is not down yet (still lowering on the first docked
+ * ticks). A walk across it waits rather than fail: the planner would find no route and back off.
  */
 function rampsStillLowering(ctx: Pick<StepCtx, "state">): boolean {
   return Object.values(ctx.state.doors).some(
@@ -108,7 +109,7 @@ function rampsStillLowering(ctx: Pick<StepCtx, "state">): boolean {
   );
 }
 
-/** D63: the gate of the dock alongside the port the ship is docked at, if it has one. */
+/** §passage-job: the gate of the dock alongside the port the ship is docked at, if it has one. */
 function gateHere(ctx: Pick<StepCtx, "state" | "content">): TileCoord | undefined {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return undefined;
@@ -116,8 +117,9 @@ function gateHere(ctx: Pick<StepCtx, "state" | "content">): TileCoord | undefine
 }
 
 /**
- * Where a passenger comes onto the map: at the gate of the dock alongside (D63), from where they
- * walk across the dock and up the personnel ramp; with no dock, inside the ramp as before.
+ * Where a passenger comes onto the map: at the gate of the dock alongside (§passage-job), from
+ * where they walk across the dock and up the personnel ramp; with no dock, inside the ramp as
+ * before.
  */
 function arrivalTile(ctx: Pick<StepCtx, "state" | "content">): TileCoord {
   const gate = gateHere(ctx);
@@ -155,9 +157,9 @@ export function spawnPassenger(ctx: ApplyCtx, job: Job, cause: Cause): ActorId {
   const def = findCrewDef(ctx.content, ctx.state, PASSENGER_CREW_DEF_ID);
   if (def === undefined) throw new Error(`passage: no "${PASSENGER_CREW_DEF_ID}" crew template`);
   const deck = theDeck(ctx);
-  // D70: a passenger who came over with their offer (or was on the dock already) is a local until
-  // the captain takes them on; they board from where they stand, and the local goes, so the dock
-  // never has the same person twice.
+  // §offers-in-person: a passenger who came over with their offer (or was on the dock already) is a
+  // local until the captain takes them on; they board from where they stand, and the local goes, so
+  // the dock never has the same person twice.
   const local = localNamed(ctx.state, job.issuerPerson.name);
   const tile =
     local === undefined
@@ -199,7 +201,7 @@ function standingOnAny(tiles: readonly TileCoord[], actor: Actor): boolean {
 
 /**
  * Where a passenger walks to leave the ship: down across the dock and out through its gate
- * (D63), or with no dock to the personnel ramp, where they step off.
+ * (§passage-job), or with no dock to the personnel ramp, where they step off.
  */
 function exitTiles(ctx: Pick<StepCtx, "state" | "content">): readonly TileCoord[] {
   const gate = gateHere(ctx);
@@ -215,15 +217,16 @@ function cannotWalk(ctx: StepCtx, actor: Actor): boolean {
 }
 
 /**
- * Drive one tick of the walk off the ship: to the dock's gate (D63), or the personnel ramp with
- * no dock. Returns true once the passenger is there (or cannot get there), i.e. the moment they
- * can step off.
+ * Drive one tick of the walk off the ship: to the dock's gate (§passage-job), or the personnel ramp
+ * with no dock. Returns true once the passenger is there (or cannot get there), i.e. the moment
+ * they can step off.
  */
 function walkOff(ctx: StepCtx, actor: Actor): boolean {
   if (actor.disembarking !== true) actor.disembarking = true;
   const exits = exitTiles(ctx);
   if (standingOnAny(exits, actor)) return true;
-  // D63: the walk to the gate crosses a ramp; on the first docked ticks it is still coming down.
+  // §passage-job: the walk to the gate crosses a ramp; on the first docked ticks it is still coming
+  // down.
   if (gateHere(ctx) !== undefined && rampsStillLowering(ctx)) return false;
   if (cannotWalk(ctx, actor)) return true;
   const walking = actor.activity.kind === "personal" && actor.activity.activity === "wander";
@@ -354,7 +357,7 @@ function goAshore(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor, por
 
 function returnAboard(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor): void {
   const deck = theDeck(ctx);
-  // D63: they come back through the gate and walk aboard (`walkAboard`).
+  // §passage-job: they come back through the gate and walk aboard (`walkAboard`).
   const tile = arrivalTile(ctx);
   actor.location = onTile(deck, tile);
   actor.availability = "available";
@@ -384,7 +387,7 @@ function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
   return overdueCardsOf(state, jobId).some((d) => d.status === "pending");
 }
 
-/** D29: the first officer brings the overdue card, when the ship has one. */
+/** §spoken-cards: the first officer brings the overdue card, when the ship has one. */
 function firstOfficerName(state: ReadonlyWorldState): string | undefined {
   return Object.values(state.actors).find(
     (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
@@ -463,8 +466,8 @@ function sweepBack(ctx: StepCtx, job: Job, passage: JobPassage, actor: Actor): v
 }
 
 /**
- * The job's luggage that is physically aboard (stowed, or in a crew member's hands). D61: luggage
- * lying on the dock is already ashore and needs no unloading.
+ * The job's luggage that is physically aboard (stowed, or in a crew member's hands).
+ * §living-on-the-dock: luggage lying on the dock is already ashore and needs no unloading.
  */
 function luggageAboard(ctx: StepCtx, job: Job): ItemId[] {
   return job.cargoItemIds.filter((itemId) => {
@@ -498,9 +501,9 @@ function headedAboard(ctx: StepCtx, actor: Actor): boolean {
 }
 
 /**
- * D63: a passenger on the dock who is not leaving (just booked at the gate, or back from ashore)
- * walks across it and up the personnel ramp to the passenger spawn point. Handed out every tick
- * until they are on their way, as departure prep's call aboard is: the planner may overwrite a
+ * §passage-job: a passenger on the dock who is not leaving (just booked at the gate, or back from
+ * ashore) walks across it and up the personnel ramp to the passenger spawn point. Handed out every
+ * tick until they are on their way, as departure prep's call aboard is: the planner may overwrite a
  * pending intent on the tick it runs, and leaves a `comeAboard` under way alone.
  */
 function walkAboard(ctx: StepCtx, actor: Actor): void {
@@ -560,8 +563,9 @@ export function endPassageEarly(ctx: ApplyCtx, job: Job, cause: Cause): void {
   const actor = ctx.state.actors[passage.actorId];
   const travel = ctx.state.travel;
   const portId = travel.stage === "docked" ? travel.portId : travel.toPortId;
-  // "Aboard" here means on the map, the dock included (D61): a passenger standing on the dock is
-  // still the ship's to walk off, so they are put off and leave through the sweep like anyone else.
+  // "Aboard" here means on the map, the dock included (§living-on-the-dock): a passenger standing
+  // on the dock is still the ship's to walk off, so they are put off and leave through the sweep
+  // like anyone else.
   const aboard = actor !== undefined && actor.location.kind === "onDeck";
   const reason: PassageEndReason = passage.leg === "ashore" || !aboard ? "leftBehind" : "putOff";
   // Docked: they walk off here, and travel (which runs before the sweep) must not leave first.

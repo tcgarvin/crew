@@ -1,7 +1,7 @@
 /**
- * D26 aftermath caption: the one line shown for a moment after the player picks a side, saying
- * plainly what happens next. Narrator prose wins, then the option's own `aftermath`, then a
- * built-in line for job offers, then a generic line.
+ * §aftermath-caption: the one line shown for a moment after the player picks a side, saying plainly
+ * what happens next. Narrator prose wins, then the option's own `aftermath`, then a built-in line
+ * for job offers, then a generic line.
  */
 import { type DecisionCardText, renderTextRef } from "@crew/content";
 import type { ContentBundle, Decision, DeepReadonly } from "@crew/sim";
@@ -19,7 +19,8 @@ const GENERIC_AFTERMATH = "Decided. The crew get on with it.";
 
 /**
  * The narrator's card may carry `leftAftermath`/`rightAftermath` (added by the narrator package
- * alongside D26). Read structurally so this works whether or not the field has landed.
+ * alongside the aftermath caption). Read structurally so this works whether or not the field has
+ * landed.
  */
 function narratorAftermath(
   card: DecisionCardText | undefined,

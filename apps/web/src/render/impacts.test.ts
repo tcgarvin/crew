@@ -1,4 +1,4 @@
-/** D92 (call 16): an impact flashes once, from when playback first shows it. */
+/** §rock-impacts (call 16): an impact flashes once, from when playback first shows it. */
 import type { RenderImpact, Tick } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { FLASH_MS, ImpactFlashes, drawImpactFlashes } from "./impacts";

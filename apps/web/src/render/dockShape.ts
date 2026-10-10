@@ -1,9 +1,9 @@
 /**
  * Dockside §3.1 (phase 2): what the renderer reads off a dock map once, memoized per def: the tile
- * grid as row runs per kind, the berth's box (D72: `DockDef.berth`, a size-class box of void), the
- * edges where the box meets the quay and where walls meet floor, and how the berth is drawn;
- * `dockSurface` adds the floor's look once the port's setting is known. Pure; dock frame (tile
- * (0,0) is the map's top-left).
+ * grid as row runs per kind, the berth's box (§berth-boxes: `DockDef.berth`, a size-class box of
+ * void), the edges where the box meets the quay and where walls meet floor, and how the berth is
+ * drawn; `dockSurface` adds the floor's look once the port's setting is known. Pure; dock frame
+ * (tile (0,0) is the map's top-left).
  */
 import { type DockDef, type DockTileKind, HULL_SIZE_BOX, type PortSetting } from "@crew/sim";
 import type { Bounds } from "./hull";
@@ -135,7 +135,7 @@ function edgesToFloor(
   return edges;
 }
 
-/** D72: the berth's tile box, from its origin and size class. */
+/** §berth-boxes: the berth's tile box, from its origin and size class. */
 function berthBox(dock: Pick<DockDef, "berth">): Bounds {
   const { origin, sizeClass } = dock.berth;
   const box = HULL_SIZE_BOX[sizeClass];
@@ -148,8 +148,8 @@ function inBox(box: Bounds, x: number, y: number): boolean {
 
 /**
  * The share of tiles bordering the berth's box on its north, west and east sides that are floor
- * (off the map counts as not). D72: the quay along the box's south edge is always floor, so it
- * says nothing about whether the box is a pad set into the ground or an open slot.
+ * (off the map counts as not). §berth-boxes: the quay along the box's south edge is always floor,
+ * so it says nothing about whether the box is a pad set into the ground or an open slot.
  */
 function surroundShare(
   kinds: readonly DockTileKind[],
@@ -196,7 +196,7 @@ export function dockShape(dock: DockDef): DockShape {
   return shape;
 }
 
-/** How a dock's ground reads, which depends on its port being a station or a planet (D61). */
+/** How a dock's ground reads, which depends on its port being a station or a planet. */
 export interface DockSurface {
   readonly floorPattern: FloorPattern;
   /**

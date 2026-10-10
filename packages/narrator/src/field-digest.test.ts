@@ -1,9 +1,9 @@
 /**
- * D92-D95 in the digest (slice 5 call 15): the field scheduled, in progress and crossed; the
- * alert; the hull with its scars; repairs at port and leaving with them unfinished; damage the
- * crew know of against damage nobody has seen; the intercom. The world comes from the in-code
- * fixtures and the field, scars, problems and facts are written by hand, so these hold whatever
- * the field and damage systems do.
+ * The field and hull lines of the digest (§field-lifecycle, §hull-scars-and-ship-loss; slice 5 call
+ * 15): the field scheduled, in progress and crossed; the alert; the hull with its scars; repairs at
+ * port and leaving with them unfinished; damage the crew know of against damage nobody has seen;
+ * the intercom. The world comes from the in-code fixtures and the field, scars, problems and facts
+ * are written by hand, so these hold whatever the field and damage systems do.
  */
 import type {
   ActorId,
@@ -380,7 +380,7 @@ describe("the field digest: damage known against damage that exists", () => {
     );
   });
 
-  it("names engineering without an article, as the deck's phrase says (D94)", () => {
+  it("names engineering without an article, as the deck's phrase says (§reporting-damage)", () => {
     const state = inTransit().state;
     const hit = scar(state, 1, "engineering");
     problem(state, 1, "hullScar", {

@@ -1,5 +1,5 @@
 /**
- * The provisions reserve, counted in days of meals (D81, reconciling D80's food rule).
+ * The provisions reserve, counted in days of meals (§galley-provisions).
  *
  * A crate of `provisions` is one meal: the serve uses the crate up and sets `servingsPerMeal`
  * servings on the counter (`cook.ts` `runServe`), whatever `galley.servingsPerCrate` says the
@@ -11,7 +11,7 @@
  *
  * Commerce's `reserveLow` (`commerce/reserve.ts`) buys crates against `galley.lowBelowDays` /
  * `restockToDays`; the digest and `crew beats` print the days. Ration packs are not provisions:
- * they stay D80's `commerce.foodReserve`, the fallback.
+ * they stay `commerce.foodReserve`, the fallback.
  *
  * Owner: W1 of ship life slice 3 (complete at the gate; W1 may extend, not rename).
  */

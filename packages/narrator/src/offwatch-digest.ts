@@ -1,13 +1,13 @@
 /**
- * Off watch in the digest (slice 4, call 24; D87). Pure reads of the snapshot's social slice and
- * the actors' steps:
+ * Off watch in the digest (slice 4, call 24; §ship-life-lines). Pure reads of the snapshot's social
+ * slice and the actors' steps:
  *
  * - `off watch:` under "Ship": every open or running group session (`social.sessions`, by id)
  *   and everyone playing on their own now (a `recreate` step outside a listed session);
  * - `rivalries:` under "Ship": tallies from `social.rivalries` with three games or more, or a
  *   run of two or more, names in the key's order;
  * - the crew line's off-watch clauses after `good at`: likes and dislikes, who they are close to
- *   and at odds with (`affinitiesFrom`: compatibility and their own memories, D88), and their
+ *   and at odds with (`affinitiesFrom`: compatibility and their own memories, §affinity), and their
  *   berth;
  * - a thought label's `{ref}` filled with the name of the thought's `refId`.
  */

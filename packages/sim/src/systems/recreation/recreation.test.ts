@@ -67,7 +67,7 @@ const labelOf = (world: World, id: ActorId): string => {
 
 /**
  * The seeded winner of the lounge's first game of cards (weights 1 + interest: Jax 4, Tomas 2).
- * D88: a chat's draw on the social stream comes before it, so the pin moved to Jax.
+ * §ambient-chat: a chat's draw on the social stream comes before it, so the pin moved to Jax.
  */
 const PINNED_WINNER: ActorId = JAX;
 
@@ -242,9 +242,9 @@ describe("mood (call 2)", () => {
   it("a low-mood person keeps to a book, a high-mood one hosts rather than sitting alone", () => {
     const fixture = looked({ activities: CARDS_ONLY });
     const { world } = fixture;
-    // Keen on reading, fond of cards: alone with a book when low... (D84 tuning: at an ordinary
-    // mood hosting is worth its interest + 1, which ties the book and hosts, so the contrast is
-    // drawn from low spirits now, not ordinary ones.)
+    // Keen on reading, fond of cards: alone with a book when low... (§choosing-recreation: at an
+    // ordinary mood hosting is worth its interest + 1, which ties the book and hosts, so the
+    // contrast is drawn from low spirits now, not ordinary ones.)
     const jax = world.state.actors[JAX];
     if (jax === undefined) throw new Error("no Jax");
     jax.interests = { likes: ["reading", "cards"], strong: "reading", dislikes: [] };

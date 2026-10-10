@@ -1,6 +1,6 @@
 /**
- * Dirt (D82): a quantised grid per deck fed by footfall, boots, dust and deposits; room tiers;
- * the `compartmentDirty` problem and its mop task. Register after `registerEquipmentSystems`
+ * Dirt (§dirt-grid): a quantised grid per deck fed by footfall, boots, dust and deposits; room
+ * tiers; the `compartmentDirty` problem and its mop task. Register after `registerEquipmentSystems`
  * (same phase).
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";

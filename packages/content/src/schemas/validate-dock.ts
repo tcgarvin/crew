@@ -1,13 +1,12 @@
 /**
  * Dock map validation (Dockside §3.1). L2: the port exists and has one dock, keys are unique, the
  * map has the posts and areas physical port work needs, a planet has a sky, and castSeed posts
- * name real posts. L3: the map's geometry against every deck in the bundle: the berth box (D72)
- * lies on the map and is all void; the quay row under it is walkable floor across its width
- * (`checkQuayRow`); for each deck whose class fits the
- * box, its ramps (the deck placed in the box, `shipAtInBerth`) land on walkable floor outside the
- * areas and reach every post and area; posts and areas are walkable; the map fits the size cap.
- * A scenario's ship fits every dock's box (`checkScenarioBerths`). The deck's side of the
- * contract is `validate-hull.ts`.
+ * name real posts. L3: the map's geometry against every deck in the bundle: the berth box
+ * (§berth-boxes) lies on the map and is all void; the quay row under it is walkable floor across
+ * its width (`checkQuayRow`); for each deck whose class fits the box, its ramps (the deck placed in
+ * the box, `shipAtInBerth`) land on walkable floor outside the areas and reach every post and area;
+ * posts and areas are walkable; the map fits the size cap. A scenario's ship fits every dock's box
+ * (`checkScenarioBerths`). The deck's side of the contract is `validate-hull.ts`.
  *
  * Walkable dock floor is a `floor` tile under no blocking prop. The sim's nav graft applies the
  * same rule (`dockFloorMask` in `@crew/sim`, which this package may only import as types); a CLI
@@ -151,7 +150,7 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
       issues,
     );
     checkComposition(dock, issues);
-    // D61: the dock takes its setting from its port rather than repeating it.
+    // §dock-map-content: the dock takes its setting from its port rather than repeating it.
     const setting = bundle.ports[dock.portId]?.setting;
     if (setting === "planet" && dock.palette.sky === undefined) {
       issues.push(issue("referential", [...path, "palette"], "a planet dock needs palette.sky"));
@@ -328,7 +327,7 @@ function checkPostsAndAreas(dock: DockDef, mask: Uint8Array, issues: ValidationI
   });
 }
 
-/** D72: the berth box lies on the map and every tile of it is authored `void`. */
+/** §berth-boxes: the berth box lies on the map and every tile of it is authored `void`. */
 function checkBerthBox(dock: DockDef, issues: ValidationIssue[]): boolean {
   const path: Path = [...dockPath(dock), "berth", "origin"];
   const { origin, sizeClass } = dock.berth;
@@ -353,10 +352,10 @@ function checkBerthBox(dock: DockDef, issues: ValidationIssue[]): boolean {
 }
 
 /**
- * L3 (D72): the quay row, just south of the berth box, is walkable floor across the box's whole
- * width, so a ramp anywhere along a hull of the box's class lands on the quay. Expects a usable
- * grid and a box on the map (`checkDockPhysical` checks both first); a quay row off the map is
- * reported as off the map.
+ * L3 (§berth-boxes): the quay row, just south of the berth box, is walkable floor across the box's
+ * whole width, so a ramp anywhere along a hull of the box's class lands on the quay. Expects a
+ * usable grid and a box on the map (`checkDockPhysical` checks both first); a quay row off the map
+ * is reported as off the map.
  */
 export function checkQuayRow(dock: DockDef, issues: ValidationIssue[]): void {
   const mask = dockWalkableMask(dock);
@@ -473,8 +472,8 @@ function checkLandings(
 }
 
 /**
- * D61, D82: a station has no sky, so a dock whose port is a `station` carries no airborne dust.
- * Grime and dust in [0, 1] are L1's (`dockDefSchema`).
+ * §dock-map-content, §dirt-deposits: a station has no sky, so a dock whose port is a `station`
+ * carries no airborne dust. Grime and dust in [0, 1] are L1's (`dockDefSchema`).
  */
 function checkStationDust(dock: DockDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
   const port = bundle.ports[dock.portId];
@@ -483,7 +482,7 @@ function checkStationDust(dock: DockDef, bundle: ContentBundle, issues: Validati
     issue(
       "physical",
       [...dockPath(dock), "airborneDust"],
-      `"${dock.id}" is a station dock but has airborneDust ${dock.airborneDust}; a station has no sky (D61)`,
+      `"${dock.id}" is a station dock but has airborneDust ${dock.airborneDust}; a station has no sky (§dock-map-content)`,
     ),
   );
 }
@@ -506,7 +505,10 @@ export function checkDockPhysical(
   }
 }
 
-/** L3 (D72): a scenario's ship can berth at every dock, its class fitting each berth box. */
+/**
+ * L3 (§orientation-and-size): a scenario's ship can berth at every dock, its class fitting each
+ * berth box.
+ */
 export function checkScenarioBerths(
   scenario: ScenarioDef,
   bundle: ContentBundle,

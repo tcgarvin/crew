@@ -1,5 +1,5 @@
 /**
- * Cooking and serving (D81): the `cookMeal` plan and its two commit steps.
+ * Cooking and serving (§cooking-and-serving): the `cookMeal` plan and its two commit steps.
  *
  * - `cookPlan`: a crate of provisions in hand already, else one split off the nearest stack the
  *   cook believes in (`pickUp` with `split`: the generic supply steps carry whole stacks, and
@@ -138,7 +138,7 @@ function useUp(ctx: StepCtx, item: Item): void {
   else delete ctx.state.items[item.id];
 }
 
-/** Tell every crew member aboard where the servings are (a report, like D69's dropped tools). */
+/** Tell every crew member aboard where the servings are (a report, like the dropped tools). */
 function callTheMess(ctx: StepCtx, cook: Actor, servings: StackItem): void {
   const source = {
     tick: ctx.tick,

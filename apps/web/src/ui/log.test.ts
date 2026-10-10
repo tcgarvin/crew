@@ -32,7 +32,7 @@ function texts(entries: readonly LogEntry[]): string[] {
   return entries.map((e) => (e.kind === "event" ? e.text : `card ${e.decision.id}`));
 }
 
-describe("the ship's log (D55)", () => {
+describe("the ship's log (§the-log-in-playback-order)", () => {
   it("shows only what playback has reached, newest first, though the worker runs ahead", () => {
     const log = appendTicker([], [line(10, "a"), line(20, "b"), line(400, "far ahead")]);
     expect(texts(visibleLog(log, 0 as Tick))).toEqual([]);
@@ -46,7 +46,7 @@ describe("the ship's log (D55)", () => {
     expect(texts(visibleLog(log, 30 as Tick))).toEqual(["c", "card d1", "a"]);
   });
 
-  it("logs a card delivered in person at its meeting, not when it was made (D70)", () => {
+  it("logs a card delivered in person at its meeting, not when it was made", () => {
     const held = { ...decision("d1", 20), deliveredTick: 60 as Tick };
     const log = appendDecision([], held);
     expect(texts(visibleLog(log, 59 as Tick))).toEqual([]);
@@ -61,7 +61,7 @@ describe("the ship's log (D55)", () => {
     expect(log[0]).toMatchObject({ kind: "card", answer: { side: "left", caption: "Taken." } });
   });
 
-  it("highlights the line that slowed the game, matched by tick and text (D76)", () => {
+  it("highlights the line that slowed the game, matched by tick and text (§auto-slowdown)", () => {
     const log = appendTicker(
       [],
       [line(10, "Coolant pump: seized bearing"), line(10, "Coolant pump at 50% (fault)")],
@@ -76,14 +76,14 @@ describe("the ship's log (D55)", () => {
     expect(log.every((e) => e.kind !== "event" || e.highlight === undefined)).toBe(true);
   });
 
-  it("marks a second identical line in the same tick on the second slowdown (D76)", () => {
+  it("marks a second identical line in the same tick on the second slowdown", () => {
     const log = appendTicker([], [line(5, "Nobody at the helm"), line(5, "Nobody at the helm")]);
     const once = highlightEvent(log, 5 as Tick, "Nobody at the helm").log;
     const twice = highlightEvent(once, 5 as Tick, "Nobody at the helm").log;
     expect(twice.filter((e) => e.kind === "event" && e.highlight === true)).toHaveLength(2);
   });
 
-  it("reports a slowdown whose line is not in the log rather than marking another (D76)", () => {
+  it("reports a slowdown whose line is not in the log rather than marking another", () => {
     const log = appendTicker([], [line(10, "Bell.")]);
     const result = highlightEvent(log, 11 as Tick, "Bell.");
     expect(result.found).toBe(false);
@@ -108,7 +108,7 @@ describe("the ship's log (D55)", () => {
     ]);
   });
 
-  it("clears every highlight, leaving an unmarked log as it was (D76 addendum)", () => {
+  it("clears every highlight, leaving an unmarked log as it was (§auto-slowdown)", () => {
     const log = appendTicker([], [line(1, "a"), line(2, "b")]);
     expect(clearHighlights(log)).toBe(log);
     const marked = highlightEvent(log, 2 as Tick, "b").log;

@@ -1,5 +1,5 @@
 /**
- * The dirt channel's playback side (D82, ship-life slice 3 call 14). The worker posts a
+ * The dirt channel's playback side (§dirt-grid, ship-life slice 3 call 14). The worker posts a
  * `DirtFrame` on load and every `host.dirtFrameEverySeconds` of sim time, but it runs ahead of
  * the viewer (D14), so a frame is queued by its tick when it arrives and shown only once playback
  * reaches that tick: a tint that darkened before the footsteps that made it would read as a bug.

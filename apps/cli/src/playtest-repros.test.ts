@@ -1,5 +1,5 @@
 /**
- * D80: the playtest's dead ends, reproduced on the real content and the full system stack (the
+ * The playtest's dead ends, reproduced on the real content and the full system stack (the
  * pacing registry), so each stays fixed as the rules move. Cards are answered "left" (hold for
  * repairs) and hooks acknowledged, as `crew beats` does.
  */
@@ -94,7 +94,7 @@ function drive(
   return all;
 }
 
-describe("playtest repros (D80)", () => {
+describe("playtest repros", () => {
   it("an engine lost mid-leg with no spare aboard limps on to port instead of drifting for good", () => {
     const { kernel, world } = freshWorld();
     noSparesAnywhere(world);
@@ -149,7 +149,7 @@ describe("playtest repros (D80)", () => {
   }, 60_000);
 });
 
-describe("slice-2 QA repros (D77 addendum)", () => {
+describe("slice-2 QA repros", () => {
   it("a port call in the Blue watch loads its cargo within the watch: cargo is all hands awake", () => {
     const { kernel, world } = freshWorld();
     const watch = watchTicks(world.config.values);
@@ -191,9 +191,9 @@ describe("slice-2 QA repros (D77 addendum)", () => {
   }, 60_000);
 });
 
-describe("patch kits restocked at port (D93)", () => {
+describe("patch kits restocked at port (§plating-and-kits-at-port)", () => {
   it(
-    "a ship short of patch kits at a port that sells them buys back to the scenario's 24 (D93)",
+    "a ship short of patch kits at a port that sells them buys back to the scenario's 24 (§plating-and-kits-at-port)",
     { timeout: 60_000 },
     () => {
       const { kernel, world } = freshWorld();

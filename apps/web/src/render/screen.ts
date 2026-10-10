@@ -16,9 +16,9 @@ export function toPx(t: ViewTransform, x: number, y: number): readonly [number, 
 
 /**
  * Map a point in the transform's local ("fit") space to real screen pixels, applying the same
- * quarter turn counter-clockwise `drawFrame` applies to the canvas (D72: the bow, +x, points up
- * on a phone; `orientation.ts`) — used to place text after `ctx.restore()` so labels stay
- * upright (task item 5).
+ * quarter turn counter-clockwise `drawFrame` applies to the canvas (§orientation-and-size: the bow,
+ * +x, points up on a phone; `orientation.ts`) — used to place text after `ctx.restore()` so labels
+ * stay upright (task item 5).
  */
 export function toScreenPx(
   t: ViewTransform,

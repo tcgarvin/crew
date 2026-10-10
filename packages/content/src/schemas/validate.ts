@@ -7,28 +7,30 @@
  *   loader before defs are keyed; see `loader.ts`); each namespace matches its table; local keys
  *   unique within their def; a zone's `machineKey` names a placement on its deck; scenario
  *   placement/fault keys exist; `unique` items have `maxStack: 1`; port routes symmetric; price
- *   bands `min <= max`; config numbers finite. D77: every watch-bill member is in the scenario's
- *   crew, and dayworkers' watches exist in the day; D79: each thought sits under its own key.
- *   Slice 4 (D84): an activity's topics and product resolve and its required item tag is carried
- *   by some item def, by a `personal` one when it must be the actor's own; at most four take part
- *   (one plate's worth); a group activity that is not a contest says how it is done alone
- *   (`solo`); a thought label carries `{ref}` only for a key the sim gives a `refId`.
+ *   bands `min <= max`; config numbers finite. §sections-and-dayworkers: every watch-bill member is
+ *   in the scenario's crew, and dayworkers' watches exist in the day; §thoughts: each thought sits
+ *   under its own key. Slice 4 (§activities-and-interests): an activity's topics and product
+ *   resolve and its required item tag is carried by some item def, by a `personal` one when it must
+ *   be the actor's own; at most four take part (one plate's worth); a group activity that is not a
+ *   contest says how it is done alone (`solo`); a thought label carries `{ref}` only for a key the
+ *   sim gives a `refId`.
  * - **L3 semantic/physical**: tile rows match width/height and use declared symbols; doors and
  *   openings sit on compartment boundaries, ramps on hull edges; footprints in bounds, on floor and
  *   non-overlapping (and don't cover doors); interaction positions walkable and adjacent to
  *   footprints; deck connected; zones on floor; spawn points on floor; recipe tools satisfiable by
  *   some item def, and carried from the start by every scenario whose deck has the machine
- *   (D71). The hull contract (`validate-hull.ts`, D72): size class, bow east, ramps south, the
- *   rooms, stations, zones and spawn points every deck needs, the helm's standby position (D77),
- *   lockers serving beds; a scenario's crew each get a crew spawn point. D77: a scenario's watch
- *   bill has a section per watch of the day, each with a helm-qualified member, and only a
- *   fixture-sized crew may go without one (`checkScenarioWatchBill`). Dock maps
- *   (`validate-dock.ts`): rows against the legend, the berth box on the map and void, each deck's
- *   ramp landings on floor, posts and areas on floor and reachable from both landings, the quay
- *   row under the box walkable, the size cap; a scenario's ship fits every berth box and has beds
- *   for its crew + 1 (`checkScenarioBeds`). Activity venues (`validate-venues.ts`, D84): a present
- *   venue fits `participants.max`, a product's zone exists, and a scenario's deck hosts every
- *   activity; a deck no scenario sails may lack some, reported as notes (`activityVenueNotes`).
+ *   (§scenario-tools). The hull contract (`validate-hull.ts`, §what-a-deck-must-offer): size class,
+ *   bow east, ramps south, the rooms, stations, zones and spawn points every deck needs, the helm's
+ *   standby position (§handover), lockers serving beds; a scenario's crew each get a crew spawn
+ *   point. §sections-and-dayworkers: a scenario's watch bill has a section per watch of the day,
+ *   each with a helm-qualified member, and only a fixture-sized crew may go without one
+ *   (`checkScenarioWatchBill`). Dock maps (`validate-dock.ts`): rows against the legend, the berth
+ *   box on the map and void, each deck's ramp landings on floor, posts and areas on floor and
+ *   reachable from both landings, the quay row under the box walkable, the size cap; a scenario's
+ *   ship fits every berth box and has beds for its crew + 1 (`checkScenarioBeds`). Activity venues
+ *   (`validate-venues.ts`, §activities-and-interests): a present venue fits `participants.max`, a
+ *   product's zone exists, and a scenario's deck hosts every activity; a deck no scenario sails may
+ *   lack some, reported as notes (`activityVenueNotes`).
  * - L4 (simulation smoke) lives in `apps/cli`, not here.
  */
 import type {
@@ -256,7 +258,8 @@ function checkItem(item: ItemDef, issues: ValidationIssue[]): void {
       issue("referential", [...path, "maxStack"], `unique item "${item.id}" must have maxStack 1`),
     );
   }
-  // D65: a hand truck is one unique thing with a load it can carry, and only a hand truck has one.
+  // §hand-truck-trips: a hand truck is one unique thing with a load it can carry, and only a hand
+  // truck has one.
   const truck = item.toolKinds.includes("handTruck");
   const capacityPath: Path = [...path, "capacityUnits"];
   if (truck && (item.capacityUnits === undefined || item.capacityUnits < 2)) {
@@ -307,7 +310,7 @@ function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue
     issues,
   );
 
-  // D47: a market line names a real item, once per port.
+  // §market-stock: a market line names a real item, once per port.
   const marketItems = new Set<string>();
   port.market.forEach((line, i) => {
     checkRef(bundle.items, line.itemDefId, "item", [...path, "market", i, "itemDefId"], issues);
@@ -409,7 +412,10 @@ function checkScenario(
   checkWatchBillCrew(scenario, path, issues);
 }
 
-/** D77: every watch-bill member is one of the scenario's crew (L1 has ruled out duplicates). */
+/**
+ * §sections-and-dayworkers: every watch-bill member is one of the scenario's crew (L1 has ruled out
+ * duplicates).
+ */
 function checkWatchBillCrew(scenario: ScenarioDef, path: Path, issues: ValidationIssue[]): void {
   const bill = scenario.watchBill;
   if (bill === undefined) return;
@@ -429,7 +435,7 @@ function checkWatchBillCrew(scenario: ScenarioDef, path: Path, issues: Validatio
   bill.dayworkers.forEach((id, j) => check(id, [...path, "watchBill", "dayworkers", j]));
 }
 
-/** D77: dayworkers' watches are watches of the day, each listed once. */
+/** §sections-and-dayworkers: dayworkers' watches are watches of the day, each listed once. */
 function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const watches = bundle.config.time.watchesPerDay;
   const seen = new Set<number>();
@@ -449,7 +455,10 @@ function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[])
  */
 const THOUGHTS_WITH_REF: ReadonlySet<string> = new Set(["keepsBeatingMe", "argued"]);
 
-/** D79: each thought def sits under its own key; D85: `{ref}` only where a `refId` comes. */
+/**
+ * §thoughts: each thought def sits under its own key; §crew-lines: `{ref}` only where a `refId`
+ * comes.
+ */
 function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): void {
   for (const [key, def] of Object.entries(bundle.thoughts)) {
     if (def.key !== key) {
@@ -470,8 +479,9 @@ function checkThoughtKeys(bundle: ContentBundle, issues: ValidationIssue[]): voi
 }
 
 /**
- * D81: the galley finds what it cooks from and what it serves by tag, so no item id lives in
- * config: exactly one `meal`-tagged item def (with a `nutrition`), at least one `provisions`.
+ * §cooking-and-serving: the galley finds what it cooks from and what it serves by tag, so no item
+ * id lives in config: exactly one `meal`-tagged item def (with a `nutrition`), at least one
+ * `provisions`.
  */
 function checkGalleyItems(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const items = Object.values(bundle.items);
@@ -501,7 +511,10 @@ function checkGalleyItems(bundle: ContentBundle, issues: ValidationIssue[]): voi
   }
 }
 
-/** One session renders as one plate of first names at the venue (D84): four fit. */
+/**
+ * One session renders as one plate of first names at the venue (§activities-and-interests): four
+ * fit.
+ */
 const MAX_PARTICIPANTS = 4;
 
 /**
@@ -549,8 +562,9 @@ function checkActivities(bundle: ContentBundle, issues: ValidationIssue[]): void
 }
 
 /**
- * D84: at most `MAX_PARTICIPANTS` take part; a group activity that is not a contest has a `solo`
- * variant, so a session nobody joined still restores something (a contest without one fails).
+ * §activities-and-interests: at most `MAX_PARTICIPANTS` take part; a group activity that is not a
+ * contest has a `solo` variant, so a session nobody joined still restores something (a contest
+ * without one fails).
  */
 function checkActivityShape(activity: ActivityDef, path: Path, issues: ValidationIssue[]): void {
   const { min, max } = activity.participants;
@@ -589,9 +603,9 @@ function checkPriceBands(bundle: ContentBundle, issues: ValidationIssue[]): void
 }
 
 /**
- * D25: every port with job templates has people to offer them, and every entry is a port. No
- * given name is a crew member's first name: labels and log lines call people by first name, so a
- * dock local named like a crew member reads as them.
+ * §issuers-and-pitches: every port with job templates has people to offer them, and every entry is
+ * a port. No given name is a crew member's first name: labels and log lines call people by first
+ * name, so a dock local named like a crew member reads as them.
  */
 function checkPeople(bundle: ContentBundle, issues: ValidationIssue[]): void {
   const people = bundle.people;
@@ -944,10 +958,10 @@ function checkRecipeToolsSatisfiable(bundle: ContentBundle, issues: ValidationIs
 }
 
 /**
- * D71: a scenario's ship starts able to do every repair and inspection its own machines' recipes
- * describe: each tool kind a recipe on the scenario's deck names is provided by one of its starting
- * items. A tool only a far port sells left every fault that needs it unrepairable everywhere else
- * (the welder, D69). Markets may still sell tools, as replacements.
+ * §scenario-tools: a scenario's ship starts able to do every repair and inspection its own
+ * machines' recipes describe: each tool kind a recipe on the scenario's deck names is provided by
+ * one of its starting items. A tool only a far port sells left every fault that needs it
+ * unrepairable everywhere else (the welder). Markets may still sell tools, as replacements.
  */
 function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: ValidationIssue[]): void {
   for (const scenario of Object.values(bundle.scenarios)) {
@@ -981,7 +995,10 @@ function checkScenarioCarriesRecipeTools(bundle: ContentBundle, issues: Validati
   }
 }
 
-/** D77: more crew than this need an authored watch bill; the generated one is for test fixtures. */
+/**
+ * §sections-and-dayworkers: more crew than this need an authored watch bill; the generated one is
+ * for test fixtures.
+ */
 const MAX_CREW_WITHOUT_WATCH_BILL = 3;
 
 /** The skill and level a helm-stander needs on `deck`: its pilot station's operator requirement. */
@@ -998,11 +1015,12 @@ function helmRequirement(
 }
 
 /**
- * D77 (ship life plan, slice 2 call 4): section `i` stands watch `i` of the day with no wrap, so
- * an authored bill has exactly `time.watchesPerDay` sections or some watch has nobody on it; each
- * section needs a member qualified for the helm, or its watch has no stander. Membership, nobody
- * listed twice and dayworkers apart from the sections are L1 and L2. A scenario without a bill
- * gets a generated one, which is for fixtures of at most `MAX_CREW_WITHOUT_WATCH_BILL` crew.
+ * §sections-and-dayworkers (ship life plan, slice 2 call 4): section `i` stands watch `i` of the
+ * day with no wrap, so an authored bill has exactly `time.watchesPerDay` sections or some watch has
+ * nobody on it; each section needs a member qualified for the helm, or its watch has no stander.
+ * Membership, nobody listed twice and dayworkers apart from the sections are L1 and L2. A scenario
+ * without a bill gets a generated one, which is for fixtures of at most
+ * `MAX_CREW_WITHOUT_WATCH_BILL` crew.
  */
 function checkScenarioWatchBill(
   scenario: ScenarioDef,

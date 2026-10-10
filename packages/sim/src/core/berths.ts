@@ -1,6 +1,6 @@
 /**
- * Berths (D74; ship-life §7). Every crew member and passenger aboard has a bed of their own when
- * the ship has one free, recorded in `WorldState.berths` as the bed's placement key.
+ * Berths (§berth-assignment; ship-life §7). Every crew member and passenger aboard has a bed of
+ * their own when the ship has one free, recorded in `WorldState.berths` as the bed's placement key.
  *
  * `assignBerths` is a standing rule, not a one-off: run at world creation and by the needs stage
  * every tick, it first releases the berth of anyone dead, gone from `actors` (a passenger who

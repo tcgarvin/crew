@@ -177,8 +177,8 @@ function renderCallSummary(call: NarratorCallRow): string {
 }
 
 /**
- * A D32 thread (`{title, scale, people, arcNotes, nextBeat}`; `stage` before D103), or a pre-D32
- * plain string.
+ * A structured thread (`{title, scale, people, arcNotes, nextBeat}`, §threads-and-scales), or a
+ * plain string from older notes.
  */
 function threadLine(thread: unknown): string {
   if (typeof thread === "string") return text(thread);
@@ -191,7 +191,7 @@ function threadLine(thread: unknown): string {
   return `${header}: ${text(arcNotes === undefined ? field(thread, "stage") : arcNotes)}${next}`;
 }
 
-/** A D31 `CardShown` entry, or whatever older notes stored. */
+/** A `CardShown` entry (§card-history), or whatever older notes stored. */
 function cardShownLine(card: unknown): string {
   if (!isRecord(card)) return typeof card === "string" ? card : (JSON.stringify(card) ?? MISSING);
   const chosen = card.chosen;
@@ -206,7 +206,8 @@ function renderNotes(notes: unknown): string {
   if (typeof notes === "string") return `summary: ${text(notes)}`;
   if (!isRecord(notes) || Object.keys(notes).length === 0) return "(empty)";
   const lines = [`summary: ${text(notes.summary)}`];
-  // Pre-D32 notes carry `openThreads: string[]`; D32 notes carry structured `threads`.
+  // Older notes carry `openThreads: string[]`; current notes (§threads-and-scales) carry structured
+  // `threads`.
   const threads = list(notes.threads ?? notes.openThreads);
   lines.push(`threads (${threads.length}):`);
   for (const thread of threads) lines.push(`  - ${threadLine(thread)}`);
@@ -365,8 +366,9 @@ function isOlder(a: NarratorCallRow, b: NarratorCallRow): boolean {
 /**
  * The route reads `games.narrative_notes` before each call and writes `notesUpdate` after an ok
  * one, and the request row doesn't carry the notes it saw; so the notes a call saw are the
- * `notesUpdate` of the newest earlier ok call that had one (empty before the first). D97: or the
- * `notes` of the newest earlier ok notes turn, which the route waits for before a call.
+ * `notesUpdate` of the newest earlier ok call that had one (empty before the first). Or
+ * (§notes-turn) the `notes` of the newest earlier ok notes turn, which the route waits for before a
+ * call.
  */
 async function notesSeenBy(
   db: Db,
@@ -399,7 +401,8 @@ function snapshotOf(request: unknown): SaveEnvelope {
     );
   }
   // Same upgrade `runNarrator` applies, so an old request still renders through today's digest:
-  // config keys added or renamed since (D76's day units) come from the loaded content.
+  // config keys added or renamed since (the day units, §the-ships-day) come from the loaded
+  // content.
   const content = contentBundle();
   const saved = snapshot as unknown as SaveEnvelope;
   const config = fillConfig(saved.config, content.config).values;

@@ -29,18 +29,18 @@ function render(card: DecisionCardText): string {
 }
 
 describe("Log", () => {
-  it("marks a card that closed a story, with the story's name (D56)", () => {
+  it("marks a card that closed a story, with the story's name (§closing-cards)", () => {
     expect(render({ ...text, closesThread: "Fenwick's manifest" })).toContain(
       "✓ Story closed: Fenwick&#x27;s manifest",
     );
   });
 
-  it("marks an unnamed close without a name, and an ordinary card not at all (D56)", () => {
+  it("marks an unnamed close without a name, and an ordinary card not at all", () => {
     expect(render({ ...text, closesThread: "" })).toContain("✓ Story closed</span>");
     expect(render(text)).not.toContain("Story closed");
   });
 
-  it("styles the line that slowed the game down, and no other (D76)", () => {
+  it("styles the line that slowed the game down, and no other (§auto-slowdown)", () => {
     const lines: EventEntry[] = [
       {
         key: "e:1",
@@ -62,7 +62,7 @@ describe("Log", () => {
     expect(html).toContain('class="log-line log-line-notable">Bell.<');
   });
 
-  it("starts compact, with a toggle to show more (D72: the portrait strip under the canvas)", () => {
+  it("starts compact, with a toggle to show more (the portrait strip under the canvas)", () => {
     const html = render(text);
     expect(html).toContain('<section class="log-panel">');
     expect(html).toContain('aria-expanded="false"');

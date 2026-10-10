@@ -111,7 +111,7 @@ describe("dock map validation", () => {
     expect(messages).toContainEqual(expect.stringContaining('inside area "staging"'));
   });
 
-  it("rejects a berth box over anything but void (D72)", () => {
+  it("rejects a berth box over anything but void (§berth-boxes)", () => {
     const messages = messagesAfter((dock) => {
       dock.berth = { origin: { x: 1, y: 2 }, sizeClass: "M" };
     });
@@ -152,7 +152,7 @@ describe("dock map validation", () => {
     );
   });
 
-  it("needs a sky colour for a planet port's dock, and none for a station's (D61)", () => {
+  it("needs a sky colour for a planet port's dock, and none for a station's (§dock-map-content)", () => {
     const planet = messagesAfter((_dock, raw) => {
       const port = raw.ports?.[HUB_PORT] as { setting: string };
       port.setting = "planet";
@@ -164,7 +164,7 @@ describe("dock map validation", () => {
     expect(station).toContainEqual(expect.stringContaining("a station dock has no sky colour"));
   });
 
-  it("refuses a dock that repeats its port's setting (D61)", () => {
+  it("refuses a dock that repeats its port's setting (§dock-map-content)", () => {
     const messages = messagesAfter((dock) => {
       (dock as unknown as Record<string, unknown>).setting = "station";
     });
@@ -199,7 +199,7 @@ describe("dock map validation", () => {
   });
 });
 
-describe("berth box against hull classes (D72)", () => {
+describe("berth box against hull classes (§orientation-and-size)", () => {
   it("leaves a deck whose class is bigger than the box out of the dock's landing checks", () => {
     const messages = messagesAfter((_dock, raw) => {
       const mk1 = raw.decks?.["deck.freighter_mk1"] as { hull: { sizeClass: string } };
@@ -231,7 +231,7 @@ describe("berth box against hull classes (D72)", () => {
   });
 });
 
-describe("quay row (D72)", () => {
+describe("quay row (§berth-boxes)", () => {
   /**
    * A 26 x 16 map with an S box (24 x 14) at (1,0) between two wall columns, the quay row (14)
    * floor from edge to edge, and a wall row under it.
@@ -308,7 +308,7 @@ describe("quay row (D72)", () => {
   });
 });
 
-describe("dock grime and dust (D61, D82)", () => {
+describe("dock grime and dust (§dock-map-content, §dirt-deposits)", () => {
   const TERNS = "dock.terns_rest";
   const dust = (dockId: string, value: number): string[] =>
     messagesAfter((_, raw) => {
@@ -317,7 +317,7 @@ describe("dock grime and dust (D61, D82)", () => {
 
   it("rejects airborne dust on a station's dock", () => {
     expect(dust(HUB, 0.1)).toEqual([
-      `docks.${HUB}.airborneDust: "${HUB}" is a station dock but has airborneDust 0.1; a station has no sky (D61)`,
+      `docks.${HUB}.airborneDust: "${HUB}" is a station dock but has airborneDust 0.1; a station has no sky (§dock-map-content)`,
     ]);
   });
 

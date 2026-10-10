@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rejectionMessage } from "./rejectionMessage";
 
-describe("rejectionMessage (D42)", () => {
+describe("rejectionMessage (§decision-queue-and-halts)", () => {
   it("maps the known preconditionFailed reasons to a friendly line", () => {
     expect(
       rejectionMessage("acceptContract", {

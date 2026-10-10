@@ -178,9 +178,9 @@ export const recipeActionSchema = z.enum([
   "installComponent",
   "test",
 ]);
-/** D72: hull size classes (sim `HULL_SIZE_CLASSES`). */
+/** §orientation-and-size: hull size classes (sim `HULL_SIZE_CLASSES`). */
 export const hullSizeClassSchema = z.enum(["S", "M", "L"]);
-/** D79, D81, D82: the thoughts the sim raises (sim `THOUGHT_KEYS`). */
+/** §thoughts: the thoughts the sim raises (sim `THOUGHT_KEYS`). */
 export const thoughtKeySchema = z.enum([
   "stoodLongWatch",
   "doubleWatch",
@@ -210,7 +210,7 @@ export const thoughtKeySchema = z.enum([
   "ateATreat",
   "nearMiss",
 ]);
-/** D88: what one person remembers about another (sim `MEMORY_KEYS`). */
+/** §memories: what one person remembers about another (sim `MEMORY_KEYS`). */
 export const memoryKeySchema = z.enum([
   "chatted",
   "rubbedWrong",
@@ -270,11 +270,17 @@ export const problemKindSchema = z.enum([
   "hullDamaged",
   "compartmentToCheck",
 ]);
-/** D92: field severities (sim `FIELD_SEVERITIES`), the keys of `config.field.severities`. */
+/**
+ * §scheduling-a-field: field severities (sim `FIELD_SEVERITIES`), the keys of
+ * `config.field.severities`.
+ */
 export const fieldSeveritySchema = z.enum(["light", "heavy", "brutal"]);
-/** D92: rock sizes (sim `ROCK_SIZES`), the keys of `config.field.hullDamage`. */
+/** §rock-impacts: rock sizes (sim `ROCK_SIZES`), the keys of `config.field.hullDamage`. */
 export const rockSizeSchema = z.enum(["small", "large"]);
-/** D92: machine effects (sim `MACHINE_EFFECTS`), the keys of `config.field.machineEffects`. */
+/**
+ * §machines-in-the-blast: machine effects (sim `MACHINE_EFFECTS`), the keys of
+ * `config.field.machineEffects`.
+ */
 export const machineEffectSchema = z.enum(["none", "graze", "damage", "knockout", "fault"]);
 
 export const skillLevelsSchema = z.partialRecord(

@@ -4,10 +4,10 @@ import { templateCard } from "@crew/content";
  * is configured and the fallback for every model failure, so the game stays playable with the
  * LLM unavailable. For a policy decision it writes a template card. D40: the narrator is the
  * only source of work, so for `captainAshore` it makes one job offer from the
- * port's `jobTemplates` and the content name table (D25), built as an `offerJob` intent and run
- * through the same translator as a model's offer, so pay, clamps and the person/pitch shape are
- * identical. The draw is seeded from the snapshot's tick and the port, so the same snapshot
- * always yields the same offer.
+ * port's `jobTemplates` and the content name table (§issuers-and-pitches), built as an `offerJob`
+ * intent and run through the same translator as a model's offer, so pay, clamps and the
+ * person/pitch shape are identical. The draw is seeded from the snapshot's tick and the port, so
+ * the same snapshot always yields the same offer.
  */
 import {
   type ContentBundle,
@@ -39,7 +39,8 @@ const TEMPLATE_ISSUER_ROLE = "shipper";
 
 /**
  * What the offline offer says about the job (`{cargo}`, `{from}`, `{to}` filled from content).
- * No pay and no numbers (D24, GDD §22); the pitch comes from the name table's lines.
+ * No pay and no numbers (§cards-never-mention-pay, GDD §22); the pitch comes from the name table's
+ * lines.
  */
 export const NULL_OFFER_DESCRIPTIONS: readonly string[] = [
   "{cargo} waiting on the dock at {from}, bound for {to}.",
@@ -97,9 +98,9 @@ function quantityFor(count: number): (typeof QUANTITIES)[number] {
 }
 
 /**
- * D25: who offers the job and what they say, from the content name table over the `social`
- * stream (the `commerce` stream draws only route, count and pay). Without a table entry for the
- * port the template's `issuer` becomes the name.
+ * §issuers-and-pitches: who offers the job and what they say, from the content name table over the
+ * `social` stream (the `commerce` stream draws only route, count and pay). Without a table entry
+ * for the port the template's `issuer` becomes the name.
  */
 function drawPerson(
   rng: RngApi,
@@ -139,10 +140,10 @@ function drawPerson(
 type Person = ReturnType<typeof drawPerson>;
 
 /**
- * D70: half the time the work comes from someone standing on the dock (a regular at their post,
- * or someone the staging call placed), as the prompt asks the model to prefer, so the captain
- * offline walks over and talks to them as well as going out through the gate. Their name and
- * role; the drawn organisation and pitch stay.
+ * §offers-in-person: half the time the work comes from someone standing on the dock (a regular at
+ * their post, or someone the staging call placed), as the prompt asks the model to prefer, so the
+ * captain offline walks over and talks to them as well as going out through the gate. Their name
+ * and role; the drawn organisation and pitch stay.
  */
 function withDockIssuer(rng: RngApi, snapshot: Snapshot, person: Person): Person {
   const onDock = Object.values(snapshot.state.dockside.locals).filter(
@@ -239,7 +240,8 @@ export function nullNarratorResponse(
     if (decision === undefined) return base;
     return { ...base, card: templateCard(decision, options.content) };
   }
-  // D66: the staging call is answered with an empty plan: the dock is the sim's floor set.
+  // §staging-hook-and-the-hold: the staging call is answered with an empty plan: the dock is the
+  // sim's floor set.
   if (hook.kind === "stageDock") return base;
   if (hook.kind === "captainAshore" && options.content) {
     const offer = nullOffer(req, hook.context.portId, options.content, base.callId);

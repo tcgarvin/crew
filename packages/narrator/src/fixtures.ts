@@ -41,8 +41,8 @@ const MERIDIAN = "port.green_meridian" as PortDefId;
 const OSSORY = "port.ossory_station" as PortDefId;
 
 /**
- * D61: the dock alongside follows the travel stage. A fixture that writes the stage by hand calls
- * this after, so the snapshot never has the start port's dock alongside in flight.
+ * §travel-stages: the dock alongside follows the travel stage. A fixture that writes the stage by
+ * hand calls this after, so the snapshot never has the start port's dock alongside in flight.
  */
 function alignDock(state: WorldState, content: ContentBundle): void {
   const due = expectedDock(content, state.travel);
@@ -54,7 +54,7 @@ function alignDock(state: WorldState, content: ContentBundle): void {
     return;
   }
   state.deck.dock = { dockId: due.id, deckId };
-  // D66: the dock alongside comes with its floor set, as the sim dresses it.
+  // §floor-set-rule: the dock alongside comes with its floor set, as the sim dresses it.
   dressDock(state, content, undefined, state.tick, 1);
 }
 
@@ -118,9 +118,9 @@ function tireCrew(world: World): void {
 }
 
 /**
- * Approaching Kessler Drift from Crossroads Hub, no jobs yet, on a `quietTooLong` check-in. D66
- * retired `approachingPort`, which this fixture used to carry; the ship on approach is still the
- * base the other fixtures build on.
+ * Approaching Kessler Drift from Crossroads Hub, no jobs yet, on a `quietTooLong` check-in.
+ * `approachingPort` is retired (§staging-hook-and-the-hold: arrival is the staging call's), which
+ * this fixture used to carry; the ship on approach is still the base the other fixtures build on.
  */
 export function approachRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const { kernel, world } = newWorld(content, seed);
@@ -155,9 +155,10 @@ export function approachRequest(content: ContentBundle, seed = 11): NarratorRequ
 }
 
 /**
- * D66: the staging call for Kessler Drift, as the sim raises it: in transit from Crossroads Hub,
- * `narrator.approachHookLeadSeconds` from the end of the route, the travel record `raised` for
- * this hook, and the hook's context carrying the floor set (Kessler's posted regulars).
+ * §staging-hook-and-the-hold: the staging call for Kessler Drift, as the sim raises it: in transit
+ * from Crossroads Hub, `narrator.approachHookLeadSeconds` from the end of the route, the travel
+ * record `raised` for this hook, and the hook's context carrying the floor set (Kessler's posted
+ * regulars).
  */
 export function stageDockRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const { kernel, world } = newWorld(content, seed);
@@ -270,8 +271,8 @@ export function quietTooLongRequest(content: ContentBundle, seed = 23): Narrator
 }
 
 /**
- * D70: the captain has walked down the personnel ramp and stands at its foot on the dock alongside,
- * looking for work: the moment `captainAshore` is raised. Returns the captain's id.
+ * §looking-for-work: the captain has walked down the personnel ramp and stands at its foot on the
+ * dock alongside, looking for work: the moment `captainAshore` is raised. Returns the captain's id.
  */
 function captainSteppedAshore(state: WorldState, content: ContentBundle): ActorId {
   const captain = Object.values(state.actors).find((a) => a.roleTags.includes("captain"));
@@ -288,7 +289,7 @@ function captainSteppedAshore(state: WorldState, content: ContentBundle): ActorI
 
 /**
  * The approach fixture's crew and money docked at `portId` with nothing on offer, the captain
- * just stepped onto the dock to look for work (D40, D70).
+ * just stepped onto the dock to look for work (D40, §looking-for-work).
  */
 function captainAshoreAt(
   content: ContentBundle,
@@ -569,8 +570,9 @@ export function notableEventRequest(content: ContentBundle, seed = 23): Narrator
 }
 
 /**
- * D37: a departure-gate card (D36) as the kernel queues it, with the fixture's engineer named as
- * the speaker in the template params, under a `policyDecision` hook naming the engine.
+ * §policy-decision-hook: a departure-gate card (§departure-gate) as the kernel queues it, with the
+ * fixture's engineer named as the speaker in the template params, under a `policyDecision` hook
+ * naming the engine.
  */
 export function departureGateRequest(content: ContentBundle, seed = 11): NarratorRequest {
   const base = approachRequest(content, seed);
@@ -619,7 +621,7 @@ export function departureGateRequest(content: ContentBundle, seed = 11): Narrato
     tick: base.hook.tick,
   };
   snapshot.state.narrator.pendingHook = hook;
-  // The kernel announces the decision in the tick that raises the hook (D37).
+  // The kernel announces the decision in the tick that raises the hook (§policy-decision-hook).
   const recentEvents = [
     ...base.recentEvents,
     event(3, base.hook.tick, "decisionPending", { decisionId }, "narrative"),
@@ -628,9 +630,9 @@ export function departureGateRequest(content: ContentBundle, seed = 11): Narrato
 }
 
 /**
- * D99: the departure call the narrator asked for when it offered the Meridian run at Crossroads
- * Hub. The ship has just cast off (`departing`, the tick `departed` is emitted) with the whole
- * 45 s leg ahead; the request is in state, served by this `requestedCall` hook.
+ * §requested-call-back: the departure call the narrator asked for when it offered the Meridian run
+ * at Crossroads Hub. The ship has just cast off (`departing`, the tick `departed` is emitted) with
+ * the whole 45 s leg ahead; the request is in state, served by this `requestedCall` hook.
  */
 export function requestedCallRequest(content: ContentBundle, seed = 23): NarratorRequest {
   const base = quietTooLongRequest(content, seed);
@@ -675,8 +677,9 @@ export function requestedCallRequest(content: ContentBundle, seed = 23): Narrato
 }
 
 /**
- * D100: the aftermath of a field on the Meridian leg. The field is over and the alert has stood
- * down (`alertCleared`), the crew have reported in, and the hull carries one unpatched scar.
+ * §notable-event-hook: the aftermath of a field on the Meridian leg. The field is over and the
+ * alert has stood down (`alertCleared`), the crew have reported in, and the hull carries one
+ * unpatched scar.
  */
 export function alertClearedRequest(content: ContentBundle, seed = 23): NarratorRequest {
   const base = quietTooLongRequest(content, seed);

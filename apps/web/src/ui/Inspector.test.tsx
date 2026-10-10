@@ -44,7 +44,7 @@ const steady: PersonWords = {
 const NOTHING: WeighingWords = { verdict: "nothing to do", options: [], ruledOut: [] };
 
 describe("Inspector actor sheet", () => {
-  it("lists what a crew member is weighing, marks the current and next choice, and why others are out (D90)", () => {
+  it("lists what a crew member is weighing, marks the current and next choice, and why others are out", () => {
     const weighing: WeighingWords = {
       verdict: "keeps at what they're doing: nothing else outranks it yet",
       options: [
@@ -152,7 +152,7 @@ describe("Inspector actor sheet", () => {
     expect(html.match(/inspector-tag/g)).toHaveLength(1);
   });
 
-  it("shows a crew member's watch, helm role, mood word and top thoughts (D77, D79)", () => {
+  it("shows a crew member's watch, helm role, mood word and top thoughts", () => {
     const person: PersonWords = {
       watch: "Red section, on watch",
       helm: "stands this watch's helm",
@@ -288,7 +288,7 @@ describe("Inspector item sheet", () => {
     },
   });
 
-  it("says freight on offer is on offer and nobody's until the job is taken (D63)", () => {
+  it("says freight on offer is on offer and nobody's until the job is taken", () => {
     const html = renderToStaticMarkup(<Inspector data={crate("offered")} onClose={() => {}} />);
     expect(html).toContain('class="inspector-subtitle">freight on offer<');
     expect(html).toContain("nobody loads it until then");
@@ -301,7 +301,7 @@ describe("Inspector item sheet", () => {
   });
 });
 
-describe("Inspector local sheet (D68)", () => {
+describe("Inspector local sheet (§items-places-and-locals)", () => {
   it("shows a regular's name, role and post", () => {
     const html = renderToStaticMarkup(
       <Inspector

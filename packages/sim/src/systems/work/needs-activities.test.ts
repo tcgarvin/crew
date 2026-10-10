@@ -79,7 +79,8 @@ describe("sleeping", () => {
     if (mara === undefined || jon === undefined) throw new Error("no crew");
     place(world, MARA, { x: 1, y: 5 });
     place(world, JON, { x: 2, y: 5 });
-    // D77: both are on watch, so only pressing tiredness sends them to bed now.
+    // §duty-and-the-sleep-watch: both are on watch, so only pressing tiredness sends them to bed
+    // now.
     mara.needs.fatigue = 0.75;
     jon.needs.fatigue = 0.75;
 
@@ -111,8 +112,8 @@ describe("sleeping", () => {
     const mara = world.state.actors[MARA];
     if (mara === undefined) throw new Error("no mara");
     place(world, MARA, { x: 2, y: 2 });
-    // D77: off watch (her section stands [0, 300) s), so she turns in at routine tiredness and
-    // nothing but `wakeBelow` wakes her.
+    // §duty-and-the-sleep-watch: off watch (her section stands [0, 300) s), so she turns in at
+    // routine tiredness and nothing but `wakeBelow` wakes her.
     world.state.tick = 300 * world.config.values.time.tickRate;
     mara.needs.fatigue = 0.55;
     const log = run(tw, 20 * 120, () => eventsOfTypeSeen(tw, "wokeUp"));

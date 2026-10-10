@@ -292,7 +292,7 @@ const drawConveyor: PropDrawer = (ctx, prop, look) => {
     }
   }
   ctx.stroke();
-  // Ore as small angular chunks in dull rock colours (D69): round gold lumps read as crew dots
+  // Ore as small angular chunks in dull rock colours: round gold lumps read as crew dots
   // at phone scale, so no discs and nothing near the accent's gold.
   const seed = hashKey(prop.key);
   const ores = ["#6d5b4a", "#5a5550", "#7a6a58"].map((c) => mixHex(c, look.palette.wall, 0.25));

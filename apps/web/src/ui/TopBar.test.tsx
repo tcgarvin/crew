@@ -1,4 +1,7 @@
-/** D92/D93: the hull bar beside the ship's clock, and the alert's tint and bell line. */
+/**
+ * §sighting-and-the-alert, §hull-scars-and-ship-loss: the hull bar beside the ship's clock, and the
+ * alert's tint and bell line.
+ */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { HullBar, TopBar, type TopBarProps, hullLevel, hullPercent } from "./TopBar";
@@ -30,7 +33,7 @@ function bar(overrides: Partial<TopBarProps>): string {
   return renderToStaticMarkup(<TopBar {...props} />);
 }
 
-describe("hull bar (D93)", () => {
+describe("hull bar (§hull-scars-and-ship-loss)", () => {
   it("turns critical below a third of the hull", () => {
     expect(hullLevel(100, 100)).toBe("sound");
     expect(hullLevel(34, 100)).toBe("sound");
@@ -59,7 +62,7 @@ describe("hull bar (D93)", () => {
   });
 });
 
-describe("alert (D92)", () => {
+describe("alert (§sighting-and-the-alert)", () => {
   it("tints the bar and reads ALERT in place of the watch", () => {
     const html = bar({ alert: true });
     expect(html).toContain("top-bar top-bar-alert");

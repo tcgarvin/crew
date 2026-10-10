@@ -1,5 +1,5 @@
 /**
- * Relationships (slice 4, call 9; D88): directed memories in `social.relationships`, sparse.
+ * Relationships (slice 4, call 9; §memories): directed memories in `social.relationships`, sparse.
  *
  * - `addMemory(ctx, from, to, key)`: `from` remembers `key` about `to` for the memory's
  *   `durationDays`. Below its `stackLimit` a new one is added; at the limit the one expiring

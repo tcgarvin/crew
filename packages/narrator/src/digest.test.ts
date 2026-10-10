@@ -35,7 +35,7 @@ const HUB_PORT = "port.crossroads_hub";
 
 /**
  * "2 hops, 425s transit" and the waypoints by name, from content: the leg lengths are tuning
- * (D76 made the spur legs a watch long), so tests derive them rather than pin them.
+ * (spur legs are a watch long, §the-ships-day), so tests derive them rather than pin them.
  */
 function pathWords(from: string, to: string): { hops: string; via: string } {
   const path = pathBetween(content(), from, to);
@@ -64,7 +64,7 @@ function manyEvents(n: number): SimEvent[] {
   })) as unknown as SimEvent[];
 }
 
-describe("buildDigest: parts market (D47)", () => {
+describe("buildDigest: parts market (§market-lever)", () => {
   function dockedWithShortfall(portId: string, balance = 5000) {
     const req = approachRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
@@ -148,7 +148,7 @@ describe("buildDigest", () => {
     expect(digest.approxTokens).toBeLessThanOrEqual(2_500);
   });
 
-  it("lists every past arc, never trimmed and outside the character budget (D103)", () => {
+  it("lists every past arc, never trimmed and outside the character budget (§past-arcs)", () => {
     const req = quietTooLongRequest(content());
     const empty = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
     expect(empty.text).toContain("## Past arcs\n(none yet: no story has ended this game)");
@@ -203,7 +203,7 @@ describe("buildDigest", () => {
     ).toEqual(small);
   });
 
-  it("includes the running notes, threads and past rejections (D32)", () => {
+  it("includes the running notes, threads and past rejections (§threads-and-scales)", () => {
     const req = quietTooLongRequest(content());
     const notes = {
       ...EMPTY_NOTES,
@@ -230,7 +230,7 @@ describe("buildDigest", () => {
     expect(text).toContain("rejected last time: offerJob: no route");
   });
 
-  it("shows each crew member's voice after their bio (D38)", () => {
+  it("shows each crew member's voice after their bio (§crew-lines)", () => {
     const req = quietTooLongRequest(content());
     const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
     const crewLines = text
@@ -244,7 +244,7 @@ describe("buildDigest", () => {
     expect(text).toContain(`${dane?.bio} voice: ${dane?.voice}`);
   });
 
-  it("says a crew member on the dock alongside is on the dock (D61)", () => {
+  it("says a crew member on the dock alongside is on the dock (§dock-alongside)", () => {
     const bundle = content();
     const req = farCaptainAshoreRequest(bundle);
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
@@ -265,7 +265,7 @@ describe("buildDigest", () => {
     );
   });
 
-  it("describes the dock alongside: its ambience and the freight on it, by standing (D63)", () => {
+  it("describes the dock alongside: its ambience and the freight on it, by standing (§dock-sections)", () => {
     const bundle = content();
     const req = farCaptainAshoreRequest(bundle);
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
@@ -318,7 +318,7 @@ describe("buildDigest", () => {
     const section = text.split(`## On the dock (${dock.name})\n`)[1]?.split("\n\n")[0];
     const lines = section?.split("\n") ?? [];
     expect(lines[0]).toBe(`the place: ${dock.ambience}`);
-    // D67: the people on the dock come first; the freight follows under its own line.
+    // §dock-sections: the people on the dock come first; the freight follows under its own line.
     expect(lines.slice(lines.indexOf("freight:"))).toEqual([
       "freight:",
       "- on offer: 2 crates staged for j901 (Hal Petrosyan (queue clerk), to Kessler Drift); not taken",
@@ -371,7 +371,7 @@ describe("buildDigest", () => {
     expect(jobLine(held, "j902")).not.toContain("not in hand");
   });
 
-  it("lists the captain first, as the player and never a speaker, with her voice (D41)", () => {
+  it("lists the captain first, as the player and never a speaker, with her voice (§captain-never-speaks)", () => {
     const req = quietTooLongRequest(content());
     const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);
     const crewLines = text
@@ -389,7 +389,7 @@ describe("buildDigest", () => {
     expect(text.match(/never a speaker/g)).toHaveLength(1);
   });
 
-  it("marks threads that have had their beat card as foreshadowed (D39)", () => {
+  it("marks threads that have had their beat card as foreshadowed (§beat-cards)", () => {
     const req = quietTooLongRequest(content());
     const thread = {
       title: "The quiet pump",
@@ -414,7 +414,7 @@ describe("buildDigest", () => {
     );
   });
 
-  it("lists the open thread titles on their own, quoted, to copy into closesThread (D98)", () => {
+  it("lists the open thread titles on their own, quoted, to copy into closesThread (§closing-cards)", () => {
     const req = quietTooLongRequest(content());
     const thread = {
       title: "The Seed-Bank Archive Run",
@@ -442,7 +442,7 @@ describe("buildDigest", () => {
     );
   });
 
-  it("lists what the captain has seen, newest first, right after the notes (D31)", () => {
+  it("lists what the captain has seen, newest first, right after the notes (§card-history)", () => {
     const req = quietTooLongRequest(content());
     const base = {
       decisionId: null,
@@ -520,7 +520,7 @@ describe("buildDigest", () => {
     expect(small.text).not.toContain("## Recent events");
   });
 
-  it("lists the people the captain knows at the port, without pay (D24, D25)", () => {
+  it("lists the people the captain knows at the port, without pay (§cards-never-mention-pay, §issuers-and-pitches)", () => {
     const req = quietTooLongRequest(content());
     const notes = {
       ...EMPTY_NOTES,
@@ -766,7 +766,7 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
     expect(early).not.toContain("OVERDUE");
   });
 
-  it("the overdue policy hook names the first officer and shows the templated card with both sides (D37)", () => {
+  it("the overdue policy hook names the first officer and shows the templated card with both sides (§policy-decision-hook)", () => {
     const req = passengerOverdueRequest(content());
     const text = digestOf(req);
     const firstOfficer = Object.values(req.snapshot.state.actors).find(
@@ -819,7 +819,7 @@ describe("buildDigest: passengers (passengers-and-galaxy §3.2, §3.3)", () => {
   });
 });
 
-describe("buildDigest: the call-back request (D99) and aftermath calls (D100)", () => {
+describe("buildDigest: the call-back request (§requested-call-back) and aftermath calls (§notable-event-hook)", () => {
   const hub = "port.crossroads_hub";
   const meridian = "port.green_meridian";
 

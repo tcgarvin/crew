@@ -4,10 +4,10 @@ import type { ShipClock } from "./clock";
 
 const SPEEDS = [1, 2, 4, 8] as const;
 
-/** D93: the hull bar's reading. */
+/** §hull-scars-and-ship-loss: the hull bar's reading. */
 export type HullLevel = "sound" | "critical";
 
-/** D93: the bar turns red below a third of the hull's points. */
+/** §hull-scars-and-ship-loss: the bar turns red below a third of the hull's points. */
 export function hullLevel(integrity: number, max: number): HullLevel {
   return integrity * 3 < max ? "critical" : "sound";
 }
@@ -18,7 +18,10 @@ export function hullPercent(integrity: number, max: number): number {
   return Math.max(0, Math.min(100, (integrity / max) * 100));
 }
 
-/** D93: the global hull bar, FTL-style: a short meter with the points left written on it. */
+/**
+ * §hull-scars-and-ship-loss: the global hull bar, FTL-style: a short meter with the points left
+ * written on it.
+ */
 export function HullBar({ hull }: { readonly hull: Pick<RenderHull, "integrity" | "max"> }) {
   const shown = Math.round(hull.integrity);
   return (
@@ -45,11 +48,13 @@ export interface TopBarProps {
   readonly paused: boolean;
   readonly onSetSpeed: (speed: number) => void;
   readonly onTogglePause: () => void;
-  /** D76/D77: the ship's day and watch at the tick playback has reached. */
+  /** §the-ships-day: the ship's day and watch at the tick playback has reached. */
   readonly clock: ShipClock;
-  /** D93: the hull at the tick playback has reached. */
+  /** §hull-scars-and-ship-loss: the hull at the tick playback has reached. */
   readonly hull: Pick<RenderHull, "integrity" | "max">;
-  /** D92: the ship is on alert: the bar tints and the bell line reads "ALERT". */
+  /**
+   * §sighting-and-the-alert: the ship is on alert: the bar tints and the bell line reads "ALERT".
+   */
   readonly alert: boolean;
   readonly money: number;
   readonly runAheadBufferedSeconds: number;
@@ -93,7 +98,7 @@ export function TopBar({
         ))}
       </div>
       <div className="top-bar-group top-bar-clock">
-        {/* D72: in portrait the day and the watch stack on two short lines in the 36 px bar. */}
+        {/* In portrait the day and the watch stack on two short lines in the 36 px bar. */}
         <span
           className="sim-clock"
           title={`${clock.whoIsOn} (${clock.elapsed} since the start)`}

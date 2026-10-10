@@ -1,7 +1,7 @@
 /**
- * D66, Dockside §5.2: the floor set, a pure function of state and content. Regulars at their
- * posts; the receiver for freight bound here (a dock hand from the name table, by the warehouse
- * door); a passenger left behind here, on the bench. Plus the 4 → 5 save migration.
+ * §floor-set-rule, Dockside §5.2: the floor set, a pure function of state and content. Regulars at
+ * their posts; the receiver for freight bound here (a dock hand from the name table, by the
+ * warehouse door); a passenger left behind here, on the bench. Plus the 4 → 5 save migration.
  */
 import { describe, expect, it } from "vitest";
 import { TINY } from "../../core/fixtures/tiny-content";
@@ -60,7 +60,7 @@ function freightJob(id: string, status: Job["status"]): Job {
   };
 }
 
-describe("the floor set (D66)", () => {
+describe("the floor set", () => {
   it("adds a receiver for freight bound here and a left-behind passenger on the bench", () => {
     const content = withBench(
       dockWorkContent({
@@ -102,7 +102,7 @@ describe("the floor set (D66)", () => {
   });
 });
 
-describe("save migration 4 → 5 (D66)", () => {
+describe("save migration 4 → 5", () => {
   it("adds an empty dockside, the local counter, and drops a pending approachingPort", () => {
     const { world } = dockWorkWorld();
     const raw = JSON.parse(JSON.stringify(world.state)) as Record<string, unknown> & {
@@ -135,7 +135,7 @@ describe("save migration 4 → 5 (D66)", () => {
     expect(migrated.narrator.pendingNotable).toBeUndefined();
   });
 
-  it("owes a notableEvent for a narrative event in the save's last tick (D69)", () => {
+  it("owes a notableEvent for a narrative event in the save's last tick", () => {
     const { world } = dockWorkWorld();
     const raw = JSON.parse(JSON.stringify(world.state)) as Record<string, unknown> & {
       narrator: Record<string, unknown>;

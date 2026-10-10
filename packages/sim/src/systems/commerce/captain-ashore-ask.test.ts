@@ -3,7 +3,7 @@
  * the first idle docked tick; the walk ashore is `captain-ashore.test.ts`.
  *
  * D40 (D46 as amended): the narrator is the only source of work. The sim never offers a job on
- * its own; the `captainAshore` hook (D70, was `jobBoard`) is the captain looking for work, raised
+ * its own; the `captainAshore` hook (§captain-ashore-ask) is the captain looking for work, raised
  * once per docking when
  * nothing is on (and not within `commerce.reofferDays` of a declined or expired offer there).
  * It is never re-raised on a timer: pacing is the narrator's judgement, so an unanswered ask

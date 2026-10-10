@@ -350,9 +350,9 @@ export function asleep(world: World, id: ActorId): void {
 export { galleyStepCtx };
 
 /**
- * D88: `from` feels `affinity` about `to` (compatibility is 0 in this fixture's config) by a set
- * of memories within their stack limits, larger opinions first, written straight into state with
- * a day to run. Throws when the memory table cannot make `affinity` exactly.
+ * §affinity: `from` feels `affinity` about `to` (compatibility is 0 in this fixture's config) by a
+ * set of memories within their stack limits, larger opinions first, written straight into state
+ * with a day to run. Throws when the memory table cannot make `affinity` exactly.
  */
 export function feels(world: World, from: ActorId, to: ActorId, affinity: number): void {
   const { memories } = world.config.values.social;

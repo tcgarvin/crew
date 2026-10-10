@@ -61,7 +61,7 @@ const PASSENGER_DEF = TINY.mara;
 
 const violations = (world: World) => [...checkInvariants(world.state), ...needsViolations(world)];
 
-describe("assignBerths (D74)", () => {
+describe("assignBerths (§berth-assignment)", () => {
   it("berths a crew of nine by rank at world creation: cabins for officers, one bunk spare", () => {
     const world = berthWorld();
     const berths = world.state.berths;
@@ -197,7 +197,7 @@ describe("assignBerths (D74)", () => {
   });
 });
 
-describe("personal belongings (D74)", () => {
+describe("personal belongings (§lockers)", () => {
   it("sets the harmonica down in Bettina's locker at tick 0, hers", () => {
     const world = berthWorld();
     const cook = actorNamed(world, "Bettina Solheim");
@@ -235,7 +235,7 @@ describe("personal belongings (D74)", () => {
   });
 });
 
-describe("needsViolations (D74)", () => {
+describe("needsViolations (§sleeping-places)", () => {
   it("reports a berth that is not a bed placement, and one that is the medbay bed", () => {
     const world = berthWorld();
     const [first, second] = Object.keys(world.state.berths) as ActorId[];

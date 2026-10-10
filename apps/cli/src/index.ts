@@ -84,8 +84,8 @@ export function runContentValidate(): CliResult {
       `${Object.keys(b.scenarios).length} scenario(s)`,
       `${Object.keys(b.docks ?? {}).length} dock(s)`,
     ].join(", ");
-    // D84: activities a deck no scenario sails cannot host (Mk1's missing lounge and gym) are
-    // notes, not failures.
+    // §activities-and-interests: activities a deck no scenario sails cannot host (Mk1's missing
+    // lounge and gym) are notes, not failures.
     const notes = activityVenueNotes(b).map((n) => `  [note] ${n.path.join(".")}: ${n.message}`);
     return ok([`content validate: OK — ${counts} (hash ${b.hash})`, ...notes].join("\n"));
   }

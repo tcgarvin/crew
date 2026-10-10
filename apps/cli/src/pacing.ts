@@ -14,7 +14,8 @@
  *
  * - The host loop runs every `LOOP_INTERVAL_MS` (50 ms) of wall time. Each iteration adds
  *   `elapsed × speed` to an accumulator and converts it to ticks wanted.
- * - Run-ahead (D14, D30): the sim may lead the viewer by up to `RUN_AHEAD_CAP_SECONDS` (60 s) of
+ * - Run-ahead (D14, §run-ahead-loop): the sim may lead the viewer by up to `RUN_AHEAD_CAP_SECONDS`
+ * (60 s) of
  *   sim time. While budget remains the loop runs at least `BURST_TICKS_PER_LOOP` (40 ticks,
  *   2 sim-s) per iteration, so the lead builds at about 40 sim-s per wall-s regardless of speed
  *   and a fresh 60 s lead is in place about 1.5 s after any depletion.
@@ -30,7 +31,7 @@
  *   lead and 25 s latency: 0 s at 1x and 2x, 10 s at 4x, 17.5 s at 8x: spec §2.2.
  * - The viewer starts playing when the sim has produced its first tick. A hook at tick 0 (before
  *   any lead exists) would be paid in full at every speed as a load-time cost, reported as
- *   `startupSeconds`, not as stall. Since D70 none does: the first `captainAshore` comes when the
+ *   `startupSeconds`, not as stall. None does: the first `captainAshore` comes when the
  *   captain steps onto the dock, some seconds in, so it is stall, partly hidden by the lead built
  *   while they walked. The script waits for each port's ask to be answered before it takes work or
  *   sets course, as a player answering the offer card would.
@@ -150,7 +151,7 @@ export interface PacingResult {
   readonly decisions: number;
   /** The ship is docked at the hub with no voyage set. */
   readonly completed: boolean;
-  /** `narrator.quietTooLongDays` in sim-seconds at the run's `daySeconds` (D76). */
+  /** `narrator.quietTooLongDays` in sim-seconds at the run's `daySeconds` (§the-ships-day). */
   readonly quietTooLongSeconds: number;
   /** Calls per hour this voyage would spend if repeated back to back at this speed. */
   readonly callsPerHour: number;
@@ -249,9 +250,10 @@ export function freightDraft(world: World): Omit<Command, "id"> {
 }
 
 /**
- * D70: the captain has gone ashore at `portId` this docking and the narrator's answer is in (the
- * `captainAshore` ask is recorded and no hook is pending). The script takes work or sets course
- * only then, as a player answering the offer card would; the stub narrator offers nothing.
+ * §captain-ashore-ask: the captain has gone ashore at `portId` this docking and the narrator's
+ * answer is in (the `captainAshore` ask is recorded and no hook is pending). The script takes work
+ * or sets course only then, as a player answering the offer card would; the stub narrator offers
+ * nothing.
  */
 function askedAt(world: World, portId: PortDefId): boolean {
   const narrator = world.state.narrator;
@@ -283,7 +285,8 @@ export class VoyageScript {
     const travel = world.state.travel;
     switch (this.phase) {
       case "offer":
-        // D70: the captain walks ashore first, and the narrator is asked; then the work is taken.
+        // §captain-ashore-ask: the captain walks ashore first, and the narrator is asked; then the
+        // work is taken.
         if (!askedAt(world, HUB_PORT_ID)) return;
         this.send(freightDraft(world));
         this.phase = "accept";
@@ -420,7 +423,8 @@ function* pacingRun(options: PacingOptions, kernel?: Kernel): ChunkedRun<PacingR
 
   function onHalt(kind: "hook" | "decision" | "lost"): void {
     if (kind === "lost") {
-      // D93: the hull gave way; the world never steps again, so the run ends here.
+      // §hull-scars-and-ship-loss: the hull gave way; the world never steps again, so the run ends
+      // here.
       simDone = true;
       return;
     }

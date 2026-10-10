@@ -1,5 +1,5 @@
 /**
- * Test fixture for the cabins (slice 4, W3): the D74 berth deck with a desk in the captain's
+ * Test fixture for the cabins (slice 4, W3): the berth deck with a desk in the captain's
  * cabin (none in the first officer's, so both ways of placing a talk are exercised), and the
  * systems a sleeping, talking crew needs: spatial, needs, cabins, work and the planner.
  *

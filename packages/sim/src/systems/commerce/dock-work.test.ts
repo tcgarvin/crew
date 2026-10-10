@@ -1,11 +1,11 @@
 /**
- * D63: port work is physical on a dock. An offer's crates are staged on the staging area, nobody's
- * until taken (withdrawn on decline, expiry or departure; staged when an offer made in flight
- * reaches its dock); the crew carry them aboard by hand and down to the delivery bay at the far
- * end, where custody pays the job once before the port takes the crates in; departure prep waits
- * for accepted freight still on the dock; parts are bought at the stall, or through the gate where
- * the dock has none, and carried aboard; passengers come and go through the gate; a schema-3 save
- * docked mid-loading has its stored freight moved onto the dock.
+ * §offered-freight: port work is physical on a dock. An offer's crates are staged on the staging
+ * area, nobody's until taken (withdrawn on decline, expiry or departure; staged when an offer made
+ * in flight reaches its dock); the crew carry them aboard by hand and down to the delivery bay at
+ * the far end, where custody pays the job once before the port takes the crates in; departure prep
+ * waits for accepted freight still on the dock; parts are bought at the stall, or through the gate
+ * where the dock has none, and carried aboard; passengers come and go through the gate; a schema-3
+ * save docked mid-loading has its stored freight moved onto the dock.
  */
 import { describe, expect, it } from "vitest";
 import { isInDockArea, isOnDock } from "../../core/docks";
@@ -46,7 +46,7 @@ const loadWork = (world: World, id: JobId) =>
     (p) => p.kind === "cargoToLoad" && p.payload.jobId === id,
   );
 
-describe("freight on offer is staged on the dock (D63)", () => {
+describe("freight on offer is staged on the dock (§offered-freight)", () => {
   it("sets an offer's crates out on the staging area, nobody's, and withdraws them on decline", () => {
     const test = dockWorkWorld();
     const { world } = test;
@@ -105,7 +105,7 @@ describe("freight on offer is staged on the dock (D63)", () => {
   });
 });
 
-describe("taking a job before the crew's first look (D63)", () => {
+describe("taking a job before the crew's first look (§loading)", () => {
   it("still leaves every crew member briefed on the ship's stores, and on the freight", () => {
     const test = dockWorkWorld();
     const { world } = test;
@@ -131,7 +131,7 @@ describe("taking a job before the crew's first look (D63)", () => {
   });
 });
 
-describe("freight is loaded by hand and delivered to the bay (D63)", () => {
+describe("freight is loaded by hand and delivered to the bay (§delivery-and-pay)", () => {
   it("carries the crates aboard from staging, delivers them to the bay, pays once, carts them in", () => {
     const test = dockWorkWorld();
     const { world } = test;
@@ -283,7 +283,7 @@ describe("freight is loaded by hand and delivered to the bay (D63)", () => {
   });
 });
 
-describe("parts are bought on the dock (D63)", () => {
+describe("parts are bought on the dock (§buying-parts)", () => {
   const boughtParts = (world: World) =>
     Object.values(world.state.items).filter((i) => i.defId === PARTS);
 
@@ -313,7 +313,7 @@ describe("parts are bought on the dock (D63)", () => {
     ).toBe(true);
   });
 
-  it("sets the leftover parts down when the repair is done, not carried off to bed (D69)", () => {
+  it("sets the leftover parts down when the repair is done, not carried off to bed", () => {
     // The verifier's 8x playthroughs held for repairs indefinitely: the last repairer kept the
     // ship's only stack of spares in hand through meals, sleep and rest, and every other repair
     // was blocked on an inaccessible supply.
@@ -412,7 +412,7 @@ describe("parts are bought on the dock (D63)", () => {
   });
 });
 
-describe("passengers come and go through the gate (D63)", () => {
+describe("passengers come and go through the gate (§passage-job)", () => {
   it("boards at the gate, walks aboard, and at the far port walks out through the gate", () => {
     const test = dockWorkWorld();
     const { world } = test;
@@ -474,7 +474,7 @@ describe("passengers come and go through the gate (D63)", () => {
   });
 });
 
-describe("a schema-3 save docked mid-loading (D63)", () => {
+describe("a schema-3 save docked mid-loading", () => {
   it("has its freight moved from the warehouse store onto the staging area", () => {
     const test = dockWorkWorld();
     const { kernel, world } = test;
@@ -509,7 +509,7 @@ describe("a schema-3 save docked mid-loading (D63)", () => {
   });
 });
 
-describe("cargo in port is all hands awake (D77 addendum, the slice-2 QA stall)", () => {
+describe("cargo in port is all hands awake (§duty-and-the-sleep-watch)", () => {
   it("loads with nobody on the bill: both crew are off duty on the second watch and still carry the crates aboard", () => {
     const test = dockWorkWorld();
     const { world } = test;

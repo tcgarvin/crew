@@ -131,7 +131,10 @@ function extraCrew(base: CrewDef): Record<CrewDefId, CrewDef> {
   return out;
 }
 
-/** D77: hold off rounds for good, for tests written against a crew that stands idle on duty. */
+/**
+ * §sections-and-dayworkers: hold off rounds for good, for tests written against a crew that stands
+ * idle on duty.
+ */
 export function withoutRounds(world: World): void {
   for (const actor of Object.values(world.state.actors)) {
     actor.workBackoff = { ...(actor.workBackoff ?? {}), rounds: Number.MAX_SAFE_INTEGER };
@@ -140,15 +143,18 @@ export function withoutRounds(world: World): void {
 
 /**
  * Tiny config: a 600 s day of two watches, so the scenarios' `alpha` section stands `[0, 300)`
- * and `beta` (off duty at start) `[300, 600)` (D77; the shift windows these tests were written
- * against). The day knobs keep their durations in seconds.
+ * and `beta` (off duty at start) `[300, 600)` (§sections-and-dayworkers; the shift windows these
+ * tests were written against). The day knobs keep their durations in seconds.
  */
 export function crewConfig(overrides: Partial<ConfigDef> = {}): ConfigDef {
   const base = tinyConfig({ daySeconds: 600, watchesPerDay: 2 });
   return { ...base, ...overrides };
 }
 
-/** D77: crew of eight: the even extras stand `alpha` with Mara and Jon, the odd ones `beta`. */
+/**
+ * §sections-and-dayworkers: crew of eight: the even extras stand `alpha` with Mara and Jon, the odd
+ * ones `beta`.
+ */
 function crewEightBill(extras: readonly CrewDefId[]): WatchBillDef {
   return {
     sections: [

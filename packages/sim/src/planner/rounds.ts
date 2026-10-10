@@ -1,5 +1,6 @@
 /**
- * What an on-duty actor with nothing else to do does (D77), voluntary class throughout:
+ * What an on-duty actor with nothing else to do does (§gangway-watch-and-rounds), voluntary class
+ * throughout:
  *
  * - the officer of the watch (`self.watch.officerOfTheWatch`) walks rounds, and between them
  *   goes to the captain's chair's `use` tile and stands there idle: it is not a hold, so anything

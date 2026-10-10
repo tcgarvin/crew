@@ -1,5 +1,5 @@
 /**
- * Thoughts and mood (D79). A thought is something on a person's mind for a while; mood is the
+ * Thoughts and mood (§thoughts). A thought is something on a person's mind for a while; mood is the
  * clamped sum of the live ones, and its only effect yet is work speed (`moodWorkFactor`).
  *
  * `addThought` gives one (a non-stacking key refreshes the one already held; a stacking key adds

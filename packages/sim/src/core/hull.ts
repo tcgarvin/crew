@@ -1,9 +1,9 @@
 /**
- * D92, D93: the hull as rocks see it. The footprint is every authored deck tile (slice 5 call 18:
- * walls are edges in this model, so "walls included" excludes nothing); a large rock's blast is
- * its centre and eight neighbours, clipped to the footprint. The hull bar is `max` less what every
- * scar has cost and not had back, so the field (charging) and damage response (patching,
- * plating) agree on one number.
+ * §rock-impacts, §hull-scars-and-ship-loss: the hull as rocks see it. The footprint is every
+ * authored deck tile (slice 5 call 18: walls are edges in this model, so "walls included" excludes
+ * nothing); a large rock's blast is its centre and eight neighbours, clipped to the footprint. The
+ * hull bar is `max` less what every scar has cost and not had back, so the field (charging) and
+ * damage response (patching, plating) agree on one number.
  */
 import type { DeepReadonly, TileCoord } from "./types/common";
 import type { DeckDef, RockSize } from "./types/content";

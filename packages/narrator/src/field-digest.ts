@@ -1,11 +1,11 @@
 /**
- * The asteroid field, the hull and the damage in the digest (D92-D95, slice 5 calls 14, 15).
- * Pure reads of the snapshot: the leg's field (`WorldState.field`) scheduled, in progress or
- * crossed; the alert; the hull bar with its scars patched and unpatched, which of them came
- * aboard from an earlier leg, the repairs a port allows and whether the ship is leaving with
- * them unfinished; the damage the crew know of against the damage that exists (a `hullScar` or
- * `machineDamaged` problem someone holds a `problem` fact for, or a public one); and who
- * reported on the intercom since the last call.
+ * The asteroid field, the hull and the damage in the digest (§field-lifecycle,
+ * §hull-scars-and-ship-loss; slice 5 calls 14, 15). Pure reads of the snapshot: the leg's field
+ * (`WorldState.field`) scheduled, in progress or crossed; the alert; the hull bar with its scars
+ * patched and unpatched, which of them came aboard from an earlier leg, the repairs a port allows
+ * and whether the ship is leaving with them unfinished; the damage the crew know of against the
+ * damage that exists (a `hullScar` or `machineDamaged` problem someone holds a `problem` fact for,
+ * or a public one); and who reported on the intercom since the last call.
  */
 import {
   type ConfigDef,

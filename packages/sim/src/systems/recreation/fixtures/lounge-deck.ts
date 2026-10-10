@@ -697,7 +697,10 @@ export function loungeStepCtx(world: World): { ctx: StepCtx; drafts: EventDraft[
   return { ctx, drafts };
 }
 
-/** Set a course to the next port; with no nav terminal aboard it counts as plotted (D78). */
+/**
+ * Set a course to the next port; with no nav terminal aboard it counts as plotted
+ * (§course-plotting).
+ */
 export function setCourseAway(fixture: TestWorld): void {
   fixture.kernel.enqueueCommand(
     fixture.world,

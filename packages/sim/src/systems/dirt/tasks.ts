@@ -1,9 +1,9 @@
 /**
- * Task derivation for `compartmentDirty` (D82): one `cleanCompartment` task, `requiredTools:
- * ["mop"]`, target `{ kind: "compartment" }`, `interactionTiles` the room's `mopTilesPerTrip`
- * dirtiest floor cells at or above half the `untidy` threshold (ties in row-major order), walked
- * nearest first from the cleaning locker (greedy; from the dirtiest tile on a deck with no
- * locker), progress `{ kind: "room" }`, `estimatedWorkSeconds: mopSecondsPerTile × tiles`,
+ * Task derivation for `compartmentDirty` (§room-cleaning-problem): one `cleanCompartment` task,
+ * `requiredTools: ["mop"]`, target `{ kind: "compartment" }`, `interactionTiles` the room's
+ * `mopTilesPerTrip` dirtiest floor cells at or above half the `untidy` threshold (ties in row-major
+ * order), walked nearest first from the cleaning locker (greedy; from the dirtiest tile on a deck
+ * with no locker), progress `{ kind: "room" }`, `estimatedWorkSeconds: mopSecondsPerTile × tiles`,
  * `baseUrgency` the problem's. No tiles worth mopping, no task. Merged by `systems/work/` with
  * the other systems' rules.
  *

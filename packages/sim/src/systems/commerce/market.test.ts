@@ -1,11 +1,11 @@
 /**
- * D47: the parts market, through the real kernel. A diagnosed engine fault whose repair step
- * consumes a part the ship does not carry raises `partsNeeded`; while docked at a port whose
+ * §buying-parts: the parts market, through the real kernel. A diagnosed engine fault whose repair
+ * step consumes a part the ship does not carry raises `partsNeeded`; while docked at a port whose
  * market sells it and the ship can pay, a crew member walks to the ramp, buys it (money down,
  * market down, parts on the deck, `partsBought` in the ticker), and the repair then completes.
- * Without stock or money the problem stays open and nothing is bought. The narrator's
- * `stockMarket` makes a part available or withdraws it, and a departure held for repairs waits
- * docked until the part is bought and fitted.
+ * Without stock or money the problem stays open and nothing is bought. The narrator's `stockMarket`
+ * makes a part available or withdraws it, and a departure held for repairs waits docked until the
+ * part is bought and fitted.
  */
 import { describe, expect, it } from "vitest";
 import { rebuildItemIndexes } from "../../core/caches";
@@ -51,7 +51,7 @@ interface MarketWorldOptions {
   readonly stock?: number;
   readonly money?: number;
   readonly travel?: boolean;
-  /** D71: the misfire repair also needs a `welder`, which only `TORCH` provides. */
+  /** §tool-shortfall: the misfire repair also needs a `welder`, which only `TORCH` provides. */
   readonly needsTorch?: boolean;
   /** Torches stowed aboard at the start (in engineering stores). */
   readonly torchesAboard?: number;
@@ -207,7 +207,7 @@ function engineFaults(world: World, machineId: MachineId) {
 
 const TWO_MINUTES = 20 * 120;
 
-describe("parts market (D47): a repair that needs a part the ship lacks", () => {
+describe("parts market (§buying-parts): a repair that needs a part the ship lacks", () => {
   it("raises partsNeeded for the shortfall, once per machine and item, and nothing else buys", () => {
     const tw = marketWorld({ stock: 0 });
     const { problemId } = addEngineFault(tw.world);
@@ -370,7 +370,7 @@ describe("parts market (D47): a repair that needs a part the ship lacks", () => 
   });
 });
 
-describe("parts market and the departure gate (D36, D47)", () => {
+describe("parts market and the departure gate (§departure-gate, §buying-parts)", () => {
   it("a hold for repairs waits docked until the part is bought and fitted, then lifts", () => {
     const tw = marketWorld({ stock: 1, money: 500, travel: true });
     const { world } = tw;
@@ -427,7 +427,7 @@ function torches(world: World) {
   return Object.values(world.state.items).filter((i) => i.defId === TORCH);
 }
 
-describe("repairs out of reach never hold the ship (D71)", () => {
+describe("repairs out of reach never hold the ship (§repairs-out-of-reach)", () => {
   it("leaves without a card when the part is short and not for sale here, and says why", () => {
     const tw = marketWorld({ stock: 0, money: 500, travel: true });
     const { world } = tw;
@@ -516,7 +516,8 @@ describe("repairs out of reach never hold the ship (D71)", () => {
     expect(holding.some((e) => e.type === "departureHeld")).toBe(true);
     expect(world.state.travel).toMatchObject({ stage: "docked", holdForRepairs: true });
 
-    // The torch goes ashore to the warehouse (as gear left on a dock does, D61), out of reach.
+    // The torch goes ashore to the warehouse (as gear left on a dock does, §ramps-and-cast-off),
+    // out of reach.
     const [torch] = torches(world);
     if (torch === undefined) throw new Error("no torch aboard");
     expect(torch.location.kind).toBe("onDeck");

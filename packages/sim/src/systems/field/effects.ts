@@ -1,8 +1,8 @@
 /**
- * D92: what a rock does to the machines it hits (slice 5 call 7). Every ship machine with a
- * footprint tile inside the blast rolls once on `field.machineEffects` (or takes the scripted
- * impact's effect): `none` glances off; `graze` and `damage` take `field.effectIntegrity` off
- * through damage response's `damageMachine`; `knockout` takes the machine's whole integrity, so
+ * §machines-in-the-blast: what a rock does to the machines it hits (slice 5 call 7). Every ship
+ * machine with a footprint tile inside the blast rolls once on `field.machineEffects` (or takes the
+ * scripted impact's effect): `none` glances off; `graze` and `damage` take `field.effectIntegrity`
+ * off through damage response's `damageMachine`; `knockout` takes the machine's whole integrity, so
  * one hit can take a system from whole to out; `fault` is one of the machine's fault defs,
  * weighted, through the one fault path (D6, equipment's `applyFault`). A machine with no fault
  * left to take (none in content, or every one already present or on its way) takes `damage`

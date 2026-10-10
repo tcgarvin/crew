@@ -1,7 +1,7 @@
 /**
- * D78: the sixth lever through the route. The real narrator over a fake transport (never the
- * network) answers an in-transit check-in with a `scheduleHazard`; the client gets the kernel
- * command, tier turned into the config difficulty, and the call log keeps it.
+ * §debris-fields-and-ion-storms: the sixth lever through the route. The real narrator over a fake
+ * transport (never the network) answers an in-transit check-in with a `scheduleHazard`; the client
+ * gets the kernel command, tier turned into the config difficulty, and the call log keeps it.
  */
 import { loadBundle } from "@crew/content";
 import { type ModelTransport, quietTooLongRequest, runNarratorWithTrace } from "@crew/narrator";
@@ -22,7 +22,7 @@ function content(): ContentBundle {
 }
 
 function planWith(intents: unknown[]): ModelTransport {
-  // D97: the plan turn, then the notes turn (the one with a continuation).
+  // §notes-turn: the plan turn, then the notes turn (the one with a continuation).
   return async (request) => ({
     model: request.model,
     content: JSON.stringify(
@@ -32,7 +32,7 @@ function planWith(intents: unknown[]): ModelTransport {
             rationale: "A long quiet leg and the junior at the helm: put something in her path.",
             intents,
             card: null,
-            // D99: every plan the model writes carries its call-back request.
+            // §requested-call-back: every plan the model writes carries its call-back request.
             callBack: { when: "nextPort", why: "" },
           },
     ),
@@ -74,7 +74,7 @@ async function post(transport: ModelTransport) {
   return { res, db, gameId: game.id };
 }
 
-describe("POST /api/games/:id/narrator, scheduleHazard (D78)", () => {
+describe("POST /api/games/:id/narrator, scheduleHazard (§debris-fields-and-ion-storms)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });

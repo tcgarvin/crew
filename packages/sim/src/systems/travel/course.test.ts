@@ -67,7 +67,7 @@ function plotWorkTicks(tw: TestWorld): { ticks: number; events: SimEvent[] } {
   return { ticks: at - first + 1, events };
 }
 
-describe("course plotting (D78)", () => {
+describe("course plotting (§course-plotting)", () => {
   it("a course set raises courseToPlot: one plotCourse task at the nav terminal for a qualified pilot", () => {
     const tw = roundsWorld({ travel: true });
     const { world } = tw;

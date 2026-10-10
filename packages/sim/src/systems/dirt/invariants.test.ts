@@ -1,4 +1,4 @@
-/** Dirt in a save (D82): a 720-cell grid round-trips and the invariants catch a bad one. */
+/** Dirt in a save (§dirt-grid): a 720-cell grid round-trips and the invariants catch a bad one. */
 import { describe, expect, it } from "vitest";
 import {
   TINY,
@@ -36,7 +36,7 @@ function wideWorld() {
   return { registry, kernel, world };
 }
 
-describe("dirt in a save (D82)", () => {
+describe("dirt in a save (§dirt-grid)", () => {
   it("a 720-cell grid round-trips through serialize, JSON and restore, invariants clean", () => {
     const { registry, kernel, world } = wideWorld();
     const cells = world.state.dirt.cells[TINY.deck];

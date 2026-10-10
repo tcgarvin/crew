@@ -222,7 +222,7 @@ describe("narrator-log", () => {
     expect(out).toContain("lastUpdatedTick: 1800");
   });
 
-  it("notes: renders D32 structured threads and D31 cardsShown", async () => {
+  it("notes: renders structured threads (§threads-and-scales) and cardsShown (§card-history)", async () => {
     const db = new MemoryDb();
     const { game } = await seed(db);
     await db.updateNotes(game.id, {

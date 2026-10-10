@@ -1,6 +1,6 @@
 /**
- * The galley and dirt in the digest (D81-D83). Pure reads of the snapshot: the servings on the
- * `serving` zone and who cooked them, the next meal against the bell, the provisions aboard in
+ * The galley and dirt in the digest (§ship-life-lines). Pure reads of the snapshot: the servings on
+ * the `serving` zone and who cooked them, the next meal against the bell, the provisions aboard in
  * crates and days (`@crew/sim`'s own `provisionsCratesAboard` / `provisionsDays`, so the digest
  * says what commerce buys against), the rooms at `dirty` or worse from `state.dirt.tiers`, and
  * the problem lines for a provisions `reserveLow` and a `compartmentDirty`.
@@ -118,8 +118,9 @@ function openProblems<K extends Problem["kind"]>(
 
 /**
  * The next meal against the bell. The galley raises `mealToCook` `mealLeadDays` before each bell
- * (D81): while one is open the meal is the coming bell's, said with who is cooking it; past the
- * call with none open, the coming bell's meal is served (or missed) and the next is the bell after.
+ * (§meal-problem): while one is open the meal is the coming bell's, said with who is cooking it;
+ * past the call with none open, the coming bell's meal is served (or missed) and the next is the
+ * bell after.
  */
 function nextMealPhrase(state: State, config: ConfigDef): string {
   const length = watchTicks(config);
@@ -180,7 +181,10 @@ const ROLE_WORDS: Readonly<Record<RoleTag, string>> = {
   medic: "medic",
 };
 
-/** Whose mop the room waits on (D82 `cleaningRolesFor`): "the deckhand's to mop", "anyone's to mop". */
+/**
+ * Whose mop the room waits on (§who-mops `cleaningRolesFor`): "the deckhand's to mop", "anyone's to
+ * mop".
+ */
 function whoseToMop(state: State, content: ContentBundle, key: LocalKey): string {
   const roles = cleaningRolesFor(roomDef(state, content, key)?.tags ?? []);
   if (roles.length === 0) return "anyone's to mop";
@@ -203,14 +207,14 @@ export function dirtLine(state: State, content: ContentBundle): string | undefin
   return `dirt: ${rooms.map((r) => `${r.name} ${r.tier}`).join("; ")}`;
 }
 
-/** Is `itemDefId` a `provisions`-tagged item (the galley's stores, D81)? */
+/** Is `itemDefId` a `provisions`-tagged item (the galley's stores, §galley-provisions)? */
 export function isProvisions(content: ContentBundle, itemDefId: ItemDefId): boolean {
   return content.items[itemDefId]?.tags.includes("provisions") === true;
 }
 
 /**
- * D81 through D80: a provisions `reserveLow` reads as the galley running low, in days of meals,
- * with the crates that restock it and why it is still open (`reason`, the digest's
+ * §reserve-low-problem: a provisions `reserveLow` reads as the galley running low, in days of
+ * meals, with the crates that restock it and why it is still open (`reason`, the digest's
  * `partsReason`).
  */
 export function provisionsReserveDetail(
@@ -224,7 +228,9 @@ export function provisionsReserveDetail(
   return `provisions are low (${daysPhrase(days)} of meals left); ${count} ${count === 1 ? "crate" : "crates"} would restock the galley; ${reason}`;
 }
 
-/** D82: "Cargo Hold is filthy; Dane Ruiz mopping" or "...; nobody is mopping it yet". */
+/**
+ * §ship-life-lines: "Cargo Hold is filthy; Dane Ruiz mopping" or "...; nobody is mopping it yet".
+ */
 export function compartmentDirtyDetail(
   state: State,
   content: ContentBundle,

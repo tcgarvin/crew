@@ -1,6 +1,6 @@
 /**
- * Field events (D92, D93): an asteroid field scheduled, sighted, entered and cleared; each rock
- * that hits; the alert; the ship stuck in the rocks; and the hull giving way.
+ * Field events (§field-lifecycle, §rock-impacts): an asteroid field scheduled, sighted, entered and
+ * cleared; each rock that hits; the alert; the ship stuck in the rocks; and the hull giving way.
  */
 import type { TileCoord } from "../common";
 import type { FieldDetection, FieldSeverity, MachineEffect, RockSize } from "../content";

@@ -1,7 +1,8 @@
 /**
- * Boots and dust (D82) on the dirt fixture: boots loaded on the quay shed a decaying trail from
- * the ramp into the hold; dust settles near the open ramp while docked, up to the visit cap, and
- * the count resets once the quay is gone; one docked visit of crew walking cargo leaves a trail.
+ * Boots and dust (§footfall-and-boots) on the dirt fixture: boots loaded on the quay shed a
+ * decaying trail from the ramp into the hold; dust settles near the open ramp while docked, up to
+ * the visit cap, and the count resets once the quay is gone; one docked visit of crew walking cargo
+ * leaves a trail.
  */
 import { describe, expect, it } from "vitest";
 import type { TestWorld } from "../../core/fixtures/test-world";
@@ -66,7 +67,7 @@ function walk(test: TestWorld, actorId: ActorId, to: TileCoord): TileCoord[] {
 
 const onDeck = (t: TileCoord): boolean => t.x >= 0 && t.y >= 0 && t.y < 7;
 
-describe("boots and the trail from the ramp (D82)", () => {
+describe("boots and the trail from the ramp (§footfall-and-boots)", () => {
   it("boots loaded on the quay shed a decaying trail from the ramp into the hold", () => {
     const test = dirtWorld({ bare: true, dock: { airborneDust: 0 } });
     bringQuayAlongside(test);
@@ -97,7 +98,7 @@ describe("boots and the trail from the ramp (D82)", () => {
   });
 });
 
-describe("airborne dust (D82)", () => {
+describe("airborne dust (§dirt-deposits)", () => {
   it("settles near the open ramp while docked, stops at the visit cap, resets after undocking", () => {
     const test = dirtWorld({ bare: true });
     const config = test.world.config.values;
@@ -129,7 +130,7 @@ describe("airborne dust (D82)", () => {
   });
 });
 
-describe("one docked visit (D82 done-when)", () => {
+describe("one docked visit (§footfall-and-boots)", () => {
   it("crew carrying from the quay into the hold leave a visible trail from the ramp", () => {
     const test = dirtWorld({ bare: true });
     bringQuayAlongside(test);

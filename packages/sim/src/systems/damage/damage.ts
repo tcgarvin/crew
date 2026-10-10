@@ -1,8 +1,9 @@
 /**
- * D93, D94: damage response, every tick in the `needs` phase (after cabins). Each pass:
+ * §machine-damage, §scouts: damage response, every tick in the `needs` phase (after cabins). Each
+ * pass:
  *
  * 1. A `machineDamaged` whose machine is whole again (mended, or an overheat repair that restored
- *    it, D35) is resolved.
+ *    it, §integrity) is resolved.
  * 2. On alert, recreation ends: every `recreate` activity is stopped (its session closes through
  *    `leaveRecreation`), and the planner offers none until the alert clears (`planner/alert.ts`).
  * 3. Each scar's `hullScar` follows the alert: essential while it stands, routine after; a scar

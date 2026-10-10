@@ -10,7 +10,7 @@ const ev = (type: string, tick: number, payload: object = {}) =>
 const impact = (tick: number, fieldId: string, hullDamage: number) =>
   ev("asteroidImpact", tick, { fieldId, hullDamage, hits: [] });
 
-describe("the field tally (D95)", () => {
+describe("the field tally (§the-beats-instrument)", () => {
   it("counts each field's rocks, hull lost, time stuck and first report, and sums them by severity", () => {
     const tally = new FieldTally("cycle", TICK_RATE);
     tally.events([

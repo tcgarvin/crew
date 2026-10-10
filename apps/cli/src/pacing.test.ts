@@ -21,8 +21,8 @@ const kernel = createKernel(createPacingRegistry());
 
 /**
  * The first test to need each run pays for it (about 10 s of real work on a quiet machine since
- * D76 made Kessler–Ossory a 400 s spur, several times that under the full parallel `pnpm test`),
- * well past Vitest's 5 s default. The runs yield between chunks (`runPacingAsync`,
+ * Kessler–Ossory is a 400 s spur (§the-ships-day), several times that under the full parallel `pnpm
+ * test`), well past Vitest's 5 s default. The runs yield between chunks (`runPacingAsync`,
  * `yielding.ts`; slice-5 integration): a synchronous run held the worker past the minute its RPC
  * allows ("Timeout calling onTaskUpdate") under load.
  */
@@ -67,7 +67,7 @@ describe("crew pacing: there-and-back voyage", () => {
     "raises stageDock at every docking and captainAshore at the hub and the far port only",
     async () => {
       const slow = await slowRun();
-      // D66: the staging call is guaranteed, waypoints included.
+      // §staging-hook-and-the-hold: the staging call is guaranteed, waypoints included.
       expect(slow.hooksByKind.stageDock).toBe(4);
       // Waypoint dockings do not send the captain ashore for work (§2.3).
       expect(slow.hooksByKind.captainAshore).toBe(2);
@@ -77,7 +77,7 @@ describe("crew pacing: there-and-back voyage", () => {
   );
 
   it(
-    "raises quietTooLong only on the watch-long spur legs, at most once per quiet window (a watch, D76)",
+    "raises quietTooLong only on the watch-long spur legs, at most once per quiet window (a watch, §the-ships-day)",
     async () => {
       const slow = await slowRun();
       // A spur leg is one watch of transit and the quiet window is one watch, with `stageDock`
@@ -108,9 +108,9 @@ describe("crew pacing: there-and-back voyage", () => {
     "hides narrator latency inside the run-ahead lead at 1x and not at 8x",
     async () => {
       const { slow, fast } = await results();
-      // D70: the first ask comes when the captain steps onto the dock, some seconds into the game,
-      // not at tick 0: no load-time wait, and at 1x only that first call (raised before a full
-      // lead has built) shows through as stall.
+      // §captain-ashore-ask: the first ask comes when the captain steps onto the dock, some seconds
+      // into the game, not at tick 0: no load-time wait, and at 1x only that first call (raised
+      // before a full lead has built) shows through as stall.
       expect(slow.startupSeconds).toBe(0);
       expect(fast.startupSeconds).toBe(0);
       const [first, ...rest] = slow.calls;

@@ -32,7 +32,7 @@ export function configTicks(config: ConfigDef, seconds: Seconds): Tick {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ship's day (D76)
+// Ship's day (§the-ships-day)
 // ---------------------------------------------------------------------------------------------
 //
 // Day-relative knobs (`Days`, and rates per day) stay as authored in the config, which every save

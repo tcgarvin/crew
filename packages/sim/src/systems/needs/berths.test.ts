@@ -97,7 +97,7 @@ function addAboard(world: World, defId: CrewDefId, tile: TileCoord, passenger = 
   return id;
 }
 
-describe("berths as a standing rule (D74)", () => {
+describe("berths as a standing rule (§berth-assignment)", () => {
   it("berths a crew member who joins mid-voyage on the next tick, and frees a leaver's", () => {
     const tw = berthWorld();
     const { world } = tw;
@@ -114,7 +114,7 @@ describe("berths as a standing rule (D74)", () => {
   });
 });
 
-describe("sleeping in one's own berth (D74)", () => {
+describe("sleeping in one's own berth (§sleeping-in-a-berth)", () => {
   it("walks to her own bunk past a nearer free one", () => {
     const tw = berthWorld();
     const { world } = tw;
@@ -158,7 +158,7 @@ describe("sleeping in one's own berth (D74)", () => {
   });
 });
 
-describe("without a berth (D74)", () => {
+describe("without a berth (§unberthed-crew)", () => {
   it("sleeps in the unassigned pool, never the nearer medbay bed", () => {
     const tw = berthWorld(BERTH.eleven);
     const { world } = tw;

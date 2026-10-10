@@ -1,8 +1,8 @@
 /**
- * D92: stuck is a clock, not a cliff (slice 5 call 9). A scripted knockout on the engine thirty
- * seconds in takes it from whole to out; the ship stops making way and is stuck in the rocks
- * (`shipStuck`), taking them at 70 % of the rate, and after six impacts while stuck it drifts
- * clear (`fieldCleared`, drifted). With the engine restored mid-field the ship is under way
+ * §stuck-in-the-rocks: stuck is a clock, not a cliff (slice 5 call 9). A scripted knockout on the
+ * engine thirty seconds in takes it from whole to out; the ship stops making way and is stuck in
+ * the rocks (`shipStuck`), taking them at 70 % of the rate, and after six impacts while stuck it
+ * drifts clear (`fieldCleared`, drifted). With the engine restored mid-field the ship is under way
  * again (`shipUnstuck`) and leaves by progress.
  */
 import { describe, expect, it } from "vitest";
@@ -43,7 +43,7 @@ function knockedOutAtThirty(test: TestWorld) {
   return { engine, field, events };
 }
 
-describe("stuck in the field (D92, call 9)", { timeout: 30_000 }, () => {
+describe("stuck in the field (§stuck-in-the-rocks, call 9)", { timeout: 30_000 }, () => {
   it("a knocked-out engine leaves the ship stuck, and six impacts later it drifts clear", () => {
     const test = fieldWorld();
     const { engine, field, events } = knockedOutAtThirty(test);

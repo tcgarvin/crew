@@ -1,10 +1,11 @@
 /**
- * Ambient chat leaves memories (slice 4, call 10; D88): `onConversation(ctx, a, b)`, called by
- * `systems/work/ambient.ts` after it emits `conversation`. Unless the pair's last memorable chat
- * (`lastChatTick`, either side) is within `social.chatMemoryEveryDays`, each side remembers it:
- * `rubbedWrong` with the chance `social.chatSour` gives the pair's compatibility, else `chatted`.
- * The sides roll apart, so one can enjoy a talk the other found grating, and a pair that does not
- * click cools by talking. Members of a running session still chat: that is the table talk.
+ * Ambient chat leaves memories (slice 4, call 10; §ambient-chat): `onConversation(ctx, a, b)`,
+ * called by `systems/work/ambient.ts` after it emits `conversation`. Unless the pair's last
+ * memorable chat (`lastChatTick`, either side) is within `social.chatMemoryEveryDays`, each side
+ * remembers it: `rubbedWrong` with the chance `social.chatSour` gives the pair's compatibility,
+ * else `chatted`. The sides roll apart, so one can enjoy a talk the other found grating, and a pair
+ * that does not click cools by talking. Members of a running session still chat: that is the table
+ * talk.
  *
  * Owner: W2 of ship life slice 4.
  */

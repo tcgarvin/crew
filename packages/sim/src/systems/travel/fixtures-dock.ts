@@ -1,7 +1,7 @@
 /**
- * D61 test fixture: the furnished crew deck (`work/fixtures/crew-deck.ts`) with the spike's two
- * south ramps, the spike's quay as the dock at the start port (`TINY.port`), a copy of it at
- * `TINY.port2`, and none at `TINY.port3`. Spatial, needs, work, the planner and travel are
+ * §dock-alongside test fixture: the furnished crew deck (`work/fixtures/crew-deck.ts`) with the
+ * spike's two south ramps, the spike's quay as the dock at the start port (`TINY.port`), a copy of
+ * it at `TINY.port2`, and none at `TINY.port3`. Spatial, needs, work, the planner and travel are
  * registered, so departure prep's call aboard runs through the real work system.
  *
  * Deck (12×8) rows 5–6 are the corridor; the cargo ramp is under (2,6), the personnel ramp under

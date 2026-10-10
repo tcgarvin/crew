@@ -1,7 +1,7 @@
 /**
- * D70: save schema 5 → 6. `jobBoard` becomes `captainAshore` (a pending hook and the docking's
+ * Save schema 5 → 6. `jobBoard` becomes `captainAshore` (a pending hook and the docking's
  * last ask, both now naming who went ashore: the captain), `decisions.held` starts empty, and
- * D42's `surfaceWhenDocked` is retired: an offer whose card was waiting for the dock is withdrawn
+ * `surfaceWhenDocked` is retired: an offer whose card was waiting for the dock is withdrawn
  * as expired, since offers are now only made in person at the dock.
  */
 import { describe, expect, it } from "vitest";
@@ -28,7 +28,7 @@ function schema5(): { raw: Raw; captainId: string } {
   return { raw, captainId: captain.id };
 }
 
-describe("save migration 5 → 6 (D70)", () => {
+describe("save migration 5 → 6", () => {
   it("renames the board's ask and a pending jobBoard hook, naming the captain", () => {
     const { raw, captainId } = schema5();
     raw.narrator.jobBoardLastAsk = { portId: PORTS.a, tick: 400 };

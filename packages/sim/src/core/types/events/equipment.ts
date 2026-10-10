@@ -3,7 +3,10 @@ import type { LocalKey, MachineId } from "../ids";
 import type { OperatingMode } from "../ship";
 import type { SignificanceCatalog } from "./significance";
 
-/** Why a machine's output fell below 1: the smallest of its output factors (D35 adds integrity). */
+/**
+ * Why a machine's output fell below 1: the smallest of its output factors (§integrity adds
+ * integrity).
+ */
 export type DerateCause = "power" | "heat" | "fault" | "integrity";
 
 export interface EquipmentEventPayloads {

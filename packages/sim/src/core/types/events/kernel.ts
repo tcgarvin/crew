@@ -14,7 +14,7 @@ export interface KernelEventPayloads {
   commandRejected: { readonly kind: CommandKind; readonly rejection: CommandRejection };
   /** An enabled invariant check failed (diagnostics; the tick still completes). */
   invariantViolated: { readonly invariant: string; readonly detail: string };
-  /** D99: the narrator's call-back request was replaced (`requestCall`). */
+  /** §requested-call-back: the narrator's call-back request was replaced (`requestCall`). */
   callBackRequested: { readonly when: CallBackWhen };
 }
 

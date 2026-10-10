@@ -18,7 +18,7 @@ if (deck === undefined) throw new Error("no deck");
 const layout = buildDeckLayout(deck, bundle);
 const hull = hullGeometry(layout);
 const docks = bundle.docks ?? {};
-/** Every authored dock with the scenario deck in its berth box (D72). */
+/** Every authored dock with the scenario deck in its berth box (§ship-placement). */
 const allDocks: BerthedDock[] = Object.values(docks).map((dock) => berthInView(dock, layout));
 const MOTION = { reducedMotion: false };
 
@@ -84,7 +84,7 @@ describe("camera framing at both ends", () => {
   });
 });
 
-describe("legibility on a 390×700 portrait phone (D72)", () => {
+describe("legibility on a 390×700 portrait phone", () => {
   // The canvas the app lays out under its portrait chrome (top bar, headline, travel bar, compact
   // log), not the whole window. Dots are at least 8 px across and labels 11 px whatever the scale;
   // at 12 px a tile the compartment labels show and the ship reads.

@@ -67,9 +67,12 @@ export const ITEM_TAGS = [
   "container",
   /** Ship life §7: someone's own belongings; `UniqueItem.ownerId` says whose. */
   "personal",
-  /** D81: a crate the galley cooks from (`galley.servingsPerCrate` servings each); not `food`. */
+  /**
+   * §galley-provisions: a crate the galley cooks from (`galley.servingsPerCrate` servings each);
+   * not `food`.
+   */
   "provisions",
-  /** D81: a cooked serving (also `food`); carries `Item.meal` once served. */
+  /** §cooking-and-serving: a cooked serving (also `food`); carries `Item.meal` once served. */
   "meal",
   /** Slice 4: something to read off the shelf (`ActivityDef.requires`). */
   "book",
@@ -77,9 +80,15 @@ export const ITEM_TAGS = [
   "instrument",
   /** Slice 4: a baked snack (also `food`), eaten where found; never `meal`. */
   "treat",
-  /** Slice 5 (D93): one patch for one hull scar underway (`patchHull` consumes one). */
+  /**
+   * Slice 5 (§patching-and-plating): one patch for one hull scar underway (`patchHull` consumes
+   * one).
+   */
   "patchKit",
-  /** Slice 5 (D93): a hull plate, fitted over a scar at port (`plateHull` consumes one). */
+  /**
+   * Slice 5 (§patching-and-plating): a hull plate, fitted over a scar at port (`plateHull` consumes
+   * one).
+   */
   "plating",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
@@ -91,12 +100,15 @@ export const TOOL_KINDS = [
   "welder",
   "diagnosticScanner",
   "handTruck",
-  /** D82: the mop a `cleanCompartment` task needs. */
+  /** §mop-trips: the mop a `cleanCompartment` task needs. */
   "mop",
 ] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
-/** D47: the narrator's coarse price lever for `stockMarket`; `config.commerce.market.priceTiers` maps it. */
+/**
+ * §market-lever: the narrator's coarse price lever for `stockMarket`;
+ * `config.commerce.market.priceTiers` maps it.
+ */
 export const MARKET_PRICE_TIERS = ["cheap", "fair", "dear"] as const;
 export type MarketPriceTier = (typeof MARKET_PRICE_TIERS)[number];
 
@@ -127,7 +139,9 @@ export const MACHINE_TAGS = [
   "lifeSupport",
   "cooling",
   "rampControl",
-  /** Slice 5 (D94): an intercom panel, where a report is made to the whole ship. */
+  /**
+   * Slice 5 (§intercom-and-reporting): an intercom panel, where a report is made to the whole ship.
+   */
   "comm",
 ] as const;
 export type MachineTag = (typeof MACHINE_TAGS)[number];
@@ -157,7 +171,7 @@ export type RecipeActionKind = (typeof RECIPE_ACTIONS)[number];
 export type SymptomChannel = "visual" | "audible" | "sensor";
 
 /**
- * D79: the thoughts the sim can give someone, a closed set because each is raised by sim code
+ * §thoughts: the thoughts the sim can give someone, a closed set because each is raised by sim code
  * (a long watch, a clean pass at the helm). Content gives each its label, value and duration
  * (`ContentBundle.thoughts`, every key required).
  */
@@ -166,13 +180,13 @@ export const THOUGHT_KEYS = [
   "doubleWatch",
   "helmCleanPass",
   "helmScrape",
-  /** D81: ate a `good` meal. */
+  /** §eating: ate a `good` meal. */
   "ateWell",
-  /** D81: ate a `poor` meal. */
+  /** §eating: ate a `poor` meal. */
   "burntDinner",
-  /** D81: ate `food` with no `meal` on it (a ration pack). */
+  /** §eating: ate `food` with no `meal` on it (a ration pack). */
   "ateRationPack",
-  /** D82: ate in a room at the `dirty` tier; `ateInFilthyMess` at `filthy` (two keys, D79). */
+  /** §room-tiers: ate in a room at the `dirty` tier; `ateInFilthyMess` at `filthy` (two keys). */
   "ateInDirtyMess",
   "ateInFilthyMess",
   /** Slice 4: contest outcomes (`ActivityDef.thoughts.win`/`lose`). */
@@ -211,8 +225,8 @@ export const THOUGHT_KEYS = [
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
 
 /**
- * D88: what one person remembers about another, each a closed key raised by sim code (a chat, a
- * game, an argument, a private talk). Config gives each its opinion, duration and stack limit
+ * §memories: what one person remembers about another, each a closed key raised by sim code (a chat,
+ * a game, an argument, a private talk). Config gives each its opinion, duration and stack limit
  * (`social.memories`, every key required); affinity is compatibility plus the live memories.
  */
 export const MEMORY_KEYS = [
@@ -239,7 +253,7 @@ export const MEMORY_KEYS = [
 ] as const;
 export type MemoryKey = (typeof MEMORY_KEYS)[number];
 
-/** D88: one kind of memory (`ConfigDef.social.memories`). */
+/** §memories: one kind of memory (`ConfigDef.social.memories`). */
 export interface MemoryDef {
   /** Lower-case phrase from the rememberer's side: "a good chat", "an argument". */
   readonly label: string;
@@ -251,49 +265,51 @@ export interface MemoryDef {
 }
 
 /**
- * D82: how dirty a room is, from its cells (`systems/dirt/grid.ts` `tierOf`, with hysteresis on
- * the way down). `WorldState.dirt.tiers` holds the last tier written per room.
+ * §room-tiers: how dirty a room is, from its cells (`systems/dirt/grid.ts` `tierOf`, with
+ * hysteresis on the way down). `WorldState.dirt.tiers` holds the last tier written per room.
  */
 export const DIRT_TIERS = ["clean", "untidy", "dirty", "filthy"] as const;
 export type DirtTier = (typeof DIRT_TIERS)[number];
 
 /**
- * D81: how good a served meal is: the cook's cooking skill against `galley.goodCookingAbove` /
- * `poorCookingBelow`, dropped a step by a galley at `dirty` or worse. Fixed on the item at the
- * serve (`Item.meal`).
+ * §cooking-and-serving: how good a served meal is: the cook's cooking skill against
+ * `galley.goodCookingAbove` / `poorCookingBelow`, dropped a step by a galley at `dirty` or worse.
+ * Fixed on the item at the serve (`Item.meal`).
  */
 export const MEAL_QUALITIES = ["poor", "plain", "good"] as const;
 export type MealQuality = (typeof MEAL_QUALITIES)[number];
 
 /**
- * D78: kinds of navigation hazard the narrator's `scheduleHazard` may place on a leg. The kernel
- * rolls them all the same way; display names live in `core/render.ts`. Slice 5 (D92): the
- * asteroid belt left this list for `scheduleField`, a field the ship crosses.
+ * §debris-fields-and-ion-storms: kinds of navigation hazard the narrator's `scheduleHazard` may
+ * place on a leg. The kernel rolls them all the same way; display names live in `core/render.ts`.
+ * The asteroid belt is not one: it is `scheduleField`, a field the ship crosses.
  */
 export const HAZARD_KINDS = ["debrisField", "ionStorm"] as const;
 export type HazardKind = (typeof HAZARD_KINDS)[number];
 
 /**
- * D92: how hard an asteroid field is (`ConfigDef.field.severities`: rate, large-rock share and
- * length). The helm's detection check reads `hazards.difficulty` at easy/hard/brutal.
+ * §scheduling-a-field: how hard an asteroid field is (`ConfigDef.field.severities`: rate,
+ * large-rock share and length). The helm's detection check reads `hazards.difficulty` at
+ * easy/hard/brutal.
  */
 export const FIELD_SEVERITIES = ["light", "heavy", "brutal"] as const;
 export type FieldSeverity = (typeof FIELD_SEVERITIES)[number];
 
 /**
- * D92: how a field is noticed: `rolled` by the helm-stander's piloting check before it starts,
- * `unseen` at the first impact whatever the helm does.
+ * §sighting-and-the-alert: how a field is noticed: `rolled` by the helm-stander's piloting check
+ * before it starts, `unseen` at the first impact whatever the helm does.
  */
 export const FIELD_DETECTIONS = ["rolled", "unseen"] as const;
 export type FieldDetection = (typeof FIELD_DETECTIONS)[number];
 
-/** D92: a `small` rock hits one tile; a `large` one the tile and its eight neighbours. */
+/** §rock-impacts: a `small` rock hits one tile; a `large` one the tile and its eight neighbours. */
 export const ROCK_SIZES = ["small", "large"] as const;
 export type RockSize = (typeof ROCK_SIZES)[number];
 
 /**
- * D92: what a rock does to a machine with a tile in its blast (`ConfigDef.field.machineEffects`
- * weights): nothing, integrity down a little or a lot, integrity to zero, or one of its faults.
+ * §machines-in-the-blast: what a rock does to a machine with a tile in its blast
+ * (`ConfigDef.field.machineEffects` weights): nothing, integrity down a little or a lot, integrity
+ * to zero, or one of its faults.
  */
 export const MACHINE_EFFECTS = ["none", "graze", "damage", "knockout", "fault"] as const;
 export type MachineEffect = (typeof MACHINE_EFFECTS)[number];
@@ -331,13 +347,13 @@ export type ActivityOutcome = (typeof ACTIVITY_OUTCOMES)[number];
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D72: hull size classes. A deck fits inside its class box; a dock's berth is a class box, so any
- * ship of that class or smaller docks there (ship life §10).
+ * §orientation-and-size: hull size classes. A deck fits inside its class box; a dock's berth is a
+ * class box, so any ship of that class or smaller docks there (ship life §10).
  */
 export const HULL_SIZE_CLASSES = ["S", "M", "L"] as const;
 export type HullSizeClass = (typeof HULL_SIZE_CLASSES)[number];
 
-/** D72: the box (width × height, tiles) each size class fits inside. */
+/** §orientation-and-size: the box (width × height, tiles) each size class fits inside. */
 export const HULL_SIZE_BOX: Readonly<
   Record<HullSizeClass, { readonly w: number; readonly h: number }>
 > = {
@@ -347,14 +363,15 @@ export const HULL_SIZE_BOX: Readonly<
 };
 
 /**
- * D72: what kind of hull a deck is. Orientation is not a field: the bow is always east (high x)
- * and the ramps always open on the south hull edge, which content validation enforces.
+ * §orientation-and-size: what kind of hull a deck is. Orientation is not a field: the bow is always
+ * east (high x) and the ramps always open on the south hull edge, which content validation
+ * enforces.
  */
 export interface HullDef {
   /** Informational: "light_freighter". */
   readonly class: string;
   readonly sizeClass: HullSizeClass;
-  /** D93: the hull bar's full value in hull points (100 for a light freighter). */
+  /** §the-hull-bar: the hull bar's full value in hull points (100 for a light freighter). */
   readonly max: number;
 }
 
@@ -399,14 +416,20 @@ export interface CompartmentDef {
    * read wrong. Absent, it is "the" and the lowercased name ("the cargo hold"); see `roomPhrase`.
    */
   readonly phrase?: string;
-  /** Semantic tags (`cargoHold`, `galley`, `quarters`, `bridge`, `engineering`). Tags alone grant no function. */
+  /**
+   * Semantic tags (`cargoHold`, `galley`, `quarters`, `bridge`, `engineering`). Tags alone grant no
+   * function.
+   */
   readonly tags: readonly string[];
 }
 
 export interface DoorPlacementDef {
   readonly key: LocalKey;
   readonly edge: TileEdge;
-  /** W0 decision: ramps are doors on a hull edge with kind `ramp`; they share the door state machine. */
+  /**
+   * W0 decision: ramps are doors on a hull edge with kind `ramp`; they share the door state
+   * machine.
+   */
   readonly kind: "interior" | "ramp";
   /** Power domain key driving the actuator; absent = unpowered (manual only). */
   readonly powerDomain?: LocalKey;
@@ -470,7 +493,10 @@ export const DOCK_POST_KINDS = [
 ] as const;
 export type DockPostKind = (typeof DOCK_POST_KINDS)[number];
 
-/** Freight on offer waits on `freightStaging`; a delivery is complete once it is all in `deliveryBay`. */
+/**
+ * Freight on offer waits on `freightStaging`; a delivery is complete once it is all in
+ * `deliveryBay`.
+ */
 export const DOCK_AREA_KINDS = ["freightStaging", "deliveryBay"] as const;
 export type DockAreaKind = (typeof DOCK_AREA_KINDS)[number];
 
@@ -552,15 +578,15 @@ export interface DockForegroundDef {
 }
 
 /**
- * A port's dock map (Dockside §3.1, D72): `packages/content/data/docks/<port>.json`. Coordinates
- * are in the map's own tile frame. `berth` is a size-class box, authored `void`, that any ship of
- * that class or smaller docks in: the ship's place is not authored but derived
+ * A port's dock map (Dockside §3.1, §dock-map-content): `packages/content/data/docks/<port>.json`.
+ * Coordinates are in the map's own tile frame. `berth` is a size-class box, authored `void`, that
+ * any ship of that class or smaller docks in: the ship's place is not authored but derived
  * (`berthPlacement` in `core/docks.ts`: flush to the box's south edge, the quay side, and centred
  * across it). The sim grafts the map onto the ship's deck there (`systems/spatial/dock.ts`), so
  * with the ship at dock tile `p`, dock tile (x, y) is deck tile (x − p.x, y − p.y). Walkable dock
  * floor is a `floor` tile under no blocking prop (`dockFloorMask` in `core/docks.ts`; content
  * validation applies the same rule). Whether it is a station or a planet is the port's `setting`
- * (D61: the dock does not repeat it).
+ * (§dock-alongside: the dock does not repeat it).
  *
  * Ramp landings are not listed: each ramp door lands on the dock tile across its hull edge, and
  * both content validation and the nav builder require that tile to be walkable floor.
@@ -575,7 +601,7 @@ export interface DockDef {
   /** `height` rows of `width` characters, each a key of `legend`. */
   readonly rows: readonly string[];
   readonly legend: Readonly<Record<string, DockTileKind>>;
-  /** D72: the box a docked ship lies in: its top-left dock tile and its size class. */
+  /** §ship-placement: the box a docked ship lies in: its top-left dock tile and its size class. */
   readonly berth: DockBerthDef;
   readonly posts: readonly DockPostDef[];
   readonly areas: readonly DockAreaDef[];
@@ -584,20 +610,20 @@ export interface DockDef {
   /** One line the narrator sees about the place. */
   readonly ambience: string;
   /**
-   * D82: how much a step on this dock's floor loads a crew member's boots (0 a clean deck plate,
-   * 1 a muddy field), scaled by `config.dirt.dockGrimePerStep`; the boots shed it on the ship's
-   * floor afterwards. In [0, 1].
+   * §footfall-and-boots: how much a step on this dock's floor loads a crew member's boots (0 a
+   * clean deck plate, 1 a muddy field), scaled by `config.dirt.dockGrimePerStep`; the boots shed it
+   * on the ship's floor afterwards. In [0, 1].
    */
   readonly grime: number;
   /**
-   * D82: whether the air here settles on the deck near an open ramp while docked (0 none, 1 a
-   * dust storm), scaled by `config.dirt.airborneDustPerDay` and capped per visit. In [0, 1]; a
-   * station (no sky) authors 0.
+   * §dirt-deposits: whether the air here settles on the deck near an open ramp while docked (0
+   * none, 1 a dust storm), scaled by `config.dirt.airborneDustPerDay` and capped per visit. In [0,
+   * 1]; a station (no sky) authors 0.
    */
   readonly airborneDust: number;
 }
 
-/** D72: a dock's berth box: `HULL_SIZE_BOX[sizeClass]` tiles from `origin`, all `void`. */
+/** §berth-boxes: a dock's berth box: `HULL_SIZE_BOX[sizeClass]` tiles from `origin`, all `void`. */
 export interface DockBerthDef {
   readonly origin: TileCoord;
   readonly sizeClass: HullSizeClass;
@@ -620,7 +646,9 @@ export interface MachineDef {
   readonly tags: readonly MachineTag[];
   /** Occupied tiles relative to the placement origin at rotation 0. Must include (0,0). */
   readonly footprint: readonly TileCoord[];
-  /** Where a worker/user stands, relative to origin at rotation 0; must be outside the footprint. */
+  /**
+   * Where a worker/user stands, relative to origin at rotation 0; must be outside the footprint.
+   */
   readonly interactionPositions: readonly InteractionPositionDef[];
   readonly power: MachinePowerDef;
   readonly heat: MachineHeatDef;
@@ -769,8 +797,9 @@ export interface ItemDef {
   /** Hunger removed per unit eaten (only with the `food` tag). */
   readonly nutrition?: number;
   /**
-   * D65: units of freight it carries at once (only on a `handTruck` tool, which must have it). A
-   * crew member pushing it moves that many crates per trip instead of one in their hands.
+   * §hand-truck-trips: units of freight it carries at once (only on a `handTruck` tool, which must
+   * have it). A crew member pushing it moves that many crates per trip instead of one in their
+   * hands.
    */
   readonly capacityUnits?: number;
 }
@@ -793,8 +822,8 @@ export interface CrewDef {
   /** One line of flavour for the inspector and narrator digest. */
   readonly bio: string;
   /**
-   * D38: how this person talks and how they handle the captain, two or three sentences. Not what
-   * they want (that surfaces as narrator threads). The narrator writes them in it.
+   * §crew-lines: how this person talks and how they handle the captain, two or three sentences. Not
+   * what they want (that surfaces as narrator threads). The narrator writes them in it.
    */
   readonly voice: string;
   /**
@@ -829,13 +858,13 @@ export interface TraitDef {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Thoughts (D79)
+// Thoughts (§thoughts)
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D79: what a thought is worth. Mood is the clamped sum of a person's live thoughts' values; a
- * thought lasts `durationDays` from when it was had. A non-stacking thought had again refreshes
- * the one already held; a stacking one is held once per occasion.
+ * §mood-and-work-speed: what a thought is worth. Mood is the clamped sum of a person's live
+ * thoughts' values; a thought lasts `durationDays` from when it was had. A non-stacking thought had
+ * again refreshes the one already held; a stacking one is held once per occasion.
  */
 export interface ThoughtDef {
   readonly key: ThoughtKey;
@@ -899,7 +928,7 @@ export interface ActivityDef {
     Partial<Record<"win" | "lose" | "joined" | "listened" | "listenedDislike", ThoughtKey>>
   >;
   /**
-   * D88: memories at the end. `together`: a contest's members pairwise, both ways; a bond's
+   * §memories: memories at the end. `together`: a contest's members pairwise, both ways; a bond's
    * members who like the activity, toward each other member. `loserToWinner`: each loser.
    */
   readonly memories?: {
@@ -969,9 +998,9 @@ export interface PortDef {
   readonly castSeed: readonly CastSeedDef[];
   readonly externalStores: readonly ExternalStoreDef[];
   /**
-   * D47: what the port sells. Seeds `WorldState.markets[portId]` at world creation; the live
-   * stock (and the price, once the narrator restocks) is state, so this is the opening position,
-   * not truth. A line with `count: 0` still carries the port's price for that item.
+   * §port-markets: what the port sells. Seeds `WorldState.markets[portId]` at world creation; the
+   * live stock (and the price, once the narrator restocks) is state, so this is the opening
+   * position, not truth. A line with `count: 0` still carries the port's price for that item.
    */
   readonly market: readonly MarketLineDef[];
   /**
@@ -1002,7 +1031,7 @@ export interface ExternalStoreDef {
   readonly kind: "warehouse" | "market" | "lounge";
 }
 
-/** D47: one item a port's market sells; `price` is integer credits per unit. */
+/** §port-markets: one item a port's market sells; `price` is integer credits per unit. */
 export interface MarketLineDef {
   readonly itemDefId: ItemDefId;
   readonly count: number;
@@ -1027,11 +1056,11 @@ export interface JobTemplateDef {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D77: who stands which watch. Section `i` has the watch while `watchOfDay(tick) === i`, so the
- * order of `sections` is the order the watches come round; a section beyond
- * `config.time.watchesPerDay` never stands one (content validation requires exactly that many).
- * Dayworkers keep `config.watches.dayworkerOnWatches`. Crew in the scenario but in neither list
- * (and anyone who joins later) are dayworkers.
+ * §sections-and-dayworkers: who stands which watch. Section `i` has the watch while
+ * `watchOfDay(tick) === i`, so the order of `sections` is the order the watches come round; a
+ * section beyond `config.time.watchesPerDay` never stands one (content validation requires exactly
+ * that many). Dayworkers keep `config.watches.dayworkerOnWatches`. Crew in the scenario but in
+ * neither list (and anyone who joins later) are dayworkers.
  */
 export interface WatchBillDef {
   readonly sections: readonly WatchSectionDef[];
@@ -1065,8 +1094,9 @@ export interface ScenarioDef {
     readonly faultKey: LocalKey;
   }[];
   /**
-   * D77: the watch bill. Absent in small test fixtures, where `createWorld` generates one
-   * (`core/watch-bill.ts`); content validation decides when authored content may omit it.
+   * §sections-and-dayworkers: the watch bill. Absent in small test fixtures, where `createWorld`
+   * generates one (`core/watch-bill.ts`); content validation decides when authored content may omit
+   * it.
    */
   readonly watchBill?: WatchBillDef;
 }
@@ -1085,12 +1115,12 @@ export interface ConfigDef {
     /** Ticks per sim-second. SD §5.1 default 20. */
     readonly tickRate: number;
     /**
-     * D76: sim-seconds in one ship's day. Every `Days` knob and per-day rate is converted through
-     * this where it is read (`core/clock.ts`), so changing it rescales the routine while physical
-     * motion (walking, doors, docking stages) keeps its speed.
+     * §the-ships-day: sim-seconds in one ship's day. Every `Days` knob and per-day rate is
+     * converted through this where it is read (`core/clock.ts`), so changing it rescales the
+     * routine while physical motion (walking, doors, docking stages) keeps its speed.
      */
     readonly daySeconds: Seconds;
-    /** D76: watches in one ship's day; a watch is `daySeconds / watchesPerDay`. */
+    /** §the-ships-day: watches in one ship's day; a watch is `daySeconds / watchesPerDay`. */
     readonly watchesPerDay: number;
   };
   readonly movement: {
@@ -1111,19 +1141,21 @@ export interface ConfigDef {
     readonly autoCloseAfterSeconds: Seconds;
     readonly manualOpenSeconds: Seconds;
     /**
-     * Dockside §2.6 (D58): a powered ramp is a heavy plate, so it travels (open or shut) in this
-     * time instead of `openSeconds`/`closeSeconds`. Still passable only once fully open.
+     * Dockside §2.6 (§dock-drawing): a powered ramp is a heavy plate, so it travels (open or shut)
+     * in this time instead of `openSeconds`/`closeSeconds`. Still passable only once fully open.
      */
     readonly rampOpenSeconds: Seconds;
   };
   readonly needs: {
     /*
      * W0 decision: needs are deficits in [0, 1]; 0 = fully satisfied, 1 = critical.
-     * D76: rates are deficit per ship's day before trait multipliers, converted to per second
-     * where read (`perDayToPerSecond`). A rate of 1 fills an empty need in one day; a recovery
-     * rate `r` clears a full deficit in `1 / r` of a day.
+     * §the-ships-day: rates are deficit per ship's day before trait multipliers, converted to per
+     * second where read (`perDayToPerSecond`). A rate of 1 fills an empty need in one day; a
+     * recovery rate `r` clears a full deficit in `1 / r` of a day.
      */
-    /** About 1 a day: a 0.25-nutrition ration offsets a quarter of it, so about four meals a day. */
+    /**
+     * About 1 a day: a 0.25-nutrition ration offsets a quarter of it, so about four meals a day.
+     */
     readonly hungerPerDay: number;
     /** About 2/3 a day awake and idle: rested to `seekThreshold` 0.5 in three quarters of a day. */
     readonly fatiguePerDayAwake: number;
@@ -1149,17 +1181,17 @@ export interface ConfigDef {
     readonly recreationPerDay: number;
     /** Deficit above which a personal activity becomes a routine candidate. */
     readonly seekThreshold: number;
-    /** D76: how long a meal takes, in days (0.0125 day is 15 s of a 1200 s day). */
+    /** §the-ships-day: how long a meal takes, in days (0.0125 day is 15 s of a 1200 s day). */
     readonly mealDays: Days;
     /**
-     * D76: the shortest sleep, in days, before waking below `wakeBelow` ends it (0.2 day is a
-     * fifth of the day, 240 s of a 1200 s day: ship life §2's one full sleep a day).
+     * §the-ships-day: the shortest sleep, in days, before waking below `wakeBelow` ends it (0.2 day
+     * is a fifth of the day, 240 s of a 1200 s day: ship life §2's one full sleep a day).
      */
     readonly sleepDays: Days;
     /** Wake when fatigue falls below this. */
     readonly wakeBelow: number;
     /**
-     * D77 addendum: bedtime. In one's sleep watch (the watch after one's own) anyone with
+     * §sleep-timing: bedtime. In one's sleep watch (the watch after one's own) anyone with
      * fatigue above this turns in, so a day's tiredness is slept off in the same window every
      * day; set so a full sleep's recovery cannot reach it again within the window (no second
      * nap), and a day awake always passes it.
@@ -1185,8 +1217,9 @@ export interface ConfigDef {
     readonly timeBucketSeconds: Seconds;
     readonly retryBackoffSeconds: Seconds;
     /**
-     * Skill gained per day of successful work, per level gap (SD §11.2: conservative). D76:
-     * 0.24 is a quarter of a level per day of practice. Unread until slice 2's helm practice.
+     * Skill gained per day of successful work, per level gap (SD §11.2: conservative).
+     * §the-ships-day: 0.24 is a quarter of a level per day of practice. Unread until slice 2's helm
+     * practice.
      */
     readonly skillGainPerDay: number;
     /** Work speed multiplier per skill level above the requirement. */
@@ -1202,14 +1235,14 @@ export interface ConfigDef {
     readonly heatSurvivalAbove: number;
     /**
      * Age in days after which a routine obligation is anyone's: a plate for the helm goes to the
-     * cook or a dayworker before (D81). Renamed with the other day knobs (D76).
+     * cook or a dayworker before (§mess-call).
      */
     readonly routineAgingDays: Days;
     /**
      * Age in days after which a dirty room is anyone's on duty to mop; before it only the roles
      * that keep the room (`cleaningRolesFor`) do. Longer than `routineAgingDays`, so a dirty
      * corridor is the deckhand's for most of a watch and not the whole crew's after ninety
-     * seconds (D82).
+     * seconds (§mop-trips).
      */
     readonly cleaningAgingDays: Days;
   };
@@ -1221,17 +1254,17 @@ export interface ConfigDef {
     /** Condition below which a `maintenanceDue` problem is raised regardless of interval. */
     readonly maintenanceConditionBelow: number;
     /**
-     * D90: condition below which the `maintenanceDue` problem is essential rather than routine,
-     * so the watch's engineer services a machine before it wears out instead of after the
+     * §maintenance-due: condition below which the `maintenanceDue` problem is essential rather than
+     * routine, so the watch's engineer services a machine before it wears out instead of after the
      * nearer chores. Below `maintenanceConditionBelow`.
      */
     readonly maintenanceEssentialBelow: number;
     /**
-     * D35: integrity below this derates output linearly (factor 1 here, 0 at
+     * §integrity: integrity below this derates output linearly (factor 1 here, 0 at
      * `integrityInoperableBelow`). Above it integrity does not affect output.
      */
     readonly integrityDerateBelow: number;
-    /** D35: integrity below this makes the machine inoperable until a repair restores it. */
+    /** §integrity: integrity below this makes the machine inoperable until a repair restores it. */
     readonly integrityInoperableBelow: number;
   };
   readonly power: {
@@ -1243,7 +1276,10 @@ export interface ConfigDef {
     readonly departSeconds: Seconds;
     readonly approachSeconds: Seconds;
     readonly dockSeconds: Seconds;
-    /** Route progress per second at full engine output, in the same units as `PortDef.routes.distance`. */
+    /**
+     * Route progress per second at full engine output, in the same units as
+     * `PortDef.routes.distance`.
+     */
     readonly nominalSpeed: number;
     /**
      * W6 addition: `TaskDerivationTable` planner-ranking estimate (SD §15.3) for a `staffStation`
@@ -1251,43 +1287,48 @@ export interface ConfigDef {
      */
     readonly staffEstimateSeconds: Seconds;
     /**
-     * D36: an `engine`/`generator` machine whose output is below this while departure is planned
-     * counts as impaired, and the departure gate asks the captain before leaving.
+     * §departure-gate: an `engine`/`generator` machine whose output is below this while departure
+     * is planned counts as impaired, and the departure gate asks the captain before leaving.
      */
     readonly departureMinOutput: number;
     /**
-     * D80: share of `nominalSpeed` a ship keeps in transit while its engines are below it and
+     * §limping: share of `nominalSpeed` a ship keeps in transit while its engines are below it and
      * no repair can bring them back with what is aboard (the parts or a tool are not there): the
      * engineer coaxes the engine along, so a lost part strands the ship for a while, never for
      * good. 0 drifts as before.
      */
     readonly limpSpeedFraction: number;
     /**
-     * D61: how long departure prep calls people on the dock to come aboard before the dock crew
-     * bring up whoever is still there, so a departure is never held forever by someone who
-     * cannot (or will not) walk back.
+     * §calling-the-crew-aboard: how long departure prep calls people on the dock to come aboard
+     * before the dock crew bring up whoever is still there, so a departure is never held forever by
+     * someone who cannot (or will not) walk back.
      */
     readonly recallAboardSeconds: Seconds;
-    /** D66: how often a local standing at their post steps to a neighbouring tile and back. */
+    /**
+     * §local-behaviour: how often a local standing at their post steps to a neighbouring tile and
+     * back.
+     */
     readonly localShuffleSeconds: Seconds;
     /**
-     * D66: how long a dock hand's carting errand may take before the old instant behaviour (D63)
-     * does it instead, with a `dockHandGaveUp` event, so nothing waits forever on a blocked walk.
+     * §dock-hand-errands: how long a dock hand's carting errand may take before the old instant
+     * behaviour does it instead, with a `dockHandGaveUp` event, so nothing waits forever on a
+     * blocked walk.
      */
     readonly dockHandGiveUpSeconds: Seconds;
     /**
-     * D70: how long the captain and someone on the dock talk before that person's card comes up
-     * ("talking with Fenwick Adair").
+     * §meetings-and-visitors: how long the captain and someone on the dock talk before that
+     * person's card comes up ("talking with Fenwick Adair").
      */
     readonly talkSeconds: Seconds;
     /**
-     * D70: how long the captain is out through the gate: to see someone in the port beyond it
-     * before their card comes up, or for a look round when nothing was on offer.
+     * §meetings-and-visitors: how long the captain is out through the gate: to see someone in the
+     * port beyond it before their card comes up, or for a look round when nothing was on offer.
      */
     readonly gateVisitSeconds: Seconds;
     /**
-     * D70: how long a card may wait to be delivered in person (the captain walking over, or the
-     * speaker walking to the ramp) before it comes up anyway, so no card waits forever on a walk.
+     * §give-up-and-leaving: how long a card may wait to be delivered in person (the captain walking
+     * over, or the speaker walking to the ramp) before it comes up anyway, so no card waits forever
+     * on a walk.
      */
     readonly cardDeliveryGiveUpSeconds: Seconds;
   };
@@ -1300,7 +1341,7 @@ export interface ConfigDef {
     readonly priceBands: Readonly<
       Record<CargoClass | "passenger", { readonly min: number; readonly max: number }>
     >;
-    /** D76: how long an offered job stays open, in days (0.5 is half a day). */
+    /** §the-ships-day: how long an offered job stays open, in days (0.5 is half a day). */
     readonly jobOfferTtlDays: Days;
     /**
      * W6 addition: flat integer credits charged on arrival at a port (SD §17.3 "simple running
@@ -1311,7 +1352,7 @@ export interface ConfigDef {
     readonly haulEstimateSeconds: Seconds;
     /**
      * How long after a declined or expired offer at a port before the narrator is asked again
-     * there (the `captainAshore` hook, D40), in days (D76).
+     * there (the `captainAshore` hook, D40), in days (§the-ships-day).
      */
     readonly reofferDays: Days;
     /**
@@ -1322,7 +1363,9 @@ export interface ConfigDef {
     readonly maxCratesPerJob: number;
     /** Passengers-and-galaxy §3.3: how long a round-trip passenger stays ashore. */
     readonly passage: {
-      /** `returnsAtTick` is drawn uniformly in [min, max] days after going ashore (D76). */
+      /**
+       * `returnsAtTick` is drawn uniformly in [min, max] days after going ashore (§the-ships-day).
+       */
       readonly ashoreDaysMin: Days;
       readonly ashoreDaysMax: Days;
       /**
@@ -1332,19 +1375,19 @@ export interface ConfigDef {
       readonly overdueDays: Days;
     };
     /**
-     * D80: the food the ship keeps aboard, in days of its people's hunger (the nutrition of the
-     * food aboard over eaters × `needs.hungerPerDay`). Below `lowBelowDays`, while docked at a
-     * port whose market sells food, the crew buy enough to bring it to `restockToDays`
+     * §reserve-kinds: the food the ship keeps aboard, in days of its people's hunger (the nutrition
+     * of the food aboard over eaters × `needs.hungerPerDay`). Below `lowBelowDays`, while docked at
+     * a port whose market sells food, the crew buy enough to bring it to `restockToDays`
      * (`reserveLow`, bought like a part). `lowBelowDays` 0 turns it off.
      */
     readonly foodReserve: { readonly lowBelowDays: Days; readonly restockToDays: Days };
     /**
-     * D80: units of each `spare`-tagged item the ship keeps aboard. Docked at a port whose market
-     * sells one, a shortfall is bought (`reserveLow`, routine), so a fault far from port finds
-     * its part aboard. 0 keeps no reserve.
+     * §reserve-kinds: units of each `spare`-tagged item the ship keeps aboard. Docked at a port
+     * whose market sells one, a shortfall is bought (`reserveLow`, routine), so a fault far from
+     * port finds its part aboard. 0 keeps no reserve.
      */
     readonly sparesReserve: number;
-    /** D47: the parts market. */
+    /** §port-markets: the parts market. */
     readonly market: {
       /** Multipliers over a port's content price for the narrator's `stockMarket` price tiers. */
       readonly priceTiers: Readonly<Record<MarketPriceTier, number>>;
@@ -1358,24 +1401,25 @@ export interface ConfigDef {
   };
   readonly narrator: {
     /**
-     * Quiet-too-long hook fires after this many days without a narrative event (D76; a third
-     * of a day is one watch, so at most once a watch).
+     * Quiet-too-long hook fires after this many days without a narrative event (§the-ships-day; a
+     * third of a day is one watch, so at most once a watch).
      */
     readonly quietTooLongDays: Days;
     /**
-     * D66: the `stageDock` hook is raised this long (as a distance at `travel.nominalSpeed`)
-     * before the end of the route; transit holds at the end until it is answered.
+     * §staging-hook-and-the-hold: the `stageDock` hook is raised this long (as a distance at
+     * `travel.nominalSpeed`) before the end of the route; transit holds at the end until it is
+     * answered.
      */
     readonly approachHookLeadSeconds: Seconds;
     readonly maxSpawnsPerCommand: number;
     /**
-     * Upper bound on `scheduleFault` window length. D76: the one narrator cadence still in
-     * seconds this slice.
+     * Upper bound on `scheduleFault` window length. §the-ships-day: the one narrator cadence still
+     * in seconds this slice.
      */
     readonly maxFaultWindowSeconds: Seconds;
     /**
      * Narrator budget (review §D.3), refilled to these values (and `hazardBudget`) every
-     * `budgetRefillDays` (D76; `core/pipeline.ts` runs the refill since D78).
+     * `budgetRefillDays` (§the-ships-day; `core/pipeline.ts` runs the refill).
      */
     readonly spawnBudget: number;
     readonly faultBudget: number;
@@ -1387,16 +1431,16 @@ export interface ConfigDef {
      */
     readonly hookOnEvents: readonly string[];
     /**
-     * D100: event types (plain strings, as `hookOnEvents`) that raise `notableEvent` at any
-     * significance, as the aftermath of something the narrator set in motion: the alert standing
-     * down after a field, a hazard rolled, a fault it caused repaired. Some have a filter of their
-     * own (`core/pipeline.ts` `hooksNarrator`: `faultRepaired` only for a fault with a cause,
-     * and not while a field is on).
+     * §notable-event-hook: event types (plain strings, as `hookOnEvents`) that raise `notableEvent`
+     * at any significance, as the aftermath of something the narrator set in motion: the alert
+     * standing down after a field, a hazard rolled, a fault it caused repaired. Some have a filter
+     * of their own (`core/pipeline.ts` `hooksNarrator`: `faultRepaired` only for a fault with a
+     * cause, and not while a field is on).
      */
     readonly aftermathHookOnEvents: readonly string[];
     /**
-     * D78: narrator-caused navigation hazards before the budget refills (`scheduleHazard`), a
-     * budget of their own beside spawns and faults.
+     * §debris-fields-and-ion-storms: narrator-caused navigation hazards before the budget refills
+     * (`scheduleHazard`), a budget of their own beside spawns and faults.
      */
     readonly hazardBudget: number;
   };
@@ -1410,19 +1454,24 @@ export interface ConfigDef {
     readonly remoteSaveEverySeconds: Seconds;
     readonly frameEveryTicks: number;
     /**
-     * D76: `SimEvent["type"]` names (plain strings, as `narrator.hookOnEvents`) that drop the web
-     * host's fast-forward back to 1× when playback reaches them.
+     * §auto-slowdown: `SimEvent["type"]` names (plain strings, as `narrator.hookOnEvents`) that
+     * drop the web host's fast-forward back to 1× when playback reaches them.
      */
     readonly slowDownOnEvents: readonly string[];
-    /** D82: how often (host real time, seconds) the worker posts a `DirtFrame` to the renderer. */
+    /**
+     * §dirt-grid: how often (host real time, seconds) the worker posts a `DirtFrame` to the
+     * renderer.
+     */
     readonly dirtFrameEverySeconds: Seconds;
   };
   /**
-   * D77: watches replace shifts. Which section is on watch comes from the scenario's bill against
-   * `time.watchesPerDay`; these are the rhythm's tunables.
+   * §sections-and-dayworkers: watches replace shifts. Which section is on watch comes from the
+   * scenario's bill against `time.watchesPerDay`; these are the rhythm's tunables.
    */
   readonly watches: {
-    /** Watches of the day (0-based, each `< time.watchesPerDay`) on which dayworkers are on duty. */
+    /**
+     * Watches of the day (0-based, each `< time.watchesPerDay`) on which dayworkers are on duty.
+     */
     readonly dayworkerOnWatches: readonly number[];
     /** How long before the bell the oncoming helm-stander makes for the helm. */
     readonly handoverLeadSeconds: Seconds;
@@ -1443,7 +1492,7 @@ export interface ConfigDef {
     /** Work to plot a course at the nav terminal, before the skill rate (work at a machine). */
     readonly plotCourseSeconds: Seconds;
   };
-  /** D79: mood (the clamped sum of live thoughts) and its bounded effects. */
+  /** §mood-and-work-speed: mood (the clamped sum of live thoughts) and its bounded effects. */
   readonly mood: {
     /** Mood below this is low: work at `lowWorkSpeed`. */
     readonly lowBelow: number;
@@ -1453,9 +1502,9 @@ export interface ConfigDef {
     readonly highWorkSpeed: number;
   };
   /**
-   * D81: the galley. Meals are cooked before each bell from a crate of provisions and served on
-   * the `serving` zone; the oncoming watch eats first. Days (D76) for the rhythm, seconds for work
-   * at the stove.
+   * §galley-and-mess-call: the galley. Meals are cooked before each bell from a crate of provisions
+   * and served on the `serving` zone; the oncoming watch eats first. Days (§the-ships-day) for the
+   * rhythm, seconds for work at the stove.
    */
   readonly galley: {
     /** How long before the bell `mealToCook` is raised for the coming watch. */
@@ -1475,9 +1524,9 @@ export interface ConfigDef {
     /** Hunger above which a known hot meal is a routine candidate (well under `seekThreshold`). */
     readonly mealCallHungerAbove: number;
     /**
-     * D80/D81: the provisions reserve, in days of meals (a crate is a meal and a meal a watch,
-     * so crates aboard over `time.watchesPerDay`, plus the plates on the counter as a fraction of
-     * one). Below `lowBelowDays`, docked at a port whose market sells
+     * §reserve-kinds, §galley-provisions: the provisions reserve, in days of meals (a crate is a
+     * meal and a meal a watch, so crates aboard over `time.watchesPerDay`, plus the plates on the
+     * counter as a fraction of one). Below `lowBelowDays`, docked at a port whose market sells
      * provisions, the crew buy crates to bring it to `restockToDays` (`reserveLow`, bought like a
      * part). 0 turns it off. Ration packs are `commerce.foodReserve`'s.
      */
@@ -1493,8 +1542,8 @@ export interface ConfigDef {
     readonly treatHungerAbove: number;
   };
   /**
-   * D82: dirt. A cell is 0..255 (255 = 1.0 of dirt); footfall, boots and deposits are unitless
-   * amounts of that 1.0; tiers are thresholds on a room's weighted dirt.
+   * §dirt-grid: dirt. A cell is 0..255 (255 = 1.0 of dirt); footfall, boots and deposits are
+   * unitless amounts of that 1.0; tiers are thresholds on a room's weighted dirt.
    */
   readonly dirt: {
     /** Dirt a step leaves on a deck tile. */
@@ -1539,7 +1588,7 @@ export interface ConfigDef {
     readonly tintScale: number;
     readonly tintMaxAlpha: number;
   };
-  /** D78: navigation hazards (the narrator's `scheduleHazard`). */
+  /** §debris-fields-and-ion-storms: navigation hazards (the narrator's `scheduleHazard`). */
   readonly hazards: {
     /** The narrator's difficulty tiers as piloting-check difficulties (1-10). */
     readonly difficulty: { readonly easy: number; readonly hard: number; readonly brutal: number };
@@ -1554,16 +1603,16 @@ export interface ConfigDef {
     readonly chatCooldownSeconds: Seconds;
     /** Templates with `{a}` (speaker) and `{b}` (listener) placeholders. */
     readonly templateLines: readonly string[];
-    /** D88: a pair's chat leaves a memory at most once in this many days. */
+    /** §ambient-chat: a pair's chat leaves a memory at most once in this many days. */
     readonly chatMemoryEveryDays: Days;
     /**
-     * D88: the chance, per side, that a chat leaves `rubbedWrong` rather than `chatted`:
+     * §ambient-chat: the chance, per side, that a chat leaves `rubbedWrong` rather than `chatted`:
      * `atZero − perPoint × compatibility`, clamped to [0, 1].
      */
     readonly chatSour: { readonly atZero: number; readonly perPoint: number };
     /**
-     * D88: a pair's compatibility, an integer in ±`range`, symmetric and fixed by who they are:
-     * `base − perValuePoint × (summed value-axis gaps) + perSharedLike × (likes in common)
+     * §affinity: a pair's compatibility, an integer in ±`range`, symmetric and fixed by who they
+     * are: `base − perValuePoint × (summed value-axis gaps) + perSharedLike × (likes in common)
      * − perClash × (one's likes the other dislikes, both ways)`, rounded.
      */
     readonly compatibility: {
@@ -1573,9 +1622,12 @@ export interface ConfigDef {
       readonly perClash: number;
       readonly range: number;
     };
-    /** D88: every memory's opinion, duration and stack limit. */
+    /** §memories: every memory's opinion, duration and stack limit. */
     readonly memories: Readonly<Record<MemoryKey, MemoryDef>>;
-    /** Slice 4: affinity is an integer in [-affinityRange, affinityRange] (D88: derived, clamped). */
+    /**
+     * Slice 4: affinity is an integer in [-affinityRange, affinityRange] (§affinity: derived,
+     * clamped).
+     */
     readonly affinityRange: number;
     /** Slice 4: at or below this, someone is avoided (seats, sessions). */
     readonly avoidBelow: number;
@@ -1608,7 +1660,7 @@ export interface ConfigDef {
     /** A `privateTalk` not held this long after it was called is missed. */
     readonly privateTalkWaitSeconds: Seconds;
   };
-  /** D92: the asteroid field (the narrator's `scheduleField`, `systems/field/`). */
+  /** §the-asteroid-field: the asteroid field (the narrator's `scheduleField`, `systems/field/`). */
   readonly field: {
     /** The helm's detection check falls this long before the field's start. */
     readonly warningSeconds: Seconds;
@@ -1639,12 +1691,12 @@ export interface ConfigDef {
     readonly machineEffects: Readonly<Record<MachineEffect, number>>;
     /** Integrity a `graze` and a `damage` take off a machine. */
     readonly effectIntegrity: { readonly graze: number; readonly damage: number };
-    /** D93: the share of a scar's hull damage a patch kit restores underway. */
+    /** §patching-and-plating: the share of a scar's hull damage a patch kit restores underway. */
     readonly patchRecovers: number;
     /** Call 2: the most scripted impacts one `scheduleField` may carry. */
     readonly maxScripted: number;
   };
-  /** D93: the crew's damage work (`systems/damage/`). */
+  /** §hull-scars-and-ship-loss: the crew's damage work (`systems/damage/`). */
   readonly damage: {
     /** Welding a patch kit over a scar. */
     readonly patchSeconds: Seconds;
@@ -1655,7 +1707,7 @@ export interface ConfigDef {
     /** A scout's look round a compartment once there. */
     readonly checkSeconds: Seconds;
   };
-  /** D94: intercom panels (`systems/intercom/`). */
+  /** §intercom-and-reporting: intercom panels (`systems/intercom/`). */
   readonly intercom: {
     /** A report at a panel. */
     readonly reportSeconds: Seconds;
@@ -1679,10 +1731,10 @@ export interface ConfigDef {
  * W0 decision: the bundle also carries `traits` and `scenarios` tables beyond the six def kinds.
  */
 /**
- * D25 (2026-09-30): who offers work, for the null narrator's offline offers (`data/people/`). Names
- * are drawn from the shared lists; roles, organisations and extra pitch lines are per port, so
- * the people at a mining outpost sound like it. Pitch lines take `{cargo}`, `{from}` and `{to}`
- * placeholders and never mention pay (D24).
+ * §issuers-and-pitches (2026-09-30): who offers work, for the null narrator's offline offers
+ * (`data/people/`). Names are drawn from the shared lists; roles, organisations and extra pitch
+ * lines are per port, so the people at a mining outpost sound like it. Pitch lines take `{cargo}`,
+ * `{from}` and `{to}` placeholders and never mention pay (§cards-never-mention-pay).
  */
 export interface PeopleTableDef {
   readonly givenNames: readonly string[];
@@ -1712,8 +1764,8 @@ export interface ContentBundle {
   readonly ports: Readonly<Record<PortDefId, PortDef>>;
   readonly scenarios: Readonly<Record<ScenarioDefId, ScenarioDef>>;
   /**
-   * D25 name table. Optional so hand-built test bundles need not carry one; without it the null
-   * narrator falls back to the template's `issuer` as the person's name.
+   * §issuers-and-pitches name table. Optional so hand-built test bundles need not carry one;
+   * without it the null narrator falls back to the template's `issuer` as the person's name.
    */
   readonly people?: PeopleTableDef;
   /**
@@ -1721,7 +1773,10 @@ export interface ContentBundle {
    * not carry any; a port without one keeps the transfer-tile behaviour.
    */
   readonly docks?: Readonly<Record<DockDefId, DockDef>>;
-  /** D79: every thought's def; required, so a missing one fails validation (and `createWorld`). */
+  /**
+   * §thoughts: every thought's def; required, so a missing one fails validation (and
+   * `createWorld`).
+   */
   readonly thoughts: Readonly<Record<ThoughtKey, ThoughtDef>>;
   /** Slice 4: off-watch activities by id (required; may be empty in a hand-built bundle). */
   readonly activities: Readonly<Record<ActivityDefId, ActivityDef>>;

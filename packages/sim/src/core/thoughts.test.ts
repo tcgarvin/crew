@@ -22,7 +22,7 @@ function setup(tick = 100) {
 
 const at = (ctx: ThoughtCtx, tick: number): ThoughtCtx => ({ ...ctx, tick });
 
-describe("addThought (D79)", () => {
+describe("addThought (§thoughts)", () => {
   it("gives the def's value until the def's duration has passed, and says so in a trace event", () => {
     const { ctx, mara, emitted, thoughts } = setup();
     addThought(ctx, mara, "stoodLongWatch");
@@ -85,7 +85,7 @@ describe("addThought (D79)", () => {
   });
 });
 
-describe("moodOf (D79)", () => {
+describe("moodOf (§mood-and-work-speed)", () => {
   const holding = (...thoughts: Actor["thoughts"]) => ({ thoughts });
 
   it("sums only the thoughts still live at the tick (expiresAtTick is the first tick they do not count)", () => {
@@ -112,7 +112,7 @@ describe("moodOf (D79)", () => {
   });
 });
 
-describe("moodWorkFactor (D79)", () => {
+describe("moodWorkFactor (§mood-and-work-speed)", () => {
   it("is the low speed below lowBelow, the high speed above highAbove, else 1", () => {
     const { ctx } = setup();
     const { lowBelow, highAbove, lowWorkSpeed, highWorkSpeed } = ctx.config.mood;

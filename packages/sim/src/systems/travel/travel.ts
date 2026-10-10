@@ -5,9 +5,9 @@
  * docked`. Runs every tick in the "equipment" phase (PHASES[3]) alongside power/equipment, since
  * travel progress depends on the engine's output the same way a machine's does.
  *
- * Dockside (D61): travel owns the dock's lifetime. The port's dock map (if content has one) is
- * grafted alongside at the start of `docking` and cast off at the end of `undocking`; departure
- * prep keeps the ramps down and calls everyone on the dock aboard before raising them
+ * Dockside (§dock-alongside): travel owns the dock's lifetime. The port's dock map (if content has
+ * one) is grafted alongside at the start of `docking` and cast off at the end of `undocking`;
+ * departure prep keeps the ramps down and calls everyone on the dock aboard before raising them
  * (`ashore.ts`).
  */
 import { configTicks } from "../../core/clock";
@@ -65,11 +65,11 @@ function propulsionFactor(ctx: Pick<StepCtx, "state" | "content">): number {
 }
 
 /**
- * D80: why the ship limps rather than drifts: below `travel.limpSpeedFraction`, every engine that
- * is wanted on and below it is impaired by a repair nothing aboard can finish (no market under
- * way). The first such reason, by machine id; `undefined` when a repair aboard can still bring
- * an engine back (the crew are on it: the ship waits for them, as before), or the engines are
- * fine, or off by choice.
+ * §limping-under-way: why the ship limps rather than drifts: below `travel.limpSpeedFraction`,
+ * every engine that is wanted on and below it is impaired by a repair nothing aboard can finish (no
+ * market under way). The first such reason, by machine id; `undefined` when a repair aboard can
+ * still bring an engine back (the crew are on it: the ship waits for them, as before), or the
+ * engines are fine, or off by choice.
  */
 function limpReason(ctx: StepCtx, raw: number): RepairOutOfReach | undefined {
   const fraction = ctx.config.travel.limpSpeedFraction;
@@ -88,8 +88,9 @@ function limpReason(ctx: StepCtx, raw: number): RepairOutOfReach | undefined {
 }
 
 /**
- * D80: start or stop the limp for this tick (`shipLimping` when it begins) and return the
- * propulsion factor transit moves at: the engines' own, or `limpSpeedFraction` while limping.
+ * §limping-under-way: start or stop the limp for this tick (`shipLimping` when it begins) and
+ * return the propulsion factor transit moves at: the engines' own, or `limpSpeedFraction` while
+ * limping.
  */
 function updateLimp(ctx: StepCtx, travel: InFlight, raw: number): number {
   const why = limpReason(ctx, raw);
@@ -210,7 +211,7 @@ function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * D63: freight of a job taken at the port alongside (`accepted`, or `inTransit` once departure
+ * §loading: freight of a job taken at the port alongside (`accepted`, or `inTransit` once departure
  * prep has begun) still lying on the dock, i.e. not yet loaded. Its `cargoToLoad` is normally
  * open too; this holds the ship even if that work were gone, since a crate on the dock is left
  * behind when the dock goes.
@@ -229,7 +230,7 @@ function acceptedFreightOnDock(ctx: Pick<StepCtx, "state" | "content">): boolean
   );
 }
 
-/** Open freight work of `kinds`, or accepted freight on the dock (D63). */
+/** Open freight work of `kinds`, or accepted freight on the dock (§loading). */
 function hasOpenFreightWork(
   ctx: Pick<StepCtx, "state" | "content">,
   kinds: readonly ("cargoToLoad" | "cargoToUnload")[],
@@ -241,7 +242,7 @@ function hasOpenFreightWork(
   );
 }
 
-/** Freight still to load: open `cargoToLoad` work, or accepted freight on the dock (D63). */
+/** Freight still to load: open `cargoToLoad` work, or accepted freight on the dock (§loading). */
 function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return hasOpenFreightWork(ctx, ["cargoToLoad"]);
 }
@@ -252,8 +253,8 @@ function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
 }
 
 /**
- * D47 at a waypoint: an open `partsNeeded` the crew could answer at this port's market (stock
- * and money allow at least one unit), i.e. one that derives a runnable `buyParts` task. The
+ * At a waypoint (§buying-parts): an open `partsNeeded` the crew could answer at this port's market
+ * (stock and money allow at least one unit), i.e. one that derives a runnable `buyParts` task. The
  * voyage waits for it, so a stalled repair can buy its part on the way through.
  */
 function hasRunnableBuyPartsWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
@@ -292,8 +293,8 @@ export function waitingForPassenger(
 }
 
 /**
- * A decision card is queued for the captain (any origin), or (D70) one is on its way to them in
- * person: the ship does not leave while someone is walking over with word.
+ * A decision card is queued for the captain (any origin), or (§departure-while-a-card-is-held) one
+ * is on its way to them in person: the ship does not leave while someone is walking over with word.
  */
 function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
   const { records, queue, held } = ctx.state.decisions;
@@ -303,8 +304,9 @@ function hasPendingDecision(ctx: Pick<StepCtx, "state">): boolean {
 /**
  * What keeps a ship with a course set docked: freight still moving through the open ramp
  * (Integration 2), a passenger ashore or walking off (passengers §3.3: the ship never leaves them
- * quietly, only through the overdue card or `endPassage`), or (D70) a card on its way to the
- * captain in person. Departure prep begins the first tick none of them applies.
+ * quietly, only through the overdue card or `endPassage`), or (§departure-while-a-card-is-held) a
+ * card on its way to the captain in person. Departure prep begins the first tick none of them
+ * applies.
  */
 export function departureWaits(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return (
@@ -366,8 +368,8 @@ export function beginDeparture(
     routeDistance: distance ?? 0,
     drifting: false,
     stageStartedTick: ctx.tick,
-    // D36: "leave anyway" answered while docked still covers the departure it was asked for,
-    // and (§2.3) the rest of the voyage.
+    // §departure-gate: "leave anyway" answered while docked still covers the departure it was asked
+    // for, and (§2.3) the rest of the voyage.
     ...carriedVoyageFields(travel),
   };
   ctx.emit({
@@ -397,7 +399,7 @@ function continueVoyageIfFree(ctx: StepCtx): void {
   }
   if (voyageHeldAtWaypoint(ctx)) return;
   travel.plannedDestinationId = hop;
-  // D78: every hop of a voyage is plotted at its waypoint.
+  // §course-plotting: every hop of a voyage is plotted at its waypoint.
   // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
   delete travel.coursePlotted;
 }
@@ -407,41 +409,45 @@ function advanceTravel(ctx: StepCtx): void {
   if (travel.stage === "docked") {
     continueVoyageIfFree(ctx);
     // Integration 2: a course set while freight was still moving waits here, docked with the
-    // ramp open, until the last crate is aboard (or ashore), then departure prep begins. D77: the
-    // helm's watch post opens as soon as a course is planned (`systems/watch/watch.ts`), so the
-    // stander walks up while loading still runs and stays: the post is open until docked again.
+    // ramp open, until the last crate is aboard (or ashore), then departure prep begins.
+    // §problem-ownership: the helm's watch post opens as soon as a course is planned
+    // (`systems/watch/watch.ts`), so the stander walks up while loading still runs and stays: the
+    // post is open until docked again.
     const planned = travel.plannedDestinationId;
     if (planned === undefined || departureWaits(ctx)) return;
-    // D78: prep begins only once the course is plotted (`course.ts`).
+    // §course-plotting: prep begins only once the course is plotted (`course.ts`).
     if (!coursePlotted(ctx)) return;
-    // D36: the departure gate asks (once) before prep begins when an engine/generator is impaired.
+    // §departure-gate: the departure gate asks (once) before prep begins when an engine/generator
+    // is impaired.
     if (departureCleared(ctx)) beginDeparture(ctx, planned);
     return;
   }
 
   if (travel.stage === "preparingDeparture") {
-    // D63: loading includes accepted freight still lying on the dock (cargo work, so it blocks
+    // §loading: loading includes accepted freight still lying on the dock (cargo work, so it blocks
     // as cargo work does), and the call aboard waits until it is done: the loading crew are out
     // on the dock fetching it and must not be called back from it.
     const openCargo = hasOpenLoading(ctx);
-    // D61: the ramps stay down while anyone is on the dock (or walking onto it, or out through
-    // the gate, D63), and while freight is still being loaded with a dock alongside; otherwise
-    // they come up. Under the ramp rules (D59) nobody else ever lowers them, so raising one early
-    // strands whoever is out.
+    // §calling-the-crew-aboard: the ramps stay down while anyone is on the dock (or walking onto
+    // it, or out through the gate), and while freight is still being loaded with a dock alongside;
+    // otherwise they come up. Under the ramp rules (D59) nobody else ever lowers them, so raising
+    // one early strands whoever is out.
     const ashore = peopleAshore(ctx);
     const holdRamps = ashore.length > 0 || (openCargo && ctx.state.deck.dock !== undefined);
     requestRamps(ctx, holdRamps ? "open" : "closed");
-    // D77: the helm's watch post is the watch's (`systems/watch/watch.ts`), open since the course
-    // was planned; prep waits for someone in the seat.
+    // §problem-ownership: the helm's watch post is the watch's (`systems/watch/watch.ts`), open
+    // since the course was planned; prep waits for someone in the seat.
     const staffed = helmManned(ctx.state, ctx.content);
     // Loading crew may be out on the dock fetching freight; the call waits for the cargo.
     if (ashore.length === 0) endRecall(travel);
     else if (!openCargo) recallAshore(ctx, travel, ashore);
-    // D36: a course set with no cargo work enters this stage straight from `setCourse`, so the
-    // departure gate is also checked here; a hold stalls the stage like any other precondition.
+    // §departure-gate: a course set with no cargo work enters this stage straight from `setCourse`,
+    // so the departure gate is also checked here; a hold stalls the stage like any other
+    // precondition.
     if (!departureCleared(ctx)) return;
     if (openCargo || !staffed) return; // stalled: preconditions unmet
-    if (ashore.length > 0) return; // stalled: waiting for everyone to come aboard (D61)
+    // §calling-the-crew-aboard: stalled, waiting for everyone to come aboard
+    if (ashore.length > 0) return;
     // Ramps retract during prep (Dockside §2.4), so their closing runs alongside the timer; the
     // stage only waits on them if it would otherwise end with a ramp still down.
     if (!rampsClosed(ctx)) {
@@ -450,8 +456,8 @@ function advanceTravel(ctx: StepCtx): void {
     }
   }
 
-  // D77: vacancy is a gate, not a slowdown: the approach and docking hold in place until someone
-  // has the helm (and the end of transit waits, below); transit itself flies on.
+  // §helm-vacancy: vacancy is a gate, not a slowdown: the approach and docking hold in place until
+  // someone has the helm (and the end of transit waits, below); transit itself flies on.
   const manoeuvre = travel.stage === "approaching" || travel.stage === "docking";
   if (manoeuvre && !helmManned(ctx.state, ctx.content)) return; // stalled
 
@@ -476,13 +482,15 @@ function advanceTravel(ctx: StepCtx): void {
     );
     travel.stageProgress =
       travel.routeDistance === 0 ? 1 : travel.routeProgress / travel.routeDistance;
-    // D66: the staging call is raised before the end-of-route check, so a leg that starts inside
-    // the lead distance (or has none) raises it this tick rather than costing one.
+    // §staging-hook-and-the-hold: the staging call is raised before the end-of-route check, so a
+    // leg that starts inside the lead distance (or has none) raises it this tick rather than
+    // costing one.
     stageDockIfDue(ctx, travel);
     if (travel.routeProgress < travel.routeDistance) return;
-    // D66: held at the end of the route until the staging call has been answered.
+    // §staging-hook-and-the-hold: held at the end of the route until the staging call has been
+    // answered.
     if (!stagingAnswered(ctx.state, ctx.content, travel)) return;
-    // D77: the approach does not begin with nobody at the helm.
+    // §helm-vacancy: the approach does not begin with nobody at the helm.
     if (!helmManned(ctx.state, ctx.content)) return;
     advanceStage(ctx);
     return;
@@ -505,9 +513,9 @@ function advanceStageTimer(
 }
 
 /**
- * D61: the port's dock comes alongside at the start of `docking` (a port without one keeps the
- * transfer tiles), grafted onto the ship's deck. Its ramps are still up, so nobody can walk onto
- * it until `docked` lowers them.
+ * §travel-stages: the port's dock comes alongside at the start of `docking` (a port without one
+ * keeps the transfer tiles), grafted onto the ship's deck. Its ramps are still up, so nobody can
+ * walk onto it until `docked` lowers them.
  */
 function bringDockAlongside(
   ctx: StepCtx,
@@ -517,16 +525,17 @@ function bringDockAlongside(
   const dock = dockForPort(ctx.content, portId);
   if (dock === undefined) return;
   attachDock(ctx, { dockId: dock.id, deckId: theDeckId(ctx) });
-  // D66: the dock slides in with its people already at their posts: the floor set, and the
-  // staging call's plan if it gave one.
+  // §staging-plan-dressing: the dock slides in with its people already at their posts: the floor
+  // set, and the staging call's plan if it gave one.
   dressDockAlongside(ctx, staging?.status === "raised" ? staging.plan : undefined);
 }
 
 /**
- * D61: the dock leaves at the end of `undocking`. Prep has brought everyone aboard and raised
- * the ramps; `clearDock` leaves anything still lying there at the port, then the graft goes.
- * D66: the locals go first, with the dock, never aboard: they are not in `actors`, so neither the
- * call aboard nor `clearDock` ever sees them; a dock hand's open errand is finished on the spot.
+ * §travel-stages: the dock leaves at the end of `undocking`. Prep has brought everyone aboard and
+ * raised the ramps; `clearDock` leaves anything still lying there at the port, then the graft goes.
+ * §locals-come-and-go-with-the-dock: the locals go first, with the dock, never aboard: they are not
+ * in `actors`, so neither the call aboard nor `clearDock` ever sees them; a dock hand's open errand
+ * is finished on the spot.
  */
 function castOffDock(ctx: StepCtx, portId: PortDefId): void {
   if (ctx.state.deck.dock === undefined) return;
@@ -544,7 +553,7 @@ function advanceStage(ctx: StepCtx): void {
   if (to === "docked") {
     const portId = travel.toPortId;
     // §2.3: the voyage (and the gate's answer for it) survives an intermediate docking and ends
-    // at its destination; with no voyage, "leave anyway" is forgotten here as before (D36).
+    // at its destination; with no voyage, "leave anyway" is forgotten here (§departure-gate).
     const voyageContinues =
       travel.voyageDestinationId !== undefined && travel.voyageDestinationId !== portId;
     ctx.state.travel = {
@@ -591,7 +600,8 @@ function advanceStage(ctx: StepCtx): void {
     drifting: travel.drifting,
     stageStartedTick: ctx.tick,
     ...carriedVoyageFields(travel),
-    // D66: the staging record rides from transit into the approach and is spent at docking.
+    // §staging-hook-and-the-hold: the staging record rides from transit into the approach and is
+    // spent at docking.
     ...(to === "approaching" && travel.staging !== undefined ? { staging: travel.staging } : {}),
   };
   if (to === "docking") bringDockAlongside(ctx, travel.toPortId, travel.staging);
@@ -610,14 +620,14 @@ function advanceStage(ctx: StepCtx): void {
 /**
  * Raise `notableEvent` for a hookable narrative event committed in an earlier tick. Core's phase
  * 8 records it as `narrator.pendingNotable` (see `core/pipeline.ts`); it waits there while
- * another hook is pending, so a staging call raised the tick after the event (D69) delays the
- * notable hook rather than swallowing it. A story hook raised after the event clears it
+ * another hook is pending, so a staging call raised the tick after the event (§notable-event-hook)
+ * delays the notable hook rather than swallowing it. A story hook raised after the event clears it
  * (`core/hooks.ts`).
  */
 function checkNotableEventHook(ctx: StepCtx): void {
   const owed = ctx.state.narrator.pendingNotable;
   if (owed === undefined || owed.tick >= ctx.tick) return;
-  // D100: an aftermath event passed its filter when phase 8 recorded it.
+  // §notable-event-hook: an aftermath event passed its filter when phase 8 recorded it.
   const { hookOnEvents, aftermathHookOnEvents } = ctx.config.narrator;
   if (!hookOnEvents.includes(owed.type) && !aftermathHookOnEvents.includes(owed.type)) {
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
@@ -639,7 +649,8 @@ export const travelSystem: System = {
   phase: "equipment",
   run(ctx) {
     advanceTravel(ctx);
-    // D99: before the notable check, so a requested call settles a notable owed meanwhile.
+    // §requested-call-back: before the notable check, so a requested call settles a notable owed
+    // meanwhile.
     checkRequestedCall(ctx);
     checkNotableEventHook(ctx);
   },

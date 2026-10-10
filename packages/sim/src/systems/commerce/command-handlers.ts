@@ -84,7 +84,7 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     if (issuer.name === "" || issuer.role === "") {
       return reject("invalidPayload", "offerJob: the issuer needs a name and a role");
     }
-    // D70 (retiring D42's wait for the dock): an offer is put to the captain in person, at the
+    // §offer-cards: an offer is put to the captain in person, at the
     // dock, so a surfaced offer needs the ship docked at its origin. A quiet one may be posted
     // anywhere (scenarios and tests use that).
     if (command.payload.surface && !dockedAtOrigin(ctx.state, job)) {
@@ -161,10 +161,11 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         : {}),
     };
     ctx.state.jobs[jobId] = job;
-    // D63, D66: alongside the origin's dock, commerce's sweep this tick sends a dock hand out with
-    // the freight (or sets it out at once at a dock with no warehouse door); an offer made in
-    // flight is staged the same way when that dock comes alongside.
-    // D70: validated docked at the origin; the card is held until the captain meets the issuer.
+    // §offered-freight, §dock-hand-errands: alongside the origin's dock, commerce's sweep this tick
+    // sends a dock hand out with the freight (or sets it out at once at a dock with no warehouse
+    // door); an offer made in flight is staged the same way when that dock comes alongside.
+    // §offer-cards: validated docked at the origin; the card is held until the captain meets the
+    // issuer.
     const decisionId = surface ? surfaceOfferCard(ctx, job) : undefined;
     const held = decisionId !== undefined && heldCard(ctx.state, decisionId) !== undefined;
     ctx.emit({
@@ -172,7 +173,8 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       subjectIds: [jobId],
       causeIds: [command.id],
       source: command.source,
-      // D70: an offer whose card waits for the meeting is not in the log before it: the card is.
+      // §delivered-tick: an offer whose card waits for the meeting is not in the log before it: the
+      // card is.
       ...(held ? { significance: "trace" as const } : {}),
       payload: { jobId },
     });
@@ -193,8 +195,8 @@ export const acceptContract: CommandHandler<"acceptContract", null> = {
     if (travel.stage !== "docked" || travel.portId !== job.fromPortId) {
       return reject("preconditionFailed", `acceptContract: not docked at "${job.fromPortId}"`);
     }
-    // D16/D50: one job at a time. Offers can wait (the card stays, "Pass" is always open); taking
-    // one while another is still under way is refused.
+    // §one-job-in-hand, D50: one job at a time. Offers can wait (the card stays, "Pass" is always
+    // open); taking one while another is still under way is refused.
     const inHand = jobBlockingAcceptance(ctx.state);
     if (inHand !== undefined && inHand.id !== job.id) {
       return reject(
@@ -242,7 +244,8 @@ export const declineJob: CommandHandler<"declineJob", null> = {
       source: command.source,
       payload: { jobId: job.id },
     });
-    // D66: commerce's sweep this tick sends a dock hand to cart the staged crates back in.
+    // §dock-hand-errands: commerce's sweep this tick sends a dock hand to cart the staged crates
+    // back in.
     return NO_TEMP_REFS;
   },
 };
@@ -274,7 +277,8 @@ export const endPassage: CommandHandler<"endPassage", null> = {
 };
 
 // ---------------------------------------------------------------------------------------------
-// stockMarket (D47): what a port sells. Narrator and scenario only; never money, never aboard.
+// stockMarket (§market-stock): what a port sells. Narrator and scenario only; never money, never
+// aboard.
 // ---------------------------------------------------------------------------------------------
 
 export const stockMarket: CommandHandler<"stockMarket", null> = {
@@ -503,7 +507,8 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
           // Owner feedback 2026-09-30: a narrator manifest spawn is `spawn.count` individual
           // crates, not one stack, so loading reads one unit at a time (see `jobs.ts` `acceptJob`,
           // which spawns the same way for the deterministic job source's manifests).
-          // D63: on the origin's staging area when its dock is alongside, else in its store.
+          // §offered-freight: on the origin's staging area when its dock is alongside, else in its
+          // store.
           const locations = freightSpawnLocations(ctx, job.fromPortId, spawn.count);
           const ids = locations.map((location) =>
             spawnCargoItem(ctx, job, def, 1, def.stacking, location, stowageZoneKey, cause),

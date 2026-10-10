@@ -1,9 +1,9 @@
 /**
  * The recreation candidate's scoring (slice 4, call 2) over a hand-built `AgentView`
  * (dependency-cruiser's `planner-boundary` rule covers tests here too): off duty above
- * `joinAbove`, on duty only past the seek threshold and voluntary (D84 tuning); interest 3/2/1/0
- * with a dislike never chosen; joining needs a neutral, hosting a like; an open table +2 and
- * hosting a group activity +1 (D84 tuning); join over host over solo, then the bigger table;
+ * `joinAbove`, on duty only past the seek threshold and voluntary (§choosing-recreation); interest
+ * 3/2/1/0 with a dislike never chosen; joining needs a neutral, hosting a like; an open table +2
+ * and hosting a group activity +1; join over host over solo, then the bigger table;
  * friends and enemies in a session; mood; the voyage and a blocking problem; backoff.
  */
 import { describe, expect, it } from "vitest";
@@ -229,7 +229,7 @@ describe("recreationCandidate (call 2)", () => {
     ).toBeUndefined();
   });
 
-  it("on duty past the seek threshold offers the same choice at voluntary class (D84 tuning)", () => {
+  it("on duty past the seek threshold offers the same choice at voluntary class (§choosing-recreation)", () => {
     // An idle cook bakes or plays, but any routine work of the watch still comes first.
     const result = recreationCandidate(view({ onDuty: true }), config);
     expect(result).toMatchObject({ ref: "recreate:activity.cards", urgency: "voluntaryActivity" });
@@ -268,19 +268,19 @@ describe("recreationCandidate (call 2)", () => {
 
   it("prefers joining over hosting and over a liked solo activity", () => {
     const interests: Interests = { likes: ["cards", "exercise"], strong: "exercise", dislikes: [] };
-    // Exercise 3 alone; cards 2 + 2 for the open table (D84 tuning: +2, was +1 and a tie).
+    // Exercise 3 alone; cards 2 + 2 for the open table (+2 for an open session).
     const result = recreationCandidate(view({ interests, sessions: [session([FRIEND])] }), config);
     expect(choice(result)).toMatchObject({ activityId: CARDS.id, role: "join" });
   });
 
-  it("a neutral makes up an open table rather than play their own strong solo (D84 tuning)", () => {
+  it("a neutral makes up an open table rather than play their own strong solo (§choosing-recreation)", () => {
     const interests: Interests = { likes: ["exercise"], strong: "exercise", dislikes: [] };
     // Exercise 3 alone; neutral cards 1 + 2 for the open table: the tie goes to the join.
     const result = recreationCandidate(view({ interests, sessions: [session([FRIEND])] }), config);
     expect(choice(result)).toMatchObject({ activityId: CARDS.id, role: "join" });
   });
 
-  it("hosts a liked debate rather than a strong-liked solo (D84 tuning: company is +1)", () => {
+  it("hosts a liked debate rather than a strong-liked solo (company is +1)", () => {
     const interests: Interests = { likes: ["debate"], strong: "exercise", dislikes: [] };
     const activities = [DEBATE, EXERCISE];
     // Debate 2 + 1 for hosting a group activity ties exercise 3; host goes before solo.
@@ -290,7 +290,7 @@ describe("recreationCandidate (call 2)", () => {
     });
   });
 
-  it("puts on the vids, not the two-hand video game, at the one screen (D84 tuning)", () => {
+  it("puts on the vids, not the two-hand video game, at the one screen (§choosing-recreation)", () => {
     const interests: Interests = { likes: [], strong: "vids", dislikes: [] };
     // Same interest, same venue, same score: the bigger table wins before the id would.
     const activities = [VIDEO_GAME, VIDS];
@@ -320,9 +320,9 @@ describe("recreationCandidate (call 2)", () => {
       role: "solo",
     });
     const interests: Interests = { likes: ["exercise", "cards"], strong: "exercise", dislikes: [] };
-    // D84 tuning: hosting cards (2 + 1) ties exercise (3) at an ordinary mood and the host goes
-    // first (before the tuning the solo won here and only high spirits made a host); in high
-    // spirits cards wins outright (2 + 1 + 1); low, the strong solo.
+    // §choosing-recreation: hosting cards (2 + 1) ties exercise (3) at an ordinary mood and the
+    // host goes first (before the tuning the solo won here and only high spirits made a host); in
+    // high spirits cards wins outright (2 + 1 + 1); low, the strong solo.
     expect(choice(recreationCandidate(view({ interests }), config))).toMatchObject({
       activityId: CARDS.id,
       role: "host",

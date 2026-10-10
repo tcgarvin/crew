@@ -1,5 +1,6 @@
 /**
- * Polish A: the render frame's items-aboard projection (D28) and ship headline (D27).
+ * Polish A: the render frame's items-aboard projection (§rooms-items-and-cargo) and ship headline
+ * (§the-ship-headline).
  */
 import { describe, expect, it } from "vitest";
 import { tinyTestWorld } from "./fixtures/test-world";
@@ -176,7 +177,7 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
   });
 
-  it("says the departure waits on a course while one is to plot (D78)", () => {
+  it("says the departure waits on a course while one is to plot (§course-plotting)", () => {
     const { world } = tinyTestWorld();
     world.state.travel = { stage: "docked", portId: TINY.port, plannedDestinationId: TINY.port2 };
     const id = "p.course" as ProblemId;
@@ -206,7 +207,7 @@ describe("shipHeadline", () => {
     expect(headline(world.state)).toBe("Docking at Far Dock");
   });
 
-  it("waits for the helm in prep and docking only while it is empty, not while its post is open (D77)", () => {
+  it("waits for the helm in prep and docking only while it is empty, not while its post is open (§helm-vacancy)", () => {
     const { world } = tinyTestWorld();
     // The watch post is open for the whole of underway; on its own it says nothing.
     const id = "p.watch" as ProblemId;
@@ -384,7 +385,7 @@ describe("renderItems", () => {
   });
 });
 
-describe("ticker lines for the watch and the helm (D77, D78)", () => {
+describe("ticker lines for the watch and the helm (§the-bell, §hazard-roll)", () => {
   const { world } = tinyTestWorld();
   const mara = "a1" as ActorId;
   const pump = Object.values(world.state.machines)[0]?.id as MachineId;

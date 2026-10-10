@@ -1,4 +1,4 @@
-/** D93 (call 13): the end screen and its account of the ship's last day. */
+/** §hull-scars-and-ship-loss (call 13): the end screen and its account of the ship's last day. */
 import type { PortDef, PortDefId, Tick } from "@crew/sim";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

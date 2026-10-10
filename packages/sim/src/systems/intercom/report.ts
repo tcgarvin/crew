@@ -1,8 +1,8 @@
 /**
- * D94: a report on the intercom (slice 5 call 12). The `report` step runs at the panel: a panel
- * that turns out dead or unpowered fails it (the reporter now knows, and the planner sends them
- * to the next); otherwise, at the step's end, every damage fact the reporter holds goes to every
- * crew member aboard as `report` evidence with its original `observedTick` (the `tellCrew`
+ * §reporting-damage: a report on the intercom (slice 5 call 12). The `report` step runs at the
+ * panel: a panel that turns out dead or unpowered fails it (the reporter now knows, and the planner
+ * sends them to the next); otherwise, at the step's end, every damage fact the reporter holds goes
+ * to every crew member aboard as `report` evidence with its original `observedTick` (the `tellCrew`
  * pattern in `systems/work/execute.ts`), `alert.reports` is set for each compartment the report
  * covers, and `intercomReport` names the damage.
  *

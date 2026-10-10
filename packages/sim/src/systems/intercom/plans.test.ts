@@ -1,8 +1,8 @@
 /**
- * The report's plan and step (D94) on the intercom fixture: the plan walks to the chosen panel's
- * `operate` position and spends `intercom.reportSeconds` there; a target that is no panel is
- * refused; at a dead panel the step fails and the reporter learns it is dead; the broadcast
- * waits for the step's last tick.
+ * The report's plan and step (§reporting-damage) on the intercom fixture: the plan walks to the
+ * chosen panel's `operate` position and spends `intercom.reportSeconds` there; a target that is no
+ * panel is refused; at a dead panel the step fails and the reporter learns it is dead; the
+ * broadcast waits for the step's last tick.
  */
 import { describe, expect, it } from "vitest";
 import type { Actor } from "../../core/types/actor";
@@ -61,7 +61,7 @@ function atPanel(world: ReturnType<typeof setUp>["world"], actor: Actor, room: "
   return { panelId, step: plan.plan.steps[1] as Extract<ActivityStep, { kind: "work" }> };
 }
 
-describe("reportPlan (D94)", () => {
+describe("reportPlan (§reporting-damage)", () => {
   it("walks to the panel's operate position and reports for reportSeconds", SLOW, () => {
     const { world, actor } = setUp();
     const { ctx } = galleyStepCtx(world);
@@ -109,7 +109,7 @@ describe("reportPlan (D94)", () => {
   });
 });
 
-describe("runReport (D94)", () => {
+describe("runReport (§reporting-damage)", () => {
   it("fails at a dead panel, and the reporter sees that it is dead", SLOW, () => {
     const { world, actor } = setUp();
     soundAlert(world);

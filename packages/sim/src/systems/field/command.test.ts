@@ -46,7 +46,7 @@ function engineId(test: Test): MachineId {
   return engine.id;
 }
 
-describe("scheduleField (D92, slice 5 calls 2, 19, 20)", () => {
+describe("scheduleField (§scheduling-a-field, slice 5 calls 2, 19, 20)", () => {
   it("is refused docked with no course, and placed scheduled once a course is planned", () => {
     const test = fieldWorld();
     expect(rejection(schedule(test, heavy))?.reason).toContain("no course planned");

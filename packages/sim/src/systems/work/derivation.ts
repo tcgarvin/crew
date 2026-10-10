@@ -15,7 +15,7 @@
  *   Exception: a claimed `staffStation` task outlives its resolved problem until the staffer's
  *   hold ends (see `execute.ts`), otherwise the pilot would leave the helm the moment the
  *   station counts as staffed and travel would immediately re-raise the problem; likewise a
- *   claimed `buyParts` task (D63) until the buyer has carried the units aboard;
+ *   claimed `buyParts` task (§buying-parts) until the buyer has carried the units aboard;
  * - terminal tasks whose problem is no longer open and that no activity references are pruned so
  *   `state.work.tasks` stays small.
  *
@@ -162,8 +162,8 @@ function settleClosedProblem(ctx: StepCtx, problem: Problem, tasks: readonly Tas
   for (const task of tasks) {
     if (isTerminal(task)) continue;
     if (problem.status === "resolved") {
-      // D63: a buyer's purchase resolves `partsNeeded` while the units are still in their hands
-      // on the dock; their task lives until they have carried them aboard (its plan's end).
+      // §buying-parts: a buyer's purchase resolves `partsNeeded` while the units are still in their
+      // hands on the dock; their task lives until they have carried them aboard (its plan's end).
       const held =
         (task.type === "staffStation" || task.type === "buyParts") &&
         task.claimState.kind === "claimed";
@@ -180,7 +180,7 @@ function referencedTaskIds(ctx: StepCtx): Set<TaskId> {
     const activity = actor.activity;
     if (activity.kind !== "task") continue;
     ids.add(activity.taskId);
-    // D65: a hand-truck trip's other tasks are referenced too.
+    // §one-activity-several-claims: a hand-truck trip's other tasks are referenced too.
     for (const leg of activity.haul?.legs ?? []) ids.add(leg.taskId);
   }
   return ids;

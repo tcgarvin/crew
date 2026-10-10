@@ -245,7 +245,7 @@ describe("FramePlayback paused", () => {
   });
 });
 
-describe("interpolateFrame and the dock's locals (D66)", () => {
+describe("interpolateFrame and the dock's locals (§local-behaviour)", () => {
   function withLocals(base: RenderFrame, locals: { id: string; x: number; facing: number }[]) {
     return {
       ...base,
@@ -285,7 +285,7 @@ describe("interpolateFrame and the dock's locals (D66)", () => {
   });
 });
 
-describe("interpolateFrame and the asteroid field (D92, D93)", () => {
+describe("interpolateFrame and the asteroid field (§rock-impacts)", () => {
   function hit(tick: number, x: number): RenderImpact {
     return { tick: tick as Tick, x, y: 3, rock: "small", tiles: [{ x, y: 3 }] };
   }

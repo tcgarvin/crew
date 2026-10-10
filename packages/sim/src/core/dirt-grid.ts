@@ -1,5 +1,5 @@
 /**
- * The dirt grid's index arithmetic (D82). One row-major cell per authored deck tile
+ * The dirt grid's index arithmetic (§dirt-grid). One row-major cell per authored deck tile
  * (`y × width + x`), so `core/world.ts` and the migration can allocate a deck's cells without
  * importing `systems/dirt` (the `core/watch-bill.ts` precedent); the dirt system owns what the
  * cells hold.

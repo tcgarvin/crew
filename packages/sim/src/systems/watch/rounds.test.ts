@@ -43,7 +43,7 @@ const roundStarts = (log: ReturnType<typeof run>, id: ActorId) =>
     (e) => e.subjectIds[0] === id && e.payload.activity === "rounds",
   );
 
-describe("the officer of the watch's rounds (D77)", () => {
+describe("the officer of the watch's rounds (§gangway-watch-and-rounds)", () => {
   it("Mara walks engineering → hold → mess → the helm's standby, ends at the chair, and goes again after the cadence", () => {
     const tw = roundsWorld();
     const { world } = tw;
@@ -124,7 +124,7 @@ describe("the officer of the watch's rounds (D77)", () => {
   });
 });
 
-describe("an engineer's machine round (D77)", () => {
+describe("an engineer's machine round (§gangway-watch-and-rounds)", () => {
   it("Jon, on duty with nothing to do, visits each engineering machine, and the ticker shows none of it", () => {
     const tw = roundsWorld();
     const { world } = tw;

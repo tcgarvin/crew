@@ -1,9 +1,10 @@
 /**
- * D92: the narrator's `scheduleField` (slice 5 calls 2, 19, 20). Validation is complete here (the
- * kernel revalidates at apply, so every rule holds at both moments); apply places the field on
- * the leg, `scheduled`, with its start sampled in the window on the `failures` stream exactly as
- * `scheduleHazard` samples its fire tick, and never sooner than `field.warningSeconds` away, so
- * the helm's check (that long before the start) is never already past.
+ * §scheduling-a-field: the narrator's `scheduleField` (slice 5 calls 2, 19, 20). Validation is
+ * complete here (the kernel revalidates at apply, so every rule holds at both moments); apply
+ * places the field on the leg, `scheduled`, with its start sampled in the window on the `failures`
+ * stream exactly as `scheduleHazard` samples its fire tick, and never sooner than
+ * `field.warningSeconds` away, so the helm's check (that long before the start) is never already
+ * past.
  *
  * The rules: a known severity and detection; a window as `scheduleHazard`'s; at most
  * `field.maxScripted` scripted impacts, each inside the severity's length, aimed at a machine,

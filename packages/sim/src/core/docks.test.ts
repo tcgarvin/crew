@@ -1,7 +1,7 @@
 /**
- * D72: the ship's place in a dock's berth box. `berthPlacement` is the one rule every footprint
- * shares (flush to the box's south edge, the quay side, and centred across it); `berthDock`
- * carries that place with the map, and the frame conversions read it.
+ * §ship-placement: the ship's place in a dock's berth box. `berthPlacement` is the one rule every
+ * footprint shares (flush to the box's south edge, the quay side, and centred across it);
+ * `berthDock` carries that place with the map, and the frame conversions read it.
  */
 import { describe, expect, it } from "vitest";
 import {

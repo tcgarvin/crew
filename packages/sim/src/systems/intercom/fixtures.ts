@@ -1,9 +1,10 @@
 import type { TestWorld } from "../../core/fixtures/test-world";
 /**
- * W3 test fixture (D94): the galley fixture's ship (`systems/galley/fixtures/galley-deck.ts`)
- * with an intercom panel in each of its five rooms, and helpers that stand in for the field and
- * damage response, which are other streams': sounding the alert, and damage raised by hand as
- * the problems damage raises (`machineDamaged`, `hullScar`, discovered).
+ * W3 test fixture (§reporting-damage): the galley fixture's ship
+ * (`systems/galley/fixtures/galley-deck.ts`) with an intercom panel in each of its five rooms, and
+ * helpers that stand in for the field and damage response, which are other streams': sounding the
+ * alert, and damage raised by hand as the problems damage raises (`machineDamaged`, `hullScar`,
+ * discovered).
  *
  *   x 0123456789ABCDEFG
  *   0 LLiSGIMssMMbbbBBB    i, I, … = panels; each is worked from the tile below it:

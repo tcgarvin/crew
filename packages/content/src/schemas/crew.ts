@@ -49,7 +49,10 @@ export const crewDefSchema = z.strictObject({
   traits: z.array(traitDefIdSchema).exactOptional(),
   startingInventory: z.array(itemCountSchema),
   bio: z.string(),
-  /** D38: how they talk and handle the captain; required so every crew member sounds like someone. */
+  /**
+   * §crew-lines: how they talk and handle the captain; required so every crew member sounds like
+   * someone.
+   */
   voice: z.string().min(1),
   /** Slice 4: absent, generated at spawn. */
   interests: interestsSchema.exactOptional(),

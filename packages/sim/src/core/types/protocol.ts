@@ -24,7 +24,7 @@ import type { WorldState } from "./state";
 import type { AgentViewSnapshot, DirtFrame, RenderFrame } from "./view";
 import type { UrgencyClass } from "./work";
 
-/** D90: one option an actor is weighing, in words, for the inspector. */
+/** §what-a-crew-member-weighs: one option an actor is weighing, in words, for the inspector. */
 export interface WeighedOptionWords {
   readonly text: string;
   readonly urgency: UrgencyClass;
@@ -34,7 +34,7 @@ export interface WeighedOptionWords {
   readonly mark?: "doing" | "next";
 }
 
-/** D90: what an actor is weighing (`weighOptions`), worded by the host. */
+/** §what-a-crew-member-weighs: what an actor is weighing (`weighOptions`), worded by the host. */
 export interface WeighingWords {
   /** One line: what they will do and why, e.g. "keeps playing cards: nothing outranks it". */
   readonly verdict: string;
@@ -75,15 +75,15 @@ export type FromWorker =
   /** Frames are produced ahead of the viewer; the main thread buffers and plays them by tick. */
   | { readonly type: "frame"; readonly frame: RenderFrame }
   /**
-   * D82: the dirt grid, on load and every `host.dirtFrameEverySeconds`; the main thread queues
-   * these by tick and applies the newest with `tick <= viewTick` in the playback step (D14).
+   * §dirt-grid: the dirt grid, on load and every `host.dirtFrameEverySeconds`; the main thread
+   * queues these by tick and applies the newest with `tick <= viewTick` in the playback step (D14).
    */
   | { readonly type: "dirt"; readonly frame: DirtFrame }
   | { readonly type: "events"; readonly events: readonly SimEvent[] }
   /** The worker stopped at a hook at `tick`; the main thread shows the narrator loading state when playback reaches it. */
   | { readonly type: "hookRaised"; readonly hook: NarratorHook; readonly tick: Tick }
   | { readonly type: "decisionPending"; readonly decision: Decision }
-  /** D93: the ship was lost at `tick`; the worker has stopped for good. */
+  /** §hull-scars-and-ship-loss: the ship was lost at `tick`; the worker has stopped for good. */
   | { readonly type: "shipLost"; readonly tick: Tick }
   | { readonly type: "commandResult"; readonly requestId: string; readonly result: EnqueueResult }
   | { readonly type: "saveBlob"; readonly requestId: string; readonly envelope: SaveEnvelope }
@@ -99,7 +99,7 @@ export type FromWorker =
       readonly actorId: ActorId;
       readonly tick: Tick;
       readonly view: AgentViewSnapshot;
-      /** D90: what they are weighing and what they will do next. */
+      /** §what-a-crew-member-weighs: what they are weighing and what they will do next. */
       readonly weighing: WeighingWords;
     }
   | {

@@ -1,7 +1,7 @@
 /**
- * The capability list (D11): exactly what the seven narrator levers can do in this game,
- * generated from content, config and the ship's machines so the prompt never promises what the
- * sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
+ * The capability list (§narrator-authority): exactly what the seven narrator levers can do in this
+ * game, generated from content, config and the ship's machines so the prompt never promises what
+ * the sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
  * count and distance of every port from the one the ship is at or heading for) change only
  * when the ship moves or the narrator restocks, so the cache still serves a run of calls.
@@ -54,7 +54,7 @@ function seconds(n: number): string {
   return `${Math.round(n)}s`;
 }
 
-/** D47: a live price as a tier word against the content price, never a number. */
+/** §market-lever: a live price as a tier word against the content price, never a number. */
 function priceTierWord(price: number, base: number, config: ConfigDef): MarketPriceTier {
   const tiers = config.commerce.market.priceTiers;
   let best: MarketPriceTier = "fair";
@@ -69,7 +69,9 @@ function priceTierWord(price: number, base: number, config: ConfigDef): MarketPr
   return best;
 }
 
-/** D47: one port's market, item by item: "item.x "Name" x4 (fair)"; "nothing" when empty. */
+/**
+ * §market-lever: one port's market, item by item: "item.x "Name" x4 (fair)"; "nothing" when empty.
+ */
 export function marketLine(
   state: State,
   content: ContentBundle,
@@ -102,7 +104,7 @@ function reachLine(content: ContentBundle, hereId: string, portId: string): stri
   return `${legs}, ${seconds(path.distance)} transit in all${stops}`;
 }
 
-/** D78: the sixth lever, with its kinds, tiers and windows from config. */
+/** §hazard-and-field-levers: the sixth lever, with its kinds, tiers and windows from config. */
 function hazardLever(config: ConfigDef): string[] {
   const windows = faultWindowSeconds(config);
   const tiers = HAZARD_DIFFICULTIES.map((t) => `${t} (${config.hazards.difficulty[t]})`).join(", ");
@@ -117,7 +119,7 @@ function hazardLever(config: ConfigDef): string[] {
 }
 
 /**
- * D95: what a field of each severity costs as it comes, before the helm: its rocks
+ * §scheduling-a-field: what a field of each severity costs as it comes, before the helm: its rocks
  * (`impactsPerMinute` over `lengthSeconds`) and their hull points at the severity's large share.
  */
 export function fieldExpectation(
@@ -140,8 +142,9 @@ const FIELD_CHECK_TIER: Readonly<Record<FieldSeverity, (typeof HAZARD_DIFFICULTI
 };
 
 /**
- * D95: the ship's rooms, each with its machines by id and name: what a scripted impact may aim
- * at. Rooms in deck order; a machine outside every room (none on the authored decks) is left out.
+ * §scheduling-a-field: the ship's rooms, each with its machines by id and name: what a scripted
+ * impact may aim at. Rooms in deck order; a machine outside every room (none on the authored decks)
+ * is left out.
  */
 function targetLines(state: State, content: ContentBundle): string[] {
   const deckId = shipDeckOf(state);
@@ -164,7 +167,7 @@ function targetLines(state: State, content: ContentBundle): string[] {
   );
 }
 
-/** D95: the seventh lever, an asteroid field (D92, D93), from config and the ship's deck. */
+/** The seventh lever, an asteroid field (§scheduling-a-field), from config and the ship's deck. */
 function fieldLever(state: State, content: ContentBundle, config: ConfigDef): string[] {
   const f = config.field;
   const severities = FIELD_SEVERITIES.map((severity) => {
@@ -289,7 +292,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     '- endPassage puts the current passenger off: valid only while a passenger is aboard or ashore on a live passage (see "Aboard" under Crew). They leave at the next docking (now, if docked) with no fare and stay at that port as someone in your cast. That is the real side of a crew-friction card ("Put him off at Kessler." / "He stays."); the sim does the rest.',
   );
-  // D86: a side effect of a card, not a seventh lever.
+  // §private-talk: a side effect of a card, not a seventh lever.
   lines.push(
     '- privateTalk is a private word in the captain\'s cabin, warm or stern (tone warm | stern), with the crew member named in talkWith (their full name as "Crew" lists it): the crew member walks there and the talk moves how they feel about the captain, which shows next call ("close to" / "at odds with", their mood). Only crew aboard, never the captain herself, a passenger or someone ashore, and one talk at a time. It is the real side of a card about someone\'s conduct ("Send Jax up." / "Let it go."); the crew carry it out, and whether it lands is the sim\'s.',
   );
@@ -307,7 +310,8 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; you never buy, deliver, repair or pay. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
-  // D81: the galley's stores are bought like parts; name them by id so the model can stock them.
+  // §galley-provisions: the galley's stores are bought like parts; name them by id so the model can
+  // stock them.
   const provisions = Object.values(content.items)
     .filter((def) => def.tags.includes("provisions"))
     .map((def) => def.id)

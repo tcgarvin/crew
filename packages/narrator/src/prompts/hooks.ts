@@ -1,11 +1,15 @@
 /**
  * Per-hook instructions for the story narrator. All of them sit in the static, cached system
  * prefix (so the prefix is the same for every hook); the one for this call is repeated after the
- * digest. D66: `stageDock` is not a story hook (it has its own call, `run.ts`), so it has none.
+ * digest. §staging-hook-and-the-hold: `stageDock` is not a story hook (it has its own call,
+ * `run.ts`), so it has none.
  */
 import type { NarratorHookKind } from "@crew/sim";
 
-/** The hooks the story narrator answers: every kind but the staging call (D66). */
+/**
+ * The hooks the story narrator answers: every kind but the staging call
+ * (§staging-hook-and-the-hold).
+ */
 export type StoryHookKind = Exclude<NarratorHookKind, "stageDock">;
 
 export const HOOK_INSTRUCTIONS: Readonly<Record<StoryHookKind, string>> = {

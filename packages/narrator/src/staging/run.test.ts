@@ -40,7 +40,7 @@ function ctx(transport?: ReturnType<typeof fakeTransport>) {
 
 const reply = (body: unknown) => fakeTransport(okResult(JSON.stringify(body)));
 
-describe("the staging call (D67)", () => {
+describe("the staging call (§staging-call-on-the-server)", () => {
   it("asks the model with the staging prompt and schema, and answers one stageDock, no notes", async () => {
     const transport = reply({
       rationale: "Greta's grudge is due: put her where the captain will see her waiting.",

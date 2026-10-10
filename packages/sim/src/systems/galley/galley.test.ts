@@ -1,6 +1,6 @@
 /**
- * The galley's rhythm (D81) on the galley fixture: the meal problem before each bell, the cook
- * and her substitute, the mess call, the helm's plate, spoilage, the missed meal, provisions.
+ * The galley's rhythm (§meal-problem) on the galley fixture: the meal problem before each bell, the
+ * cook and her substitute, the mess call, the helm's plate, spoilage, the missed meal, provisions.
  */
 import { describe, expect, it } from "vitest";
 import { dayTicks, watchTicks } from "../../core/clock";
@@ -56,7 +56,7 @@ function claimWatcher(type: string) {
   return { claims, check };
 }
 
-describe("the meal problem (D81)", () => {
+describe("the meal problem (§meal-problem)", () => {
   it("opens mealLeadDays before the bell for the coming watch, once", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -110,7 +110,7 @@ describe("the meal problem (D81)", () => {
   }, 30_000);
 });
 
-describe("the substitute (D81 call 3)", () => {
+describe("the substitute (§meal-problem, call 3)", () => {
   // About a second alone, but past vitest's 5 s default under the whole suite's parallel load.
   it("with the cook asleep, Tomas (on duty, cooking 1) cooks after substituteAfterDays: poor", () => {
     const base = galleyConfig();
@@ -139,7 +139,7 @@ describe("the substitute (D81 call 3)", () => {
   }, 30_000);
 });
 
-describe("the mess call (D81 call 1)", () => {
+describe("the mess call (§meal-problem, call 1)", () => {
   it("the oncoming section eats before the bell, the section on watch after, at the table", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -203,7 +203,7 @@ describe("the mess call (D81 call 1)", () => {
   });
 });
 
-describe("rations (D81 call 4)", () => {
+describe("rations (§meal-problem, call 4)", () => {
   it("with no hot meal, a hungry person eats a ration and thinks ateRationPack", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -218,7 +218,7 @@ describe("rations (D81 call 4)", () => {
   });
 });
 
-describe("spoilage (D81 call 7)", () => {
+describe("spoilage (§meal-problem, call 7)", () => {
   it("sweeps what is left on the counter mealSpoilDays after the serve", () => {
     // Nobody hungry, so the whole stack is still on the counter when it spoils.
     const base = galleyConfig();
@@ -246,7 +246,7 @@ describe("spoilage (D81 call 7)", () => {
   });
 });
 
-describe("the missed meal (D81 call 2)", () => {
+describe("the missed meal (§meal-problem, call 2)", () => {
   it("with no provisions aboard, the meal is given up at the grace with mealMissed", () => {
     const fixture = galleyWorld({ crates: 0 });
     const { world } = fixture;
@@ -261,7 +261,7 @@ describe("the missed meal (D81 call 2)", () => {
   });
 });
 
-describe("a dirty galley (D81 call 4)", () => {
+describe("a dirty galley (§meal-problem, call 4)", () => {
   it("lowers the cook's good dinner a step to plain", () => {
     const fixture = galleyWorld();
     const { world } = fixture;
@@ -271,7 +271,7 @@ describe("a dirty galley (D81 call 4)", () => {
   });
 });
 
-describe("the helm's plate (D81 call 5)", () => {
+describe("the helm's plate (§meal-problem, call 5)", () => {
   it("the cook carries a plate to the standby tile and the stander eats it in the seat", () => {
     // An early meal, so the plate is up and eaten well before the oncoming comes to the standby;
     // a slow ship, so the leg (25 units) lasts the watch.
@@ -309,7 +309,7 @@ describe("the helm's plate (D81 call 5)", () => {
   });
 });
 
-describe("the helm's plate, the counter's last serving (D81 call 5)", () => {
+describe("the helm's plate, the counter's last serving (§meal-problem, call 5)", () => {
   it("is still carried up when the carrier took the counter's last serving", () => {
     const base = galleyConfig();
     const config = { ...base, travel: { ...base.travel, nominalSpeed: 25 / 1000 } };
@@ -337,7 +337,7 @@ describe("the helm's plate, the counter's last serving (D81 call 5)", () => {
   });
 });
 
-describe("provisions (D81 call 8, through D80's reserveLow)", () => {
+describe("provisions (§galley-provisions, call 8)", () => {
   it("says provisionsLow at the serve that takes the crates under lowBelowDays", () => {
     // A crate is a meal and the fixture's day is two watches, so one crate is half a day.
     const config = galleyConfig({ lowBelowDays: 0.5, restockToDays: 4 });

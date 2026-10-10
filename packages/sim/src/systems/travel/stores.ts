@@ -1,4 +1,4 @@
-/** A port's warehouse store as a custody location (moved out of `travel.ts` for D66's modules). */
+/** A port's warehouse store as a custody location. */
 import type { PhysicalLocation } from "../../core/types/common";
 import type { ExternalStoreDef, PortDef } from "../../core/types/content";
 

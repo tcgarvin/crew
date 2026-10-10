@@ -1,7 +1,8 @@
 /**
- * D77-D79 in the digest: the watch line, duty tags, mood and the helm's stakes. The world comes
- * from the in-code fixtures (the default scenario's bill) and the helm, thoughts and hazards are
- * written by hand, so these hold whatever the sim's helm rules do and whenever fixtures change.
+ * The watch line (§who-has-the-helm, §hazard-roll, §mood-and-work-speed) in the digest: the watch
+ * line, duty tags, mood and the helm's stakes. The world comes from the in-code fixtures (the
+ * default scenario's bill) and the helm, thoughts and hazards are written by hand, so these hold
+ * whatever the sim's helm rules do and whenever fixtures change.
  */
 import {
   type ActorId,
@@ -132,7 +133,7 @@ function label(key: ThoughtKey): string {
   return content().thoughts[key].label;
 }
 
-describe("buildDigest: the watch line (D77)", () => {
+describe("buildDigest: the watch line (§who-has-the-helm)", () => {
   it("under way: the section on watch, who has the helm with their piloting and since when, the officer, the next bell", () => {
     const snapshot = clone(quietTooLongRequest(content()));
     atWatch(snapshot, 1, 120);
@@ -200,7 +201,7 @@ describe("buildDigest: the watch line (D77)", () => {
   });
 });
 
-describe("buildDigest: duty and mood on the crew lines (D77, D79)", () => {
+describe("buildDigest: duty and mood on the crew lines (§duty-and-the-sleep-watch, §mood-and-work-speed)", () => {
   it("tags each crew member with their section or as a dayworker, on or off", () => {
     const snapshot = clone(quietTooLongRequest(content()));
     // Watch 2 (Blue): the dayworkers' default window is watches 0 and 1.
@@ -251,7 +252,7 @@ describe("buildDigest: duty and mood on the crew lines (D77, D79)", () => {
   });
 });
 
-describe("buildDigest: the helm's stakes (D78)", () => {
+describe("buildDigest: the helm's stakes (§hazard-roll)", () => {
   it("reports each hazard with who was at the helm and how it went, and an empty helm", () => {
     const snapshot = clone(quietTooLongRequest(content()));
     const state = snapshot.state;

@@ -1,8 +1,9 @@
 /**
  * Generic render projection (D7: the map shows truth). Fills `RenderFrame` from state: actor
  * positions and action labels, machine and door states, travel progress, money, and the ticker.
- * Polish A adds the items aboard (D28) and a one-line ship headline (D27). D61 adds the dock
- * alongside, with everyone and everything on it flagged `onDock`.
+ * Polish A adds the items aboard (§rooms-items-and-cargo) and a one-line ship headline
+ * (§the-ship-headline). The dock alongside (§living-on-the-dock) is in the frame too, with everyone
+ * and everything on it flagged `onDock`.
  */
 import { configTicks } from "./clock";
 import { findItemDef } from "./defs";
@@ -102,8 +103,8 @@ function machineState(
   const inoperable = machine.faults.some(
     (fault) => faultDefs.find((def) => def.key === fault.faultKey)?.effect.kind === "inoperable",
   );
-  // D35: a machine blocked by an inoperable fault or low integrity (at the config threshold, not
-  // only at 0) reads "failed" even though equipment has switched it off.
+  // §output-and-blocking: a machine blocked by an inoperable fault or low integrity (at the config
+  // threshold, not only at 0) reads "failed" even though equipment has switched it off.
   if (inoperable || machine.integrity < config.equipment.integrityInoperableBelow) return "failed";
   if (machine.actualMode === "off") return "off";
   if (machine.faults.length > 0 || machine.output < 1) return "degraded";
@@ -160,9 +161,10 @@ const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
   "decisionPending",
   "commandRejected",
   "invariantViolated",
-  // D78: the narrator's bookkeeping (its hazard came to nothing); the player saw nothing happen.
+  // §hazard-roll: the narrator's bookkeeping (its hazard came to nothing); the player saw nothing
+  // happen.
   "navHazardMissed",
-  // D92: likewise for a field whose leg ended before it began.
+  // §field-lifecycle: likewise for a field whose leg ended before it began.
   "fieldMissed",
 ]);
 
@@ -187,18 +189,18 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
   docking: "Docking",
 };
 
-/** D78: how each navigation hazard kind reads in the ticker. */
+/** §debris-fields-and-ion-storms: how each navigation hazard kind reads in the ticker. */
 const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
   debrisField: "Debris field",
   ionStorm: "Ion storm",
 };
 
-/** D77: "white" → "White", for "Bell. White section has the watch." */
+/** §the-bell: "white" → "White", for "Bell. White section has the watch." */
 function sectionName(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-/** D78: the ticker line for a navigation hazard's outcome. */
+/** §hazard-roll: the ticker line for a navigation hazard's outcome. */
 function navHazardLine(event: Extract<SimEvent, { type: "navHazard" }>, n: Names): string {
   const { kind, outcome, standerId, scrapedMachineId, lostSeconds } = event.payload;
   const head = HAZARD_NAMES[kind];
@@ -239,7 +241,7 @@ type Names = {
   faultName(machineId: string, faultKey: string): string;
   symptomName(machineId: string, symptomKey: string): string;
   job(id: string): { issuer: string; name: string; to: string; passenger: boolean } | undefined;
-  /** D82: "the galley" for the room `key` of the ship's deck; "the room" if unknown. */
+  /** §room-tiers: "the galley" for the room `key` of the ship's deck; "the room" if unknown. */
   room(key: string): string;
   /** "The galley": `room` capitalised to start a line. */
   roomCap(key: string): string;
@@ -539,8 +541,8 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
 }
 
 /**
- * Slice 5 (D92-D94): the asteroid field's lines: the rocks, the alert, the crew's answer and the
- * intercom. `undefined` for any other event (the generic line).
+ * Slice 5 (§sighting-and-the-alert, §reporting-damage): the asteroid field's lines: the rocks, the
+ * alert, the crew's answer and the intercom. `undefined` for any other event (the generic line).
  */
 function fieldLine(event: SimEvent, n: Names): string | null | undefined {
   switch (event.type) {
@@ -688,7 +690,7 @@ export function tickerLine(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Items aboard (Polish A, D28)
+// Items aboard (Polish A, §rooms-items-and-cargo)
 // ---------------------------------------------------------------------------------------------
 
 function itemKind(def: DeepReadonly<ItemDef> | undefined): RenderItemKind {
@@ -739,13 +741,13 @@ function physicalLocation(
 
 /**
  * Is this item on the map: on the deck or the dock alongside, carried, or inside something that
- * is? (D61: before the dock existed this was "aboard"; the dock is now on the map too.)
+ * is?
  */
 function isOnMap(item: DeepReadonly<Item>, state: ReadonlyWorldState): boolean {
   return physicalLocation(item, state)?.kind === "onDeck";
 }
 
-/** D61: is this item aboard the ship, i.e. on the map and not on the dock? */
+/** §living-on-the-dock: is this item aboard the ship, i.e. on the map and not on the dock? */
 function isAboardShip(
   item: DeepReadonly<Item>,
   state: ReadonlyWorldState,
@@ -781,8 +783,8 @@ function renderItemLocation(
 }
 
 /**
- * Items on the map, for the canvas: aboard, and (D61) on the dock alongside. Port-store and
- * installed items are left out.
+ * Items on the map, for the canvas: aboard, and on the dock alongside (§living-on-the-dock).
+ * Port-store and installed items are left out.
  */
 export function renderItems(state: ReadonlyWorldState, content: ContentBundle): RenderItem[] {
   const items: RenderItem[] = [];
@@ -806,7 +808,7 @@ export function renderItems(state: ReadonlyWorldState, content: ContentBundle): 
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ship headline (Polish A, D27)
+// Ship headline (Polish A, §the-ship-headline)
 // ---------------------------------------------------------------------------------------------
 
 function portName(content: ContentBundle, portId: PortDefId): string {
@@ -837,8 +839,8 @@ interface FreightCount {
 }
 
 /**
- * Is this item in someone's hands, directly or in a container they hold (D65: a crate on the hand
- * truck being pushed is not stowed yet)?
+ * Is this item in someone's hands, directly or in a container they hold (a crate on the hand
+ * truck being pushed is not stowed yet, §hand-truck-trips)?
  */
 function inHands(item: DeepReadonly<Item>, state: ReadonlyWorldState): boolean {
   let location: DeepReadonly<PhysicalLocation> = item.location;
@@ -855,8 +857,8 @@ function inHands(item: DeepReadonly<Item>, state: ReadonlyWorldState): boolean {
 /**
  * Progress over the manifests of the jobs with open `kind` problems, in units (a stack of two
  * crates is two): stowed aboard, set down rather than in someone's hands (load), or no longer
- * aboard (unload). D61: freight on the dock is not aboard, whether it lies there or someone
- * standing there holds it. `undefined` when no such problem is open.
+ * aboard (unload). §living-on-the-dock: freight on the dock is not aboard, whether it lies there or
+ * someone standing there holds it. `undefined` when no such problem is open.
  */
 function freightProgress(
   state: ReadonlyWorldState,
@@ -903,8 +905,8 @@ function hasOpenProblem(state: ReadonlyWorldState, kind: ProblemKind): boolean {
 }
 
 /**
- * D77: the helm is empty while its watch is wanted. The watch post is open for the whole of
- * underway, so an open `stationToStaff` problem no longer means nobody is at the helm; the
+ * §helm-vacancy: the helm is empty while its watch is wanted. The watch post is open for the whole
+ * of underway, so an open `stationToStaff` problem no longer means nobody is at the helm; the
  * watch system's vacancy mark does.
  */
 function helmWaiting(state: ReadonlyWorldState): boolean {
@@ -932,9 +934,9 @@ function passengerAshoreHere(state: ReadonlyWorldState): string | undefined {
 }
 
 /**
- * D61: the name of someone on the dock while departure prep waits for them to come aboard (the
- * lowest actor id, so the line is stable). A passenger walking off is not waited for here.
- * Mirrors `systems/travel/ashore.ts` (core may not import systems).
+ * §calling-the-crew-aboard: the name of someone on the dock while departure prep waits for them to
+ * come aboard (the lowest actor id, so the line is stable). A passenger walking off is not waited
+ * for here. Mirrors `systems/travel/ashore.ts` (core may not import systems).
  */
 function awaitedAboard(state: ReadonlyWorldState, content: ContentBundle): string | undefined {
   if (state.deck.dock === undefined) return undefined;
@@ -944,7 +946,10 @@ function awaitedAboard(state: ReadonlyWorldState, content: ContentBundle): strin
   return ashore[0]?.name;
 }
 
-/** D61: departure prep's clock has run out but a ramp is still coming up (or cannot). */
+/**
+ * §calling-the-crew-aboard: departure prep's clock has run out but a ramp is still coming up (or
+ * cannot).
+ */
 function waitingOnRamps(state: ReadonlyWorldState): boolean {
   const travel = state.travel;
   if (travel.stage !== "preparingDeparture" || travel.stageProgress < 1) return false;
@@ -952,9 +957,9 @@ function waitingOnRamps(state: ReadonlyWorldState): boolean {
 }
 
 /**
- * D70: the captain ashore, for the headline: "Mara Osei is ashore looking for work", and on the
- * way to (or with) someone a held card names, "Mara Osei is talking with Fenwick Adair" (the
- * activity's own label, `systems/work/labels.ts`). Undefined when nobody is.
+ * §looking-for-work: the captain ashore, for the headline: "Mara Osei is ashore looking for work",
+ * and on the way to (or with) someone a held card names, "Mara Osei is talking with Fenwick Adair"
+ * (the activity's own label, `systems/work/labels.ts`). Undefined when nobody is.
  */
 function captainAshoreLine(state: ReadonlyWorldState): string | undefined {
   for (const actor of Object.values(state.actors)) {
@@ -970,8 +975,8 @@ function captainAshoreLine(state: ReadonlyWorldState): string | undefined {
 }
 
 /**
- * One plain-language line of what the ship is doing (D27), derived from travel stage, open
- * freight problems and the job board. Pure; cheap enough to compute every frame.
+ * One plain-language line of what the ship is doing (§the-ship-headline), derived from travel
+ * stage, open freight problems and the job board. Pure; cheap enough to compute every frame.
  */
 export function shipHeadline(
   state: ReadonlyWorldState,
@@ -981,7 +986,8 @@ export function shipHeadline(
   const travel = state.travel;
   if (travel.stage === "docked") {
     const here = `Docked at ${portName(content, travel.portId)}`;
-    // D70: the captain ashore is the moment to watch; the freight count comes back after.
+    // §looking-for-work: the captain ashore is the moment to watch; the freight count comes back
+    // after.
     const ashore = captainAshoreLine(state);
     if (ashore !== undefined) return `${here} — ${ashore}`;
     const unloading = freightProgress(state, content, "cargoToUnload");
@@ -1003,13 +1009,13 @@ export function shipHeadline(
       if (travel.holdForRepairs === true) {
         return `${here} — holding for repairs before departing for ${to}`;
       }
-      // D78: the course is travel's open `courseToPlot` until someone plots it.
+      // §course-plotting: the course is travel's open `courseToPlot` until someone plots it.
       return hasOpenProblem(state, "courseToPlot")
         ? `Preparing to depart for ${to} — waiting on a course`
         : `Preparing to depart for ${to}`;
     }
-    // Offers are the card's story to tell, not the headline's (D34): the headline only says what
-    // the ship is doing.
+    // Offers are the card's story to tell, not the headline's (§the-ship-headline): the headline
+    // only says what the ship is doing.
     return `${here} — looking for work`;
   }
 
@@ -1036,7 +1042,7 @@ export function shipHeadline(
     case "transit": {
       const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
       if (travel.limping === true) {
-        // D80: the engine is down and nothing aboard can fix it; the engineer coaxes it along.
+        // §limping: the engine is down and nothing aboard can fix it; the engineer coaxes it along.
         const crawl = speeds.nominalSpeed * speeds.limpSpeedFraction;
         return `Limping on to ${to} on a crippled engine — ${formatEta(remaining / crawl)}`;
       }
@@ -1087,7 +1093,7 @@ export function renderTravel(travel: DeepReadonly<TravelState>): RenderTravel {
   };
 }
 
-/** D58: 0 shut to 1 open; a jammed door is impassable, so it reads shut. */
+/** §dock-drawing: 0 shut to 1 open; a jammed door is impassable, so it reads shut. */
 export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionProgress">): number {
   switch (door.physicalState) {
     case "open":
@@ -1102,7 +1108,7 @@ export function doorOpenFraction(door: Pick<Door, "physicalState" | "transitionP
   }
 }
 
-/** D66: the locals on the dock alongside, in id order. */
+/** §locals-table: the locals on the dock alongside, in id order. */
 function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
   return Object.values(state.dockside.locals)
     .sort(byId)
@@ -1122,7 +1128,7 @@ function renderLocals(state: ReadonlyWorldState): RenderLocal[] {
     }));
 }
 
-/** D66: the staging plan's props on the dock alongside. */
+/** §staging-plan-dressing: the staging plan's props on the dock alongside. */
 function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): RenderDockProp[] {
   const deckId = state.deck.dock?.deckId;
   if (deckId === undefined) return [];
@@ -1142,8 +1148,8 @@ function renderDockProps(state: ReadonlyWorldState, content: ContentBundle): Ren
 }
 
 /**
- * D82: the ship deck's dirt grid at the current tick (`WorldState.dirt.cells` as bytes), for the
- * renderer's grime tint. Throws if the state has no ship deck or the deck no cells, which world
+ * §dirt-grid: the ship deck's dirt grid at the current tick (`WorldState.dirt.cells` as bytes), for
+ * the renderer's grime tint. Throws if the state has no ship deck or the deck no cells, which world
  * creation and the migration rule out.
  */
 export function getDirtFrame(world: World): DirtFrame {
@@ -1250,7 +1256,7 @@ export function renderSessions(state: ReadonlyWorldState, content: ContentBundle
   return out;
 }
 
-/** D93: the hull bar and its scars. */
+/** §hull-scars-and-ship-loss: the hull bar and its scars. */
 export function renderHull(state: ReadonlyWorldState): RenderHull {
   const hull = state.hull;
   return {
@@ -1268,9 +1274,9 @@ export function renderHull(state: ReadonlyWorldState): RenderHull {
 }
 
 /**
- * D92: the field as the rock layers see it: `near` in transit within `field.warningSeconds` of
- * its start, `active` while the ship is in it, `clearing` once it ended and the alert still
- * stands; undefined otherwise (call 16).
+ * §sighting-and-the-alert: the field as the rock layers see it: `near` in transit within
+ * `field.warningSeconds` of its start, `active` while the ship is in it, `clearing` once it ended
+ * and the alert still stands; undefined otherwise (call 16).
  */
 export function renderField(state: ReadonlyWorldState, config: ConfigDef): RenderField | undefined {
   const field = state.field;
@@ -1289,7 +1295,7 @@ export function renderField(state: ReadonlyWorldState, config: ConfigDef): Rende
   }
 }
 
-/** D92: an impact for the flash, from its event. */
+/** §rock-impacts: an impact for the flash, from its event. */
 function renderImpact(event: Extract<SimEvent, { type: "asteroidImpact" }>): RenderImpact {
   const { tile, rock, tiles } = event.payload;
   return { tick: event.tick, x: tile.x, y: tile.y, rock, tiles: tiles.map((t) => ({ ...t })) };

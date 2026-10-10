@@ -1,6 +1,6 @@
 /**
- * D68: the dock's own people and the staging call's props, drawn at every authored dock, styled
- * from a look seed that never reads as crew or passenger.
+ * §locals-and-props: the dock's own people and the staging call's props, drawn at every authored
+ * dock, styled from a look seed that never reads as crew or passenger.
  */
 import type {
   DockDef,
@@ -53,7 +53,7 @@ const stars = buildStarField();
 const docks = bundle.docks ?? {};
 const allDocks: DockDef[] = Object.values(docks);
 
-/** Deck-frame centre of a dock tile, as the sim places people and props (D59, D66). */
+/** Deck-frame centre of a dock tile, as the sim places people and props (D59, §locals-table). */
 function onDeck(dock: DockDef, x: number, y: number) {
   const { shipAt } = berthInView(dock, layout);
   return { x: x - shipAt.x + 0.5, y: y - shipAt.y + 0.5 };
@@ -173,7 +173,7 @@ function distance(a: string, b: string): number {
   return Math.hypot(ar - br, ag - bg, ab - bb);
 }
 
-describe("every dock draws its locals and props (D68)", () => {
+describe("every dock draws its locals and props (§locals-and-props)", () => {
   for (const dock of allDocks) {
     const other = allDocks.find((d) => d !== dock)?.portId ?? dock.portId;
     const moments: RenderTravel[] = [

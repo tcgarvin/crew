@@ -1,7 +1,7 @@
 # Crew — notes for Claude
 
-Read `README.md` for layout and `docs/PLAN.md` / `docs/DECISIONS.md` for design. This file holds
-only what those don't.
+Read `README.md` for layout, `docs/spec/` for how the game works now, and `docs/DECISIONS.md` for
+the choices that shape it. This file holds only what those don't.
 
 ## Checks
 
@@ -20,8 +20,12 @@ when narrator prompts or plan parsing change.
   catch-all handlers, no `null`/`undefined` doubling as several states, validate at boundaries
   (Zod in `packages/content`, request parsing in `packages/server`).
 - Dependency direction is enforced by `pnpm depcruise`; fix the design, never the rule.
-- Design decisions get the next `D<n>` entry in `docs/DECISIONS.md`, and commit messages cite
-  them, e.g. `... (D56)`.
+- Behaviour changes update the spec in the same commit: the section in `docs/spec/` that
+  describes the mechanic, written to `docs/spec/README.md`. Code comments cite a section as
+  `§<anchor>` (`§mess-call`); `pnpm lint` fails on one that names no heading.
+- Only a real decision (a choice between alternatives that shapes much of the design, often an
+  owner ruling) gets the next `D<n>` entry in `docs/DECISIONS.md`: a few lines of choice,
+  alternatives and reason, never how a mechanic works. Most work needs no entry.
 
 ## Deployment and environment
 

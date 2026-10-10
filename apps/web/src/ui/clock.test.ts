@@ -14,7 +14,7 @@ const SECTIONS: readonly ClockSection[] = [
   { key: "blue", names: ["Dane Whitcross"] },
 ];
 
-describe("the ship's clock (D76, D77)", () => {
+describe("the ship's clock (§the-ships-day, §the-bell)", () => {
   it("starts on day 1 in the first section's watch", () => {
     expect(shipClock(0, values, SECTIONS).text).toBe("Day 1 · Red watch");
   });

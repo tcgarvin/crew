@@ -1,6 +1,6 @@
 /**
- * The top bar's clock (D76, D77): the ship's day and the watch, "Day 2 · White watch", from the
- * tick playback has reached. Pure, no React; `TopBar.tsx` renders it.
+ * The top bar's clock (§the-ships-day, §the-bell): the ship's day and the watch, "Day 2 · White
+ * watch", from the tick playback has reached. Pure, no React; `TopBar.tsx` renders it.
  *
  * A watch is named for the section that stands it (the scenario's watch bill, section `i` on
  * watch `i` of the day); a watch of the day with no section is "Watch 3".

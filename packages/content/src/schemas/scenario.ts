@@ -13,9 +13,10 @@ import {
 } from "./primitives";
 
 /**
- * D77: the watch bill. Structure here (at least one section, distinct keys, nobody listed twice
- * across sections and dayworkers); that every member is in the scenario's crew is L2, and the
- * section count against `config.time.watchesPerDay` and a qualified helm-stander per section L3.
+ * §sections-and-dayworkers: the watch bill. Structure here (at least one section, distinct keys,
+ * nobody listed twice across sections and dayworkers); that every member is in the scenario's crew
+ * is L2, and the section count against `config.time.watchesPerDay` and a qualified helm-stander per
+ * section L3.
  */
 const watchBillSchema = z
   .strictObject({

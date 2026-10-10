@@ -3,15 +3,15 @@
  * paid | declined | expired | failed`. A per-tick sweep here pays a job exactly once
  * (`Job.paymentTransactionId` guard) once every line is confirmed delivered.
  *
- * D63 (Dockside phase 2): at a port with a dock map, freight is physical on the dock. An offer's
+ * §offered-freight: at a port with a dock map, freight is physical on the dock. An offer's
  * crates are staged on the origin's staging area while the ship is alongside there (`docking` or
  * `docked`), owned by nobody: the job is still `offered`, so no `cargoToLoad` work exists and no
  * crew member touches them. Accepting raises the load work for the crates already there; a
  * declined, expired or departed-from offer has its crates withdrawn. At the destination the crew
  * carry the freight to the delivery bay; the job is delivered when every crate is in the bay,
- * and the crates are then carted into the warehouse store. D66: the carting (out on offer, back
- * on withdrawal, in after delivery) is a dock hand's walk, `dock-hands.ts`. A port without a dock
- * keeps the store and the transfer tiles.
+ * and the crates are then carted into the warehouse store. The carting (out on offer, back
+ * on withdrawal, in after delivery) is a dock hand's walk (§dock-hand-errands, `dock-hands.ts`). A
+ * port without a dock keeps the store and the transfer tiles.
  */
 import type { ApplyCtx } from "../../core/commands";
 import { queueOrHold } from "../../core/delivery";
@@ -40,7 +40,7 @@ import { writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
 
 // ---------------------------------------------------------------------------------------------
-// Issuers (D25)
+// Issuers (§issuers-and-pitches)
 // ---------------------------------------------------------------------------------------------
 
 /** Role given to an issuer known only by a bare name (old saves, string-issuer drafts). */
@@ -209,7 +209,7 @@ const SYSTEM_CAUSE: Cause = { causeIds: [], source: "system" };
 /**
  * Create one item at `location`, a freight item of a job when `freight` names it (owner:
  * commerce), with no work attached. The "kernel spawn path": allocate-and-insert directly, the
- * same pattern `scenarioSpawn`'s `apply()` uses. Staging an offer (D63) stops here;
+ * same pattern `scenarioSpawn`'s `apply()` uses. Staging an offer (§offered-freight) stops here;
  * `spawnCargoItem` also opens the load work, and `spawnAtBoundary` spawns store items this way.
  */
 export function spawnItem(
@@ -300,8 +300,8 @@ export function spawnCargoItem(
 }
 
 /**
- * D63: the staging area's tiles with the free ones first (no item lying there), so several
- * crates spread out before any two share a tile.
+ * §offered-freight: the staging area's tiles with the free ones first (no item lying there), so
+ * several crates spread out before any two share a tile.
  */
 export function stagingTilesFreeFirst(
   ctx: Pick<StepCtx, "state">,
@@ -319,7 +319,7 @@ export function stagingTilesFreeFirst(
 
 /**
  * Where `count` new crates of a job leaving `fromPortId` appear: on the staging area of the
- * origin's dock when it is alongside (D63), else in the origin's warehouse store.
+ * origin's dock when it is alongside (§offered-freight), else in the origin's warehouse store.
  */
 export function freightSpawnLocations(
   ctx: Pick<StepCtx, "state" | "content" | "defs">,
@@ -340,9 +340,9 @@ export function freightSpawnLocations(
 }
 
 /**
- * D63: where an offered job's crates belong right now: staged on its origin's dock while that
- * dock is alongside and the offer can still be taken there (`docking` or `docked`); nowhere
- * otherwise. Undefined for anything but an open offer.
+ * §offered-freight: where an offered job's crates belong right now: staged on its origin's dock
+ * while that dock is alongside and the offer can still be taken there (`docking` or `docked`);
+ * nowhere otherwise. Undefined for anything but an open offer.
  */
 export function offerStagingDock(
   ctx: Pick<StepCtx, "state" | "content">,
@@ -359,8 +359,8 @@ export function offerStagingDock(
 }
 
 /**
- * D63: stage an offer's freight on the origin's staging area, one crate per unit, owned by
- * nobody: the job stays `offered`, so no work is raised. Records the crates on the job.
+ * §offered-freight: stage an offer's freight on the origin's staging area, one crate per unit,
+ * owned by nobody: the job stays `offered`, so no work is raised. Records the crates on the job.
  */
 export function stageOfferedFreight(ctx: ApplyCtx, job: Job, cause: Cause = SYSTEM_CAUSE): void {
   if (job.cargoItemIds.length > 0) return;
@@ -416,9 +416,9 @@ function briefCrew(ctx: ApplyCtx, itemIds: readonly ItemId[]): void {
 
 /**
  * Accept a job's manifest, one item per cargo unit (owner feedback 2026-09-30: loading must read
- * as one crate at a time). D63: at a port with a dock the crates are already staged (staged now if
- * the offer was taken before the sweep got to it), and accepting opens their `cargoToLoad` work
- * and briefs the crew where they lie. Without a dock the manifest spawns into the origin's
+ * as one crate at a time). §loading: at a port with a dock the crates are already staged (staged
+ * now if the offer was taken before the sweep got to it), and accepting opens their `cargoToLoad`
+ * work and briefs the crew where they lie. Without a dock the manifest spawns into the origin's
  * warehouse store, loaded through the transfer tiles as before.
  */
 export function acceptJob(ctx: ApplyCtx, job: Job): ItemId[] {
@@ -479,8 +479,8 @@ export function raiseUnloadProblems(
 type CustodyState = Pick<ReadonlyWorldState, "items" | "deck">;
 
 /**
- * Pure: is this item in `portId`'s custody? In one of its stores, or (D63) set down in the
- * delivery bay of its dock while that dock is alongside: custody is checked in the bay.
+ * Pure: is this item in `portId`'s custody? In one of its stores, or (§offered-freight) set down in
+ * the delivery bay of its dock while that dock is alongside: custody is checked in the bay.
  */
 function inPortCustody(
   state: CustodyState,
@@ -499,7 +499,7 @@ function inPortCustody(
 
 /**
  * Pure: every manifest item is delivered at the job's destination: in one of its stores, or in
- * the delivery bay of its dock while alongside (D63).
+ * the delivery bay of its dock while alongside (§delivery-and-pay).
  */
 export function deliveryComplete(
   state: CustodyState,
@@ -570,19 +570,20 @@ export function expireStaleOffers(ctx: ApplyCtx): void {
         source: "sim",
         payload: { jobId: job.id },
       });
-      // D66: its crates go back in by way of a dock hand (`dock-hands.ts`, the same tick).
+      // §dock-hand-errands: its crates go back in by way of a dock hand (`dock-hands.ts`, the same
+      // tick).
     }
   }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Offer cards (D42, D70)
+// Offer cards (§offer-cards)
 // ---------------------------------------------------------------------------------------------
 
 /**
  * Params for the offer card's `job.offer` template (`@crew/content` renders them): the person,
  * the route, the cargo kind, the urgency and the pitch (its prose, or its key when it has none).
- * D24: pay is deliberately absent, so no card can print it.
+ * §cards-never-mention-pay: pay is deliberately absent, so no card can print it.
  */
 function offerPromptParams(job: Readonly<Job>): Record<string, string> {
   const person = job.issuerPerson;
@@ -616,9 +617,9 @@ export function dockedAtOrigin(
 
 /**
  * Build the offer's decision card: "Take the job" accepts and sets course for the destination,
- * "Pass" declines. The one place a job card is built. D70 (replacing D42's wait for the dock):
- * offers are only surfaced while docked at their origin, and the card is held until the captain
- * meets the issuer (`core/delivery.ts`), unless the issuer is aboard already.
+ * "Pass" declines. The one place a job card is built. §offer-cards: offers are only surfaced
+ * while docked at their origin, and the card is held until the captain meets the issuer
+ * (`core/delivery.ts`), unless the issuer is aboard already.
  */
 export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
   const decisionId: DecisionId = allocateId(ctx.state, "decision");
@@ -647,7 +648,8 @@ export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
     createdTick: ctx.tick,
     jobId: job.id,
   };
-  // D70: the issuer is one of the port's people, so the card waits to be delivered in person.
+  // §offers-in-person: the issuer is one of the port's people, so the card waits to be delivered in
+  // person.
   queueOrHold(ctx, decisionId, job.issuerPerson.name);
   return decisionId;
 }

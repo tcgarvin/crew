@@ -1,5 +1,5 @@
 /**
- * Damage response's task derivation (slice 5 calls 21–23, D94's scouts) on the damage fixture:
+ * Damage response's task derivation (slice 5 calls 21–23, §scouts) on the damage fixture:
  * a damaged machine derives one welder repair sized by what is missing; a scar derives a patch
  * while a kit is aboard and a plate while docked with plating aboard; the plating shortfall
  * derives commerce's purchase; a room to check derives a walk to its door.

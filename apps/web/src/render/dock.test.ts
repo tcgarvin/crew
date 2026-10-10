@@ -50,7 +50,7 @@ function dockOf(portId: string): DockDef {
 const HUB = "port.crossroads_hub" as PortDefId;
 const DRIFT = "port.kessler_drift" as PortDefId;
 const hubDock = dockOf(HUB);
-/** The Hub with the scenario deck in its berth box, as the sim grafts it (D72). */
+/** The Hub with the scenario deck in its berth box, as the sim grafts it (§ship-placement). */
 const hubBerth = berthInView(hubDock, layout);
 
 function travel(
@@ -155,7 +155,8 @@ describe("dock placement", () => {
       y: -hubBerth.shipAt.y,
     });
     const start = sceneAt(travel("docking", 0, DRIFT, HUB), bundle.ports, { reducedMotion: false });
-    // The berth is ahead (negative offset), so the dock is drawn toward the bow, +x (D72).
+    // The berth is ahead (negative offset), so the dock is drawn toward the bow, +x
+    // (§ship-placement).
     expect(dockSlide(start, layout.width)).toBeCloseTo(-DOCKING_START_OFFSET * layout.width);
     expect(dockOrigin(hubBerth, start, layout.width).x).toBeGreaterThan(-hubBerth.shipAt.x + 40);
   });
@@ -233,7 +234,7 @@ describe("dock to screen and back", () => {
   }
 });
 
-describe("the portrait turn (D72)", () => {
+describe("the portrait turn", () => {
   it("points the bow up and puts the quay on the right of a phone", () => {
     const [width, height] = [390, 700];
     const rotated = shouldRotate(width, height, layout);
@@ -266,7 +267,7 @@ describe("dockTargetAt (taps on the dock)", () => {
     const p = onDeck(hubBerth, staging.rect.x, staging.rect.y);
     expect(dockTargetAt(hubBerth, layout, p.x, p.y)).toEqual({ kind: "dock", id: hubDock.id });
     expect(dockTargetAt(hubBerth, layout, 5.5, 5.5)).toBeUndefined();
-    // Void beside the berth, astern of the ship (−x, D72).
+    // Void beside the berth, astern of the ship (−x, §orientation-and-size).
     expect(dockTargetAt(hubBerth, layout, -2.5, 5.5)).toBeUndefined();
   });
 });

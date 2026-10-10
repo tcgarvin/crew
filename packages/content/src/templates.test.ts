@@ -1,4 +1,7 @@
-/** D24–D26 offer card text from template keys, as the web host and the null narrator show it. */
+/**
+ * Offer card text from template keys (§issuers-and-pitches, §aftermath-caption), as the web host
+ * and the null narrator show it.
+ */
 import type { Decision, DecisionId } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { loadBundle } from "./loader";
@@ -52,7 +55,7 @@ describe("offer card templates", () => {
       "“This lot was picked this morning. It won't wait for the next quiet ship.” Fresh produce, Green Meridian to Crossroads Hub, needed urgently.",
     );
     expect(card.situation.split(/\s+/).length).toBeLessThanOrEqual(70);
-    // D29: the issuer speaks on the offer card.
+    // §spoken-cards: the issuer speaks on the offer card.
     expect(card.speaker).toBe("Ysolde Maren");
     expect(card.leftAftermath).toBe(
       "Taken. The crew start loading — we leave once the hold is full.",
@@ -77,7 +80,7 @@ describe("offer card templates", () => {
     expect(card.situation).toMatch(/no rush\.$/);
   });
 
-  it("never prints pay, even for a pre-D25 decision that still carries it", () => {
+  it("never prints pay, even for an older decision that still carries it (§cards-never-mention-pay)", () => {
     const card = templateCard(
       offer({
         issuer: "Rendell Freight Co.",
@@ -155,7 +158,7 @@ describe("passage offer card templates (passengers §6)", () => {
   });
 });
 
-describe("departure gate card templates (D36)", () => {
+describe("departure gate card templates (§departure-gate)", () => {
   function gate(params: Decision["prompt"]["params"]): Decision {
     return {
       ...offer({}),
@@ -265,14 +268,14 @@ describe("narrator card templates", () => {
     };
   }
 
-  it("carries the thread a closing card ends (D56)", () => {
+  it("carries the thread a closing card ends (§closing-cards)", () => {
     const card = templateCard(
       narratorCard({ title: "Fenwick's handoff", closesThread: "Fenwick" }),
     );
     expect(card.closesThread).toBe("Fenwick");
   });
 
-  it("keeps an unnamed close, and leaves an ordinary card without one (D56)", () => {
+  it("keeps an unnamed close, and leaves an ordinary card without one (§closing-cards)", () => {
     expect(templateCard(narratorCard({ title: "t", closesThread: "" })).closesThread).toBe("");
     expect(templateCard(narratorCard({ title: "t" })).closesThread).toBeUndefined();
   });

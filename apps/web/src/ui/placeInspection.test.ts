@@ -50,7 +50,7 @@ describe("dockWhere (items on the dock)", () => {
   const deck = scenario === undefined ? undefined : bundle.decks[scenario.deckId];
   if (deck === undefined) throw new Error("no deck");
   const layout = buildDeckLayout(deck, bundle);
-  /** The Hub with the scenario deck in its berth box (D72). */
+  /** The Hub with the scenario deck in its berth box (§ship-placement). */
   const hubBerth = berthInView(hub, layout);
 
   it("names the area an item sits in", () => {

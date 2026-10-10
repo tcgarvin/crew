@@ -1,10 +1,10 @@
 /**
- * The staging call end to end (Dockside §6.1, D67): the staging prompt over the same digest the
- * story narrator reads (plus the dock being dressed), the staging schema, the staging translator.
- * The answer carries at most one `stageDock` command and never a `notesUpdate`, so the notes
- * pass through untouched. Any failure falls back to the null answer for this hook, an empty plan
- * (the sim's floor set), with `fallback` set; the server decides what a fallback means (D43,
- * with staging's exception).
+ * The staging call end to end (Dockside §6.1, §staging-call-on-the-server): the staging prompt over
+ * the same digest the story narrator reads (plus the dock being dressed), the staging schema, the
+ * staging translator. The answer carries at most one `stageDock` command and never a `notesUpdate`,
+ * so the notes pass through untouched. Any failure falls back to the null answer for this hook, an
+ * empty plan (the sim's floor set), with `fallback` set; the server decides what a fallback means
+ * (D43, with staging's exception).
  */
 import type { ContentBundle, DeepReadonly } from "@crew/sim";
 import type { FallbackReason, NarratorRequest, NarratorResponse } from "../contract";

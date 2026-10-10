@@ -1,6 +1,6 @@
 /**
- * D74 test fixture: a small deck furnished like Freighter Mk2's sleeping quarters. Built on the
- * tiny content bundle; independent of `packages/content`.
+ * §berth-assignment test fixture: a small deck furnished like Freighter Mk2's sleeping quarters.
+ * Built on the tiny content bundle; independent of `packages/content`.
  *
  *   x 0123456789ABCDEF
  *   0 llllllllKKFFpPpP    l = bunk lockers (0..7,0); p = passenger lockers (12,0) (14,0)

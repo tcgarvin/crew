@@ -1,9 +1,10 @@
 /**
- * Slice 5 (D92, call 16): the asteroid field on screen. Two layers of rocks, placed from a fixed
- * hash like the stars (`stars.ts`): a far layer drawn after the stars and before the hull, and a
- * sparser near layer over the ship in the foreground slot. Both stream fore to aft with the stars
- * while a field is near or around the ship, fade in while it is `near`, show in full while
- * `active` and fade out while `clearing`; a stuck ship (engines out) holds them still.
+ * Slice 5 (§asteroid-field-scars-and-alert, call 16): the asteroid field on screen. Two layers of
+ * rocks, placed from a fixed hash like the stars (`stars.ts`): a far layer drawn after the stars
+ * and before the hull, and a sparser near layer over the ship in the foreground slot. Both stream
+ * fore to aft with the stars while a field is near or around the ship, fade in while it is `near`,
+ * show in full while `active` and fade out while `clearing`; a stuck ship (engines out) holds them
+ * still.
  *
  * The rocks are truth only in their presence (D7): where each one is drawn means nothing, and a
  * hit is the impact flash (`impacts.ts`), not a rock reaching the hull.

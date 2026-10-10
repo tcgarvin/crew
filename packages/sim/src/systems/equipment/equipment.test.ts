@@ -112,7 +112,7 @@ describe("scheduleFault", () => {
     expect(byDef(world, W5.engine).scheduledFaults).toEqual([]);
   });
 
-  it("spends the narrator's fault budget, and is rejected once it is spent (D78)", () => {
+  it("spends the narrator's fault budget, and is rejected once it is spent ", () => {
     const { kernel, world } = w5TestWorld();
     const engine = byDef(world, W5.engine);
     const schedule = (faultKey: string) =>
@@ -188,7 +188,7 @@ describe("maintenance", () => {
     );
   });
 
-  it("raises the open problem to essential once condition falls below the essential threshold (D90)", () => {
+  it("raises the open problem to essential once condition falls below the essential threshold", () => {
     const { kernel, world } = w5TestWorld({
       overrides: { engineFailure: { baseHazardPerSecond: 0, heatFactor: 1, wearPerSecond: 0 } },
     });
@@ -210,7 +210,7 @@ describe("maintenance", () => {
   });
 });
 
-describe("integrity (D35)", () => {
+describe("integrity (§integrity)", () => {
   it("derates output linearly between the derate and inoperable thresholds", () => {
     const { kernel, world } = w5TestWorld();
     const { integrityDerateBelow, integrityInoperableBelow } = world.config.values.equipment;

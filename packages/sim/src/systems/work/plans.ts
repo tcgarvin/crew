@@ -227,7 +227,8 @@ function haulPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 function machineTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.target.kind !== "machine") return blocked("unreachableTarget");
   const machineId = task.target.machineId;
-  // D77: the helm's plan is the watch's (standby, handover, seat); D78: the plot's is travel's.
+  // §who-has-the-helm: the helm's plan is the watch's (standby, handover, seat); §course-plotting:
+  // the plot's is travel's.
   if (task.type === "staffStation") return helmPlan(ctx, actor, task);
   if (task.type === "plotCourse") return plotCoursePlan(ctx, actor, task);
   const supplies = supplySteps(ctx, actor, task);
@@ -242,14 +243,15 @@ function machineTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 }
 
 /**
- * D47: walk to a cargo transfer tile, spend `commerce.market.buySeconds` at the counter, then the
- * `buy` commit step hands the units over the ramp. Only derived while docked at the market's port.
+ * §buying-parts: walk to a cargo transfer tile, spend `commerce.market.buySeconds` at the counter,
+ * then the `buy` commit step hands the units over the ramp. Only derived while docked at the
+ * market's port.
  *
- * D63, with the port's dock alongside: walk to its market stall, spend the time at the counter,
- * take the units in hand, and carry them aboard to the top of the cargo ramp (a cargo transfer
- * tile, where D47 always set them down). A dock with no stall has its market through the gate:
- * walk to the gate, go out (`throughGate`, off ship for the same time), come back with the units
- * and carry them aboard the same way.
+ * §buying-parts, with the port's dock alongside: walk to its market stall, spend the time at the
+ * counter, take the units in hand, and carry them aboard to the top of the cargo ramp (a cargo
+ * transfer tile, where the plain purchase always set them down). A dock with no stall has its
+ * market through the gate: walk to the gate, go out (`throughGate`, off ship for the same time),
+ * come back with the units and carry them aboard the same way.
  */
 function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const ref = task.progressRef;
@@ -292,11 +294,12 @@ function buyPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
 export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.type === "haul") return haulPlan(ctx, actor, task);
   if (task.type === "buyParts") return buyPlan(ctx, actor, task);
-  // D81: the galley's plans are its own (`systems/galley/`); D82: the mop's is dirt's.
+  // §meal-problem: the galley's plans are its own (`systems/galley/`); §mop-trips: the mop's is
+  // dirt's.
   if (task.type === "cookMeal") return cookPlan(ctx, actor, task);
   if (task.type === "carryMeal") return carryMealPlan(ctx, actor, task);
   if (task.type === "cleanCompartment") return cleanPlan(ctx, actor, task);
-  // D93, D94: damage work's plans are damage response's (`systems/damage/`).
+  // §machine-damage, §scouts: damage work's plans are damage response's (`systems/damage/`).
   if (task.type === "repairDamage") return repairDamagePlan(ctx, actor, task);
   if (task.type === "patchHull") return patchPlan(ctx, actor, task);
   if (task.type === "plateHull") return platePlan(ctx, actor, task);
@@ -304,7 +307,7 @@ export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResul
   return machineTaskPlan(ctx, actor, task);
 }
 
-/** D74: is this bed someone else's berth? Nobody lies down in another's bed. */
+/** §sleeping-places: is this bed someone else's berth? Nobody lies down in another's bed. */
 function berthOfAnother(ctx: StepCtx, actor: Actor, bed: MachineId): boolean {
   const key = ctx.state.machines[bed]?.placementKey;
   if (key === undefined) return false;
@@ -342,7 +345,7 @@ export function buildPersonalPlan(
       return recreatePlan(ctx, actor, intent);
     case "privateTalk":
       return privateTalkPlan(ctx, actor);
-    // D94: the intercom's reflex, and the officer of the watch on the bridge.
+    // §reporting-damage: the intercom's reflex, and the officer of the watch on the bridge.
     case "report":
       return reportPlan(ctx, actor, intent);
     case "holdBridge":

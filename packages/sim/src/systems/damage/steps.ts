@@ -1,5 +1,5 @@
 /**
- * Steps of damage work (D93, D94):
+ * Steps of damage work (§machine-damage, §scouts):
  *
  * - `runMend`: at the machine with a welder in hand, integrity rises by
  *   `workRate / repairSecondsPerIntegrity` a second; at whole it is set to 1, `machineDamaged`

@@ -61,8 +61,8 @@ export const FIX = {
 } as const;
 
 /**
- * The fixture's ship's day (D76). Day knobs are written as `seconds / FIXTURE_DAY` so the values
- * the tests were written against stay visible and the conversion stays exact.
+ * The fixture's ship's day (§the-ships-day). Day knobs are written as `seconds / FIXTURE_DAY` so
+ * the values the tests were written against stay visible and the conversion stays exact.
  */
 export const FIXTURE_DAY = 1200;
 
@@ -71,11 +71,11 @@ export interface FixtureConfigOverrides {
   quietTooLongSeconds?: number;
   dockingFee?: number;
   hookOnEvents?: readonly string[];
-  /** D100: `narrator.aftermathHookOnEvents` (none by default). */
+  /** §notable-event-hook: `narrator.aftermathHookOnEvents` (none by default). */
   aftermathHookOnEvents?: readonly string[];
   maxCratesPerJob?: number;
   passage?: ConfigDef["commerce"]["passage"];
-  /** D80: `travel.limpSpeedFraction` (0, no limp, by default). */
+  /** §limping: `travel.limpSpeedFraction` (0, no limp, by default). */
   limpSpeedFraction?: number;
 }
 
@@ -156,7 +156,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       nominalSpeed: 5,
       staffEstimateSeconds: 0,
       departureMinOutput: 0.5,
-      // D80: no limp unless a test turns it on.
+      // §limping: no limp unless a test turns it on.
       limpSpeedFraction: overrides.limpSpeedFraction ?? 0,
       recallAboardSeconds: 60,
       localShuffleSeconds: 8,
@@ -183,7 +183,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
         ashoreDaysMax: 3 / FIXTURE_DAY,
         overdueDays: 10 / FIXTURE_DAY,
       },
-      // D80: off unless a test turns them on.
+      // §reserve-kinds: off unless a test turns them on.
       sparesReserve: 0,
       foodReserve: { lowBelowDays: 0, restockToDays: 0 },
       market: {
@@ -215,7 +215,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       slowDownOnEvents: [],
       dirtFrameEverySeconds: 5,
     },
-    // D77: everyone is a dayworker on every watch: always on duty, as before watches.
+    // §sections-and-dayworkers: everyone is a dayworker on every watch: always on duty, as before
+    // watches.
     watches: fixtureWatches([0, 1, 2]),
     mood: FIXTURE_MOOD,
     hazards: FIXTURE_HAZARDS,
@@ -297,8 +298,8 @@ export function fixtureContent(config: ConfigDef = fixtureConfig()): ContentBund
         heat: { risePerSecond: 0.01, coolPerSecond: 0.02, derateAbove: 0.8 },
         operation: { requiresOperator: false },
         failure: { baseHazardPerSecond: 0.0001, heatFactor: 2, wearPerSecond: 0.0001 },
-        // D36 gate tests: one derating fault and one symptom-only (overheat) fault. No equipment
-        // system runs here, so neither ever fires on its own or changes `output`.
+        // §departure-gate tests: one derating fault and one symptom-only (overheat) fault. No
+        // equipment system runs here, so neither ever fires on its own or changes `output`.
         faults: [
           {
             key: "wornBearing",
@@ -506,7 +507,7 @@ export function freightTestWorld(overrides: FixtureConfigOverrides = {}): Fixtur
  */
 /**
  * Test helper: advance one tick at a time, acknowledging hooks, until travel is in `stage`
- * (D66 retired `approachingPort`, which tests used to stop on). Throws on a decision halt or
+ * (`approachingPort` no longer exists). Throws on a decision halt or
  * when `maxTicks` runs out, so a test never silently checks the wrong moment.
  */
 export function advanceToStage(

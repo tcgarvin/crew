@@ -8,9 +8,10 @@ import type { DirtFrame, PortDef, PortDefId, RenderFrame } from "@crew/sim";
  * of the mock geometry, and rotates the canvas 90° on portrait viewports so a landscape deck
  * still fills the width (task item 5).
  *
- * Dockside (D58): the canvas runs its own animation loop, because the stars stream and the plume
- * flickers between sim frames. It redraws only while something moves (stars, plume) or when the
- * frame, selection or size changes, so a paused game at the dock costs nothing.
+ * Dockside (§stars-plume-and-the-animation-loop): the canvas runs its own animation loop, because
+ * the stars stream and the plume flickers between sim frames. It redraws only while something moves
+ * (stars, plume) or when the frame, selection or size changes, so a paused game at the dock costs
+ * nothing.
  *
  * Dockside phase 2: the dock map for the port in view is drawn alongside, and the camera eases
  * from the flight framing to ship plus dock (`cameraBounds`) with the scene's `cameraT`, so the
@@ -52,9 +53,12 @@ export interface DeckCanvasProps {
   /** The content's dock maps (empty when it has none: every port draws the stand-in berth). */
   readonly docks: DockTable;
   readonly frame: RenderFrame | undefined;
-  /** D82: the dirt frame playback has reached, for the grime tint; none yet draws a clean deck. */
+  /**
+   * §dirt-grid: the dirt frame playback has reached, for the grime tint; none yet draws a clean
+   * deck.
+   */
   readonly dirt: DirtFrame | undefined;
-  /** D82: the tint's knobs (`config.dirt`). */
+  /** §dirt-grid: the tint's knobs (`config.dirt`). */
   readonly grimeTint: GrimeTint;
   /** The game is paused: the stars and plume hold still with it. */
   readonly paused: boolean;
@@ -99,7 +103,10 @@ export function DeckCanvas({
   const hull = useMemo(() => hullGeometry(layout), [layout]);
   const stars = useMemo(() => buildStarField(), []);
   const scrollRef = useRef(new StarScroll());
-  /** D92: the asteroid field's rocks, their own scroll (still while stuck), fade and flashes. */
+  /**
+   * §stuck-in-the-rocks: the asteroid field's rocks, their own scroll (still while stuck), fade and
+   * flashes.
+   */
   const rockField = useMemo(() => buildRockField(), []);
   const rockScrollRef = useRef(new StarScroll());
   const rockFadeRef = useRef(new RockFade());
@@ -169,8 +176,8 @@ export function DeckCanvas({
         const plume = scene.plume * engineOutput(current, layout);
         const flickering = !still && !reducedMotion && plume > 0.01;
         scrollRef.current.advance(delta, still ? 0 : scene.starSpeed);
-        // D92: the rocks stream with the stars but hold still while the ship is stuck; their fade
-        // and the impact flashes run on real time, held while paused.
+        // §stuck-in-the-rocks: the rocks stream with the stars but hold still while the ship is
+        // stuck; their fade and the impact flashes run on real time, held while paused.
         const field = current.field;
         const running = still ? 0 : delta;
         rockScrollRef.current.advance(delta, rockScrollSpeed(field, scene.starSpeed, still));

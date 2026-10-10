@@ -1,4 +1,7 @@
-/** Galley events (D81): the meal cooked, missed, spoiled or carried; the provisions running low. */
+/**
+ * Galley events (§galley-and-mess-call): the meal cooked, missed, spoiled or carried; the
+ * provisions running low.
+ */
 import type { MealQuality } from "../content";
 import type { ActorId } from "../ids";
 import type { SignificanceCatalog } from "./significance";

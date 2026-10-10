@@ -37,8 +37,9 @@ const placed = (key: string, machineDefId: string, x: number) => ({
 });
 
 /**
- * The smallest deck that meets the hull contract (D72): bridge on the east edge, both ramps south,
- * every required room, station, zone and spawn point, and beds for the one crew member plus one.
+ * The smallest deck that meets the hull contract (§what-a-deck-must-offer): bridge on the east
+ * edge, both ramps south, every required room, station, zone and spawn point, and beds for the one
+ * crew member plus one.
  */
 const deck = {
   id: "deck.test.main",
@@ -69,7 +70,8 @@ const deck = {
     placed("engine1", "machine.test.engine", 0),
     placed("pump1", "machine.test.pump", 1),
     placed("stove1", "machine.test.stove", 2),
-    // two tables of two seats each, in the middle row where every side is floor (D81)
+    // two tables of two seats each, in the middle row where every side is floor
+    // (§what-a-deck-must-offer)
     { key: "table1", machineDefId: "machine.test.table", origin: { x: 3, y: 1 }, rotation: 0 },
     { key: "table2", machineDefId: "machine.test.table", origin: { x: 6, y: 1 }, rotation: 0 },
     placed("bunk1", "machine.test.bunk", 4),
@@ -143,7 +145,7 @@ const inertMachine = (name: string, tag: string) => ({
   tags: [tag],
   faults: [],
 });
-/** The helm: a seat, a standby tile apart from it (D77), and piloting 3 to stand it. */
+/** The helm: a seat, a standby tile apart from it (§handover), and piloting 3 to stand it. */
 const helm = {
   ...inertMachine("helm", "pilotStation"),
   interactionPositions: [
@@ -152,7 +154,10 @@ const helm = {
   ],
   operation: { requiresOperator: true, operatorSkill: { skill: "piloting", min: 3 } },
 };
-/** A stove with a `use` position for the cook, and tables seating two each (D81). */
+/**
+ * A stove with a `use` position for the cook, and tables seating two each
+ * (§what-a-deck-must-offer).
+ */
 const SIDES = [
   { x: -1, y: 0 },
   { x: 0, y: 1 },
@@ -185,7 +190,8 @@ const item = {
   mass: 1.2,
 };
 
-// D81: the galley finds its crate and its plate by tag; L2 wants exactly one meal def.
+// §cooking-and-serving: the galley finds its crate and its plate by tag; L2 wants exactly one meal
+// def.
 const provisions = {
   id: "item.test.provisions",
   name: "Provisions",
@@ -311,7 +317,7 @@ const thoughts = {
 };
 
 const band = { min: 1, max: 3 };
-/** D88: every memory key, one row each. */
+/** §memories: every memory key, one row each. */
 const MEMORIES = Object.fromEntries(
   memoryKeySchema.options.map((key) => [
     key,
@@ -394,7 +400,7 @@ const config = {
     nominalSpeed: 1,
     staffEstimateSeconds: 0,
     departureMinOutput: 0.5,
-    // D80: no limp unless a test turns it on.
+    // §limping: no limp unless a test turns it on.
     limpSpeedFraction: 0,
     recallAboardSeconds: 60,
     localShuffleSeconds: 8,
@@ -417,7 +423,7 @@ const config = {
     reofferDays: 0.05,
     maxCratesPerJob: 6,
     passage: { ashoreDaysMin: 0.05, ashoreDaysMax: 0.15, overdueDays: 0.1 },
-    // D80: off unless a test turns them on.
+    // §reserve-kinds: off unless a test turns them on.
     sparesReserve: 0,
     foodReserve: { lowBelowDays: 0, restockToDays: 0 },
     market: {
@@ -654,7 +660,7 @@ describe("content def schemas", () => {
     expect(activityDefSchema.safeParse(sololess).success).toBe(true);
   });
 
-  it("holds every memory to a whole, non-zero opinion, and requires every key (D88)", () => {
+  it("holds every memory to a whole, non-zero opinion, and requires every key (§memories)", () => {
     const withMemories = (memories: Record<string, unknown>) => ({
       ...config,
       social: { ...config.social, memories },
@@ -668,14 +674,14 @@ describe("content def schemas", () => {
     expect(configDefSchema.safeParse(withMemories(missing)).success).toBe(false);
   });
 
-  it("an activity's memories name memory keys (D88)", () => {
+  it("an activity's memories name memory keys (§memories)", () => {
     const remembered = { ...activity, memories: { together: "goodTime", loserToWinner: "beatMe" } };
     expect(activityDefSchema.safeParse(remembered).success).toBe(true);
     const unknown = { ...activity, memories: { together: "goodCompany" } };
     expect(activityDefSchema.safeParse(unknown).success).toBe(false);
   });
 
-  it("requires the narrator's aftermath event list, of non-empty names (D100)", () => {
+  it("requires the narrator's aftermath event list, of non-empty names (§notable-event-hook)", () => {
     const withNarrator = (narrator: Record<string, unknown>) => ({ ...config, narrator });
     const { aftermathHookOnEvents: _list, ...without } = config.narrator;
     expect(configDefSchema.safeParse(withNarrator(without)).success).toBe(false);
@@ -685,7 +691,7 @@ describe("content def schemas", () => {
     expect(configDefSchema.safeParse(withNarrator(blank)).success).toBe(false);
   });
 
-  it("requires a voice on every crew member (D38)", () => {
+  it("requires a voice on every crew member (§crew-lines)", () => {
     const { voice: _omitted, ...voiceless } = crew;
     expect(crewDefSchema.safeParse(voiceless).success).toBe(false);
     expect(crewDefSchema.safeParse({ ...crew, voice: "" }).success).toBe(false);
@@ -707,12 +713,12 @@ const people = {
   },
 };
 
-describe("people table (D25)", () => {
+describe("people table (§issuers-and-pitches)", () => {
   it("accepts a valid table", () => {
     expect(peopleTableDefSchema.safeParse(people).success).toBe(true);
   });
 
-  it("rejects a pitch that mentions a number (D24: no pay on cards)", () => {
+  it("rejects a pitch that mentions a number (§cards-never-mention-pay: no pay on cards)", () => {
     const bad = { ...people, pitches: ["I'll pay 500 for it."] };
     expect(peopleTableDefSchema.safeParse(bad).success).toBe(false);
   });
@@ -760,7 +766,7 @@ describe("bundle validation", () => {
     expect(validateStructure(bundle).ok).toBe(true);
   });
 
-  it("L1 requires every thought def, and a bill with distinct sections and members (D77, D79)", () => {
+  it("L1 requires every thought def, and a bill with distinct sections and members (§sections-and-dayworkers, §thoughts)", () => {
     const { helmScrape: _missing, ...three } = thoughts;
     expect(validateStructure({ ...bundle, thoughts: three }).ok).toBe(false);
     const bill = (sections: unknown, dayworkers: unknown) => ({
@@ -807,7 +813,7 @@ describe("bundle validation", () => {
       ).toBe(true);
     });
 
-    it("rejects a watch-bill member who is not in the scenario's crew (D77)", () => {
+    it("rejects a watch-bill member who is not in the scenario's crew (§sections-and-dayworkers)", () => {
       const billed = {
         ...scenario,
         watchBill: {
@@ -823,7 +829,7 @@ describe("bundle validation", () => {
       expect(referenceIssues({ ...bundle, scenarios: { [scenario.id]: ok } })).toEqual([]);
     });
 
-    it("rejects a dayworker watch outside the day, or listed twice (D77)", () => {
+    it("rejects a dayworker watch outside the day, or listed twice (§sections-and-dayworkers)", () => {
       const bad = { ...config, watches: { ...config.watches, dayworkerOnWatches: [1, 3, 1] } };
       const issues = referenceIssues({ ...bundle, config: bad });
       expect(issues.some((i) => i.message.includes("watch 3 is not one of the 3"))).toBe(true);
@@ -855,7 +861,7 @@ describe("bundle validation", () => {
       expect(clean.filter((i) => i.path[0] === "activities")).toEqual([]);
     });
 
-    it("rejects a thought filed under another thought's key (D79)", () => {
+    it("rejects a thought filed under another thought's key (§thoughts)", () => {
       const swapped = { ...thoughts, doubleWatch: thoughts.stoodLongWatch };
       const issues = referenceIssues({ ...bundle, thoughts: swapped });
       expect(issues.some((i) => i.path.join(".") === "thoughts.doubleWatch.key")).toBe(true);
@@ -867,7 +873,7 @@ describe("bundle validation", () => {
       expect(issues.some((i) => i.message.includes("must start with"))).toBe(true);
     });
 
-    it("rejects a market line naming an unknown item, and a duplicate line (D47)", () => {
+    it("rejects a market line naming an unknown item, and a duplicate line (§market-stock)", () => {
       const badPort = {
         ...port,
         market: [
@@ -892,7 +898,7 @@ describe("bundle validation", () => {
       expect(negative.ok).toBe(false);
     });
 
-    it("rejects a zone whose machineKey names no placement on its deck (D72)", () => {
+    it("rejects a zone whose machineKey names no placement on its deck (§what-a-deck-must-offer)", () => {
       const locker = {
         key: "locker_1",
         name: "Locker",
@@ -931,7 +937,7 @@ describe("bundle validation", () => {
       expect(issues.some((i) => i.message.includes("must have maxStack 1"))).toBe(true);
     });
 
-    it("holds capacityUnits to hand trucks, and every hand truck to a load of two or more (D65)", () => {
+    it("holds capacityUnits to hand trucks, and every hand truck to a load of two or more (§hand-truck-trips)", () => {
       const issuesFor = (bad: Record<string, unknown>) =>
         referenceIssues({
           ...bundle,
@@ -1039,7 +1045,7 @@ describe("bundle validation", () => {
       expect(issues.some((i) => i.message.includes("overlaps"))).toBe(true);
     });
 
-    it("holds every deck to the hull contract (D72)", () => {
+    it("holds every deck to the hull contract (§what-a-deck-must-offer)", () => {
       const westward = {
         ...deck,
         tiles: ["BBEEGGQQ", "BBEEGGQQ", "BHHHHHAA"],
@@ -1053,7 +1059,8 @@ describe("bundle validation", () => {
     it("gives each of a scenario's crew a crew spawn point", () => {
       const crowded = { ...scenario, crew: ["crew.test.mara", "crew.test.mara"] };
       const issues = physicalIssues({ ...bundle, scenarios: { [scenario.id]: crowded } });
-      // Two crew also outgrow the deck's two beds (crew + 1, D73); validate-hull.test.ts covers that.
+      // Two crew also outgrow the deck's two beds (crew + 1, §what-a-deck-must-offer);
+      // validate-hull.test.ts covers that.
       expect(issues.map((i) => `${i.path.join(".")}: ${i.message}`)).toContain(
         'scenarios.scenario.test.default.crew: 2 crew but "deck.test.main" has 1 crew spawn points',
       );
@@ -1084,7 +1091,7 @@ describe("bundle validation", () => {
       expect(issues.some((i) => i.message.includes("no item def provides tool kind"))).toBe(true);
     });
 
-    it("rejects a scenario that does not carry a tool its deck's repair recipes need (D71)", () => {
+    it("rejects a scenario that does not carry a tool its deck's repair recipes need (§scenario-tools)", () => {
       const bareScenario = { ...scenario, startingItems: [] };
       const issues = physicalIssues({ ...bundle, scenarios: { [scenario.id]: bareScenario } });
       expect(
@@ -1097,7 +1104,7 @@ describe("bundle validation", () => {
       expect(issues.filter((i) => i.message.includes("no starting item provides"))).toEqual([]);
     });
 
-    it("holds the pilot station to its standby position (D77)", () => {
+    it("holds the pilot station to its standby position (§handover)", () => {
       const seatOnly = { ...helm, interactionPositions: helm.interactionPositions.slice(0, 1) };
       const issues = physicalIssues({
         ...bundle,
@@ -1108,7 +1115,7 @@ describe("bundle validation", () => {
       );
     });
 
-    describe("the watch bill (D77)", () => {
+    describe("the watch bill (§sections-and-dayworkers)", () => {
       /** Hands with the given piloting; the helm needs 3. */
       const hand = (name: string, piloting: number) => ({
         ...crew,

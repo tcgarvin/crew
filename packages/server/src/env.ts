@@ -69,21 +69,27 @@ export interface Env {
   /** `CREW_NARRATOR_MODEL`: OpenRouter model slug; unset = the narrator's `DEFAULT_NARRATOR_MODEL` (D102). */
   readonly narratorModel: string;
   /**
-   * D67: `CREW_STAGING_MODEL`, the model for the staging call (`stageDock`); unset = the story
-   * model, so the staging call can move to a cheaper model without touching the story's.
+   * §staging-call-on-the-server: `CREW_STAGING_MODEL`, the model for the staging call
+   * (`stageDock`); unset = the story model, so the staging call can move to a cheaper model without
+   * touching the story's.
    */
   readonly stagingModel: string;
   /**
-   * D96: `CREW_NARRATOR_REASONING_EFFORT`, one of `REASONING_EFFORTS`; unset = the narrator's
-   * `DEFAULT_NARRATOR_REASONING_EFFORT` (D102). Set it per model: on a model that does not reason
-   * by default, any value but `"default"` (which sends nothing) switches reasoning on.
+   * §models-and-reasoning-effort: `CREW_NARRATOR_REASONING_EFFORT`, one of `REASONING_EFFORTS`;
+   * unset = the narrator's `DEFAULT_NARRATOR_REASONING_EFFORT` (D102). Set it per model: on a model
+   * that does not reason by default, any value but `"default"` (which sends nothing) switches
+   * reasoning on.
    */
   readonly narratorReasoningEffort: ReasoningEffort;
-  /** D96: `CREW_STAGING_REASONING_EFFORT`; unset = the story call's, like `stagingModel`. */
+  /**
+   * §models-and-reasoning-effort: `CREW_STAGING_REASONING_EFFORT`; unset = the story call's, like
+   * `stagingModel`.
+   */
   readonly stagingReasoningEffort: ReasoningEffort;
   /**
-   * D70: `CREW_STAGING_TIMEOUT_MS`, how long one staging attempt may take before it gives up
-   * (milliseconds); unset = the narrator's `STAGING_TIMEOUT_MS` (10 s). Story calls keep 25 s.
+   * §narrator-timeouts: `CREW_STAGING_TIMEOUT_MS`, how long one staging attempt may take before it
+   * gives up (milliseconds); unset = the narrator's `STAGING_TIMEOUT_MS` (10 s). Story calls keep
+   * 25 s.
    */
   readonly stagingTimeoutMs: number;
   /**
@@ -95,7 +101,7 @@ export interface Env {
   readonly maxSaveBytes: number;
   readonly nodeEnv: string;
   /**
-   * D97: `VERCEL=1`, set by Vercel in its functions: work after the response goes to
+   * §notes-turn: `VERCEL=1`, set by Vercel in its functions: work after the response goes to
    * `waitUntil`; elsewhere it runs inline.
    */
   readonly onVercel: boolean;

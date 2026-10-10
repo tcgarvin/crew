@@ -1,9 +1,10 @@
 /**
- * D80 on D71: whether an impairment's repair is in reach. A machine with no fault of its own that
- * another machine's impairment causes (an engine starved of power by a derated generator, an
- * engine overheating with its bus's coolant pump down) is in reach only if that cause is, and
- * the reason given is the cause's fault. With no cause to point at, D71's answer stands (in
- * reach). Judged on hand-set state over the W5 deck (one bus: generator, battery, pump, engine).
+ * §impairments-out-of-reach, §repairs-out-of-reach: whether an impairment's repair is in reach. A
+ * machine with no fault of its own that another machine's impairment causes (an engine starved of
+ * power by a derated generator, an engine overheating with its bus's coolant pump down) is in reach
+ * only if that cause is, and the reason given is the cause's fault. With no cause to point at, the
+ * plain answer stands (in reach). Judged on hand-set state over the W5 deck (one bus: generator,
+ * battery, pump, engine).
  */
 import { describe, expect, it } from "vitest";
 import { tinyConfig } from "../../core/fixtures/tiny-content";
@@ -131,7 +132,7 @@ function ctxOf(world: World) {
   return { state: world.state, content: world.content, config: world.config.values };
 }
 
-describe("D80: an impairment caused by another machine's is in reach only if its cause is", () => {
+describe("an impairment caused by another machine's is in reach only if its cause is", () => {
   it("an engine starved by a generator whose part is not to be had is out of reach, for the generator's fault", () => {
     const world = reachWorld(0);
     starveEngine(world);
@@ -168,7 +169,7 @@ describe("D80: an impairment caused by another machine's is in reach only if its
     );
   });
 
-  it("keeps D71's answer with no cause to point at: a starved engine on a healthy bus", () => {
+  it("keeps the plain answer with no cause to point at: a starved engine on a healthy bus", () => {
     const world = reachWorld(0);
     const engine = machineOf(world, W5.engine);
     engine.powerAllocatedKw = 1;

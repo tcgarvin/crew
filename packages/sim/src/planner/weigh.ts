@@ -1,7 +1,8 @@
 /**
- * What an actor is weighing, for the inspector (D90): every candidate the selector would rank,
- * best first, the ones it ruled out and why, and what it decides. Pure over the `AgentView`, like
- * the selector, and never called by the pipeline: the inspector asks for it on a tap.
+ * What an actor is weighing, for the inspector (§what-a-crew-member-weighs): every candidate the
+ * selector would rank, best first, the ones it ruled out and why, and what it decides. Pure over
+ * the `AgentView`, like the selector, and never called by the pipeline: the inspector asks for it
+ * on a tap.
  */
 import type { PlannerConfig } from "../core/types/pipeline";
 import type { AgentView } from "../core/types/view";

@@ -204,7 +204,8 @@ describe("commerce: full freight loop", () => {
       cmd({ source: "player", kind: "setCourse", payload: { destinationPortId: PORTS.b } }),
     );
     advanceToStage(kernel, world, "approaching");
-    // D52: freight under way is the one job in hand until the ship docks at its destination.
+    // §one-job-in-hand: freight under way is the one job in hand until the ship docks at its
+    // destination.
     expect(jobBlockingAcceptance(world.state)?.id).toBe(jobId);
     // Docking at B with nothing on raises `captainAshore` (D40); acknowledge that too.
     advanceThroughHooks(kernel, world, 1000);
@@ -255,15 +256,15 @@ describe("commerce: full freight loop", () => {
   });
 });
 
-describe("commerce: offers are made at the dock, never in flight (D70, retiring D42)", () => {
+describe("commerce: offers are made at the dock, never in flight (§offers-in-person)", () => {
   function jobDraftFrom(fromPortId: typeof PORTS.a, toPortId: typeof PORTS.a, pay: number) {
     return { ...jobDraft(pay), fromPortId, toPortId };
   }
 
   /**
    * Drive the ship from A toward B and stop on approach, with no hook pending: an offer made in
-   * flight (D42) now comes from a story hook such as `quietTooLong`, never from the arrival
-   * (D66 retired `approachingPort`; the fixture's ports have no dock map, so no `stageDock`).
+   * flight now comes from a story hook such as `quietTooLong`, never from the arrival
+   * (there is no `approachingPort`; the fixture's ports have no dock map, so no `stageDock`).
    */
   function approachB() {
     const { world, kernel } = freightTestWorld();

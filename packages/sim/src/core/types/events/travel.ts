@@ -20,10 +20,10 @@ export interface TravelEventPayloads {
   arrived: { readonly portId: PortDefId };
   driftingChanged: { readonly drifting: boolean };
   /**
-   * D80: in transit the engines are below `travel.limpSpeedFraction` and no repair can bring them
-   * back with what is aboard: `machineId`'s `faultKey` repair is short of `itemDefId` (a `tool`
-   * nothing aboard provides, or `part`s), so the ship limps on at `speedFraction` of nominal.
-   * Raised the tick the limp begins; it ends unannounced when the engine is repaired (with
+   * §limping: in transit the engines are below `travel.limpSpeedFraction` and no repair can bring
+   * them back with what is aboard: `machineId`'s `faultKey` repair is short of `itemDefId` (a
+   * `tool` nothing aboard provides, or `part`s), so the ship limps on at `speedFraction` of
+   * nominal. Raised the tick the limp begins; it ends unannounced when the engine is repaired (with
    * `driftingChanged`) or the leg ends.
    */
   shipLimping: {
@@ -33,19 +33,22 @@ export interface TravelEventPayloads {
     readonly need: "tool" | "part";
     readonly speedFraction: number;
   };
-  /** D36: the captain chose to wait for repairs to `machineId` before departing. */
+  /** §departure-gate: the captain chose to wait for repairs to `machineId` before departing. */
   departureHeld: { readonly machineId: MachineId };
-  /** D36: the captain chose to depart with `machineId` impaired. */
+  /** §departure-gate: the captain chose to depart with `machineId` impaired. */
   departureRiskAccepted: { readonly machineId: MachineId };
-  /** D36: a hold ended because no engine/generator is impaired any more; departure proceeds. */
+  /**
+   * §departure-gate: a hold ended because no engine/generator is impaired any more; departure
+   * proceeds.
+   */
   departureHoldLifted: { readonly toPortId: PortDefId };
   /**
-   * D71: the departure goes ahead with `machineId` impaired because its `faultKey` repair is
-   * short of `itemDefId` (a `tool` nothing aboard provides, or `part`s) and the market at
-   * `portId` cannot supply it. Raised instead of the gate card when no other repair is worth
-   * waiting for, or when it ends a hold for repairs that could no longer finish. D80: one per
-   * fault; a machine impaired only by another's (an engine starved by the generator) is told
-   * through the other's.
+   * §repairs-out-of-reach: the departure goes ahead with `machineId` impaired because its
+   * `faultKey` repair is short of `itemDefId` (a `tool` nothing aboard provides, or `part`s) and
+   * the market at `portId` cannot supply it. Raised instead of the gate card when no other repair
+   * is worth waiting for, or when it ends a hold for repairs that could no longer finish. §limping:
+   * one per fault; a machine impaired only by another's (an engine starved by the generator) is
+   * told through the other's.
    */
   departureRepairOutOfReach: {
     readonly machineId: MachineId;
@@ -57,22 +60,25 @@ export interface TravelEventPayloads {
     readonly heldForRepairs: boolean;
   };
   /**
-   * D61: someone on the dock could not walk back aboard while the ship was leaving (they cannot
-   * move, or their walk failed), so the dock crew brought them up the ramp. The departure is never
-   * held forever, and never silently.
+   * §ramps-and-cast-off: someone on the dock could not walk back aboard while the ship was leaving
+   * (they cannot move, or their walk failed), so the dock crew brought them up the ramp. The
+   * departure is never held forever, and never silently.
    */
   broughtAboard: { readonly actorId: ActorId; readonly name: string; readonly portId: PortDefId };
-  /** D61: an item was still on the dock when it slid away; it stays at the port's warehouse. */
+  /**
+   * §ramps-and-cast-off: an item was still on the dock when it slid away; it stays at the port's
+   * warehouse.
+   */
   leftOnDock: { readonly itemId: ItemId; readonly portId: PortDefId };
   /**
-   * D65: a piece of the ship's own gear (the hand truck) was still on the dock when it went, so
-   * the dock crew handed it up the cargo ramp instead of leaving it at the warehouse.
+   * §ramps-and-cast-off: a piece of the ship's own gear (the hand truck) was still on the dock when
+   * it went, so the dock crew handed it up the cargo ramp instead of leaving it at the warehouse.
    */
   gearBroughtAboard: { readonly itemId: ItemId; readonly portId: PortDefId };
   /**
-   * D66: the dock alongside was dressed: the floor set and the staging plan's people (`localIds`)
-   * and props. `unplaced` names anyone the dock had no room for near their post. `staged` is
-   * whether a staging plan was applied (false: the floor set alone).
+   * §staging-plan-dressing: the dock alongside was dressed: the floor set and the staging plan's
+   * people (`localIds`) and props. `unplaced` names anyone the dock had no room for near their
+   * post. `staged` is whether a staging plan was applied (false: the floor set alone).
    */
   dockDressed: {
     readonly portId: PortDefId;
@@ -82,17 +88,19 @@ export interface TravelEventPayloads {
     readonly staged: boolean;
     readonly unplaced: readonly string[];
   };
-  /** D66: the staging plan's one line for the log as the dock comes alongside. */
+  /**
+   * §staging-plan-dressing: the staging plan's one line for the log as the dock comes alongside.
+   */
   dockAmbience: { readonly portId: PortDefId; readonly line: string };
-  /** D78: `actorId` plotted the course to `toPortId` at the nav terminal. */
+  /** §course-plotting: `actorId` plotted the course to `toPortId` at the nav terminal. */
   coursePlotted: { readonly toPortId: PortDefId; readonly actorId: ActorId };
-  /** D78: a `scheduleHazard` placed hazard `hazardId` on the leg. */
+  /** §debris-fields-and-ion-storms: a `scheduleHazard` placed hazard `hazardId` on the leg. */
   hazardScheduled: { readonly hazardId: HazardId; readonly kind: HazardKind };
   /**
-   * D78: a navigation hazard fired in transit and the helm rolled against it: `standerId` (absent:
-   * nobody at the helm) at piloting `skill` against `difficulty`. `unattended` is a scrape and a
-   * delay both. `scrapedMachineId` is the machine a scrape put a fault on (absent: no scrape, or
-   * no machine with a fault catalog to take it); `lostSeconds` is the delay (0 without one).
+   * §hazard-roll: a navigation hazard fired in transit and the helm rolled against it: `standerId`
+   * (absent: nobody at the helm) at piloting `skill` against `difficulty`. `unattended` is a scrape
+   * and a delay both. `scrapedMachineId` is the machine a scrape put a fault on (absent: no scrape,
+   * or no machine with a fault catalog to take it); `lostSeconds` is the delay (0 without one).
    */
   navHazard: {
     readonly hazardId: HazardId;
@@ -105,9 +113,10 @@ export interface TravelEventPayloads {
     readonly lostSeconds: number;
   };
   /**
-   * D78: hazard `hazardId` never fired and is dropped with its leg, `fromPortId` → `toPortId`:
-   * transit ended before it fell due, or (absent `toPortId`) the course was given up in port
-   * before the leg began. A hazard lies on the leg it was placed on and never carries to another.
+   * §debris-fields-and-ion-storms: hazard `hazardId` never fired and is dropped with its leg,
+   * `fromPortId` → `toPortId`: transit ended before it fell due, or (absent `toPortId`) the course
+   * was given up in port before the leg began. A hazard lies on the leg it was placed on and never
+   * carries to another.
    */
   navHazardMissed: {
     readonly hazardId: HazardId;
@@ -136,7 +145,7 @@ export const TRAVEL_EVENT_SIGNIFICANCE = {
   dockAmbience: "notable",
   coursePlotted: "notable",
   hazardScheduled: "trace",
-  // The helm's stakes: in the digest and the ticker, but not hooked (D78).
+  // The helm's stakes: in the digest and the ticker, but not hooked (§hazard-roll).
   navHazard: "narrative",
   // A fact for the narrator's digest that its hazard came to nothing; no story, no ticker line.
   navHazardMissed: "notable",

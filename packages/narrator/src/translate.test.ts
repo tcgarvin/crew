@@ -78,7 +78,7 @@ const decision = {
   closesThread: "",
 };
 
-/** D39: a foreshadowing card; both sides are the captain's attitude. */
+/** §beat-cards: a foreshadowing card; both sides are the captain's attitude. */
 const beatCard = {
   kind: "surfaceDecision",
   title: "A blip on the board",
@@ -204,7 +204,7 @@ describe("translateIntents: valid intents", () => {
     expect(draft.pay).toBeGreaterThanOrEqual(Math.round(band.min * distance * 3));
     expect(draft.pay).toBeLessThanOrEqual(Math.round(band.max * distance * 3));
     expect(command.payload.surface).toBe(true);
-    // D25: a person with a role, an organisation and a line of dialogue.
+    // §issuers-and-pitches: a person with a role, an organisation and a line of dialogue.
     expect(draft.issuer).toEqual({
       name: "Ysolde Maren",
       role: "shift foreman",
@@ -227,7 +227,7 @@ describe("translateIntents: valid intents", () => {
     expect(command.payload.job.pitch?.prose?.split(" ")).toHaveLength(30);
   });
 
-  it("drops an offer whose pitch talks pay (D24)", () => {
+  it("drops an offer whose pitch talks pay (§cards-never-mention-pay)", () => {
     const req = docked(approachRequest(content()));
     const paid = {
       ...job,
@@ -286,7 +286,7 @@ describe("translateIntents: valid intents", () => {
     ]);
   });
 
-  it("stockMarket → the port's content price times the tier, count clamped, any item (D47)", () => {
+  it("stockMarket → the port's content price times the tier, count clamped, any item (§market-lever)", () => {
     const req = approachRequest(content());
     const config = req.snapshot.config;
     const result = translateIntents(
@@ -417,7 +417,7 @@ describe("translateIntents: valid intents", () => {
       { kind: "setCourse", payload: { destinationPortId: "port.crossroads_hub" } },
     ]);
     expect(card.right.commands).toEqual([]);
-    // D26: aftermaths travel on the card sides and land on the Decision options.
+    // §aftermath-caption: aftermaths travel on the card sides and land on the Decision options.
     expect(card.left.aftermath?.prose).toBe(decision.leftAftermath);
     expect(card.right.aftermath?.prose).toBe(decision.rightAftermath);
     for (const option of [card.left, card.right]) {
@@ -428,7 +428,7 @@ describe("translateIntents: valid intents", () => {
   });
 });
 
-describe("translateIntents: beat cards (D39)", () => {
+describe("translateIntents: beat cards (§beat-cards)", () => {
   it("accepts a beat card naming a stored thread, matched case-insensitively", () => {
     const req = quietTooLongRequest(content());
     const result = translateIntents(plan([beatCard]), { ...ctxOf(req), threads: [sensorThread] });
@@ -437,7 +437,7 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(result.beatCardThread).toBe("The aft sensor");
   });
 
-  it("accepts a beat card that names no stored thread as starting one, for the notes turn (D97)", () => {
+  it("accepts a beat card that names no stored thread as starting one, for the notes turn (§notes-turn)", () => {
     const req = quietTooLongRequest(content());
     const result = translateIntents(plan([beatCard]), { ...ctxOf(req), threads: [] });
     expect(result.dropped).toEqual([]);
@@ -476,7 +476,7 @@ describe("translateIntents: beat cards (D39)", () => {
     );
   });
 
-  it("puts a closing card's thread on the card and reports it (D56)", () => {
+  it("puts a closing card's thread on the card and reports it (§closing-cards)", () => {
     const req = docked(approachRequest(content()));
     const closing = { ...decision, closesThread: "the aft sensor" };
     const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [sensorThread] });
@@ -488,7 +488,7 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(command.payload.card.prompt.params.closesThread).toBe("The aft sensor");
   });
 
-  it("closes a thread whose title is not fit to show, without naming it (D56)", () => {
+  it("closes a thread whose title is not fit to show, without naming it (§closing-cards)", () => {
     const req = docked(approachRequest(content()));
     const priced = { ...sensorThread, title: "The 200 credit favour" };
     const closing = { ...decision, closesThread: "The 200 credit favour" };
@@ -500,7 +500,7 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(command.payload.card.prompt.params.closesThread).toBe("");
   });
 
-  it("puts up a closing card whose title matches no open thread, closing nothing (D98)", () => {
+  it("puts up a closing card whose title matches no open thread, closing nothing (§closing-cards)", () => {
     const req = docked(approachRequest(content()));
     // The model named the offer's issuer, not the thread.
     const closing = { ...decision, closesThread: "Tilde Haugen, seed-bank archivist" };
@@ -515,7 +515,7 @@ describe("translateIntents: beat cards (D39)", () => {
     ]);
   });
 
-  it("says nothing about an unmatched closesThread when the card is dropped anyway (D98)", () => {
+  it("says nothing about an unmatched closesThread when the card is dropped anyway (§closing-cards)", () => {
     const req = docked(approachRequest(content()));
     const closing = { ...decision, closesThread: "Somebody's run", right: decision.left };
     const result = translateIntents(plan([closing]), { ...ctxOf(req), threads: [] });
@@ -523,7 +523,7 @@ describe("translateIntents: beat cards (D39)", () => {
     expect(result.notes).toEqual([]);
   });
 
-  it("drops a closing card for a thread an earlier card already closed (D56, D98)", () => {
+  it("drops a closing card for a thread an earlier card already closed (§closing-cards)", () => {
     const req = docked(approachRequest(content()));
     const closing = { ...decision, closesThread: "the aft sensor" };
     const result = translateIntents(plan([closing]), {
@@ -538,7 +538,7 @@ describe("translateIntents: beat cards (D39)", () => {
     );
   });
 
-  it("drops a card that both foreshadows and closes (D56)", () => {
+  it("drops a card that both foreshadows and closes (§closing-cards)", () => {
     const req = quietTooLongRequest(content());
     const both = { ...beatCard, closesThread: "the aft sensor" };
     const result = translateIntents(plan([both]), { ...ctxOf(req), threads: [sensorThread] });
@@ -567,7 +567,7 @@ describe("translateIntents: drops with reasons", () => {
     expect(result.dropped[0]?.reason).toMatch(/fromPort must be port\.kessler_drift/);
   });
 
-  it("drops an offer made in flight: offers are made in person at the dock (D70)", () => {
+  it("drops an offer made in flight: offers are made in person at the dock (§offer-lever)", () => {
     const req = approachRequest(content());
     expect(req.snapshot.state.travel.stage).not.toBe("docked");
     const result = translateIntents(plan([job]), ctxOf(req));
@@ -623,7 +623,7 @@ describe("translateIntents: drops with reasons", () => {
     );
   });
 
-  it("drops every unknown id with a pointer to What you can do (D45)", () => {
+  it("drops every unknown id with a pointer to What you can do (§narrator-authority)", () => {
     const req = docked(approachRequest(content()));
     const pump = Object.values(req.snapshot.state.machines).find(
       (m) => m.defId === "machine.coolant_pump",
@@ -720,7 +720,7 @@ describe("translateIntents: drops with reasons", () => {
     expect(two.dropped[0]?.reason).toBe("surfaceDecision: only one card per call");
   });
 
-  it("drops a card whose aftermath states numbers, and omits a blank one (D26)", () => {
+  it("drops a card whose aftermath states numbers, and omits a blank one (§aftermath-caption)", () => {
     const req = docked(approachRequest(content()));
     const numeric = { ...decision, leftAftermath: "We lose 10% of the fuel getting there." };
     expect(translateIntents(plan([numeric]), ctxOf(req)).dropped[0]?.reason).toBe(
@@ -733,7 +733,7 @@ describe("translateIntents: drops with reasons", () => {
     expect(command.payload.card.right).not.toHaveProperty("aftermath");
   });
 
-  it("keeps a valid speaker and omits an empty or blank one (D29, D45)", () => {
+  it("keeps a valid speaker and omits an empty or blank one (§spoken-cards, §narrator-authority)", () => {
     const req = docked(approachRequest(content()));
     const speakerOf = (intent: unknown) => {
       const result = translateIntents(plan([intent]), ctxOf(req));
@@ -751,7 +751,7 @@ describe("translateIntents: drops with reasons", () => {
     );
   });
 
-  it("nulls a captain speaker, keeps the card and tells the model why (D41)", () => {
+  it("nulls a captain speaker, keeps the card and tells the model why (§captain-never-speaks)", () => {
     const req = docked(approachRequest(content()));
     for (const name of ["Mara Osei", "mara osei"]) {
       const result = translateIntents(plan([{ ...decision, speaker: name }]), ctxOf(req));
@@ -977,7 +977,7 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     expect(freight.dropped[0]?.reason).toBe("offerJob: only one card per call");
   });
 
-  describe("one job at a time (D16, D50)", () => {
+  describe("one job at a time (§one-job-in-hand, D50)", () => {
     function withJobStatus(status: string): { ctx: TranslationCtx; jobId: string } {
       const req = docked(passengerAboardRequest(content()), "port.kessler_drift");
       const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
@@ -1079,7 +1079,7 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
   });
 });
 
-describe("translateIntents: a privateTalk side (D86)", () => {
+describe("translateIntents: a privateTalk side (§private-talk)", () => {
   const side = (talkWith: string, tone: string) => ({
     label: "My cabin. Now.",
     effect: "privateTalk",
@@ -1208,7 +1208,7 @@ describe("translateIntents: a privateTalk side (D86)", () => {
   });
 });
 
-describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
+describe("translateIntents: scheduleHazard, the sixth lever (§hazard-and-field-levers)", () => {
   const hazard = {
     kind: "scheduleHazard",
     hazard: "debrisField",
@@ -1360,7 +1360,7 @@ describe("translateIntents: scheduleHazard, the sixth lever (D78)", () => {
   });
 });
 
-describe("translateIntents: scheduleField, the seventh lever (D95)", () => {
+describe("translateIntents: scheduleField, the seventh lever (§scheduling-a-field)", () => {
   const field = {
     kind: "scheduleField",
     severity: "heavy",
@@ -1566,7 +1566,7 @@ describe("translateIntents: scheduleField, the seventh lever (D95)", () => {
   });
 });
 
-describe("translateIntents: the call-back request (D99)", () => {
+describe("translateIntents: the call-back request (§requested-call-back)", () => {
   const req = docked(quietTooLongRequest(content()));
 
   it("emits requestCall after the intents, at the next tick, with the plan's when and why", () => {

@@ -1,10 +1,10 @@
 /**
- * Needs invariants for tests (SD §19.4 style). D74: every berth is a bed on the ship's deck: a
- * placement there whose machine carries `bed` and not `medBed`. Keys being actors and no shared
- * beds are content-free and live in `core/invariants.ts` (`berthViolations`). D79: every mood is
- * in [-1, 1] and is the clamped sum of the live thoughts (`moodOf`). D88: every memory's key is
- * config's and none is held past its stack limit (expiries and actor keys are
- * `core/invariants.ts`'s), every
+ * Needs invariants for tests (SD §19.4 style). §berth-assignment: every berth is a bed on the
+ * ship's deck: a placement there whose machine carries `bed` and not `medBed`. Keys being actors
+ * and no shared beds are content-free and live in `core/invariants.ts` (`berthViolations`).
+ * §mood-and-work-speed: every mood is in [-1, 1] and is the clamped sum of the live thoughts
+ * (`moodOf`). §memories: every memory's key is config's and none is held past its stack limit
+ * (expiries and actor keys are `core/invariants.ts`'s), every
  * rivalry row is a well-formed tally under a well-formed key, and the captain's table day is a
  * whole day or -1.
  */

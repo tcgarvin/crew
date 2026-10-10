@@ -1,9 +1,10 @@
 /**
- * Navigation hazards (D78): the narrator's `scheduleHazard` places one on the leg, and it fires
- * at the first `transit` tick at or after its `fireAtTick`, rolled against whoever has the helm.
- * A hazard lies on that leg only: if transit ends before it falls due, or the course is given up
- * in port, it is dropped (`navHazardMissed`, notable: a fact for the narrator, no ticker line),
- * never carried to the next leg. It can only be placed while the leg still has transit ahead.
+ * Navigation hazards (§debris-fields-and-ion-storms): the narrator's `scheduleHazard` places one on
+ * the leg, and it fires at the first `transit` tick at or after its `fireAtTick`, rolled against
+ * whoever has the helm. A hazard lies on that leg only: if transit ends before it falls due, or the
+ * course is given up in port, it is dropped (`navHazardMissed`, notable: a fact for the narrator,
+ * no ticker line), never carried to the next leg. It can only be placed while the leg still has
+ * transit ahead.
  *
  * The roll: the stander's piloting against the hazard's difficulty,
  * `p = clamp((skill - difficulty + 5) / 10, 0.05, 0.95)` and one `failures` draw `r`: clean if

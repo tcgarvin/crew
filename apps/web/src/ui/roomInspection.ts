@@ -1,8 +1,9 @@
 /**
- * D82 (ship-life slice 3 call 15): the inspector's view of a room, from a tap on its bare floor.
- * Read from the snapshot at the view tick, as the machine inspector is, so it agrees with the tint
- * on screen and never shows the run-ahead state (D14): the room's name, its tier, how dirty its
- * floor is on average and at the worst spot, who is mopping it, and (D93) its hull scars.
+ * §room-tiers (ship-life slice 3 call 15): the inspector's view of a room, from a tap on its bare
+ * floor. Read from the snapshot at the view tick, as the machine inspector is, so it agrees with
+ * the tint on screen and never shows the run-ahead state (D14): the room's name, its tier, how
+ * dirty its floor is on average and at the worst spot, who is mopping it, and
+ * (§hull-scars-and-ship-loss) its hull scars.
  */
 import {
   type ActorId,

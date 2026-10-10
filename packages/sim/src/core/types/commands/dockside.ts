@@ -1,7 +1,8 @@
 /**
- * Dockside commands (D66). `stageDock` is the kernel side of the staging call (Dockside §6.1):
- * the narrator's answer to a `stageDock` hook, and nothing else. It is valid only while that hook
- * is pending, and while it is, no other narrator command is (`STAGING_COMMAND_KINDS`).
+ * Dockside commands (§staging-plan-command). `stageDock` is the kernel side of the staging call
+ * (Dockside §6.1): the narrator's answer to a `stageDock` hook, and nothing else. It is valid only
+ * while that hook is pending, and while it is, no other narrator command is
+ * (`STAGING_COMMAND_KINDS`).
  */
 import type { StagingPlan } from "../dockside";
 

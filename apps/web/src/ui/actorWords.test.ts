@@ -94,7 +94,7 @@ const watch = (over: Partial<WatchView> = {}): WatchView => ({
   ...over,
 });
 
-describe("watchLine (D77)", () => {
+describe("watchLine (§sections-and-dayworkers)", () => {
   it("names the section and whether it has the watch", () => {
     const red = "red" as LocalKey;
     expect(watchLine({ watch: watch({ section: red, onWatch: true }), onDuty: true })).toBe(
@@ -115,7 +115,7 @@ describe("watchLine (D77)", () => {
   });
 });
 
-describe("helmLine (D77)", () => {
+describe("helmLine (§who-has-the-helm)", () => {
   it("says nothing for no helm role", () => {
     expect(helmLine(watch())).toBeUndefined();
   });
@@ -134,7 +134,7 @@ describe("helmLine (D77)", () => {
   });
 });
 
-describe("moodWord (D79)", () => {
+describe("moodWord (§mood-and-work-speed)", () => {
   const bands = { lowBelow: -0.4, highAbove: 0.4 };
 
   it("reads mood in three words at the config's bands", () => {
@@ -344,7 +344,7 @@ const thought = (
   ...(refId === undefined ? {} : { refId: refId as EntityId }),
 });
 
-describe("topThoughts (D79)", () => {
+describe("topThoughts (§thoughts)", () => {
   it("lists the strongest three, either sign, one line per key with a count", () => {
     const lines = topThoughts(
       [
@@ -467,7 +467,7 @@ describe("relationshipsLines (slice 4)", () => {
   });
 });
 
-describe("personWords (D77, D79)", () => {
+describe("personWords (§sections-and-dayworkers, §mood-and-work-speed)", () => {
   it("puts the inspector's words together from the agent view", () => {
     const view = {
       tick: 10 as Tick,

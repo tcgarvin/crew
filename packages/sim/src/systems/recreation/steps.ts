@@ -12,8 +12,8 @@
  * A solo play of an activity that is itself (not a group game's `solo` variant: reading, the
  * harmonica, baking) resolves its outcome when it completes, through the same
  * `resolveOutcome(ctx, session, def)` a session uses, with a one-person session that is never
- * stored: the harmonica is a performance for the room (its one `sessionEnded`, D84 tuning), the
- * bake a tray of treats. A completed
+ * stored: the harmonica is a performance for the room (its one `sessionEnded`, §group-sessions),
+ * the bake a tray of treats. A completed
  * step leaves its session itself (`finishActivity` does not call `abortActivity`).
  *
  * Owner: W1 of ship life slice 4.
@@ -36,7 +36,7 @@ const OCCUPIED: StepResult = { fail: "occupiedPosition" };
 /**
  * A solo play's outcome, through a one-person session that is never stored. A performance (the
  * harmonica) is for the room, so it ends with a `sessionEnded` line ("Bettina Solheim played the
- * harmonica in the lounge", D84 tuning); the session's id is allocated for that event like any
+ * harmonica in the lounge", §group-sessions); the session's id is allocated for that event like any
  * other (it names a real, if unstored, one-person session), and only then, so other solo plays
  * use none.
  */

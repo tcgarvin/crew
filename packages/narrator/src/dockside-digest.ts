@@ -1,5 +1,6 @@
 /**
- * The digest's dock sections (Dockside §6.1, §6.3; D63, D67), as plain lines for `digest.ts`:
+ * The digest's dock sections (Dockside §6.1, §6.3; §dock-sections, §staging-prompt), as plain lines
+ * for `digest.ts`:
  *
  * - "On the dock", for every call made with a dock alongside (story calls too): the place, the
  *   staging call's ambience line for this docking, who is on the dock (name, role, post, activity
@@ -42,9 +43,9 @@ function postName(dock: DockDef, key: string): string {
 }
 
 /**
- * D63: what freight of one job lies on the dock, and in what standing: an offer's crates staged
- * and nobody's yet, a taken job's crates still waiting to go aboard, or a delivery set down in
- * the delivery bay (the port takes it in from there).
+ * §dock-sections: what freight of one job lies on the dock, and in what standing: an offer's crates
+ * staged and nobody's yet, a taken job's crates still waiting to go aboard, or a delivery set down
+ * in the delivery bay (the port takes it in from there).
  */
 function dockFreightLine(
   state: State,
@@ -190,7 +191,7 @@ function floorSetLine(dock: DockDef, entry: DeepReadonly<FloorSetEntry>): string
   return `- ${entry.name} (${entry.role}) at ${entry.postKey} (${postName(dock, entry.postKey)})${label}: ${why}`;
 }
 
-/** "The dock you are dressing (<name>)", for a `stageDock` hook (D67). */
+/** "The dock you are dressing (<name>)", for a `stageDock` hook (§staging-prompt). */
 export function stagingDockLines(
   content: ContentBundle,
   hook: DeepReadonly<Extract<NarratorHook, { kind: "stageDock" }>>,

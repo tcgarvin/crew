@@ -1,8 +1,8 @@
 /**
- * D61: the dock alongside in the sim. Its lifetime follows travel (from the start of `docking` to
- * the end of `undocking`), departure prep keeps the ramps down and calls everyone on the dock
- * aboard (bringing up anyone who cannot come, so nothing holds a departure forever), the render
- * frame projects the dock and who is on it, and a schema-3 save gets its dock on load.
+ * §dock-alongside: the dock alongside in the sim. Its lifetime follows travel (from the start of
+ * `docking` to the end of `undocking`), departure prep keeps the ramps down and calls everyone on
+ * the dock aboard (bringing up anyone who cannot come, so nothing holds a departure forever), the
+ * render frame projects the dock and who is on it, and a schema-3 save gets its dock on load.
  */
 import { describe, expect, it } from "vitest";
 import { restoreThroughSchema6 } from "../../core/fixtures/frozen-migrations";
@@ -107,7 +107,7 @@ const ofType = <T extends SimEvent["type"]>(log: Log, type: T) =>
 
 const departed = (world: World) => world.state.travel.stage === "departing";
 
-describe("the dock's lifetime follows travel (D61)", () => {
+describe("the dock's lifetime follows travel (§dock-alongside)", () => {
   it("is alongside from the first tick at a port with a dock, ramps already down", () => {
     const { world } = docksideWorld();
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: TINY.port });
@@ -155,7 +155,7 @@ describe("the dock's lifetime follows travel (D61)", () => {
   });
 });
 
-describe("departure waits for everyone on the dock (D61)", () => {
+describe("departure waits for everyone on the dock (§calling-the-crew-aboard)", () => {
   it("keeps the ramps down and calls someone on the quay back aboard before leaving", () => {
     const test = docksideWorld();
     const { world } = test;
@@ -249,7 +249,7 @@ describe("departure waits for everyone on the dock (D61)", () => {
   });
 });
 
-describe("crossing a ramp (D61)", () => {
+describe("crossing a ramp (§ramps-and-cast-off)", () => {
   it("emits wentAshore and cameAboard, and labels the walk by its direction", () => {
     const test = docksideWorld();
     const { world } = test;
@@ -288,7 +288,7 @@ describe("crossing a ramp (D61)", () => {
   });
 });
 
-describe("the render frame's dock (D61)", () => {
+describe("the render frame's dock (§dock-alongside)", () => {
   it("names the dock alongside and flags who and what is on it", () => {
     const test = docksideWorld();
     const { world } = test;
@@ -316,7 +316,7 @@ describe("the render frame's dock (D61)", () => {
   });
 });
 
-describe("the travel invariant (D61)", () => {
+describe("the travel invariant (§dock-alongside)", () => {
   it("reports a dock alongside in flight and a missing dock while docked", () => {
     const { world } = docksideWorld();
     const presence = world.state.deck.dock;
@@ -325,7 +325,8 @@ describe("the travel invariant (D61)", () => {
     delete world.state.deck.dock;
     expect(travelViolations(world)).toEqual([
       `no dock alongside in stage docked; "${HOME_DOCK.id}" is due`,
-      // D66: its locals are still dressed for it, which is the same fault seen from dockside.
+      // §locals-come-and-go-with-the-dock: its locals are still dressed for it, which is the same
+      // fault seen from dockside.
       "dockside dressed with no dock alongside",
     ]);
     world.state.deck.dock = presence;
@@ -345,7 +346,7 @@ describe("the travel invariant (D61)", () => {
   });
 });
 
-describe("save migration 3 → 4 (D61)", () => {
+describe("save migration 3 → 4", () => {
   /** A schema-3 envelope of `world`: no `deck.dock`, ramps shut as they used to shut themselves. */
   function asSchema3(test: TestWorld) {
     const envelope = test.kernel.serialize(test.world);

@@ -1,4 +1,4 @@
-/** D82 / D14: dirt frames are applied by view tick, never ahead of it. */
+/** §room-tiers, D14: dirt frames are applied by view tick, never ahead of it. */
 import type { DeckDefId, DirtFrame, Tick } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { DirtQueue } from "./dirtQueue";

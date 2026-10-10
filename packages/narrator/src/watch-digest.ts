@@ -1,8 +1,9 @@
 /**
- * The watch, the helm and mood in the digest (D77-D79). Pure reads of the snapshot's state
- * shapes: sections and duty off `Actor.schedule`, the helm by the sim's own `whoHasTheHelm`,
- * mood off `Actor.mood` and `Actor.thoughts`, hazards off `WorldState.hazards` and the
- * `navHazard`/`helmUnattended` events since the last call.
+ * The watch, the helm and mood in the digest (§who-has-the-helm, §hazard-roll,
+ * §mood-and-work-speed). Pure reads of the snapshot's state shapes: sections and duty off
+ * `Actor.schedule`, the helm by the sim's own `whoHasTheHelm`, mood off `Actor.mood` and
+ * `Actor.thoughts`, hazards off `WorldState.hazards` and the `navHazard`/`helmUnattended` events
+ * since the last call.
  */
 import {
   type ConfigDef,
@@ -21,13 +22,13 @@ import { thoughtLabel } from "./offwatch-digest";
 
 type Actor = State["actors"][keyof State["actors"]];
 
-/** D78: how each hazard kind reads in the digest and the capability list. */
+/** §hazard-and-field-levers: how each hazard kind reads in the digest and the capability list. */
 export const HAZARD_NAMES: Readonly<Record<HazardKind, string>> = {
   debrisField: "debris field",
   ionStorm: "ion storm",
 };
 
-/** D77: "white" → "White", as the ticker's bell line says it. */
+/** §the-bell: "white" → "White", as the ticker's bell line says it. */
 export function sectionName(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
@@ -176,7 +177,7 @@ export function dutyTag(actor: Actor, tick: number, config: ConfigDef): string {
 export const MOOD_THOUGHTS_SHOWN = 3;
 
 /**
- * D79: "mood: low (stood a long watch, double watch)": the mood as a word against
+ * §mood-and-work-speed: "mood: low (stood a long watch, double watch)": the mood as a word against
  * `config.mood`, then the live thoughts that weigh most (by |value|, a stacked thought counted
  * once with its total and "x2"), at most `MOOD_THOUGHTS_SHOWN`.
  */
@@ -245,9 +246,9 @@ function navHazardLine(
 }
 
 /**
- * D78: the helm's stakes since the last call, and what is still waiting: every `navHazard` with
- * who was at the helm and how it went, every `helmUnattended`, then each scheduled hazard (truth:
- * nobody aboard knows it is coming).
+ * §hazard-roll: the helm's stakes since the last call, and what is still waiting: every `navHazard`
+ * with who was at the helm and how it went, every `helmUnattended`, then each scheduled hazard
+ * (truth: nobody aboard knows it is coming).
  */
 export function helmEventLines(
   events: readonly SimEvent[],

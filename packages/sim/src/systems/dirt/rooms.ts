@@ -1,6 +1,6 @@
 /**
- * Rooms and their `compartmentDirty` problem (D82), shared by the dirt pass (`dirt.ts`) and the
- * end of a mopping trip (`clean.ts`).
+ * Rooms and their `compartmentDirty` problem (§room-cleaning-problem), shared by the dirt pass
+ * (`dirt.ts`) and the end of a mopping trip (`clean.ts`).
  *
  * The problem (owner dirt, public, dedupe `dirty:<key>`, located at the room) opens once the room
  * is `dirty` or worse; each tier change revises it (`payload.tier`, `baseUrgency`, `revision`):

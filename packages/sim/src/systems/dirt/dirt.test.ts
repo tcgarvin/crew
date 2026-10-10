@@ -1,4 +1,7 @@
-/** The dirt pass (D82): tiers and their events, and the `compartmentDirty` problem's life. */
+/**
+ * The dirt pass (§room-tiers, §room-cleaning-problem): tiers and their events, and the
+ * `compartmentDirty` problem's life.
+ */
 import { describe, expect, it } from "vitest";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import type { TileCoord } from "../../core/types/common";
@@ -36,7 +39,7 @@ function dirtProblems(test: TestWorld): ProblemOfKind<"compartmentDirty">[] {
   );
 }
 
-describe("tiers (D82)", () => {
+describe("tiers (§room-tiers)", () => {
   it("rise at the thresholds and fall with hysteresis, one event per transition", () => {
     const test = dirtWorld({ bare: true });
     const tiers = () => test.world.state.dirt.tiers.roomB;
@@ -60,7 +63,7 @@ describe("tiers (D82)", () => {
   });
 });
 
-describe("compartmentDirty (D82)", () => {
+describe("compartmentDirty (§room-cleaning-problem)", () => {
   it("opens at dirty as routine, turns essential for a filthy galley, resolves once clean", () => {
     const test = dirtWorld({ bare: true });
     soilAndStep(test, GALLEY, 0.2);

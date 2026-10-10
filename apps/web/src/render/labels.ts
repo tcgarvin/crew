@@ -1,5 +1,5 @@
 /**
- * Where people's labels go on a crowded canvas (slice-2 QA, D72 addendum): pure geometry over
+ * Where people's labels go on a crowded canvas (slice-2 QA): pure geometry over
  * measured label sizes, no drawing. A handover puts two people a tile apart beside the helm, a
  * bridge crowd stacks over the room plates on a phone, and a label that simply rose above its
  * dot covered the next person's label, the room's name plate and the machine's name. So each

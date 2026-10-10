@@ -1,6 +1,6 @@
 /**
- * The watch bill at world creation (D77). Lives in core because `createWorld` needs it and core
- * does not import systems; the rest of the watch is `systems/watch/`.
+ * The watch bill at world creation (§sections-and-dayworkers). Lives in core because `createWorld`
+ * needs it and core does not import systems; the rest of the watch is `systems/watch/`.
  *
  * Owner: W1 of ship life slice 2.
  */

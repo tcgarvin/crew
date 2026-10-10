@@ -1,6 +1,6 @@
 /**
- * The hull contract (D72; ship life §10): what every deck must offer for the sim, the dock maps
- * and the crew's routines to take it, checked at L3 with one issue per failure.
+ * The hull contract (§what-a-deck-must-offer; ship life §10): what every deck must offer for the
+ * sim, the dock maps and the crew's routines to take it, checked at L3 with one issue per failure.
  *
  * - **Shape**: the deck fits its `hull.sizeClass` box; the `bridge` compartment touches the east
  *   hull edge (the bow is east); both ramp doors open south from the bottom row (the quay is
@@ -9,10 +9,11 @@
  *   `galley`, `engineering`, `cargoHold` and `airlock`.
  * - **Machines**: exactly one `pilotStation` and one `navStation`; at least one `engine`,
  *   `messTable` and `stove`. The pilot station has a `use` position apart from its seat, the
- *   standby tile where the oncoming watch waits to take the helm (D77).
+ *   standby tile where the oncoming watch waits to take the helm (§handover).
  * - **Zones and spawns**: a `cargoStowage` zone; a `crew` and a `passenger` spawn point; every
  *   `locker` zone serves a bed (`machineKey`) and no bed has two lockers.
- * - **The galley loop (D81, D82)**: `pantry`, `serving` and `cleaningLocker` zones; some `serving`
+ * - **The galley loop (§what-a-deck-must-offer)**: `pantry`, `serving` and `cleaningLocker` zones;
+ * some `serving`
  *   tile beside a stove's `use` position, so the cook sets plates down within reach; the mess
  *   tables seat (`use` positions) at least four.
  * - **Per scenario**: enough `crew` spawn points for the crew, and beds (`bed`, never `medBed`)
@@ -58,7 +59,10 @@ const REQUIRED_MACHINES: readonly { readonly tag: MachineTag; readonly exactlyOn
 
 const REQUIRED_SPAWN_TAGS = ["crew", "passenger"] as const;
 
-/** Zones the galley and dirt loops find by tag (D81, D82); each needs one or more tiles. */
+/**
+ * Zones the galley and dirt loops find by tag (§what-a-deck-must-offer); each needs one or more
+ * tiles.
+ */
 const REQUIRED_ZONE_TAGS: readonly string[] = ["pantry", "serving", "cleaningLocker"];
 
 /** The seats a deck must offer the mess: `use` positions of its `messTable` machines. */
@@ -200,10 +204,10 @@ function checkMachineTags(
 }
 
 /**
- * D77: the helm plan is `moveTo standby → handover → moveTo seat → hold`, so the pilot station's
- * def needs a `use` position that is not also an `operate` one: the oncoming waits there while the
- * off-going still holds the seat. A deck with no pilot station or an unknown def is reported
- * elsewhere (`checkMachineTags`, L2).
+ * §handover: the helm plan is `moveTo standby → handover → moveTo seat → hold`, so the pilot
+ * station's def needs a `use` position that is not also an `operate` one: the oncoming waits there
+ * while the off-going still holds the seat. A deck with no pilot station or an unknown def is
+ * reported elsewhere (`checkMachineTags`, L2).
  */
 function checkPilotStandby(
   deck: DeckDef,
@@ -265,9 +269,9 @@ function usePositionsOf(deck: DeckDef, machines: MachineTagTable, tag: MachineTa
 }
 
 /**
- * D81/D82: the pantry, serving counter and cleaning locker exist; a serving tile is beside a
- * stove's `use` tile (the cook plates up without walking); the mess seats at least four. Stoves
- * and tables themselves are `checkMachineTags`'s.
+ * §what-a-deck-must-offer: the pantry, serving counter and cleaning locker exist; a serving tile is
+ * beside a stove's `use` tile (the cook plates up without walking); the mess seats at least four.
+ * Stoves and tables themselves are `checkMachineTags`'s.
  */
 function checkGalleyLoop(
   deck: DeckDef,

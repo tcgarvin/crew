@@ -1,7 +1,7 @@
 /**
- * The dirt system (D82), phase `equipment`, registered after the equipment systems. It runs its
- * pass every `config.dirt.updateEverySeconds` (checked against the tick inside `run`, since a
- * system's `every` is fixed at registration and the config is not known then).
+ * The dirt system (§room-cleaning-problem), phase `equipment`, registered after the equipment
+ * systems. It runs its pass every `config.dirt.updateEverySeconds` (checked against the tick inside
+ * `run`, since a system's `every` is fixed at registration and the config is not known then).
  *
  * Each pass:
  *

@@ -255,7 +255,10 @@ describe("planner boundary", () => {
 
 const PUMP = "m1" as MachineId;
 
-/** A machine's `maintenanceDue` (D90) at `urgency`, and its service task two tiles away. */
+/**
+ * A machine's `maintenanceDue` (§maintenance-due) at `urgency`, and its service task two tiles
+ * away.
+ */
 function service(urgency: UrgencyClass): { problems: ProblemView[]; tasks: TaskView[] } {
   const problem = {
     id: "p1" as ProblemId,
@@ -302,7 +305,7 @@ const cards: SelfView["activity"] = {
   sinceTick: 0,
 } as unknown as SelfView["activity"];
 
-describe("maintenance and the watch (D90)", () => {
+describe("maintenance and the watch (§maintenance-due)", () => {
   it("rates a service by its problem: routine, or essential once the machine is badly worn", () => {
     expect(selectIntent(stubView(0, [], service("routineObligation")), config)).toMatchObject({
       kind: "task",

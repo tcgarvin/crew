@@ -64,7 +64,7 @@ export function schematicDoorSeconds(nav: NavDoor, config: ConfigDef): number | 
 }
 
 /**
- * D58: seconds a powered leaf takes to travel. A ramp is a heavy plate and takes
+ * §dock-drawing: seconds a powered leaf takes to travel. A ramp is a heavy plate and takes
  * `rampOpenSeconds` either way; other doors use `openSeconds`/`closeSeconds`.
  */
 function poweredTravelSeconds(

@@ -1,10 +1,10 @@
 /**
- * Travel invariants for tests (SD §19.4 style). D61: the dock alongside (`state.deck.dock`) is
- * exactly the dock content has for the port the ship is at, from the start of `docking` to the
- * end of `undocking`, and none otherwise (in flight, or at a port without a dock map). While the
- * ramps are not both shut, nobody is on a dock that is not there. D78: waiting hazards are well
- * formed, none is overdue in transit and none outlives its leg's transit. Pure over state and
- * content.
+ * Travel invariants for tests (SD §19.4 style). §dock-alongside: the dock alongside
+ * (`state.deck.dock`) is exactly the dock content has for the port the ship is at, from the start
+ * of `docking` to the end of `undocking`, and none otherwise (in flight, or at a port without a
+ * dock map). While the ramps are not both shut, nobody is on a dock that is not there.
+ * §debris-fields-and-ion-storms: waiting hazards are well formed, none is overdue in transit and
+ * none outlives its leg's transit. Pure over state and content.
  */
 import { dockForPort, expectedDock, isDockPoint } from "../../core/docks";
 import { HAZARD_KINDS } from "../../core/types/content";
@@ -31,10 +31,10 @@ export function travelViolations(world: Pick<World, "state" | "content">): strin
 }
 
 /**
- * D78: every waiting hazard has a known kind, a difficulty on the 1-10 scale and a whole-tick
- * fire time; none is overdue in transit, where `hazardsSystem` fires them the tick they fall
- * due; and none outlives the transit of its leg (dropped the tick it ends). (Ids below
- * `nextId.hazard` are core's, `checkInvariants`.)
+ * §debris-fields-and-ion-storms: every waiting hazard has a known kind, a difficulty on the 1-10
+ * scale and a whole-tick fire time; none is overdue in transit, where `hazardsSystem` fires them
+ * the tick they fall due; and none outlives the transit of its leg (dropped the tick it ends). (Ids
+ * below `nextId.hazard` are core's, `checkInvariants`.)
  */
 function hazardViolations({ state }: Pick<World, "state">): string[] {
   const out: string[] = [];
@@ -67,8 +67,9 @@ function hazardViolations({ state }: Pick<World, "state">): string[] {
 }
 
 /**
- * D66: the staging record lives only in `transit` and `approaching`, and the ship is never on
- * approach to a dock map's port without its staging call having been raised and answered.
+ * §staging-hook-and-the-hold: the staging record lives only in `transit` and `approaching`, and the
+ * ship is never on approach to a dock map's port without its staging call having been raised and
+ * answered.
  */
 function stagingViolations({ state, content }: Pick<World, "state" | "content">): string[] {
   const travel = state.travel;
@@ -79,7 +80,7 @@ function stagingViolations({ state, content }: Pick<World, "state" | "content">)
     return [];
   }
   const staging = travel.staging;
-  if (staging === undefined) return []; // a save from before D66, past its lead point
+  if (staging === undefined) return []; // a save before the staging record, past its lead point
   if (staging.status !== "raised" || state.narrator.pendingHook?.id === staging.hookId) {
     return [`on approach to ${travel.toPortId} with the staging call unanswered`];
   }
@@ -87,8 +88,9 @@ function stagingViolations({ state, content }: Pick<World, "state" | "content">)
 }
 
 /**
- * D66: no local without the dock they belong to, and every local on its floor (never on the
- * ship's own tiles), walking only over it; props only with a dock; errands name real jobs.
+ * §locals-come-and-go-with-the-dock: no local without the dock they belong to, and every local on
+ * its floor (never on the ship's own tiles), walking only over it; props only with a dock; errands
+ * name real jobs.
  */
 function localViolations({ state, content }: Pick<World, "state" | "content">): string[] {
   const out: string[] = [];

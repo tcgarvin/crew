@@ -1,4 +1,4 @@
-/** D82: the grime tint's alpha and the squares it draws, from a synthetic dirt frame. */
+/** §dirt-grid: the grime tint's alpha and the squares it draws, from a synthetic dirt frame. */
 import type { DeckDefId, DirtFrame, Tick } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { loadWebContent } from "../worker/content";

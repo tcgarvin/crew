@@ -54,7 +54,7 @@ function sectionOf(text: string, heading: string): string[] {
   return text.split(`## ${heading}\n`)[1]?.split("\n\n")[0]?.split("\n") ?? [];
 }
 
-describe('"On the dock" (D67)', () => {
+describe('"On the dock" (§dock-sections)', () => {
   it("lists who is on the dock, where, doing what and why, the props and the arrival line", () => {
     const { req, snapshot, bundle } = dressedKessler(KESSLER_PLAN);
     const dock = dockAlongside(bundle, snapshot.state)?.dock;
@@ -95,7 +95,7 @@ describe('"On the dock" (D67)', () => {
   });
 });
 
-describe('"The dock you are dressing" (stageDock, D67)', () => {
+describe('"The dock you are dressing" (stageDock, §staging-prompt)', () => {
   it("shows the dock's posts by key, its areas and the floor set, and no story budget", () => {
     const bundle = content();
     const req = stageDockRequest(bundle);

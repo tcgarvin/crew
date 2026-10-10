@@ -57,7 +57,7 @@ describe("repairDamage (call 21)", () => {
       (p) => p.kind === "machineDamaged",
     );
     expect(problem?.status).toBe("resolved");
-    // The welder is set down where the work ended, for the next job (D69).
+    // The welder is set down where the work ended, for the next job.
     runFor(fixture, 1);
     expect(carriedItems(world, TOMAS).some((item) => item.defId === DAMAGE.welder)).toBe(false);
   });
