@@ -696,7 +696,9 @@ instrument (apps/cli, beside `crew beats`): N fights per plan against the defaul
 tuned variants (`shaky`/`paid`, `hard`/`devoted`), reporting outcome mix, fight length, wounds and
 deaths a side, the share of fights ended by breaking rather than attrition, and how often the
 target reaches the exit. The acceptance question is the owner's: does `hold` play differently
-from `assault`, visibly, at 1× on a phone, and are deaths rare? Save schema bump for `body`.
+from `assault`, visibly, at 1× on a phone, and are deaths rare? Save schema bump for `body`. (The plan, `docs/design/expeditions-plan.md`, brings
+the site's `PortDef` of `kind: "site"` and its one route forward into A1, since a site map needs a
+port to own it; the scenario command swaps the docked map for the site's. A2 keeps `knownSites`.)
 
 **A2 — the expedition end to end.** `PortDef.kind: "site"`, known sites in the graph, landing and
 lift-off scenes and headlines, the exposed ship (visitor to the ramp, alert on contact, the
