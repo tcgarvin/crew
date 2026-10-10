@@ -1,9 +1,10 @@
 # Ship
 
-The hull contract every deck meets, the ships in the content bundle, and where crew sleep and keep
-their belongings. Code: `packages/content/src/schemas/validate-hull.ts`, `validate-dock.ts`,
-`geometry.ts`; `packages/sim/src/core/berths.ts`, `docks.ts`; `packages/sim/src/systems/cabins`.
-The deck JSON itself (`packages/content/data/decks/`) is the layout; this file does not restate it.
+The hull contract every deck meets, the ships in the content bundle, where crew sleep and keep their
+belongings, and the arms locker. Code: `packages/content/src/schemas/validate-hull.ts`,
+`validate-dock.ts`, `geometry.ts`; `packages/sim/src/core/berths.ts`, `docks.ts`;
+`packages/sim/src/systems/cabins`. The deck JSON itself (`packages/content/data/decks/`) is the
+layout; this file does not restate it.
 
 ## The hull contract
 
@@ -106,3 +107,12 @@ A locker is the zone whose `machineKey` names the bed. At world creation each cr
 `personal` starting items (the harmonica, the old photograph) leave their hands for the first tile
 of their berth's locker with `ownerId` set; with no locker or no berth they keep them
 (`stowPersonalItems`). `lockerTileOf` finds the tile where an owned item is put back after use.
+
+### Arms locker
+
+`machine.arms_locker` (tag `armsLocker`; one tile, no power, heat, wear or faults) stands against
+the airlock's north wall, on the Mk2 at (32, 14) with its `use` tile (32, 15) on the airlock floor
+beside the door from the cross-passage and off the walk from that door to the personnel ramp; on
+the Mk1 at (28, 10). A one-tile zone `arms` (`tags: ["armsLocker"]`) on the locker's tile holds
+the default scenario's three blasters and two batons (§weapons-and-fighting); the muster arms from
+it (§the-muster). The narrator does not see it (§the-narrator-and-sites).

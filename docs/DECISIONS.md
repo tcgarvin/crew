@@ -125,3 +125,12 @@ costs a narrator call and a card per waypoint while the captain acts only throug
 **D50. A passage is a job with a person in it.** No separate passage entity: the passenger is the
 job's issuer, their luggage is its cargo, and one job at a time applies, so a passenger competes
 with freight for the ship.
+
+**D103. Expeditions: the ship sets down, people can die, the captain leads.** Owner rulings on
+`docs/design/expeditions.md`: a site is a landing the ship sets down at, its own destination with
+a pad, not a place beyond a port's gate; crew and the captain can die, tuned rare, never scripted
+by the narrator, and a dead captain's command passes to the first officer (D8); kill jobs are
+allowed from the start, rare and dirty; the captain leads the away party. Rejected: sites reached
+on foot through a port, wounds that never kill, kill jobs held back to a later phase, a party sent
+without its captain. Why: the owner wants a place the ship goes, a fight with stakes, and the
+captain where the cards are. See §landing-sites, §going-down-and-death, §who-goes.

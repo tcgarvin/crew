@@ -208,7 +208,9 @@ disjoint-route test; the berth box as for any dock; size under the dock cap so t
 still fits (§camera: 12.8–14.4 px a tile docked).
 
 Phase A1 authors one site: **the Boathouse**, a planet pad on the coast below Tern's Rest (its
-`nearPortId`), a long shed with a door at each end, net racks for cover, a jetty as the exit.
+`nearPortId`), a long shed with two doors on the apron and one at its west end, net racks for
+cover, and the shingle path west past the shed as the exit (as built, the jetty is scenery and the
+armed guard sits at the end of the keeper's bench: §the-boathouse).
 A2 adds a cutting shed in the hills above Ossory and a dry-dock warehouse outside the Hub (a
 station site is a pressurised bay, `setting: "station"`, with the same rules). Templates
 composed from a kit are deferred: three authored maps teach us what the kit needs.

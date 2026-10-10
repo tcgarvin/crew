@@ -93,7 +93,8 @@ ways), rounded, clamped to +-2.
 ### Memories
 
 Memories are a closed set (`MEMORY_KEYS`) the sim raises; each has an opinion (never 0), duration
-(3 to 7 days) and stack limit (1 to 2) in `social.memories`. A memory past its stack limit
+(3 to 14 days; a fight's rescue and abandonment last longest, §thoughts-and-memories-from-a-fight)
+and stack limit (1 to 2) in `social.memories`. A memory past its stack limit
 refreshes the one expiring soonest, so repetition holds weight but never grows it. The social
 system drops expired memories each tick, and entries with nothing left (and no chat time), and
 people who have left. Between two crew, memories reach +7 at most (+9 with compatibility); only the
