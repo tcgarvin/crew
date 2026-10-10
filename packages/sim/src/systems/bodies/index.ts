@@ -11,3 +11,4 @@ export function registerBodies(registry: KernelRegistry): Unregister {
 
 export { bodiesSystem } from "./bodies";
 export { type DamageResult, type Hit, applyDamage } from "./damage";
+export { goDown } from "./down";
