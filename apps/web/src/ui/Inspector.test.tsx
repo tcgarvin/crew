@@ -77,6 +77,27 @@ describe("Inspector actor sheet", () => {
     expect(html).toContain("repairing the generator: ");
   });
 
+  it("gives a body line when the snapshot had one, marked when they are hurt (§8.6)", () => {
+    const sheet = (body?: string) =>
+      renderToStaticMarkup(
+        <Inspector
+          data={{
+            kind: "actor",
+            weighing: NOTHING,
+            view: snapshot({ roleTags: ["engineer"] }),
+            person: steady,
+            ...(body === undefined ? {} : { body }),
+          }}
+          onClose={() => {}}
+        />,
+      );
+    expect(sheet("wounded: right leg (serious), bleeding")).toContain(
+      '<dt>Body</dt><dd class="inspector-hurt">wounded: right leg (serious), bleeding</dd>',
+    );
+    expect(sheet("unhurt")).toContain("<dt>Body</dt><dd>unhurt</dd>");
+    expect(sheet()).not.toContain("<dt>Body</dt>");
+  });
+
   it("shows no weighing for a passenger, who plans no work", () => {
     const html = renderToStaticMarkup(
       <Inspector

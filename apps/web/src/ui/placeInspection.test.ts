@@ -35,6 +35,17 @@ describe("inspectPlace", () => {
     });
   });
 
+  it("names a landing site's post by its kind, since nothing is drawn there (§4)", () => {
+    const site = docks.find((d) => d.kind === "site");
+    if (site === undefined) throw new Error("no site map");
+    expect(inspectPlace(site, { kind: "post", id: "east_door" })).toMatchObject({
+      title: "East door",
+      subtitle: `A guard post \u00b7 ${site.name}`,
+    });
+    expect(inspectPlace(site, { kind: "post", id: "target" }).subtitle).toMatch(/^The objective/);
+    expect(inspectPlace(site, { kind: "dock", id: site.id }).subtitle).toBe("the landing site");
+  });
+
   it("throws on a post the dock does not have", () => {
     expect(() => inspectPlace(hub, { kind: "post", id: "nope" })).toThrow(/no post/);
   });

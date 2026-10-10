@@ -14,6 +14,7 @@ import type {
   RenderItem,
   RenderMachineState,
 } from "@crew/sim";
+import { hashKey, mixHex } from "./color";
 import { drawBadge, drawCrate, drawLoadedTruck, itemColor, loadedTruckRise } from "./crates";
 import type { DeckLayout } from "./deckLayout";
 import { berthInView, dockOrigin, dockSlide, shipInDock, withDockSlide } from "./dock";
@@ -34,7 +35,13 @@ import {
   centredBox,
   placeLabels,
 } from "./labels";
-import { drawDockProps, drawLocalDots, drawLocalTrolleys, localLabelText } from "./locals";
+import {
+  drawDockProps,
+  drawLocalDots,
+  drawLocalTrolleys,
+  localLabelText,
+  localLook,
+} from "./locals";
 import { drawRamps } from "./ramps";
 import { type RockPaint, drawRockLayer } from "./rocks";
 import { drawScars } from "./scars";
@@ -50,6 +57,7 @@ import {
 import { TEXT_COLOR, type ViewTransform, carriedSize, dotRadius, toPx, toScreenPx } from "./screen";
 import { firstName, sessionMemberIds, sessionPlateText } from "./sessions";
 import { disc } from "./shapes";
+import { type ShotTrace, drawShots } from "./shots";
 import { type StarLayer, drawStars } from "./stars";
 
 /**
@@ -463,8 +471,37 @@ export const CREW_DOT_COLOR = "#f2c14e";
 export const PASSENGER_DOT_COLOR = "#dfe9f3";
 export const PASSENGER_RIM_COLOR = "#5b86b8";
 
-export function actorDotColor(actor: Pick<RenderActor, "passenger">): string {
-  return actor.passenger ? PASSENGER_DOT_COLOR : CREW_DOT_COLOR;
+/** How one person's dot is drawn: fill, an optional rim, and a cross over the dead. */
+export interface ActorDotLook {
+  readonly fill: string;
+  readonly rim?: string;
+  readonly cross: boolean;
+}
+
+/** Grey the down and the dead fade toward, so the fight's still dots read as out of it. */
+const OUT_OF_IT = "#5a5f66";
+
+/**
+ * Crew gold, the passenger's pale dot with its blue rim, or, for the other side of a fight
+ * (expeditions A1, §8.6), a local's muted hue and darker rim (§locals-and-props: never crew gold),
+ * stable per person. Someone `down` is dimmed toward grey; someone `dead` more so, with a cross.
+ */
+export function actorDotLook(
+  actor: Pick<RenderActor, "id" | "passenger" | "side" | "state">,
+): ActorDotLook {
+  const base: { fill: string; rim?: string } =
+    actor.side === "them"
+      ? localLook(hashKey(actor.id))
+      : actor.passenger
+        ? { fill: PASSENGER_DOT_COLOR, rim: PASSENGER_RIM_COLOR }
+        : { fill: CREW_DOT_COLOR };
+  if (actor.state !== "down" && actor.state !== "dead") return { ...base, cross: false };
+  const fade = actor.state === "dead" ? 0.75 : 0.5;
+  return {
+    fill: mixHex(base.fill, OUT_OF_IT, fade),
+    ...(base.rim === undefined ? {} : { rim: mixHex(base.rim, OUT_OF_IT, fade) }),
+    cross: actor.state === "dead",
+  };
 }
 
 function drawActorDots(
@@ -478,11 +515,23 @@ function drawActorDots(
   const radius = dotRadius(t);
   for (const actor of frame.actors) {
     const [cx, cy] = toScreenPx(t, actor.x, actor.y, rotated, viewportHeight);
-    ctx.fillStyle = actorDotColor(actor);
+    const look = actorDotLook(actor);
+    ctx.fillStyle = look.fill;
     disc(ctx, cx, cy, radius);
-    if (actor.passenger) {
-      ctx.strokeStyle = PASSENGER_RIM_COLOR;
+    if (look.rim !== undefined) {
+      ctx.strokeStyle = look.rim;
       ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    if (look.cross) {
+      const arm = radius * 0.7;
+      ctx.strokeStyle = "#1b1d21";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - arm, cy - arm);
+      ctx.lineTo(cx + arm, cy + arm);
+      ctx.moveTo(cx + arm, cy - arm);
+      ctx.lineTo(cx - arm, cy + arm);
       ctx.stroke();
     }
     if (selectedId === actor.id) {
@@ -871,6 +920,8 @@ export interface Scenery {
    * §rock-impacts: impact flashes under way (`ImpactFlashes.active`); absent or empty with none.
    */
   readonly flashes?: readonly Flash[];
+  /** Expeditions A1 (§8.6): tracers and hit flashes under way (`ShotTracers.active`). */
+  readonly shots?: readonly ShotTrace[];
 }
 
 /**
@@ -1038,6 +1089,7 @@ export function drawFrame(
   drawDeckItems(ctx, t, layout, shown, rotated, viewportHeight, selectedIdOf(selected, "item"));
   drawLocalDots(ctx, t, shown.locals, rotated, viewportHeight, selectedIdOf(selected, "local"));
   drawActorDots(ctx, t, shown, rotated, viewportHeight, selectedIdOf(selected, "actor"));
+  drawShots(ctx, t, scenery.shots ?? [], rotated, viewportHeight);
   drawPersonPlates(ctx, t, people);
   // After the labels: a label plate sits just above the dot and would hide the load.
   drawCarriedItems(ctx, t, shown, rotated, viewportHeight);

@@ -18,6 +18,8 @@ export type InspectorData =
       readonly person: PersonWords;
       /** §what-a-crew-member-weighs: what they are weighing and what they will do next. */
       readonly weighing: WeighingWords;
+      /** Expeditions A1 (§8.6): `bodyLine`; absent when the snapshot had no body for them. */
+      readonly body?: string;
     }
   | {
       readonly kind: "machine";
@@ -84,6 +86,7 @@ export function Inspector({ data, onClose }: InspectorProps) {
             label={data.label}
             person={data.person}
             weighing={data.weighing}
+            body={data.body}
           />
         )}
         {data.kind === "machine" && (
@@ -102,11 +105,13 @@ function ActorInspector({
   label,
   person,
   weighing,
+  body,
 }: {
   view: AgentViewSnapshot;
   label?: string | undefined;
   person: PersonWords;
   weighing: WeighingWords;
+  body?: string | undefined;
 }) {
   const self = view.self;
   // Passengers stand no watch (passengers §3.2): the bill and the helm are the crew's.
@@ -118,6 +123,12 @@ function ActorInspector({
       <dl className="inspector-grid">
         <dt>Activity</dt>
         <dd>{label ?? self.activity.kind}</dd>
+        {body !== undefined && (
+          <>
+            <dt>Body</dt>
+            <dd className={body === "unhurt" ? undefined : "inspector-hurt"}>{body}</dd>
+          </>
+        )}
         {crew && (
           <>
             <dt>Watch</dt>

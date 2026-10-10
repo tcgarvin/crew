@@ -42,6 +42,7 @@ import { pickAt } from "./pick";
 import { RockFade, buildRockField, rockScrollSpeed } from "./rocks";
 import { sceneAt, withDockSky } from "./scene";
 import type { ViewTransform } from "./screen";
+import { ShotTracers } from "./shots";
 import { StarScroll, buildStarField } from "./stars";
 
 export type Selection = DrawSelection;
@@ -112,6 +113,9 @@ export function DeckCanvas({
   const rockFadeRef = useRef(new RockFade());
   const flashesRef = useRef(new ImpactFlashes());
   const flashCountRef = useRef(0);
+  /** Expeditions A1 (§8.6): tracers and hit flashes, on real time like the impact flashes. */
+  const tracersRef = useRef(new ShotTracers());
+  const tracerCountRef = useRef(0);
   /** Bumped whenever the picture must be redrawn even if nothing is animating. */
   const dirtyRef = useRef(true);
   const latest = useRef({ frame, dirt, selected, paused });
@@ -191,12 +195,19 @@ export function DeckCanvas({
         // One more draw after the last flash ends, to clear it.
         const flashesChanged = flashing.length > 0 || flashCountRef.current > 0;
         flashCountRef.current = flashing.length;
+        const tracers = tracersRef.current;
+        tracers.advance(running);
+        tracers.note(current.shots, current.tick);
+        const tracing = tracers.active();
+        const tracersChanged = tracing.length > 0 || tracerCountRef.current > 0;
+        tracerCountRef.current = tracing.length;
         if (
           streaming ||
           flickering ||
           dirtyRef.current ||
           fade.alpha !== alphaBefore ||
-          flashesChanged
+          flashesChanged ||
+          tracersChanged
         ) {
           dirtyRef.current = false;
           const { width, height } = sizeRef.current;
@@ -243,6 +254,7 @@ export function DeckCanvas({
                     },
                   }),
               flashes: flashing,
+              shots: tracing,
             },
             chosen,
           );

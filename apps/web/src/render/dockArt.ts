@@ -1,8 +1,9 @@
 /**
  * Dockside §2.3 layers 4 and 7 (phase 2): the dock map, drawn procedurally in its own palette.
  *
- * - `drawDock` (layer 4, behind the hull): void, the berth, floor, walls, the staging and delivery
- *   markings, the quay's edge and its clamps, the posts and the props.
+ * - `drawDock` (layer 4, behind the hull): void, the berth, floor, walls, cover (expeditions A1),
+ *   the staging and delivery markings, the quay's edge and its clamps, the posts and the props. A
+ *   landing site (`DockDef.kind: "site"`) has no quay: no edge, no clamps, its berth bare ground.
  * - `drawDockForeground` (layer 7, over the deck): bay walls, gantries, the terminal's edge,
  *   awnings and rock, each translucent where it crosses the ship so the crew stay legible.
  *
@@ -85,6 +86,13 @@ function drawVoidAndBerth(
     ctx.fillStyle = pitColor(dock);
     fillRuns(ctx, shape.runs.void, px);
   }
+  if (shape.site) {
+    // A landing site: the ship sits on the same ground as everything else, pressed a little darker.
+    const b = shape.berth;
+    ctx.fillStyle = mixHex(dock.palette.floor, BLACK, 0.12);
+    ctx.fillRect(b.minX, b.minY, b.maxX - b.minX + px, b.maxY - b.minY + px);
+    return;
+  }
   if (shape.berthStyle !== "pad") return;
   // A pad set into the quay: a darker apron with a painted frame and centreline.
   const b = shape.berth;
@@ -115,6 +123,8 @@ function drawFloor(
   const { floor } = dock.palette;
   ctx.fillStyle = floor;
   fillRuns(ctx, shape.runs.floor, px);
+  // Cover stands on the ground (`drawCover` draws it after).
+  fillRuns(ctx, shape.runs.cover, px);
   // Wear: a scatter of lighter and darker tiles, the same every frame.
   for (const run of shape.runs.floor) {
     for (let x = run.x0; x < run.x1; x++) {
@@ -174,8 +184,94 @@ function drawFloor(
         }
       }
       break;
+    case "shingle":
+      // Loose stones: a scatter of small dark and pale pebbles, no seams.
+      ctx.stroke();
+      for (const run of shape.runs.floor) {
+        for (let x = run.x0; x < run.x1; x++) {
+          for (let k = 0; k < 3; k++) {
+            const h = hash01(x, run.y, k + 11);
+            ctx.fillStyle = h < 0.5 ? rgba(BLACK, 0.16) : rgba(WHITE, 0.14);
+            disc(ctx, x + hash01(run.y, x, k), run.y + h, 0.05 + 0.05 * hash01(k, x, run.y));
+          }
+        }
+      }
+      return;
   }
   ctx.stroke();
+}
+
+/** How a cover tile is drawn, by its legend character (expeditions A1, §4). */
+type CoverLook = "nets" | "crates";
+
+/** `n` is a net rack; any other cover character is crates, the commonest thing to hide behind. */
+export function coverLookOf(legendChar: string): CoverLook {
+  return legendChar === "n" ? "nets" : "crates";
+}
+
+/** A net rack: two posts and a dark lattice of hung net between them. */
+function drawNetRack(
+  ctx: CanvasRenderingContext2D,
+  dock: DockDef,
+  x: number,
+  y: number,
+  px: number,
+) {
+  const frame = mixHex(dock.palette.wall, BLACK, 0.25);
+  ctx.fillStyle = rgba(BLACK, 0.28);
+  ctx.fillRect(x + 0.14, y + 0.3, 0.84, 0.56);
+  ctx.fillStyle = rgba(mixHex(dock.palette.wall, BLACK, 0.5), 0.75);
+  ctx.fillRect(x + 0.08, y + 0.22, 0.84, 0.56);
+  ctx.strokeStyle = rgba(mixHex(dock.palette.floor, BLACK, 0.2), 0.7);
+  ctx.lineWidth = Math.max(px, 0.03);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x + 0.08, y + 0.22, 0.84, 0.56);
+  ctx.clip();
+  ctx.beginPath();
+  for (let s = 0; s <= 1.4; s += 0.2) {
+    ctx.moveTo(x + 0.08 + s, y + 0.22);
+    ctx.lineTo(x + 0.08 + s - 0.56, y + 0.78);
+    ctx.moveTo(x + 0.08 + s - 0.56, y + 0.22);
+    ctx.lineTo(x + 0.08 + s, y + 0.78);
+  }
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = frame;
+  ctx.fillRect(x + 0.04, y + 0.12, 0.12, 0.76);
+  ctx.fillRect(x + 0.84, y + 0.12, 0.12, 0.76);
+  ctx.fillRect(x + 0.04, y + 0.12, 0.92, 0.08);
+}
+
+/**
+ * Expeditions A1 (§4): cover tiles, each run of one character drawn as net racks or as a crate
+ * stack (the crates prop's drawing), so a glance tells what a fighter can crouch behind.
+ */
+function drawCover(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockShape, look: PropLook) {
+  for (const run of shape.runs.cover) {
+    const row = dock.rows[run.y] ?? "";
+    let x0 = run.x0;
+    for (let x = run.x0 + 1; x <= run.x1; x++) {
+      const char = row[x0] ?? "";
+      if (x < run.x1 && row[x] === char) continue;
+      if (coverLookOf(char) === "nets") {
+        for (let nx = x0; nx < x; nx++) drawNetRack(ctx, dock, nx, run.y, look.px);
+      } else {
+        drawProp(
+          ctx,
+          {
+            key: `cover:${x0},${run.y}`,
+            kind: "crates",
+            rect: { x: x0, y: run.y, w: x - x0, h: 1 },
+            rot: 0,
+            blocking: true,
+          },
+          look,
+        );
+      }
+      x0 = x;
+    }
+  }
 }
 
 function drawWalls(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockShape, px: number) {
@@ -215,6 +311,7 @@ const QUAY_SETBACK = HULL_RIM + 0.08;
 
 /** Hazard stripes along the quay's edge, on the floor side, just clear of the docked hull. */
 function drawQuayEdge(ctx: CanvasRenderingContext2D, dock: DockDef, shape: DockShape, px: number) {
+  if (shape.site) return;
   const band = 0.28;
   for (const edge of shape.quay) {
     const sx = edge.nx * QUAY_SETBACK;
@@ -536,7 +633,8 @@ const POST_ART: Readonly<Record<DockPostKind, PostArt>> = {
       ctx.strokeRect(-0.56, 0.18, 1.12, 0.26);
     },
   },
-  // Expeditions A1: a site's posts are not drawn on the floor (W4 marks a tapped one).
+  // Expeditions A1 (§4): a site's posts are nothing on the ground; a tapped one is marked
+  // (`drawPostFloor`).
   target: { floor: () => {} },
   guard: { floor: () => {} },
   loot: { floor: () => {} },
@@ -544,6 +642,16 @@ const POST_ART: Readonly<Record<DockPostKind, PostArt>> = {
   flank: { floor: () => {} },
   bystander: { floor: () => {} },
 };
+
+/** The post kinds a landing site's map carries (§4), drawn only as a marker when tapped. */
+const SITE_POST_KINDS: ReadonlySet<DockPostKind> = new Set([
+  "target",
+  "guard",
+  "loot",
+  "exit",
+  "flank",
+  "bystander",
+]);
 
 function inPostFrame(ctx: CanvasRenderingContext2D, post: DockPostDef, draw: () => void): void {
   ctx.save();
@@ -561,6 +669,14 @@ function drawPostFloor(
   selected: boolean,
 ) {
   inPostFrame(ctx, post, () => POST_ART[post.kind].floor(ctx, dock, px));
+  if (selected && SITE_POST_KINDS.has(post.kind)) {
+    // A site's post has no drawing of its own, so the tap shows where it is: a small marker.
+    ctx.fillStyle = rgba(dock.palette.accent, 0.9);
+    disc(ctx, post.tile.x + 0.5, post.tile.y + 0.5, 0.16);
+    ctx.strokeStyle = rgba(BLACK, 0.7);
+    ctx.lineWidth = Math.max(px, 0.03);
+    ctx.stroke();
+  }
   if (selected) {
     ctx.strokeStyle = WHITE;
     ctx.lineWidth = 2 * px;
@@ -587,13 +703,14 @@ export function drawDock(ctx: CanvasRenderingContext2D, dock: DockDef, paint: Do
   drawVoidAndBerth(ctx, dock, shape, paint.setting, px);
   drawFloor(ctx, dock, shape, dockSurface(shape, paint.setting).floorPattern, px);
   drawWalls(ctx, dock, shape, px);
+  const look: PropLook = { palette: dock.palette, setting: paint.setting, px };
+  drawCover(ctx, dock, shape, look);
   drawAreas(ctx, dock, px);
   drawQuayEdge(ctx, dock, shape, px);
   drawClamps(ctx, dock, shape, paint);
   for (const post of dock.posts) {
     drawPostFloor(ctx, dock, post, px, post.key === paint.selectedPostKey);
   }
-  const look: PropLook = { palette: dock.palette, setting: paint.setting, px };
   for (const prop of dock.props) drawProp(ctx, prop, look);
   ctx.restore();
 }

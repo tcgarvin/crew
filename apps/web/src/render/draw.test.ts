@@ -1,8 +1,10 @@
-import type { RenderFrame, RenderItem } from "@crew/sim";
+import type { RenderActor, RenderFrame, RenderItem } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { DeckLayout } from "./deckLayout";
 import {
-  actorDotColor,
+  CREW_DOT_COLOR,
+  PASSENGER_DOT_COLOR,
+  actorDotLook,
   crewLabelText,
   deckPiles,
   drawActorLabels,
@@ -19,9 +21,42 @@ describe("crewLabelText", () => {
   });
 });
 
-describe("actorDotColor", () => {
+describe("actorDotLook", () => {
+  const person = (over: Partial<Parameters<typeof actorDotLook>[0]> = {}) => ({
+    id: "actor:1" as RenderActor["id"],
+    passenger: false,
+    ...over,
+  });
+
   it("draws passengers in a different colour from crew", () => {
-    expect(actorDotColor({ passenger: true })).not.toBe(actorDotColor({ passenger: false }));
+    expect(actorDotLook(person({ passenger: true })).fill).not.toBe(actorDotLook(person()).fill);
+  });
+
+  it("draws the other side of a fight as a local: a muted hue with a rim, never crew gold", () => {
+    for (const id of ["actor:hesk", "actor:darrow", "actor:corran", "actor:pell"]) {
+      const look = actorDotLook(person({ id: id as RenderActor["id"], side: "them" }));
+      expect(look.fill).not.toBe(CREW_DOT_COLOR);
+      expect(look.fill).not.toBe(PASSENGER_DOT_COLOR);
+      expect(look.rim).toBeDefined();
+      expect(look.cross).toBe(false);
+      // Stable per person, frame to frame.
+      expect(actorDotLook(person({ id: id as RenderActor["id"], side: "them" }))).toEqual(look);
+    }
+    // Our side stays crew gold in the fight.
+    expect(actorDotLook(person({ side: "us", state: "wavering" })).fill).toBe(CREW_DOT_COLOR);
+  });
+
+  it("dims the down, dims the dead further and crosses them out", () => {
+    const steady = actorDotLook(person({ side: "us", state: "steady" }));
+    const down = actorDotLook(person({ side: "us", state: "down" }));
+    const dead = actorDotLook(person({ side: "us", state: "dead" }));
+    expect(down.fill).not.toBe(steady.fill);
+    expect(down.cross).toBe(false);
+    expect(dead.fill).not.toBe(down.fill);
+    expect(dead.cross).toBe(true);
+    const deadGuard = actorDotLook(person({ side: "them", state: "dead" }));
+    expect(deadGuard.rim).toBeDefined();
+    expect(deadGuard.cross).toBe(true);
   });
 });
 
