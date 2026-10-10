@@ -57,7 +57,7 @@ import {
 } from "./lookups";
 import type { ArcEnding, NarratorNotes } from "./notes";
 import { crewOffWatchClauses, offWatchLine, rivalriesLine } from "./offwatch-digest";
-import { dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
+import { bodyPhrase, dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
 /**
  * Policy prompt keys whose template text is the card the captain sees (the gate card,
@@ -498,7 +498,7 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
     // §crew-lines: who they are off watch (likes, the people they feel strongly about, their berth)
     // follows `good at`.
     const offWatch = crewOffWatchClauses(state, content, actor);
-    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}; good at: ${skills || "nothing in particular"}${offWatch}`;
+    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}${bodyPhrase(actor)}; good at: ${skills || "nothing in particular"}${offWatch}`;
     return `- ${actor.name}${roles}${duty}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
   });
   // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.

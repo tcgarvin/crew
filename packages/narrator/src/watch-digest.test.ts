@@ -252,6 +252,46 @@ describe("buildDigest: duty and mood on the crew lines (§duty-and-the-sleep-wat
   });
 });
 
+describe("buildDigest: the body clause on the crew lines (expeditions A1)", () => {
+  const wound = (part: "leftLeg" | "rightArm" | "head", id: string) => ({
+    id: id as never,
+    part,
+    severity: "serious" as const,
+    type: "blaster" as const,
+    bleeding: false,
+    tick: 0,
+  });
+
+  it("adds nothing when every body is whole", () => {
+    const snapshot = clone(quietTooLongRequest(content()));
+    const text = digest(snapshot);
+    expect(text).not.toContain("wounded");
+    expect(text).not.toMatch(/; down[;,]/);
+  });
+
+  it("says where a wounded person is hurt, head to foot, naming a region once", () => {
+    const snapshot = clone(quietTooLongRequest(content()));
+    const jax = actorNamed(snapshot.state, "Jax Okonkwo");
+    jax.body.wounds = [wound("leftLeg", "w1"), wound("head", "w2"), wound("leftLeg", "w3")];
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain(
+      "; wounded in the head and the leg; good at: ",
+    );
+    jax.body.wounds = [wound("rightArm", "w1")];
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain("; wounded in the arm; ");
+  });
+
+  it("says down for someone incapacitated, ahead of the wounds", () => {
+    const snapshot = clone(quietTooLongRequest(content()));
+    const jax = actorNamed(snapshot.state, "Jax Okonkwo");
+    jax.availability = "incapacitated";
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain("; down; good at: ");
+    jax.body.wounds = [wound("leftLeg", "w1")];
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain(
+      "; down, wounded in the leg; good at: ",
+    );
+  });
+});
+
 describe("buildDigest: the helm's stakes (§hazard-roll)", () => {
   it("reports each hazard with who was at the helm and how it went, and an empty helm", () => {
     const snapshot = clone(quietTooLongRequest(content()));

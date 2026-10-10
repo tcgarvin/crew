@@ -6,6 +6,7 @@
  * since the last call.
  */
 import {
+  type BodyPart,
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
@@ -171,6 +172,36 @@ export function dutyTag(actor: Actor, tick: number, config: ConfigDef): string {
   const onDuty = isOnDuty(actor.schedule, tick, config);
   if (section === undefined) return `[dayworker, ${onDuty ? "on duty" : "off duty"}]`;
   return `[${sectionName(section.key)}, ${onDuty ? "on watch" : "off watch"}]`;
+}
+
+/** A body part as a person says it: "leftLeg" is "the leg"; the side is not the story. */
+const REGION_OF_PART: Readonly<Record<BodyPart, string>> = {
+  head: "head",
+  torso: "chest",
+  leftArm: "arm",
+  rightArm: "arm",
+  leftLeg: "leg",
+  rightLeg: "leg",
+};
+
+/** Regions are listed head to foot, whatever order the wounds came in. */
+const REGION_ORDER = ["head", "chest", "arm", "leg"] as const;
+
+/**
+ * Expeditions A1: the crew line's body clause off `Actor.body`: "down" for someone out on their
+ * feet, "wounded in the leg and the head" for open wounds. A whole body gives the empty string,
+ * so a digest with nobody hurt is byte-for-byte the one written before bodies. The dead are
+ * already tagged "(dead)" by the line's status.
+ */
+export function bodyPhrase(actor: Actor): string {
+  const regions = new Set(actor.body.wounds.map((wound) => REGION_OF_PART[wound.part]));
+  const wounded = REGION_ORDER.filter((region) => regions.has(region));
+  const parts: string[] = [];
+  if (actor.availability === "incapacitated") parts.push("down");
+  if (wounded.length > 0) {
+    parts.push(`wounded in ${wounded.map((region) => `the ${region}`).join(" and ")}`);
+  }
+  return parts.length === 0 ? "" : `; ${parts.join(", ")}`;
 }
 
 /** How many thoughts a crew line names, by weight. */

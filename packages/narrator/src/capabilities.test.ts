@@ -25,6 +25,7 @@ describe("buildCapabilities", () => {
 
   it("lists every port with its routes and stores, and every freight item; never a landing site (expeditions A1)", () => {
     expect(text).not.toContain("port.boathouse");
+    expect(ports()).toHaveLength(6);
     for (const port of ports()) {
       expect(text).toContain(`- ${port.id} "${port.name}"`);
       for (const route of port.routes) expect(text).toContain(route.toPortId);
