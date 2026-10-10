@@ -30,4 +30,18 @@ describe("Headline", () => {
     );
     expect(alarmed).toContain("headline-alert");
   });
+
+  it("drops the shore header once the fight is resolved, keeping the alert's tint", () => {
+    const expedition = {
+      phase: "resolved" as const,
+      us: "steady" as const,
+      them: "steady" as const,
+    };
+    const html = renderToStaticMarkup(
+      <Headline text="Docked at The Boathouse" expedition={expedition} alert={true} />,
+    );
+    expect(html).not.toContain("Us:");
+    expect(html).toContain("Docked at The Boathouse");
+    expect(html).toContain("headline-alert");
+  });
 });

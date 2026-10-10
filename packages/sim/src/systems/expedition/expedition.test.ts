@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { renderExpedition } from "../../core/render";
 import type { Actor } from "../../core/types/actor";
 import type { SiteCastEntryDef } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
@@ -31,6 +32,20 @@ const held = (test: Test, actor: Actor) =>
 const LONE_TARGET: readonly SiteCastEntryDef[] = [
   { ...(SITE_CAST[0] as SiteCastEntryDef), wants: "nothing" },
 ];
+
+/** Tiles where two upright, standing-still combatants of one side share a tile, as "side@x,y". */
+function stackedTiles(test: Test): string[] {
+  const seen = new Map<string, number>();
+  for (const actor of Object.values(test.world.state.actors)) {
+    const c = actor.combatant;
+    const at = actor.location;
+    if (c === undefined || at.kind !== "onDeck" || actor.movement.kind === "moving") continue;
+    if (!["steady", "wavering"].includes(c.state)) continue;
+    const key = `${c.side}@${Math.floor(at.x)},${Math.floor(at.y)}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  return [...seen].filter(([, n]) => n > 1).map(([k]) => k);
+}
 
 describe("the muster (call 12)", () => {
   it("arms everyone the plan takes, blasters to the best fighters, and walks them to the ramp", () => {
@@ -96,6 +111,64 @@ describe("the fight (§8.1)", () => {
     },
     15_000,
   );
+
+  it.each(["hold-lethal-armed", "assault-lethal-armed"])(
+    "%s: no two of a side stand still on one tile while the fight is on",
+    (plan) => {
+      for (const seed of [1, 2, 3]) {
+        const test = siteWorld({ scenario: CREW.scenario8, seed });
+        startExpedition(test, plan);
+        // A tile shared for a whole second (four samples): an arrival takes a decision to step off.
+        const streak = new Map<string, number>();
+        const stacked = new Set<string>();
+        run(test, 300 * RATE, {
+          step: 5,
+          until: () => {
+            const expedition = test.world.state.expedition;
+            const now =
+              expedition?.phase === "fight" && expedition.objectiveTick === undefined
+                ? stackedTiles(test)
+                : [];
+            for (const key of [...streak.keys()]) if (!now.includes(key)) streak.delete(key);
+            for (const key of now) {
+              streak.set(key, (streak.get(key) ?? 0) + 1);
+              if ((streak.get(key) ?? 0) >= 4) stacked.add(key);
+            }
+            return expedition?.phase === "resolved";
+          },
+        });
+        expect([...stacked], `seed ${seed}`).toEqual([]);
+      }
+    },
+    30_000,
+  );
+
+  it("words the shore header from those who fight: a shaky bystander does not make them shaky", () => {
+    const test = siteWorld({ scenario: CREW.scenario8 });
+    startExpedition(
+      test,
+      "hold-lethal-armed",
+      SITE_CAST.map((e) => ({ ...e, resolve: "steady" })),
+    );
+    run(test, 120 * RATE, {
+      until: () => ["approach", "fight"].includes(test.world.state.expedition?.phase ?? ""),
+      step: 1,
+    });
+    const state = test.world.state;
+    const bystander = Object.values(state.actors).find(
+      (a) => a.combatant?.disposition.part === "bystander",
+    );
+    if (bystander?.combatant === undefined) throw new Error("no bystander");
+    expect(renderExpedition(state, test.world.content)?.them).toBe("steady");
+    bystander.combatant.state = "wavering";
+    expect(renderExpedition(state, test.world.content)?.them).toBe("steady");
+    // With every guard gone, a target and a bystander left standing are not a side still in it.
+    for (const actor of Object.values(state.actors)) {
+      const part = actor.combatant?.disposition.part;
+      if (part === "guard" || part === "ally") delete state.actors[actor.id];
+    }
+    expect(renderExpedition(state, test.world.content)?.them).toBe("done");
+  });
 
   it("keeps the planner off combatants mid-fight and gives them back after", () => {
     const test = siteWorld({ scenario: CREW.scenario8, seed: 2 });

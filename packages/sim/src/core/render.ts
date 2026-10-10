@@ -1443,13 +1443,17 @@ function renderShot(
 
 /**
  * Expeditions A1 (§8.6): one word for a side: `done` when nobody on it can fight, `breaking` when
- * anyone breaks, `shaky` when anyone wavers, else `steady` (also before anyone is in it).
+ * anyone breaks, `shaky` when anyone wavers, else `steady` (also before anyone is in it). Only
+ * those who fight count: the target and a bystander have no morale ladder of their own.
  */
 function sideWord(state: ReadonlyWorldState, side: "us" | "them"): SideWord {
-  const states = Object.values(state.actors).flatMap((actor) =>
-    actor.combatant?.side === side ? [actor.combatant.state] : [],
+  const onSide = Object.values(state.actors).flatMap((actor) =>
+    actor.combatant?.side === side ? [actor.combatant] : [],
   );
-  if (states.length === 0) return "steady";
+  if (onSide.length === 0) return "steady";
+  const states = onSide
+    .filter((c) => side === "us" || c.disposition.part === "guard" || c.disposition.part === "ally")
+    .map((c) => c.state);
   const fighting = states.filter((s) => s === "steady" || s === "wavering" || s === "breaking");
   if (fighting.length === 0) return "done";
   if (fighting.includes("breaking")) return "breaking";

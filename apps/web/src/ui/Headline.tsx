@@ -24,9 +24,18 @@ export function Headline({ text, expedition, alert }: HeadlineProps) {
     // Not a live region: in transit the ETA changes every second.
     return <div className="headline">{body}</div>;
   }
+  // Once the fight is resolved its people are out of it, so the words would read "steady" again;
+  // the line keeps the alert's tint until the alert stands down.
+  const shore =
+    expedition.phase === "resolved" ? null : (
+      <>
+        <span className="headline-shore">{shoreHeader(expedition)}</span>{" "}
+      </>
+    );
   return (
     <div className={alert ? "headline headline-alert" : "headline"}>
-      <span className="headline-shore">{shoreHeader(expedition)}</span> {body}
+      {shore}
+      {body}
     </div>
   );
 }

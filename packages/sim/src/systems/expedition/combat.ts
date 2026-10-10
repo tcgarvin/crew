@@ -55,11 +55,13 @@ import type { StepCtx } from "../../core/types/pipeline";
 import type { BattlePlan, Expedition } from "../../core/types/state";
 import type { DamageResult, Hit } from "../bodies/damage";
 import { addMemory } from "../social/relationships";
+import { isStaticWalkable } from "../spatial/geometry";
 import { releaseReservations } from "../spatial/reservations";
 import {
   FISTS,
   aimAt,
   carriedBy,
+  destination,
   enterFight,
   goTo,
   halt,
@@ -70,12 +72,13 @@ import {
   setDown,
   setLabel,
 } from "./actions";
-import { type Ground, aboard, distance, onSite, tileOfActor } from "./ground";
+import { type Ground, aboard, distance, onSite, standable, tileOfActor } from "./ground";
 import { adjacent8, inCover, lineOfSight } from "./los";
 import { canAct, intervalDelta, shiftResolve, upright } from "./morale";
 import { type PostureMode, postureMode } from "./plans";
 import {
   type Watcher,
+  cheapestPath,
   coverSpots,
   isWatched,
   searchPath,
@@ -95,6 +98,8 @@ export interface CombatDeps {
 const REPOSITION_STEPS = 12;
 /** How far a holder shifts to get cover from what they shoot at, in steps. */
 const HOLD_SHIFT_STEPS = 2;
+/** What a tile the cast can see adds to the flank's route, in steps. */
+const SEEN_STEP = 12;
 /** How far off their post a guard steps to cover the way in, in steps. */
 const GUARD_STEPS = 3;
 /** A presser stops to shoot within this many tiles of their mark. */
@@ -137,6 +142,34 @@ const combatantOf = (actor: Actor): Combatant => {
 };
 
 const isParty = (actor: Actor) => actor.combatant?.side === "us";
+
+/** Is a tile free of `self`'s side: nobody else on it, or walking to it? */
+type Free = (tile: TileCoord) => boolean;
+
+/**
+ * The tiles another living combatant on `self`'s side stands on or is walking to. A walk claims
+ * its end at the decision that starts it, so a later decision the same tick sees the claim; tile
+ * choices prefer a free tile so a side does not stack on one (a phone shows one figure).
+ */
+function freeOf(fight: Fight, self: Actor): Free {
+  const side = combatantOf(self).side;
+  const claimed = new Set<string>();
+  for (const other of fight.people) {
+    const c = other.combatant;
+    if (other.id === self.id || c === undefined || c.side !== side || c.state === "dead") continue;
+    if (other.location.kind !== "onDeck") continue;
+    const at = tileOfActor(fight.ctx.state, other);
+    if (at !== undefined) claimed.add(`${at.x},${at.y}`);
+    const to = destination(other);
+    if (to !== undefined) claimed.add(`${to.x},${to.y}`);
+  }
+  return (tile) => !claimed.has(`${tile.x},${tile.y}`);
+}
+
+/** `tiles` with the free ones first, order otherwise kept (the claimed are a last resort). */
+function freeFirst(tiles: readonly TileCoord[], free: Free): TileCoord[] {
+  return [...tiles.filter(free), ...tiles.filter((t) => !free(t))];
+}
 
 /** Armed cast: a guard or ally with a weapon in hand, or a target who carries one. */
 function armed(fight: Fight, actor: Actor): boolean {
@@ -513,6 +546,35 @@ function decide(fight: Fight, person: Actor): void {
   }
   if (isParty(person)) partyTurn(fight, person, from, enemies);
   else castTurn(fight, person, from, enemies);
+  unstack(fight, person, from, enemies);
+}
+
+/**
+ * Someone standing still on a tile an earlier ally of their side also stands still on (the party
+ * arrives at the ramp foot together; a fight halts them where they stand) steps to a free tile
+ * beside it, one with a line to the nearest enemy in sight if they can. The earliest by id stays.
+ */
+function unstack(fight: Fight, person: Actor, from: TileCoord, enemies: readonly Seen[]): void {
+  if (person.movement.kind === "moving" || !upright(combatantOf(person))) return;
+  if (!standable(fight.ground, from)) return;
+  const side = combatantOf(person).side;
+  const shared = fight.people.some((other) => {
+    const c = other.combatant;
+    if (other.id === person.id || c === undefined || c.side !== side) return false;
+    if (c.state === "dead" || other.movement.kind === "moving") return false;
+    const at = other.location.kind === "onDeck" ? tileOfActor(fight.ctx.state, other) : undefined;
+    const earlier = other.id.localeCompare(person.id, "en", { numeric: true }) < 0;
+    return earlier && at !== undefined && at.x === from.x && at.y === from.y;
+  });
+  if (!shared) return;
+  const free = freeOf(fight, person);
+  const enemy = enemies[0];
+  const range = weaponOf(fight, person)?.range ?? 1;
+  const seeing =
+    enemy === undefined ? undefined : spotSeeing(fight.ground, from, enemy.tile, range, 1, free);
+  const beside = standingBeside(fight.ground, from, from).filter(free);
+  const to = seeing !== undefined && free(seeing) ? seeing : beside[0];
+  if (to !== undefined) goTo(fight.ctx, person, to);
 }
 
 function moraleTurn(
@@ -741,8 +803,12 @@ function pressTurn(
     if (mark === undefined) setLabel(person, "taking them");
     return;
   }
+  // Far off, the nearest side of the objective; a free tile is picked once close, so the party
+  // does not split round it on the way in.
   const beside = standingBeside(ground, goal, from);
-  const to = beside.find((t) => goTo(ctx, person, t));
+  const close = distance(from, goal) <= STAND_AND_SHOOT_TILES + 1;
+  const ordered = close ? freeFirst(beside, freeOf(fight, person)) : beside;
+  const to = ordered.find((t) => goTo(ctx, person, t));
   if (mark === undefined) setLabel(person, to === undefined ? "pinned" : "advancing");
 }
 
@@ -765,7 +831,10 @@ function holdSpot(fight: Fight, person: Actor): TileCoord {
     );
   });
   const index = holders.indexOf(person.id);
-  return spots[index] ?? ground.foot;
+  const free = freeOf(fight, person);
+  const mine = spots[index];
+  if (mine !== undefined && free(mine)) return mine;
+  return spots.find(free) ?? mine ?? ground.foot;
 }
 
 function holdTurn(fight: Fight, person: Actor, from: TileCoord, mark: Seen | undefined): void {
@@ -774,7 +843,8 @@ function holdTurn(fight: Fight, person: Actor, from: TileCoord, mark: Seen | und
     // `takeCover`: a step or two to a spot in cover from what they shoot at, then `fire`.
     const range = weaponOf(fight, person)?.range ?? 1;
     if (!inCover(ground.berth, from, mark.tile)) {
-      const spot = spotSeeing(ground, from, mark.tile, range, HOLD_SHIFT_STEPS);
+      const free = freeOf(fight, person);
+      const spot = spotSeeing(ground, from, mark.tile, range, HOLD_SHIFT_STEPS, free);
       if (spot !== undefined && inCover(ground.berth, spot, mark.tile) && goTo(ctx, person, spot)) {
         lowerAim(person);
         setLabel(person, "taking cover");
@@ -790,8 +860,9 @@ function holdTurn(fight: Fight, person: Actor, from: TileCoord, mark: Seen | und
   if (!shoots(fight, person)) {
     // Nothing to hold the line with: a baton waits at the head of the ramp, out of the shooting,
     // until `hold` presses.
-    const there = from.x === ground.top.x && from.y === ground.top.y;
-    if (!there) goTo(ctx, person, ground.top);
+    const spot = rampHead(fight, person);
+    const there = from.x === spot.x && from.y === spot.y;
+    if (!there) goTo(ctx, person, spot);
     setLabel(person, there ? "holding the ramp" : "back to the ramp");
     return;
   }
@@ -799,6 +870,18 @@ function holdTurn(fight: Fight, person: Actor, from: TileCoord, mark: Seen | und
   const there = from.x === spot.x && from.y === spot.y;
   if (!there) goTo(ctx, person, spot);
   setLabel(person, there ? "in cover" : "taking cover");
+}
+
+/** Where a baton waits under `hold`: the ramp's top, or a free deck tile beside it. */
+function rampHead(fight: Fight, person: Actor): TileCoord {
+  const { ground } = fight;
+  const free = freeOf(fight, person);
+  if (free(ground.top)) return ground.top;
+  const { x, y } = ground.top;
+  const beside = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => ({ x: x + dx, y: y + dy })));
+  const aboardTile = (t: TileCoord) =>
+    !standable(ground, t) && isStaticWalkable(ground.geometry, t.x, t.y);
+  return beside.find((t) => aboardTile(t) && free(t)) ?? ground.top;
 }
 
 /** Can `person` hit anyone past arm's length? */
@@ -813,7 +896,13 @@ function toFlank(fight: Fight, person: Actor, from: TileCoord, firing: boolean):
     expedition.flankTick ??= ctx.tick;
     return;
   }
-  goTo(ctx, person, post);
+  // Round, not through: the route the cast sees least of (a seen tile costs as much as a
+  // dozen steps), so the small group comes in by the flank's own door rather than the front one.
+  const watched = watchedTiles(ground, watchers(fight));
+  const reach = (t: TileCoord) => adjacent8(t, post);
+  const path = cheapestPath(ground, from, reach, (t) => (isWatched(watched, t) ? SEEN_STEP : 0));
+  const next = path === undefined ? post : (quietWaypoint(from, path) ?? post);
+  goTo(ctx, person, next);
   if (!firing) setLabel(person, "going round");
 }
 
@@ -963,7 +1052,7 @@ function guardTurn(fight: Fight, person: Actor, from: TileCoord, enemies: readon
   }
   if (mark !== undefined) {
     if (combatant.state === "wavering" && !inCover(ground.berth, from, mark.tile)) {
-      const spot = spotSeeing(ground, from, mark.tile, weapon.range, 3);
+      const spot = spotSeeing(ground, from, mark.tile, weapon.range, 3, freeOf(fight, person));
       if (spot !== undefined && inCover(ground.berth, spot, mark.tile)) {
         goTo(ctx, person, spot);
         lowerAim(person);
@@ -973,14 +1062,16 @@ function guardTurn(fight: Fight, person: Actor, from: TileCoord, enemies: readon
     }
     shootAt(fight, person, mark, !devoted);
     if (devoted && mark.distance > STAND_AND_SHOOT_TILES) {
-      standingBeside(ground, mark.tile, from).find((t) => goTo(ctx, person, t));
+      const beside = freeFirst(standingBeside(ground, mark.tile, from), freeOf(fight, person));
+      beside.find((t) => goTo(ctx, person, t));
     }
     return;
   }
   lowerAim(person);
   const nearest = enemies.find((s) => upright(combatantOf(s.actor)));
   if (weapon.range <= 1 && nearest !== undefined && (devoted || nearest.distance <= 4)) {
-    standingBeside(ground, nearest.tile, from).find((t) => goTo(ctx, person, t));
+    const beside = freeFirst(standingBeside(ground, nearest.tile, from), freeOf(fight, person));
+    beside.find((t) => goTo(ctx, person, t));
     setLabel(person, "closing in");
     return;
   }
@@ -998,6 +1089,7 @@ function guardTurn(fight: Fight, person: Actor, from: TileCoord, enemies: readon
       party,
       weapon.range,
       far ? REPOSITION_STEPS : GUARD_STEPS,
+      freeOf(fight, person),
     );
     if (spot !== undefined && goTo(ctx, person, spot)) {
       setLabel(person, far ? "moving up" : "covering the door");

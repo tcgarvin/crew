@@ -4,7 +4,7 @@
  * fight's character while its numbers are tuned.
  */
 import type { PlanOption, SiteCastEntryDef } from "@crew/sim";
-import { DEFAULT_PLANS } from "@crew/sim";
+import { DEFAULT_PLANS, type Kernel, createKernel } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {
   type FightRecord,
@@ -14,11 +14,12 @@ import {
   instrumentPlans,
   parseExpeditionsArgs,
   parseSeeds,
+  runExpeditions,
   runExpeditionsAsync,
   runExpeditionsCli,
   summarise,
 } from "./expeditions";
-import { loadPacingContent } from "./pacing";
+import { createPacingRegistry, loadPacingContent } from "./pacing";
 
 function boathouseCast(): readonly SiteCastEntryDef[] {
   const dock = loadPacingContent().bundle.docks?.["dock.boathouse" as never];
@@ -260,4 +261,48 @@ describe("crew expeditions: CI bounds on the default cast (ruling 13)", () => {
     expect(woundsPerFight(hold)).toBeLessThanOrEqual(0.75 * woundsPerFight(assault));
     expect(meanFight(assault)).toBeLessThanOrEqual(0.8 * meanFight(hold));
   });
+});
+
+describe("crew expeditions: flank on the Boathouse", () => {
+  it("sends the small group round the west end, not in through the shed", () => {
+    // The shed's floor inside its walls, deck frame (the Mk2 berths at dock (4,0)).
+    const inShed = (x: number, y: number) => x >= 7 && x <= 26 && y >= 23 && y <= 28;
+    const base = createKernel(createPacingRegistry());
+    const through: string[] = [];
+    let goingRound = 0;
+    const flankers = new Set<string>();
+    const kernel: Kernel = {
+      ...base,
+      advance: (world, ticks) => {
+        const result = base.advance(world, ticks);
+        const expedition = world.state.expedition;
+        if (expedition === undefined || expedition.flankTick !== undefined) return result;
+        for (const actor of Object.values(world.state.actors)) {
+          const activity = actor.activity;
+          if (activity.kind === "personal" && activity.label === "going round") {
+            flankers.add(actor.id);
+          }
+          // Still on the way (firing as they go, or not): never inside.
+          if (!flankers.has(actor.id) || actor.location.kind !== "onDeck") continue;
+          goingRound += 1;
+          const x = Math.floor(actor.location.x);
+          const y = Math.floor(actor.location.y);
+          if (inShed(x, y)) through.push(`${actor.name}@${x},${y}`);
+        }
+        return result;
+      },
+    };
+    runExpeditions(
+      {
+        siteId: "port.boathouse" as never,
+        plans: ["flank-lethal-armed"],
+        casts: ["default"],
+        n: 3,
+        seeds: [1, 2],
+      },
+      kernel,
+    );
+    expect(goingRound).toBeGreaterThan(0);
+    expect(through).toEqual([]);
+  }, 60_000);
 });

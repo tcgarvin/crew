@@ -77,6 +77,45 @@ export function searchPath(
   return undefined;
 }
 
+/**
+ * The cheapest route over site floor (moves as `searchPath`) from `from` to the first tile `goal`
+ * accepts, a step costing 1 plus `extra(tile)` for the tile it enters (whole numbers); a bucket
+ * queue, since costs are small. The path excludes `from`; undefined when no tile is reached.
+ */
+export function cheapestPath(
+  ground: Ground,
+  from: TileCoord,
+  goal: (tile: TileCoord) => boolean,
+  extra: (tile: TileCoord) => number,
+): TileCoord[] | undefined {
+  const parent = new Map<string, TileCoord | null>([[key(from), null]]);
+  const best = new Map<string, number>([[key(from), 0]]);
+  const buckets: TileCoord[][] = [[from]];
+  for (let cost = 0; cost < buckets.length; cost++) {
+    for (const tile of buckets[cost] ?? []) {
+      if (best.get(key(tile)) !== cost) continue;
+      if (cost > 0 && goal(tile)) return unwind(parent, tile);
+      for (const d of DIRS) {
+        const to = { x: tile.x + d.x, y: tile.y + d.y };
+        if (!standable(ground, to)) continue;
+        if (d.x !== 0 && d.y !== 0) {
+          const a = { x: tile.x + d.x, y: tile.y };
+          const b = { x: tile.x, y: tile.y + d.y };
+          if (!standable(ground, a) || !standable(ground, b)) continue;
+        }
+        const k = key(to);
+        const next = cost + 1 + extra(to);
+        if ((best.get(k) ?? Number.POSITIVE_INFINITY) <= next) continue;
+        best.set(k, next);
+        parent.set(k, tile);
+        while (buckets.length <= next) buckets.push([]);
+        buckets[next]?.push(to);
+      }
+    }
+  }
+  return undefined;
+}
+
 function unwind(parent: Map<string, TileCoord | null>, end: TileCoord): TileCoord[] {
   const path: TileCoord[] = [];
   let at: TileCoord | null | undefined = end;
@@ -146,7 +185,8 @@ export const isWatched = (watched: ReadonlySet<string>, tile: TileCoord): boolea
 
 /**
  * Ruling 2: a spot within `maxSteps` of `from` with a line to `seen` within `range`, in cover from
- * it if one is, else the nearest. Undefined when none is.
+ * it if one is, else the nearest; among those, one `free` accepts if any is (so a side does not
+ * stack on one tile), else any. Undefined when none is.
  */
 export function spotSeeing(
   ground: Ground,
@@ -154,13 +194,17 @@ export function spotSeeing(
   seen: TileCoord,
   range: number,
   maxSteps: number,
+  free: (tile: TileCoord) => boolean = () => true,
 ): TileCoord | undefined {
   const ok = (t: TileCoord) => distance(t, seen) <= range && lineOfSight(ground.berth, t, seen);
-  const covered = searchPath(ground, from, (t) => ok(t) && inCover(ground.berth, t, seen), {
-    maxSteps,
-  });
-  const path = covered ?? searchPath(ground, from, ok, { maxSteps });
-  return path?.[path.length - 1];
+  const covered = (t: TileCoord) => ok(t) && inCover(ground.berth, t, seen);
+  const goals = [(t: TileCoord) => covered(t) && free(t), (t: TileCoord) => ok(t) && free(t)];
+  goals.push(covered, ok);
+  for (const goal of goals) {
+    const path = searchPath(ground, from, goal, { maxSteps });
+    if (path !== undefined) return path[path.length - 1];
+  }
+  return undefined;
 }
 
 /** Tiles beside `tile` someone can stand on, nearest `toward` first. */

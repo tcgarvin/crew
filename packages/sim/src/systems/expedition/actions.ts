@@ -96,7 +96,7 @@ export function setLabel(actor: Actor, label: string): void {
 }
 
 /** The tile `actor` is walking to, if they are walking. */
-function destination(actor: DeepReadonly<Actor>): TileCoord | undefined {
+export function destination(actor: DeepReadonly<Actor>): TileCoord | undefined {
   const movement = actor.movement;
   return movement.kind === "moving" ? movement.path[movement.path.length - 1] : undefined;
 }
