@@ -536,6 +536,13 @@ const POST_ART: Readonly<Record<DockPostKind, PostArt>> = {
       ctx.strokeRect(-0.56, 0.18, 1.12, 0.26);
     },
   },
+  // Expeditions A1: a site's posts are not drawn on the floor (W4 marks a tapped one).
+  target: { floor: () => {} },
+  guard: { floor: () => {} },
+  loot: { floor: () => {} },
+  exit: { floor: () => {} },
+  flank: { floor: () => {} },
+  bystander: { floor: () => {} },
 };
 
 function inPostFrame(ctx: CanvasRenderingContext2D, post: DockPostDef, draw: () => void): void {

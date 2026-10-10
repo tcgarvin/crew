@@ -7,6 +7,7 @@ import type {
   DockAreaKind,
   DockDef,
   DockForegroundKind,
+  DockKind,
   DockPostKind,
   DockPropKind,
   DockTileKind,
@@ -19,13 +20,15 @@ import {
   hullSizeClassSchema,
   localKeySchema,
   portDefIdSchema,
+  positive,
   positiveInt,
   rotationSchema,
   tileCoordSchema,
   unitInterval,
 } from "./primitives";
+import { siteCastEntrySchema } from "./site";
 
-export const dockTileKindSchema = z.enum(["floor", "wall", "void"]);
+export const dockTileKindSchema = z.enum(["floor", "wall", "void", "cover"]);
 export const dockPostKindSchema = z.enum([
   "gate",
   "warehouseDoor",
@@ -33,7 +36,15 @@ export const dockPostKindSchema = z.enum([
   "kiosk",
   "loungeDoor",
   "bench",
+  "target",
+  "guard",
+  "loot",
+  "exit",
+  "flank",
+  "bystander",
 ]);
+/** Expeditions A1 (§4): a port's dock or a landing site's map (absent = dock). */
+export const dockKindSchema = z.enum(["dock", "site"]);
 export const dockAreaKindSchema = z.enum(["freightStaging", "deliveryBay"]);
 export const dockPropKindSchema = z.enum([
   "crates",
@@ -124,6 +135,15 @@ export const dockDefSchema = z.strictObject({
    */
   grime: unitInterval,
   airborneDust: unitInterval,
+  /** Expeditions A1 (§4): `site` for a landing site's map; absent is a port's dock. */
+  kind: dockKindSchema.exactOptional(),
+  /** Expeditions A1 (§4): tiles at which the cast notice a party; required on a site (L2). */
+  noticeRadius: positive.exactOptional(),
+  /**
+   * Expeditions A1 (§5.3): the cast placed when nobody stages the site (site only; caps and posts
+   * at L2 and L3).
+   */
+  defaultCast: z.array(siteCastEntrySchema).exactOptional(),
 }) satisfies z.ZodType<DockDef>;
 
 // Drift guards against the sim vocabularies: each must resolve to `true`.
@@ -133,4 +153,5 @@ export const DOCK_VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof dockAreaKindSchema>, DockAreaKind>,
   AssertEqual<z.infer<typeof dockPropKindSchema>, DockPropKind>,
   AssertEqual<z.infer<typeof dockForegroundKindSchema>, DockForegroundKind>,
-] = [true, true, true, true, true];
+  AssertEqual<z.infer<typeof dockKindSchema>, DockKind>,
+] = [true, true, true, true, true, true];

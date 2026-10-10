@@ -9,7 +9,8 @@
     "medical": 2,
     "engineering": 1,
     "electrical": 1,
-    "piloting": 1
+    "piloting": 1,
+    "fighting": 1
   },
   "traits": ["trait.hearty_appetite", "trait.social_butterfly"],
   "startingInventory": [

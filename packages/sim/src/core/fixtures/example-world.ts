@@ -1,3 +1,4 @@
+import { wholeBody } from "../body";
 /**
  * A small hand-built `WorldState` exercising most contract shapes. Used by the W0 JSON
  * round-trip test and available to W2+ as a starting fixture. Not a playable scenario: IDs refer
@@ -83,6 +84,7 @@ export function exampleWorldState(): WorldState {
       session: 2,
       field: 1,
       scar: 1,
+      wound: 1,
     },
     actors: {
       [a1]: {
@@ -153,6 +155,7 @@ export function exampleWorldState(): WorldState {
         },
         navigationKnowledgeRevision: 1,
         availability: "available",
+        body: wholeBody(),
         crew: true,
       },
       [a2]: {
@@ -190,6 +193,7 @@ export function exampleWorldState(): WorldState {
         knowledge: {},
         navigationKnowledgeRevision: 0,
         availability: "available",
+        body: wholeBody(),
         crew: true,
       },
     },

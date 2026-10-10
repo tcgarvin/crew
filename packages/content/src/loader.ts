@@ -11,6 +11,8 @@ import { type ValidationResult, validateBundle } from "./schemas/validate";
 import deckFreighterMk1 from "../data/decks/freighter-mk1.json";
 import deckFreighterMk2 from "../data/decks/freighter-mk2.json";
 
+// Expeditions A1 (§7.2)
+import machineArmsLocker from "../data/machines/arms-locker.json";
 import machineBatteryBank from "../data/machines/battery-bank.json";
 import machineBunk from "../data/machines/bunk.json";
 import machineCaptainsChair from "../data/machines/captains-chair.json";
@@ -33,6 +35,9 @@ import machineOpsTerminal from "../data/machines/ops-terminal.json";
 import machineVidScreen from "../data/machines/vid-screen.json";
 import machineWorkbench from "../data/machines/workbench.json";
 
+// Expeditions A1 (§7.2)
+import itemBaton from "../data/items/baton.json";
+import itemBlaster from "../data/items/blaster.json";
 import itemBook from "../data/items/book.json";
 import itemCoolantCanister from "../data/items/coolant-canister.json";
 import itemCrateFragile from "../data/items/crate-fragile.json";
@@ -76,6 +81,8 @@ import traitRestless from "../data/traits/restless.json";
 import traitSocialButterfly from "../data/traits/social-butterfly.json";
 import traitSteady from "../data/traits/steady.json";
 
+// Expeditions A1 (§3.1): the one landing site
+import portBoathouse from "../data/ports/boathouse.json";
 import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
 import portKesslerDrift from "../data/ports/kessler-drift.json";
@@ -83,6 +90,8 @@ import portOssoryStation from "../data/ports/ossory-station.json";
 import portTernsRest from "../data/ports/terns-rest.json";
 import portVesperGate from "../data/ports/vesper-gate.json";
 
+// Expeditions A1 (§4)
+import dockBoathouse from "../data/docks/boathouse.json";
 // Docks (Dockside §3)
 import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
 import dockGreenMeridian from "../data/docks/green-meridian.json";
@@ -108,19 +117,25 @@ import thoughtGoodCompany from "../data/thoughts/good-company.json";
 import thoughtGotLectured from "../data/thoughts/got-lectured.json";
 import thoughtHatedTheNoise from "../data/thoughts/hated-the-noise.json";
 import thoughtHeardOut from "../data/thoughts/heard-out.json";
+// Expeditions A1 (§11)
+import thoughtHeldTheLine from "../data/thoughts/held-the-line.json";
 import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
 import thoughtHelmScrape from "../data/thoughts/helm-scrape.json";
 import thoughtKeepsBeatingMe from "../data/thoughts/keeps-beating-me.json";
+import thoughtKilledSomeone from "../data/thoughts/killed-someone.json";
 import thoughtLostContest from "../data/thoughts/lost-contest.json";
 import thoughtNearMiss from "../data/thoughts/near-miss.json";
 import thoughtNoBunkOfMyOwn from "../data/thoughts/no-bunk-of-my-own.json";
 import thoughtNoisyBunkroom from "../data/thoughts/noisy-bunkroom.json";
 import thoughtOwnCabin from "../data/thoughts/own-cabin.json";
+import thoughtRanFromAFight from "../data/thoughts/ran-from-a-fight.json";
 import thoughtSatWithTheCaptain from "../data/thoughts/sat-with-the-captain.json";
+import thoughtSawCrewHurt from "../data/thoughts/saw-crew-hurt.json";
 import thoughtSparringBruise from "../data/thoughts/sparring-bruise.json";
 import thoughtSpiritedTalk from "../data/thoughts/spirited-talk.json";
 import thoughtStoodLongWatch from "../data/thoughts/stood-long-watch.json";
 import thoughtWonContest from "../data/thoughts/won-contest.json";
+import thoughtWounded from "../data/thoughts/wounded.json";
 
 // Off watch (slice 4)
 import activityBaking from "../data/activities/baking.json";
@@ -173,6 +188,7 @@ const MACHINES = [
   machineWorkbench,
   machineEngineeringConsole,
   machineIntercom,
+  machineArmsLocker,
 ];
 const ITEMS = [
   itemToolkit,
@@ -195,6 +211,8 @@ const ITEMS = [
   itemTreat,
   itemPatchKit,
   itemHullPlating,
+  itemBlaster,
+  itemBaton,
 ];
 const CREW = [
   crewMaraOsei,
@@ -227,6 +245,7 @@ const PORTS = [
   portOssoryStation,
   portVesperGate,
   portTernsRest,
+  portBoathouse,
 ];
 const DOCKS = [
   dockCrossroadsHub,
@@ -235,6 +254,7 @@ const DOCKS = [
   dockOssoryStation,
   dockVesperGate,
   dockTernsRest,
+  dockBoathouse,
 ];
 const SCENARIOS = [scenarioDefault];
 const THOUGHTS = [
@@ -265,6 +285,11 @@ const THOUGHTS = [
   thoughtDressedDown,
   thoughtAteATreat,
   thoughtNearMiss,
+  thoughtKilledSomeone,
+  thoughtSawCrewHurt,
+  thoughtHeldTheLine,
+  thoughtRanFromAFight,
+  thoughtWounded,
 ];
 const ACTIVITIES = [
   activityCards,

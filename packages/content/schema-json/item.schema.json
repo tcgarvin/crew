@@ -38,7 +38,8 @@
           "instrument",
           "treat",
           "patchKit",
-          "plating"
+          "plating",
+          "weapon"
         ]
       }
     },
@@ -65,6 +66,41 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 9007199254740991
+    },
+    "weapon": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["blaster", "baton"]
+        },
+        "range": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "aimSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["graze", "serious", "grave"]
+        },
+        "damageType": {
+          "type": "string",
+          "enum": ["blaster", "blunt"]
+        },
+        "stun": {
+          "type": "boolean"
+        }
+      },
+      "required": ["kind", "range", "aimSeconds", "hit", "severity", "damageType", "stun"],
+      "additionalProperties": false
     }
   },
   "required": ["id", "name", "stacking", "maxStack", "tags", "toolKinds", "mass"],

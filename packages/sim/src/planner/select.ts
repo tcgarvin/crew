@@ -86,6 +86,15 @@ function toIntent(best: Candidate, t: PlannerTrace): Intent {
 export function selectIntent(view: AgentView, config: PlannerConfig): Intent {
   // Passengers §3.5: a passenger walking to the ramp keeps walking; commerce owns that intent.
   if (view.self.disembarking === true) return { kind: "continue" };
+  // Expeditions A1 (call 6): the muster and the fight are the expedition system's; the planner
+  // keeps out until it hands the person back.
+  const current = view.self.activity;
+  if (
+    current.kind === "personal" &&
+    (current.activity === "fight" || current.activity === "muster")
+  ) {
+    return { kind: "continue" };
+  }
   const { candidates, rejected } = enumerateCandidates(view, config);
   const ranked = [...candidates].sort((a, b) => compareCandidates(a, b, config));
   const best = ranked[0];

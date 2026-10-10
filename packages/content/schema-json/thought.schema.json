@@ -31,7 +31,12 @@
         "heardOut",
         "dressedDown",
         "ateATreat",
-        "nearMiss"
+        "nearMiss",
+        "killedSomeone",
+        "sawCrewHurt",
+        "heldTheLine",
+        "ranFromAFight",
+        "wounded"
       ]
     },
     "label": {

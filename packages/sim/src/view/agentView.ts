@@ -22,11 +22,13 @@
  *   (`KnownItemView.ownerId`);
  * - slice 5 (§sighting-and-the-alert): the alert while the ship is on one (`alert()`, the klaxon:
  *   common knowledge).
+ * - expeditions A1: their own body (`self.body`), and who is down (`roster()[].down`).
  *
  * W4a decision: `AgentView.tick` is `state.tick + 1`, the tick whose planning phase is running
  * (the same number as `StepCtx.tick` there). The resulting intent is applied by work in phase 3
  * of the following tick. Backoff and blockage `retryAfterTick`s compare against this tick.
  */
+import { bodyCapacities } from "../core/body";
 import { watchOfDay } from "../core/clock";
 import { isOnDock } from "../core/docks";
 import { affinitiesFrom } from "../core/social";
@@ -200,6 +202,12 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
     roleTags: actor.roleTags,
     needs: actor.needs,
     capacities: actor.capacities,
+    // Expeditions A1 (§7.1): their own body, as they feel it.
+    body: {
+      capacities: bodyCapacities(actor.body, config),
+      wounded: actor.body.wounds.length > 0,
+      bleeding: actor.body.wounds.some((w) => w.bleeding),
+    },
     skills: actor.skills,
     traits: actor.traits,
     mood: actor.mood,
@@ -381,6 +389,8 @@ function roster(state: ReadonlyWorldState): RosterEntry[] {
       roleTags: a.roleTags,
       skills: a.skills,
       ...(a.passenger === true ? { passenger: true as const } : {}),
+      // Expeditions A1: someone down is still aboard (or carried), and everyone knows it.
+      ...(a.availability === "incapacitated" ? { down: true as const } : {}),
     }));
 }
 

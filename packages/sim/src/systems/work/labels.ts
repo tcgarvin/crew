@@ -33,6 +33,7 @@ import type { CompartmentId, ItemDefId, ItemId, MachineId } from "../../core/typ
 import type { DerivedCaches, ReadonlyWorldState } from "../../core/types/pipeline";
 import type { ActivityStep, HoldKind, StepTarget, Task } from "../../core/types/work";
 import { damageTaskLabel } from "../damage/labels";
+import { fightLabel, musterLabel } from "../expedition/labels";
 import { reportLabel } from "../intercom/labels";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { whoHasTheHelm } from "../watch/helm";
@@ -503,6 +504,9 @@ export function labelFor(ctx: LabelCtx, actor: DeepReadonly<Actor>): string {
   if (activity.activity === "privateTalk") return talkLabel(ctx, actor, step);
   // §reporting-damage: the walk to the panel and the report read as one activity.
   if (activity.activity === "report") return reportLabel(ctx, actor, step);
+  // Expeditions A1: the muster and the fight read as the expedition system says.
+  if (activity.activity === "muster") return musterLabel(ctx, actor, step);
+  if (activity.activity === "fight") return fightLabel(ctx, actor);
   return personalStepLabel(ctx, actor, step);
 }
 

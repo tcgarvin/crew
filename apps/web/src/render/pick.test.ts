@@ -63,6 +63,7 @@ function crew(x: number, y: number): RenderActor {
     onDock: true,
     actionLabel: "walking on the dock",
     passenger: false,
+    wounded: false,
   };
 }
 

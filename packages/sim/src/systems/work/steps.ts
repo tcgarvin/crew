@@ -42,6 +42,7 @@ import { runMop } from "../dirt/clean";
 import { depositDirt } from "../dirt/deposit";
 import type { RecipeCtx, RecipeOutcome } from "../equipment/recipes";
 import { advanceStage } from "../equipment/recipes";
+import { runArm } from "../expedition/muster";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
 import { runReport } from "../intercom/report";
@@ -618,6 +619,9 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
       return runCheck(ctx, actor, step);
     case "report":
       return runReport(ctx, actor, step);
+    // Expeditions A1: arming at the arms locker.
+    case "arm":
+      return runArm(ctx, actor, step);
     case "eat":
     case "buy":
     case "rounds":

@@ -78,6 +78,7 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
       ...at(post.tile.x, post.tile.y),
       actionLabel: "waiting",
       passenger: false,
+      wounded: false,
       onDock: true,
     })),
     machines: [],
@@ -112,6 +113,7 @@ function frameAt(dock: DockDef, t: RenderTravel): RenderFrame {
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
+    shots: [],
     // §dock-alongside: the sim names the dock alongside from the start of docking to the end of
     // undocking.
     ...(ALONGSIDE.has(t.state) ? { dock: { dockId: dock.id, deckId: layout.deckId } } : {}),
@@ -159,8 +161,8 @@ function render(
 }
 
 describe("every authored dock draws", () => {
-  it("has one map per port, six in all", () => {
-    expect(allDocks.length).toBe(6);
+  it("has one map per port, seven in all (six ports and the Boathouse site)", () => {
+    expect(allDocks.length).toBe(7);
   });
 
   for (const dock of allDocks) {

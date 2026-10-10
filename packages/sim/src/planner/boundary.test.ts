@@ -116,6 +116,63 @@ const config: PlannerConfig = {
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },
+  // Expeditions A1: read by no candidate yet; the default bundle's values by hand (no fixtures).
+  bodies: {
+    tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
+    severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },
+    severityPain: { graze: 0.1, serious: 0.3, grave: 0.6 },
+    painDecayPerSecond: 0.01,
+    bleedPerSecond: { graze: 0, serious: 0.004, grave: 0.012 },
+    bleedStopsAfterSeconds: { graze: 0, serious: 60, grave: 180 },
+    bloodRecoverPerSecond: 0.002,
+    stunPerHit: 0.5,
+    stunDecayPerSecond: 0.004,
+    incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
+    deadBelowBlood: 0.25,
+    healPerDay: 0.5,
+    partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
+    stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
+  },
+  expedition: {
+    decideEverySeconds: 0.5,
+    maxFightSeconds: 120,
+    alertClearSeconds: 60,
+    hitSkillBase: 0.7,
+    hitPerFighting: 0.06,
+    rangeFalloffFloor: 0.5,
+    coverPenalty: 0.5,
+    movingTargetFactor: 0.8,
+    movingShooterFactor: 0.7,
+    meleeAdjacentOnly: true,
+    resolveTiers: { shaky: 0.45, steady: 0.7, hard: 0.95 },
+    tie: {
+      paid: { resolve: 0.8, loyalty: 0.3 },
+      bound: { resolve: 1, loyalty: 0.7 },
+      devoted: { resolve: 1.25, loyalty: 1 },
+    },
+    castFighting: { shaky: 2, steady: 4, hard: 6 },
+    crewResolve: { base: 0.6, perFighting: 0.03, perMood: 0.1, perLeaderAffinity: 0.02 },
+    morale: {
+      hitSelf: -0.25,
+      allyDown: -0.2,
+      allyDead: -0.3,
+      underFireNoCoverPerSecond: -0.05,
+      outnumberedPerSecond: -0.03,
+      allyHit: 0.05,
+      inCoverPerSecond: 0.02,
+      leaderNearPerSecond: 0.02,
+      outflanked: -0.3,
+      targetTaken: -0.4,
+      waverBelow: 0.5,
+      breakBelow: 0.25,
+      recoverAbove: 0.6,
+    },
+    withdrawWhen: { firstDown: 1, halfDown: 0.5 },
+    leaderNearTiles: 3,
+    surrenderIfCornered: true,
+    blasters: 3,
+    batons: 2,
+  },
   work: {
     reconsiderEveryTicks: 10,
     switchCooldownSeconds: 2,
@@ -172,6 +229,11 @@ function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): 
     roleTags: [],
     needs: { hunger, fatigue: 0, comfort: 0, social: 0, recreation: 0 },
     capacities: { movement: 1, manipulation: 1, consciousness: 1 },
+    body: {
+      capacities: { movement: 1, manipulation: 1, consciousness: 1 },
+      wounded: false,
+      bleeding: false,
+    },
     skills: {},
     traits: [],
     mood: 0,
@@ -250,6 +312,27 @@ describe("planner boundary", () => {
     expect(selectIntent(stubView(0.6, [{ ...ration, absent: true }]), config)).toEqual({
       kind: "idle",
     });
+  });
+
+  it("leaves a fighter and a mustering party member to the expedition, starving or not (expeditions A1, call 6)", () => {
+    for (const activity of ["fight", "muster"] as const) {
+      const busy: SelfView["activity"] = {
+        kind: "personal",
+        activity,
+        urgency: "essentialOperation",
+        action: {
+          kind: "wait",
+          stage: "waiting",
+          progress: 0,
+          startedTick: 90,
+          interruptible: true,
+        },
+        sinceTick: 90,
+      };
+      expect(selectIntent(stubView(0.99, [ration], { activity: busy }), config)).toEqual({
+        kind: "continue",
+      });
+    }
   });
 });
 

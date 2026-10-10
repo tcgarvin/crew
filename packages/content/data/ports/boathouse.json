@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.boathouse",
+  "name": "The Boathouse",
+  "setting": "planet",
+  "kind": "site",
+  "nearPortId": "port.terns_rest",
+  "description": "A boat shed on the shingle below the Rest",
+  "character": "A long tarred shed where the Rest's few boats were hauled out, now kept by a man who does not want visitors. Whoever comes down the shingle uninvited is watched from the doors before they reach them.",
+  "castSeed": [],
+  "externalStores": [],
+  "market": [],
+  "jobTemplates": [],
+  "routes": [
+    {
+      "toPortId": "port.terns_rest",
+      "distance": 20
+    }
+  ]
+}

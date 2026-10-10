@@ -30,6 +30,12 @@ and interaction tile. A report at a panel reaches everyone aboard. The default s
 patch kits in each of the twelve bunk lockers (§patching-and-plating). The hull bar is 100
 (`hull.max`).
 
+Arms locker (expeditions A1, §7.2): `arms_locker` (`machine.arms_locker`) against the airlock's
+north wall at (32,14), its `use` position (32,15) on the airlock floor beside the door from the
+cross-passage, off every spawn point, zone and interaction tile and off the walk from that door
+to the personnel ramp. Its one-tile `arms` zone on the locker's tile holds the default scenario's
+three blasters and two batons; the party arms there before going down the ramp.
+
 ```
 Freighter Mk2 (deck.freighter_mk2)
 36 x 20 tiles
@@ -94,7 +100,7 @@ Doors (19):
   personnel_ramp: (34,19) side s, ramp, closed, power=main
   cargo_ramp: (13,19) side s, ramp, closed, power=main
 
-Machines (49):
+Machines (50):
   helm_1: machine.helm @ (34,2) rot=0
   nav_terminal_1: machine.nav_terminal @ (34,0) rot=0
   ops_terminal_1: machine.ops_terminal @ (34,5) rot=0
@@ -144,6 +150,7 @@ Machines (49):
   intercom_stores: machine.intercom @ (23,19) rot=180
   intercom_gym: machine.intercom @ (24,14) rot=0
   intercom_cargo_hold: machine.intercom @ (6,8) rot=0
+  arms_locker: machine.arms_locker @ (32,14) rot=0
 ```
 
 ## Off watch

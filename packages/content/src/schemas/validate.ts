@@ -340,9 +340,31 @@ function checkPort(port: PortDef, bundle: ContentBundle, issues: ValidationIssue
     });
   });
 
+  // Expeditions A1 (§3.1, call 1): a site's one route runs to its port, which never lists it back,
+  // so nothing sails to a site until A2.
+  if (port.kind === "site" && port.nearPortId !== undefined) {
+    if (checkRef(bundle.ports, port.nearPortId, "port", [...path, "nearPortId"], issues)) {
+      if (bundle.ports[port.nearPortId]?.kind === "site") {
+        issues.push(
+          issue("referential", [...path, "nearPortId"], "a site lies near a port, not a site"),
+        );
+      }
+    }
+  }
   port.routes.forEach((route, i) => {
     const routePath: Path = [...path, "routes", i];
     if (!checkRef(bundle.ports, route.toPortId, "port", [...routePath, "toPortId"], issues)) return;
+    if (bundle.ports[route.toPortId]?.kind === "site") {
+      issues.push(
+        issue(
+          "referential",
+          routePath,
+          `a port never lists a site in its routes ("${route.toPortId}")`,
+        ),
+      );
+      return;
+    }
+    if (port.kind === "site") return;
     const back = bundle.ports[route.toPortId]?.routes.find((r) => r.toPortId === port.id);
     if (back === undefined) {
       issues.push(

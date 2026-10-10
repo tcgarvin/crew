@@ -52,6 +52,7 @@ function frame(crates: number): RenderFrame {
         onDock: false,
         actionLabel: "hauling 3 crates",
         passenger: false,
+        wounded: false,
       },
     ],
     machines: [],
@@ -67,6 +68,7 @@ function frame(crates: number): RenderFrame {
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
+    shots: [],
   };
 }
 

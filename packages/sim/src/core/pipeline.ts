@@ -86,7 +86,8 @@ export function runStep(world: World, registry: KernelRegistry): SimEvent[] {
  * `narrator.hookOnEvents`, or (§notable-event-hook) an aftermath event of any significance whose
  * type is in `narrator.aftermathHookOnEvents` and that passes its type's filter: `faultRepaired`
  * only for a fault something caused (a scheduled fault, a hazard scrape, a field impact; never
- * wear) and not while a field is on, when the field's own calls cover it.
+ * wear) and not while a field is on, when the field's own calls cover it; `alertCleared` only for a
+ * field's alert (a fight's is not the narrator's in A1).
  */
 export function hooksNarrator(
   event: SimEvent,
@@ -100,6 +101,9 @@ export function hooksNarrator(
   switch (event.type) {
     case "faultRepaired":
       return event.causeIds.length > 0 && state.field === undefined;
+    // Expeditions A1 (call 4): the narrator hears nothing of a fight until A2.
+    case "alertCleared":
+      return event.payload.cause === "field";
     default:
       return true;
   }
@@ -164,6 +168,8 @@ function runPlannerStage(
     field: config.field,
     damage: config.damage,
     intercom: config.intercom,
+    expedition: config.expedition,
+    bodies: config.bodies,
   };
   const due = dueActors(actorIds, base.tick, config.work.reconsiderEveryTicks);
   for (const actorId of due) {

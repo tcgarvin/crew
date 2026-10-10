@@ -149,6 +149,10 @@ function candidateWords(names: Names, view: AgentView, candidate: Candidate): st
       return "reporting on the intercom";
     case "holdBridge":
       return "holding the bridge";
+    case "muster":
+      return "arming for the site";
+    case "fight":
+      return "in the fight";
   }
 }
 

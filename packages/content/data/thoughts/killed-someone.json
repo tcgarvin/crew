@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "killedSomeone",
+  "label": "killed someone",
+  "value": -0.4,
+  "durationDays": 3,
+  "stacks": false
+}

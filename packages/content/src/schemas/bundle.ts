@@ -70,6 +70,11 @@ export const contentBundleSchema = z.strictObject({
     dressedDown: thoughtDefSchema,
     ateATreat: thoughtDefSchema,
     nearMiss: thoughtDefSchema,
+    killedSomeone: thoughtDefSchema,
+    sawCrewHurt: thoughtDefSchema,
+    heldTheLine: thoughtDefSchema,
+    ranFromAFight: thoughtDefSchema,
+    wounded: thoughtDefSchema,
   }),
   /** Slice 4: the off-watch activities and the debate topics, keyed by id. */
   activities: z.record(activityDefIdSchema, activityDefSchema),

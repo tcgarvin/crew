@@ -15,6 +15,7 @@ import type { CommerceCommandPayloads } from "./commerce";
 import type { DecisionCommandPayloads } from "./decisions";
 import type { DocksideCommandPayloads } from "./dockside";
 import type { EquipmentCommandPayloads } from "./equipment";
+import type { ExpeditionCommandPayloads } from "./expedition";
 import type { FieldCommandPayloads } from "./field";
 import type { ScenarioCommandPayloads } from "./scenario";
 import type { SpawnCommandPayloads } from "./spawn";
@@ -26,6 +27,7 @@ export type * from "./commerce";
 export type * from "./decisions";
 export type * from "./dockside";
 export type * from "./equipment";
+export type * from "./expedition";
 export type * from "./field";
 export type * from "./scenario";
 export type * from "./spawn";
@@ -42,7 +44,8 @@ export interface CommandPayloadMap
     DocksideCommandPayloads,
     CabinsCommandPayloads,
     FieldCommandPayloads,
-    CallBackCommandPayloads {}
+    CallBackCommandPayloads,
+    ExpeditionCommandPayloads {}
 
 export type CommandKind = keyof CommandPayloadMap;
 

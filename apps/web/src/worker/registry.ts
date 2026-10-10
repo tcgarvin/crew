@@ -6,7 +6,9 @@
  * galley (§meal-problem) → recreation, social, cabins (slice 4: off watch) → damage, intercom
  * (slice 5: the crew's answer to the rocks) → work (execution, perception, chat, derivation with
  * every system's rules, AgentView builder) → planner. The field (slice 5) registers after travel,
- * so it runs after travel's hazards in the equipment phase.
+ * so it runs after travel's hazards in the equipment phase. Expeditions A1: bodies after needs (the
+ * needs phase), the expedition just before work (the actions phase: after spatial, before
+ * `work.execute`).
  */
 import {
   type KernelRegistry,
@@ -17,11 +19,13 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  registerBodies,
   registerCabins,
   registerCommerce,
   registerDamage,
   registerDirt,
   registerEquipmentSystems,
+  registerExpedition,
   registerField,
   registerGalley,
   registerIntercom,
@@ -45,6 +49,8 @@ export function createFullRegistry(): KernelRegistry {
   registerField(registry);
   registerCommerce(registry);
   registerNeeds(registry);
+  // Expeditions A1: bodies after needs in the needs phase (call 5).
+  registerBodies(registry);
   registerWatch(registry);
   registerGalley(registry);
   registerRecreation(registry);
@@ -52,6 +58,8 @@ export function createFullRegistry(): KernelRegistry {
   registerCabins(registry);
   registerDamage(registry);
   registerIntercom(registry);
+  // Expeditions A1: the muster and the fight, in the actions phase after spatial, before work.
+  registerExpedition(registry);
   // `registerWork` also installs the AgentView builder (the inspector reads it).
   registerWork(registry, {
     derivations: {

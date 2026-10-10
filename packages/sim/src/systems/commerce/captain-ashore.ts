@@ -19,6 +19,9 @@
  * from the gate as a visitor), and the card comes up when they get there. Nothing waits forever:
  * a card held `travel.cardDeliveryGiveUpSeconds` comes up anyway, and one held at a port the ship
  * is no longer docked at comes up at once. An offer whose job closed first is dropped instead.
+ *
+ * Expeditions A1 (call 4): at a landing site nobody goes looking for work, so no `captainAshore` is
+ * raised there.
  */
 import { configTicks } from "../../core/clock";
 import { commandActor, isFitForCommand } from "../../core/command-actor";
@@ -26,6 +29,7 @@ import { deliverHeldCard, localNamed } from "../../core/delivery";
 import { type BerthedDock, dockAlongsideAt, dockPost, isOnDock, postTile } from "../../core/docks";
 import { raiseHookIfIdle } from "../../core/hooks";
 import { postFacing, spawnLocal, waitingSpotByRamp } from "../../core/locals";
+import { isSite } from "../../core/places";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { HeldCard } from "../../core/types/decisions";
@@ -97,6 +101,8 @@ function sweepLookingForWork(ctx: Ctx): void {
   }
   const portId = travel.portId;
   if (ctx.state.narrator.captainAshoreLastAsk?.portId === portId) return;
+  // Expeditions A1 (call 4): nobody looks for work at a landing site, and the narrator is not told.
+  if (isSite(ctx.content, portId)) return;
   const looking = Object.values(ctx.state.actors).find((a) => onShoreActivity(a, "lookForWork"));
   if (looking !== undefined) {
     // Something came up on the way down (an offer, a course): the walk has no point now. The ask

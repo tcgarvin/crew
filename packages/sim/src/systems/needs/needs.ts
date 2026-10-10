@@ -23,12 +23,15 @@
  * `urgency.needSurvivalAbove`, `capacities.movement` and `.manipulation` fall linearly from 1 to
  * `movement.fatigueSpeedFloor` at fatigue 1.0 (bounded). Spatial already applies a mild,
  * whole-range fatigue speed factor; this only adds the "severe deprivation impairs" tail SD §11.3
- * asks for. Capacities are restored to 1 below the threshold (bodies are deferred, PLAN §7).
+ * asks for. Expeditions A1 (call 5): the curve lives in `core/body.ts`, and capacities are written
+ * by `applyCapacities` there, fatigue's curve times the body's (1 for a whole body); the bodies
+ * system writes them for everyone this system skips.
  *
  * W4a decision: "need critical" is `needThresholdCrossed` with `rising: true` at
  * `urgency.needSurvivalAbove`, emitted at `notable` significance (so it reaches the ticker);
  * crossing `needs.seekThreshold` either way is `trace`. No separate `needCritical` event kind.
  */
+import { applyCapacities } from "../../core/body";
 import { perDayToPerSecond } from "../../core/clock";
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import type { Actor, NeedKey } from "../../core/types/actor";
@@ -101,12 +104,8 @@ function emitCrossings(ctx: StepCtx, actor: Actor, key: NeedKey, before: number,
   });
 }
 
-/** Bounded capacity curve for severe fatigue (see module doc). */
-export function fatigueCapacity(fatigue: number, severeAbove: number, floor: number): number {
-  if (fatigue <= severeAbove || severeAbove >= 1) return 1;
-  const t = clamp01((fatigue - severeAbove) / (1 - severeAbove));
-  return clamp01(1 - (1 - clamp01(floor)) * t);
-}
+/** Bounded capacity curve for severe fatigue (see module doc); `core/body.ts` owns it. */
+export { fatigueCapacity } from "../../core/body";
 
 function updateActor(ctx: StepCtx, actor: Actor, dt: number): void {
   const rates = needRatesPerDay(ctx, actor);
@@ -121,15 +120,7 @@ function updateActor(ctx: StepCtx, actor: Actor, dt: number): void {
       emitCrossings(ctx, actor, key, before, after);
     }
   }
-  const capacity = fatigueCapacity(
-    actor.needs.fatigue,
-    ctx.config.urgency.needSurvivalAbove,
-    ctx.config.movement.fatigueSpeedFloor,
-  );
-  if (actor.capacities.movement !== capacity || actor.capacities.manipulation !== capacity) {
-    actor.capacities.movement = capacity;
-    actor.capacities.manipulation = capacity;
-  }
+  applyCapacities(actor, ctx.config);
 }
 
 export const needsSystem: System = {

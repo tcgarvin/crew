@@ -16,6 +16,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
         facing,
         actionLabel: "walking",
         passenger: false,
+        wounded: false,
       },
     ],
     machines: [],
@@ -37,6 +38,7 @@ function frame(tick: number, x: number, y: number, facing = 0): RenderFrame {
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
+    shots: [],
   };
 }
 

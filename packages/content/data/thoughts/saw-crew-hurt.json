@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "sawCrewHurt",
+  "label": "saw a crewmate hurt",
+  "value": -0.2,
+  "durationDays": 1,
+  "stacks": true
+}

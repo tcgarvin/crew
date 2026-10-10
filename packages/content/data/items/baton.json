@@ -1,0 +1,19 @@
+{
+  "$schema": "../../schema-json/item.schema.json",
+  "id": "item.baton",
+  "name": "Baton",
+  "stacking": "unique",
+  "maxStack": 1,
+  "tags": ["weapon"],
+  "toolKinds": [],
+  "mass": 1,
+  "weapon": {
+    "kind": "baton",
+    "range": 1,
+    "aimSeconds": 0.6,
+    "hit": 0.7,
+    "severity": "serious",
+    "damageType": "blunt",
+    "stun": false
+  }
+}

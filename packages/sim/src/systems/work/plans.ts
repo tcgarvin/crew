@@ -23,6 +23,7 @@ import type {
 import { privateTalkPlan } from "../cabins/private-talk";
 import { checkPlan, holdBridgePlan, patchPlan, platePlan, repairDamagePlan } from "../damage/plans";
 import { cleanPlan } from "../dirt/clean";
+import { musterPlan } from "../expedition/muster";
 import { cookPlan } from "../galley/cook";
 import { carryMealPlan, eatPlan } from "../galley/eat";
 import { reportPlan } from "../intercom/plans";
@@ -350,6 +351,12 @@ export function buildPersonalPlan(
       return reportPlan(ctx, actor, intent);
     case "holdBridge":
       return holdBridgePlan(ctx, actor);
+    // Expeditions A1 (call 12): the muster is the expedition system's; the fight is never planned
+    // (the combat system sets it and moves the person itself, call 6).
+    case "muster":
+      return musterPlan(ctx, actor);
+    case "fight":
+      return blocked("unreachableTarget");
     case "rest":
     case "socialize":
     case "wander":

@@ -94,7 +94,7 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 20 items, 27 thoughts, 12 activities and 7 topics", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 22 items, 32 thoughts, 12 activities and 7 topics", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
@@ -105,7 +105,7 @@ describe("loadBundle", () => {
       topics: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
-    expect(Object.keys(bundle.items)).toHaveLength(20);
+    expect(Object.keys(bundle.items)).toHaveLength(22);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
     expect(Object.keys(bundle.activities)).toHaveLength(12);
@@ -125,19 +125,24 @@ describe("loadBundle", () => {
       "gotLectured",
       "hatedTheNoise",
       "heardOut",
+      "heldTheLine",
       "helmCleanPass",
       "helmScrape",
       "keepsBeatingMe",
+      "killedSomeone",
       "lostContest",
       "nearMiss",
       "noBunkOfMyOwn",
       "noisyBunkroom",
       "ownCabin",
+      "ranFromAFight",
       "satWithTheCaptain",
+      "sawCrewHurt",
       "sparringBruise",
       "spiritedTalk",
       "stoodLongWatch",
       "wonContest",
+      "wounded",
     ]);
   });
 
@@ -250,7 +255,10 @@ describe("port distances (D10: short hop <= ~30s)", () => {
 
 describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
   const bundle = authoredBundle();
-  const ports = bundle.ports;
+  // Expeditions A1 (call 1): the landing site is a port of `kind: "site"`, not one of the six.
+  const ports = Object.fromEntries(
+    Object.entries(bundle.ports).filter(([, port]) => port.kind !== "site"),
+  ) as typeof bundle.ports;
   const ids = Object.keys(ports).sort();
 
   it("has the three core ports and three far ports", () => {
@@ -298,7 +306,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
   });
 
   it("gives every port one dock map, with at least one regular posted on it (Dockside §3.3)", () => {
-    const docks = Object.values(bundle.docks ?? {});
+    const docks = Object.values(bundle.docks ?? {}).filter((d) => d.kind !== "site");
     for (const port of Object.values(ports)) {
       expect(docks.filter((d) => d.portId === port.id).length, port.id).toBe(1);
       expect(
@@ -314,7 +322,7 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     // The delivery's receiver waits at the warehouse door and is sent for the crates only once
     // the hand truck is parked, which is when departure prep begins: a long walk (Kessler's was
     // 27 steps round the conveyor) loses the race to the cast-off.
-    for (const dock of Object.values(bundle.docks ?? {})) {
+    for (const dock of Object.values(bundle.docks ?? {}).filter((d) => d.kind !== "site")) {
       const mask = dockWalkableMask(dock);
       const floor = (x: number, y: number) =>
         x >= 0 && y >= 0 && x < dock.width && y < dock.height && mask[y * dock.width + x] === 1;
@@ -345,6 +353,29 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
       expect(found, dock.id).toBeDefined();
       expect(found, dock.id).toBeLessThanOrEqual(8);
     }
+  });
+
+  it("has one landing site, the Boathouse near Tern's Rest, that no port lists (expeditions A1, call 1)", () => {
+    const sites = Object.values(bundle.ports).filter((p) => p.kind === "site");
+    expect(sites.map((s) => s.id)).toEqual(["port.boathouse"]);
+    const [site] = sites;
+    expect(site?.nearPortId).toBe("port.terns_rest");
+    expect(site?.routes).toEqual([{ toPortId: "port.terns_rest", distance: 20 }]);
+    expect(site?.market).toEqual([]);
+    for (const port of Object.values(ports)) {
+      expect(
+        port.routes.some((r) => r.toPortId === "port.boathouse"),
+        port.id,
+      ).toBe(false);
+    }
+    const map = Object.values(bundle.docks ?? {}).find((d) => d.portId === "port.boathouse");
+    expect(map?.kind).toBe("site");
+    expect(map?.defaultCast?.map((c) => c.name)).toEqual([
+      "Corran Vale",
+      "Hesk Marrow",
+      "Darrow Finch",
+      "Old Pell",
+    ]);
   });
 
   it("sells patch kits wherever it sells hull plating, so a scarred ship restocks both (§plating-and-kits-at-port)", () => {

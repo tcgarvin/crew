@@ -9,7 +9,8 @@
     "electrical": 1,
     "medical": 1,
     "cooking": 2,
-    "piloting": 1
+    "piloting": 1,
+    "fighting": 4
   },
   "startingInventory": [],
   "bio": "Cargo hand; knows exactly how to stack a hold so nothing shifts in transit.",

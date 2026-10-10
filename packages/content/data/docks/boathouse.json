@@ -1,0 +1,254 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.boathouse",
+  "portId": "port.boathouse",
+  "name": "The Boathouse, on the shingle",
+  "kind": "site",
+  "palette": {
+    "floor": "#8a8577",
+    "wall": "#4a3f33",
+    "accent": "#c9b27a",
+    "sky": "#b7c7cf"
+  },
+  "width": 44,
+  "height": 30,
+  "rows": [
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "............................................",
+    "....................cc........cc............",
+    "..........######.#########.#####............",
+    "..........#....................#............",
+    "..........#....................#............",
+    "..........#..nn.......nn.......#............",
+    "...............................#        ..  ",
+    "..........#....................#        ..  ",
+    "          #....................#        ..  ",
+    "          ######################        ..  "
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "c": "cover",
+    "n": "cover"
+  },
+  "berth": {
+    "origin": {
+      "x": 4,
+      "y": 0
+    },
+    "sizeClass": "M"
+  },
+  "posts": [
+    {
+      "key": "target",
+      "kind": "target",
+      "name": "the keeper's bench",
+      "tile": {
+        "x": 21,
+        "y": 27
+      },
+      "facing": "n"
+    },
+    {
+      "key": "loot",
+      "kind": "loot",
+      "name": "the strongbox shelf",
+      "tile": {
+        "x": 22,
+        "y": 27
+      },
+      "facing": "n"
+    },
+    {
+      "key": "east_door",
+      "kind": "guard",
+      "name": "the east door",
+      "tile": {
+        "x": 26,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "west_door_inside",
+      "kind": "guard",
+      "name": "inside the west door",
+      "tile": {
+        "x": 16,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "net_bench",
+      "kind": "bystander",
+      "name": "the net bench",
+      "tile": {
+        "x": 29,
+        "y": 27
+      },
+      "facing": "w"
+    },
+    {
+      "key": "jetty_end",
+      "kind": "exit",
+      "name": "the jetty",
+      "tile": {
+        "x": 41,
+        "y": 29
+      },
+      "facing": "s"
+    },
+    {
+      "key": "west_door",
+      "kind": "flank",
+      "name": "the west door",
+      "tile": {
+        "x": 8,
+        "y": 26
+      },
+      "facing": "e"
+    }
+  ],
+  "areas": [],
+  "props": [
+    {
+      "key": "skiff",
+      "kind": "hullSection",
+      "rect": {
+        "x": 33,
+        "y": 23,
+        "w": 3,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "lamp_west",
+      "kind": "lamp",
+      "rect": {
+        "x": 2,
+        "y": 21,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    },
+    {
+      "key": "lamp_east",
+      "kind": "lamp",
+      "rect": {
+        "x": 39,
+        "y": 21,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    },
+    {
+      "key": "barrels",
+      "kind": "barrels",
+      "rect": {
+        "x": 12,
+        "y": 23,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    }
+  ],
+  "foreground": [
+    {
+      "kind": "awning",
+      "rect": {
+        "x": 10,
+        "y": 22,
+        "w": 22,
+        "h": 1
+      }
+    },
+    {
+      "kind": "rockWall",
+      "rect": {
+        "x": 0,
+        "y": 28,
+        "w": 10,
+        "h": 2
+      }
+    }
+  ],
+  "ambience": "Gulls on the shed roof, the tide pulling at the jetty piles, and nobody in sight who wants to be.",
+  "grime": 0.6,
+  "airborneDust": 0.4,
+  "noticeRadius": 6,
+  "defaultCast": [
+    {
+      "name": "Corran Vale",
+      "role": "boat-shed keeper",
+      "look": "grey, wiry, never still",
+      "part": "target",
+      "arms": "none",
+      "resolve": "steady",
+      "tie": "bound",
+      "wants": "out",
+      "post": "target"
+    },
+    {
+      "name": "Hesk Marrow",
+      "role": "hired hand",
+      "look": "big, bored, a blaster across his knees",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "steady",
+      "tie": "paid",
+      "wants": "money",
+      "post": "east_door"
+    },
+    {
+      "name": "Darrow Finch",
+      "role": "the keeper's nephew",
+      "look": "young, trying to look hard",
+      "part": "guard",
+      "arms": "melee",
+      "resolve": "shaky",
+      "tie": "bound",
+      "wants": "out",
+      "post": "west_door_inside"
+    },
+    {
+      "name": "Old Pell",
+      "role": "net mender",
+      "look": "deaf, or pretending",
+      "part": "bystander",
+      "arms": "none",
+      "resolve": "shaky",
+      "tie": "paid",
+      "wants": "nothing",
+      "post": "net_bench"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 /**
- * Ship life slice 2, slice 3, slice 4 and slice 5 content every hand-built
- * fixture bundle needs: the twenty-seven thought defs (`ContentBundle.thoughts` is required), three of the
+ * Ship life slice 2, slice 3, slice 4 and slice 5 (and expeditions A1) content every hand-built
+ * fixture bundle needs: the thirty-two thought defs (`ContentBundle.thoughts` is required), three of the
  * twelve activities and the seven topics (slice 4: `activities` and `topics` are required), and
  * the `watches`, `mood`, `hazards`, `galley`, `dirt`, `recreation`, `cabins`, slice 4 `social` and
- * slice 5 `field`, `damage` and `intercom` config at the default bundle's values. A fixture overrides `dayworkerOnWatches` to keep the
+ * slice 5 `field`, `damage` and `intercom` and expeditions A1 `bodies` and `expedition` config at
+ * the default bundle's values. A fixture overrides `dayworkerOnWatches` to keep the
  * duty pattern its tests were written against.
  */
 import type { ActivityDef, ConfigDef, ThoughtDef, ThoughtKey, TopicDef } from "../types/content";
@@ -193,6 +194,41 @@ export const FIXTURE_THOUGHTS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.5,
     stacks: false,
   },
+  killedSomeone: {
+    key: "killedSomeone",
+    label: "killed someone",
+    value: -0.4,
+    durationDays: 3,
+    stacks: false,
+  },
+  sawCrewHurt: {
+    key: "sawCrewHurt",
+    label: "saw a crewmate hurt",
+    value: -0.2,
+    durationDays: 1,
+    stacks: true,
+  },
+  heldTheLine: {
+    key: "heldTheLine",
+    label: "held the line",
+    value: 0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  ranFromAFight: {
+    key: "ranFromAFight",
+    label: "ran from a fight",
+    value: -0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  wounded: {
+    key: "wounded",
+    label: "wounded",
+    value: -0.2,
+    durationDays: 0.5,
+    stacks: false,
+  },
 };
 
 const keyedById = <Id extends string, T extends { readonly id: Id }>(
@@ -292,6 +328,9 @@ export const FIXTURE_MEMORIES: ConfigDef["social"]["memories"] = {
   heardMeOut: { label: "heard me out", opinion: 2, durationDays: 7, stackLimit: 1 },
   dressedMeDown: { label: "dressed me down", opinion: -2, durationDays: 7, stackLimit: 1 },
   talkedItThrough: { label: "talked it through", opinion: 1, durationDays: 7, stackLimit: 1 },
+  foughtBeside: { label: "fought beside me", opinion: 1, durationDays: 7, stackLimit: 2 },
+  carriedMeOut: { label: "carried me out", opinion: 3, durationDays: 14, stackLimit: 1 },
+  leftMeBehind: { label: "left me behind", opinion: -3, durationDays: 14, stackLimit: 1 },
 };
 
 /**
@@ -428,3 +467,63 @@ export const FIXTURE_DAMAGE: ConfigDef["damage"] = {
 
 /** Slice 5 (§intercom-and-reporting): the intercom at the default bundle's values. */
 export const FIXTURE_INTERCOM: ConfigDef["intercom"] = { reportSeconds: 3 };
+
+/** Expeditions A1 (§7.1): bodies at the default bundle's values. */
+export const FIXTURE_BODIES: ConfigDef["bodies"] = {
+  tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
+  severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },
+  severityPain: { graze: 0.1, serious: 0.3, grave: 0.6 },
+  painDecayPerSecond: 0.01,
+  bleedPerSecond: { graze: 0, serious: 0.004, grave: 0.012 },
+  bleedStopsAfterSeconds: { graze: 0, serious: 60, grave: 180 },
+  bloodRecoverPerSecond: 0.002,
+  stunPerHit: 0.5,
+  stunDecayPerSecond: 0.004,
+  incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
+  deadBelowBlood: 0.25,
+  healPerDay: 0.5,
+  partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
+  stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
+};
+
+/** Expeditions A1 (§8): the fight at the default bundle's values. */
+export const FIXTURE_EXPEDITION: ConfigDef["expedition"] = {
+  decideEverySeconds: 0.5,
+  maxFightSeconds: 120,
+  alertClearSeconds: 60,
+  hitSkillBase: 0.7,
+  hitPerFighting: 0.06,
+  rangeFalloffFloor: 0.5,
+  coverPenalty: 0.5,
+  movingTargetFactor: 0.8,
+  movingShooterFactor: 0.7,
+  meleeAdjacentOnly: true,
+  resolveTiers: { shaky: 0.45, steady: 0.7, hard: 0.95 },
+  tie: {
+    paid: { resolve: 0.8, loyalty: 0.3 },
+    bound: { resolve: 1, loyalty: 0.7 },
+    devoted: { resolve: 1.25, loyalty: 1 },
+  },
+  castFighting: { shaky: 2, steady: 4, hard: 6 },
+  crewResolve: { base: 0.6, perFighting: 0.03, perMood: 0.1, perLeaderAffinity: 0.02 },
+  morale: {
+    hitSelf: -0.25,
+    allyDown: -0.2,
+    allyDead: -0.3,
+    underFireNoCoverPerSecond: -0.05,
+    outnumberedPerSecond: -0.03,
+    allyHit: 0.05,
+    inCoverPerSecond: 0.02,
+    leaderNearPerSecond: 0.02,
+    outflanked: -0.3,
+    targetTaken: -0.4,
+    waverBelow: 0.5,
+    breakBelow: 0.25,
+    recoverAbove: 0.6,
+  },
+  withdrawWhen: { firstDown: 1, halfDown: 0.5 },
+  leaderNearTiles: 3,
+  surrenderIfCornered: true,
+  blasters: 3,
+  batons: 2,
+};

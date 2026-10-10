@@ -22,7 +22,6 @@
       "minLength": 1
     },
     "castSeed": {
-      "minItems": 2,
       "maxItems": 3,
       "type": "array",
       "items": {
@@ -50,7 +49,6 @@
       }
     },
     "externalStores": {
-      "minItems": 1,
       "type": "array",
       "items": {
         "type": "object",
@@ -164,6 +162,14 @@
         "required": ["toPortId", "distance"],
         "additionalProperties": false
       }
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["port", "site"]
+    },
+    "nearPortId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
     }
   },
   "required": [

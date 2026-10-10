@@ -17,9 +17,11 @@ import type {
   ContentBundle,
   DeckDef,
   DockDef,
+  DockPostKind,
   DockRect,
   PortDef,
   ScenarioDef,
+  SiteCastEntryDef,
   TileCoord,
 } from "@crew/sim";
 import {
@@ -34,6 +36,7 @@ import {
   tileKey,
 } from "./geometry";
 import { type Path, type ValidationIssue, checkLocalKeyLists, checkRef, issue } from "./issues";
+import { SITE_CAST_LIMITS } from "./site";
 
 /** Dockside §3.1: ship plus dock stays legible in the docked camera on a phone. */
 const DOCK_MAX_WIDTH = 48;
@@ -107,6 +110,9 @@ function countOf<T extends { kind: string }>(items: readonly T[], kind: T["kind"
 }
 
 function checkComposition(dock: DockDef, issues: ValidationIssue[]): void {
+  // Expeditions A1 (§4, call 10): a site needs no gate, warehouse door, stall or areas; its own
+  // composition is `checkSiteComposition`'s.
+  if (dock.kind === "site") return;
   const path = dockPath(dock);
   const exactlyOne = (count: number, what: string, where: "posts" | "areas") => {
     if (count !== 1) {
@@ -150,6 +156,7 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
       issues,
     );
     checkComposition(dock, issues);
+    checkSiteReferences(dock, bundle, issues);
     // §dock-map-content: the dock takes its setting from its port rather than repeating it.
     const setting = bundle.ports[dock.portId]?.setting;
     if (setting === "planet" && dock.palette.sky === undefined) {
@@ -162,6 +169,91 @@ export function checkDockReferences(bundle: ContentBundle, issues: ValidationIss
     }
   }
 }
+
+/** Expeditions A1 (§5.2): which post kinds each cast part may stand at. */
+const POSTS_FOR_PART: Readonly<Record<SiteCastEntryDef["part"], readonly DockPostKind[]>> = {
+  target: ["target"],
+  guard: ["guard"],
+  bystander: ["bystander"],
+  ally: ["guard", "bystander"],
+};
+
+/**
+ * L2, expeditions A1 (§3.1, §4, §5.3): a site map belongs to a site port and a dock map to a port;
+ * only a site has a `noticeRadius` (and must) and a `defaultCast`; the cast is within the caps
+ * (`SITE_CAST_LIMITS`) and each entry stands at a post of its part's kind.
+ */
+function checkSiteReferences(
+  dock: DockDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const path = dockPath(dock);
+  const site = dock.kind === "site";
+  const portIsSite = bundle.ports[dock.portId]?.kind === "site";
+  if (bundle.ports[dock.portId] !== undefined && site !== portIsSite) {
+    issues.push(
+      issue(
+        "referential",
+        [...path, "kind"],
+        site
+          ? `a site map belongs to a site, not port "${dock.portId}"`
+          : `site "${dock.portId}" needs a map of kind "site"`,
+      ),
+    );
+  }
+  if (!site) {
+    if (dock.noticeRadius !== undefined || dock.defaultCast !== undefined) {
+      issues.push(issue("referential", path, "only a site map has noticeRadius and defaultCast"));
+    }
+    return;
+  }
+  if (dock.noticeRadius === undefined) {
+    issues.push(issue("referential", [...path, "noticeRadius"], "a site map needs a noticeRadius"));
+  }
+  const cast = dock.defaultCast ?? [];
+  const count = (pred: (e: SiteCastEntryDef) => boolean) => cast.filter(pred).length;
+  for (const [n, max, what] of [
+    [cast.length, SITE_CAST_LIMITS.people, "people"],
+    [count((e) => e.arms !== "none"), SITE_CAST_LIMITS.armed, "armed"],
+    [count((e) => e.part === "target"), SITE_CAST_LIMITS.targets, "targets"],
+    [count((e) => e.part === "ally"), SITE_CAST_LIMITS.allies, "allies"],
+  ] as const) {
+    if (n > max) {
+      issues.push(issue("referential", [...path, "defaultCast"], `${n} ${what}; at most ${max}`));
+    }
+  }
+  cast.forEach((entry, i) => {
+    const post = dock.posts.find((p) => p.key === entry.post);
+    const allowed = POSTS_FOR_PART[entry.part];
+    if (post === undefined) {
+      issues.push(
+        issue("referential", [...path, "defaultCast", i, "post"], `no post "${entry.post}"`),
+      );
+    } else if (!allowed.includes(post.kind)) {
+      issues.push(
+        issue(
+          "referential",
+          [...path, "defaultCast", i, "post"],
+          `${entry.name} is a ${entry.part}, at a ${allowed.join(" or ")} post, not "${post.key}" (${post.kind})`,
+        ),
+      );
+    }
+  });
+}
+
+/**
+ * L3, expeditions A1 (§4, call 10): a site's own composition: one `target`, one `exit`, at least
+ * one `guard`; a `flank` post's route to the target disjoint from the landing's south of the apron
+ * except the target's neighbours; `noticeRadius` under the map's width.
+ *
+ * Gate stub: nothing yet. Owner: W3 of expeditions A1.
+ */
+export function checkSiteComposition(
+  _dock: DockDef,
+  _bundle: ContentBundle,
+  _issues: ValidationIssue[],
+): void {}
 
 /** L2: a castSeed `post` names a post on that port's dock map (Dockside §5.2). */
 export function checkCastSeedPosts(
@@ -503,6 +595,7 @@ export function checkDockPhysical(
   for (const deck of Object.values(bundle.decks)) {
     if (deckBerthsAt(dock, deck)) checkLandings(dock, deck, mask, issues);
   }
+  if (dock.kind === "site") checkSiteComposition(dock, bundle, issues);
 }
 
 /**

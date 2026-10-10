@@ -83,6 +83,11 @@ function stubView(stub: Stub): AgentView {
     roleTags: stub.roles ?? ["captain"],
     needs: { hunger: 0, fatigue: 0, comfort: 0, social: 0, recreation: 0 },
     capacities: { movement: 1, manipulation: 1, consciousness: 1 },
+    body: {
+      capacities: { movement: 1, manipulation: 1, consciousness: 1 },
+      wounded: false,
+      bleeding: false,
+    },
     skills: {},
     traits: [],
     mood: 0,

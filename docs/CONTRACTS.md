@@ -20,6 +20,9 @@ All sim contracts live under `packages/sim/src/core/types/` and are re-exported 
 | Content defs: `DeckDef`, `MachineDef`, `ItemDef`, `CrewDef`, `TraitDef`, `PortDef`, `ScenarioDef`, `ConfigDef`, `ContentBundle`, closed vocabularies (`SKILLS`, `MACHINE_TAGS`, …) | `core/types/content.ts` | W10 authors data | W2–W6, W9, W10 |
 | `WorldState`, `SCHEMA_VERSION`, `WorkState`, `DynamicDefs` | `core/types/state.ts` | W2 | everyone |
 | `Actor`, `Needs`, `MovementState`, `KnownFact`, `KnowledgeTable` | `core/types/actor.ts` | W3 (location/movement), W4a (needs), W4 (activity), perception (knowledge) | W3, W4, W7, W9 |
+| `Body`, `Wound`, `Combatant`, `Disposition` (expeditions A1) | `core/types/actor.ts` | bodies (`systems/bodies/`: `Actor.body`, through `applyDamage` and the bodies system); expedition (`Actor.combatant`) | combat, AgentView, render, narrator (A2) |
+| Body formulas: `wholeBody`, `bodyCapacities`, `applyCapacities`, `isDeadBy`, `incapacityOf` | `core/body.ts` | bodies | needs, bodies, AgentView, invariants |
+| `Expedition`, `BattlePlan`, `PlanOption`, the site map (`DockDef.kind: "site"`, `SiteCastEntryDef`, `SITE_LIMITS`), `PortDef.kind: "site"` | `core/types/state.ts`, `core/types/view.ts`, `core/types/content.ts`; readers `core/sites.ts`, `core/places.ts` | expedition (`systems/expedition/`), plan menu (`view/planMenu.ts`) | web, the instrument, narrator (A2) |
 | `Machine`, `MachineFault`, `Door`, `Compartment`, `DeckState`, `Item`, `PowerState` | `core/types/ship.ts` | W3 (deck, doors), W5 (machines, power), transfers (items) | W3–W7, W9 |
 | `TravelState`, `Job`, `MoneyState` | `core/types/travel.ts` | W6 | W7, W9 |
 | **Work contract**: `Problem`, `Task`, `Claim`, `Action`, `Activity`, `Intent`, `UrgencyClass`, `TaskDerivationTable` | `core/types/work.ts` | problems: owning system (W5, W6); tasks/claims/activity: W4 | W4, W5, W6, W7 |
@@ -81,7 +84,16 @@ holds a `hullImpact` fact about the field, with the compartment only for those w
     `Math.random`, no `Date` in the kernel.
 11. **Mutation model.** Systems mutate `WorldState` in place; entity types are mutable, value
     objects are `readonly` and replaced whole. Everyone else reads `ReadonlyWorldState`.
-12. **A lost ship halts the kernel** (§hull-scars-and-ship-loss). Once `hull.lostAtTick` is set,
+12. **Bodies and the fight (expeditions A1).** Damage reaches a body only through `applyDamage`
+    (`systems/bodies/damage.ts`). Capacities have one formula and two writers: `applyCapacities`
+    (`core/body.ts`, fatigue's curve times the body's), called by needs for the crew it steps and by
+    the bodies system for everyone else; `bodyViolations` holds them to it, and `dead` to
+    `isDeadBy`. The combat system owns its combatants: during a fight it sets each one's activity to
+    `personal` `fight` and moves them itself; the planner returns `continue` for `fight` and
+    `muster`, and work does not step a fighter. Cast actors are `crew: false` and never planned or
+    stepped. A landing site (`PortDef.kind: "site"`) is not the narrator's in A1: `isSite` filters it
+    from the capability block, the paths, and the null narrator's offers.
+13. **A lost ship halts the kernel** (§hull-scars-and-ship-loss). Once `hull.lostAtTick` is set,
 `advance` returns the `AdvanceHalt` `{ kind: "lost" }` without stepping, every time; nothing
 un-loses a ship, and a restored lost save halts at once. Every `switch` on `halt.kind` handles it:
     the worker host posts `shipLost { tick }` once, `crew pacing` and `crew beats` end the run.
@@ -132,8 +144,9 @@ Commands and events are split one file per system under `core/types/commands/` a
 
 - Additive changes (a new optional field, a new variant in your own file) need no coordination
   beyond keeping `pnpm typecheck` green.
-- Breaking changes to `WorldState` bump `SCHEMA_VERSION` (12 since slice 5: `hull`,
-  `field`, `alert`, the `field` and `scar` id counters; 11 → 12 migrates). Before the slice is
+- Breaking changes to `WorldState` bump `SCHEMA_VERSION` (13 since expeditions A1: `Actor.body`,
+  `skills.fighting`, `combatant`, `expedition`, the `wound` id counter, the arms locker; 12 → 13
+  migrates). Before the slice is
   playable, wipe saves instead of writing a migration; after that, ship a `Migration`.
 - Changing a closed vocabulary in `content.ts` (skills, tags, tool kinds) requires the matching
   enum in `packages/content/src/schemas/primitives.ts`; the `VOCABULARY_IN_SYNC` check fails to

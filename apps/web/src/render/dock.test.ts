@@ -71,6 +71,7 @@ function actor(id: string, x: number, y: number, onDock = false): RenderActor {
     y,
     actionLabel: "standing",
     passenger: false,
+    wounded: false,
     onDock,
   };
 }
@@ -103,6 +104,7 @@ function frameWith(actors: RenderActor[], items: RenderItem[], t: RenderTravel):
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
+    shots: [],
   };
 }
 

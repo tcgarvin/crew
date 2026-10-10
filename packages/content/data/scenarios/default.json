@@ -131,6 +131,16 @@
       "itemDefId": "item.patch_kit",
       "count": 2,
       "zoneKey": "locker_passenger_2"
+    },
+    {
+      "itemDefId": "item.blaster",
+      "count": 3,
+      "zoneKey": "arms"
+    },
+    {
+      "itemDefId": "item.baton",
+      "count": 2,
+      "zoneKey": "arms"
     }
   ],
   "initialFaults": [],

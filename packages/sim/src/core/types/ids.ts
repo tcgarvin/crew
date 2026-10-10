@@ -86,6 +86,8 @@ export type SessionId = Brand<string, "SessionId">;
 export type FieldId = Brand<string, "FieldId">;
 /** §hull-scars-and-ship-loss: one impact's mark on the hull (`state.hull.scars`). */
 export type ScarId = Brand<string, "ScarId">;
+/** Expeditions A1 (§7.1): one wound on a body (`Actor.body.wounds`). */
+export type WoundId = Brand<string, "WoundId">;
 
 /**
  * Prefix per instance kind. The kernel's ID allocator (W2) is the only writer; it formats
@@ -116,6 +118,8 @@ export const ID_PREFIX = {
   // `s` is the session).
   field: "f",
   scar: "r",
+  // Expeditions A1 (§7.1): wounds.
+  wound: "w",
 } as const;
 
 export type InstanceKind = keyof typeof ID_PREFIX;
@@ -140,6 +144,7 @@ export interface InstanceIdOf {
   session: SessionId;
   field: FieldId;
   scar: ScarId;
+  wound: WoundId;
 }
 
 /** Any kernel-allocated instance ID. */

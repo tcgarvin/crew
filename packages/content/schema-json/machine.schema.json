@@ -35,7 +35,8 @@
           "lifeSupport",
           "cooling",
           "rampControl",
-          "comm"
+          "comm",
+          "armsLocker"
         ]
       }
     },
@@ -211,7 +212,15 @@
           "properties": {
             "skill": {
               "type": "string",
-              "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+              "enum": [
+                "engineering",
+                "electrical",
+                "piloting",
+                "cargo",
+                "medical",
+                "cooking",
+                "fighting"
+              ]
             },
             "min": {
               "type": "number",
@@ -362,7 +371,8 @@
                             "piloting",
                             "cargo",
                             "medical",
-                            "cooking"
+                            "cooking",
+                            "fighting"
                           ]
                         },
                         "min": {
@@ -477,7 +487,15 @@
               "properties": {
                 "skill": {
                   "type": "string",
-                  "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+                  "enum": [
+                    "engineering",
+                    "electrical",
+                    "piloting",
+                    "cargo",
+                    "medical",
+                    "cooking",
+                    "fighting"
+                  ]
                 },
                 "min": {
                   "type": "number",

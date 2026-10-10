@@ -28,6 +28,18 @@ describe("W0 contracts", () => {
     expect(AUTHORITY.narrator).toBe(NARRATOR_COMMAND_KINDS);
   });
 
+  it("starts an expedition only as the scenario; the player chooses its plan and calls it back (expeditions A1)", () => {
+    expect(AUTHORITY.scenario).toEqual(
+      expect.arrayContaining(["scenarioStartExpedition", "adoptPlan", "withdrawParty"]),
+    );
+    expect(AUTHORITY.player).toEqual(expect.arrayContaining(["adoptPlan", "withdrawParty"]));
+    for (const source of ["player", "narrator", "system"] as const) {
+      expect(AUTHORITY[source]).not.toContain("scenarioStartExpedition");
+    }
+    expect(AUTHORITY.narrator).not.toContain("adoptPlan");
+    expect(AUTHORITY.system).not.toContain("adoptPlan");
+  });
+
   it("no source other than scenario may spawn inside the ship or set needs", () => {
     for (const source of ["player", "narrator", "system"] as const) {
       expect(AUTHORITY[source]).not.toContain("scenarioSpawn");

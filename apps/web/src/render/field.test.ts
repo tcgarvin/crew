@@ -48,6 +48,7 @@ const frame: RenderFrame = {
   alert: true,
   field: { phase: "active", severity: "brutal", stuck: false },
   impacts: [],
+  shots: [],
 };
 
 function render(width: number, height: number, withField: boolean) {

@@ -3,15 +3,18 @@
  * untrusted JSON and must tolerate missing or odd fields: anything it does not recognise is left
  * for the invariants to judge.
  */
+import { wholeBody } from "./body";
 import { watchIndexAt } from "./clock";
 import { emptyCells } from "./dirt-grid";
 import { berthDock, dockAreaTiles } from "./docks";
 import { interestsFromSeed } from "./interests";
+import { instantiatePlacement } from "./placement";
 import { SaveCompatibilityError } from "./save-error";
 import type { TileCoord } from "./types/common";
 import type { ItemDef } from "./types/content";
 import type { ActorId, CrewDefId, DeckDefId, DockDefId, ScenarioDefId } from "./types/ids";
 import type { MigrationContext, MigrationRegistry } from "./types/save";
+import type { WorldState } from "./types/state";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -587,6 +590,59 @@ function asteroidField(raw: unknown, { content, warn }: MigrationContext): unkno
   return raw;
 }
 
+/**
+ * 12 → 13 (expeditions A1, plan call 13): bodies and arms.
+ * - every actor gains a whole `body`, and `skills.fighting` from its crew def (content, else the
+ *   save's generated defs), else 0;
+ * - no `expedition`; `nextId.wound` starts at 1;
+ * - each `armsLocker` placement of the save's deck that the save has no machine for is
+ *   instantiated (`instantiatePlacement`) with the mean failure threshold, 1 (it never fails, and a
+ *   migration draws on no stream);
+ * - the scenario's `weapon`-tagged `startingItems` stowed as 11 → 12 stowed the patch kits, unless
+ *   the save holds one; the owner is told through `warn`.
+ */
+function bodiesAndArms(raw: unknown, { content, warn }: MigrationContext): unknown {
+  if (!isRecord(raw)) return raw;
+  const dynamicCrew =
+    isRecord(raw.defs) && isRecord(raw.defs.dynamic) && isRecord(raw.defs.dynamic.crew)
+      ? raw.defs.dynamic.crew
+      : {};
+  if (isRecord(raw.actors)) {
+    for (const actor of Object.values(raw.actors)) {
+      if (!isRecord(actor)) continue;
+      if (!isRecord(actor.body)) actor.body = wholeBody();
+      if (!isRecord(actor.skills) || typeof actor.skills.fighting === "number") continue;
+      const defId = typeof actor.defId === "string" ? actor.defId : "";
+      const def = content.crew[defId as CrewDefId] ?? dynamicCrew[defId];
+      const skills = isRecord(def) && isRecord(def.skills) ? def.skills : {};
+      actor.skills.fighting = typeof skills.fighting === "number" ? skills.fighting : 0;
+    }
+  }
+  if (isRecord(raw.nextId) && typeof raw.nextId.wound !== "number") raw.nextId.wound = 1;
+  const deckIds = isRecord(raw.deck) && isRecord(raw.deck.tiles) ? Object.keys(raw.deck.tiles) : [];
+  if (isRecord(raw.machines) && isRecord(raw.nextId)) {
+    const held = new Set(
+      Object.values(raw.machines).flatMap((m) =>
+        isRecord(m) && typeof m.placementKey === "string" ? [m.placementKey] : [],
+      ),
+    );
+    const host = raw as unknown as Pick<WorldState, "machines" | "nextId">;
+    for (const deck of deckIds.map((id) => content.decks[id as DeckDefId])) {
+      if (deck === undefined) continue;
+      for (const placement of deck.machines) {
+        if (held.has(placement.key)) continue;
+        if (!content.machines[placement.machineDefId]?.tags.includes("armsLocker")) continue;
+        instantiatePlacement(host, deck, placement, content, 1);
+      }
+    }
+  }
+  const spawned = spawnScenarioStores(raw, content, deckIds, (def) => def.tags.includes("weapon"));
+  if (spawned.length > 0) {
+    warn?.(`Save predates expeditions (schema 12); stowed the scenario's ${spawned.join(" and ")}`);
+  }
+  return raw;
+}
+
 /** A detached plain-JSON copy, so a migrated actor never aliases content. */
 function structuredJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
@@ -604,4 +660,5 @@ export const migrations: MigrationRegistry = {
   9: offWatch,
   10: affinityFromMemories,
   11: asteroidField,
+  12: bodiesAndArms,
 };

@@ -11,9 +11,10 @@ import { isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
 import { roomPhrase } from "./rooms";
+import { siteOf } from "./sites";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
-import type { ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
+import type { BodyPart, ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
 import type { SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
@@ -25,6 +26,7 @@ import type {
   RenderActor,
   RenderDock,
   RenderDockProp,
+  RenderExpedition,
   RenderField,
   RenderFrame,
   RenderHull,
@@ -36,7 +38,9 @@ import type {
   RenderMachine,
   RenderMachineState,
   RenderSession,
+  RenderShot,
   RenderTravel,
+  SideWord,
   TickerEntry,
 } from "./types/view";
 import type { DirtFrame } from "./types/view";
@@ -70,7 +74,10 @@ export function actionLabel(
   content: ContentBundle,
 ): string {
   if (actor.availability === "dead") return "dead";
-  if (actor.availability === "incapacitated") return "incapacitated";
+  // Expeditions A1 (§8.6): in a fight, someone incapacitated is "down".
+  if (actor.availability === "incapacitated") {
+    return actor.combatant === undefined ? "incapacitated" : "down";
+  }
   const activity = actor.activity;
   if (activity.kind === "idle") {
     return actor.movement.kind === "moving" ? "walking" : "idle";
@@ -131,6 +138,10 @@ function renderActor(
     facing: actor.facing,
     actionLabel: actionLabel(actor, state, content),
     passenger: actor.passenger === true,
+    ...(actor.combatant === undefined
+      ? {}
+      : { state: actor.combatant.state, side: actor.combatant.side }),
+    wounded: actor.body.wounds.length > 0,
   };
 }
 
@@ -152,6 +163,9 @@ const TICKER_TRACE_TYPES: ReadonlySet<SimEvent["type"]> = new Set([
   "taskCompleted",
   "travelStageChanged",
   "fellAsleep",
+  // Expeditions A1 (§8.6): every shot reaches the frame's tracers (`RenderFrame.shots`); its
+  // line is null, so the log never shows it.
+  "shotFired",
 ]);
 
 /** Notable events whose information another ticker line already carries. */
@@ -257,6 +271,10 @@ type Names = {
   cabinOf(actorId: string): string;
   /** Slice 4: "played the harmonica in the lounge": a performance, said from where they are. */
   performed(actorId: string, activityId: string): string;
+  /** Expeditions A1: is this actor crew (a party member) rather than one of the site's cast? */
+  isCrew(actorId: string): boolean;
+  /** Expeditions A1: the site's exit post's name ("the jetty"), or "the way out". */
+  siteExit(): string;
 };
 
 function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
@@ -300,6 +318,11 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       return text.charAt(0).toUpperCase() + text.slice(1);
     },
     actor: (id) => state.actors[id as Actor["id"]]?.name,
+    isCrew: (id) => state.actors[id as Actor["id"]]?.crew === true,
+    siteExit: () => {
+      const exit = siteOf(content, state)?.dock.posts.find((p) => p.kind === "exit");
+      return exit?.name ?? "the way out";
+    },
     machine,
     machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
     port: (id) => portName(content, id as PortDefId),
@@ -583,7 +606,98 @@ function fieldLine(event: SimEvent, n: Names): string | null | undefined {
     case "intercomReport":
       return intercomLine(event, n);
     default:
+      return expeditionLine(event, n);
+  }
+}
+
+const COUNT_WORDS = ["no one", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+
+/** "four", for a ticker line; digits past eight. */
+function countWord(n: number): string {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
+/** Expeditions A1 (§8.6): where a wound landed, for "is hit in the leg". */
+const PART_WORDS: Readonly<Record<BodyPart, string>> = {
+  head: "the head",
+  torso: "the body",
+  leftArm: "the arm",
+  rightArm: "the arm",
+  leftLeg: "the leg",
+  rightLeg: "the leg",
+};
+
+/**
+ * Expeditions A1 (§8.6): the fight's lines: the party going down the ramp, contact, hits, people
+ * going down, breaking and dying, the pull-back and the end. `undefined` for any other event.
+ */
+function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
+  switch (event.type) {
+    case "expeditionStarted": {
+      const [leaderId] = event.payload.party;
+      if (leaderId === undefined) return `Set down at ${n.port(event.payload.siteId)}`;
+      const leader = n.actor(leaderId) ?? "The captain";
+      const others = event.payload.party.length - 1;
+      return others === 0
+        ? `${leader} goes down the ramp alone`
+        : `${leader} takes ${countWord(others)} down the ramp`;
+    }
+    case "expeditionContact":
+      return `Shots at ${n.port(event.payload.siteId).toLowerCase()}`;
+    case "shotFired":
+    case "partyMustered":
+      return null;
+    case "wounded": {
+      const who = n.actor(event.payload.actorId) ?? "Someone";
+      if (event.payload.type === "stun") return `${who} is stunned`;
+      return n.isCrew(event.payload.actorId)
+        ? `${who} is hit in ${PART_WORDS[event.payload.part]}`
+        : `${who} is hit`;
+    }
+    case "incapacitated":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} is down`;
+    case "died":
+      return `${n.actor(event.payload.actorId) ?? "Someone"} is dead`;
+    case "woundHealed":
+      return null;
+    case "combatantBroke": {
+      const who = n.actor(event.payload.actorId) ?? "Someone";
+      if (event.payload.how === "surrendered") return `${who} gives up`;
+      return event.payload.side === "us"
+        ? `${who} runs for the ship`
+        : `${who} runs for ${n.siteExit()}`;
+    }
+    case "partyWithdrew":
+      return "The party pulls back to the ramp";
+    case "expeditionResolved":
+      return resolvedLine(event, n);
+    default:
       return undefined;
+  }
+}
+
+/** "Corran Vale taken; two of ours hurt", "Corran Vale got away", and the rest. */
+function resolvedLine(event: Extract<SimEvent, { type: "expeditionResolved" }>, n: Names): string {
+  const { outcome, targetName, woundsUs, deadUs, siteId } = event.payload;
+  const target = targetName ?? "The target";
+  switch (outcome) {
+    case "targetTaken": {
+      const cost =
+        deadUs > 0
+          ? `; ${countWord(deadUs)} of ours dead`
+          : woundsUs > 0
+            ? `; ${countWord(woundsUs)} of ours hurt`
+            : "";
+      return `${target} taken${cost}`;
+    }
+    case "targetFled":
+      return `${target} got away`;
+    case "partyRouted":
+      return "The party is driven back to the ship";
+    case "partyWithdrew":
+      return `The party came back without ${targetName ?? "the target"}`;
+    case "timedOut":
+      return `The fight at ${n.port(siteId).toLowerCase()} peters out`;
   }
 }
 
@@ -1301,6 +1415,56 @@ function renderImpact(event: Extract<SimEvent, { type: "asteroidImpact" }>): Ren
   return { tick: event.tick, x: tile.x, y: tile.y, rock, tiles: tiles.map((t) => ({ ...t })) };
 }
 
+/** Expeditions A1 (§8.6): a shot for the tracer, from where shooter and target stand now. */
+function renderShot(
+  event: Extract<SimEvent, { type: "shotFired" }>,
+  state: ReadonlyWorldState,
+): RenderShot | undefined {
+  const at = (id: Actor["id"]) => {
+    let location = state.actors[id]?.location;
+    if (location?.kind === "carriedBy") location = state.actors[location.actorId]?.location;
+    return location?.kind === "onDeck" ? location : undefined;
+  };
+  const from = at(event.payload.byActorId);
+  const to = at(event.payload.atActorId);
+  if (from === undefined || to === undefined) return undefined;
+  return {
+    tick: event.tick,
+    fromX: from.x,
+    fromY: from.y,
+    toX: to.x,
+    toY: to.y,
+    hit: event.payload.hit,
+  };
+}
+
+/**
+ * Expeditions A1 (§8.6): one word for a side: `done` when nobody on it can fight, `breaking` when
+ * anyone breaks, `shaky` when anyone wavers, else `steady` (also before anyone is in it).
+ */
+function sideWord(state: ReadonlyWorldState, side: "us" | "them"): SideWord {
+  const states = Object.values(state.actors).flatMap((actor) =>
+    actor.combatant?.side === side ? [actor.combatant.state] : [],
+  );
+  if (states.length === 0) return "steady";
+  const fighting = states.filter((s) => s === "steady" || s === "wavering" || s === "breaking");
+  if (fighting.length === 0) return "done";
+  if (fighting.includes("breaking")) return "breaking";
+  if (fighting.includes("wavering")) return "shaky";
+  return "steady";
+}
+
+/** Expeditions A1 (§8.6): the expedition for the HUD, while its site is alongside. */
+export function renderExpedition(
+  state: ReadonlyWorldState,
+  content: ContentBundle,
+): RenderExpedition | undefined {
+  const expedition = state.expedition;
+  if (expedition === undefined) return undefined;
+  if (siteOf(content, state)?.dock.portId !== expedition.siteId) return undefined;
+  return { phase: expedition.phase, us: sideWord(state, "us"), them: sideWord(state, "them") };
+}
+
 export function getRenderFrame(world: World): RenderFrame {
   const { state, content } = world;
   const actors = Object.values(state.actors).flatMap(
@@ -1315,14 +1479,20 @@ export function getRenderFrame(world: World): RenderFrame {
   }));
   const tickerEvents: TickerEntry[] = [];
   const impacts: RenderImpact[] = [];
+  const shots: RenderShot[] = [];
   for (const event of world.caches.diagnostics.lastEvents) {
     if (event.type === "asteroidImpact") impacts.push(renderImpact(event));
+    if (event.type === "shotFired") {
+      const shot = renderShot(event, state);
+      if (shot !== undefined) shots.push(shot);
+    }
     const text = tickerLine(event, state, content);
     if (text !== null) {
       tickerEvents.push({ tick: event.tick, text, significance: event.significance });
     }
   }
   const field = renderField(state, world.config.values);
+  const expedition = renderExpedition(state, content);
   const presence = state.deck.dock;
   const dock: RenderDock | undefined =
     presence === undefined ? undefined : { dockId: presence.dockId, deckId: presence.deckId };
@@ -1350,5 +1520,7 @@ export function getRenderFrame(world: World): RenderFrame {
     alert: state.alert !== undefined,
     ...(field === undefined ? {} : { field }),
     impacts,
+    shots,
+    ...(expedition === undefined ? {} : { expedition }),
   };
 }

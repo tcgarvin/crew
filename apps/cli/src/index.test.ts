@@ -256,7 +256,7 @@ describe("dock maps take both M-class footprints (§berth-boxes)", () => {
     expect(Object.keys(withMk2.decks)).toEqual(
       expect.arrayContaining(["deck.freighter_mk1", mk2Footprint.id]),
     );
-    expect(docks.length).toBe(6);
+    expect(docks.length).toBe(7);
   });
 
   it("lays every map out round an M box: 2-tile side margins, a quay below, under 44 x 30", () => {

@@ -18,6 +18,13 @@ const POST_ROLE: Readonly<Record<DockPostKind, string>> = {
   kiosk: "Somebody keeps this post.",
   loungeDoor: "The way into the port's lounge.",
   bench: "Somewhere to wait.",
+  // Expeditions A1 (§4): a landing site's spots.
+  target: "Where the one they came for keeps to.",
+  guard: "Somebody watches the way in from here.",
+  loot: "Where the thing worth taking is kept.",
+  exit: "The way out, for anyone who runs.",
+  flank: "A second way in.",
+  bystander: "Somebody who is not part of this.",
 };
 
 function capitalise(text: string): string {

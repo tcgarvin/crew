@@ -330,6 +330,41 @@ const DEFS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.5,
     stacks: false,
   },
+  killedSomeone: {
+    key: "killedSomeone",
+    label: "killed someone",
+    value: -0.4,
+    durationDays: 3,
+    stacks: false,
+  },
+  sawCrewHurt: {
+    key: "sawCrewHurt",
+    label: "saw a crewmate hurt",
+    value: -0.2,
+    durationDays: 1,
+    stacks: true,
+  },
+  heldTheLine: {
+    key: "heldTheLine",
+    label: "held the line",
+    value: 0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  ranFromAFight: {
+    key: "ranFromAFight",
+    label: "ran from a fight",
+    value: -0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  wounded: {
+    key: "wounded",
+    label: "wounded",
+    value: -0.2,
+    durationDays: 0.5,
+    stacks: false,
+  },
 };
 
 const thought = (

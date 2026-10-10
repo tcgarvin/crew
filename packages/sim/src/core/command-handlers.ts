@@ -4,6 +4,7 @@
  * (§requested-call-back), `surfaceDecision` and `resolveDecision`. Other kinds belong to their
  * systems and register through the same `registerCommandHandler` path.
  */
+import { wholeBody } from "./body";
 import { commandActor, isFitForCommand } from "./command-actor";
 import {
   type AppliedCommand,
@@ -215,6 +216,8 @@ export function newActor(
     knowledge: {},
     navigationKnowledgeRevision: 0,
     availability: "available",
+    // Expeditions A1 (§7.1): everyone starts whole.
+    body: wholeBody(),
     crew: location.kind !== "inExternalStore",
   };
 }

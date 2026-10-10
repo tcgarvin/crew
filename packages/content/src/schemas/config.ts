@@ -26,6 +26,29 @@ const memoryDefSchema = z.strictObject({
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
 
+/** Expeditions A1 (§7.1): one number per body part. */
+const partRecord = (value: z.ZodNumber) =>
+  z.strictObject({
+    head: value,
+    torso: value,
+    leftArm: value,
+    rightArm: value,
+    leftLeg: value,
+    rightLeg: value,
+  });
+
+/** Expeditions A1 (§7.1): one number per wound severity. */
+const severityRecord = (value: z.ZodNumber) =>
+  z.strictObject({ graze: value, serious: value, grave: value });
+
+/** Expeditions A1: where a hit lands, relative weights that are not all 0. */
+const weightTable = partRecord(nonNegative).refine((t) => Object.values(t).some((w) => w > 0), {
+  message: "part weights must not all be 0",
+});
+
+/** Expeditions A1 (§5.2): a tie's factor on resolve and its loyalty. */
+const tieSchema = z.strictObject({ resolve: positive, loyalty: unitInterval });
+
 /**
  * §scheduling-a-field: one field severity: its mean impact rate, share of large rocks and length.
  */
@@ -338,5 +361,70 @@ export const configDefSchema = z.strictObject({
     checkSeconds: positive,
   }),
   intercom: z.strictObject({ reportSeconds: positive }),
+  bodies: z.strictObject({
+    tolerance: partRecord(positive),
+    severityDamage: severityRecord(nonNegative),
+    severityPain: severityRecord(unitInterval),
+    painDecayPerSecond: nonNegative,
+    bleedPerSecond: severityRecord(nonNegative),
+    bleedStopsAfterSeconds: severityRecord(nonNegative),
+    bloodRecoverPerSecond: nonNegative,
+    stunPerHit: unitInterval,
+    stunDecayPerSecond: nonNegative,
+    incapacitatedBelow: z.strictObject({ consciousness: unitInterval, movement: unitInterval }),
+    deadBelowBlood: unitInterval,
+    healPerDay: nonNegative,
+    partTable: weightTable,
+    stunPartTable: weightTable,
+  }),
+  expedition: z.strictObject({
+    decideEverySeconds: positive,
+    maxFightSeconds: positive,
+    alertClearSeconds: nonNegative,
+    hitSkillBase: nonNegative,
+    hitPerFighting: nonNegative,
+    rangeFalloffFloor: unitInterval,
+    coverPenalty: unitInterval,
+    movingTargetFactor: unitInterval,
+    movingShooterFactor: unitInterval,
+    meleeAdjacentOnly: z.boolean(),
+    resolveTiers: z.strictObject({ shaky: unitInterval, steady: unitInterval, hard: unitInterval }),
+    tie: z.strictObject({ paid: tieSchema, bound: tieSchema, devoted: tieSchema }),
+    castFighting: z.strictObject({
+      shaky: z.number().min(0).max(10),
+      steady: z.number().min(0).max(10),
+      hard: z.number().min(0).max(10),
+    }),
+    crewResolve: z.strictObject({
+      base: unitInterval,
+      perFighting: nonNegative,
+      perMood: nonNegative,
+      perLeaderAffinity: nonNegative,
+    }),
+    morale: z
+      .strictObject({
+        hitSelf: z.number(),
+        allyDown: z.number(),
+        allyDead: z.number(),
+        underFireNoCoverPerSecond: z.number(),
+        outnumberedPerSecond: z.number(),
+        allyHit: z.number(),
+        inCoverPerSecond: z.number(),
+        leaderNearPerSecond: z.number(),
+        outflanked: z.number(),
+        targetTaken: z.number(),
+        waverBelow: unitInterval,
+        breakBelow: unitInterval,
+        recoverAbove: unitInterval,
+      })
+      .refine((m) => m.breakBelow < m.waverBelow && m.waverBelow < m.recoverAbove, {
+        message: "breakBelow < waverBelow < recoverAbove",
+      }),
+    withdrawWhen: z.strictObject({ firstDown: positiveInt, halfDown: unitInterval }),
+    leaderNearTiles: positive,
+    surrenderIfCornered: z.boolean(),
+    blasters: nonNegativeInt,
+    batons: nonNegativeInt,
+  }),
   events: z.strictObject({ tickerMaxEntries: positiveInt, traceRingSize: positiveInt }),
 }) satisfies z.ZodType<ConfigDef>;

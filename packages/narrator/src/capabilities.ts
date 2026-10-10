@@ -19,6 +19,7 @@ import {
   type MarketPriceTier,
   basePriceFor,
   effectiveMarket,
+  isSite,
 } from "@crew/sim";
 import { FIELD_MOMENTS, HAZARD_DIFFICULTIES, SCRIPTED_EFFECTS } from "./contract";
 import {
@@ -26,6 +27,7 @@ import {
   SPAWN_QUANTITY_UNITS,
   type State,
   faultWindowSeconds,
+  isArmsLocker,
   itemName,
   machineCompartment,
   machineName,
@@ -152,7 +154,8 @@ function targetLines(state: State, content: ContentBundle): string[] {
   if (deck === undefined) throw new Error(`capabilities: no deck def ${deckId}`);
   const byRoom = new Map<string, string[]>();
   const machines = Object.values(state.machines)
-    .filter((m) => m.deckId === deckId)
+    // Expeditions A1 (call 4): the arms locker is not the narrator's until A2.
+    .filter((m) => m.deckId === deckId && !isArmsLocker(content, m))
     .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
   for (const machine of machines) {
     const room = machineCompartment(content, machine);
@@ -191,7 +194,10 @@ function fieldLever(state: State, content: ContentBundle, config: ConfigDef): st
 }
 
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
-  const ports = Object.values(content.ports).sort((a, b) => a.id.localeCompare(b.id));
+  // Expeditions A1 (call 4): a landing site is not the narrator's until A2.
+  const ports = Object.values(content.ports)
+    .filter((p) => !isSite(content, p.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
   const here = portHereOrNext(state);
   const cargo = Object.values(content.items)
     .filter((i) => i.cargoClass !== undefined)

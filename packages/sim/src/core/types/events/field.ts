@@ -58,10 +58,18 @@ export interface FieldEventPayloads {
     readonly actorId: ActorId;
     readonly compartmentId: CompartmentId;
   };
-  /** The ship went on alert. */
-  alertRaised: { readonly cause: "field"; readonly fieldId: FieldId };
-  /** The alert stood down (`field.alertClearSeconds` after the field ended). */
-  alertCleared: { readonly cause: "field" };
+  /**
+   * The ship went on alert: for a field, or (expeditions A1, `cause: "fight"`) for a fight at the
+   * site `siteId`.
+   */
+  alertRaised:
+    | { readonly cause: "field"; readonly fieldId: FieldId }
+    | { readonly cause: "fight"; readonly siteId: PortDefId };
+  /**
+   * The alert stood down (`field.alertClearSeconds` after the field ended, or
+   * `expedition.alertClearSeconds` after the fight).
+   */
+  alertCleared: { readonly cause: "field" | "fight" };
   /** Engines out inside the field: the ship has stopped making way and is stuck in the rocks. */
   shipStuck: { readonly fieldId: FieldId };
   /** Engines back inside the field: under way again. */

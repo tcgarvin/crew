@@ -43,6 +43,7 @@ import {
   type Snapshot,
   type State,
   faultDiscovery,
+  isArmsLocker,
   itemName,
   machineCompartment,
   machineName,
@@ -467,7 +468,8 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
   const lines = actors.map((actor) => {
     const roles = actor.roleTags.length > 0 ? ` [${actor.roleTags.join(", ")}]` : "";
     const skills = Object.entries(actor.skills)
-      .filter(([, level]) => (level ?? 0) >= 3)
+      // Expeditions A1 (call 4): the narrator hears nothing of fighting until A2.
+      .filter(([skill, level]) => skill !== "fighting" && (level ?? 0) >= 3)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([skill, level]) => `${skill} ${level}`)
       .join(", ");
@@ -527,9 +529,10 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
 }
 
 function machineSection(state: State, content: ContentBundle, tickRate: number): Section {
-  const machines = Object.values(state.machines).sort((a, b) =>
-    a.id.localeCompare(b.id, "en", { numeric: true }),
-  );
+  const machines = Object.values(state.machines)
+    // Expeditions A1 (call 4): the arms locker is not the narrator's until A2.
+    .filter((machine) => !isArmsLocker(content, machine))
+    .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
   const lines: string[] = [];
   const quiet = new Map<string, number>();
   for (const machine of machines) {

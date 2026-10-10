@@ -32,6 +32,10 @@ Intercoms (slice 5, §reporting-damage): one `machine.intercom` per compartment,
 a wall with its `panel` position on the room's floor. Mk1 has no locker zones, so no patch kits are
 stowed on it. The hull bar is 100 (`hull.max`).
 
+Arms locker (expeditions A1, §7.2): `arms_locker` against the airlock's north wall at (28,10), its
+`use` position (28,11) on the airlock floor, with a one-tile `arms` zone on the locker's tile, as on
+Mk2.
+
 ```
 Freighter Mk1 (deck.freighter_mk1)
 32 x 18 tiles
@@ -77,7 +81,7 @@ Doors (10):
   engineering_cargo: (7,13) side e, interior, closed, power=main
   cargo_ramp: (18,17) side s, ramp, closed, power=main
 
-Machines (27):
+Machines (28):
   helm_1: machine.helm @ (30,3) rot=0
   engine_1: machine.engine @ (6,2) rot=180
   coolant_pump_1: machine.coolant_pump @ (6,5) rot=180
@@ -105,4 +109,5 @@ Machines (27):
   intercom_corridor: machine.intercom @ (31,8) rot=0
   intercom_cargo_hold: machine.intercom @ (8,10) rot=0
   intercom_airlock: machine.intercom @ (31,10) rot=0
+  arms_locker: machine.arms_locker @ (28,10) rot=0
 ```

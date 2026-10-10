@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { wholeBody } from "./body";
 import { cmd, tinyTestWorld } from "./fixtures/test-world";
 import { TINY, tinyConfig, tinyContent, tinyEffectiveConfig } from "./fixtures/tiny-content";
+import { checkInvariants } from "./invariants";
 import { createKernel } from "./kernel";
 import { migrations } from "./migrations";
 import { createRegistry } from "./registry";
 import { SaveCompatibilityError, migrateState, restore, serialize } from "./save";
 import type { ContentBundle } from "./types/content";
-import type { ItemDefId } from "./types/ids";
+import type { ItemDefId, MachineDefId } from "./types/ids";
 import { SIM_VERSION } from "./types/save";
 import { SCHEMA_VERSION } from "./types/state";
 
@@ -493,6 +495,141 @@ describe("serialize / restore", () => {
     const kits = Object.values(state.items).filter((item) => item.defId === KIT);
     expect(kits.reduce((sum, i) => sum + (i.stacking === "stack" ? i.count : 0), 0)).toBe(2);
     expect(restored.warnings.some((w) => /predates the asteroid field/.test(w))).toBe(true);
+    kernel.advance(restored, 20);
+    expect(restored.state.tick).toBe(60);
+  });
+
+  it("migrates a schema-12 save to 13: bodies whole, fighting from the def, the arms locker and its weapons (expeditions A1)", () => {
+    const LOCKER = "machine.tiny.arms_locker" as MachineDefId;
+    const BLASTER = "item.tiny.blaster" as ItemDefId;
+    // The tiny content with an arms locker at (0,2) (its `use` tile (0,3)), a blaster stowed in
+    // it, and Mara good for a fight.
+    const armedContent = (): ContentBundle => {
+      const base = tinyContent(tinyConfig());
+      const deck = base.decks[TINY.deck];
+      const scenario = base.scenarios[TINY.scenario];
+      const mara = base.crew[TINY.mara];
+      if (deck === undefined || scenario === undefined || mara === undefined) {
+        throw new Error("tiny content");
+      }
+      return {
+        ...base,
+        machines: {
+          ...base.machines,
+          [LOCKER]: {
+            id: LOCKER,
+            name: "Arms Locker",
+            tags: ["armsLocker"],
+            footprint: [{ x: 0, y: 0 }],
+            interactionPositions: [
+              { key: "use", offset: { x: 0, y: 1 }, purposes: ["use"], capacity: 1 },
+            ],
+            power: { role: "none" },
+            heat: { risePerSecond: 0, coolPerSecond: 0, derateAbove: 1 },
+            operation: { requiresOperator: false },
+            failure: { baseHazardPerSecond: 0, heatFactor: 0, wearPerSecond: 0 },
+            faults: [],
+            components: [],
+          },
+        },
+        decks: {
+          [TINY.deck]: {
+            ...deck,
+            machines: [
+              ...deck.machines,
+              { key: "arms_locker", machineDefId: LOCKER, origin: { x: 0, y: 2 }, rotation: 0 },
+            ],
+            zones: [
+              ...deck.zones,
+              {
+                key: "arms",
+                name: "Arms Locker",
+                tags: ["armsLocker"],
+                tiles: [{ x: 0, y: 2 }],
+                machineKey: "arms_locker",
+              },
+            ],
+          },
+        },
+        items: {
+          ...base.items,
+          [BLASTER]: {
+            id: BLASTER,
+            name: "Blaster",
+            stacking: "unique",
+            maxStack: 1,
+            tags: ["weapon"],
+            toolKinds: [],
+            mass: 1.5,
+            weapon: {
+              kind: "blaster",
+              range: 8,
+              aimSeconds: 1.2,
+              hit: 0.55,
+              severity: "serious",
+              damageType: "blaster",
+              stun: true,
+            },
+          },
+        },
+        crew: { ...base.crew, [TINY.mara]: { ...mara, skills: { ...mara.skills, fighting: 4 } } },
+        scenarios: {
+          [TINY.scenario]: {
+            ...scenario,
+            startingItems: [
+              ...scenario.startingItems,
+              { itemDefId: BLASTER, count: 1, zoneKey: "arms" },
+            ],
+          },
+        },
+      };
+    };
+    const registry = createRegistry();
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(TINY.scenario, 42, armedContent(), tinyEffectiveConfig());
+    kernel.advance(world, 40);
+    const envelope = serialize(world);
+    type Json = Record<string, unknown>;
+    const at = (value: unknown, key: string) => (value as Json)[key] as Json;
+    const strip = (value: Json, key: string) => {
+      const { [key]: _gone, ...rest } = value;
+      return rest;
+    };
+    // Schema 12's shape: no bodies, no fighting, no wound counter, no locker, no weapons.
+    const raw = JSON.parse(JSON.stringify(envelope.state)) as Json;
+    raw.schemaVersion = 12;
+    raw.nextId = strip(at(raw, "nextId"), "wound");
+    raw.actors = Object.fromEntries(
+      Object.entries(at(raw, "actors")).map(([id, actor]) => {
+        const bare = strip(actor as Json, "body");
+        return [id, { ...bare, skills: strip(at(actor, "skills"), "fighting") }];
+      }),
+    );
+    raw.machines = Object.fromEntries(
+      Object.entries(at(raw, "machines")).filter(
+        ([, m]) => (m as Json).placementKey !== "arms_locker",
+      ),
+    );
+    raw.items = Object.fromEntries(
+      Object.entries(at(raw, "items")).filter(([, item]) => (item as Json).defId !== BLASTER),
+    );
+    const old = { ...envelope, schemaVersion: 12, state: raw } as unknown as typeof envelope;
+
+    const restored = restore(old, world.content, registry);
+    const state = restored.state;
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.nextId.wound).toBe(1);
+    expect(state.expedition).toBeUndefined();
+    for (const actor of Object.values(state.actors)) {
+      expect(actor.body).toEqual(wholeBody());
+      expect(actor.skills.fighting).toBe(4);
+    }
+    const lockers = Object.values(state.machines).filter((m) => m.placementKey === "arms_locker");
+    expect(lockers).toHaveLength(1);
+    expect(lockers[0]?.failure.threshold).toBe(1);
+    expect(Object.values(state.items).filter((i) => i.defId === BLASTER)).toHaveLength(1);
+    expect(restored.warnings.some((w) => /predates expeditions/.test(w))).toBe(true);
+    expect(checkInvariants(state)).toEqual([]);
     kernel.advance(restored, 20);
     expect(restored.state.tick).toBe(60);
   });

@@ -17,6 +17,7 @@ import {
   type PortDefId,
   type RngApi,
   createRngApi,
+  isSite,
   seedAllStreams,
   seedStream,
 } from "@crew/sim";
@@ -202,7 +203,8 @@ function nullOffer(
   callId: string,
 ): Pick<NarratorResponse, "commands" | "dropped"> | undefined {
   const port = content.ports[portId];
-  if (port === undefined) return undefined;
+  // Expeditions A1 (call 4): nothing is offered at a landing site.
+  if (port === undefined || isSite(content, portId)) return undefined;
   const snapshot = req.snapshot as Snapshot;
   const rng = offerRng(snapshot, portId);
   for (const template of templatesInDrawOrder(rng, port)) {

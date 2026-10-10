@@ -9,7 +9,8 @@
     "engineering": 4,
     "electrical": 3,
     "medical": 2,
-    "cooking": 1
+    "cooking": 1,
+    "fighting": 5
   },
   "traits": ["trait.steady", "trait.methodical"],
   "startingInventory": [],

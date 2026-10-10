@@ -7,7 +7,17 @@
  * observation in W4/W5); `skills` by work (experience gain); `availability` by needs/bodies.
  */
 import type { PhysicalLocation, Tick, TileCoord } from "./common";
-import type { InterestTag, RoleTag, SkillLevels, ThoughtKey } from "./content";
+import type {
+  BodyPart,
+  CastPart,
+  DamageType,
+  InterestTag,
+  RoleTag,
+  SkillLevels,
+  ThoughtKey,
+  WantsTier,
+  WoundSeverity,
+} from "./content";
 import type {
   ActorId,
   CompartmentId,
@@ -20,6 +30,7 @@ import type {
   ProblemId,
   TaskId,
   TraitDefId,
+  WoundId,
 } from "./ids";
 import type { Activity, Intent } from "./work";
 
@@ -59,13 +70,82 @@ export interface Values {
 }
 
 /**
- * Body capacities in [0, 1]. Bodies/wounds are deferred (PLAN §7); V1 keeps these at 1 except
- * for fatigue effects, so speed and work formulas have their inputs from day one.
+ * Body capacities in [0, 1]. Expeditions A1 (call 5): one formula, `core/body.ts`
+ * `applyCapacities`: movement and manipulation are fatigue's curve times the body's, consciousness
+ * the body's. A whole, rested body gives 1 across.
  */
 export interface Capacities {
   movement: number;
   manipulation: number;
   consciousness: number;
+}
+
+/**
+ * Expeditions A1 (§7.1, SD §12.2): one wound. Severity sets its damage and pain
+ * (`config.bodies`); `bleeding` until it stops on its own (`bleedStopsAfterSeconds`); a `stun`
+ * wound carries no damage and never bleeds. `causeActorId` names who made it, when someone did.
+ */
+export interface Wound {
+  id: WoundId;
+  part: BodyPart;
+  severity: WoundSeverity;
+  type: DamageType;
+  bleeding: boolean;
+  tick: Tick;
+  causeActorId?: ActorId;
+}
+
+/**
+ * Expeditions A1 (§7.1, SD §12's minimum): the body. `parts[p].damage` is the sum of the part's
+ * open wounds' damage; `blood`, `pain` and `stun` (consciousness debt) are in [0, 1]. Whole is
+ * `core/body.ts` `wholeBody()`. Owner: bodies (`systems/bodies/`), through `applyDamage` and the
+ * bodies system.
+ */
+export interface Body {
+  parts: Record<BodyPart, { damage: number }>;
+  blood: number;
+  pain: number;
+  stun: number;
+  wounds: Wound[];
+}
+
+/** Expeditions A1 (§8.2): where a combatant stands in the morale ladder. */
+export const COMBATANT_STATES = [
+  "steady",
+  "wavering",
+  "breaking",
+  "fled",
+  "surrendered",
+  "down",
+  "dead",
+] as const;
+export type CombatantState = (typeof COMBATANT_STATES)[number];
+
+/**
+ * Expeditions A1 (§5.2): a combatant's disposition, the cast entry's tiers mapped to numbers
+ * (`resolveBase` from `config.expedition.resolveTiers` and `tie`, `loyalty` from `tie`). For the
+ * party, `part` is `ally` and `wants` `nothing`.
+ */
+export interface Disposition {
+  part: CastPart;
+  resolveBase: number;
+  loyalty: number;
+  wants: WantsTier;
+}
+
+/**
+ * Expeditions A1 (§8.1, call 6): someone in the fight, on either side. Owner: the combat system
+ * (`systems/expedition/`). `resolve` in [0, 1] moves at each decision; `lastDecidedTick` drives the
+ * staggered cadence; `cover` the cover tile they crouch by; `aim` a shot being lined up.
+ */
+export interface Combatant {
+  side: "us" | "them";
+  disposition: Disposition;
+  state: CombatantState;
+  resolve: number;
+  lastDecidedTick: Tick;
+  cover?: TileCoord;
+  aim?: { targetId: ActorId; sinceTick: Tick };
 }
 
 /** SD §11.1 availability. Sleeping is an activity, not an availability state. */
@@ -185,6 +265,11 @@ export interface FactValues {
    * `observedTick` is the impact's tick, so the latest belief is the latest impact.
    */
   hullImpact: { fieldId: FieldId; compartmentId?: CompartmentId };
+  /**
+   * Expeditions (A2's intercom reflex): word of a fight at the site, at `expeditionTick` (the
+   * expedition's start). Declared in A1; nobody writes it yet.
+   */
+  fightSeen: { expeditionTick: Tick };
 }
 
 export type FactType = keyof FactValues;
@@ -282,6 +367,13 @@ export interface Actor {
    * `passenger: true`, which is what keeps them out of work, posts and the helm.
    */
   crew: boolean;
+  /** Expeditions A1 (§7.1): the body; whole for everyone until something hurts them. */
+  body: Body;
+  /**
+   * Expeditions A1 (§5.1, §8.1): set on everyone in a fight at a site, the party and the cast;
+   * absent otherwise. Owner: the combat system.
+   */
+  combatant?: Combatant;
   /** Passengers-and-galaxy §3: a paying passenger (`Job.passage.actorId`). Never `false`. */
   passenger?: true;
   /**

@@ -10,12 +10,14 @@
 import type { CommandSource } from "../commands";
 import type { LocationRef, Tick } from "../common";
 import type { CommandId, EntityId, EventId } from "../ids";
+import { BODIES_EVENT_SIGNIFICANCE, type BodiesEventPayloads } from "./bodies";
 import { CABINS_EVENT_SIGNIFICANCE, type CabinsEventPayloads } from "./cabins";
 import { COMMERCE_EVENT_SIGNIFICANCE, type CommerceEventPayloads } from "./commerce";
 import { DAMAGE_EVENT_SIGNIFICANCE, type DamageEventPayloads } from "./damage";
 import { DECISION_EVENT_SIGNIFICANCE, type DecisionEventPayloads } from "./decisions";
 import { DIRT_EVENT_SIGNIFICANCE, type DirtEventPayloads } from "./dirt";
 import { EQUIPMENT_EVENT_SIGNIFICANCE, type EquipmentEventPayloads } from "./equipment";
+import { EXPEDITION_EVENT_SIGNIFICANCE, type ExpeditionEventPayloads } from "./expedition";
 import { FIELD_EVENT_SIGNIFICANCE, type FieldEventPayloads } from "./field";
 import { GALLEY_EVENT_SIGNIFICANCE, type GalleyEventPayloads } from "./galley";
 import { INTERCOM_EVENT_SIGNIFICANCE, type IntercomEventPayloads } from "./intercom";
@@ -30,12 +32,14 @@ import { TRAVEL_EVENT_SIGNIFICANCE, type TravelEventPayloads } from "./travel";
 import { WATCH_EVENT_SIGNIFICANCE, type WatchEventPayloads } from "./watch";
 import { WORK_EVENT_SIGNIFICANCE, type WorkEventPayloads } from "./work";
 
+export type * from "./bodies";
 export type * from "./cabins";
 export type * from "./commerce";
 export type * from "./damage";
 export type * from "./decisions";
 export type * from "./dirt";
 export type * from "./equipment";
+export type * from "./expedition";
 export type * from "./field";
 export type * from "./galley";
 export type * from "./intercom";
@@ -69,7 +73,9 @@ export interface EventPayloadMap
     CabinsEventPayloads,
     FieldEventPayloads,
     DamageEventPayloads,
-    IntercomEventPayloads {}
+    IntercomEventPayloads,
+    BodiesEventPayloads,
+    ExpeditionEventPayloads {}
 
 export type EventType = keyof EventPayloadMap;
 
@@ -93,7 +99,18 @@ export const EVENT_SIGNIFICANCE: SignificanceCatalog<EventPayloadMap> = {
   ...FIELD_EVENT_SIGNIFICANCE,
   ...DAMAGE_EVENT_SIGNIFICANCE,
   ...INTERCOM_EVENT_SIGNIFICANCE,
+  ...BODIES_EVENT_SIGNIFICANCE,
+  ...EXPEDITION_EVENT_SIGNIFICANCE,
 };
+
+/**
+ * Expeditions A1: the fight's family (bodies and the expedition), for the instrument's count of
+ * its ticker lines.
+ */
+export const EXPEDITION_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  ...(Object.keys(BODIES_EVENT_SIGNIFICANCE) as EventType[]),
+  ...(Object.keys(EXPEDITION_EVENT_SIGNIFICANCE) as EventType[]),
+]);
 
 /**
  * The asteroid-field family (slice 5): the field, the crew's damage work and the

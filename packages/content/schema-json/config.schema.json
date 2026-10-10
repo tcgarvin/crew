@@ -1536,6 +1536,81 @@
               },
               "required": ["label", "opinion", "durationDays", "stackLimit"],
               "additionalProperties": false
+            },
+            "foughtBeside": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
+            },
+            "carriedMeOut": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
+            },
+            "leftMeBehind": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1550,7 +1625,10 @@
             "sharedATable",
             "heardMeOut",
             "dressedMeDown",
-            "talkedItThrough"
+            "talkedItThrough",
+            "foughtBeside",
+            "carriedMeOut",
+            "leftMeBehind"
           ],
           "additionalProperties": false
         },
@@ -1881,6 +1959,537 @@
       "required": ["reportSeconds"],
       "additionalProperties": false
     },
+    "bodies": {
+      "type": "object",
+      "properties": {
+        "tolerance": {
+          "type": "object",
+          "properties": {
+            "head": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "torso": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "leftArm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "rightArm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "leftLeg": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "rightLeg": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+          "additionalProperties": false
+        },
+        "severityDamage": {
+          "type": "object",
+          "properties": {
+            "graze": {
+              "type": "number",
+              "minimum": 0
+            },
+            "serious": {
+              "type": "number",
+              "minimum": 0
+            },
+            "grave": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["graze", "serious", "grave"],
+          "additionalProperties": false
+        },
+        "severityPain": {
+          "type": "object",
+          "properties": {
+            "graze": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "serious": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "grave": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["graze", "serious", "grave"],
+          "additionalProperties": false
+        },
+        "painDecayPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "bleedPerSecond": {
+          "type": "object",
+          "properties": {
+            "graze": {
+              "type": "number",
+              "minimum": 0
+            },
+            "serious": {
+              "type": "number",
+              "minimum": 0
+            },
+            "grave": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["graze", "serious", "grave"],
+          "additionalProperties": false
+        },
+        "bleedStopsAfterSeconds": {
+          "type": "object",
+          "properties": {
+            "graze": {
+              "type": "number",
+              "minimum": 0
+            },
+            "serious": {
+              "type": "number",
+              "minimum": 0
+            },
+            "grave": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["graze", "serious", "grave"],
+          "additionalProperties": false
+        },
+        "bloodRecoverPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stunPerHit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "stunDecayPerSecond": {
+          "type": "number",
+          "minimum": 0
+        },
+        "incapacitatedBelow": {
+          "type": "object",
+          "properties": {
+            "consciousness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "movement": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["consciousness", "movement"],
+          "additionalProperties": false
+        },
+        "deadBelowBlood": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "healPerDay": {
+          "type": "number",
+          "minimum": 0
+        },
+        "partTable": {
+          "type": "object",
+          "properties": {
+            "head": {
+              "type": "number",
+              "minimum": 0
+            },
+            "torso": {
+              "type": "number",
+              "minimum": 0
+            },
+            "leftArm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rightArm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "leftLeg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rightLeg": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+          "additionalProperties": false
+        },
+        "stunPartTable": {
+          "type": "object",
+          "properties": {
+            "head": {
+              "type": "number",
+              "minimum": 0
+            },
+            "torso": {
+              "type": "number",
+              "minimum": 0
+            },
+            "leftArm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rightArm": {
+              "type": "number",
+              "minimum": 0
+            },
+            "leftLeg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rightLeg": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "tolerance",
+        "severityDamage",
+        "severityPain",
+        "painDecayPerSecond",
+        "bleedPerSecond",
+        "bleedStopsAfterSeconds",
+        "bloodRecoverPerSecond",
+        "stunPerHit",
+        "stunDecayPerSecond",
+        "incapacitatedBelow",
+        "deadBelowBlood",
+        "healPerDay",
+        "partTable",
+        "stunPartTable"
+      ],
+      "additionalProperties": false
+    },
+    "expedition": {
+      "type": "object",
+      "properties": {
+        "decideEverySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxFightSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "alertClearSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hitSkillBase": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hitPerFighting": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rangeFalloffFloor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "coverPenalty": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "movingTargetFactor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "movingShooterFactor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "meleeAdjacentOnly": {
+          "type": "boolean"
+        },
+        "resolveTiers": {
+          "type": "object",
+          "properties": {
+            "shaky": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "steady": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "hard": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["shaky", "steady", "hard"],
+          "additionalProperties": false
+        },
+        "tie": {
+          "type": "object",
+          "properties": {
+            "paid": {
+              "type": "object",
+              "properties": {
+                "resolve": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "loyalty": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["resolve", "loyalty"],
+              "additionalProperties": false
+            },
+            "bound": {
+              "type": "object",
+              "properties": {
+                "resolve": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "loyalty": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["resolve", "loyalty"],
+              "additionalProperties": false
+            },
+            "devoted": {
+              "type": "object",
+              "properties": {
+                "resolve": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "loyalty": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["resolve", "loyalty"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["paid", "bound", "devoted"],
+          "additionalProperties": false
+        },
+        "castFighting": {
+          "type": "object",
+          "properties": {
+            "shaky": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "steady": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "hard": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
+          },
+          "required": ["shaky", "steady", "hard"],
+          "additionalProperties": false
+        },
+        "crewResolve": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "perFighting": {
+              "type": "number",
+              "minimum": 0
+            },
+            "perMood": {
+              "type": "number",
+              "minimum": 0
+            },
+            "perLeaderAffinity": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["base", "perFighting", "perMood", "perLeaderAffinity"],
+          "additionalProperties": false
+        },
+        "morale": {
+          "type": "object",
+          "properties": {
+            "hitSelf": {
+              "type": "number"
+            },
+            "allyDown": {
+              "type": "number"
+            },
+            "allyDead": {
+              "type": "number"
+            },
+            "underFireNoCoverPerSecond": {
+              "type": "number"
+            },
+            "outnumberedPerSecond": {
+              "type": "number"
+            },
+            "allyHit": {
+              "type": "number"
+            },
+            "inCoverPerSecond": {
+              "type": "number"
+            },
+            "leaderNearPerSecond": {
+              "type": "number"
+            },
+            "outflanked": {
+              "type": "number"
+            },
+            "targetTaken": {
+              "type": "number"
+            },
+            "waverBelow": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "breakBelow": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "recoverAbove": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "hitSelf",
+            "allyDown",
+            "allyDead",
+            "underFireNoCoverPerSecond",
+            "outnumberedPerSecond",
+            "allyHit",
+            "inCoverPerSecond",
+            "leaderNearPerSecond",
+            "outflanked",
+            "targetTaken",
+            "waverBelow",
+            "breakBelow",
+            "recoverAbove"
+          ],
+          "additionalProperties": false
+        },
+        "withdrawWhen": {
+          "type": "object",
+          "properties": {
+            "firstDown": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "halfDown": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["firstDown", "halfDown"],
+          "additionalProperties": false
+        },
+        "leaderNearTiles": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "surrenderIfCornered": {
+          "type": "boolean"
+        },
+        "blasters": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "batons": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "decideEverySeconds",
+        "maxFightSeconds",
+        "alertClearSeconds",
+        "hitSkillBase",
+        "hitPerFighting",
+        "rangeFalloffFloor",
+        "coverPenalty",
+        "movingTargetFactor",
+        "movingShooterFactor",
+        "meleeAdjacentOnly",
+        "resolveTiers",
+        "tie",
+        "castFighting",
+        "crewResolve",
+        "morale",
+        "withdrawWhen",
+        "leaderNearTiles",
+        "surrenderIfCornered",
+        "blasters",
+        "batons"
+      ],
+      "additionalProperties": false
+    },
     "events": {
       "type": "object",
       "properties": {
@@ -1923,6 +2532,8 @@
     "field",
     "damage",
     "intercom",
+    "bodies",
+    "expedition",
     "events"
   ],
   "additionalProperties": false

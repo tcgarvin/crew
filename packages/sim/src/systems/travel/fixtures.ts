@@ -9,9 +9,11 @@
  */
 import {
   FIXTURE_ACTIVITIES,
+  FIXTURE_BODIES,
   FIXTURE_CABINS,
   FIXTURE_DAMAGE,
   FIXTURE_DIRT,
+  FIXTURE_EXPEDITION,
   FIXTURE_FIELD,
   FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
@@ -223,6 +225,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
     field: FIXTURE_FIELD,
     damage: FIXTURE_DAMAGE,
     intercom: FIXTURE_INTERCOM,
+    bodies: FIXTURE_BODIES,
+    expedition: FIXTURE_EXPEDITION,
     galley: FIXTURE_GALLEY,
     dirt: FIXTURE_DIRT,
     social: {

@@ -11,3 +11,4 @@ export { toAgentViewSnapshot } from "./snapshot";
 export function registerAgentView(registry: KernelRegistry): Unregister {
   return registry.setAgentViewBuilder(buildAgentView);
 }
+export { planMenu } from "./planMenu";

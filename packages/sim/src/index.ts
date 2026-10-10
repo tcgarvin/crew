@@ -38,6 +38,18 @@ export { registerCabins } from "./systems/cabins/index";
 export { registerField, scriptedHullDamage } from "./systems/field/index";
 export { damageTaskDerivations, registerDamage } from "./systems/damage/index";
 export { registerIntercom } from "./systems/intercom/index";
+export {
+  applyDamage,
+  type DamageResult,
+  type Hit,
+  registerBodies,
+} from "./systems/bodies/index";
+export {
+  DEFAULT_PLANS,
+  lockerWeapons,
+  registerExpedition,
+  squadFor,
+} from "./systems/expedition/index";
 export { interestScore } from "./core/interests";
 export { affinitiesFrom, affinityOf, compatibility } from "./core/social";
 export {
@@ -57,4 +69,4 @@ export {
   registerPlannerDefaults,
   weighOptions,
 } from "./planner/index";
-export { toAgentViewSnapshot } from "./view/index";
+export { planMenu, toAgentViewSnapshot } from "./view/index";

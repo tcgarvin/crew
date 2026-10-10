@@ -226,7 +226,7 @@ export interface System {
  *
  * Slice 4: `recreation`, `social` and `mood`, for the recreation candidate's join threshold,
  * affinity bands and mood bands. Slice 5: `field`, `damage` and `intercom`, for the alert's
- * candidates and the reporting reflex.
+ * candidates and the reporting reflex. Expeditions A1: `expedition` and `bodies`.
  */
 export type PlannerConfig = Pick<
   ConfigDef,
@@ -241,6 +241,8 @@ export type PlannerConfig = Pick<
   | "field"
   | "damage"
   | "intercom"
+  | "expedition"
+  | "bodies"
 >;
 
 /**

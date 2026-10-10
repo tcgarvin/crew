@@ -64,6 +64,9 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "endPassage",
     /** Slice 4: a card side's word in the captain's cabin (never the narrator's directly). */
     "privateTalk",
+    /** Expeditions A1: A2's card sides at the site; nothing issues them yet. */
+    "adoptPlan",
+    "withdrawParty",
   ],
   narrator: NARRATOR_COMMAND_KINDS,
   system: [
@@ -95,5 +98,8 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "privateTalk",
     "scheduleField",
     "requestCall",
+    "scenarioStartExpedition",
+    "adoptPlan",
+    "withdrawParty",
   ],
 };

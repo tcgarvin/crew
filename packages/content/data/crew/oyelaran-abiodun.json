@@ -9,7 +9,8 @@
     "cooking": 2,
     "engineering": 1,
     "electrical": 1,
-    "piloting": 2
+    "piloting": 2,
+    "fighting": 2
   },
   "startingInventory": [],
   "bio": "Ship's medic; trained in a border-station trauma ward before signing on.",

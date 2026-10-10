@@ -9,7 +9,8 @@
     "cargo": 4,
     "piloting": 1,
     "medical": 1,
-    "cooking": 1
+    "cooking": 1,
+    "fighting": 3
   },
   "traits": ["trait.brisk_walker"],
   "startingInventory": [],

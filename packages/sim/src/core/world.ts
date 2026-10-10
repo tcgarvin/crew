@@ -17,6 +17,7 @@ import { allocateId, initialIdCounters } from "./ids";
 import { dressDock } from "./locals";
 import { marketSeed } from "./markets";
 import { runStep } from "./pipeline";
+import { instantiatePlacement } from "./placement";
 import type { KernelRegistry } from "./registry";
 import { isTickerEvent } from "./render";
 import { createRngApi, seedAllStreams } from "./rng";
@@ -43,7 +44,6 @@ import type {
 } from "./types/ids";
 import type { AdvanceHalt, AdvanceResult, EffectiveConfig, World } from "./types/kernel";
 import type { RngApi } from "./types/pipeline";
-import type { Machine } from "./types/ship";
 import { SCHEMA_VERSION, type WorldState } from "./types/state";
 import { resolveWatchBill, sectionsByCrewDef } from "./watch-bill";
 
@@ -136,34 +136,7 @@ function instantiateDeck(state: WorldState, deck: DeckDef, content: ContentBundl
     };
   }
   for (const placement of deck.machines) {
-    const def = content.machines[placement.machineDefId];
-    if (def === undefined) {
-      throw new Error(`Deck "${deck.id}" places unknown machine "${placement.machineDefId}"`);
-    }
-    const id = allocateId(state, "machine");
-    const machine: Machine = {
-      id,
-      defId: def.id,
-      deckId: deck.id,
-      placementKey: placement.key,
-      integrity: 1,
-      condition: 1,
-      desiredMode: "on",
-      actualMode: "on",
-      output: 1,
-      powerAllocatedKw: 0,
-      temperature: 0,
-      faults: [],
-      scheduledFaults: [],
-      failure: { accumulatedHazard: 0, threshold: -Math.log(1 - rng.float("failures")) },
-      lastMaintainedTick: 0,
-      maintenanceProgress: 0,
-      roleState:
-        def.power.role === "battery"
-          ? { role: "battery", storedKj: def.power.capacityKj }
-          : { role: "none" },
-    };
-    state.machines[id] = machine;
+    instantiatePlacement(state, deck, placement, content, -Math.log(1 - rng.float("failures")));
   }
   for (const domain of deck.powerDomains) {
     state.power.domains[domain.key] = {

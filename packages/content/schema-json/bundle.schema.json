@@ -478,7 +478,8 @@
                 "lifeSupport",
                 "cooling",
                 "rampControl",
-                "comm"
+                "comm",
+                "armsLocker"
               ]
             }
           },
@@ -654,7 +655,15 @@
                 "properties": {
                   "skill": {
                     "type": "string",
-                    "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+                    "enum": [
+                      "engineering",
+                      "electrical",
+                      "piloting",
+                      "cargo",
+                      "medical",
+                      "cooking",
+                      "fighting"
+                    ]
                   },
                   "min": {
                     "type": "number",
@@ -805,7 +814,8 @@
                                   "piloting",
                                   "cargo",
                                   "medical",
-                                  "cooking"
+                                  "cooking",
+                                  "fighting"
                                 ]
                               },
                               "min": {
@@ -926,7 +936,8 @@
                           "piloting",
                           "cargo",
                           "medical",
-                          "cooking"
+                          "cooking",
+                          "fighting"
                         ]
                       },
                       "min": {
@@ -1050,7 +1061,8 @@
                 "instrument",
                 "treat",
                 "patchKit",
-                "plating"
+                "plating",
+                "weapon"
               ]
             }
           },
@@ -1077,6 +1089,41 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 9007199254740991
+          },
+          "weapon": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["blaster", "baton"]
+              },
+              "range": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "aimSeconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "hit": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["graze", "serious", "grave"]
+              },
+              "damageType": {
+                "type": "string",
+                "enum": ["blaster", "blunt"]
+              },
+              "stun": {
+                "type": "boolean"
+              }
+            },
+            "required": ["kind", "range", "aimSeconds", "hit", "severity", "damageType", "stun"],
+            "additionalProperties": false
           }
         },
         "required": ["id", "name", "stacking", "maxStack", "tags", "toolKinds", "mass"],
@@ -1111,7 +1158,15 @@
             "type": "object",
             "propertyNames": {
               "type": "string",
-              "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+              "enum": [
+                "engineering",
+                "electrical",
+                "piloting",
+                "cargo",
+                "medical",
+                "cooking",
+                "fighting"
+              ]
             },
             "additionalProperties": {
               "type": "number",
@@ -1324,7 +1379,6 @@
             "minLength": 1
           },
           "castSeed": {
-            "minItems": 2,
             "maxItems": 3,
             "type": "array",
             "items": {
@@ -1352,7 +1406,6 @@
             }
           },
           "externalStores": {
-            "minItems": 1,
             "type": "array",
             "items": {
               "type": "object",
@@ -1466,6 +1519,14 @@
               "required": ["toPortId", "distance"],
               "additionalProperties": false
             }
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["port", "site"]
+          },
+          "nearPortId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
           }
         },
         "required": [
@@ -1762,7 +1823,7 @@
             },
             "additionalProperties": {
               "type": "string",
-              "enum": ["floor", "wall", "void"]
+              "enum": ["floor", "wall", "void", "cover"]
             }
           },
           "berth": {
@@ -1804,7 +1865,20 @@
                 },
                 "kind": {
                   "type": "string",
-                  "enum": ["gate", "warehouseDoor", "marketStall", "kiosk", "loungeDoor", "bench"]
+                  "enum": [
+                    "gate",
+                    "warehouseDoor",
+                    "marketStall",
+                    "kiosk",
+                    "loungeDoor",
+                    "bench",
+                    "target",
+                    "guard",
+                    "loot",
+                    "exit",
+                    "flank",
+                    "bystander"
+                  ]
                 },
                 "name": {
                   "type": "string",
@@ -2014,6 +2088,73 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["dock", "site"]
+          },
+          "noticeRadius": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "defaultCast": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "look": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "part": {
+                  "type": "string",
+                  "enum": ["target", "guard", "bystander", "ally"]
+                },
+                "arms": {
+                  "type": "string",
+                  "enum": ["none", "melee", "blaster"]
+                },
+                "resolve": {
+                  "type": "string",
+                  "enum": ["shaky", "steady", "hard"]
+                },
+                "tie": {
+                  "type": "string",
+                  "enum": ["paid", "bound", "devoted"]
+                },
+                "wants": {
+                  "type": "string",
+                  "enum": ["money", "out", "blood", "nothing"]
+                },
+                "post": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+                }
+              },
+              "required": [
+                "name",
+                "role",
+                "look",
+                "part",
+                "arms",
+                "resolve",
+                "tie",
+                "wants",
+                "post"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -2072,7 +2213,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2127,7 +2273,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2182,7 +2333,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2237,7 +2393,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2292,7 +2453,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2347,7 +2513,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2402,7 +2573,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2457,7 +2633,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2512,7 +2693,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2567,7 +2753,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2622,7 +2813,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2677,7 +2873,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2732,7 +2933,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2787,7 +2993,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2842,7 +3053,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2897,7 +3113,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -2952,7 +3173,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3007,7 +3233,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3062,7 +3293,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3117,7 +3353,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3172,7 +3413,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3227,7 +3473,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3282,7 +3533,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3337,7 +3593,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3392,7 +3653,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3447,7 +3713,12 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3502,7 +3773,312 @@
                 "heardOut",
                 "dressedDown",
                 "ateATreat",
-                "nearMiss"
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "killedSomeone": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat",
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "sawCrewHurt": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat",
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "heldTheLine": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat",
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "ranFromAFight": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat",
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "durationDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "stacks": {
+              "type": "boolean"
+            }
+          },
+          "required": ["key", "label", "value", "durationDays", "stacks"],
+          "additionalProperties": false
+        },
+        "wounded": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "stoodLongWatch",
+                "doubleWatch",
+                "helmCleanPass",
+                "helmScrape",
+                "ateWell",
+                "burntDinner",
+                "ateRationPack",
+                "ateInDirtyMess",
+                "ateInFilthyMess",
+                "wonContest",
+                "lostContest",
+                "keepsBeatingMe",
+                "goodCompany",
+                "spiritedTalk",
+                "argued",
+                "gotLectured",
+                "enjoyedMusic",
+                "hatedTheNoise",
+                "sparringBruise",
+                "ownCabin",
+                "noisyBunkroom",
+                "noBunkOfMyOwn",
+                "satWithTheCaptain",
+                "heardOut",
+                "dressedDown",
+                "ateATreat",
+                "nearMiss",
+                "killedSomeone",
+                "sawCrewHurt",
+                "heldTheLine",
+                "ranFromAFight",
+                "wounded"
               ]
             },
             "label": {
@@ -3553,7 +4129,12 @@
         "heardOut",
         "dressedDown",
         "ateATreat",
-        "nearMiss"
+        "nearMiss",
+        "killedSomeone",
+        "sawCrewHurt",
+        "heldTheLine",
+        "ranFromAFight",
+        "wounded"
       ],
       "additionalProperties": false
     },
@@ -3624,7 +4205,8 @@
                     "lifeSupport",
                     "cooling",
                     "rampControl",
-                    "comm"
+                    "comm",
+                    "armsLocker"
                   ]
                 },
                 "zoneTag": {
@@ -3762,7 +4344,12 @@
                   "heardOut",
                   "dressedDown",
                   "ateATreat",
-                  "nearMiss"
+                  "nearMiss",
+                  "killedSomeone",
+                  "sawCrewHurt",
+                  "heldTheLine",
+                  "ranFromAFight",
+                  "wounded"
                 ]
               },
               "lose": {
@@ -3794,7 +4381,12 @@
                   "heardOut",
                   "dressedDown",
                   "ateATreat",
-                  "nearMiss"
+                  "nearMiss",
+                  "killedSomeone",
+                  "sawCrewHurt",
+                  "heldTheLine",
+                  "ranFromAFight",
+                  "wounded"
                 ]
               },
               "joined": {
@@ -3826,7 +4418,12 @@
                   "heardOut",
                   "dressedDown",
                   "ateATreat",
-                  "nearMiss"
+                  "nearMiss",
+                  "killedSomeone",
+                  "sawCrewHurt",
+                  "heldTheLine",
+                  "ranFromAFight",
+                  "wounded"
                 ]
               },
               "listened": {
@@ -3858,7 +4455,12 @@
                   "heardOut",
                   "dressedDown",
                   "ateATreat",
-                  "nearMiss"
+                  "nearMiss",
+                  "killedSomeone",
+                  "sawCrewHurt",
+                  "heldTheLine",
+                  "ranFromAFight",
+                  "wounded"
                 ]
               },
               "listenedDislike": {
@@ -3890,7 +4492,12 @@
                   "heardOut",
                   "dressedDown",
                   "ateATreat",
-                  "nearMiss"
+                  "nearMiss",
+                  "killedSomeone",
+                  "sawCrewHurt",
+                  "heldTheLine",
+                  "ranFromAFight",
+                  "wounded"
                 ]
               }
             },
@@ -3913,7 +4520,10 @@
                   "sharedATable",
                   "heardMeOut",
                   "dressedMeDown",
-                  "talkedItThrough"
+                  "talkedItThrough",
+                  "foughtBeside",
+                  "carriedMeOut",
+                  "leftMeBehind"
                 ]
               },
               "loserToWinner": {
@@ -3930,7 +4540,10 @@
                   "sharedATable",
                   "heardMeOut",
                   "dressedMeDown",
-                  "talkedItThrough"
+                  "talkedItThrough",
+                  "foughtBeside",
+                  "carriedMeOut",
+                  "leftMeBehind"
                 ]
               }
             },
@@ -3949,7 +4562,15 @@
             "properties": {
               "skill": {
                 "type": "string",
-                "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+                "enum": [
+                  "engineering",
+                  "electrical",
+                  "piloting",
+                  "cargo",
+                  "medical",
+                  "cooking",
+                  "fighting"
+                ]
               },
               "perDay": {
                 "type": "number",
@@ -3996,7 +4617,8 @@
                   "instrument",
                   "treat",
                   "patchKit",
-                  "plating"
+                  "plating",
+                  "weapon"
                 ]
               },
               "own": {
@@ -5651,6 +6273,81 @@
                   },
                   "required": ["label", "opinion", "durationDays", "stackLimit"],
                   "additionalProperties": false
+                },
+                "foughtBeside": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "carriedMeOut": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
+                },
+                "leftMeBehind": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "opinion": {
+                      "type": "integer",
+                      "minimum": -5,
+                      "maximum": 5
+                    },
+                    "durationDays": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "stackLimit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["label", "opinion", "durationDays", "stackLimit"],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -5665,7 +6362,10 @@
                 "sharedATable",
                 "heardMeOut",
                 "dressedMeDown",
-                "talkedItThrough"
+                "talkedItThrough",
+                "foughtBeside",
+                "carriedMeOut",
+                "leftMeBehind"
               ],
               "additionalProperties": false
             },
@@ -5996,6 +6696,537 @@
           "required": ["reportSeconds"],
           "additionalProperties": false
         },
+        "bodies": {
+          "type": "object",
+          "properties": {
+            "tolerance": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "torso": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "leftArm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "rightArm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "leftLeg": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "rightLeg": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+              "additionalProperties": false
+            },
+            "severityDamage": {
+              "type": "object",
+              "properties": {
+                "graze": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "serious": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "grave": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["graze", "serious", "grave"],
+              "additionalProperties": false
+            },
+            "severityPain": {
+              "type": "object",
+              "properties": {
+                "graze": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "serious": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "grave": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["graze", "serious", "grave"],
+              "additionalProperties": false
+            },
+            "painDecayPerSecond": {
+              "type": "number",
+              "minimum": 0
+            },
+            "bleedPerSecond": {
+              "type": "object",
+              "properties": {
+                "graze": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "serious": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "grave": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["graze", "serious", "grave"],
+              "additionalProperties": false
+            },
+            "bleedStopsAfterSeconds": {
+              "type": "object",
+              "properties": {
+                "graze": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "serious": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "grave": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["graze", "serious", "grave"],
+              "additionalProperties": false
+            },
+            "bloodRecoverPerSecond": {
+              "type": "number",
+              "minimum": 0
+            },
+            "stunPerHit": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "stunDecayPerSecond": {
+              "type": "number",
+              "minimum": 0
+            },
+            "incapacitatedBelow": {
+              "type": "object",
+              "properties": {
+                "consciousness": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "movement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["consciousness", "movement"],
+              "additionalProperties": false
+            },
+            "deadBelowBlood": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "healPerDay": {
+              "type": "number",
+              "minimum": 0
+            },
+            "partTable": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "torso": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "leftArm": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "rightArm": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "leftLeg": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "rightLeg": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+              "additionalProperties": false
+            },
+            "stunPartTable": {
+              "type": "object",
+              "properties": {
+                "head": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "torso": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "leftArm": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "rightArm": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "leftLeg": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "rightLeg": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tolerance",
+            "severityDamage",
+            "severityPain",
+            "painDecayPerSecond",
+            "bleedPerSecond",
+            "bleedStopsAfterSeconds",
+            "bloodRecoverPerSecond",
+            "stunPerHit",
+            "stunDecayPerSecond",
+            "incapacitatedBelow",
+            "deadBelowBlood",
+            "healPerDay",
+            "partTable",
+            "stunPartTable"
+          ],
+          "additionalProperties": false
+        },
+        "expedition": {
+          "type": "object",
+          "properties": {
+            "decideEverySeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maxFightSeconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "alertClearSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "hitSkillBase": {
+              "type": "number",
+              "minimum": 0
+            },
+            "hitPerFighting": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rangeFalloffFloor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "coverPenalty": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "movingTargetFactor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "movingShooterFactor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "meleeAdjacentOnly": {
+              "type": "boolean"
+            },
+            "resolveTiers": {
+              "type": "object",
+              "properties": {
+                "shaky": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "steady": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "hard": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["shaky", "steady", "hard"],
+              "additionalProperties": false
+            },
+            "tie": {
+              "type": "object",
+              "properties": {
+                "paid": {
+                  "type": "object",
+                  "properties": {
+                    "resolve": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "loyalty": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["resolve", "loyalty"],
+                  "additionalProperties": false
+                },
+                "bound": {
+                  "type": "object",
+                  "properties": {
+                    "resolve": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "loyalty": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["resolve", "loyalty"],
+                  "additionalProperties": false
+                },
+                "devoted": {
+                  "type": "object",
+                  "properties": {
+                    "resolve": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "loyalty": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["resolve", "loyalty"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["paid", "bound", "devoted"],
+              "additionalProperties": false
+            },
+            "castFighting": {
+              "type": "object",
+              "properties": {
+                "shaky": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                "steady": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                "hard": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 10
+                }
+              },
+              "required": ["shaky", "steady", "hard"],
+              "additionalProperties": false
+            },
+            "crewResolve": {
+              "type": "object",
+              "properties": {
+                "base": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "perFighting": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "perMood": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "perLeaderAffinity": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": ["base", "perFighting", "perMood", "perLeaderAffinity"],
+              "additionalProperties": false
+            },
+            "morale": {
+              "type": "object",
+              "properties": {
+                "hitSelf": {
+                  "type": "number"
+                },
+                "allyDown": {
+                  "type": "number"
+                },
+                "allyDead": {
+                  "type": "number"
+                },
+                "underFireNoCoverPerSecond": {
+                  "type": "number"
+                },
+                "outnumberedPerSecond": {
+                  "type": "number"
+                },
+                "allyHit": {
+                  "type": "number"
+                },
+                "inCoverPerSecond": {
+                  "type": "number"
+                },
+                "leaderNearPerSecond": {
+                  "type": "number"
+                },
+                "outflanked": {
+                  "type": "number"
+                },
+                "targetTaken": {
+                  "type": "number"
+                },
+                "waverBelow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "breakBelow": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "recoverAbove": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "hitSelf",
+                "allyDown",
+                "allyDead",
+                "underFireNoCoverPerSecond",
+                "outnumberedPerSecond",
+                "allyHit",
+                "inCoverPerSecond",
+                "leaderNearPerSecond",
+                "outflanked",
+                "targetTaken",
+                "waverBelow",
+                "breakBelow",
+                "recoverAbove"
+              ],
+              "additionalProperties": false
+            },
+            "withdrawWhen": {
+              "type": "object",
+              "properties": {
+                "firstDown": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "halfDown": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["firstDown", "halfDown"],
+              "additionalProperties": false
+            },
+            "leaderNearTiles": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "surrenderIfCornered": {
+              "type": "boolean"
+            },
+            "blasters": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "batons": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "decideEverySeconds",
+            "maxFightSeconds",
+            "alertClearSeconds",
+            "hitSkillBase",
+            "hitPerFighting",
+            "rangeFalloffFloor",
+            "coverPenalty",
+            "movingTargetFactor",
+            "movingShooterFactor",
+            "meleeAdjacentOnly",
+            "resolveTiers",
+            "tie",
+            "castFighting",
+            "crewResolve",
+            "morale",
+            "withdrawWhen",
+            "leaderNearTiles",
+            "surrenderIfCornered",
+            "blasters",
+            "batons"
+          ],
+          "additionalProperties": false
+        },
         "events": {
           "type": "object",
           "properties": {
@@ -6038,6 +7269,8 @@
         "field",
         "damage",
         "intercom",
+        "bodies",
+        "expedition",
         "events"
       ],
       "additionalProperties": false

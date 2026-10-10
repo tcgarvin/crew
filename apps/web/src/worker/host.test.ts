@@ -118,6 +118,7 @@ function makeFakeKernel(hookAtTick: number) {
         hull: { integrity: 100, max: 100, scars: [], lost: false },
         alert: false,
         impacts: [],
+        shots: [],
       };
     },
     serialize: (world) =>

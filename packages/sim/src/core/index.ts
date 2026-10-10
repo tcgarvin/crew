@@ -3,7 +3,14 @@
  * invariants and serialize/restore/migrate. Contracts are in `./types`.
  */
 export * from "./types";
-export { actionLabel, describeEvent, getDirtFrame, getRenderFrame, tickerLine } from "./render";
+export {
+  actionLabel,
+  describeEvent,
+  getDirtFrame,
+  getRenderFrame,
+  renderExpedition,
+  tickerLine,
+} from "./render";
 export { cellIndex, emptyCells, inGrid, roomCells } from "./dirt-grid";
 export {
   configTicks,
@@ -44,7 +51,19 @@ export {
 export { clearDockside, dressDock, personnelRampFoot } from "./locals";
 export { decisionShownTick, localNamed } from "./delivery";
 export { allocateId } from "./ids";
-export { checkInvariants } from "./invariants";
+export { bodyViolations, checkInvariants, expeditionViolations } from "./invariants";
+export {
+  applyCapacities,
+  bodyCapacities,
+  capacitiesOf,
+  incapacityOf,
+  isDeadBy,
+  partFunction,
+  wholeBody,
+} from "./body";
+export { isSite } from "./places";
+export { isCover, postsOfKind, rampFoot, siteOf, tileKindAt } from "./sites";
+export { instantiatePlacement } from "./placement";
 export { createKernel, kernel } from "./kernel";
 export { createRegistry, type KernelRegistry, NotImplementedError } from "./registry";
 export { createRngApi, seedAllStreams, seedStream } from "./rng";

@@ -73,7 +73,7 @@ function tileKinds(dock: DockDef): DockTileKind[] {
 }
 
 function rowRuns(kinds: readonly DockTileKind[], width: number, height: number) {
-  const runs: Record<DockTileKind, TileRun[]> = { floor: [], wall: [], void: [] };
+  const runs: Record<DockTileKind, TileRun[]> = { floor: [], wall: [], void: [], cover: [] };
   for (let y = 0; y < height; y++) {
     let x0 = 0;
     for (let x = 1; x <= width; x++) {

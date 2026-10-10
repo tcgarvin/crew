@@ -314,6 +314,11 @@ const thoughts = {
   dressedDown: thought("dressedDown", -0.15, false),
   ateATreat: thought("ateATreat", 0.1, false),
   nearMiss: thought("nearMiss", -0.15, false),
+  killedSomeone: thought("killedSomeone", -0.4, false),
+  sawCrewHurt: thought("sawCrewHurt", -0.2, true),
+  heldTheLine: thought("heldTheLine", 0.2, false),
+  ranFromAFight: thought("ranFromAFight", -0.2, false),
+  wounded: thought("wounded", -0.2, false),
 };
 
 const band = { min: 1, max: 3 };
@@ -552,6 +557,62 @@ const config = {
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },
+  bodies: {
+    tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
+    severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },
+    severityPain: { graze: 0.1, serious: 0.3, grave: 0.6 },
+    painDecayPerSecond: 0.01,
+    bleedPerSecond: { graze: 0, serious: 0.004, grave: 0.012 },
+    bleedStopsAfterSeconds: { graze: 0, serious: 60, grave: 180 },
+    bloodRecoverPerSecond: 0.002,
+    stunPerHit: 0.5,
+    stunDecayPerSecond: 0.004,
+    incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
+    deadBelowBlood: 0.25,
+    healPerDay: 0.5,
+    partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
+    stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
+  },
+  expedition: {
+    decideEverySeconds: 0.5,
+    maxFightSeconds: 120,
+    alertClearSeconds: 60,
+    hitSkillBase: 0.7,
+    hitPerFighting: 0.06,
+    rangeFalloffFloor: 0.5,
+    coverPenalty: 0.5,
+    movingTargetFactor: 0.8,
+    movingShooterFactor: 0.7,
+    meleeAdjacentOnly: true,
+    resolveTiers: { shaky: 0.45, steady: 0.7, hard: 0.95 },
+    tie: {
+      paid: { resolve: 0.8, loyalty: 0.3 },
+      bound: { resolve: 1, loyalty: 0.7 },
+      devoted: { resolve: 1.25, loyalty: 1 },
+    },
+    castFighting: { shaky: 2, steady: 4, hard: 6 },
+    crewResolve: { base: 0.6, perFighting: 0.03, perMood: 0.1, perLeaderAffinity: 0.02 },
+    morale: {
+      hitSelf: -0.25,
+      allyDown: -0.2,
+      allyDead: -0.3,
+      underFireNoCoverPerSecond: -0.05,
+      outnumberedPerSecond: -0.03,
+      allyHit: 0.05,
+      inCoverPerSecond: 0.02,
+      leaderNearPerSecond: 0.02,
+      outflanked: -0.3,
+      targetTaken: -0.4,
+      waverBelow: 0.5,
+      breakBelow: 0.25,
+      recoverAbove: 0.6,
+    },
+    withdrawWhen: { firstDown: 1, halfDown: 0.5 },
+    leaderNearTiles: 3,
+    surrenderIfCornered: true,
+    blasters: 3,
+    batons: 2,
+  },
   events: { tickerMaxEntries: 20, traceRingSize: 500 },
 };
 
@@ -989,6 +1050,51 @@ describe("bundle validation", () => {
         ports: { [port.id]: port, [lonelyB.id]: lonelyB },
       });
       expect(issues.some((i) => i.message.includes("no return route"))).toBe(true);
+    });
+
+    it("keeps a landing site off every port's routes, its one route to its port (expeditions A1)", () => {
+      const site = {
+        ...portB,
+        id: "port.test.site",
+        name: "Site",
+        kind: "site",
+        nearPortId: "port.test.a",
+        castSeed: [],
+        externalStores: [],
+        routes: [{ toPortId: "port.test.a", distance: 10 }],
+      };
+      expect(portDefSchema.safeParse(site).success).toBe(true);
+      expect(portDefSchema.safeParse({ ...site, market: port.market }).success).toBe(false);
+      expect(portDefSchema.safeParse({ ...site, routes: port.routes }).success).toBe(false);
+      expect(portDefSchema.safeParse({ ...port, castSeed: [] }).success).toBe(false);
+      const alone = referenceIssues({
+        ...bundle,
+        ports: { [port.id]: port, [portB.id]: portB, [site.id]: site },
+      });
+      expect(alone.filter((i) => i.path.includes("port.test.site"))).toEqual([]);
+      const listed = { ...port, routes: [...port.routes, { toPortId: site.id, distance: 10 }] };
+      const issues = referenceIssues({
+        ...bundle,
+        ports: { [port.id]: listed, [portB.id]: portB, [site.id]: site },
+      });
+      expect(issues.some((i) => i.message.includes("never lists a site"))).toBe(true);
+    });
+
+    it("gives a weapon exactly to a weapon-tagged item (expeditions A1)", () => {
+      const weapon = {
+        kind: "blaster",
+        range: 8,
+        aimSeconds: 1.2,
+        hit: 0.55,
+        severity: "serious",
+        damageType: "blaster",
+        stun: true,
+      };
+      const blaster = { ...item, id: "item.test.blaster", tags: ["weapon"], toolKinds: [], weapon };
+      expect(itemDefSchema.safeParse(blaster).success).toBe(true);
+      expect(itemDefSchema.safeParse({ ...blaster, tags: [] }).success).toBe(false);
+      const { weapon: _none, ...bare } = blaster;
+      expect(itemDefSchema.safeParse(bare).success).toBe(false);
     });
 
     it("rejects an inverted price band", () => {

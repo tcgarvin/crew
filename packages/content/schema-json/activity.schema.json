@@ -60,7 +60,8 @@
               "lifeSupport",
               "cooling",
               "rampControl",
-              "comm"
+              "comm",
+              "armsLocker"
             ]
           },
           "zoneTag": {
@@ -198,7 +199,12 @@
             "heardOut",
             "dressedDown",
             "ateATreat",
-            "nearMiss"
+            "nearMiss",
+            "killedSomeone",
+            "sawCrewHurt",
+            "heldTheLine",
+            "ranFromAFight",
+            "wounded"
           ]
         },
         "lose": {
@@ -230,7 +236,12 @@
             "heardOut",
             "dressedDown",
             "ateATreat",
-            "nearMiss"
+            "nearMiss",
+            "killedSomeone",
+            "sawCrewHurt",
+            "heldTheLine",
+            "ranFromAFight",
+            "wounded"
           ]
         },
         "joined": {
@@ -262,7 +273,12 @@
             "heardOut",
             "dressedDown",
             "ateATreat",
-            "nearMiss"
+            "nearMiss",
+            "killedSomeone",
+            "sawCrewHurt",
+            "heldTheLine",
+            "ranFromAFight",
+            "wounded"
           ]
         },
         "listened": {
@@ -294,7 +310,12 @@
             "heardOut",
             "dressedDown",
             "ateATreat",
-            "nearMiss"
+            "nearMiss",
+            "killedSomeone",
+            "sawCrewHurt",
+            "heldTheLine",
+            "ranFromAFight",
+            "wounded"
           ]
         },
         "listenedDislike": {
@@ -326,7 +347,12 @@
             "heardOut",
             "dressedDown",
             "ateATreat",
-            "nearMiss"
+            "nearMiss",
+            "killedSomeone",
+            "sawCrewHurt",
+            "heldTheLine",
+            "ranFromAFight",
+            "wounded"
           ]
         }
       },
@@ -349,7 +375,10 @@
             "sharedATable",
             "heardMeOut",
             "dressedMeDown",
-            "talkedItThrough"
+            "talkedItThrough",
+            "foughtBeside",
+            "carriedMeOut",
+            "leftMeBehind"
           ]
         },
         "loserToWinner": {
@@ -366,7 +395,10 @@
             "sharedATable",
             "heardMeOut",
             "dressedMeDown",
-            "talkedItThrough"
+            "talkedItThrough",
+            "foughtBeside",
+            "carriedMeOut",
+            "leftMeBehind"
           ]
         }
       },
@@ -385,7 +417,15 @@
       "properties": {
         "skill": {
           "type": "string",
-          "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+          "enum": [
+            "engineering",
+            "electrical",
+            "piloting",
+            "cargo",
+            "medical",
+            "cooking",
+            "fighting"
+          ]
         },
         "perDay": {
           "type": "number",
@@ -432,7 +472,8 @@
             "instrument",
             "treat",
             "patchKit",
-            "plating"
+            "plating",
+            "weapon"
           ]
         },
         "own": {

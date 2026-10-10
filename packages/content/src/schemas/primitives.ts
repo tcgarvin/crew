@@ -8,7 +8,10 @@
 import type {
   ActivityDefId,
   ActivityOutcome,
+  BodyPart,
   CargoClass,
+  CastArms,
+  CastPart,
   CrewDefId,
   DeckDefId,
   DockDefId,
@@ -25,18 +28,22 @@ import type {
   PowerPriority,
   ProblemKind,
   RecipeActionKind,
+  ResolveTier,
   RockSize,
   RoleTag,
   ScenarioDefId,
   SkillId,
   SkillLevels,
   ThoughtKey,
+  TieTier,
   TileCoord,
   TileEdge,
   ToolKind,
   TopicDefId,
   TraitDefId,
   TraitModifierKey,
+  WantsTier,
+  WoundSeverity,
 } from "@crew/sim";
 import { z } from "zod";
 
@@ -104,6 +111,7 @@ export const skillIdSchema = z.enum([
   "cargo",
   "medical",
   "cooking",
+  "fighting",
 ]);
 export const roleTagSchema = z.enum([
   "captain",
@@ -130,6 +138,7 @@ export const itemTagSchema = z.enum([
   "treat",
   "patchKit",
   "plating",
+  "weapon",
 ]);
 export const toolKindSchema = z.enum([
   "wrench",
@@ -162,6 +171,7 @@ export const machineTagSchema = z.enum([
   "cooling",
   "rampControl",
   "comm",
+  "armsLocker",
 ]);
 export const powerPrioritySchema = z.enum([
   "lifeSupport",
@@ -209,6 +219,11 @@ export const thoughtKeySchema = z.enum([
   "dressedDown",
   "ateATreat",
   "nearMiss",
+  "killedSomeone",
+  "sawCrewHurt",
+  "heldTheLine",
+  "ranFromAFight",
+  "wounded",
 ]);
 /** §memories: what one person remembers about another (sim `MEMORY_KEYS`). */
 export const memoryKeySchema = z.enum([
@@ -224,6 +239,9 @@ export const memoryKeySchema = z.enum([
   "heardMeOut",
   "dressedMeDown",
   "talkedItThrough",
+  "foughtBeside",
+  "carriedMeOut",
+  "leftMeBehind",
 ]);
 export const traitModifierSchema = z.enum([
   "hungerRate",
@@ -282,6 +300,23 @@ export const rockSizeSchema = z.enum(["small", "large"]);
  * `config.field.machineEffects`.
  */
 export const machineEffectSchema = z.enum(["none", "graze", "damage", "knockout", "fault"]);
+/** Expeditions A1 (§7.1): body parts (sim `BODY_PARTS`), the keys of `config.bodies` tables. */
+export const bodyPartSchema = z.enum([
+  "head",
+  "torso",
+  "leftArm",
+  "rightArm",
+  "leftLeg",
+  "rightLeg",
+]);
+/** Expeditions A1 (§7.1): wound severities (sim `WOUND_SEVERITIES`). */
+export const woundSeveritySchema = z.enum(["graze", "serious", "grave"]);
+/** Expeditions A1 (§5.2): the cast tiers (sim `CAST_PARTS` … `WANTS_TIERS`). */
+export const castPartSchema = z.enum(["target", "guard", "bystander", "ally"]);
+export const castArmsSchema = z.enum(["none", "melee", "blaster"]);
+export const resolveTierSchema = z.enum(["shaky", "steady", "hard"]);
+export const tieTierSchema = z.enum(["paid", "bound", "devoted"]);
+export const wantsTierSchema = z.enum(["money", "out", "blood", "nothing"]);
 
 export const skillLevelsSchema = z.partialRecord(
   skillIdSchema,
@@ -318,7 +353,21 @@ export const VOCABULARY_IN_SYNC: [
   AssertEqual<z.infer<typeof fieldSeveritySchema>, FieldSeverity>,
   AssertEqual<z.infer<typeof rockSizeSchema>, RockSize>,
   AssertEqual<z.infer<typeof machineEffectSchema>, MachineEffect>,
+  AssertEqual<z.infer<typeof bodyPartSchema>, BodyPart>,
+  AssertEqual<z.infer<typeof woundSeveritySchema>, WoundSeverity>,
+  AssertEqual<z.infer<typeof castPartSchema>, CastPart>,
+  AssertEqual<z.infer<typeof castArmsSchema>, CastArms>,
+  AssertEqual<z.infer<typeof resolveTierSchema>, ResolveTier>,
+  AssertEqual<z.infer<typeof tieTierSchema>, TieTier>,
+  AssertEqual<z.infer<typeof wantsTierSchema>, WantsTier>,
 ] = [
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
   true,
   true,
   true,

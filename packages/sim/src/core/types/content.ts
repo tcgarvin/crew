@@ -39,6 +39,8 @@ export const SKILLS = [
   "cargo",
   "medical",
   "cooking",
+  /** Expeditions A1 (§7.2): handling a weapon and oneself in a fight; hit chance and resolve. */
+  "fighting",
 ] as const;
 export type SkillId = (typeof SKILLS)[number];
 
@@ -90,6 +92,8 @@ export const ITEM_TAGS = [
    * one).
    */
   "plating",
+  /** Expeditions A1 (§7.2): a weapon (`ItemDef.weapon`); only a weapon carries the tag. */
+  "weapon",
 ] as const;
 export type ItemTag = (typeof ITEM_TAGS)[number];
 
@@ -143,6 +147,8 @@ export const MACHINE_TAGS = [
    * Slice 5 (§intercom-and-reporting): an intercom panel, where a report is made to the whole ship.
    */
   "comm",
+  /** Expeditions A1 (§7.2): the arms locker, where the party arms before going ashore. */
+  "armsLocker",
 ] as const;
 export type MachineTag = (typeof MACHINE_TAGS)[number];
 
@@ -221,6 +227,16 @@ export const THOUGHT_KEYS = [
   "ateATreat",
   /** Slice 5: a rock came through the tile they stood on (no bodies yet: a fright, not a wound). */
   "nearMiss",
+  /** Expeditions A1 (§11): a shot of theirs killed someone. */
+  "killedSomeone",
+  /** Expeditions A1 (§11): saw a crewmate wounded in a fight (stacks). */
+  "sawCrewHurt",
+  /** Expeditions A1 (§11): stood their ground through a fight the party won. */
+  "heldTheLine",
+  /** Expeditions A1 (§11): broke and ran in a fight. */
+  "ranFromAFight",
+  /** Expeditions A1 (§11): carrying an open wound (kept while one is open). */
+  "wounded",
 ] as const;
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
 
@@ -250,6 +266,12 @@ export const MEMORY_KEYS = [
   "heardMeOut",
   "dressedMeDown",
   "talkedItThrough",
+  /** Expeditions A1 (§11): fought beside them, both ways, among the party. */
+  "foughtBeside",
+  /** Expeditions A1 (§11): they dragged me out of the fight. */
+  "carriedMeOut",
+  /** Expeditions A1 (§11): they left me on the floor. */
+  "leftMeBehind",
 ] as const;
 export type MemoryKey = (typeof MEMORY_KEYS)[number];
 
@@ -478,11 +500,20 @@ export interface DockingInterfaceDef {
 // Dock maps (Dockside §3, docs/design/dockside.md)
 // ---------------------------------------------------------------------------------------------
 
-/** What a dock map tile is. Only `floor` is walkable, and only where no blocking prop stands. */
-export const DOCK_TILE_KINDS = ["floor", "wall", "void"] as const;
+/**
+ * What a dock map tile is. Only `floor` is walkable, and only where no blocking prop stands.
+ * Expeditions A1 (§4, call 8): `cover` is never walked (a solid thing someone can crouch behind)
+ * and blocks a line of fire unless it is beside either end of it (`core/sites.ts`).
+ */
+export const DOCK_TILE_KINDS = ["floor", "wall", "void", "cover"] as const;
 export type DockTileKind = (typeof DOCK_TILE_KINDS)[number];
 
-/** Where a local stands. The gate and warehouse door are the edge of the simulated world. */
+/**
+ * Where a local stands. The gate and warehouse door are the edge of the simulated world.
+ * Expeditions A1 (§4): the site kinds: where the `target` stands (and the `loot` lies), the cast's
+ * `guard` spots, the `exit` a breaking cast member runs for, a `flank` approach, and `bystander`
+ * spots. Either map kind may carry any post kind; nothing reads a post it does not know (call 10).
+ */
 export const DOCK_POST_KINDS = [
   "gate",
   "warehouseDoor",
@@ -490,8 +521,18 @@ export const DOCK_POST_KINDS = [
   "kiosk",
   "loungeDoor",
   "bench",
+  "target",
+  "guard",
+  "loot",
+  "exit",
+  "flank",
+  "bystander",
 ] as const;
 export type DockPostKind = (typeof DOCK_POST_KINDS)[number];
+
+/** Expeditions A1 (§4): a port's dock (absent `kind`) or a site's landing ground. */
+export const DOCK_KINDS = ["dock", "site"] as const;
+export type DockKind = (typeof DOCK_KINDS)[number];
 
 /**
  * Freight on offer waits on `freightStaging`; a delivery is complete once it is all in
@@ -621,7 +662,70 @@ export interface DockDef {
    * 1]; a station (no sky) authors 0.
    */
   readonly airborneDust: number;
+  /** Expeditions A1 (§4): `site` for a landing site's map; absent is a port's dock. */
+  readonly kind?: DockKind;
+  /**
+   * Expeditions A1 (§4): tiles at which the cast notice an approaching party (required on a
+   * site, positive).
+   */
+  readonly noticeRadius?: number;
+  /**
+   * Expeditions A1 (§5.3): the cast the sim places when nobody stages the site (site only;
+   * `SITE_LIMITS` caps it).
+   */
+  readonly defaultCast?: readonly SiteCastEntryDef[];
 }
+
+// ---------------------------------------------------------------------------------------------
+// Sites and the cast (expeditions A1, §5)
+// ---------------------------------------------------------------------------------------------
+
+/** §5.2: what part someone plays at a site. */
+export const CAST_PARTS = ["target", "guard", "bystander", "ally"] as const;
+export type CastPart = (typeof CAST_PARTS)[number];
+
+/** §5.2: what they carry: nothing, a baton, or a blaster. */
+export const CAST_ARMS = ["none", "melee", "blaster"] as const;
+export type CastArms = (typeof CAST_ARMS)[number];
+
+/** §5.2: how much it takes to break them (`config.expedition.resolveTiers`). */
+export const RESOLVE_TIERS = ["shaky", "steady", "hard"] as const;
+export type ResolveTier = (typeof RESOLVE_TIERS)[number];
+
+/** §5.2: their loyalty to the target. */
+export const TIE_TIERS = ["paid", "bound", "devoted"] as const;
+export type TieTier = (typeof TIE_TIERS)[number];
+
+/** §5.2: what a parley could offer them (A2); `nothing` for a bystander. */
+export const WANTS_TIERS = ["money", "out", "blood", "nothing"] as const;
+export type WantsTier = (typeof WANTS_TIERS)[number];
+
+/**
+ * §5.1, §5.2: one person at a site, as authored (`DockDef.defaultCast`) or staged
+ * (`scenarioStartExpedition.cast`). Spawned as an actor (`crew: false`) at `post`, a post of the
+ * part's kind on the site map (a `target` at a `target` post, a `guard` at a `guard`, a `bystander`
+ * at a `bystander`, an `ally` at a `guard` or `bystander` post).
+ */
+export interface SiteCastEntryDef {
+  readonly name: string;
+  /** Lower case: "boat-shed keeper"; becomes the generated crew def's `bio`. */
+  readonly role: string;
+  /** One line of how they look. */
+  readonly look: string;
+  readonly part: CastPart;
+  readonly arms: CastArms;
+  readonly resolve: ResolveTier;
+  /** Ignored for the target and bystanders; authored all the same. */
+  readonly tie: TieTier;
+  readonly wants: WantsTier;
+  readonly post: LocalKey;
+}
+
+/**
+ * §5.2: the kernel's caps on a site's cast (beside `STAGING_LIMITS`): people, armed people, targets
+ * and allies.
+ */
+export const SITE_LIMITS = { people: 6, armed: 3, targets: 1, allies: 1 } as const;
 
 /** §berth-boxes: a dock's berth box: `HULL_SIZE_BOX[sizeClass]` tiles from `origin`, all `void`. */
 export interface DockBerthDef {
@@ -780,6 +884,31 @@ export interface ItemCount {
 // Items
 // ---------------------------------------------------------------------------------------------
 
+/** Expeditions A1 (§12.2 of SD, §7.1): body parts, wound severities and damage types. */
+export const BODY_PARTS = ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"] as const;
+export type BodyPart = (typeof BODY_PARTS)[number];
+
+export const WOUND_SEVERITIES = ["graze", "serious", "grave"] as const;
+export type WoundSeverity = (typeof WOUND_SEVERITIES)[number];
+
+export const DAMAGE_TYPES = ["blaster", "blunt", "stun"] as const;
+export type DamageType = (typeof DAMAGE_TYPES)[number];
+
+/**
+ * Expeditions A1 (§7.2): what a weapon does. `range` in tiles, `aimSeconds` from the decision to
+ * the shot, `hit` the base chance in (0, 1], `severity`/`damageType` of a hit; `stun` says it has
+ * a stun setting (a `fire: stun` plan hits with `stun` instead).
+ */
+export interface WeaponDef {
+  readonly kind: "blaster" | "baton";
+  readonly range: number;
+  readonly aimSeconds: Seconds;
+  readonly hit: number;
+  readonly severity: WoundSeverity;
+  readonly damageType: "blaster" | "blunt";
+  readonly stun: boolean;
+}
+
 /** SD §8.1: unique entities for distinctive things, stacks for interchangeable stock. */
 export interface ItemDef {
   readonly id: ItemDefId;
@@ -802,6 +931,8 @@ export interface ItemDef {
    * hands.
    */
   readonly capacityUnits?: number;
+  /** Expeditions A1 (§7.2): present exactly on a `weapon`-tagged item. */
+  readonly weapon?: WeaponDef;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -979,6 +1110,14 @@ export interface TopicDef {
 export const PORT_SETTINGS = ["station", "planet"] as const;
 export type PortSetting = (typeof PORT_SETTINGS)[number];
 
+/**
+ * Expeditions A1 (§3.1, call 1): a port, or a site: a landing that sells nothing, reached from its
+ * `nearPortId`. A port never lists a site in its routes (content L2), so in A1 nothing sails there;
+ * the expedition starts there by `scenarioStartExpedition`.
+ */
+export const PORT_KINDS = ["port", "site"] as const;
+export type PortKind = (typeof PORT_KINDS)[number];
+
 export interface PortDef {
   readonly id: PortDefId;
   readonly name: string;
@@ -1013,6 +1152,10 @@ export interface PortDef {
    * Symmetry is checked at L2, not assumed.
    */
   readonly routes: readonly { readonly toPortId: PortDefId; readonly distance: Seconds }[];
+  /** Expeditions A1 (§3.1): `site` for a landing site; absent is a port. */
+  readonly kind?: PortKind;
+  /** Expeditions A1 (§3.1): the port a site lies near (its one route); site only. */
+  readonly nearPortId?: PortDefId;
 }
 
 /** A recurring local at a port, for the narrator's continuity (passengers spec §2.4). */
@@ -1711,6 +1854,93 @@ export interface ConfigDef {
   readonly intercom: {
     /** A report at a panel. */
     readonly reportSeconds: Seconds;
+  };
+  /**
+   * Expeditions A1 (§7.1, SD §12): bodies. Part damage against `tolerance` gives a part's
+   * function; wounds add damage and pain, bleed, and heal; capacities follow (`core/body.ts`).
+   */
+  readonly bodies: {
+    /** Damage at which a part stops working (and a head or torso kills). */
+    readonly tolerance: Readonly<Record<BodyPart, number>>;
+    /** Part damage one wound of each severity adds. */
+    readonly severityDamage: Readonly<Record<WoundSeverity, number>>;
+    /** Pain one wound of each severity adds (pain is in [0, 1]). */
+    readonly severityPain: Readonly<Record<WoundSeverity, number>>;
+    readonly painDecayPerSecond: number;
+    /** Blood lost per second while a wound of each severity bleeds. */
+    readonly bleedPerSecond: Readonly<Record<WoundSeverity, number>>;
+    /** A wound of each severity stops bleeding on its own this long after it was made. */
+    readonly bleedStopsAfterSeconds: Readonly<Record<WoundSeverity, Seconds>>;
+    /** Blood regained per second while nothing bleeds. */
+    readonly bloodRecoverPerSecond: number;
+    /** Consciousness debt one stun hit adds (`Body.stun`). */
+    readonly stunPerHit: number;
+    readonly stunDecayPerSecond: number;
+    /** Below either floor someone is incapacitated. */
+    readonly incapacitatedBelow: { readonly consciousness: number; readonly movement: number };
+    /** Blood below this is death. */
+    readonly deadBelowBlood: number;
+    /** Share of a wound's damage healed a day once it no longer bleeds. */
+    readonly healPerDay: number;
+    /** Relative weights of where a hit lands, and where a stun hit lands. */
+    readonly partTable: Readonly<Record<BodyPart, number>>;
+    readonly stunPartTable: Readonly<Record<BodyPart, number>>;
+  };
+  /**
+   * Expeditions A1 (§8): the fight. Seconds for cadences, factors for hit chance, resolve deltas
+   * per event or per second (`morale`), thresholds with hysteresis.
+   */
+  readonly expedition: {
+    /** Each combatant decides this often (staggered by actor index). */
+    readonly decideEverySeconds: Seconds;
+    /** A fight still going this long after contact ends `timedOut`. */
+    readonly maxFightSeconds: Seconds;
+    /** The alert stands this long after the fight resolves. */
+    readonly alertClearSeconds: Seconds;
+    readonly hitSkillBase: number;
+    readonly hitPerFighting: number;
+    /** Range falloff: 1 at point blank, this at the weapon's full range. */
+    readonly rangeFalloffFloor: number;
+    readonly coverPenalty: number;
+    readonly movingTargetFactor: number;
+    readonly movingShooterFactor: number;
+    readonly meleeAdjacentOnly: boolean;
+    readonly resolveTiers: Readonly<Record<ResolveTier, number>>;
+    /**
+     * A cast member's tie to the target: a factor on their resolve (capped at 1) and their
+     * loyalty; ignored (factor 1, loyalty 0) for the target and bystanders.
+     */
+    readonly tie: Readonly<Record<TieTier, { readonly resolve: number; readonly loyalty: number }>>;
+    /** A cast member's `fighting` skill by their resolve tier (their generated crew def's). */
+    readonly castFighting: Readonly<Record<ResolveTier, number>>;
+    readonly crewResolve: {
+      readonly base: number;
+      readonly perFighting: number;
+      readonly perMood: number;
+      readonly perLeaderAffinity: number;
+    };
+    readonly morale: {
+      readonly hitSelf: number;
+      readonly allyDown: number;
+      readonly allyDead: number;
+      readonly underFireNoCoverPerSecond: number;
+      readonly outnumberedPerSecond: number;
+      readonly allyHit: number;
+      readonly inCoverPerSecond: number;
+      readonly leaderNearPerSecond: number;
+      readonly outflanked: number;
+      readonly targetTaken: number;
+      readonly waverBelow: number;
+      readonly breakBelow: number;
+      readonly recoverAbove: number;
+    };
+    /** The party withdraws at its first casualty, or with this share of it down. */
+    readonly withdrawWhen: { readonly firstDown: number; readonly halfDown: number };
+    readonly leaderNearTiles: number;
+    readonly surrenderIfCornered: boolean;
+    /** The arms the default scenario stows (informational for the plan menu's squad rules). */
+    readonly blasters: number;
+    readonly batons: number;
   };
   readonly events: {
     readonly tickerMaxEntries: number;

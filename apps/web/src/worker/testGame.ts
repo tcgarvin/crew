@@ -4,10 +4,12 @@
  */
 import type { Actor, World } from "@crew/sim";
 import {
+  bodyViolations,
   checkInvariants,
   commerceViolations,
   createKernel,
   dirtViolations,
+  expeditionViolations,
   spatialViolations,
   travelViolations,
   workViolations,
@@ -32,6 +34,9 @@ export function assertInvariants(world: World): void {
     ...workViolations(world),
     ...travelViolations(world),
     ...commerceViolations(world),
+    // Expeditions A1: bodies whole and capacities from one formula; no combatant off a site.
+    ...bodyViolations(world),
+    ...expeditionViolations(world),
   ];
   if (violations.length > 0) {
     throw new Error(`tick ${world.state.tick}: ${violations.slice(0, 5).join("; ")}`);

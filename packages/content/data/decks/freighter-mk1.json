@@ -454,6 +454,15 @@
       },
       "rotation": 0,
       "powerDomain": "main"
+    },
+    {
+      "key": "arms_locker",
+      "machineDefId": "machine.arms_locker",
+      "origin": {
+        "x": 28,
+        "y": 10
+      },
+      "rotation": 0
     }
   ],
   "powerDomains": [
@@ -780,6 +789,18 @@
           "y": 7
         }
       ]
+    },
+    {
+      "key": "arms",
+      "name": "Arms Locker",
+      "tags": ["armsLocker"],
+      "tiles": [
+        {
+          "x": 28,
+          "y": 10
+        }
+      ],
+      "machineKey": "arms_locker"
     }
   ],
   "docking": {

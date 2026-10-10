@@ -47,7 +47,10 @@ function catalogueLine(item: ItemDef): string {
 
 /** The item catalogue for props: every item def in content, by id. Fixed for a game. */
 export function buildStagingCatalogue(content: ContentBundle): string {
-  const items = Object.values(content.items).sort((a, b) => a.id.localeCompare(b.id));
+  // Expeditions A1 (call 4): weapons are not set dressing, and not the narrator's until A2.
+  const items = Object.values(content.items)
+    .filter((item) => !item.tags.includes("weapon"))
+    .sort((a, b) => a.id.localeCompare(b.id));
   return [
     "# The item catalogue",
     "Props are drawn like these items. Use the ids exactly.",

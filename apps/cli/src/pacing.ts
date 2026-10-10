@@ -65,11 +65,13 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  registerBodies,
   registerCabins,
   registerCommerce,
   registerDamage,
   registerDirt,
   registerEquipmentSystems,
+  registerExpedition,
   registerField,
   registerGalley,
   registerIntercom,
@@ -195,6 +197,8 @@ export function createPacingRegistry(): KernelRegistry {
   registerField(registry);
   registerCommerce(registry);
   registerNeeds(registry);
+  // Expeditions A1: bodies after needs in the needs phase (call 5).
+  registerBodies(registry);
   registerWatch(registry);
   registerGalley(registry);
   registerRecreation(registry);
@@ -202,6 +206,8 @@ export function createPacingRegistry(): KernelRegistry {
   registerCabins(registry);
   registerDamage(registry);
   registerIntercom(registry);
+  // Expeditions A1: the muster and the fight, in the actions phase after spatial, before work.
+  registerExpedition(registry);
   registerWork(registry, {
     derivations: {
       ...equipmentTaskDerivation,

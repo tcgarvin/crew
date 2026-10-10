@@ -21,7 +21,7 @@
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking"]
+        "enum": ["engineering", "electrical", "piloting", "cargo", "medical", "cooking", "fighting"]
       },
       "additionalProperties": {
         "type": "number",

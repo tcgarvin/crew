@@ -2,10 +2,13 @@
  * Cheap physical and structural invariants (SD §19.4, CONTRACTS rules 2 and 4). Returns one
  * message per violation; empty means healthy. Used by tests after every step and by `restore`.
  */
+import { capacitiesOf, isDeadBy } from "./body";
 import { integrityFromScars } from "./hull";
 import { parseInstanceId } from "./ids";
-import { INTEREST_TAGS } from "./types/content";
+import { siteOf } from "./sites";
+import { BODY_PARTS, INTEREST_TAGS } from "./types/content";
 import type { InstanceKind } from "./types/ids";
+import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
 
 /** Walk a value and report anything that would not survive a JSON round-trip unchanged. */
@@ -192,6 +195,7 @@ function marketViolations(state: ReadonlyWorldState): string[] {
 
 function actorViolations(state: ReadonlyWorldState): string[] {
   const out: string[] = [];
+  const woundIds = new Set<string>();
   for (const actor of Object.values(state.actors)) {
     const location = actor.location;
     if (location.kind === "carriedBy" || location.kind === "equippedBy") {
@@ -211,6 +215,7 @@ function actorViolations(state: ReadonlyWorldState): string[] {
       }
     });
     out.push(...characterViolations(actor));
+    out.push(...bodyShapeViolations(actor, state.nextId.wound, woundIds));
     // §footfall-and-boots: boots carry a share of dirt in [0, 1].
     if (!(actor.boots >= 0 && actor.boots <= 1)) {
       out.push(`actors.${actor.id}.boots is ${actor.boots}`);
@@ -228,6 +233,121 @@ function actorViolations(state: ReadonlyWorldState): string[] {
 }
 
 const INTEREST_TAG_SET: ReadonlySet<string> = new Set(INTEREST_TAGS);
+
+type ReadonlyActor = ReadonlyWorldState["actors"][keyof ReadonlyWorldState["actors"]];
+
+const inUnit = (v: number): boolean => v >= 0 && v <= 1;
+
+/**
+ * Expeditions A1 (§7.1): a body has the six parts with finite, non-negative damage; `blood`,
+ * `pain` and `stun` in [0, 1]; wound ids allocated (below `nextId.wound`) and unique across
+ * everyone (`seen` collects them).
+ */
+function bodyShapeViolations(actor: ReadonlyActor, nextWound: number, seen: Set<string>): string[] {
+  const out: string[] = [];
+  const where = `actors.${actor.id}.body`;
+  const body = actor.body;
+  for (const part of BODY_PARTS) {
+    const damage = body.parts[part]?.damage;
+    if (damage === undefined || !Number.isFinite(damage) || damage < 0) {
+      out.push(`${where}.parts.${part} damage is ${String(damage)}`);
+    }
+  }
+  if (Object.keys(body.parts).length !== BODY_PARTS.length) {
+    out.push(`${where}.parts has ${Object.keys(body.parts).length} parts`);
+  }
+  for (const key of ["blood", "pain", "stun"] as const) {
+    if (!inUnit(body[key])) out.push(`${where}.${key} is ${body[key]}`);
+  }
+  body.wounds.forEach((wound, i) => {
+    const parsed = parseInstanceId(wound.id);
+    if (parsed?.kind !== "wound" || parsed.counter >= nextWound) {
+      out.push(`${where}.wounds[${i}] has unallocated id ${wound.id}`);
+    }
+    if (seen.has(wound.id)) out.push(`${where}.wounds[${i}] repeats id ${wound.id}`);
+    seen.add(wound.id);
+  });
+  return out;
+}
+
+/**
+ * Expeditions A1: the expedition names actors that exist, its leader among a non-empty party, and
+ * a fight has a plan.
+ */
+function expeditionShapeViolations(state: ReadonlyWorldState): string[] {
+  const expedition = state.expedition;
+  if (expedition === undefined) return [];
+  const out: string[] = [];
+  for (const id of expedition.party) {
+    if (state.actors[id] === undefined) out.push(`expedition.party names unknown actor ${id}`);
+  }
+  if (state.actors[expedition.leaderId] === undefined) {
+    out.push(`expedition.leaderId ${expedition.leaderId} is not an actor`);
+  }
+  if (expedition.party.length > 0 && !expedition.party.includes(expedition.leaderId)) {
+    out.push(`expedition leader ${expedition.leaderId} is not in the party`);
+  }
+  if (expedition.phase === "fight" && expedition.plan === undefined) {
+    out.push("expedition is in a fight without a plan");
+  }
+  if (!Number.isInteger(expedition.shots) || expedition.shots < 0) {
+    out.push(`expedition.shots is ${expedition.shots}`);
+  }
+  return out;
+}
+
+/**
+ * Expeditions A1 (§7.1, plan call 5), the body rules that need config: `dead` exactly when the
+ * body is dead by threshold (`isDeadBy`), and capacities as `applyCapacities` writes them (fatigue
+ * composed with the body), so nothing else writes them. Tests and fixtures call it beside
+ * `checkInvariants`, which sees state alone.
+ */
+export function bodyViolations(world: Pick<World, "state" | "config">): string[] {
+  const out: string[] = [];
+  const config = world.config.values;
+  for (const actor of Object.values(world.state.actors)) {
+    const where = `actors.${actor.id}`;
+    const dead = isDeadBy(actor.body, config);
+    if (dead !== (actor.availability === "dead")) {
+      out.push(`${where} is ${actor.availability} with a body that is ${dead ? "" : "not "}dead`);
+    }
+    const expected = capacitiesOf(actor, config);
+    for (const key of ["movement", "manipulation", "consciousness"] as const) {
+      if (Math.abs(actor.capacities[key] - expected[key]) > 1e-9) {
+        out.push(`${where}.capacities.${key} is ${actor.capacities[key]}, not ${expected[key]}`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Expeditions A1, the rules that need content: a combatant stands on the deck with the site
+ * alongside (or is carried there), and an expedition that is not over has its site alongside.
+ */
+export function expeditionViolations(world: Pick<World, "state" | "content">): string[] {
+  const out: string[] = [];
+  const { state, content } = world;
+  const site = siteOf(content, state);
+  const presence = state.deck.dock;
+  for (const actor of Object.values(state.actors)) {
+    if (actor.combatant === undefined) continue;
+    const location = actor.location;
+    const onSiteDeck =
+      site !== undefined &&
+      (location.kind === "carriedBy" ||
+        (location.kind === "onDeck" && location.deckId === presence?.deckId));
+    if (!onSiteDeck) out.push(`actors.${actor.id} is a combatant away from a site`);
+  }
+  const expedition = state.expedition;
+  if (expedition !== undefined && expedition.phase !== "resolved") {
+    if (site === undefined) out.push(`expedition at ${expedition.siteId} with no site alongside`);
+    else if (site.dock.portId !== expedition.siteId) {
+      out.push(`expedition at ${expedition.siteId} with "${site.dock.id}" alongside`);
+    }
+  }
+  return out;
+}
 
 /**
  * Slice 4: interests are known tags, the strong one among the likes, none both liked and
@@ -535,6 +655,7 @@ export function checkInvariants(state: ReadonlyWorldState): string[] {
     ...fieldViolations(state),
     ...dirtAndGalleyViolations(state),
     ...socialViolations(state),
+    ...expeditionShapeViolations(state),
     ...taskCycleViolations(state),
     ...queueViolations(state),
   );

@@ -63,7 +63,7 @@
       },
       "additionalProperties": {
         "type": "string",
-        "enum": ["floor", "wall", "void"]
+        "enum": ["floor", "wall", "void", "cover"]
       }
     },
     "berth": {
@@ -105,7 +105,20 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["gate", "warehouseDoor", "marketStall", "kiosk", "loungeDoor", "bench"]
+            "enum": [
+              "gate",
+              "warehouseDoor",
+              "marketStall",
+              "kiosk",
+              "loungeDoor",
+              "bench",
+              "target",
+              "guard",
+              "loot",
+              "exit",
+              "flank",
+              "bystander"
+            ]
           },
           "name": {
             "type": "string",
@@ -315,6 +328,63 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["dock", "site"]
+    },
+    "noticeRadius": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "defaultCast": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "look": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "part": {
+            "type": "string",
+            "enum": ["target", "guard", "bystander", "ally"]
+          },
+          "arms": {
+            "type": "string",
+            "enum": ["none", "melee", "blaster"]
+          },
+          "resolve": {
+            "type": "string",
+            "enum": ["shaky", "steady", "hard"]
+          },
+          "tie": {
+            "type": "string",
+            "enum": ["paid", "bound", "devoted"]
+          },
+          "wants": {
+            "type": "string",
+            "enum": ["money", "out", "blood", "nothing"]
+          },
+          "post": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          }
+        },
+        "required": ["name", "role", "look", "part", "arms", "resolve", "tie", "wants", "post"],
+        "additionalProperties": false
+      }
     }
   },
   "required": [

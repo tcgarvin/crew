@@ -139,7 +139,7 @@ describe("null narrator offers work (D40)", () => {
   it("translates a two-hop template at a far port, priced by path distance (§2.3)", () => {
     const TERNS = "port.terns_rest" as PortDefId;
     const bundle = content();
-    expect(Object.keys(bundle.ports)).toHaveLength(6);
+    expect(Object.values(bundle.ports).filter((p) => p.kind !== "site")).toHaveLength(6);
     const terns = bundle.ports[TERNS];
     if (terns === undefined) throw new Error("fixture port");
     // Tern's Rest -> Kessler Drift runs through the Hub: 90 + 25.

@@ -17,6 +17,7 @@ import {
   configTicks,
   hopCount,
   isOnDock,
+  isSite,
   roomPhrase,
   shortestPath,
 } from "@crew/sim";
@@ -140,6 +141,14 @@ export function offerPortNow(state: State): PortDefId | undefined {
   return travel.stage === "docked" ? travel.portId : undefined;
 }
 
+/**
+ * Expeditions A1 (call 4): the arms locker, which the narrator does not see until A2 (its
+ * capability lists and the digest's machines skip it).
+ */
+export function isArmsLocker(content: ContentBundle, machine: DeepReadonly<Machine>): boolean {
+  return content.machines[machine.defId]?.tags.includes("armsLocker") ?? false;
+}
+
 /** The length of a direct leg between two ports, or `undefined` when no route joins them. */
 export function routeDistance(
   content: ContentBundle,
@@ -163,6 +172,10 @@ export function pathBetween(
 ):
   | { readonly path: readonly PortDefId[]; readonly hops: number; readonly distance: number }
   | undefined {
+  // Expeditions A1 (call 4): no chain of legs reaches a landing site for the narrator until A2.
+  if (isSite(content, fromPortId as PortDefId) || isSite(content, toPortId as PortDefId)) {
+    return undefined;
+  }
   const found = shortestPath(content.ports, fromPortId as PortDefId, toPortId as PortDefId);
   if (found === undefined) return undefined;
   return { path: found.path, hops: hopCount(found.path), distance: found.distance };

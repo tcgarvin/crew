@@ -1,9 +1,12 @@
-import { FIELD_SEVERITIES, HAZARD_KINDS } from "@crew/sim";
+import { FIELD_SEVERITIES, HAZARD_KINDS, isSite } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildCapabilities, fieldExpectation } from "./capabilities";
 import { captainAshoreRequest, quietTooLongRequest } from "./fixtures";
-import { pathBetween, routeDistance } from "./lookups";
+import { isArmsLocker, pathBetween, routeDistance } from "./lookups";
 import { content } from "./test-support";
+
+/** The ports the narrator knows: every port but a landing site (expeditions A1, call 4). */
+const ports = () => Object.values(content().ports).filter((p) => !isSite(content(), p.id));
 
 describe("buildCapabilities", () => {
   const req = quietTooLongRequest(content());
@@ -20,8 +23,9 @@ describe("buildCapabilities", () => {
     }
   });
 
-  it("lists every port with its routes and stores, and every freight item", () => {
-    for (const port of Object.values(content().ports)) {
+  it("lists every port with its routes and stores, and every freight item; never a landing site (expeditions A1)", () => {
+    expect(text).not.toContain("port.boathouse");
+    for (const port of ports()) {
       expect(text).toContain(`- ${port.id} "${port.name}"`);
       for (const route of port.routes) expect(text).toContain(route.toPortId);
       for (const store of port.externalStores)
@@ -127,7 +131,9 @@ describe("buildCapabilities", () => {
     const deck = Object.values(content().decks).find((d) => d.id === deckId);
     for (const room of deck?.compartments ?? []) expect(lever).toContain(`  - "${room.name}": `);
     for (const machine of Object.values(req.snapshot.state.machines)) {
-      expect(lever).toMatch(new RegExp(`[:,] ${machine.id} `));
+      // Expeditions A1 (call 4): the arms locker is the one machine the narrator does not see.
+      const listed = !isArmsLocker(content(), machine);
+      expect(new RegExp(`[:,] ${machine.id} `).test(lever), machine.id).toBe(listed);
     }
     expect(lever).toContain('  - "Galley": ');
   });
@@ -135,7 +141,7 @@ describe("buildCapabilities", () => {
   it("lists every port's character, legs and distance from the port the ship is heading for (§2.4)", () => {
     // The fixture is in transit Hub -> Green Meridian, so "here" is Green Meridian.
     expect(text).toContain('"From here" is measured from port.green_meridian (Green Meridian)');
-    for (const port of Object.values(content().ports)) {
+    for (const port of ports()) {
       expect(text).toContain(`  character: ${port.character}`);
       for (const route of port.routes)
         expect(text).toContain(`${route.toPortId} (${route.distance}s transit)`);

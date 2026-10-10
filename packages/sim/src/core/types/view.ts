@@ -8,7 +8,16 @@
  *
  * The render frame is truth (D7: the player's map shows truth) but only what the canvas needs.
  */
-import type { Capacities, FactType, Interests, KnownFact, Needs, Thought, Values } from "./actor";
+import type {
+  Capacities,
+  CombatantState,
+  FactType,
+  Interests,
+  KnownFact,
+  Needs,
+  Thought,
+  Values,
+} from "./actor";
 import type { DeepReadonly, PhysicalLocation, Tick, TileCoord, TileEdge } from "./common";
 import type {
   ActivityDef,
@@ -45,7 +54,7 @@ import type {
   TraitDefId,
 } from "./ids";
 import type { DoorPhysicalState } from "./ship";
-import type { AlertState, GroupSession } from "./state";
+import type { AlertState, BattlePlan, ExpeditionPhase, GroupSession, PlanId } from "./state";
 import type { TravelStage } from "./travel";
 import type { Activity, Problem, Task } from "./work";
 
@@ -91,6 +100,17 @@ export interface WatchView {
   readonly gangway?: true;
 }
 
+/**
+ * Expeditions A1 (§7.1): what someone knows of their own body: the body's capacities alone
+ * (`core/body.ts` `bodyCapacities`, before fatigue), whether a wound is open, and whether one
+ * bleeds.
+ */
+export interface BodyView {
+  readonly capacities: Readonly<Capacities>;
+  readonly wounded: boolean;
+  readonly bleeding: boolean;
+}
+
 /** The actor's own state: they always know their body, needs and what they carry. */
 export interface SelfView {
   readonly id: ActorId;
@@ -98,6 +118,8 @@ export interface SelfView {
   readonly roleTags: readonly RoleTag[];
   readonly needs: Readonly<Needs>;
   readonly capacities: Readonly<Capacities>;
+  /** Expeditions A1: their body. */
+  readonly body: BodyView;
   readonly skills: SkillLevels;
   readonly traits: readonly TraitDefId[];
   readonly mood: number;
@@ -229,6 +251,20 @@ export interface RosterEntry {
   readonly skills: SkillLevels;
   /** Passengers §3.2: aboard as a passenger, not crew. Absent for crew. */
   readonly passenger?: true;
+  /** Expeditions A1: down (incapacitated); absent while up. The dead are not on the roster. */
+  readonly down?: true;
+}
+
+/**
+ * Expeditions A1 (§8.4): one plan on the menu: its handle, the plan, whether it can be chosen now
+ * and, when not (or to say what it means), why ("flank needs four fit people: only three fit").
+ * Written by the sim (`view/planMenu.ts` `planMenu`), re-derived at apply.
+ */
+export interface PlanOption {
+  readonly id: PlanId;
+  readonly plan: BattlePlan;
+  readonly available: boolean;
+  readonly why: string;
 }
 
 /**
@@ -324,6 +360,12 @@ export interface RenderActor {
   readonly actionLabel: string;
   /** Passengers §3.2: a paying passenger rather than crew, so the client can draw them apart. */
   readonly passenger: boolean;
+  /** Expeditions A1 (§8.6): a combatant's state in the fight; absent outside one. */
+  readonly state?: CombatantState;
+  /** Expeditions A1 (§8.6): which side a combatant is on; absent outside a fight. */
+  readonly side?: "us" | "them";
+  /** Expeditions A1 (§8.6): an open wound (`Actor.body.wounds` not empty). */
+  readonly wounded: boolean;
 }
 
 export type RenderMachineState = "ok" | "degraded" | "failed" | "off";
@@ -562,6 +604,34 @@ export interface RenderField {
 }
 
 /**
+ * Expeditions A1 (§8.6): a shot since the previous frame (from the tick's `shotFired` events), for
+ * the tracer: from the shooter to the target (tile-unit positions, deck frame), and whether it hit.
+ */
+export interface RenderShot {
+  readonly tick: Tick;
+  readonly fromX: number;
+  readonly fromY: number;
+  readonly toX: number;
+  readonly toY: number;
+  readonly hit: boolean;
+}
+
+/** Expeditions A1 (§8.6): one word a side for the shore header. */
+export const SIDE_WORDS = ["steady", "shaky", "breaking", "done"] as const;
+export type SideWord = (typeof SIDE_WORDS)[number];
+
+/**
+ * Expeditions A1 (§8.6): the expedition as the HUD shows it: its phase and a word for each side
+ * (`steady` while most are steady, `shaky` when any wavers, `breaking` when any breaks, `done` when
+ * none can fight).
+ */
+export interface RenderExpedition {
+  readonly phase: ExpeditionPhase;
+  readonly us: SideWord;
+  readonly them: SideWord;
+}
+
+/**
  * One frame for the canvas and HUD. Plain data, structured-clone safe (no class instances, no
  * functions). A Float32Array positions variant may be added later for large crews.
  * W0 decision: frames also carry `money` (HUD) and actor `name` (labels) beyond the minimum.
@@ -604,4 +674,8 @@ export interface RenderFrame {
   readonly field?: RenderField;
   /** §rock-impacts: impacts since the previous frame, for the flash. */
   readonly impacts: readonly RenderImpact[];
+  /** Expeditions A1 (§8.6): shots since the previous frame, for the tracers. */
+  readonly shots: readonly RenderShot[];
+  /** Expeditions A1 (§8.6): the expedition at the site alongside; absent with none. */
+  readonly expedition?: RenderExpedition;
 }

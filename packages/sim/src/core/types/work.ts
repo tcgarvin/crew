@@ -524,6 +524,16 @@ export const PERSONAL_ACTIVITIES = [
   "report",
   /** §scouts: the officer of the watch on alert, holding the bridge. */
   "holdBridge",
+  /**
+   * Expeditions A1 (call 12): a party member to the arms locker, arming, and down to the ramp
+   * foot. Never planned: the expedition system hands it out (`systems/expedition/muster.ts`).
+   */
+  "muster",
+  /**
+   * Expeditions A1 (call 6): in the fight. Set and driven by the combat system, which moves the
+   * person itself; the planner keeps out (`continue`) and work does not step them.
+   */
+  "fight",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -565,7 +575,9 @@ export type WorkStageKey =
   /** §scouts: a scout's look round a compartment (`damage/steps.ts` `runCheck`). */
   | "check"
   /** §reporting-damage: a report at an intercom panel (`intercom/report.ts` `runReport`). */
-  | "report";
+  | "report"
+  /** Expeditions A1: arming at the arms locker (`expedition/muster.ts` `runArm`). */
+  | "arm";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
 export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway" | "bridge";

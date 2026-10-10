@@ -90,8 +90,12 @@ import type { Claim, Problem, Task } from "./work";
  * `alert`, `nextId.field` and `scar`; the `asteroidBelt` hazard kind is gone. Migrated: the hull
  * starts whole, a waiting `asteroidBelt` hazard becomes a `debrisField`, and an old save gets the
  * scenario's patch kits in the lockers.
+ * 13 (2026-10-10): expeditions A1: `Actor.body` (whole) and `skills.fighting`, `combatant`,
+ * `expedition`, `nextId.wound`; the alert's `fight` cause. Migrated: everyone whole, fighting from
+ * the crew def, the arms locker instantiated on a deck that lacks it and the scenario's weapons
+ * stowed in it.
  */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 /**
  * §memories: one thing `from` remembers about `to`; its opinion is config's (`social.memories`).
@@ -304,7 +308,8 @@ export interface ActiveField {
  */
 export interface AlertState {
   sinceTick: Tick;
-  cause: "field";
+  /** Expeditions A1 (§8.6): `fight` while a fight at a site is on (owner: the combat system). */
+  cause: "field" | "fight";
   clearsAtTick?: Tick;
   reports: Record<CompartmentId, Tick>;
 }
@@ -349,6 +354,76 @@ export interface MarketLine {
 
 /** §port-markets: a port's live market, keyed by item def. Absent item = not sold here. */
 export type MarketStock = Record<ItemDefId, MarketLine>;
+
+// ---------------------------------------------------------------------------------------------
+// Expeditions (A1, docs/design/expeditions.md §8)
+// ---------------------------------------------------------------------------------------------
+
+/** §8.3: a plan's handle on the menu ("assault-lethal-armed"); a card carries only this. */
+export type PlanId = string;
+
+export const SQUAD_RULES = ["everyone", "armedOnly", "blastersOnly", "smallTeam"] as const;
+export type SquadRule = (typeof SQUAD_RULES)[number];
+
+export const POSTURES = ["assault", "hold", "flank", "bait", "creep"] as const;
+export type Posture = (typeof POSTURES)[number];
+
+export const FIRE_RULES = ["lethal", "stun", "holdFire"] as const;
+export type FireRule = (typeof FIRE_RULES)[number];
+
+export const OBJECTIVES = ["takeTarget", "takeItem", "breakThem"] as const;
+export type Objective = (typeof OBJECTIVES)[number];
+
+export const WITHDRAW_RULES = ["firstDown", "halfDown", "never"] as const;
+export type WithdrawRule = (typeof WITHDRAW_RULES)[number];
+
+/** §8.3: the captain's order for the fight, written by the sim's plan menu (`planMenu`). */
+export interface BattlePlan {
+  readonly id: PlanId;
+  readonly squad: SquadRule;
+  readonly posture: Posture;
+  readonly fire: FireRule;
+  readonly objective: Objective;
+  /** From the errand's `wants` (A2); the plan never overrides it. */
+  readonly targetMustLive: boolean;
+  readonly withdrawWhen: WithdrawRule;
+}
+
+/**
+ * §8.5, call 11: where the expedition is. `mustering` at the arms locker, `walkingOut` down the
+ * ramp, `approach` once the leader stands on the site floor (noticing is checked), `fight` from
+ * contact, `resolved` once it ended (kept until a new expedition replaces it).
+ */
+export type ExpeditionPhase = "mustering" | "walkingOut" | "approach" | "fight" | "resolved";
+
+export const EXPEDITION_OUTCOMES = [
+  "targetTaken",
+  "targetFled",
+  "partyWithdrew",
+  "partyRouted",
+  "timedOut",
+] as const;
+export type ExpeditionOutcome = (typeof EXPEDITION_OUTCOMES)[number];
+
+/**
+ * Expeditions A1 (§2, §8): the expedition at the site alongside, from `scenarioStartExpedition` on.
+ * Owner: the expedition system (`systems/expedition/`). `party` is set when the plan is adopted
+ * (call 11; empty before); `leaderId` leads (the captain by default, §8.5); `shots` counts every
+ * shot fired.
+ */
+export interface Expedition {
+  siteId: PortDefId;
+  phase: ExpeditionPhase;
+  party: ActorId[];
+  leaderId: ActorId;
+  plan?: BattlePlan;
+  startedTick: Tick;
+  fightStartedTick?: Tick;
+  resolvedTick?: Tick;
+  outcome?: ExpeditionOutcome;
+  shots: number;
+  causeCommandId?: CommandId;
+}
 
 /** Work slice (W4): problems are written by their owning systems, tasks/claims by work. */
 export interface WorkState {
@@ -418,6 +493,8 @@ export interface WorldState {
   field?: ActiveField;
   /** §sighting-and-the-alert: the ship is on alert. Owners per `AlertState`. */
   alert?: AlertState;
+  /** Expeditions A1: the expedition at the site alongside, if one was started. */
+  expedition?: Expedition;
   /** Owner: galley (§meal-problem). */
   galley: GalleyState;
   /** Slice 4: owners per `SocialState` (recreation, social, cabins). */

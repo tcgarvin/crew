@@ -9,7 +9,8 @@
     "engineering": 2,
     "electrical": 1,
     "medical": 1,
-    "cooking": 1
+    "cooking": 1,
+    "fighting": 4
   },
   "startingInventory": [
     {

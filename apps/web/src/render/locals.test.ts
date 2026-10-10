@@ -136,6 +136,7 @@ function frameAt(dock: DockDef, travel: RenderTravel, withDockside: boolean): Re
     hull: { integrity: 100, max: 100, scars: [], lost: false },
     alert: false,
     impacts: [],
+    shots: [],
     ...(withDockside ? dockside(dock) : { locals: [], dockProps: [] }),
     ...(travel.state === "departing" ? {} : { dock: { dockId: dock.id, deckId: layout.deckId } }),
   };
@@ -271,6 +272,7 @@ describe("local labels", () => {
           onDock: false,
           actionLabel: "at the helm",
           passenger: false,
+          wounded: false,
         },
       ],
       items: [],
