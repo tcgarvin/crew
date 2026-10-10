@@ -490,6 +490,8 @@ export const FIXTURE_BODIES: ConfigDef["bodies"] = {
 export const FIXTURE_EXPEDITION: ConfigDef["expedition"] = {
   decideEverySeconds: 0.5,
   maxFightSeconds: 120,
+  contactAfterSeconds: 15,
+  maxApproachSeconds: 90,
   alertClearSeconds: 60,
   hitSkillBase: 0.7,
   hitPerFighting: 0.06,
@@ -504,7 +506,7 @@ export const FIXTURE_EXPEDITION: ConfigDef["expedition"] = {
     bound: { resolve: 1, loyalty: 0.7 },
     devoted: { resolve: 1.25, loyalty: 1 },
   },
-  castFighting: { shaky: 2, steady: 4, hard: 6 },
+  castFighting: { shaky: 1, steady: 3, hard: 5 },
   crewResolve: { base: 0.6, perFighting: 0.03, perMood: 0.1, perLeaderAffinity: 0.02 },
   morale: {
     hitSelf: -0.25,

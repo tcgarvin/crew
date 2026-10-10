@@ -2207,6 +2207,14 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
+        "contactAfterSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxApproachSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "alertClearSeconds": {
           "type": "number",
           "minimum": 0
@@ -2469,6 +2477,8 @@
       "required": [
         "decideEverySeconds",
         "maxFightSeconds",
+        "contactAfterSeconds",
+        "maxApproachSeconds",
         "alertClearSeconds",
         "hitSkillBase",
         "hitPerFighting",

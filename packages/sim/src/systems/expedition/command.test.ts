@@ -95,8 +95,14 @@ describe("scenarioStartExpedition (expeditions A1, call 3)", () => {
     for (const actor of cast) {
       expect(actor.crew).toBe(false);
       expect(actor.combatant?.side).toBe("them");
-      expect(actor.combatant?.state).toBe("steady");
     }
+    // Ruling 7: the ladder starts from resolve; the shaky (0.45) start wavering.
+    expect(cast.map((a) => a.combatant?.state)).toEqual([
+      "steady",
+      "steady",
+      "wavering",
+      "wavering",
+    ]);
     const carried = Object.values(state.items).filter((i) => i.location.kind === "carriedBy");
     expect(carried.map((i) => i.defId).sort()).toEqual([SITE.baton, SITE.blaster]);
     expect(state.expedition).toMatchObject({ siteId: SITE.port, phase: "mustering", shots: 0 });

@@ -6,21 +6,25 @@
  * locker into their hands (blasters to the best `fighting` first, batons next, nothing for the
  * rest), then down to the foot of the personnel ramp.
  *
- * Gate stubs: `handOutMuster` hands nothing out and `musterPlan` is blocked, so nobody musters;
- * `runArm` counts its ticks. `lockerWeapons` is complete (the squad rules read it).
+ * Arming makes them a combatant (side `us`, their disposition from `partyDisposition`); the
+ * expedition system puts them into the fight when they stand on the site floor.
  *
  * Owner after the gate: W2 of expeditions A1.
  */
+import { configTicks } from "../../core/clock";
 import { findItemDef } from "../../core/defs";
+import { isOnDock } from "../../core/docks";
+import { rampFoot } from "../../core/sites";
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
-import type { ItemId } from "../../core/types/ids";
+import type { ItemId, MachineId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { ActivityStep } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
-import { type PlanResult, blocked } from "../work/plans";
+import { type PlanResult, blocked, interactionTarget, planOf } from "../work/plans";
 import type { StepResult } from "../work/steps";
+import { initialState, partyDisposition } from "./morale";
 
 /** A weapon lying in the arms locker. */
 export interface LockerWeapon {
@@ -57,23 +61,135 @@ export function lockerWeapons(state: ReadonlyWorldState, content: ContentBundle)
   );
 }
 
-/** Hand `muster` to the party members who have not mustered yet. Gate stub: nobody. */
-export function handOutMuster(_ctx: StepCtx): void {}
+/** The arms locker's machine on the ship deck, if there is one. */
+function lockerMachine(ctx: StepCtx): MachineId | undefined {
+  const deckId = shipDeckId(ctx.state);
+  return Object.values(ctx.state.machines)
+    .filter(
+      (m) =>
+        m.deckId === deckId && ctx.content.machines[m.defId]?.tags.includes("armsLocker") === true,
+    )
+    .map((m) => m.id)
+    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }))[0];
+}
 
-/** The muster's plan for `actor`. Gate stub: blocked, so a stray `muster` intent goes nowhere. */
-export function musterPlan(_ctx: StepCtx, _actor: Actor): PlanResult {
-  return blocked("unreachableTarget");
+function inActivity(actor: DeepReadonly<Actor>, activity: "muster" | "fight"): boolean {
+  return actor.activity.kind === "personal" && actor.activity.activity === activity;
 }
 
 /**
- * The `arm` work step at the locker. Gate stub: counts its ticks and arms nobody (W2 commits the
- * weapon into their hands on the last tick).
+ * Hand `muster` to every party member who is not yet ashore in the fight: as commerce hands out
+ * `lookForWork`, a `personal` intent at `essentialOperation`, written every tick until it starts
+ * (the planner may overwrite a pending intent on its tick), giving way to survival. Nobody is sent
+ * before there is a plan (call 11), after the party is called back, or once they broke.
+ */
+export function handOutMuster(ctx: StepCtx): void {
+  const expedition = ctx.state.expedition;
+  if (expedition === undefined || expedition.plan === undefined) return;
+  if (expedition.phase === "resolved" || expedition.withdrawTick !== undefined) return;
+  for (const id of expedition.party) {
+    const actor = ctx.state.actors[id];
+    if (actor === undefined || actor.availability !== "available") continue;
+    if (inActivity(actor, "muster") || inActivity(actor, "fight")) continue;
+    const combatant = actor.combatant;
+    if (combatant !== undefined && combatant.state !== "steady" && combatant.state !== "wavering") {
+      continue;
+    }
+    if (actor.activity.kind !== "idle" && actor.activity.urgency === "immediateSurvival") continue;
+    if (isOnDock(ctx.content, ctx.state, actor.location)) continue;
+    actor.pendingIntent = {
+      kind: "personal",
+      activity: "muster",
+      urgency: "essentialOperation",
+      trace: { candidates: 0, chosenReason: "mustering for the expedition", rejected: [] },
+    };
+  }
+}
+
+/**
+ * The muster's plan for `actor`: to the arms locker's `use` position, the `arm` step, then down to
+ * the foot of the personnel ramp. Someone already armed (a combatant) only walks down. Blocked
+ * for anyone not in the party, with no ramp foot, or no locker.
+ */
+export function musterPlan(ctx: StepCtx, actor: Actor): PlanResult {
+  const expedition = ctx.state.expedition;
+  if (expedition === undefined || !expedition.party.includes(actor.id)) {
+    return blocked("dependencyPending");
+  }
+  const foot = rampFoot(ctx.content, ctx.state);
+  if (foot === undefined) return blocked("rampClosed");
+  const down: ActivityStep = { kind: "moveTo", target: foot, requested: false };
+  if (actor.combatant !== undefined) return planOf([down]);
+  const locker = lockerMachine(ctx);
+  const at = locker === undefined ? undefined : interactionTarget(ctx, actor, locker, "use");
+  if (at === undefined) return blocked("unreachableTarget");
+  return planOf([
+    { kind: "moveTo", target: at, requested: false },
+    {
+      kind: "work",
+      stage: "arm",
+      ticksDone: 0,
+      ticksNeeded: configTicks(ctx.config, ARM_SECONDS),
+    },
+    down,
+  ]);
+}
+
+/** How long taking a weapon from the locker takes. */
+export const ARM_SECONDS = 2;
+
+/**
+ * The `arm` work step at the locker. On its last tick the best weapon left goes into their hands:
+ * among the party not yet armed, ranked by `fighting` (ties by id), the top as many as there are
+ * blasters left take a blaster, the next as many as batons a baton, the rest nothing, so whoever
+ * reaches the locker first never takes what a better fighter should have. They join the fight's
+ * roll (`combatant`, side `us`) whatever they carry.
  */
 export function runArm(
-  _ctx: StepCtx,
-  _actor: DeepReadonly<Actor>,
+  ctx: StepCtx,
+  actor: DeepReadonly<Actor>,
   step: Extract<ActivityStep, { kind: "work" }>,
 ): StepResult {
   step.ticksDone += 1;
-  return step.ticksDone >= step.ticksNeeded ? "done" : "wait";
+  if (step.ticksDone < step.ticksNeeded) return "wait";
+  const expedition = ctx.state.expedition;
+  const self = ctx.state.actors[actor.id];
+  if (expedition === undefined || self === undefined || self.combatant !== undefined) return "done";
+  const unarmed = expedition.party
+    .map((id) => ctx.state.actors[id])
+    .filter((a): a is Actor => a !== undefined && a.combatant === undefined)
+    .sort(
+      (a, b) =>
+        (b.skills.fighting ?? 0) - (a.skills.fighting ?? 0) ||
+        a.id.localeCompare(b.id, "en", { numeric: true }),
+    );
+  const rank = unarmed.findIndex((a) => a.id === self.id);
+  const weapons = lockerWeapons(ctx.state, ctx.content);
+  const blasters = weapons.filter((w) => w.kind === "blaster");
+  const batons = weapons.filter((w) => w.kind === "baton");
+  const pick =
+    rank < blasters.length
+      ? blasters[0]
+      : rank < blasters.length + batons.length
+        ? batons[0]
+        : undefined;
+  if (pick !== undefined) {
+    const item = ctx.state.items[pick.itemId];
+    if (item !== undefined) {
+      item.location = { kind: "carriedBy", actorId: self.id };
+      ctx.caches.dirty.inventory = true;
+    }
+  }
+  const disposition = partyDisposition(ctx.state, ctx.config, self, expedition.leaderId);
+  const every = configTicks(ctx.config, ctx.config.expedition.decideEverySeconds);
+  const index = expedition.party.indexOf(self.id);
+  self.combatant = {
+    side: "us",
+    disposition,
+    state: initialState(disposition.resolveBase, ctx.config.expedition.morale),
+    resolve: disposition.resolveBase,
+    // Staggered by their place in the party, as the planner staggers.
+    lastDecidedTick: ctx.tick - (Math.max(0, index) % Math.max(1, every)),
+  };
+  return "done";
 }

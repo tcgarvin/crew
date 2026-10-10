@@ -380,6 +380,8 @@ export const configDefSchema = z.strictObject({
   expedition: z.strictObject({
     decideEverySeconds: positive,
     maxFightSeconds: positive,
+    contactAfterSeconds: positive,
+    maxApproachSeconds: positive,
     alertClearSeconds: nonNegative,
     hitSkillBase: nonNegative,
     hitPerFighting: nonNegative,

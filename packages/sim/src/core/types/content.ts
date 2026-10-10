@@ -1895,6 +1895,13 @@ export interface ConfigDef {
     readonly decideEverySeconds: Seconds;
     /** A fight still going this long after contact ends `timedOut`. */
     readonly maxFightSeconds: Seconds;
+    /**
+     * The party on the site floor this long under any posture but `creep` is contact (the
+     * landing was loud), noticed or not.
+     */
+    readonly contactAfterSeconds: Seconds;
+    /** An approach with no contact this long after the party is ashore ends `timedOut`. */
+    readonly maxApproachSeconds: Seconds;
     /** The alert stands this long after the fight resolves. */
     readonly alertClearSeconds: Seconds;
     readonly hitSkillBase: number;

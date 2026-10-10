@@ -1,42 +1,163 @@
 /**
  * Expeditions A1 (§8): the expedition system, phase `actions`, registered before work so it runs
  * after spatial and before `work.execute` (registration order within a phase). It owns the
- * phases (`mustering` → `walkingOut` → `approach` → `fight` → `resolved`), hands out the muster
- * (`muster.ts`), runs the fight (`combat.ts`), and resolves it: the outcome and its tally
- * (`expeditionResolved`), the alert stood down `alertClearSeconds` later, thoughts and memories,
- * the `fight` activities cleared and the cast's survivors gone.
+ * phases, hands out the muster (`muster.ts`), runs the fight (`combat.ts`), and resolves it.
  *
- * Gate stub: only an expedition that is on reaches the muster and the combat loop, both no-ops.
- * `orderWithdrawal` (the `withdrawParty` command) is complete.
+ * **Phases.** `mustering` (with a plan: the party to the locker) → `walkingOut` once every party
+ * member is armed (`partyMustered`) → `approach` once the leader stands on the site floor in the
+ * fight (`approachTick`) → `fight` at contact → `resolved`. A party member on the site floor done
+ * with the muster goes into the `fight` activity.
+ *
+ * **The objective** (held from `objectiveTick` on): `takeTarget` once a party member who presses
+ * stands beside the target and no armed cast member who can fight is within two tiles (the target
+ * surrenders and walks to the ramp with them; the cast take `morale.targetTaken`); `takeItem` the
+ * same beside the loot post; `breakThem` once no armed cast member can fight. From then the party
+ * falls back to the ramp foot, the down carried.
+ *
+ * **Resolution**, checked every tick: `targetFled` when the target leaves by the exit;
+ * `targetTaken` once the objective is held and the party (the down carried or set down at the
+ * ramp) and the target are at the ramp foot or aboard; `partyWithdrew` once a called-back party
+ * is aboard (anyone down left behind); `partyRouted` once every party member is down, dead or
+ * fled aboard without being called back; `timedOut` `maxFightSeconds` after contact, or
+ * `maxApproachSeconds` (ruling 3) after the approach began with no contact.
+ * `expeditionResolved` carries the tally (wounds and deaths per side since the start); the alert
+ * stands down `alertClearSeconds` later; thoughts and memories (`heldTheLine` at a taking for
+ * those who never broke, `ranFromAFight` for those who broke, `foughtBeside` pairwise among the
+ * living, `leftMeBehind` from a down party member left on the floor about the leader); the party
+ * leaves the fight (the planner has them again); the taken target, the dead and the down of the
+ * cast are removed (A1: the narrator says what then in A2); the rest of the cast walk off by the
+ * exit and are removed there.
  *
  * Owner after the gate: W2 of expeditions A1.
  */
+import { configTicks } from "../../core/clock";
+import { addThought } from "../../core/thoughts";
+import type { Actor } from "../../core/types/actor";
 import type { EventDraft } from "../../core/types/events";
+import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
-import { runCombat } from "./combat";
+import type { Expedition, ExpeditionOutcome } from "../../core/types/state";
+import { type DamageResult, type Hit, applyDamage } from "../bodies/damage";
+import { addMemory } from "../social/relationships";
+import { abortActivity } from "../work/execute";
+import { enterFight, goTo, heldWeapon, inFight, setDown, setLabel } from "./actions";
+import {
+  AT_RAMP_TILES,
+  type CombatDeps,
+  type Fight,
+  checkContact,
+  fightOf,
+  presses,
+  removeCast,
+  runCombat,
+  shaken,
+  surrender,
+} from "./combat";
+import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
+import { adjacent8 } from "./los";
+import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
 import { handOutMuster } from "./muster";
 
-export const expeditionSystem: System = {
-  name: "expedition.expedition",
-  phase: "actions",
-  run(ctx) {
-    const expedition = ctx.state.expedition;
-    if (expedition === undefined || expedition.phase === "resolved") return;
-    handOutMuster(ctx);
-    runCombat(ctx);
-  },
-};
+/** Ruling: the objective is held only with no armed cast able to fight this close. */
+const GUARDED_TILES = 2;
+
+/** The expedition system, its damage entry point injectable (tests use a double until W1). */
+export function makeExpeditionSystem(deps: CombatDeps): System {
+  return {
+    name: "expedition.expedition",
+    phase: "actions",
+    run(ctx) {
+      const expedition = ctx.state.expedition;
+      if (expedition === undefined) return;
+      const ground = groundOf(ctx);
+      if (expedition.phase === "resolved") {
+        aftermath(ctx, ground);
+        return;
+      }
+      if (ground === undefined) return;
+      handOutMuster(ctx);
+      advancePhase(ctx, expedition);
+      if (expedition.phase === "mustering") return;
+      const fight = fightOf(ctx, deps, ground);
+      if (fight === undefined) return;
+      const tick = runCombat(fight);
+      checkContact(fight);
+      checkWithdrawal(fight);
+      checkObjective(fight);
+      const outcome = tick.targetFled !== undefined ? "targetFled" : outcomeNow(fight);
+      if (outcome !== undefined) resolve(fight, outcome, tick.targetFled);
+    },
+  };
+}
+
+export const expeditionSystem: System = makeExpeditionSystem({
+  applyDamage: (ctx: StepCtx, actorId: ActorId, hit: Hit): DamageResult =>
+    applyDamage(ctx, actorId, hit),
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phases
+// ---------------------------------------------------------------------------------------------
+
+function partyActors(ctx: StepCtx, expedition: Expedition): Actor[] {
+  return expedition.party
+    .map((id) => ctx.state.actors[id])
+    .filter((a): a is Actor => a !== undefined);
+}
+
+function advancePhase(ctx: StepCtx, expedition: Expedition): void {
+  if (expedition.plan === undefined) return;
+  const party = partyActors(ctx, expedition);
+  if (expedition.phase === "mustering" && party.every((a) => a.combatant !== undefined)) {
+    expedition.phase = "walkingOut";
+    const armed = party.filter((a) => heldWeapon(ctx, a) !== undefined).map((a) => a.id);
+    ctx.emit({
+      type: "partyMustered",
+      subjectIds: party.map((a) => a.id),
+      causeIds: [],
+      source: "sim",
+      payload: { party: party.map((a) => a.id), armed },
+    });
+  }
+  for (const actor of party) {
+    const combatant = actor.combatant;
+    if (combatant === undefined || !canAct(combatant) || inFight(actor)) continue;
+    if (actor.availability !== "available" || !onSite(ctx, actor)) continue;
+    const activity = actor.activity;
+    if (activity.kind === "personal" && activity.activity === "muster") continue;
+    enterFight(ctx, actor, "ashore");
+  }
+  if (expedition.phase !== "walkingOut") return;
+  const leader = ctx.state.actors[expedition.leaderId];
+  const leading = leader !== undefined && inFight(leader) && onSite(ctx, leader);
+  const anyone = party.some((a) => inFight(a) && onSite(ctx, a));
+  if (leading || (anyone && (leader === undefined || leader.availability !== "available"))) {
+    expedition.phase = "approach";
+    expedition.approachTick = ctx.tick;
+  }
+}
+
+/** §8.3 `withdrawWhen`, checked every tick in the fight. */
+function checkWithdrawal(fight: Fight): void {
+  const { ctx, expedition, plan } = fight;
+  if (expedition.phase !== "fight" || expedition.withdrawTick !== undefined) return;
+  if (plan === undefined || !withdrawalDue(ctx.state, expedition, plan.withdrawWhen, ctx.config)) {
+    return;
+  }
+  orderWithdrawal(ctx);
+}
 
 /**
  * §8.3 `withdrawWhen`, or the captain's order: every party member still fighting breaks for the
- * ramp foot, and `partyWithdrew` says so once.
+ * ship, and `partyWithdrew` says so once.
  */
 export function orderWithdrawal(
-  ctx: Pick<StepCtx, "state" | "emit">,
+  ctx: Pick<StepCtx, "state" | "emit" | "tick">,
   cause: Pick<EventDraft, "causeIds" | "source"> = { causeIds: [], source: "sim" },
 ): void {
   const expedition = ctx.state.expedition;
-  if (expedition === undefined) return;
+  if (expedition === undefined || expedition.withdrawTick !== undefined) return;
+  expedition.withdrawTick = ctx.tick;
   for (const id of expedition.party) {
     const combatant = ctx.state.actors[id]?.combatant;
     if (combatant === undefined) continue;
@@ -50,4 +171,274 @@ export function orderWithdrawal(
     ...cause,
     payload: {},
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The objective
+// ---------------------------------------------------------------------------------------------
+
+const isParty = (a: Actor) => a.combatant?.side === "us";
+
+/** Is an armed cast member who can fight within `GUARDED_TILES` of `tile`? */
+function guarded(fight: Fight, tile: { x: number; y: number }): boolean {
+  return fight.people.some((p) => {
+    const c = p.combatant;
+    if (c === undefined || c.side !== "them" || !canAct(c)) return false;
+    if (heldWeapon(fight.ctx, p) === undefined) return false;
+    const at = tileOfActor(fight.ctx.state, p);
+    return at !== undefined && distance(at, tile) <= GUARDED_TILES;
+  });
+}
+
+/** A party member going for the objective who stands beside `tile`. */
+function pressedBeside(fight: Fight, tile: { x: number; y: number }): boolean {
+  return fight.people.some((p) => {
+    if (!presses(fight, p) || !onSite(fight.ctx, p)) return false;
+    const at = tileOfActor(fight.ctx.state, p);
+    return at !== undefined && adjacent8(at, tile);
+  });
+}
+
+function checkObjective(fight: Fight): void {
+  const { ctx, expedition, plan } = fight;
+  if (plan === undefined || expedition.objectiveTick !== undefined) return;
+  if (expedition.withdrawTick !== undefined) return;
+  if (expedition.phase !== "fight" && expedition.phase !== "approach") return;
+  let held = false;
+  if (plan.objective === "takeTarget") {
+    const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
+    const at = target === undefined ? undefined : tileOfActor(ctx.state, target);
+    const c = target?.combatant;
+    if (target !== undefined && at !== undefined && c !== undefined && upright(c)) {
+      held = pressedBeside(fight, at) && !guarded(fight, at);
+      if (held) surrender(fight, target);
+    }
+  } else if (plan.objective === "takeItem") {
+    const loot = fight.ground.posts.loot;
+    held = loot !== undefined && pressedBeside(fight, loot) && !guarded(fight, loot);
+  } else {
+    held =
+      expedition.phase === "fight" &&
+      !fight.people.some(
+        (p) =>
+          !isParty(p) &&
+          p.combatant !== undefined &&
+          canAct(p.combatant) &&
+          heldWeapon(ctx, p) !== undefined,
+      );
+  }
+  if (!held) return;
+  expedition.objectiveTick = ctx.tick;
+  const morale = ctx.config.expedition.morale;
+  for (const p of fight.people) {
+    const c = p.combatant;
+    if (c === undefined || c.side !== "them" || !canAct(c)) continue;
+    shaken(fight, p, morale.targetTaken);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Resolution
+// ---------------------------------------------------------------------------------------------
+
+/** At the ramp foot, or aboard. */
+function home(fight: Fight, actor: Actor): boolean {
+  if (aboard(fight.ctx, fight.ground, actor)) return true;
+  const at = tileOfActor(fight.ctx.state, actor);
+  return at !== undefined && distance(at, fight.ground.foot) <= AT_RAMP_TILES;
+}
+
+function outcomeNow(fight: Fight): ExpeditionOutcome | undefined {
+  const { ctx, expedition } = fight;
+  const party = partyActors(ctx, expedition);
+  const ticks = (seconds: number) => configTicks(ctx.config, seconds);
+  const e = ctx.config.expedition;
+  if (expedition.phase === "approach" || expedition.phase === "fight") {
+    const out = party.every((a) => {
+      const s = a.combatant?.state;
+      return s === "down" || s === "dead" || s === "fled";
+    });
+    if (party.length > 0 && out) {
+      if (expedition.withdrawTick !== undefined) return "partyWithdrew";
+      if (expedition.phase === "fight") return "partyRouted";
+    }
+    if (expedition.objectiveTick !== undefined && returned(fight, party)) return "targetTaken";
+  }
+  if (expedition.phase === "fight") {
+    const since = expedition.fightStartedTick ?? ctx.tick;
+    if (ctx.tick - since >= ticks(e.maxFightSeconds)) return "timedOut";
+  }
+  if (expedition.phase === "approach" && expedition.approachTick !== undefined) {
+    if (ctx.tick - expedition.approachTick >= ticks(e.maxApproachSeconds)) return "timedOut";
+  }
+  return undefined;
+}
+
+/** Everyone (and the taken target) back at the ramp, the down brought in. */
+function returned(fight: Fight, party: readonly Actor[]): boolean {
+  for (const actor of party) {
+    const s = actor.combatant?.state;
+    if (s === "dead" || s === "fled") continue;
+    if (actor.location.kind === "carriedBy") continue;
+    if (!home(fight, actor)) return false;
+  }
+  if (fight.plan?.objective !== "takeTarget") return true;
+  const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
+  return target === undefined || home(fight, target);
+}
+
+interface Tally {
+  readonly woundsUs: number;
+  readonly woundsThem: number;
+  readonly deadUs: number;
+  readonly deadThem: number;
+}
+
+function tally(fight: Fight): Tally {
+  const since = fight.expedition.startedTick;
+  let woundsUs = 0;
+  let woundsThem = 0;
+  let deadUs = 0;
+  let deadThem = 0;
+  for (const p of fight.people) {
+    const wounds = p.body.wounds.filter((w) => w.tick >= since).length;
+    const dead = p.availability === "dead" ? 1 : 0;
+    if (isParty(p)) {
+      woundsUs += wounds;
+      deadUs += dead;
+    } else {
+      woundsThem += wounds;
+      deadThem += dead;
+    }
+  }
+  return { woundsUs, woundsThem, deadUs, deadThem };
+}
+
+function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | undefined): void {
+  const { ctx, expedition } = fight;
+  const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
+  const targetName = fledName ?? target?.name;
+  const from = expedition.fightStartedTick ?? expedition.approachTick ?? expedition.startedTick;
+  const counts = tally(fight);
+  expedition.phase = "resolved";
+  expedition.resolvedTick = ctx.tick;
+  expedition.outcome = outcome;
+  ctx.emit({
+    type: "expeditionResolved",
+    subjectIds: fight.people.map((p) => p.id),
+    causeIds: [],
+    source: "sim",
+    locationRef: { kind: "port", portId: expedition.siteId },
+    payload: {
+      siteId: expedition.siteId,
+      outcome,
+      ...(targetName === undefined ? {} : { targetName }),
+      seconds: (ctx.tick - from) / ctx.config.time.tickRate,
+      shots: expedition.shots,
+      ...counts,
+    },
+  });
+  const alert = ctx.state.alert;
+  if (alert?.cause === "fight") {
+    alert.clearsAtTick =
+      ctx.tick + configTicks(ctx.config, ctx.config.expedition.alertClearSeconds);
+  }
+  afterTheFight(fight, outcome);
+  for (const person of fight.people) {
+    if (ctx.state.actors[person.id] === undefined) continue;
+    if (isParty(person)) leaveFight(ctx, person);
+    else castAfter(fight, person, outcome);
+  }
+}
+
+/** Thoughts and memories of the fight (§11). */
+function afterTheFight(fight: Fight, outcome: ExpeditionOutcome): void {
+  const { ctx, expedition } = fight;
+  const morale = ctx.config.expedition.morale;
+  const party = partyActors(ctx, expedition);
+  const has = (key: string) => key in ctx.content.thoughts;
+  for (const actor of party) {
+    const c = actor.combatant;
+    if (c === undefined || actor.availability === "dead") continue;
+    const ran = (c.state === "breaking" || c.state === "fled") && c.resolve < morale.breakBelow;
+    if (ran && has("ranFromAFight")) addThought(ctx, actor, "ranFromAFight");
+    if (!ran && outcome === "targetTaken" && has("heldTheLine") && canAct(c)) {
+      addThought(ctx, actor, "heldTheLine");
+    }
+  }
+  const living = party.filter((a) => a.availability !== "dead" && a.crew);
+  for (const a of living) {
+    for (const b of living) if (a.id !== b.id) addMemory(ctx, a.id, b.id, "foughtBeside");
+  }
+  const leader = ctx.state.actors[expedition.leaderId];
+  for (const actor of living) {
+    if (actor.combatant?.state !== "down" || actor.location.kind === "carriedBy") continue;
+    if (leader === undefined || leader.id === actor.id || home(fight, actor)) continue;
+    addMemory(ctx, actor.id, leader.id, "leftMeBehind");
+  }
+}
+
+/** A party member out of the fight: set down if carried, the planner has them again. */
+function leaveFight(ctx: StepCtx, actor: Actor): void {
+  if (actor.location.kind === "carriedBy") {
+    const carrier = ctx.state.actors[actor.location.actorId];
+    if (carrier !== undefined) setDown(carrier, actor);
+  }
+  if (inFight(actor)) abortActivity(ctx, actor, "cancelled");
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete actor.combatant;
+}
+
+/** The cast after the fight: the taken, the dead and the down are gone; the rest walk off. */
+function castAfter(fight: Fight, person: Actor, outcome: ExpeditionOutcome): void {
+  const c = person.combatant;
+  if (c === undefined) return;
+  const taken = outcome === "targetTaken" && c.disposition.part === "target";
+  const gone = !upright(c) && c.state !== "surrendered";
+  if (taken || gone || person.availability !== "available") {
+    removeCast(fight.ctx, person);
+    return;
+  }
+  walkOff(fight.ctx, fight.ground, person);
+}
+
+function walkOff(ctx: StepCtx, ground: Ground | undefined, person: Actor): void {
+  const c = person.combatant;
+  if (c === undefined) return;
+  c.state = "fled";
+  // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+  delete c.aim;
+  const exit = ground?.posts.exit;
+  if (exit !== undefined && goTo(ctx, person, exit)) setLabel(person, "leaving");
+}
+
+/** After resolution: the cast walk off and go at the exit; the alert stands down when due. */
+function aftermath(ctx: StepCtx, ground: Ground | undefined): void {
+  const alert = ctx.state.alert;
+  if (
+    alert?.cause === "fight" &&
+    alert.clearsAtTick !== undefined &&
+    alert.clearsAtTick <= ctx.tick
+  ) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete ctx.state.alert;
+    ctx.emit({
+      type: "alertCleared",
+      subjectIds: [],
+      causeIds: [],
+      source: "sim",
+      payload: { cause: "fight" },
+    });
+  }
+  const leaving = Object.values(ctx.state.actors).filter((a) => a.combatant !== undefined);
+  if (leaving.length === 0) return;
+  const exit = ground?.posts.exit;
+  for (const person of leaving) {
+    const at = tileOfActor(ctx.state, person);
+    const there = exit === undefined || at === undefined || distance(at, exit) <= 1;
+    const stuck = person.movement.kind !== "moving" && !there;
+    if (there || (stuck && (exit === undefined || !goTo(ctx, person, exit)))) {
+      removeCast(ctx, person);
+    }
+  }
 }
