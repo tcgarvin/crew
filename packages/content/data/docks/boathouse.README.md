@@ -8,7 +8,7 @@ East (high x) is fore. The ship's ramps open on its south flank onto the quay; e
 
 ```
 The Boathouse, on the shingle (dock.boathouse)
-planet dock for The Boathouse (port.boathouse)
+planet landing site for The Boathouse (port.boathouse)
 44 x 30 tiles; M berth box 36 x 20 at (4,0)
 
 Freighter Mk2 (deck.freighter_mk2) docked at (4,0)
@@ -36,11 +36,11 @@ Freighter Mk2 (deck.freighter_mk2) docked at (4,0)
 18     EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
 19     EEEEEEHHHHHHHHHHHHHHSSSSYYYYYYXXAAAA
 20 .................v....................v.....
-21 ..:.................??........??.......:....
+21 ..:.................cc........cc.......:....
 22 ..........######.#########.#####............
 23 ..........#.%%.................#.%%%........
 24 ..........#.....4.........3....#.%%%........
-25 ..........#..??.......??.......#............
+25 ..........#..nn.......nn.......#............
 26 ........7......................#        ..
 27 ..........#..........12......5.#        ..
 28           #....................#        ..
@@ -71,11 +71,11 @@ Freighter Mk1 (deck.freighter_mk1) docked at (6,2)
 18     ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 19     ==EEEEEEEEHHHHHHHHHHHHHHHHHHHHAAAA==
 20 ........................v..........v........
-21 ..:.................??........??.......:....
+21 ..:.................cc........cc.......:....
 22 ..........######.#########.#####............
 23 ..........#.%%.................#.%%%........
 24 ..........#.....4.........3....#.%%%........
-25 ..........#..??.......??.......#............
+25 ..........#..nn.......nn.......#............
 26 ........7......................#        ..
 27 ..........#..........12......5.#        ..
 28           #....................#        ..
@@ -86,13 +86,14 @@ Key:
   =  berth box tile no ship floor covers
   v  ramp landing     s  freight staging     d  delivery bay
   %  blocking prop    :  prop you can walk past    1-9  posts (below)
+  c n  cover (not walkable; shelters whoever crouches beside it)
 
 Posts (7):
-  1  target: target, the keeper's bench, at (21,27) facing n
+  1  target: target, the keeper's bench, at (21,27) facing n; cast: Corran Vale
   2  loot: loot, the strongbox shelf, at (22,27) facing n
-  3  east_door: guard, the east door, at (26,24) facing n
-  4  west_door_inside: guard, inside the west door, at (16,24) facing n
-  5  net_bench: bystander, the net bench, at (29,27) facing w
+  3  east_door: guard, the east door, at (26,24) facing n; cast: Hesk Marrow
+  4  west_door_inside: guard, inside the west door, at (16,24) facing n; cast: Darrow Finch
+  5  net_bench: bystander, the net bench, at (29,27) facing w; cast: Old Pell
   6  jetty_end: exit, the jetty, at (41,29) facing s
   7  west_door: flank, the west door, at (8,26) facing e
 
@@ -103,6 +104,14 @@ Ramp landings (deck.freighter_mk2):
 Ramp landings (deck.freighter_mk1):
   personnel_ramp: (35,20)
   cargo_ramp: (24,20)
+
+Notice radius: 6 tiles
+
+Default cast (4):
+  Corran Vale, boat-shed keeper ("grey, wiry, never still"): target at target, unarmed, resolve steady, tie bound, wants out
+  Hesk Marrow, hired hand ("big, bored, a blaster across his knees"): guard at east_door, blaster, resolve steady, tie paid, wants money
+  Darrow Finch, the keeper's nephew ("young, trying to look hard"): guard at west_door_inside, melee, resolve shaky, tie bound, wants out
+  Old Pell, net mender ("deaf, or pretending"): bystander at net_bench, unarmed, resolve shaky, tie paid, wants nothing
 
 Areas (0):
 

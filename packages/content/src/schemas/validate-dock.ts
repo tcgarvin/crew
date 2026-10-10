@@ -244,16 +244,131 @@ function checkSiteReferences(
 
 /**
  * L3, expeditions A1 (§4, call 10): a site's own composition: one `target`, one `exit`, at least
- * one `guard`; a `flank` post's route to the target disjoint from the landing's south of the apron
- * except the target's neighbours; `noticeRadius` under the map's width.
- *
- * Gate stub: nothing yet. Owner: W3 of expeditions A1.
+ * one `guard`; `noticeRadius` under the map's width; and each `flank` post a real second way in
+ * (`checkFlankRoutes`). Reachability of every post from the landings is `checkLandings`'.
  */
 export function checkSiteComposition(
-  _dock: DockDef,
-  _bundle: ContentBundle,
-  _issues: ValidationIssue[],
-): void {}
+  dock: DockDef,
+  bundle: ContentBundle,
+  issues: ValidationIssue[],
+): void {
+  const path = dockPath(dock);
+  for (const [kind, min, max] of [
+    ["target", 1, 1],
+    ["exit", 1, 1],
+    ["guard", 1, Number.POSITIVE_INFINITY],
+  ] as const) {
+    const n = countOf(dock.posts, kind);
+    if (n < min || n > max) {
+      const want = max === min ? `exactly ${min}` : `at least ${min}`;
+      issues.push(
+        issue("physical", [...path, "posts"], `a site needs ${want} ${kind} post, found ${n}`),
+      );
+    }
+  }
+  if (dock.noticeRadius !== undefined && dock.noticeRadius >= dock.width) {
+    issues.push(
+      issue(
+        "physical",
+        [...path, "noticeRadius"],
+        `noticeRadius ${dock.noticeRadius} is not under the map's width ${dock.width}`,
+      ),
+    );
+  }
+  checkFlankRoutes(dock, bundle, issues);
+}
+
+/**
+ * The first row of a site's buildings: the first row south of the quay row with a wall in it. The
+ * rows between (the quay row included) are the apron, open ground every route crosses. A map with
+ * no wall south of the quay is all buildings below the quay row.
+ */
+function siteRowsFrom(dock: DockDef): number {
+  const quayRow = berthBox(dock).y + berthBox(dock).h;
+  for (let y = quayRow + 1; y < dock.height; y++) {
+    if ([...(dock.rows[y] ?? "")].some((ch) => dock.legend[ch] === "wall")) return y;
+  }
+  return quayRow + 1;
+}
+
+/** One shortest walk from `from` to `to` over `mask` (both ends included), or undefined. */
+function shortestRoute(
+  dock: DockDef,
+  mask: Uint8Array,
+  from: TileCoord,
+  to: TileCoord,
+): TileCoord[] | undefined {
+  if (!walkable(dock, mask, from) || !walkable(dock, mask, to)) return undefined;
+  const parent = new Map<number, TileCoord>();
+  const seen = new Uint8Array(dock.width * dock.height);
+  seen[cell(dock, from)] = 1;
+  const queue: TileCoord[] = [from];
+  for (let head = 0; head < queue.length; head++) {
+    const t = queue[head] as TileCoord;
+    if (t.x === to.x && t.y === to.y) {
+      const route = [t];
+      for (let p = parent.get(cell(dock, t)); p !== undefined; p = parent.get(cell(dock, p))) {
+        route.push(p);
+      }
+      return route.reverse();
+    }
+    for (const d of NEIGHBOURS) {
+      const n = { x: t.x + d.x, y: t.y + d.y };
+      if (!walkable(dock, mask, n) || seen[cell(dock, n)] === 1) continue;
+      seen[cell(dock, n)] = 1;
+      parent.set(cell(dock, n), t);
+      queue.push(n);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Call 10: a `flank` post is a second way in, not the front door by another name. For each ramp
+ * landing of each deck that berths here, the direct route (one shortest walk from the landing to
+ * the target) is masked off south of the apron (`siteRowsFrom`), except the target's own
+ * neighbours where both routes must end; the target must still be reachable from each flank post.
+ * Masking one route rather than comparing two shortest ones keeps the rule indifferent to how
+ * either walk breaks ties. A target the landing cannot reach is `checkLandings`' to report.
+ */
+function checkFlankRoutes(dock: DockDef, bundle: ContentBundle, issues: ValidationIssue[]): void {
+  const target = dock.posts.find((p) => p.kind === "target");
+  const flanks = dock.posts.filter((p) => p.kind === "flank");
+  if (target === undefined || flanks.length === 0) return;
+  const mask = dockWalkableMask(dock);
+  const fromRow = siteRowsFrom(dock);
+  const nearTarget = new Set(
+    NEIGHBOURS.map((d) => tileKey({ x: target.tile.x + d.x, y: target.tile.y + d.y })),
+  );
+  for (const deck of Object.values(bundle.decks)) {
+    if (!deckBerthsAt(dock, deck)) continue;
+    for (const landing of dockRampLandings(dock, deck)) {
+      const direct = shortestRoute(dock, mask, landing.tile, target.tile);
+      if (direct === undefined) continue;
+      const masked = mask.slice();
+      const shut = direct.filter(
+        (t) => t.y >= fromRow && !nearTarget.has(tileKey(t)) && !samePlace(t, target.tile),
+      );
+      for (const t of shut) masked[cell(dock, t)] = 0;
+      for (const flank of flanks) {
+        const i = dock.posts.indexOf(flank);
+        if (!walkable(dock, mask, flank.tile)) continue; // `checkPostsAndAreas` reports it
+        if (reachableFrom(dock, masked, flank.tile)[cell(dock, target.tile)] === 1) continue;
+        issues.push(
+          issue(
+            "physical",
+            [...dockPath(dock), "posts", i],
+            `flank post "${flank.key}" at ${at(flank.tile)} reaches the target only along the direct route from ramp "${landing.key}" of "${deck.id}"; a flank needs its own way in south of row ${fromRow}`,
+          ),
+        );
+      }
+    }
+  }
+}
+
+function samePlace(a: TileCoord, b: TileCoord): boolean {
+  return a.x === b.x && a.y === b.y;
+}
 
 /** L2: a castSeed `post` names a post on that port's dock map (Dockside §5.2). */
 export function checkCastSeedPosts(
