@@ -1921,7 +1921,6 @@ export interface ConfigDef {
     readonly coverPenalty: number;
     readonly movingTargetFactor: number;
     readonly movingShooterFactor: number;
-    readonly meleeAdjacentOnly: boolean;
     readonly resolveTiers: Readonly<Record<ResolveTier, number>>;
     /**
      * A cast member's tie to the target: a factor on their resolve (capped at 1) and their
@@ -1955,9 +1954,6 @@ export interface ConfigDef {
     readonly withdrawWhen: { readonly firstDown: number; readonly halfDown: number };
     readonly leaderNearTiles: number;
     readonly surrenderIfCornered: boolean;
-    /** The arms the default scenario stows (informational for the plan menu's squad rules). */
-    readonly blasters: number;
-    readonly batons: number;
   };
   readonly events: {
     readonly tickerMaxEntries: number;

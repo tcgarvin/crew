@@ -3,7 +3,8 @@
  * over a few seeds, never one fight's events: `hold` and `assault` end differently (an assault
  * takes the target, sooner; against a cast too shaky to come out, a party that holds watches him
  * slip away by the shingle path), nobody dies often, every fight resolves, and `creep` against a
- * shaky cast reaches the target unnoticed and takes him.
+ * shaky cast reaches the target unnoticed and takes him; `flank` outflanks the guard who sees both
+ * groups.
  */
 import { describe, expect, it } from "vitest";
 import { type FightRecord, runFight } from "./expedition-fight-fixture";
@@ -33,6 +34,15 @@ describe("the fight at the Boathouse (expeditions A1)", () => {
       const world = record.world;
       expect(world.state.alert?.cause).toBe("fight");
       expect(Object.values(world.state.actors).some((a) => a.combatant?.side === "us")).toBe(false);
+    }
+  }, 60_000);
+
+  it("outflanks the guard who sees both of flank's groups, once the small one is round", () => {
+    const flank = fights("flank-lethal-armed");
+    expect(flank.some((r) => r.outflanked.includes("Hesk Marrow"))).toBe(true);
+    for (const record of flank) {
+      const guards = ["Hesk Marrow", "Darrow Finch"];
+      expect(record.outflanked.every((name) => guards.includes(name))).toBe(true);
     }
   }, 60_000);
 

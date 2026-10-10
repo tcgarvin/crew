@@ -391,7 +391,6 @@ export const configDefSchema = z.strictObject({
     coverPenalty: unitInterval,
     movingTargetFactor: unitInterval,
     movingShooterFactor: unitInterval,
-    meleeAdjacentOnly: z.boolean(),
     resolveTiers: z.strictObject({ shaky: unitInterval, steady: unitInterval, hard: unitInterval }),
     tie: z.strictObject({ paid: tieSchema, bound: tieSchema, devoted: tieSchema }),
     castFighting: z.strictObject({
@@ -427,8 +426,6 @@ export const configDefSchema = z.strictObject({
     withdrawWhen: z.strictObject({ firstDown: positiveInt, halfDown: unitInterval }),
     leaderNearTiles: positive,
     surrenderIfCornered: z.boolean(),
-    blasters: nonNegativeInt,
-    batons: nonNegativeInt,
   }),
   events: z.strictObject({ tickerMaxEntries: positiveInt, traceRingSize: positiveInt }),
 }) satisfies z.ZodType<ConfigDef>;

@@ -501,7 +501,6 @@ export const FIXTURE_EXPEDITION: ConfigDef["expedition"] = {
   coverPenalty: 0.5,
   movingTargetFactor: 0.8,
   movingShooterFactor: 0.7,
-  meleeAdjacentOnly: true,
   resolveTiers: { shaky: 0.45, steady: 0.7, hard: 0.95 },
   tie: {
     paid: { resolve: 0.8, loyalty: 0.3 },
@@ -528,6 +527,4 @@ export const FIXTURE_EXPEDITION: ConfigDef["expedition"] = {
   withdrawWhen: { firstDown: 1, halfDown: 0.5 },
   leaderNearTiles: 3,
   surrenderIfCornered: true,
-  blasters: 3,
-  batons: 2,
 };

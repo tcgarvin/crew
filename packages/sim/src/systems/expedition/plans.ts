@@ -105,6 +105,27 @@ export function squadFor(ctx: SquadCtx, squad: SquadRule): ActorId[] {
 }
 
 /**
+ * §8.5 leader succession: who leads the party now. The expedition's leader while they are on their
+ * feet; once they are down or dead, the first party member in squad order (captain, first officer,
+ * then by `fighting`) who is not; the leader again when nobody is.
+ */
+export function leaderNow(
+  state: ReadonlyWorldState,
+  expedition: DeepReadonly<Pick<Expedition, "party" | "leaderId">>,
+): ActorId {
+  const standing = (actor: DeepReadonly<Actor> | undefined): actor is DeepReadonly<Actor> => {
+    const s = actor?.combatant?.state;
+    return actor !== undefined && s !== undefined && s !== "down" && s !== "dead";
+  };
+  if (standing(state.actors[expedition.leaderId])) return expedition.leaderId;
+  const next = expedition.party
+    .map((id) => state.actors[id])
+    .filter(standing)
+    .sort(rank)[0];
+  return next?.id ?? expedition.leaderId;
+}
+
+/**
  * §8.3: what a party member does under the plan's posture at this moment.
  * - `press`: go for the objective, firing on the way.
  * - `hold`: stay in cover by the ramp and fire.

@@ -11,14 +11,17 @@
  * radius for someone whose resolve starts below `waverBelow`: the shaky are not watching; W2
  * decision, so `creep` can work against a shaky cast); the first shot; or (ruling 1) the party
  * ashore `contactAfterSeconds` under any posture but `creep`; or a creeper beside the objective
- * (they spring: the taking needs no guard within two tiles, so one there makes it a fight).
+ * (they spring: the taking needs no guard within four tiles in sight of it, so one there makes it a
+ * fight).
  *
- * **A decision** moves resolve by the interval's terms (after contact; `morale.ts`), then picks
- * what to do by side, part and state:
+ * **A decision** moves resolve by the interval's terms (after contact; `morale.ts`; "leader near"
+ * reads the leader now, `plans.ts` `leaderNow`, so the lead passes on when the leader is down), and
+ * under `flank` a cast member who sees both groups once the small one is at the flank post takes
+ * `morale.outflanked` once; then it picks what to do by side, part and state:
  * - `breaking`: the cast `retreat` to the exit, surrendering when cornered (no route, or a party
  *   member beside them) or unarmed; the party `retreat` aboard by the ramp.
  * - The party by posture (`plans.ts` `postureMode`): `press` (`fire` at what is in sight and in
- *   range, standing within three tiles, else while they `advance` on the objective); `hold`
+ *   range, standing within five tiles, else while they `advance` on the objective); `hold`
  *   (`takeCover` at their cover spot by the ramp, `fire`, else `guardPassage`; a baton waits at
  *   the head of the ramp, out of the shooting, and `hold` presses once no cast member who shoots
  *   is left); `flank`'s small group `advance`s to the flank post first; `bait`'s leader walks in
@@ -75,7 +78,7 @@ import {
 import { type Ground, aboard, distance, onSite, standable, tileOfActor } from "./ground";
 import { adjacent8, inCover, lineOfSight } from "./los";
 import { canAct, intervalDelta, shiftResolve, upright } from "./morale";
-import { type PostureMode, postureMode } from "./plans";
+import { type PostureMode, flankGroups, leaderNow, postureMode } from "./plans";
 import {
   type Watcher,
   cheapestPath,
@@ -102,8 +105,11 @@ const HOLD_SHIFT_STEPS = 2;
 const SEEN_STEP = 12;
 /** How far off their post a guard steps to cover the way in, in steps. */
 const GUARD_STEPS = 3;
-/** A presser stops to shoot within this many tiles of their mark. */
-const STAND_AND_SHOOT_TILES = 3;
+/**
+ * A presser stops to shoot within this many tiles of their mark: far enough out that an assault
+ * trades fire with the guard rather than walking past him to the target.
+ */
+const STAND_AND_SHOOT_TILES = 5;
 /** "At the ramp": this close to its foot. */
 export const AT_RAMP_TILES = 2;
 /** A cast member this close to the exit is gone. */
@@ -539,6 +545,7 @@ function decide(fight: Fight, person: Actor): void {
   const enemies = seenOf(fight, person, from, combatant.side === "us" ? "them" : "us");
   if (fight.expedition.phase === "fight" && canAct(combatant) && fights(person)) {
     moraleTurn(fight, person, from, enemies, interval);
+    if (!isParty(person)) outflank(fight, person, enemies);
   }
   if (combatant.state === "breaking") {
     retreat(fight, person, from);
@@ -593,7 +600,7 @@ function moraleTurn(
   );
   const selfArmed = isParty(person) || armed(fight, person) ? 1 : 0;
   const nearest = armedEnemies[0];
-  const leader = ctx.state.actors[fight.expedition.leaderId];
+  const leader = ctx.state.actors[leaderNow(ctx.state, fight.expedition)];
   const leaderTile = leader === undefined ? undefined : tileOfActor(ctx.state, leader);
   const leaderNear =
     isParty(person) &&
@@ -617,6 +624,22 @@ function moraleTurn(
     e.morale,
   );
   breakIf(fight, person, shiftResolve(combatant, delta, e.morale));
+}
+
+/**
+ * §8.3 `flank`: once the small group has reached the flank post, a cast member who sees a member
+ * of each group takes `morale.outflanked`, once a fight.
+ */
+function outflank(fight: Fight, person: Actor, enemies: readonly Seen[]): void {
+  const { expedition } = fight;
+  const combatant = combatantOf(person);
+  if (expedition.plan?.posture !== "flank" || expedition.flankTick === undefined) return;
+  if (combatant.outflanked === true) return;
+  const { small, large } = flankGroups(fight.ctx.state, expedition.party);
+  const sees = (group: readonly ActorId[]) => enemies.some((s) => group.includes(s.actor.id));
+  if (!sees(small) || !sees(large)) return;
+  combatant.outflanked = true;
+  shaken(fight, person, fight.ctx.config.expedition.morale.outflanked);
 }
 
 /** `retreat`: the cast to the exit (or give up), the party aboard. */

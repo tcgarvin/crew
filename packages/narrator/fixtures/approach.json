@@ -543,7 +543,6 @@
         "coverPenalty": 0.5,
         "movingTargetFactor": 0.8,
         "movingShooterFactor": 0.7,
-        "meleeAdjacentOnly": true,
         "resolveTiers": {
           "shaky": 0.45,
           "steady": 0.7,
@@ -594,9 +593,7 @@
           "halfDown": 0.5
         },
         "leaderNearTiles": 3,
-        "surrenderIfCornered": true,
-        "blasters": 3,
-        "batons": 2
+        "surrenderIfCornered": true
       },
       "events": {
         "tickerMaxEntries": 30,

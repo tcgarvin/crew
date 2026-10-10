@@ -9,7 +9,8 @@
  * with the muster goes into the `fight` activity.
  *
  * **The objective** (held from `objectiveTick` on): `takeTarget` once a party member who presses
- * stands beside the target and no armed cast member who can fight is within two tiles (the target
+ * stands beside the target and no armed cast member who can fight is within four tiles with a line
+ * to it (the target
  * surrenders and walks to the ramp with them; the cast take `morale.targetTaken`); `takeItem` the
  * same beside the loot post; `breakThem` once no armed cast member can fight. From then the party
  * falls back to the ramp foot, the down carried.
@@ -54,12 +55,12 @@ import {
   surrender,
 } from "./combat";
 import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
-import { adjacent8 } from "./los";
+import { adjacent8, lineOfSight } from "./los";
 import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
 import { handOutMuster } from "./muster";
 
-/** Ruling: the objective is held only with no armed cast able to fight this close. */
-const GUARDED_TILES = 2;
+/** The objective is held only with no armed cast able to fight this close and in sight of it. */
+const GUARDED_TILES = 4;
 
 /** The expedition system, its damage entry point injectable (tests use a double until W1). */
 export function makeExpeditionSystem(deps: CombatDeps): System {
@@ -179,14 +180,18 @@ export function orderWithdrawal(
 
 const isParty = (a: Actor) => a.combatant?.side === "us";
 
-/** Is an armed cast member who can fight within `GUARDED_TILES` of `tile`? */
+/**
+ * Is `tile` under an armed cast member's eye: one who can fight, within `GUARDED_TILES` with a
+ * line to it? A guard who steps back into cover still guards what he can see.
+ */
 function guarded(fight: Fight, tile: { x: number; y: number }): boolean {
   return fight.people.some((p) => {
     const c = p.combatant;
     if (c === undefined || c.side !== "them" || !canAct(c)) return false;
     if (heldWeapon(fight.ctx, p) === undefined) return false;
     const at = tileOfActor(fight.ctx.state, p);
-    return at !== undefined && distance(at, tile) <= GUARDED_TILES;
+    if (at === undefined || distance(at, tile) > GUARDED_TILES) return false;
+    return lineOfSight(fight.ground.berth, at, tile);
   });
 }
 

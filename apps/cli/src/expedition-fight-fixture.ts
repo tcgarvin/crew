@@ -38,6 +38,8 @@ export interface FightRecord {
    */
   readonly quiet: boolean;
   readonly fled: readonly string[];
+  /** Cast members who took `morale.outflanked` (`flank`), by name. */
+  readonly outflanked: readonly string[];
   readonly surrendered: readonly string[];
   readonly lines: readonly string[];
   readonly world: World;
@@ -92,6 +94,7 @@ export function runFight(
   let acks = 0;
   const fled: string[] = [];
   const surrendered: string[] = [];
+  const outflanked = new Set<string>();
   const lines: string[] = [];
   const party = new Set<string>();
   let sprang = false;
@@ -116,6 +119,9 @@ export function runFight(
       if (event.type === "expeditionResolved") {
         resolved = event.payload;
       }
+    }
+    for (const actor of Object.values(world.state.actors)) {
+      if (actor.combatant?.outflanked === true) outflanked.add(actor.name);
     }
     const hookId = world.state.narrator.pendingHook?.id;
     if (hookId !== undefined) {
@@ -147,6 +153,7 @@ export function runFight(
     quiet: objective !== undefined && (contact === undefined || objective < contact || sprang),
     downUs: members.filter((a) => a?.availability === "incapacitated").length,
     fled,
+    outflanked: [...outflanked].sort(),
     surrendered,
     lines,
     world,

@@ -10,6 +10,7 @@ import { inFight } from "./actions";
 import { testDamage } from "./fixtures/damage";
 import { run, runToResolution, startExpedition, violations } from "./fixtures/fight";
 import { SITE, SITE_CAST, siteWorld } from "./fixtures/site";
+import { leaderNow } from "./plans";
 
 const RATE = 20;
 const FOOT = { x: 9, y: 7 };
@@ -213,6 +214,63 @@ describe("the fight (§8.1)", () => {
       false,
     );
     expect(violations(test)).toEqual([]);
+  });
+
+  it("outflanks both guards once flank's small group is at the flank post (§8.3)", () => {
+    // Hard, devoted guards with blasters, so both are still in it to see the pincer close.
+    const cast = SITE_CAST.map((e) =>
+      e.part === "guard"
+        ? { ...e, resolve: "hard" as const, tie: "devoted" as const, arms: "blaster" as const }
+        : e,
+    );
+    const bySeed: string[][] = [];
+    for (const seed of [1, 2, 3]) {
+      const test = siteWorld({ scenario: CREW.scenario8, seed });
+      startExpedition(test, "flank-lethal-armed", cast);
+      const outflanked = new Set<string>();
+      let early = 0;
+      run(test, 300 * RATE, {
+        step: 1,
+        until: () => {
+          const expedition = test.world.state.expedition;
+          for (const actor of Object.values(test.world.state.actors)) {
+            if (actor.combatant?.outflanked !== true) continue;
+            if (expedition?.flankTick === undefined) early += 1;
+            outflanked.add(actor.name);
+          }
+          return expedition?.phase === "resolved";
+        },
+      });
+      expect(early, `seed ${seed}: outflanked before the flank post`).toBe(0);
+      bySeed.push([...outflanked].sort());
+    }
+    expect(bySeed).toContainEqual(["Darrow Finch", "Hesk Marrow"]);
+  }, 30_000);
+
+  it("passes the lead to the next fit party member when the leader goes down (§8.5)", () => {
+    const test = siteWorld({ scenario: CREW.scenario8, seed: 2 });
+    startExpedition(test, "hold-lethal-armed", LONE_TARGET);
+    run(test, 200 * RATE, { until: () => test.world.state.expedition?.phase === "fight" });
+    const expedition = test.world.state.expedition;
+    if (expedition === undefined) throw new Error("no fight");
+    const [first, second, third] = expedition.party;
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error("party too small");
+    }
+    const state = test.world.state;
+    expect(first).toBe(expedition.leaderId);
+    expect(leaderNow(state, expedition)).toBe(first);
+    const combatant = (id: ActorId) => {
+      const c = state.actors[id]?.combatant;
+      if (c === undefined) throw new Error(`${id} is not in the fight`);
+      return c;
+    };
+    combatant(first).state = "down";
+    expect(leaderNow(state, expedition)).toBe(second);
+    combatant(second).state = "dead";
+    expect(leaderNow(state, expedition)).toBe(third);
+    combatant(first).state = "wavering";
+    expect(leaderNow(state, expedition)).toBe(first);
   });
 
   it("gives the shooter whose hit killed `killedSomeone`", () => {

@@ -2255,9 +2255,6 @@
           "minimum": 0,
           "maximum": 1
         },
-        "meleeAdjacentOnly": {
-          "type": "boolean"
-        },
         "resolveTiers": {
           "type": "object",
           "properties": {
@@ -2470,16 +2467,6 @@
         },
         "surrenderIfCornered": {
           "type": "boolean"
-        },
-        "blasters": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "batons": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -2496,7 +2483,6 @@
         "coverPenalty",
         "movingTargetFactor",
         "movingShooterFactor",
-        "meleeAdjacentOnly",
         "resolveTiers",
         "tie",
         "castFighting",
@@ -2504,9 +2490,7 @@
         "morale",
         "withdrawWhen",
         "leaderNearTiles",
-        "surrenderIfCornered",
-        "blasters",
-        "batons"
+        "surrenderIfCornered"
       ],
       "additionalProperties": false
     },
