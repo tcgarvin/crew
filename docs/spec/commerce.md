@@ -142,8 +142,9 @@ withdrawn. Names carry no pronouns, so cards say "them".
   until it is on the dock.
 
 Either way the passenger leaves the roster and the digest's Aboard line and appears in the
-narrator's people section at that port. The narrator never decides a passenger's fate and never
-narrates what they did ashore as fact; the null narrator never offers passages. Events:
+narrator's people section at that port. `endPassage` is the narrator's one lever on a passenger
+today, so it states no other fate for them and never narrates what they did ashore as fact
+(D106: what it decides, it shows); the null narrator never offers passages. Events:
 `passageEnded {reason}`.
 
 ## Errands
