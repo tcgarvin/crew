@@ -21,18 +21,29 @@ strings the translator checks against it (§plan-schema-in-the-prompt).
 
 ### The narrator and sites
 
-Until the captain's card for an expedition exists (phase A2), the narrator sees nothing of sites
-or fighting. `isSite` filters landing sites (§landing-sites) out of the capability block's ports,
-the legs between ports (`pathBetween` finds none to or from a site), the null narrator's offers
-and the staging prompt's catalogue; the arms locker is left out of the capability lists and the
-digest's machines, weapons out of the staging catalogue, and `fighting` out of a crew line's
-skills. No hook is raised at a site: no `captainAshore` (§looking-for-work), and a fight's
-`alertCleared` never hooks (§notable-event-hook). What the digest does see is the crew's bodies
-(§crew-lines).
+The narrator sees every authored landing site (§landing-sites) and may send the ship to one, but
+only through an errand (§offer-lever). The capability block's ports leave sites out; they go under
+"Sites: where an errand goes", each under its near port, with its id, name, description,
+character, its reach from here through the near port, and its default cast in words (name, role,
+arms, look; the target by role only, since the errand's `targetName` becomes their name), never a
+tier or a number about the fight. "From here" is measured from the near port while the ship is at
+or bound for a site. `pathBetween` runs over the `"all"` graph (`portGraph`, §known-sites), so a
+site is reached through its near port. Freight, a passage or a card's `setCourse` to a site is
+dropped, and nothing is offered while the ship is set down at one.
+
+At the site the narrator dresses the two kernel cards on `policyDecision` (§the-arrival-card,
+§the-turn-card): only the words change, each side keeps its commands. It cannot choose the plans,
+stage the site, set a stance, script a turn or parley (deferred: each is a new lever, D6), and it
+never states a wound, a death or a capture the digest does not show. The arms locker stays out of
+the capability lists and the digest's machines, weapons out of the staging catalogue, and
+`fighting` out of a crew line's skills. No `captainAshore` is raised at a site
+(§looking-for-work), and a fight's `alertCleared` never hooks (§notable-event-hook); the fight's
+end and a failed errand do (`expeditionResolved`, `jobFailed`). The digest sees the crew's bodies
+(§crew-lines) and the site (§dock-sections).
 
 ### Offer lever
 
-`offerJob` makes a freight contract or a passenger passage.
+`offerJob` makes a freight contract, a passenger passage, or an errand to a site.
 
 - Every offer comes from a person (§issuers-and-pitches): `issuerName`, `issuerRole`, optional
   `issuerOrg`, and a `pitch` they say to the captain. Neither pitch nor description ever mentions
@@ -45,6 +56,15 @@ skills. No hook is raised at a site: no `captainAshore` (§looking-for-work), an
   posts it quietly on the port board. A passenger offer is always surfaced (a person at the ramp)
   and is dropped, not posted quietly, if the call's card is taken. `roundTrip` needs `passenger`.
   For a passenger `cargoItem` is luggage (one unit, or empty) and `quantity` is ignored.
+- An errand (`errandKind` `fetchPerson` or `fetchItem`, §errand-job) goes to a site listed under
+  "Sites" and back: `site` is the site and `toPort` is `fromPort` (a site written there is
+  corrected, with a note). A `fetchPerson` names `targetName` (clipped to a cast name's length)
+  and `wants` alive, either or dead (empty is offered as alive, with a note). A `fetchItem` names
+  an existing `targetItem`, wants it either way, and is called by `targetName` or else the item's
+  name. An errand carries no cargo and nobody rides on it; its pay is the sim's `errandPay` over
+  the path there and back at the `payTier` (§errand-pay). A kill job (`wants: "dead"`) is
+  accepted; the prompt keeps it rare and its issuer never clean (D103). Every errand field is
+  empty for freight and passages.
 
 ### Spawn and fault levers
 
@@ -278,6 +298,17 @@ by where they stand, then freight by job (on offer, waiting to be loaded, delive
 unloading). The story prompt tells the narrator those people are really there and make natural
 issuers and speakers; a new face is cast only if the story wants them.
 
+While a site map is alongside, "On the dock" becomes "At the site (<name>)"
+(`site-digest.ts`): the place's ambience line; the errand it is for (who is sought, how they are
+wanted, for whom, and home where); where the expedition stands (waiting on the captain's plan,
+arming, going down the ramp, out on the ground, the fight, or over with how it ended); the party
+and who leads once a plan is chosen; and each person at the site with their role, what they are to
+the errand (the one it is after, one of theirs, a bystander, on the crew's side), what they carry,
+where they stand by the map's posts, and their bearing as a word (steady, wavering, breaking,
+fled, has given up, down, dead). It shows the arrival card's two plans with their why while it is
+up (the chosen plan after), and the turn card's sides while it is up. No digit appears in the
+section; a head count is written in words.
+
 ## Prompt rules
 
 The static system prompt (`prompts/system.ts`) and per-hook instructions (`prompts/hooks.ts`)
@@ -316,6 +347,9 @@ designer reasons about:
   "nothing", and a different kind of story than the past arcs; `requestedCall` is where a leg gets
   its beat; aftermath calls (`alertCleared`, `navHazard`, `faultRepaired`) belong to the people in
   them and add no new pressure; `policyDecision` dresses the existing card.
+- An errand is a story about a person; who is at the site is the sim's, and so is the fight. A
+  kill job is rare and its issuer never clean; errands are occasional among freight and passages.
+  On `policyDecision` the arrival and turn cards are dressed, never replaced.
 
 ## Staging prompt
 
