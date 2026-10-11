@@ -109,6 +109,7 @@ const staged: ModelTransport = async (request) => ({
     cacheCreationInputTokens: 0,
   },
   reasoningDetails: [],
+  toolCalls: [],
 });
 
 describe("POST /api/games/:id/narrator, stageDock (§staging-call-on-the-server)", () => {

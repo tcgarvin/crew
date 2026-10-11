@@ -39,6 +39,8 @@ export interface NarratorCtx {
   readonly reasoningEffort: ReasoningEffort;
   /** §repair-turn: `CREW_NARRATOR_REPAIRS`; absent = the narrator's default. */
   readonly maxRepairs?: number;
+  /** §notes-turn-tools: `CREW_NARRATOR_TOOL_ROUNDS`; absent = the narrator's default. */
+  readonly maxToolRounds?: number;
 }
 
 /**
@@ -109,6 +111,7 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
     reasoningEffort: ctx.reasoningEffort,
     ...(ctx.maxRepairs === undefined ? {} : { maxRepairs: ctx.maxRepairs }),
+    ...(ctx.maxToolRounds === undefined ? {} : { maxToolRounds: ctx.maxToolRounds }),
   });
   return {
     response: run.response,

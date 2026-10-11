@@ -40,8 +40,12 @@ import { applyDecisionEvents, recordCardsFromCall } from "./history";
 import { type State, portName } from "./lookups";
 import {
   DEFAULT_MAX_REPAIRS,
+  DEFAULT_MAX_TOOL_ROUNDS,
+  NO_TOOL_LOOP,
   type RepairRecord,
   ReplyFailedError,
+  type ToolCallRecord,
+  type ToolLoop,
   callForValidReply,
   parseJsonReply,
   schemaIssue,
@@ -57,6 +61,7 @@ import {
   mergeThreads,
   parseNotes,
 } from "./notes";
+import { NOTES_TOOLS, type NotesToolData, runNotesTool } from "./notes-tools";
 import { nullNarratorResponse } from "./null";
 import { planJsonSchema, schemaInstruction } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
@@ -122,6 +127,11 @@ export interface RunNarratorCtx {
   readonly reasoningEffort?: ReasoningEffort;
   /** §repair-turn: repairs per model call (plan, notes or staging); absent = `DEFAULT_MAX_REPAIRS`. */
   readonly maxRepairs?: number;
+  /**
+   * §notes-turn-tools: tool rounds the notes turn may spend; 0 offers no tools; absent =
+   * `DEFAULT_MAX_TOOL_ROUNDS`.
+   */
+  readonly maxToolRounds?: number;
 }
 
 /** Everything the eval harness prints, beyond the response. */
@@ -147,6 +157,8 @@ export type NotesRun =
       readonly rawContent: string;
       /** §repair-turn: the repairs the notes reply needed. */
       readonly repairs: readonly RepairRecord[];
+      /** §notes-turn-tools: the tool calls the notes turn made. */
+      readonly toolCalls: readonly ToolCallRecord[];
     }
   | {
       readonly ok: false;
@@ -154,6 +166,7 @@ export type NotesRun =
       readonly error: string;
       readonly rawContent?: string;
       readonly repairs: readonly RepairRecord[];
+      readonly toolCalls: readonly ToolCallRecord[];
     };
 
 export interface NarratorRun {
@@ -513,11 +526,19 @@ function planRequest(
   return lines;
 }
 
+/**
+ * §notes-turn-tools: the notes request's reminder that the tools are there, when they are. The
+ * how and when is in the static rules ("Your notes").
+ */
+export const NOTES_TOOLS_LINE =
+  "You may call the tools first (at most a few rounds) if your notes need what the digest does not show; then answer with the notes JSON.";
+
 /** §notes-turn: the notes turn's user message: what became of the plan, then the notes schema. */
 function notesRequest(
   translated: TranslationResult,
   stored: NarratorNotes,
   req: NarratorRequest,
+  toolsOffered: boolean,
 ): string {
   const outcome =
     translated.dropped.length === 0
@@ -548,6 +569,7 @@ function notesRequest(
     ...planRequest(translated, stored, req),
     "",
     'Write your notes now (see "Your notes").',
+    ...(toolsOffered ? [NOTES_TOOLS_LINE] : []),
     schemaInstruction(planJsonSchema(buildNotesSchema())),
   ].join("\n");
 }
@@ -564,6 +586,19 @@ interface NotesTurnInputs {
   readonly logContext: Readonly<Record<string, string>>;
   readonly request: string;
   readonly merge: (written: WrittenNotes) => NarratorNotes;
+  /** §notes-turn-tools */
+  readonly tools: ToolLoop;
+}
+
+/** §notes-turn-tools: the notes turn's tool loop over this call's data; none at 0 rounds. */
+function notesToolLoop(data: NotesToolData, maxRounds: number): ToolLoop {
+  if (maxRounds <= 0) return NO_TOOL_LOOP;
+  return {
+    kind: "loop",
+    tools: NOTES_TOOLS,
+    run: (name, args) => runNotesTool(data, name, args),
+    maxRounds,
+  };
 }
 
 function parseWrittenNotes(content: string): WrittenNotes {
@@ -575,7 +610,7 @@ function parseWrittenNotes(content: string): WrittenNotes {
 /**
  * §notes-turn: the notes turn. The same system prefix as the plan (so it reads from the prompt
  * cache), the plan's user turn, the model's plan with its reasoning (and any §repair-turn before
- * it), then the request for notes.
+ * it), then the request for notes. §notes-turn-tools: it may call the notes tools first.
  */
 async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
   try {
@@ -593,7 +628,11 @@ async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
         timeoutMs: NOTES_TIMEOUT_MS,
       },
       parseWrittenNotes,
-      { maxRepairs: turn.maxRepairs, logContext: { ...turn.logContext, turn: "notes" } },
+      {
+        maxRepairs: turn.maxRepairs,
+        logContext: { ...turn.logContext, turn: "notes" },
+        tools: turn.tools,
+      },
     );
     return {
       ok: true,
@@ -602,6 +641,7 @@ async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
       usage: reply.usage,
       rawContent: reply.content,
       repairs: reply.repairs,
+      toolCalls: reply.toolCalls,
     };
   } catch (err) {
     if (!(err instanceof ReplyFailedError)) throw err;
@@ -611,6 +651,7 @@ async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
       error: err.message,
       ...(err.rawContent === undefined ? {} : { rawContent: err.rawContent }),
       repairs: err.repairs,
+      toolCalls: err.toolCalls,
     };
   }
 }
@@ -726,7 +767,7 @@ export async function runNarratorWithTrace(
         timeoutMs,
       },
       (raw) => parsePlan(raw, schema),
-      { maxRepairs, logContext },
+      { maxRepairs, logContext, tools: NO_TOOL_LOOP },
     );
     const rawContent = reply.content;
     const { plan, corrections } = reply.value;
@@ -747,6 +788,10 @@ export async function runNarratorWithTrace(
     };
     const merge = (written: WrittenNotes) =>
       notesFrom(written, notes, req.hook.tick, translated, content, snapshot.state);
+    const tools = notesToolLoop(
+      { snapshot, notes, recentEvents: req.recentEvents, content },
+      ctx.maxToolRounds ?? DEFAULT_MAX_TOOL_ROUNDS,
+    );
     const notesTurn = () =>
       runNotesTurn({
         transport,
@@ -757,8 +802,9 @@ export async function runNarratorWithTrace(
         reasoningEffort,
         maxRepairs,
         logContext,
-        request: notesRequest(translated, notes, req),
+        request: notesRequest(translated, notes, req, tools.kind === "loop"),
         merge,
+        tools,
       });
     const response: NarratorResponse = {
       commands: translated.commands,

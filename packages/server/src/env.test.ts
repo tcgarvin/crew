@@ -1,5 +1,6 @@
 import {
   DEFAULT_MAX_REPAIRS,
+  DEFAULT_MAX_TOOL_ROUNDS,
   DEFAULT_NARRATOR_MODEL,
   DEFAULT_NARRATOR_REASONING_EFFORT,
   STAGING_TIMEOUT_MS,
@@ -78,6 +79,16 @@ describe("loadEnv narrator repairs (§repair-turn)", () => {
     expect(loadEnv({ CREW_NARRATOR_REPAIRS: "3" }).narratorRepairs).toBe(3);
     expect(() => loadEnv({ CREW_NARRATOR_REPAIRS: "-1" })).toThrow(/CREW_NARRATOR_REPAIRS/);
     expect(() => loadEnv({ CREW_NARRATOR_REPAIRS: "1.5" })).toThrow(/CREW_NARRATOR_REPAIRS/);
+  });
+});
+
+describe("loadEnv notes-turn tool rounds (§notes-turn-tools)", () => {
+  it("defaults to the narrator's four rounds and reads CREW_NARRATOR_TOOL_ROUNDS, zero included", () => {
+    expect(loadEnv({}).narratorToolRounds).toBe(DEFAULT_MAX_TOOL_ROUNDS);
+    expect(DEFAULT_MAX_TOOL_ROUNDS).toBe(4);
+    expect(loadEnv({ CREW_NARRATOR_TOOL_ROUNDS: "0" }).narratorToolRounds).toBe(0);
+    expect(loadEnv({ CREW_NARRATOR_TOOL_ROUNDS: "2" }).narratorToolRounds).toBe(2);
+    expect(() => loadEnv({ CREW_NARRATOR_TOOL_ROUNDS: "-1" })).toThrow(/CREW_NARRATOR_TOOL_ROUNDS/);
   });
 });
 

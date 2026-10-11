@@ -146,6 +146,8 @@ async function finishNotesTurn(
           notes: run.notes,
           usage: run.usage,
           ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
+          // §notes-turn-tools: tool calls ride in the jsonb as repairs do.
+          ...(run.toolCalls.length === 0 ? {} : { toolCalls: run.toolCalls }),
         },
         error: null,
       });
@@ -159,11 +161,12 @@ async function finishNotesTurn(
       latencyMs,
       status: "error",
       response:
-        run.rawContent === undefined && run.repairs.length === 0
+        run.rawContent === undefined && run.repairs.length === 0 && run.toolCalls.length === 0
           ? null
           : {
               ...(run.rawContent === undefined ? {} : { rawContent: run.rawContent }),
               ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
+              ...(run.toolCalls.length === 0 ? {} : { toolCalls: run.toolCalls }),
             },
       error: `${run.reason}: ${run.error}`,
     });
@@ -342,6 +345,7 @@ export function registerNarratorRoutes(
         reasoningEffort: staging ? env.stagingReasoningEffort : env.narratorReasoningEffort,
         ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
         maxRepairs: env.narratorRepairs,
+        maxToolRounds: env.narratorToolRounds,
       });
       // §repair-turn: repairs ride in the logged response jsonb (no column of their own).
       const repairs = outcome.repairs ?? [];

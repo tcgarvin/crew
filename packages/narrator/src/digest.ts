@@ -63,6 +63,7 @@ import {
   type CardShown,
   type NarratorNotes,
   PLAN_TIERS,
+  type PastArc,
   type PlanTier,
   type PlannedBeat,
 } from "./notes";
@@ -502,9 +503,57 @@ function passengersAshoreAt(
   return ashore.sort((a, b) => a.actor.id.localeCompare(b.actor.id, "en", { numeric: true }));
 }
 
+const isCaptain = (a: { readonly roleTags: readonly string[] }) => a.roleTags.includes("captain");
+
+/**
+ * §crew-lines: one crew member's line, as the digest's crew section shows it.
+ * §notes-turn-tools: `crew(name)` returns it whole, however the digest was trimmed.
+ */
+export function crewLine(snapshot: Snapshot, content: ContentBundle, actor: Actor): string {
+  const state = snapshot.state;
+  const roles = actor.roleTags.length > 0 ? ` [${actor.roleTags.join(", ")}]` : "";
+  const skills = Object.entries(actor.skills)
+    // Expeditions A1 (call 4): the narrator hears nothing of fighting until A2.
+    .filter(([skill, level]) => skill !== "fighting" && (level ?? 0) >= 3)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([skill, level]) => `${skill} ${level}`)
+    .join(", ");
+  const needs = [
+    ...(["hunger", "fatigue", "comfort", "social"] as const).map((key) => {
+      const word = needWord(actor.needs[key]);
+      return word === undefined ? undefined : `${key} ${word}`;
+    }),
+    // Slice 4: recreation is never urgent; past the seek threshold they are simply bored.
+    actor.needs.recreation >= snapshot.config.needs.seekThreshold ? "bored" : undefined,
+  ]
+    .filter((n) => n !== undefined)
+    .join(", ");
+  const where = placePhrase(content, state, actor.location);
+  const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
+  // §duty-and-the-sleep-watch: their section and whether they are on now; §mood-and-work-speed:
+  // mood and what weighs on them.
+  const duty = ` ${dutyTag(actor, state.tick, snapshot.config)}`;
+  const mood = moodPhrase(actor, state, content, snapshot.config);
+  const def = content.crew[actor.defId];
+  const bio = def?.bio;
+  // §crew-lines: the voice line is how this person sounds on every card. §captain-never-speaks:
+  // the captain's voice is how they come across, for how others react to them.
+  const voice = def?.voice;
+  const captain = isCaptain(actor) ? "this is the captain, the player; never a speaker. " : "";
+  // §crew-lines: who they are off watch (likes, the people they feel strongly about, their berth)
+  // follows `good at`.
+  const offWatch = crewOffWatchClauses(state, content, actor);
+  const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}${bodyPhrase(actor)}; good at: ${skills || "nothing in particular"}${offWatch}`;
+  return `- ${actor.name}${roles}${duty}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
+}
+
+/** §notes-turn-tools: a passenger's "Aboard" line, as the crew section shows it while they ride. */
+export function passengerLine(snapshot: Snapshot, content: ContentBundle, actor: Actor): string {
+  return aboardLine(snapshot, content, actor, passageOf(snapshot.state, actor.id));
+}
+
 function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
   const state = snapshot.state;
-  const isCaptain = (a: { readonly roleTags: readonly string[] }) => a.roleTags.includes("captain");
   // §captain-never-speaks: the captain (the player's avatar) is listed first and never as a
   // speaker.
   const actors = Object.values(state.actors)
@@ -514,42 +563,7 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
         Number(isCaptain(b)) - Number(isCaptain(a)) ||
         a.id.localeCompare(b.id, "en", { numeric: true }),
     );
-  const lines = actors.map((actor) => {
-    const roles = actor.roleTags.length > 0 ? ` [${actor.roleTags.join(", ")}]` : "";
-    const skills = Object.entries(actor.skills)
-      // Expeditions A1 (call 4): the narrator hears nothing of fighting until A2.
-      .filter(([skill, level]) => skill !== "fighting" && (level ?? 0) >= 3)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([skill, level]) => `${skill} ${level}`)
-      .join(", ");
-    const needs = [
-      ...(["hunger", "fatigue", "comfort", "social"] as const).map((key) => {
-        const word = needWord(actor.needs[key]);
-        return word === undefined ? undefined : `${key} ${word}`;
-      }),
-      // Slice 4: recreation is never urgent; past the seek threshold they are simply bored.
-      actor.needs.recreation >= snapshot.config.needs.seekThreshold ? "bored" : undefined,
-    ]
-      .filter((n) => n !== undefined)
-      .join(", ");
-    const where = placePhrase(content, state, actor.location);
-    const status = actor.availability === "available" ? "" : ` (${actor.availability})`;
-    // §duty-and-the-sleep-watch: their section and whether they are on now; §mood-and-work-speed:
-    // mood and what weighs on them.
-    const duty = ` ${dutyTag(actor, state.tick, snapshot.config)}`;
-    const mood = moodPhrase(actor, state, content, snapshot.config);
-    const def = content.crew[actor.defId];
-    const bio = def?.bio;
-    // §crew-lines: the voice line is how this person sounds on every card. §captain-never-speaks:
-    // the captain's voice is how they come across, for how others react to them.
-    const voice = def?.voice;
-    const captain = isCaptain(actor) ? "this is the captain, the player; never a speaker. " : "";
-    // §crew-lines: who they are off watch (likes, the people they feel strongly about, their berth)
-    // follows `good at`.
-    const offWatch = crewOffWatchClauses(state, content, actor);
-    const doing = `${actionLabel(actor, state, content)}${where}; needs: ${needs || "fine"}; ${mood}${bodyPhrase(actor)}; good at: ${skills || "nothing in particular"}${offWatch}`;
-    return `- ${actor.name}${roles}${duty}${status}: ${captain}${doing}${bio ? `. ${bio}` : ""}${voice ? ` voice: ${voice}` : ""}`;
-  });
+  const lines = actors.map((actor) => crewLine(snapshot, content, actor));
   // §3.2: passengers aboard (or ashore mid-passage) each get an "Aboard" line after the crew.
   // One whose passage has ended is not aboard: left behind or put off, they are off ship at a
   // port and appear under "People you know here" there (`peopleSection`); put off while still on
@@ -810,15 +824,18 @@ function heldSection(state: State): Section {
   return section("Cards on their way to the captain in person", lines, 9);
 }
 
+/** One recent event as the digest shows it (§notes-turn-tools: `eventsSince` too). */
+export function eventLine(e: SimEvent, state: State, content: ContentBundle): string {
+  const payload = JSON.stringify(e.payload);
+  const detail = payload.length > 100 ? `${payload.slice(0, 99)}…` : payload;
+  return `- t${e.tick} ${describeEvent(e, state as never, content)} ${detail}`;
+}
+
 function eventSection(events: readonly SimEvent[], state: State, content: ContentBundle): Section {
   const lines = events
     .filter((e) => e.significance !== "trace")
     .slice(-DIGEST_MAX_EVENTS)
-    .map((e) => {
-      const payload = JSON.stringify(e.payload);
-      const detail = payload.length > 100 ? `${payload.slice(0, 99)}…` : payload;
-      return `- t${e.tick} ${describeEvent(e, state as never, content)} ${detail}`;
-    });
+    .map((e) => eventLine(e, state, content));
   return { heading: "Recent events (oldest first)", lines, priority: 3, trimFrom: "start" };
 }
 
@@ -940,6 +957,13 @@ const ARC_ENDING_TEXT: Readonly<Record<ArcEnding, string>> = {
  * what it has told (a run of cargo runs with no trouble shows as one). Never trimmed, and outside
  * the digest's character budget: the owner chose the tokens over a narrator that forgets.
  */
+/** §past-arcs: one past arc's line (§notes-turn-tools: `pastArcs` too). */
+export function pastArcLine(a: PastArc): string {
+  const people = a.people.length > 0 ? a.people.join(", ") : "nobody named";
+  const shape = a.shape === "" ? "" : ` ${a.shape}.`;
+  return `- t${a.openedTick}-t${a.closedTick} [${a.scale}] "${a.title}" (${people}):${shape} ${a.summary} (${ARC_ENDING_TEXT[a.ending]})`;
+}
+
 function pastArcsSection(notes: NarratorNotes): Section {
   const arcs = notes.pastArcs;
   const lines =
@@ -947,11 +971,7 @@ function pastArcsSection(notes: NarratorNotes): Section {
       ? ["(none yet: no story has ended this game)"]
       : [
           `${arcs.length === 1 ? "1 story has" : `${arcs.length} stories have`} ended this game:`,
-          ...arcs.map((a) => {
-            const people = a.people.length > 0 ? a.people.join(", ") : "nobody named";
-            const shape = a.shape === "" ? "" : ` ${a.shape}.`;
-            return `- t${a.openedTick}-t${a.closedTick} [${a.scale}] "${a.title}" (${people}):${shape} ${a.summary} (${ARC_ENDING_TEXT[a.ending]})`;
-          }),
+          ...arcs.map(pastArcLine),
         ];
   return section("Past arcs", lines, NEVER_DROPS);
 }
@@ -987,6 +1007,18 @@ function triedWords(card: CardShown): string {
   return ` (the way in unseen, ${card.tried.odds}%): ${how}`;
 }
 
+/** §card-history: one card the captain saw (§notes-turn-tools: `cardsShown` too). */
+export function cardShownLine(c: CardShown): string {
+  const who = c.speaker ?? "observed";
+  const chose =
+    c.chosen === null
+      ? "unresolved"
+      : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
+  // §closing-cards: the thread is retired; this is how the model knows it is finished.
+  const closed = c.closedThread === null ? "" : ` (closed thread "${c.closedThread}")`;
+  return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}${triedWords(c)}${closed}`;
+}
+
 function cardsSeenSection(
   notes: NarratorNotes,
   hook: DeepReadonly<NarratorHook> | undefined,
@@ -997,16 +1029,7 @@ function cardsSeenSection(
   const lines = [...notes.cardsShown]
     .filter((c) => c.decisionId !== pendingId)
     .reverse()
-    .map((c) => {
-      const who = c.speaker ?? "observed";
-      const chose =
-        c.chosen === null
-          ? "unresolved"
-          : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
-      // §closing-cards: the thread is retired; this is how the model knows it is finished.
-      const closed = c.closedThread === null ? "" : ` (closed thread "${c.closedThread}")`;
-      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}${triedWords(c)}${closed}`;
-    });
+    .map(cardShownLine);
   return { heading: "What the captain has seen", lines, priority: 8.5, trimFrom: "start" };
 }
 
