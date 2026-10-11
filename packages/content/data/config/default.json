@@ -282,7 +282,7 @@
     "chatCooldownSeconds": 45,
     "templateLines": [
       "{a} joked about the food",
-      "{b} complained about the docking fee",
+      { "line": "{b} complained about the docking fee", "when": "paidDockingFee" },
       "{a} asked {b} whether the coolant pump always sounds like that",
       "{a} and {b} argued about the fastest route home",
       "{a} told {b} a story about an old captain",

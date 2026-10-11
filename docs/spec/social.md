@@ -103,6 +103,14 @@ deferred until the narrator needs a lasting bond.
 
 ### Ambient chat
 
+Every 20 ticks two awake crew (passengers too) on one deck within `social.chatRadiusTiles` (2),
+neither on a task and both past `social.chatCooldownSeconds` (45), have a one-line `conversation`
+from `social.templateLines` (`systems/work/ambient.ts`). Nobody in a fight chats, nor anyone in
+the party while the expedition is under way (any phase but `resolved`), and the cast never do
+(§the-combat-system-owns-its-combatants). A line with `when: "paidDockingFee"` comes up only while
+the ship lies docked at a port where she paid the docking fee (§travel-stages), so never at a site
+or at the port a run starts from.
+
 A conversation leaves each side a memory unless the pair last had a memorable one within
 `social.chatMemoryEveryDays` (2): `chatted`, or `rubbedWrong` with chance
 `social.chatSour.atZero - perPoint * compatibility` (0.25, 0.1; 5% to 45%). The sides roll apart,

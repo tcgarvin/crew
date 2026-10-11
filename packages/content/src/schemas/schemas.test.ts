@@ -737,6 +737,19 @@ describe("content def schemas", () => {
     expect(configDefSchema.safeParse(withMemories(missing)).success).toBe(false);
   });
 
+  it("takes a chat line plain or gated on a known condition (§ambient-chat)", () => {
+    const withLines = (templateLines: unknown[]) => ({
+      ...config,
+      social: { ...config.social, templateLines },
+    });
+    const fee = { line: "{b} complained about the docking fee", when: "paidDockingFee" };
+    expect(configDefSchema.safeParse(withLines(["{a} joked", fee])).success).toBe(true);
+    const unknown = { ...fee, when: "atSea" };
+    expect(configDefSchema.safeParse(withLines([unknown])).success).toBe(false);
+    const ungated = { line: fee.line };
+    expect(configDefSchema.safeParse(withLines([ungated])).success).toBe(false);
+  });
+
   it("an activity's memories name memory keys (§memories)", () => {
     const remembered = { ...activity, memories: { together: "goodTime", loserToWinner: "beatMe" } };
     expect(activityDefSchema.safeParse(remembered).success).toBe(true);

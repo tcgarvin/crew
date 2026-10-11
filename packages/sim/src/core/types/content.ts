@@ -1244,6 +1244,18 @@ export interface ScenarioDef {
   readonly watchBill?: WatchBillDef;
 }
 
+/**
+ * §ambient-chat: when a gated chat line may come up. `paidDockingFee`: the ship lies docked at a
+ * port where she paid the docking fee.
+ */
+export type ChatLineCondition = "paidDockingFee";
+
+/**
+ * §ambient-chat: one chat template, with `{a}` (speaker) and `{b}` (listener) placeholders; the
+ * object form joins the pool only while its `when` holds.
+ */
+export type ChatLineDef = string | { readonly line: string; readonly when: ChatLineCondition };
+
 // ---------------------------------------------------------------------------------------------
 // Config (all tunables; PLAN §5: none hardcoded in sim)
 // ---------------------------------------------------------------------------------------------
@@ -1745,8 +1757,8 @@ export interface ConfigDef {
     readonly chatRadiusTiles: number;
     /** Min seconds between two conversations involving the same person. */
     readonly chatCooldownSeconds: Seconds;
-    /** Templates with `{a}` (speaker) and `{b}` (listener) placeholders. */
-    readonly templateLines: readonly string[];
+    /** §ambient-chat: the chat templates, some gated on where the ship lies. */
+    readonly templateLines: readonly ChatLineDef[];
     /** §ambient-chat: a pair's chat leaves a memory at most once in this many days. */
     readonly chatMemoryEveryDays: Days;
     /**
