@@ -66,6 +66,11 @@ describe("NarratorPlan structured-output schema", () => {
           surface: true,
           passenger: false,
           roundTrip: false,
+          errandKind: "",
+          site: "",
+          targetName: "",
+          targetItem: "",
+          wants: "",
         },
         {
           kind: "spawnAtBoundary",
@@ -159,6 +164,11 @@ describe("NarratorPlan structured-output schema", () => {
       surface: true,
       passenger: true,
       roundTrip: true,
+      errandKind: "",
+      site: "",
+      targetName: "",
+      targetItem: "",
+      wants: "",
     };
     const putOff = {
       kind: "surfaceDecision",

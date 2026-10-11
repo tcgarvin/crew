@@ -29,6 +29,7 @@
  * one coming back from ashore appears at the gate and walks aboard the same way.
  */
 import { configTicks, dayTicks, daysToSeconds } from "../../core/clock";
+import { firstOfficerOf } from "../../core/command-actor";
 import { newActor } from "../../core/command-handlers";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
@@ -36,6 +37,7 @@ import { findCrewDef } from "../../core/defs";
 import { localNamed } from "../../core/delivery";
 import { gateTileAt, isDockPoint, isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
+import { portGraph } from "../../core/places";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { DeckDef, PortDef } from "../../core/types/content";
@@ -328,7 +330,11 @@ function endPassageWith(
 function planVoyageHome(ctx: StepCtx, job: Job): void {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) return;
-  const route = shortestPath(ctx.content.ports, travel.portId, job.fromPortId);
+  const route = shortestPath(
+    portGraph(ctx.content, ctx.state, "known"),
+    travel.portId,
+    job.fromPortId,
+  );
   const hop = route?.path[1];
   if (route === undefined || hop === undefined) return;
   travel.plannedDestinationId = hop;
@@ -389,9 +395,7 @@ function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
 
 /** §spoken-cards: the first officer brings the overdue card, when the ship has one. */
 function firstOfficerName(state: ReadonlyWorldState): string | undefined {
-  return Object.values(state.actors).find(
-    (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
-  )?.name;
+  return firstOfficerOf(state)?.name;
 }
 
 function raiseOverdueCard(ctx: StepCtx, job: Job, actor: Actor, portId: PortDefId): void {

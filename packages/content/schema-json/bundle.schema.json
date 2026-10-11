@@ -5315,9 +5315,24 @@
                   },
                   "required": ["min", "max"],
                   "additionalProperties": false
+                },
+                "errand": {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["min", "max"],
+                  "additionalProperties": false
                 }
               },
-              "required": ["general", "fragile", "perishable", "hazardous", "passenger"],
+              "required": ["general", "fragile", "perishable", "hazardous", "passenger", "errand"],
               "additionalProperties": false
             },
             "jobOfferTtlDays": {

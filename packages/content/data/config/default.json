@@ -124,6 +124,10 @@
       "passenger": {
         "min": 6,
         "max": 12
+      },
+      "errand": {
+        "min": 6,
+        "max": 12
       }
     },
     "jobOfferTtlDays": 0.5,
@@ -170,7 +174,9 @@
       "passengerReturned",
       "fieldSighted",
       "fieldEntered",
-      "shipStuck"
+      "shipStuck",
+      "jobFailed",
+      "expeditionResolved"
     ],
     "aftermathHookOnEvents": ["alertCleared", "navHazard", "faultRepaired"],
     "hazardBudget": 2

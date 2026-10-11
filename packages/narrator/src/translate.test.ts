@@ -57,6 +57,11 @@ const job = {
   surface: true,
   passenger: false,
   roundTrip: false,
+  errandKind: "",
+  site: "",
+  targetName: "",
+  targetItem: "",
+  wants: "",
 };
 
 const decision = {

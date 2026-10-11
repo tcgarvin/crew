@@ -55,3 +55,14 @@ export function commandActor(state: ActorTable): ActorId {
   const firstOfficer = actors.find((a) => a.roleTags.includes("firstOfficer"));
   return firstOfficer?.id ?? captain.id;
 }
+
+/**
+ * §spoken-cards: the ship's first officer (crew, not a passenger), who brings the cards that are
+ * the ship's business rather than the captain's own: the overdue card, and (expeditions A2) the
+ * expedition's arrival and turn cards. `undefined` when the ship has none.
+ */
+export function firstOfficerOf(state: ActorTable): DeepReadonly<Actor> | undefined {
+  return Object.values(state.actors).find(
+    (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
+  );
+}

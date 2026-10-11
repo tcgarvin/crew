@@ -20,6 +20,7 @@ import {
   ok,
   reject,
 } from "../../core/commands";
+import { portGraph } from "../../core/places";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { MachineId, PortDefId } from "../../core/types/ids";
 import { coursePlotRequired } from "./course";
@@ -48,7 +49,9 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     if (ctx.content.ports[destinationPortId] === undefined) {
       return reject("unknownEntity", `setCourse: unknown port "${destinationPortId}"`);
     }
-    const route = shortestPath(ctx.content.ports, travel.portId, destinationPortId);
+    // Expeditions A2 call 2: a site is reachable only while it is known (an errand names it).
+    const graph = portGraph(ctx.content, ctx.state, "known");
+    const route = shortestPath(graph, travel.portId, destinationPortId);
     const nextHop = route?.path[1];
     if (route === undefined || nextHop === undefined) {
       return reject(

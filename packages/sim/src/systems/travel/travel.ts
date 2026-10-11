@@ -15,7 +15,7 @@ import { dockForPort, dockedPortOf, isOnDock } from "../../core/docks";
 import { raiseHookIfIdle } from "../../core/hooks";
 import { allocateId } from "../../core/ids";
 import { affordableUnits } from "../../core/markets";
-import type { PortDef } from "../../core/types/content";
+import { isSite, portGraph } from "../../core/places";
 import type { EventDraft } from "../../core/types/events";
 import type { DeckDefId, DoorId, PortDefId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx, System } from "../../core/types/pipeline";
@@ -202,8 +202,17 @@ function emitStageChanged(ctx: StepCtx, from: TravelStage, to: TravelStage): voi
   });
 }
 
-function findRoute(port: PortDef, toPortId: PortDefId): number | undefined {
-  return port.routes.find((r) => r.toPortId === toPortId)?.distance;
+/**
+ * The distance of the leg from `fromPortId` to `toPortId` on the known graph (expeditions A2 call
+ * 2: a near port's route to a known site lives only there), or `undefined` when no route joins them.
+ */
+function legDistance(
+  ctx: Pick<StepCtx, "state" | "content">,
+  fromPortId: PortDefId,
+  toPortId: PortDefId,
+): number | undefined {
+  const from = portGraph(ctx.content, ctx.state, "known")[fromPortId];
+  return from?.routes.find((r) => r.toPortId === toPortId)?.distance;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -357,8 +366,7 @@ export function beginDeparture(
 ): void {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked") return;
-  const fromPort = ctx.content.ports[travel.portId];
-  const distance = fromPort === undefined ? undefined : findRoute(fromPort, toPortId);
+  const distance = legDistance(ctx, travel.portId, toPortId);
   ctx.state.travel = {
     stage: "preparingDeparture",
     fromPortId: travel.portId,
@@ -391,7 +399,7 @@ function continueVoyageIfFree(ctx: StepCtx): void {
   if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) return;
   const voyage = travel.voyageDestinationId;
   if (voyage === undefined || voyage === travel.portId) return;
-  const hop = nextHop(ctx.content.ports, travel.portId, voyage);
+  const hop = nextHop(portGraph(ctx.content, ctx.state, "known"), travel.portId, voyage);
   if (hop === undefined) {
     // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
     delete travel.voyageDestinationId;
@@ -540,7 +548,9 @@ function bringDockAlongside(
 function castOffDock(ctx: StepCtx, portId: PortDefId): void {
   if (ctx.state.deck.dock === undefined) return;
   dismissLocals(ctx, portId);
-  clearDock(ctx, portId, portStoreLocation(ctx.defs.port(portId)));
+  // Expeditions A2 call 8: a site keeps no store, so what is left on its floor goes with it.
+  const store = isSite(ctx.content, portId) ? "none" : portStoreLocation(ctx.defs.port(portId));
+  clearDock(ctx, portId, store);
   detachDock(ctx);
 }
 
@@ -563,8 +573,9 @@ function advanceStage(ctx: StepCtx): void {
     };
     requestRamps(ctx, "open");
     // W6 decision: the fee is a flat config value, not per-`PortDef`, to keep V1 thin; a
-    // per-port fee would read `ctx.defs.port(portId)` here instead.
-    const fee = ctx.config.commerce.dockingFee;
+    // per-port fee would read `ctx.defs.port(portId)` here instead. Expeditions A2 (§3.3): setting
+    // down at a site costs nothing.
+    const fee = isSite(ctx.content, portId) ? 0 : ctx.config.commerce.dockingFee;
     if (fee > 0) {
       const txId = allocateId(ctx.state, "transaction");
       ctx.state.money.balance -= fee;
@@ -588,7 +599,7 @@ function advanceStage(ctx: StepCtx): void {
 
   const routeDistance =
     to === "transit"
-      ? (findRoute(ctx.defs.port(travel.fromPortId), travel.toPortId) ?? travel.routeDistance)
+      ? (legDistance(ctx, travel.fromPortId, travel.toPortId) ?? travel.routeDistance)
       : travel.routeDistance;
   ctx.state.travel = {
     stage: to,

@@ -10,7 +10,7 @@ import type {
   PortDefId,
   TransactionId,
 } from "../ids";
-import type { PassageEndReason } from "../travel";
+import type { ErrandOutcome, PassageEndReason } from "../travel";
 import type { SignificanceCatalog } from "./significance";
 
 export interface CommerceEventPayloads {
@@ -77,6 +77,11 @@ export interface CommerceEventPayloads {
   passengerReturned: PassengerEvent;
   /** The passage ended, for any reason; `completed` is the only one that pays. */
   passageEnded: PassengerEvent & { readonly reason: PassageEndReason; readonly portId: PortDefId };
+  /**
+   * Expeditions A2 (§6): a job ended unpaid: an errand that failed at the site (`failed`), or its
+   * captive put off or left behind (the passage's ending).
+   */
+  jobFailed: { readonly jobId: JobId; readonly outcome: ErrandOutcome | PassageEndReason };
 }
 
 /** What every passenger event carries: the job, the actor, and their name (for ticker and digest). */
@@ -110,4 +115,5 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   passengerAshore: "notable",
   passengerReturned: "narrative",
   passageEnded: "narrative",
+  jobFailed: "narrative",
 } as const satisfies SignificanceCatalog<CommerceEventPayloads>;

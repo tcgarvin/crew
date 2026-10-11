@@ -192,6 +192,12 @@ function offerIntent(
     // Passengers-and-galaxy §4.4: the null narrator never offers passages.
     passenger: false,
     roundTrip: false,
+    // Expeditions A2 (plan call 14): nor errands.
+    errandKind: "",
+    site: "",
+    targetName: "",
+    targetItem: "",
+    wants: "",
   };
 }
 

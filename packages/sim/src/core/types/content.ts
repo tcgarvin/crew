@@ -1479,10 +1479,11 @@ export interface ConfigDef {
     /**
      * Credits per unit distance per cargo unit, inclusive band. Narrator `offerJob` pay must fit.
      * `passenger` (passengers-and-galaxy §3.4) is per unit of path distance for one fare, doubled
-     * for a round trip; luggage adds nothing.
+     * for a round trip; luggage adds nothing. `errand` (expeditions A2, §6) is per unit of path
+     * distance to the site and back (`errandPay`).
      */
     readonly priceBands: Readonly<
-      Record<CargoClass | "passenger", { readonly min: number; readonly max: number }>
+      Record<CargoClass | "passenger" | "errand", { readonly min: number; readonly max: number }>
     >;
     /** §the-ships-day: how long an offered job stays open, in days (0.5 is half a day). */
     readonly jobOfferTtlDays: Days;

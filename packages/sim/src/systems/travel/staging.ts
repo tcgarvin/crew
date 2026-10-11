@@ -20,6 +20,7 @@ import { findItemDef } from "../../core/defs";
 import { dockForPort } from "../../core/docks";
 import { floorSet } from "../../core/floor-set";
 import { raiseHookIfIdle } from "../../core/hooks";
+import { isSite } from "../../core/places";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { DockDef } from "../../core/types/content";
 import type { NarratorHook } from "../../core/types/decisions";
@@ -44,6 +45,8 @@ function leadDistance(ctx: Pick<StepCtx, "config">): number {
  * and raise the hook as soon as no other hook is pending.
  */
 export function stageDockIfDue(ctx: StepCtx, travel: InFlight): void {
+  // Expeditions A2 call 9: a site has no regulars to stage; its people are the expedition's.
+  if (isSite(ctx.content, travel.toPortId)) return;
   const dock = dockForPort(ctx.content, travel.toPortId);
   if (dock === undefined) return;
   if (travel.staging === undefined) {
@@ -65,14 +68,16 @@ export function stageDockIfDue(ctx: StepCtx, travel: InFlight): void {
 }
 
 /**
- * May transit end? Yes at a port with no dock map; otherwise only once the staging hook has been
- * raised and is no longer pending (the host acknowledged it, with or without a plan).
+ * May transit end? Yes at a port with no dock map and (expeditions A2 call 9) at a site, which is
+ * never staged; otherwise only once the staging hook has been raised and is no longer pending (the
+ * host acknowledged it, with or without a plan).
  */
 export function stagingAnswered(
   state: Pick<ReadonlyWorldState, "narrator">,
   content: StepCtx["content"],
   travel: Pick<InFlight, "toPortId" | "staging">,
 ): boolean {
+  if (isSite(content, travel.toPortId)) return true;
   if (dockForPort(content, travel.toPortId) === undefined) return true;
   const staging = travel.staging;
   return staging?.status === "raised" && state.narrator.pendingHook?.id !== staging.hookId;

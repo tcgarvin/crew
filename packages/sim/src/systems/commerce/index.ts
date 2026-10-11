@@ -27,3 +27,5 @@ export {
 export { commerceTaskDerivations } from "./tasks";
 export { affordableUnits } from "../../core/markets";
 export { marketBlock } from "./market";
+export { PAY_TIER_FRACTION, type PayTier, errandPay } from "./errand";
+export { checkErrandBand } from "./jobs";

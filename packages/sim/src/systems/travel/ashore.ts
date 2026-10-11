@@ -218,9 +218,10 @@ function handAboard(ctx: Ctx, item: Item, portId: PortDefId): void {
 
 /**
  * Clear the dock before it detaches at the end of `undocking`: anyone still on it is brought
- * aboard, and anything still on it stays at the port, in `store` (its warehouse).
+ * aboard, and anything still on it stays at the port, in `store` (its warehouse). `"none"`
+ * (expeditions A2 call 8: a landing site, which keeps no store): what is left is gone with it.
  */
-export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation): void {
+export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation | "none"): void {
   if (ctx.state.deck.dock === undefined) return;
   for (const actor of Object.values(ctx.state.actors)) {
     if (onDock(ctx, actor) || isOutThroughGate(actor)) bringAboard(ctx, actor, portId);
@@ -231,7 +232,8 @@ export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation):
       handAboard(ctx, item, portId);
       continue;
     }
-    item.location = store;
+    if (store === "none") delete ctx.state.items[item.id];
+    else item.location = store;
     ctx.dirty.inventory = true;
     ctx.emit({
       type: "leftOnDock",

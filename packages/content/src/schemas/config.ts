@@ -151,6 +151,7 @@ export const configDefSchema = z.strictObject({
       perishable: band,
       hazardous: band,
       passenger: band,
+      errand: band,
     }),
     jobOfferTtlDays: positive,
     dockingFee: z.number().int().min(0),

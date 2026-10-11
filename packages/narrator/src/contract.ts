@@ -21,6 +21,8 @@ import {
   type ConfigDef,
   type ContentBundle,
   type DeepReadonly,
+  ERRAND_KINDS,
+  ERRAND_WANTS,
   FIELD_DETECTIONS,
   FIELD_SEVERITIES,
   HAZARD_KINDS,
@@ -264,6 +266,16 @@ export function buildNarratorPlanSchema() {
     passenger: z.boolean(),
     /** Passenger only: there and back to fromPort. Dropped with a reason without `passenger`. */
     roundTrip: z.boolean(),
+    /**
+     * Expeditions A2 (§6): an errand to a landing site and back. All five are empty for freight and
+     * passages (§narrator-authority); the capability block explains them, so the descriptions stay
+     * under eight words (plan call 7: the schema's size).
+     */
+    errandKind: z.enum(["", ...ERRAND_KINDS]).describe(`Errand to a site; ${EMPTY_FOR_NONE}.`),
+    site: idOf("Site id"),
+    targetName: z.string().describe(`Who to fetch; ${EMPTY_FOR_NONE}.`),
+    targetItem: idOf("Item id"),
+    wants: z.enum(["", ...ERRAND_WANTS]).describe(`Target alive or dead; ${EMPTY_FOR_NONE}.`),
   });
 
   // W0 decision: V1 narrator spawns only existing item defs into port stores; generated defs wait
