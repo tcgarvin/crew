@@ -167,6 +167,8 @@ const TICKER_TRACE_TYPES: ReadonlySet<SimEvent["type"]> = new Set([
   // Expeditions A1 (§8.6): every shot reaches the frame's tracers (`RenderFrame.shots`); its
   // line is null, so the log never shows it.
   "shotFired",
+  // The party armed and walking out: the "takes four down the ramp" line.
+  "partyMustered",
 ]);
 
 /** Notable events whose information another ticker line already carries. */
@@ -251,6 +253,8 @@ type Names = {
   /** The machine's name in lower case, or "machine", for mid-sentence use. */
   machineLower(id: string): string;
   port(id: string): string;
+  /** Expeditions A2: is this port a landing site (§landing-sites)? */
+  isSite(id: string): boolean;
   item(id: string): string;
   itemDef(defId: string): string;
   faultName(machineId: string, faultKey: string): string;
@@ -345,6 +349,7 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     machine,
     machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
     port: (id) => portName(content, id as PortDefId),
+    isSite: (id) => isSite(content, id as PortDefId),
     item: (id) => {
       const item = state.items[id as keyof ReadonlyWorldState["items"]];
       const def = item === undefined ? undefined : findItemDef(content, state, item.defId);
@@ -457,8 +462,12 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "broughtAboard":
       return `The dock crew brought ${event.payload.name} back aboard at ${n.port(event.payload.portId)}`;
-    case "leftOnDock":
-      return `Left ${n.item(event.payload.itemId)} on the dock at ${n.port(event.payload.portId)}`;
+    case "leftOnDock": {
+      // A site keeps nothing: the item is gone by the time the line is read, so name its def.
+      const { itemId, defId, portId } = event.payload;
+      if (n.isSite(portId)) return `Left ${n.itemDef(defId)} behind at ${n.port(portId)}`;
+      return `Left ${n.item(itemId)} on the dock at ${n.port(portId)}`;
+    }
     case "dockAmbience":
       return event.payload.line;
     case "lookingForWork":
@@ -662,9 +671,13 @@ const PART_WORDS: Readonly<Record<BodyPart, string>> = {
  */
 function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
   switch (event.type) {
-    case "expeditionStarted": {
+    // The party goes down the ramp once it is armed, not when the ship sets down: on a landing
+    // nobody moves until the arrival card's plan is chosen, and the plan picks the party again.
+    case "expeditionStarted":
+      return `Set down at ${n.port(event.payload.siteId)}`;
+    case "partyMustered": {
       const [leaderId] = event.payload.party;
-      if (leaderId === undefined) return `Set down at ${n.port(event.payload.siteId)}`;
+      if (leaderId === undefined) return null;
       const leader = n.actor(leaderId) ?? "The captain";
       const others = event.payload.party.length - 1;
       return others === 0
@@ -672,9 +685,8 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
         : `${leader} takes ${countWord(others)} down the ramp`;
     }
     case "expeditionContact":
-      return `Shots at ${n.port(event.payload.siteId).toLowerCase()}`;
+      return `Shots at ${midSentence(n.port(event.payload.siteId))}`;
     case "shotFired":
-    case "partyMustered":
       return null;
     case "wounded": {
       const who = n.actor(event.payload.actorId) ?? "Someone";
@@ -726,7 +738,7 @@ function resolvedLine(event: Extract<SimEvent, { type: "expeditionResolved" }>, 
     case "partyWithdrew":
       return `The party came back without ${targetName ?? "the target"}`;
     case "timedOut":
-      return `The fight at ${n.port(siteId).toLowerCase()} peters out`;
+      return `The fight at ${midSentence(n.port(siteId))} peters out`;
   }
 }
 

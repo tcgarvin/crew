@@ -620,6 +620,39 @@ describe("expeditions A2: setting down, lifting off, and the errand's lines", ()
       ).toMatch(/^The job for Ysolde Maren is lost: /);
     });
 
+    it("names what a site keeps nothing of, and the site mid-sentence", () => {
+      expect(
+        line({
+          type: "leftOnDock",
+          significance: "notable",
+          payload: { itemId: "i.gone" as ItemId, defId: TINY.wrench, portId: TINY.port2 },
+        }),
+      ).toBe("Left wrench behind at Far Dock");
+      expect(
+        line({
+          type: "expeditionContact",
+          significance: "narrative",
+          payload: { siteId: TINY.port2 },
+        }),
+      ).toBe("Shots at Far Dock");
+    });
+
+    it("sets down on starting, and goes down the ramp once the party is armed", () => {
+      const leader = Object.values(world.state.actors).find((a) => a.crew);
+      if (leader === undefined) throw new Error("fixture has no crew");
+      const party = [leader.id, "a.second" as ActorId, "a.third" as ActorId];
+      expect(
+        line({
+          type: "expeditionStarted",
+          significance: "narrative",
+          payload: { siteId: TINY.port2, party },
+        }),
+      ).toBe("Set down at Far Dock");
+      expect(
+        line({ type: "partyMustered", significance: "trace", payload: { party, armed: party } }),
+      ).toBe(`${leader.name} takes two down the ramp`);
+    });
+
     it("tells an errand's offer and its completion by the target, not as freight or a fare", () => {
       expect(line({ type: "jobOffered", significance: "notable", payload: { jobId: JOB } })).toBe(
         "Ysolde Maren wants Corran Vale brought back from Far Dock",

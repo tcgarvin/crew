@@ -246,7 +246,7 @@ export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation |
       locationRef: { kind: "port", portId },
       causeIds: [],
       source: "sim",
-      payload: { itemId: item.id, portId },
+      payload: { itemId: item.id, defId: item.defId, portId },
     });
   }
 }

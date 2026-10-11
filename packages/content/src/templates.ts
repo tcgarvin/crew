@@ -57,6 +57,8 @@ export const NARRATOR_TEXT_KEYS = {
 
 /** The pitch key the kernel gives a job whose draft carried no pitch (`systems/commerce`). */
 const DEFAULT_PITCH_KEY = "job.pitch.default";
+/** Expeditions A2: what an errand's issuer says when the draft carried no pitch. */
+const ERRAND_PITCH_KEY = "job.pitch.errand";
 
 /** GDD §22 card budget, as in `@crew/narrator`'s `CARD_SITUATION_MAX_WORDS` (§spoken-cards: 70). */
 const SITUATION_MAX_WORDS = 70;
@@ -104,10 +106,10 @@ function offerSituation(p: Params, c: ContentBundle | undefined): string {
   if (p.name === undefined) {
     return `${p.issuer ?? "A dockside broker"} has freight bound from ${portLabel(p.from, c)} to ${portLabel(p.to, c)} and wants us to carry it.`;
   }
-  const pitch =
-    p.pitch !== undefined
-      ? String(p.pitch)
-      : renderTextRef({ key: String(p.pitchKey ?? DEFAULT_PITCH_KEY), params: p }, c);
+  const pitchKey = String(p.pitchKey ?? DEFAULT_PITCH_KEY);
+  // The kernel's default pitch is a freight broker's; an errand's issuer says something else.
+  const key = isErrand(p) && pitchKey === DEFAULT_PITCH_KEY ? ERRAND_PITCH_KEY : pitchKey;
+  const pitch = p.pitch !== undefined ? String(p.pitch) : renderTextRef({ key, params: p }, c);
   const urgency = URGENCY_WORDS[String(p.urgency)] ?? "no rush";
   const context = isErrand(p)
     ? errandContext(p, c, urgency)
@@ -287,6 +289,10 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
   // §issuers-and-pitches: a pitch without prose (old saves, drafts that carried none).
   [DEFAULT_PITCH_KEY]: () => "Got freight that needs moving, if you've got the room.",
   "job.pitch": () => "Got freight that needs moving, if you've got the room.",
+  [ERRAND_PITCH_KEY]: (p) =>
+    p.errand === "fetchItem"
+      ? "Something of mine needs bringing back, and I'd rather not ask the usual people."
+      : "Someone needs bringing back, and I'd rather not ask the usual people.",
   "job.template": () => "A routine freight contract.",
   "decision.accept": () => "Accept",
   "decision.decline": () => "Decline",

@@ -317,6 +317,33 @@ describe("errand offer card templates (expeditions A2, §6)", () => {
     );
   });
 
+  it("has its own pitch when the draft carried none, never the freight broker's", () => {
+    const unpitched = (params: Decision["prompt"]["params"]) =>
+      templateCard(
+        offer({
+          name: "Ysolde Maren",
+          from: "port.terns_rest",
+          to: "port.terns_rest",
+          pitchKey: "job.pitch.default",
+          errand: "fetchPerson",
+          target: "Corran Vale",
+          site: "port.boathouse",
+          wants: "alive",
+          ...params,
+        }),
+        bundle(),
+      );
+    const person = unpitched({});
+    expect(person.situation).toMatch(/^“Someone needs bringing back/);
+    expect(person.situation).not.toMatch(/freight/i);
+    const thing = unpitched({
+      errand: "fetchItem",
+      target: "the strongbox papers",
+      wants: "either",
+    });
+    expect(thing.situation).toMatch(/^“Something of mine needs bringing back/);
+  });
+
   it("fetches a thing by its name", () => {
     const card = errand({ errand: "fetchItem", target: "the strongbox papers", wants: "either" });
     expect(card.situation).toMatch(/Fetch the strongbox papers from the Boathouse, wanted soon\.$/);

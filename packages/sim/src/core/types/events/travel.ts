@@ -69,7 +69,7 @@ export interface TravelEventPayloads {
    * §ramps-and-cast-off: an item was still on the dock when it slid away; it stays at the port's
    * warehouse.
    */
-  leftOnDock: { readonly itemId: ItemId; readonly portId: PortDefId };
+  leftOnDock: { readonly itemId: ItemId; readonly defId: ItemDefId; readonly portId: PortDefId };
   /**
    * §ramps-and-cast-off: a piece of the ship's own gear (the hand truck) was still on the dock when
    * it went, so the dock crew handed it up the cargo ramp instead of leaving it at the warehouse.
