@@ -249,6 +249,44 @@ const ITEM_ERRAND_NOTES = {
   lastRejections: [],
 };
 
+/**
+ * §outcome-levers (D106): notes for a quiet leg whose thread is due a falling-out: Tomas found the
+ * marked deck Jax won his share with, and the beat is the two falling out over it, so the model has
+ * a reason to reach for fallOut or plantMemory (the test only sees whether what it sends translates).
+ */
+const FALLING_OUT_NOTES = {
+  summary:
+    "The crew are on the Meridian run with the growers' crates. At the Hub Jax Okonkwo won most of Tomas Ruiz's share of the last run at cards.",
+  threads: [
+    {
+      title: "The marked deck",
+      scale: "episode",
+      people: ["Tomas Ruiz", "Jax Okonkwo"],
+      arcNotes:
+        "Jax took Tomas's share at cards at the Hub. Tomas has since found the deck Jax brought aboard, and the corners are nicked. He has told nobody yet.",
+      nextBeat:
+        "On this leg it comes out: Tomas confronts Jax over the marked deck, and the two fall out for good. The crew will feel it at dinner; the decision is not the captain's to make, it is the story's.",
+      lastBeatTick: 3_000,
+      beatCardShown: true,
+    },
+  ],
+  cardsShown: [],
+  cast: [],
+  lastUpdatedTick: 3_000,
+  lastRejections: [],
+};
+
+/** §outcome-levers: the kinds that decide an outcome outright. */
+const OUTCOME_KINDS: readonly string[] = [
+  "strike",
+  "transact",
+  "plantMemory",
+  "fallOut",
+  "giveThought",
+  "reveal",
+  "injectFault",
+];
+
 /** §requested-call-back: the call-back request the model wrote, for the run log. */
 function callBackOf(run: NarratorRun): string {
   const plan = run.trace.plan;
@@ -272,6 +310,9 @@ function playerText(card: NarratorResponse["card"]): string {
 /** The checks every hook shares: the model answered, the plan parsed, nothing fell back. */
 function expectModelAnswered(run: NarratorRun): NarratorResponse {
   const { response } = run;
+  if (response.fallback !== undefined) {
+    console.log(`raw reply that fell back for ${req(run)}:`, run.trace.rawContent ?? "(none)");
+  }
   expect(
     response.fallback,
     `narrator fell back (${response.fallback ?? "?"}): ${run.error ?? "no error recorded"}`,
@@ -388,6 +429,26 @@ suite(
       "quietTooLong: the model answers with a plan",
       async () => {
         expectModelAnswered(await liveRun(quietTooLongRequest(content())));
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "quietTooLong with a falling-out due: the plan parses and any outcome lever it sends translates (§outcome-levers, D106)",
+      async () => {
+        const run = await liveRun(quietTooLongRequest(content()), { notes: FALLING_OUT_NOTES });
+        const response = expectModelAnswered(run);
+        const plan = run.trace.plan;
+        const story = plan !== undefined && "intents" in plan ? plan : undefined;
+        const written = (story?.intents ?? []).map((i) => (i as { kind: string }).kind);
+        const outcome = written.filter((kind) => OUTCOME_KINDS.includes(kind));
+        console.log(
+          `falling-out call: wrote ${JSON.stringify(written)}; outcome levers ${JSON.stringify(outcome)}; rationale: ${story?.rationale ?? ""}`,
+        );
+        const droppedOutcome = (response.dropped ?? []).filter((d) =>
+          OUTCOME_KINDS.includes(d.kind),
+        );
+        expect(droppedOutcome, JSON.stringify(droppedOutcome)).toEqual([]);
       },
       LIVE_TIMEOUT_MS,
     );

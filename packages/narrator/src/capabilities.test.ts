@@ -1,4 +1,4 @@
-import { FIELD_SEVERITIES, HAZARD_KINDS, isSite } from "@crew/sim";
+import { FIELD_SEVERITIES, HAZARD_KINDS, NARRATOR_MEMORY_KEYS, isSite } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildCapabilities, fieldExpectation } from "./capabilities";
 import {
@@ -71,7 +71,7 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the ten narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field, card.unseen D105, strike and transact §outcome-levers)", () => {
+  it("names exactly the fifteen narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field, card.unseen D105, D106's §outcome-levers)", () => {
     const levers = [...text.matchAll(/^## \d+\. ([\w.]+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
@@ -84,9 +84,14 @@ describe("buildCapabilities", () => {
       "card.unseen",
       "strike",
       "transact",
+      "plantMemory",
+      "fallOut",
+      "giveThought",
+      "reveal",
+      "injectFault",
     ]);
-    expect(text).toContain("You have exactly ten levers");
-    expect(text).not.toContain("eight levers");
+    expect(text).toContain("You have exactly fifteen levers");
+    expect(text).not.toContain("ten levers");
   });
 
   it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (§hazard-and-field-levers)", () => {
@@ -243,13 +248,30 @@ describe("buildCapabilities", () => {
     expect(text).toContain("a card still never states a sum");
   });
 
+  it("documents the memory, thought, reveal and fault-now levers and the hazard's outcome, from content and config (§memory-levers, §thought-and-reveal-levers, §forced-faults-and-hazards)", () => {
+    const memories = req.snapshot.config.social.memories;
+    expect(text).toContain("## 11. plantMemory:");
+    for (const key of NARRATOR_MEMORY_KEYS) {
+      expect(text).toContain(`${key} (${memories[key].label}, ${memories[key].durationDays} days)`);
+    }
+    expect(text).toContain("true holds for good");
+    expect(text).toContain("## 12. fallOut:");
+    expect(text).toContain("Never violent");
+    expect(text).toContain("## 13. giveThought:");
+    expect(text).toContain('worriedAbout ("worried about {ref}")');
+    expect(text).toContain("## 14. reveal:");
+    expect(text).toContain("## 15. injectFault:");
+    expect(text).toContain("- outcome: empty lets the helm's roll decide");
+    expect(text).toContain("clean | scrape | delay decides it instead");
+  });
+
   it("documents privateTalk as a card side effect, warm or stern, and not as a lever (§private-talk)", () => {
     expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
     expect(text).toContain("the talk moves how they feel about the captain");
     expect(text).toContain("never the captain herself, a passenger or someone ashore");
-    expect(text).toContain("You have exactly ten levers.");
-    expect(text.match(/^## \d+\. /gm)).toHaveLength(10);
+    expect(text).toContain("You have exactly fifteen levers.");
+    expect(text.match(/^## \d+\. /gm)).toHaveLength(15);
   });
 
   it("measures distance from the docked port when docked", () => {

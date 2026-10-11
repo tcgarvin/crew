@@ -19,6 +19,7 @@ import type { EquipmentCommandPayloads } from "./equipment";
 import type { ExpeditionCommandPayloads } from "./expedition";
 import type { FieldCommandPayloads } from "./field";
 import type { ScenarioCommandPayloads } from "./scenario";
+import type { SocialCommandPayloads } from "./social";
 import type { SpawnCommandPayloads } from "./spawn";
 import type { TravelCommandPayloads } from "./travel";
 
@@ -32,6 +33,7 @@ export type * from "./equipment";
 export type * from "./expedition";
 export type * from "./field";
 export type * from "./scenario";
+export type * from "./social";
 export type * from "./spawn";
 export type * from "./travel";
 
@@ -48,7 +50,8 @@ export interface CommandPayloadMap
     FieldCommandPayloads,
     CallBackCommandPayloads,
     ExpeditionCommandPayloads,
-    BodiesCommandPayloads {}
+    BodiesCommandPayloads,
+    SocialCommandPayloads {}
 
 export type CommandKind = keyof CommandPayloadMap;
 

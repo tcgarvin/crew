@@ -766,6 +766,16 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "maxWindfall": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxOfferPay": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -778,7 +788,9 @@
         "budgetRefillDays",
         "hookOnEvents",
         "aftermathHookOnEvents",
-        "hazardBudget"
+        "hazardBudget",
+        "maxWindfall",
+        "maxOfferPay"
       ],
       "additionalProperties": false
     },
@@ -1645,6 +1657,106 @@
               },
               "required": ["label", "opinion", "durationDays", "stackLimit"],
               "additionalProperties": false
+            },
+            "betrayedMe": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
+            },
+            "savedMyLife": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
+            },
+            "wrongedOverSomeone": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
+            },
+            "madeItRight": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "opinion": {
+                  "type": "integer",
+                  "minimum": -5,
+                  "maximum": 5
+                },
+                "durationDays": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "stackLimit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["label", "opinion", "durationDays", "stackLimit"],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1662,7 +1774,11 @@
             "talkedItThrough",
             "foughtBeside",
             "carriedMeOut",
-            "leftMeBehind"
+            "leftMeBehind",
+            "betrayedMe",
+            "savedMyLife",
+            "wrongedOverSomeone",
+            "madeItRight"
           ],
           "additionalProperties": false
         },

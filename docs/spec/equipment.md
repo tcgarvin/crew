@@ -48,7 +48,10 @@ the sampled threshold draws one absent fault by weight on the `failures` stream 
 A fault raises a `machineSymptom` problem, essential urgency. A `sensor`-channel symptom (the
 engine's stall warning, the generator's coil burnout) is public at once, like a panel alarm; a
 `visual` or `audible` one is discovered only by someone in the compartment. Faults injected by a
-scenario get the same problem: the tick opens one for any undiagnosed fault without one.
+scenario get the same problem: the tick opens one for any undiagnosed fault without one. The
+narrator's `reveal` makes one public and lets the best engineer aboard notice it now, and its
+`injectFault` goes through `applyFault` like a scheduled fault (§thought-and-reveal-levers,
+§forced-faults-and-hazards).
 
 ### Diagnosis
 

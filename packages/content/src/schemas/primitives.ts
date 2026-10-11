@@ -224,6 +224,10 @@ export const thoughtKeySchema = z.enum([
   "heldTheLine",
   "ranFromAFight",
   "wounded",
+  "worriedAbout",
+  "grieving",
+  "shaken",
+  "heartened",
 ]);
 /** §memories: what one person remembers about another (sim `MEMORY_KEYS`). */
 export const memoryKeySchema = z.enum([
@@ -242,6 +246,10 @@ export const memoryKeySchema = z.enum([
   "foughtBeside",
   "carriedMeOut",
   "leftMeBehind",
+  "betrayedMe",
+  "savedMyLife",
+  "wrongedOverSomeone",
+  "madeItRight",
 ]);
 export const traitModifierSchema = z.enum([
   "hungerRate",

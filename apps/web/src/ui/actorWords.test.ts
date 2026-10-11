@@ -365,6 +365,34 @@ const DEFS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.5,
     stacks: false,
   },
+  worriedAbout: {
+    key: "worriedAbout",
+    label: "worried about {ref}",
+    value: -0.15,
+    durationDays: 2,
+    stacks: false,
+  },
+  grieving: {
+    key: "grieving",
+    label: "grieving for {ref}",
+    value: -0.35,
+    durationDays: 7,
+    stacks: false,
+  },
+  shaken: {
+    key: "shaken",
+    label: "shaken",
+    value: -0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  heartened: {
+    key: "heartened",
+    label: "heartened",
+    value: 0.2,
+    durationDays: 2,
+    stacks: false,
+  },
 };
 
 const thought = (

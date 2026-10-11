@@ -1,5 +1,5 @@
 /**
- * The capability list (§narrator-authority): exactly what the ten narrator levers can do in this
+ * The capability list (§narrator-authority): exactly what the fifteen narrator levers can do in this
  * game, generated from content, config and the ship's machines so the prompt never promises what
  * the sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
@@ -16,16 +16,21 @@ import {
   DAMAGE_TYPES,
   ERRAND_KINDS,
   ERRAND_WANTS,
+  FALL_OUT_OVER_MAX,
   FIELD_SEVERITIES,
+  FORCED_HAZARD_OUTCOMES,
   type FaultEffect,
   type FieldSeverity,
   HAZARD_KINDS,
   JOB_URGENCIES,
   MARKET_PRICE_TIERS,
   type MarketPriceTier,
+  NARRATOR_MEMORY_KEYS,
+  NARRATOR_THOUGHT_KEYS,
   type PortDef,
   type PortDefId,
   type SiteCastEntryDef,
+  type ThoughtKey,
   WOUND_SEVERITIES,
   basePriceFor,
   dockForPort,
@@ -189,6 +194,7 @@ function hazardLever(config: ConfigDef): string[] {
     `- window: soon (${seconds(windows.soon[0])}-${seconds(windows.soon[1])}), later (${seconds(windows.later[0])}-${seconds(windows.later[1])}), muchLater (${seconds(windows.muchLater[0])}-${seconds(windows.muchLater[1])}) from now. It goes off at the first moment the ship is in transit at or after that, so one placed while docked with a course set waits for that leg's transit.`,
     "- Only while a course is set or the ship is under way, and only on a leg with transit left: dropped while docked with no course, on approach or docking, or when the window opens after this leg's transit ends. The departure call you ask for with callBack (when: departure) is the natural moment: the ship has just cast off and the whole leg is ahead. One hazard waits at a time. Uses one hazard from the budget in the digest.",
     `- The sim rolls it against whoever has the helm when it goes off, never you: clean (nothing happens), a scrape (one of the ship's machines takes a fault, which the crew must find and repair like any other), or a delay (about ${seconds(config.hazards.delaySeconds)} lost on the leg). With nobody at the helm it is a scrape and a delay both. The next digest shows who was at the helm and how it went.`,
+    `- outcome: empty lets the helm's roll decide, as above, and is the usual answer: the pilot's skill is the story. ${FORCED_HAZARD_OUTCOMES.join(" | ")} decides it instead, when the story needs that result more than the dice (the scrape that sends the engineer into the engine room before the port, the clean pass the green pilot needs); it still goes off when it would, the pilot still has the helm and takes it to heart, and nobody aboard can tell it was decided.`,
   ];
 }
 
@@ -303,6 +309,57 @@ function transactLever(config: ConfigDef): string[] {
   ];
 }
 
+/**
+ * §memory-levers: the eleventh and twelfth levers, a memory and a falling-out, with the memories'
+ * weights from config against the digest's "close to" / "at odds with" line.
+ */
+function memoryLevers(config: ConfigDef): string[] {
+  const memories = config.social.memories;
+  const keys = NARRATOR_MEMORY_KEYS.map(
+    (key) => `${key} (${memories[key].label}, ${memories[key].durationDays} days)`,
+  ).join(", ");
+  return [
+    "## 11. plantMemory: something one person will hold against, or for, another",
+    `- from remembers key about to (full names, crew or passengers aboard, never the same person; the dead and anyone ashore are dropped). key: ${keys}. Each is strong enough on its own to put from "at odds with" (or "close to") to on their crew line, which is where the sim shows it: who sits with whom, who they avoid at the table, who they argue with, what they feel about the captain if to is the captain. It is one-way: plant it both ways for both.`,
+    "- lasting: false fades after its days, as the crew's own memories do; true holds for good, a season's grudge or debt, until you plant another memory from the same person about the same person (madeItRight is how a lasting grudge is laid down). The log never shows a feeling: show it on a card in one of their voices.",
+    "",
+    "## 12. fallOut: two people fall out, out loud",
+    `- a and b (full names, crew or passengers aboard) fall out over over (who or what, a few words, at most ${FALL_OUT_OVER_MAX} characters; the log shows "a and b have fallen out over ..."). Both take wronged me over someone about the other and the argument a debate leaves (each argued with the other), so both are at odds with each other on their crew lines, the next card can be the loser's or the first officer's on the bad blood, and the rest is the sim's. Never violent: nobody is hurt; a brawl that hurts is a strike (9) as well.`,
+  ];
+}
+
+/**
+ * §thought-and-reveal-levers: the thirteenth and fourteenth levers, a thought and a fault noticed;
+ * §forced-faults-and-hazards: the fifteenth, a fault now.
+ */
+function thoughtAndFaultLevers(content: ContentBundle): string[] {
+  const label = (key: ThoughtKey) => content.thoughts[key]?.label ?? key;
+  const story = NARRATOR_THOUGHT_KEYS.map((key) => `${key} ("${label(key)}")`).join(", ");
+  const sims = STORY_SIM_THOUGHTS.map((key) => `${key} ("${label(key)}")`).join(", ");
+  return [
+    "## 13. giveThought: something on a person's mind for a while, in their mood",
+    `- who (full name, crew or a passenger aboard) has the thought key: ${story}; or one the sim gives, when the story did it off the sim's own path: ${sims}. ref: who it is about (full name), required for a thought "about {ref}", else empty. It weighs on their mood (the digest's "mood" and "on their mind") and their work speed for its days, as any thought does; it never makes them do anything. Show it: a card in their voice, or the first officer's on how they are.`,
+    "",
+    "## 14. reveal: the crew notice a fault's symptom now",
+    "- machine and faultKey: a fault the machine has now, marked [undiscovered] under Machines (a scheduled one has not happened yet; reveal it once it has). The symptom shows on the panels and the crew member best at engineering aboard notices it (the log says who noticed what, from which machine); the crew then inspect, diagnose and repair it as they would have. Once revealed it is no longer a secret, so this plan's card may name the symptom (never the fault until diagnosed). Use it when the story wants the find now (before the port, in front of the passenger) instead of whenever someone walks past.",
+    "",
+    "## 15. injectFault: a machine develops one of its own faults now",
+    "- machine and faultKey as for scheduleFault (3), the same list; the fault happens the moment your plan is applied instead of in a window, so it is a decided moment, not a gamble on timing. Not on a machine that has or awaits it. Uses one fault from the budget in the digest. The crew still have to notice it (or reveal it next call) and fix it; this call's card may not mention it.",
+  ];
+}
+
+/**
+ * §thought-and-reveal-levers: the sim's own thoughts a story may give off its path (a near miss
+ * the narrator's rock caused, the death the narrator decided).
+ */
+const STORY_SIM_THOUGHTS: readonly ThoughtKey[] = [
+  "nearMiss",
+  "sawCrewHurt",
+  "killedSomeone",
+  "heldTheLine",
+  "ranFromAFight",
+];
+
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
   // Expeditions A2: landing sites are listed under "Sites", not with the ports.
   const ports = Object.values(content.ports)
@@ -328,7 +385,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly ten levers. Anything not listed here does not exist in this game yet: no direct changes to needs, moods, who likes whom or where people are, no messages, no new places. A lever that cannot happen (a dead person struck, a debit the ship cannot pay, an id that does not exist) is dropped and you are told why next call.",
+    "You have exactly fifteen levers. Anything not listed here does not exist in this game yet: no direct changes to needs or where people are, no messages, no new places; moods and who likes whom move only through the memories and thoughts you plant (11-13). A lever that cannot happen (a dead person struck, a debit the ship cannot pay, an id that does not exist) is dropped and you are told why next call.",
   );
   lines.push(
     "The ids below (ports, sites, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -459,5 +516,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(...strikeLever(config));
   lines.push("");
   lines.push(...transactLever(config));
+  lines.push("");
+  lines.push(...memoryLevers(config));
+  lines.push("");
+  lines.push(...thoughtAndFaultLevers(content));
   return lines.join("\n");
 }

@@ -36,7 +36,9 @@ A thought is a closed `ThoughtKey` with a content def (`packages/content/data/th
 `label`, `value`, `durationDays`, `stacks`); the files are the catalogue. `addThought`
 (`core/thoughts.ts`) gives one and emits `thoughtAdded`. A non-stacking def refreshes the held
 thought with the same key and `refId` (extends expiry, keeps value); a stacking one adds another.
-`moodSystem` drops expired thoughts each tick.
+`moodSystem` drops expired thoughts each tick. `worriedAbout`, `grieving`, `shaken` and `heartened`
+are the narrator's to give (`giveThought`, §thought-and-reveal-levers); nothing in the sim raises
+them.
 
 ### Mood and work speed
 

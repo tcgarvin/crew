@@ -134,4 +134,5 @@ rolled against its tier's difficulty (`hazards.difficulty`: easy 3, hard 5, brut
 p = clamp((skill - difficulty + 5) / 10, 0.05, 0.95), else evenly a scrape (one weighted fault on a
 ship machine through the single fault path, D6) or a delay (the leg set back
 `hazards.delaySeconds`, 60, at nominal speed, never past its start). An empty helm is a scrape and
-a delay, unrolled. The stander gets `helmCleanPass` or `helmScrape`; a delay gives none.
+a delay, unrolled. The stander gets `helmCleanPass` or `helmScrape`; a delay gives none. A hazard
+the narrator placed with a decided outcome skips the roll (§forced-faults-and-hazards).

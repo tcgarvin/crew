@@ -23,10 +23,12 @@ import type {
   DirtTier,
   FieldDetection,
   FieldSeverity,
+  ForcedHazardOutcome,
   HazardKind,
   ItemDef,
   MachineEffect,
   MemoryKey,
+  NarratorMemoryKey,
   RockSize,
 } from "./content";
 import type { DecisionsState, NarratorState } from "./decisions";
@@ -100,11 +102,21 @@ export const SCHEMA_VERSION = 13;
 
 /**
  * §memories: one thing `from` remembers about `to`; its opinion is config's (`social.memories`).
+ * Most expire; §memory-levers: a narrator memory planted `lasting` never does, and only another
+ * planted memory from the same `from` about the same `to` clears it.
  */
-export interface SocialMemory {
+export type SocialMemory = TimedMemory | LastingMemory;
+
+export interface TimedMemory {
   key: MemoryKey;
   /** First tick the memory no longer counts; the social system drops it then. */
   expiresAtTick: Tick;
+}
+
+/** §memory-levers: a season's grudge or debt, held until the narrator plants another. */
+export interface LastingMemory {
+  key: NarratorMemoryKey;
+  lasting: true;
 }
 
 /**
@@ -237,6 +249,8 @@ export interface ScheduledHazard {
   difficulty: number;
   fireAtTick: Tick;
   causeCommandId?: CommandId;
+  /** §forced-faults-and-hazards: the outcome the narrator decided; absent, the helm's roll decides. */
+  outcome?: ForcedHazardOutcome;
 }
 
 /**

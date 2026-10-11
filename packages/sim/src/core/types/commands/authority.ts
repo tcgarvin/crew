@@ -17,7 +17,10 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
  * arrival card as the way in unseen; the player still chooses, and the sim runs the fight.
  * D106 (§outcome-levers): the narrator may decide outcomes, so `strike` wounds a person through
  * the one damage entry point (the body rules say whether they go down or die) and `transact` moves
- * the ship's money; each is refused only when it is impossible.
+ * the ship's money; each is refused only when it is impossible. `plantMemory`, `fallOut` and
+ * `giveThought` reach who feels what about whom through the social system's memories and the
+ * thoughts (§memory-levers, §thought-and-reveal-levers), `reveal` lets the crew notice a fault, and
+ * `injectFault` breaks a machine now (§forced-faults-and-hazards).
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
@@ -32,6 +35,11 @@ export const NARRATOR_COMMAND_KINDS = [
   "markUnseen",
   "strike",
   "transact",
+  "plantMemory",
+  "fallOut",
+  "giveThought",
+  "reveal",
+  "injectFault",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
@@ -111,5 +119,10 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "markUnseen",
     "strike",
     "transact",
+    "plantMemory",
+    "fallOut",
+    "giveThought",
+    "reveal",
+    "injectFault",
   ],
 };

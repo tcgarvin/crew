@@ -15,13 +15,17 @@
  * (never below the start of the leg). The stander has a thought about it: `helmCleanPass` for a
  * clean pass, `helmScrape` for a scrape; a delay leaves them none.
  *
+ * §forced-faults-and-hazards (D106): a hazard placed with an `outcome` skips the roll: it fires the
+ * same way, with that outcome (a scrape or a delay, never both, even at an empty helm), the
+ * stander's thought, and `navHazard` marked `forced`.
+ *
  * Owner: W3 of ship life slice 2.
  */
 import { configTicks } from "../../core/clock";
 import { type CommandHandler, NO_TEMP_REFS, causedBy, ok, reject } from "../../core/commands";
 import { allocateId } from "../../core/ids";
 import { addThought } from "../../core/thoughts";
-import { type FaultDef, HAZARD_KINDS } from "../../core/types/content";
+import { FORCED_HAZARD_OUTCOMES, type FaultDef, HAZARD_KINDS } from "../../core/types/content";
 import type { ActorId, LocalKey, MachineId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
@@ -35,9 +39,12 @@ export const HAZARD_DIFFICULTY_MAX = 10;
 
 export const scheduleHazard: CommandHandler<"scheduleHazard", null> = {
   validate(ctx, command) {
-    const { kind, difficulty, windowTicks } = command.payload;
+    const { kind, difficulty, windowTicks, outcome } = command.payload;
     if (!(HAZARD_KINDS as readonly string[]).includes(kind)) {
       return reject("invalidPayload", `scheduleHazard: unknown hazard kind "${kind}"`);
+    }
+    if (outcome !== undefined && !(FORCED_HAZARD_OUTCOMES as readonly string[]).includes(outcome)) {
+      return reject("invalidPayload", `scheduleHazard: unknown outcome "${String(outcome)}"`);
     }
     if (
       !Number.isInteger(difficulty) ||
@@ -87,11 +94,18 @@ export const scheduleHazard: CommandHandler<"scheduleHazard", null> = {
     return ok(null);
   },
   apply(ctx, command) {
-    const { kind, difficulty, windowTicks } = command.payload;
+    const { kind, difficulty, windowTicks, outcome } = command.payload;
     const [earliest, latest] = windowTicks;
     const fireAtTick = ctx.rng.int("failures", ctx.tick + earliest, ctx.tick + latest);
     const id = allocateId(ctx.state, "hazard");
-    ctx.state.hazards.push({ id, kind, difficulty, fireAtTick, causeCommandId: command.id });
+    ctx.state.hazards.push({
+      id,
+      kind,
+      difficulty,
+      fireAtTick,
+      causeCommandId: command.id,
+      ...(outcome === undefined ? {} : { outcome }),
+    });
     // §narrator-lever-budgets: advice, never a refusal; it may go below zero.
     ctx.state.narrator.budget.hazardsRemaining -= 1;
     ctx.emit({
@@ -181,10 +195,13 @@ function fireHazard(ctx: StepCtx, hazard: ScheduledHazard): void {
     throw new Error(`hazard ${hazard.id}: the helm's stander ${standerId} is not in state`);
   }
   const skill = stander?.skills.piloting ?? 0;
+  // §forced-faults-and-hazards: a decided outcome skips the roll (and the draw), helm or no helm.
   const outcome: HazardOutcome =
-    stander === undefined
-      ? "unattended"
-      : hazardOutcome(cleanPassChance(skill, hazard.difficulty), ctx.rng.float("failures"));
+    hazard.outcome !== undefined
+      ? hazard.outcome
+      : stander === undefined
+        ? "unattended"
+        : hazardOutcome(cleanPassChance(skill, hazard.difficulty), ctx.rng.float("failures"));
   const scraped = outcome === "scrape" || outcome === "unattended";
   const delayed = outcome === "delay" || outcome === "unattended";
   const scrapedMachineId = scraped ? scrape(ctx, hazard) : undefined;
@@ -221,6 +238,7 @@ function emitNavHazard(ctx: StepCtx, hazard: ScheduledHazard, result: NavHazardR
       outcome,
       ...(scrapedMachineId === undefined ? {} : { scrapedMachineId }),
       lostSeconds,
+      ...(hazard.outcome === undefined ? {} : { forced: true as const }),
     },
   });
 }

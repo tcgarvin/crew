@@ -1,7 +1,7 @@
 /**
- * §outcome-levers (D106): the translator's impossible-only guards for `strike`, `transact` and
- * `offerJob.payCredits`, the real kernel taking what passes, and the budget as advice in the
- * digest.
+ * §outcome-levers (D106): the translator's impossible-only guards for `strike`, `transact`,
+ * `offerJob.payCredits`, the memory and thought levers, `reveal`, `injectFault` and a decided
+ * hazard, the real kernel taking what passes, and the budget as advice in the digest.
  */
 import {
   type Actor,
@@ -13,6 +13,8 @@ import {
   createRegistry,
   registerBodies,
   registerCommerce,
+  registerEquipmentSystems,
+  registerSocial,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import {
@@ -22,7 +24,12 @@ import {
   buildNarratorPlanSchema,
 } from "./contract";
 import { buildDigest } from "./digest";
-import { FIXTURE_SCENARIO, approachRequest, captainAshoreRequest } from "./fixtures";
+import {
+  FIXTURE_SCENARIO,
+  approachRequest,
+  captainAshoreRequest,
+  quietTooLongRequest,
+} from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { content, emptyPlan } from "./test-support";
 import { translateIntents } from "./translate";
@@ -325,5 +332,249 @@ describe("the budget as advice in the digest (§narrator-lever-budgets)", () => 
     expect(text).toContain("spawns remaining: 2");
     expect(text).toContain("faults remaining: 0 (1 past it)");
     expect(text).toContain("hazards remaining: 0");
+  });
+});
+
+describe("the memory and thought levers in the translator (§memory-levers, §thought-and-reveal-levers)", () => {
+  it("names people by their full names and sends the kernel's plantMemory, fallOut and giveThought", () => {
+    const req = approachRequest(content());
+    const [a, b] = [nthCrew(req.snapshot, 0), nthCrew(req.snapshot, 1)];
+    const result = translateIntents(
+      plan([
+        { kind: "plantMemory", from: a.name, to: b.name, key: "betrayedMe", lasting: true },
+        { kind: "fallOut", a: a.name, b: b.name, over: "Ysolde Maren" },
+        { kind: "giveThought", who: a.name, key: "worriedAbout", ref: b.name },
+        { kind: "giveThought", who: b.name, key: "shaken", ref: "" },
+      ]),
+      ctxOf(req),
+    );
+    expect(result.dropped).toEqual([]);
+    expect(result.commands.map((c) => [c.kind, c.payload])).toEqual([
+      ["plantMemory", { fromActorId: a.id, toActorId: b.id, key: "betrayedMe", lasting: true }],
+      ["fallOut", { aId: a.id, bId: b.id, over: "Ysolde Maren" }],
+      ["giveThought", { actorId: a.id, key: "worriedAbout", refId: b.id }],
+      ["giveThought", { actorId: b.id, key: "shaken" }],
+    ]);
+  });
+
+  it("drops one person twice, nobody, the dead, someone ashore, an unknown thought and a thought about nobody", () => {
+    const req = approachRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const [a, dead, ashore] = [0, 1, 2].map((n) => nthCrew(snapshot, n)) as [Actor, Actor, Actor];
+    const deadActor = snapshot.state.actors[dead.id as ActorId];
+    const ashoreActor = snapshot.state.actors[ashore.id as ActorId];
+    if (deadActor === undefined || ashoreActor === undefined) throw new Error("no actors");
+    deadActor.availability = "dead";
+    ashoreActor.availability = "offShip";
+    const memory = (from: string, to: string) => ({
+      kind: "plantMemory",
+      from,
+      to,
+      key: "madeItRight",
+      lasting: false,
+    });
+    const result = translateIntents(
+      plan([
+        memory(a.name, a.name),
+        memory(a.name, "Nobody Atall"),
+        memory(dead.name, a.name),
+        { kind: "fallOut", a: a.name, b: ashore.name, over: "the cards" },
+        { kind: "fallOut", a: a.name, b: nthCrew(snapshot, 3).name, over: "40 credits" },
+        { kind: "giveThought", who: a.name, key: "elated", ref: "" },
+        { kind: "giveThought", who: a.name, key: "grieving", ref: "" },
+      ]),
+      ctxOf(req, snapshot),
+    );
+    expect(result.commands).toEqual([]);
+    expect(reasons(result)).toEqual([
+      "plantMemory: from and to are the same person",
+      'plantMemory: to: nobody called "Nobody Atall"; use a name the digest lists',
+      `plantMemory: from: ${dead.name} is dead`,
+      `fallOut: b: ${ashore.name} is not aboard`,
+      "fallOut: over: player-facing text states a numeric consequence",
+      'giveThought: unknown thought key "elated"; use one listed under What you can do',
+      "giveThought: grieving is about someone: name them in ref",
+    ]);
+  });
+});
+
+describe("reveal, injectFault and a decided hazard in the translator (§thought-and-reveal-levers, §forced-faults-and-hazards)", () => {
+  const card = (situation: string) => ({
+    kind: "surfaceDecision",
+    title: "A noise in the engine room",
+    speaker: "",
+    situation,
+    left: { label: "Have a look", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    right: { label: "It can wait", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    leftAftermath: "",
+    rightAftermath: "",
+    beatOfThread: "",
+    closesThread: "",
+  });
+  const noise = card("A grinding noise comes up through the deck plates from the pump.");
+
+  function pumpOf(req: NarratorRequest) {
+    const pump = Object.values(req.snapshot.state.machines).find(
+      (m) => m.defId === "machine.coolant_pump",
+    );
+    if (pump === undefined) throw new Error("no pump");
+    return pump;
+  }
+
+  it("reveals an undiscovered fault, and lets this plan's card name its symptom", () => {
+    const req = quietTooLongRequest(content());
+    const pump = pumpOf(req);
+    const reveal = { kind: "reveal", machine: pump.id, faultKey: "worn_bearing" };
+    const hidden = translateIntents(plan([noise]), ctxOf(req));
+    expect(reasons(hidden)[0]).toContain("reveals something nobody aboard knows");
+    const shown = translateIntents(plan([noise, reveal]), ctxOf(req));
+    expect(shown.dropped).toEqual([]);
+    expect(shown.commands.map((c) => c.kind)).toEqual(["surfaceDecision", "reveal"]);
+    expect(shown.commands[1]?.payload).toEqual({ machineId: pump.id, faultKey: "worn_bearing" });
+  });
+
+  it("drops a reveal of a fault the machine does not have, or one already diagnosed", () => {
+    const req = quietTooLongRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const pump = pumpOf(req);
+    const stored = snapshot.state.machines[pump.id];
+    const fault = stored?.faults[0];
+    if (fault === undefined) throw new Error("no fault");
+    fault.diagnosed = true;
+    const engine = Object.values(snapshot.state.machines).find(
+      (m) => m.id !== pump.id && content().machines[m.defId]?.faults.length,
+    );
+    if (engine === undefined) throw new Error("no other machine with faults");
+    const otherFault = content().machines[engine.defId]?.faults[0]?.key ?? "";
+    const result = translateIntents(
+      plan([
+        { kind: "reveal", machine: pump.id, faultKey: "worn_bearing" },
+        { kind: "reveal", machine: engine.id, faultKey: otherFault },
+      ]),
+      ctxOf(req, snapshot),
+    );
+    expect(reasons(result)).toEqual([
+      'reveal: "worn_bearing" is already diagnosed',
+      expect.stringContaining(`reveal: ${engine.id} does not have "${otherFault}" now`),
+    ]);
+  });
+
+  it("injects a fault now, keeps it off this plan's card, and drops one the machine has", () => {
+    const req = quietTooLongRequest(content());
+    const pump = pumpOf(req);
+    const engine = Object.values(req.snapshot.state.machines).find(
+      (m) => m.id !== pump.id && (content().machines[m.defId]?.faults.length ?? 0) > 0,
+    );
+    if (engine === undefined) throw new Error("no other machine with faults");
+    const fault = content().machines[engine.defId]?.faults[0];
+    if (fault === undefined) throw new Error("no fault");
+    const symptom = fault.symptom.key.replace(/_/g, " ");
+    const result = translateIntents(
+      plan([
+        { kind: "injectFault", machine: engine.id, faultKey: fault.key },
+        { kind: "injectFault", machine: pump.id, faultKey: "worn_bearing" },
+        card(`Someone mentions a ${symptom} on the way past.`),
+      ]),
+      ctxOf(req),
+    );
+    expect(result.commands.map((c) => c.kind)).toEqual(["injectFault"]);
+    expect(result.commands[0]?.payload).toEqual({ machineId: engine.id, faultKey: fault.key });
+    expect(reasons(result)).toEqual([
+      `injectFault: ${pump.id} already has or awaits "worn_bearing"`,
+      expect.stringContaining("reveals something nobody aboard knows"),
+    ]);
+  });
+
+  it("sends a hazard's decided outcome, and none when it is empty", () => {
+    const req = quietTooLongRequest(content());
+    const hazard = (outcome: string) => ({
+      kind: "scheduleHazard",
+      hazard: "debrisField",
+      difficulty: "hard",
+      window: "soon",
+      outcome,
+    });
+    const forced = translateIntents(plan([hazard("scrape")]), ctxOf(req));
+    expect(forced.dropped).toEqual([]);
+    expect(forced.commands[0]?.payload).toMatchObject({ outcome: "scrape" });
+    const rolled = translateIntents(plan([hazard("")]), ctxOf(req));
+    expect(rolled.commands[0]?.payload).not.toHaveProperty("outcome");
+  });
+});
+
+describe("the memory and fault levers through the real kernel (§memory-levers, §thought-and-reveal-levers)", () => {
+  function realWorld() {
+    const bundle = content();
+    const registry = createRegistry();
+    registerEquipmentSystems(registry);
+    registerSocial(registry);
+    const kernel = createKernel(registry);
+    const world = kernel.createWorld(FIXTURE_SCENARIO, 7, bundle, {
+      values: bundle.config,
+      hash: bundle.hash,
+    });
+    return { bundle, kernel, world };
+  }
+
+  it("a translated falling-out shows as at odds both ways on the next digest's crew lines, with the argument in recent events", () => {
+    const { bundle, kernel, world } = realWorld();
+    const snapshot = kernel.serialize(world);
+    const [a, b] = [nthCrew(snapshot, 0), nthCrew(snapshot, 1)];
+    const ctx: TranslationCtx = {
+      snapshot,
+      content: bundle,
+      hookTick: world.state.tick,
+      callId: "call-fallout",
+    };
+    const { commands, dropped } = translateIntents(
+      plan([{ kind: "fallOut", a: a.name, b: b.name, over: "the last berth" }]),
+      ctx,
+    );
+    expect(dropped).toEqual([]);
+    for (const command of commands) {
+      expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+    }
+    const { events } = kernel.advance(world, 2);
+    const argument = events.find((e) => e.type === "argument");
+    expect(argument?.payload).toEqual({ aId: a.id, bId: b.id, over: "the last berth" });
+    const after = kernel.serialize(world);
+    const { text } = buildDigest(after, events, EMPTY_NOTES, bundle, approachRequest(bundle).hook);
+    const lineOf = (name: string) => text.split("\n").find((l) => l.startsWith(`- ${name}`)) ?? "";
+    expect(lineOf(a.name)).toMatch(new RegExp(`at odds with: [^;]*${b.name}`));
+    expect(lineOf(b.name)).toMatch(new RegExp(`at odds with: [^;]*${a.name}`));
+    expect(text).toContain("have fallen out over the last berth");
+  });
+
+  it("a translated injectFault then reveal turns an undiscovered fault into a noticed symptom in the digest", () => {
+    const { bundle, kernel, world } = realWorld();
+    const pump = Object.values(world.state.machines).find(
+      (m) => m.defId === "machine.coolant_pump",
+    );
+    if (pump === undefined) throw new Error("no pump");
+    const send = (intents: unknown[], callId: string) => {
+      const ctx: TranslationCtx = {
+        snapshot: kernel.serialize(world),
+        content: bundle,
+        hookTick: world.state.tick,
+        callId,
+      };
+      const { commands, dropped } = translateIntents(plan(intents), ctx);
+      expect(dropped).toEqual([]);
+      for (const command of commands) {
+        expect(kernel.enqueueCommand(world, command).status).toBe("accepted");
+      }
+      return kernel.advance(world, 2).events;
+    };
+    send([{ kind: "injectFault", machine: pump.id, faultKey: "worn_bearing" }], "call-inject");
+    const hook = approachRequest(bundle).hook;
+    const before = buildDigest(kernel.serialize(world), [], EMPTY_NOTES, bundle, hook).text;
+    expect(before).toContain('worn_bearing "Worn bearing" [undiscovered]');
+    const events = send(
+      [{ kind: "reveal", machine: pump.id, faultKey: "worn_bearing" }],
+      "call-reveal",
+    );
+    expect(events.some((e) => e.type === "faultObserved")).toBe(true);
+    const after = buildDigest(kernel.serialize(world), [], EMPTY_NOTES, bundle, hook).text;
+    expect(after).toContain('worn_bearing "Worn bearing" [symptom noticed, not diagnosed]');
   });
 });

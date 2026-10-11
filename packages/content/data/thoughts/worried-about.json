@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "worriedAbout",
+  "label": "worried about {ref}",
+  "value": -0.15,
+  "durationDays": 2,
+  "stacks": false
+}

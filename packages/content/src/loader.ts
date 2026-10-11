@@ -117,8 +117,10 @@ import thoughtDressedDown from "../data/thoughts/dressed-down.json";
 import thoughtEnjoyedMusic from "../data/thoughts/enjoyed-music.json";
 import thoughtGoodCompany from "../data/thoughts/good-company.json";
 import thoughtGotLectured from "../data/thoughts/got-lectured.json";
+import thoughtGrieving from "../data/thoughts/grieving.json";
 import thoughtHatedTheNoise from "../data/thoughts/hated-the-noise.json";
 import thoughtHeardOut from "../data/thoughts/heard-out.json";
+import thoughtHeartened from "../data/thoughts/heartened.json";
 // Expeditions A1 (§11)
 import thoughtHeldTheLine from "../data/thoughts/held-the-line.json";
 import thoughtHelmCleanPass from "../data/thoughts/helm-clean-pass.json";
@@ -133,10 +135,12 @@ import thoughtOwnCabin from "../data/thoughts/own-cabin.json";
 import thoughtRanFromAFight from "../data/thoughts/ran-from-a-fight.json";
 import thoughtSatWithTheCaptain from "../data/thoughts/sat-with-the-captain.json";
 import thoughtSawCrewHurt from "../data/thoughts/saw-crew-hurt.json";
+import thoughtShaken from "../data/thoughts/shaken.json";
 import thoughtSparringBruise from "../data/thoughts/sparring-bruise.json";
 import thoughtSpiritedTalk from "../data/thoughts/spirited-talk.json";
 import thoughtStoodLongWatch from "../data/thoughts/stood-long-watch.json";
 import thoughtWonContest from "../data/thoughts/won-contest.json";
+import thoughtWorriedAbout from "../data/thoughts/worried-about.json";
 import thoughtWounded from "../data/thoughts/wounded.json";
 
 // Off watch (slice 4)
@@ -294,6 +298,10 @@ const THOUGHTS = [
   thoughtHeldTheLine,
   thoughtRanFromAFight,
   thoughtWounded,
+  thoughtWorriedAbout,
+  thoughtGrieving,
+  thoughtShaken,
+  thoughtHeartened,
 ];
 const ACTIVITIES = [
   activityCards,

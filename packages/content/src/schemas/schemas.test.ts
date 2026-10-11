@@ -319,6 +319,10 @@ const thoughts = {
   heldTheLine: thought("heldTheLine", 0.2, false),
   ranFromAFight: thought("ranFromAFight", -0.2, false),
   wounded: thought("wounded", -0.2, false),
+  worriedAbout: thought("worriedAbout", -0.15, false),
+  grieving: thought("grieving", -0.35, false),
+  shaken: thought("shaken", -0.2, false),
+  heartened: thought("heartened", 0.2, false),
 };
 
 const band = { min: 1, max: 3 };

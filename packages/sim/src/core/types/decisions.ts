@@ -190,6 +190,9 @@ export const STRIKE_HOW_MAX = 120;
 /** §money-levers: the longest `memo` and `counterparty` a `transact` may carry. */
 export const TRANSACT_TEXT_MAX = 80;
 
+/** §memory-levers: the longest `over` a `fallOut` may carry (who or what it is over). */
+export const FALL_OUT_OVER_MAX = 80;
+
 /**
  * §requested-call-back: the narrator's standing request for its next call (the `requestCall`
  * command). One at a time; every story call's plan replaces it. It is deleted when the hook that

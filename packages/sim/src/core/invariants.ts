@@ -393,6 +393,8 @@ function socialViolations(state: ReadonlyWorldState): string[] {
       const where = `social.relationships.${from}.${to}`;
       if (!(to in state.actors) || to === from) out.push(`${where} is not another actor`);
       for (const memory of relationship.memories) {
+        // §memory-levers: a lasting memory has no expiry.
+        if ("lasting" in memory) continue;
         if (!Number.isInteger(memory.expiresAtTick) || memory.expiresAtTick <= state.tick) {
           out.push(`${where} holds ${memory.key} expiring at ${memory.expiresAtTick}`);
         }

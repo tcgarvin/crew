@@ -493,3 +493,63 @@ describe("hazard invariants (§debris-fields-and-ion-storms)", () => {
     ]);
   });
 });
+
+describe("a forced hazard outcome (§forced-faults-and-hazards)", () => {
+  function scheduleForced(test: Test, outcome: "clean" | "scrape" | "delay") {
+    const command = cmd({
+      source: "narrator",
+      kind: "scheduleHazard",
+      payload: { kind: "debrisField", difficulty: 5, windowTicks: [2, 2], outcome },
+    });
+    expect(test.kernel.enqueueCommand(test.world, command).status).toBe("accepted");
+    step(test);
+  }
+
+  it("scrapes when the narrator says so, though the roll would have passed clean, and navHazard still fires", () => {
+    const test = freightTestWorld();
+    inTransit(test);
+    const stander = seatCaptain(test);
+    scheduleForced(test, "scrape");
+    expect(test.world.state.hazards[0]?.outcome).toBe("scrape");
+    rigNextRoll(test, 0, 0.05);
+    const { fired } = untilFired(test);
+    expect(fired.payload).toMatchObject({ outcome: "scrape", forced: true, standerId: stander.id });
+    expect(fired.payload.scrapedMachineId).toBeDefined();
+    expect(fired.payload.lostSeconds).toBe(0);
+    expect(stander.thoughts.map((t) => t.key)).toEqual(["helmScrape"]);
+  });
+
+  it("passes clean with nobody at the helm when the narrator decided it, instead of the unattended scrape and delay", () => {
+    const test = freightTestWorld();
+    inTransit(test);
+    scheduleForced(test, "clean");
+    const { fired } = untilFired(test);
+    expect(fired.payload).toMatchObject({ outcome: "clean", forced: true, lostSeconds: 0 });
+    expect(fired.payload.scrapedMachineId).toBeUndefined();
+  });
+
+  it("delays without a scrape", () => {
+    const test = freightTestWorld();
+    inTransit(test);
+    seatCaptain(test);
+    scheduleForced(test, "delay");
+    const { fired } = untilFired(test);
+    expect(fired.payload).toMatchObject({ outcome: "delay", forced: true });
+    expect(fired.payload.lostSeconds).toBeGreaterThan(0);
+    expect(fired.payload.scrapedMachineId).toBeUndefined();
+  });
+
+  it("rejects an outcome the hazard does not have", () => {
+    const test = freightTestWorld();
+    planCourse(test);
+    const result = test.kernel.enqueueCommand(
+      test.world,
+      cmd({
+        source: "narrator",
+        kind: "scheduleHazard",
+        payload: { ...debris, outcome: "unattended" as "clean" },
+      }),
+    );
+    expect(codeOf(result)).toBe("invalidPayload");
+  });
+});

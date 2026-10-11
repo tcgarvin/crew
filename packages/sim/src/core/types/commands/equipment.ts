@@ -1,5 +1,6 @@
 /**
- * Equipment commands (review §D.3 `scheduleFault`).
+ * Equipment commands (review §D.3 `scheduleFault`; D106 `injectFault` and `reveal`,
+ * §forced-faults-and-hazards and §thought-and-reveal-levers).
  */
 import type { LocalKey, MachineId } from "../ids";
 
@@ -16,4 +17,15 @@ export interface EquipmentCommandPayloads {
     readonly faultKey: LocalKey;
     readonly windowTicks: readonly [number, number];
   };
+  /**
+   * D106, narrator and scenario: the machine develops `faultKey`, one of its own catalogued
+   * faults, now, through the one fault path (`applyFault`: the symptom problem opens by the usual
+   * rule). Refused on a machine that has or awaits it. Spends the fault budget (advice).
+   */
+  injectFault: { readonly machineId: MachineId; readonly faultKey: LocalKey };
+  /**
+   * D106: the crew notice the symptom of `faultKey` on `machineId`, an active, undiagnosed fault:
+   * its symptom problem goes public and the best engineer aboard learns of it (`faultObserved`).
+   */
+  reveal: { readonly machineId: MachineId; readonly faultKey: LocalKey };
 }

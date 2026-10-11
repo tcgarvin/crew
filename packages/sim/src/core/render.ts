@@ -612,8 +612,15 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return `${n.actor(event.payload.actorId) ?? "Someone"} took a knock ${n.activityLabel(event.payload.activityId)}`;
     case "treatsBaked":
       return `${n.actor(event.payload.cookId) ?? "Someone"} baked a tray of treats`;
-    case "argument":
-      // The `sessionEnded` line carries it.
+    case "argument": {
+      // A debate's: the `sessionEnded` line carries it. §memory-levers: a falling-out's own line.
+      if (!("over" in event.payload)) return null;
+      const { aId, bId, over } = event.payload;
+      return `${n.actor(aId) ?? "Someone"} and ${n.actor(bId) ?? "someone"} have fallen out over ${over}`;
+    }
+    case "memoryPlanted":
+    case "thoughtGiven":
+      // §memory-levers: a feeling is a card's to show, never the log's.
       return null;
     case "privateTalkCalled": {
       const { captainId, actorId } = event.payload;

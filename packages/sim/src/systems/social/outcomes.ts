@@ -113,6 +113,18 @@ function rememberBoth(ctx: StepCtx, a: ActorId, b: ActorId, key: MemoryKey): voi
   addMemory(ctx, b, a, key);
 }
 
+/**
+ * An argument between `a` and `b`, both ways: the `argued` thought about the other and the `argued`
+ * memory. The caller emits the `argument` event (a debate's first arguing pair; the narrator's
+ * `fallOut`, §memory-levers).
+ */
+export function argue(ctx: StepCtx, a: Actor, b: Actor): void {
+  addThought(ctx, a, "argued", b.id);
+  addThought(ctx, b, "argued", a.id);
+  addMemory(ctx, a.id, b.id, "argued");
+  addMemory(ctx, b.id, a.id, "argued");
+}
+
 // ---------------------------------------------------------------------------------------------
 // Contest
 // ---------------------------------------------------------------------------------------------
@@ -220,9 +232,7 @@ function resolveDebate(
       addThought(ctx, b, "spiritedTalk");
       rememberBoth(ctx, a.id, b.id, "goodTalk");
     } else if (gap >= argueBeyond) {
-      addThought(ctx, a, "argued", b.id);
-      addThought(ctx, b, "argued", a.id);
-      rememberBoth(ctx, a.id, b.id, "argued");
+      argue(ctx, a, b);
       if (!argued)
         emitSim(ctx, "argument", [a.id, b.id], { aId: a.id, bId: b.id, topicId: topic.id });
       argued = true;

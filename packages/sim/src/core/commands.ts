@@ -60,6 +60,14 @@ export interface AppliedCommand {
 export const NO_TEMP_REFS: AppliedCommand = { tempRefs: {} };
 
 /**
+ * A command applies outside any system's run: no cadence, the caches' dirty flags. For a handler
+ * that calls a system's own step helpers (`applyDamage`, `addMemory`, `applyFault`).
+ */
+export function stepCtxOfApply(ctx: ApplyCtx): StepCtx {
+  return { ...ctx, elapsedTicks: 0, dirty: ctx.caches.dirty };
+}
+
+/**
  * One command kind's behaviour. `validate` is pure and returns a plan or a rejection; `apply`
  * executes a plan produced by `validate` against the same state and must not fail.
  */

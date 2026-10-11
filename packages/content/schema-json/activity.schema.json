@@ -204,7 +204,11 @@
             "sawCrewHurt",
             "heldTheLine",
             "ranFromAFight",
-            "wounded"
+            "wounded",
+            "worriedAbout",
+            "grieving",
+            "shaken",
+            "heartened"
           ]
         },
         "lose": {
@@ -241,7 +245,11 @@
             "sawCrewHurt",
             "heldTheLine",
             "ranFromAFight",
-            "wounded"
+            "wounded",
+            "worriedAbout",
+            "grieving",
+            "shaken",
+            "heartened"
           ]
         },
         "joined": {
@@ -278,7 +286,11 @@
             "sawCrewHurt",
             "heldTheLine",
             "ranFromAFight",
-            "wounded"
+            "wounded",
+            "worriedAbout",
+            "grieving",
+            "shaken",
+            "heartened"
           ]
         },
         "listened": {
@@ -315,7 +327,11 @@
             "sawCrewHurt",
             "heldTheLine",
             "ranFromAFight",
-            "wounded"
+            "wounded",
+            "worriedAbout",
+            "grieving",
+            "shaken",
+            "heartened"
           ]
         },
         "listenedDislike": {
@@ -352,7 +368,11 @@
             "sawCrewHurt",
             "heldTheLine",
             "ranFromAFight",
-            "wounded"
+            "wounded",
+            "worriedAbout",
+            "grieving",
+            "shaken",
+            "heartened"
           ]
         }
       },
@@ -378,7 +398,11 @@
             "talkedItThrough",
             "foughtBeside",
             "carriedMeOut",
-            "leftMeBehind"
+            "leftMeBehind",
+            "betrayedMe",
+            "savedMyLife",
+            "wrongedOverSomeone",
+            "madeItRight"
           ]
         },
         "loserToWinner": {
@@ -398,7 +422,11 @@
             "talkedItThrough",
             "foughtBeside",
             "carriedMeOut",
-            "leftMeBehind"
+            "leftMeBehind",
+            "betrayedMe",
+            "savedMyLife",
+            "wrongedOverSomeone",
+            "madeItRight"
           ]
         }
       },

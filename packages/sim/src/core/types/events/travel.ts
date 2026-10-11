@@ -111,6 +111,8 @@ export interface TravelEventPayloads {
     readonly outcome: "clean" | "scrape" | "delay" | "unattended";
     readonly scrapedMachineId?: MachineId;
     readonly lostSeconds: number;
+    /** §forced-faults-and-hazards: the narrator decided the outcome; nothing was rolled. */
+    readonly forced?: true;
   };
   /**
    * §debris-fields-and-ion-storms: hazard `hazardId` never fired and is dropped with its leg,

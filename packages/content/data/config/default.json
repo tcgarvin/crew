@@ -394,6 +394,30 @@
         "opinion": -3,
         "durationDays": 14,
         "stackLimit": 1
+      },
+      "betrayedMe": {
+        "label": "betrayed me",
+        "opinion": -5,
+        "durationDays": 14,
+        "stackLimit": 1
+      },
+      "savedMyLife": {
+        "label": "saved my life",
+        "opinion": 5,
+        "durationDays": 14,
+        "stackLimit": 1
+      },
+      "wrongedOverSomeone": {
+        "label": "wronged me over someone",
+        "opinion": -4,
+        "durationDays": 10,
+        "stackLimit": 1
+      },
+      "madeItRight": {
+        "label": "made it right",
+        "opinion": 3,
+        "durationDays": 10,
+        "stackLimit": 1
       }
     },
     "affinityRange": 10,

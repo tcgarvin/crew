@@ -19,11 +19,13 @@ import {
   type ContentBundle,
   type DecisionId,
   type DeepReadonly,
+  FALL_OUT_OVER_MAX,
   type ImpactTarget,
   type ItemDef,
   type ItemDefId,
   type Job,
   type JobDraft,
+  type LocalKey,
   type MachineId,
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
@@ -36,6 +38,7 @@ import {
   type ScriptedImpactDraft,
   TRANSACT_TEXT_MAX,
   type TempRef,
+  type ThoughtKey,
   basePriceFor,
   configTicks,
   errandPay,
@@ -79,6 +82,7 @@ import {
   faultDiscovery,
   faultWindowSeconds,
   faultWindowTicks,
+  isArmsLocker,
   livePassage,
   machineName,
   offerPortNow,
@@ -138,7 +142,11 @@ export function clipChars(text: string, max: number): string {
  * faults nobody has noticed, and of scheduled faults. A substring heuristic, deliberately
  * conservative; the prompt carries the real instruction.
  */
-export function secretPhrases(snapshot: Snapshot, content: ContentBundle): readonly string[] {
+export function secretPhrases(
+  snapshot: Snapshot,
+  content: ContentBundle,
+  planned: PlannedFaults = NO_PLANNED_FAULTS,
+): readonly string[] {
   const state = snapshot.state;
   const phrases = new Set<string>();
   for (const machine of Object.values(state.machines)) {
@@ -150,12 +158,29 @@ export function secretPhrases(snapshot: Snapshot, content: ContentBundle): reado
       phrases.add(fault.symptom.key.replace(/_/g, " ").toLowerCase());
     };
     for (const fault of machine.faults) {
+      if (planned.revealed.has(faultRef(machine.id, fault.faultKey))) continue;
       if (faultDiscovery(state, machine, fault) === "undiscovered") add(fault.faultKey);
     }
     for (const scheduled of machine.scheduledFaults) add(scheduled.faultKey);
+    for (const injected of planned.injected) {
+      if (injected.startsWith(`${machine.id}/`)) add(injected.slice(machine.id.length + 1));
+    }
   }
   return [...phrases].sort();
 }
+
+/**
+ * §thought-and-reveal-levers: the faults this plan reveals (no longer secret on its cards) and
+ * injects (secret from the start), as `machineId/faultKey`.
+ */
+export interface PlannedFaults {
+  readonly revealed: ReadonlySet<string>;
+  readonly injected: readonly string[];
+}
+
+const NO_PLANNED_FAULTS: PlannedFaults = { revealed: new Set(), injected: [] };
+
+const faultRef = (machineId: string, faultKey: string) => `${machineId}/${faultKey}`;
 
 /**
  * Why player-facing text cannot go out (empty, a numeric consequence, a secret), or undefined.
@@ -600,6 +625,8 @@ function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<Na
       kind: intent.hazard,
       difficulty: config.hazards.difficulty[intent.difficulty],
       windowTicks: [windowTicks[0], windowTicks[1]],
+      // §forced-faults-and-hazards: a decided outcome skips the helm's roll.
+      ...(intent.outcome === "" ? {} : { outcome: intent.outcome }),
     },
   });
 }
@@ -838,6 +865,149 @@ function translateTransact(env: Env, intent: Intent<"transact">): Outcome<Narrat
   }
   env.tally.money += amount;
   return ok({ kind: "transact", payload: { amount, memo, counterparty } });
+}
+
+/**
+ * §memory-levers: someone a memory or a thought can be about or held by: a living crew member or
+ * passenger aboard, by full name or id.
+ */
+function aboardPerson(env: Env, written: string): Outcome<DeepReadonly<Actor>> {
+  const person = personByName(env, written);
+  if (!person.ok) return person;
+  const actor = person.value;
+  if (actor.availability === "dead") return no(`${actor.name} is dead`);
+  if (!actor.crew) return no(`${actor.name} is not crew or a passenger; only they remember`);
+  if (actor.availability === "offShip") return no(`${actor.name} is not aboard`);
+  return ok(actor);
+}
+
+/** §memory-levers: two different people aboard, by the roles the intent names them in. */
+function aboardPair(
+  env: Env,
+  a: string,
+  b: string,
+  roles: readonly [string, string],
+): Outcome<readonly [DeepReadonly<Actor>, DeepReadonly<Actor>]> {
+  const first = aboardPerson(env, a);
+  if (!first.ok) return no(`${roles[0]}: ${first.reason}`);
+  const second = aboardPerson(env, b);
+  if (!second.ok) return no(`${roles[1]}: ${second.reason}`);
+  if (first.value.id === second.value.id) {
+    return no(`${roles[0]} and ${roles[1]} are the same person`);
+  }
+  return ok([first.value, second.value] as const);
+}
+
+/**
+ * §memory-levers: `plantMemory`, a story-sized memory in what `from` holds about `to`. Guards are
+ * the impossible only: two different people, alive and aboard; the key is the schema's.
+ */
+function translatePlantMemory(env: Env, intent: Intent<"plantMemory">): Outcome<NarratorDraft> {
+  const pair = aboardPair(env, intent.from, intent.to, ["from", "to"]);
+  if (!pair.ok) return pair;
+  const [from, to] = pair.value;
+  return ok({
+    kind: "plantMemory",
+    payload: { fromActorId: from.id, toActorId: to.id, key: intent.key, lasting: intent.lasting },
+  });
+}
+
+/**
+ * §memory-levers: `fallOut`, a falling-out between two people aboard; `over` is the log's words, so
+ * it takes the player-facing text checks.
+ */
+function translateFallOut(env: Env, intent: Intent<"fallOut">): Outcome<NarratorDraft> {
+  const pair = aboardPair(env, intent.a, intent.b, ["a", "b"]);
+  if (!pair.ok) return pair;
+  const [a, b] = pair.value;
+  const over = clipChars(intent.over, FALL_OUT_OVER_MAX);
+  const text = textProblem(over, env.secrets);
+  if (text !== undefined) return no(`over: ${text}`);
+  return ok({ kind: "fallOut", payload: { aId: a.id, bId: b.id, over } });
+}
+
+/**
+ * §thought-and-reveal-levers: `giveThought`, a thought from the content's set. A thought whose
+ * label names someone (`{ref}`) needs `ref`; `ref` is anyone the digest names.
+ */
+function translateGiveThought(env: Env, intent: Intent<"giveThought">): Outcome<NarratorDraft> {
+  const who = aboardPerson(env, intent.who);
+  if (!who.ok) return no(`who: ${who.reason}`);
+  const key = intent.key.trim();
+  const def = env.content.thoughts[key as ThoughtKey];
+  if (def === undefined) return no(unknownId("thought key", key));
+  let refId: ActorId | undefined;
+  if (intent.ref.trim() !== "") {
+    const ref = personByName(env, intent.ref);
+    if (!ref.ok) return no(`ref: ${ref.reason}`);
+    refId = ref.value.id;
+  } else if (def.label.includes("{ref}")) {
+    return no(`${key} is about someone: name them in ref`);
+  }
+  return ok({
+    kind: "giveThought",
+    payload: { actorId: who.value.id, key: def.key, ...(refId === undefined ? {} : { refId }) },
+  });
+}
+
+/** A machine aboard the plan names, and the fault in its catalogue, or why not. */
+function catalogueFault(
+  env: Pick<Env, "snapshot" | "content">,
+  intent: { readonly machine: string; readonly faultKey: string },
+): Outcome<{ machineId: MachineId; faultKey: LocalKey }> {
+  const machine = env.snapshot.state.machines[intent.machine as MachineId];
+  if (machine === undefined || isArmsLocker(env.content, machine)) {
+    return no(`machine: ${unknownId("machine", intent.machine)}`);
+  }
+  const def = env.content.machines[machine.defId];
+  if (def === undefined || !def.faults.some((f) => f.key === intent.faultKey)) {
+    return no(
+      `machine ${intent.machine} has no fault "${intent.faultKey}"; use a faultKey listed under it in What you can do`,
+    );
+  }
+  return ok({ machineId: machine.id, faultKey: intent.faultKey as LocalKey });
+}
+
+/**
+ * §forced-faults-and-hazards: `injectFault`, a catalogued fault now. Impossible: no such machine or
+ * fault, or the machine already has or awaits it. Spends the fault budget (advice).
+ */
+function translateInjectFault(env: Env, intent: Intent<"injectFault">): Outcome<NarratorDraft> {
+  const found = catalogueFault(env, intent);
+  if (!found.ok) return found;
+  const machine = env.snapshot.state.machines[found.value.machineId];
+  if (
+    machine?.faults.some((f) => f.faultKey === intent.faultKey) === true ||
+    machine?.scheduledFaults.some((f) => f.faultKey === intent.faultKey) === true
+  ) {
+    return no(`${intent.machine} already has or awaits "${intent.faultKey}"`);
+  }
+  return ok({ kind: "injectFault", payload: found.value });
+}
+
+/**
+ * §thought-and-reveal-levers: why `reveal` cannot let the crew notice this fault, or the command: no
+ * such machine or fault, the machine does not have it now (a fault injected in this plan is there
+ * only once applied: reveal it next call), it is diagnosed, or the crew already noticed it.
+ */
+function revealOutcome(
+  env: Pick<Env, "snapshot" | "content">,
+  intent: Intent<"reveal">,
+): Outcome<NarratorDraft> {
+  const found = catalogueFault(env, intent);
+  if (!found.ok) return found;
+  const state = env.snapshot.state;
+  const machine = state.machines[found.value.machineId];
+  const fault = machine?.faults.find((f) => f.faultKey === intent.faultKey);
+  if (machine === undefined || fault === undefined) {
+    return no(
+      `${intent.machine} does not have "${intent.faultKey}" now; a fault scheduled or injected this call can be revealed once it has happened`,
+    );
+  }
+  const discovery = faultDiscovery(state, machine, fault);
+  if (discovery === "diagnosed") return no(`"${intent.faultKey}" is already diagnosed`);
+  if (discovery === "symptomNoticed") return no(`the crew already noticed "${intent.faultKey}"`);
+  return ok({ kind: "reveal", payload: found.value });
 }
 
 type Side = Intent<"surfaceDecision">["left"];
@@ -1165,6 +1335,16 @@ function translateByKind(env: Env, intent: NarratorIntent): Outcome<NarratorDraf
       return translateStrike(env, intent);
     case "transact":
       return translateTransact(env, intent);
+    case "plantMemory":
+      return translatePlantMemory(env, intent);
+    case "fallOut":
+      return translateFallOut(env, intent);
+    case "giveThought":
+      return translateGiveThought(env, intent);
+    case "reveal":
+      return revealOutcome(env, intent);
+    case "injectFault":
+      return translateInjectFault(env, intent);
   }
 }
 
@@ -1332,6 +1512,31 @@ function translateCallBack(
 }
 
 /**
+ * §thought-and-reveal-levers: what this plan's `reveal`s and `injectFault`s will do to what the
+ * crew know, for this call's text checks: a fault the plan reveals may be on its card (what you
+ * decide, you show), one it injects may not.
+ */
+function plannedFaults(
+  snapshot: Snapshot,
+  content: ContentBundle,
+  rawIntents: readonly unknown[],
+  intentSchema: ReturnType<typeof buildNarratorPlanSchema>["shape"]["intents"]["element"],
+): PlannedFaults {
+  const revealed = new Set<string>();
+  const injected: string[] = [];
+  for (const raw of rawIntents) {
+    const parsed = intentSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const intent = parsed.data;
+    if (intent.kind === "reveal" && revealOutcome({ snapshot, content }, intent).ok) {
+      revealed.add(faultRef(intent.machine, intent.faultKey));
+    }
+    if (intent.kind === "injectFault") injected.push(faultRef(intent.machine, intent.faultKey));
+  }
+  return { revealed, injected };
+}
+
+/**
  * Translate a plan. The plan is treated as untrusted even though it passed the schema: each
  * intent is re-parsed against the intent schema, so a hand-built or partially valid plan cannot
  * smuggle through an unknown kind or an extra field; every id is then checked against the
@@ -1344,11 +1549,16 @@ export const translateIntents: TranslateIntents = (
   const snapshot = ctx.snapshot;
   const hook = ctx.hook ?? snapshot.state.narrator.pendingHook;
   const intentSchema = buildNarratorPlanSchema().shape.intents.element;
+  const rawIntents: readonly unknown[] = Array.isArray(plan.intents) ? plan.intents : [];
   const env: Env = {
     snapshot,
     content: ctx.content,
     hook,
-    secrets: secretPhrases(snapshot, ctx.content),
+    secrets: secretPhrases(
+      snapshot,
+      ctx.content,
+      plannedFaults(snapshot, ctx.content, rawIntents, intentSchema),
+    ),
     threads: (ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
     closedThreads: (ctx.closedThreads ?? []).map((t) => t.trim().toLowerCase()),
     captainName: captainName(snapshot, ctx.content),
@@ -1366,7 +1576,6 @@ export const translateIntents: TranslateIntents = (
   };
   const commands: NarratorCommand[] = [];
   const dropped: DroppedIntent[] = [];
-  const rawIntents: readonly unknown[] = Array.isArray(plan.intents) ? plan.intents : [];
 
   rawIntents.forEach((raw, intentIndex) => {
     const kind = kindOf(raw);
