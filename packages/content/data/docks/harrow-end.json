@@ -1,0 +1,277 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.harrow_end",
+  "portId": "port.harrow_end",
+  "name": "Harrow End, the silo yard",
+  "kind": "site",
+  "palette": {
+    "floor": "#a8975f",
+    "wall": "#6a5a48",
+    "accent": "#d4a83c",
+    "sky": "#d3d99a"
+  },
+  "width": 44,
+  "height": 30,
+  "rows": [
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "............................................",
+    "............................b....b..........",
+    ".................b.b........b....b..........",
+    "...##.....##..####.####.....b....b..........",
+    "..####...####.#.......#.....................",
+    "..####...####.#.......#....#######..........",
+    "...##.....##..#.......#.....................",
+    "..............####.####.....................",
+    "............................................",
+    "............................................"
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "b": "cover"
+  },
+  "berth": {
+    "origin": {
+      "x": 4,
+      "y": 0
+    },
+    "sizeClass": "M"
+  },
+  "posts": [
+    {
+      "key": "target",
+      "kind": "target",
+      "name": "the weigh-house scale",
+      "tile": {
+        "x": 16,
+        "y": 25
+      },
+      "facing": "e"
+    },
+    {
+      "key": "loot",
+      "kind": "loot",
+      "name": "the seed container doors",
+      "tile": {
+        "x": 23,
+        "y": 25
+      },
+      "facing": "e"
+    },
+    {
+      "key": "bale_row",
+      "kind": "guard",
+      "name": "behind the bale row",
+      "tile": {
+        "x": 27,
+        "y": 22
+      },
+      "facing": "e"
+    },
+    {
+      "key": "weigh_door",
+      "kind": "guard",
+      "name": "inside the weigh-house door",
+      "tile": {
+        "x": 18,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "back_door",
+      "kind": "guard",
+      "name": "by the back door",
+      "tile": {
+        "x": 18,
+        "y": 26
+      },
+      "facing": "s"
+    },
+    {
+      "key": "gleaning",
+      "kind": "bystander",
+      "name": "the spilt grain",
+      "tile": {
+        "x": 31,
+        "y": 27
+      },
+      "facing": "n"
+    },
+    {
+      "key": "farm_track",
+      "kind": "exit",
+      "name": "the farm track",
+      "tile": {
+        "x": 0,
+        "y": 28
+      },
+      "facing": "w"
+    },
+    {
+      "key": "back_lane",
+      "kind": "flank",
+      "name": "the back lane",
+      "tile": {
+        "x": 18,
+        "y": 28
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [],
+  "props": [
+    {
+      "key": "seed_container",
+      "kind": "container",
+      "rect": {
+        "x": 24,
+        "y": 25,
+        "w": 3,
+        "h": 2
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "grain_auger",
+      "kind": "conveyor",
+      "rect": {
+        "x": 5,
+        "y": 22,
+        "w": 5,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "water_drums",
+      "kind": "barrels",
+      "rect": {
+        "x": 36,
+        "y": 25,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    },
+    {
+      "key": "lamp_weigh_house",
+      "kind": "lamp",
+      "rect": {
+        "x": 21,
+        "y": 22,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    },
+    {
+      "key": "lamp_landing",
+      "kind": "lamp",
+      "rect": {
+        "x": 41,
+        "y": 21,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    }
+  ],
+  "foreground": [
+    {
+      "kind": "awning",
+      "rect": {
+        "x": 14,
+        "y": 23,
+        "w": 9,
+        "h": 1
+      }
+    }
+  ],
+  "ambience": "Chaff blowing off the stubble, a silo hatch banging in the wind, and somebody's radio playing low inside the weigh-house.",
+  "grime": 0.7,
+  "airborneDust": 0.5,
+  "noticeRadius": 5,
+  "defaultCast": [
+    {
+      "name": "Teodor Lusk",
+      "role": "co-op steward gone to ground",
+      "look": "soft hands, a good coat, keeps looking at the sky",
+      "part": "target",
+      "arms": "none",
+      "resolve": "steady",
+      "tie": "bound",
+      "wants": "out",
+      "post": "target"
+    },
+    {
+      "name": "Rhee Castellan",
+      "role": "the buyer's hired gun",
+      "look": "off-world boots, a long blaster, chewing something",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "steady",
+      "tie": "paid",
+      "wants": "money",
+      "post": "bale_row"
+    },
+    {
+      "name": "Mattie Lusk",
+      "role": "the steward's daughter",
+      "look": "his coat on her shoulders, a blaster held like a spade",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "shaky",
+      "tie": "devoted",
+      "wants": "out",
+      "post": "weigh_door"
+    },
+    {
+      "name": "Amos Wray",
+      "role": "the old silo keeper",
+      "look": "a flail over one shoulder, deaf on that side",
+      "part": "guard",
+      "arms": "melee",
+      "resolve": "shaky",
+      "tie": "bound",
+      "wants": "nothing",
+      "post": "back_door"
+    },
+    {
+      "name": "Wenna Brae",
+      "role": "gleaner",
+      "look": "a sack half full of spilt seed",
+      "part": "bystander",
+      "arms": "none",
+      "resolve": "shaky",
+      "tie": "paid",
+      "wants": "nothing",
+      "post": "gleaning"
+    }
+  ]
+}
