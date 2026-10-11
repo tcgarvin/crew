@@ -1,9 +1,12 @@
 # Expeditions: Implementation Plan
 
 Status: phase A1 landed on `expeditions-a1`, 2026-10-10; what was built is in
-`docs/spec/expeditions.md` and D103, and where it differs from this plan the spec wins. Design and
+`docs/spec/expeditions.md` and D103, and where it differs from this plan the spec wins. Phase A2 is
+planned below as tonight's slice (2026-10-11, "Phase A2 (tonight's slice)"): one errand end to
+end, with the design's narrator range (`stageSite`, parley, scripted turns, the approach effect)
+deferred to a second A2 pass the owner rules on in the morning. Design and
 rationale: `docs/design/expeditions.md` (section references below are to that file unless another
-doc is named). Phases A2, B, C and D are planned here when the one before each lands, as
+doc is named). Phases B, C and D are planned here when the one before each lands, as
 `docs/design/ship-life-plan.md` did its slices. A1 ends with all four checks green
 (`pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test`), `crew content validate` clean, the
 `crew expeditions` numbers recorded, a phone playtest, the owner's rulings as the next
@@ -761,3 +764,367 @@ The tuning loop (lead, integration step 6), one knob at a time, re-running the i
 - **Spec, existing files.** Save schema 13 and the `crew expeditions` instrument with its CI
   bounds in `architecture.md`; the site look and the fight on the phone in `client.md`; the
   narrator's blindness to sites until A2 (call 4) in `narrator-story.md`.
+
+## Phase A2 (tonight's slice): one errand, end to end
+
+### Scope
+
+A real player reaches the fight and comes home paid, with nothing the owner has not ruled on:
+
+- `Job.errand` (§6): `fetchPerson` first, `fetchItem` as W1's stretch; `wants` accepted for both.
+  The narrator offers it through `offerJob`'s new errand fields and sees every authored site in a
+  "Sites" section of the capability block; pay is a new `commerce.priceBands.errand` band over the
+  path to the site and back.
+- Known sites on the graph (§3.2): a site is reachable while an errand names it and while the ship
+  is at it. Accepting sets course to the site; a far near-port is a voyage (D49).
+- Landing and lift-off at a site (§3.3, §3.5): no fee, no staging call, no `captainAshore`
+  (already so), the headline says "Setting down at" and "Lifting off from".
+- The site dressed from the map's `defaultCast` with the errand's target name on the target entry.
+  The expedition starts itself the tick the ship is docked there, with no plan.
+- Two kernel policy cards dressed by the narrator on the existing `policyDecision` hook
+  (§policy-decision-cards): the **arrival card** (two plans from the menu, the default pair when
+  both are available, brought by the first officer) and the **turn card**, once a fight, at the
+  first side to break or the first party member down ("Press on" / "Pull back to the ship").
+- Resolution settles the errand: a target taken alive boards as a passenger with their own name
+  (the captive, §6), a target dead counts as brought dead when the job wanted that, anything else
+  fails the job with a new `jobFailed` event; the sim sets the voyage home; the captive walks off at
+  the return port and the job is paid as a passage is (`contractCompleted`, the closing card, D54).
+- Two sites: the Boathouse (A1, off Tern's Rest) and **the Meridian site**, authored tonight by a
+  content agent in parallel (a planet pad, `nearPortId: port.green_meridian`, one route of about 20,
+  its own port and dock ids under `packages/content/data/{ports,docks}/`), so a first errand from
+  the Hub is 65 of transit away and not 420. Every stream works for any site: nothing names
+  `port.boathouse` outside the Boathouse's own tests and the instrument's default.
+- A deep episode test on the null narrator, the spec sections, a prompt bump with one live run.
+
+### Non-goals (deferred to the morning's ruling), each with why
+
+- **`stageSite`, cast tiers, the target's stance, scripted turns (§5.2, §9.2, §9.3):** a new entry
+  in `NARRATOR_COMMAND_KINDS` is a lever, and D6 says adding one is the owner's decision; D103
+  records only §13's rulings 1–4. The default cast is the design's own fallback, so the episode is
+  whole without it.
+- **Parley (§9.1) and the approach effect (§9.4):** parley is a new player command that spends the
+  ship's money (D6 names money); the approach effect is a new card-side effect in the narrator
+  schema. Both are range, not the spine.
+- **The narrator choosing which two plans (§8.4, design call 12):** needs `expeditionArrived` as a
+  story hook (design call 15, with a D43 exception for its fallback). Tonight the sim writes the
+  pair and the narrator voices it; the story hook can replace the policy card later without a state
+  change (see call 4).
+- **The body item and `sawTheBody` (§6):** a `fetchPerson` brought dead pays with no corpse in the
+  hold; the item belongs with phase B's medicine.
+- **The intercom `fightSeen` fact, a cast member walking to the ramp (§3.4):** colour, not spine.
+- **`cameWillingly` as an outcome:** it is parley's.
+- **Port `heat`, `rampsUp`, a station site:** C.
+
+### Calls made against the code (A2)
+
+1. **Known sites include offered errands.** `surfaceOfferCard`'s accept side runs `acceptContract`
+   then `setCourse`, and `resolveDecision` validates both before applying either, so `setCourse`
+   sees the job still `offered`. `knownSites(state)` (`core/places.ts`) is therefore the `siteId` of
+   every errand whose status is `offered`, `accepted` or `inTransit`, plus the port the ship is
+   docked at or heading for when it is a site. An offer that expires or is declined drops its site
+   again; nothing can be under way to it then.
+2. **One graph function, two modes.** `portGraph(content, state, mode)` in `core/places.ts` returns
+   a ports record whose near ports carry an extra route to each site: `"known"` adds the known
+   sites, `"all"` every authored site. Every caller that today passes `content.ports` to
+   `shortestPath` or `nextHop`, and both places that read `fromPort.routes` directly (`findRoute` in
+   `systems/travel/travel.ts`: `beginDeparture` and `advanceStage` to `transit`), go through the
+   `"known"` graph; without that the leg to a site has `routeDistance 0` and the ship arrives the
+   tick it leaves. Price checks (`bandRoute` in `systems/commerce/jobs.ts`, the narrator's
+   `pathBetween`) use `"all"`, since the site is not known until the offer exists.
+3. **The accept side sets course to the site.** `surfaceOfferCard` (`systems/commerce/jobs.ts`)
+   writes `setCourse { destinationPortId: job.errand.siteId }` for an errand; `toPortId` is the
+   return port and equals `fromPortId`, which `setCourse` would refuse as "must differ".
+4. **The arrival and turn cards are policy decisions, not story hooks.** `queuePolicyDecision`
+   (`core/decisions.ts`) with prompt keys `expedition.arrival` and `expedition.turn`; the record
+   carries no `jobId` (a decision with one never gets its `policyDecision` hook,
+   `headNeedingNarration`) and names the job in `prompt.params`. The world halts on the hook before
+   the card shows, so the fight holds while the narrator writes, and a failed call follows D43's
+   retry and error panel instead of the design's template exception. Reversal later: an
+   `expeditionArrived` story hook whose card carries `adoptPlan` sides; `Expedition.cards` keeps
+   the decision ids either way.
+5. **`settleErrand` runs before `castAfter`, and the captive loses `combatant`.** In
+   `systems/expedition/expedition.ts` `resolve()`, `settleErrand(fight, outcome)` is called after
+   `afterTheFight` and before the party/cast loop. It deletes the taken target from `state.actors`
+   and spawns the captive as a fresh `crew.passenger` actor (no `combatant`), because `castAfter`
+   removes a taken target and `aftermath()` removes every actor that still has a `combatant` once
+   the expedition is `resolved`.
+6. **One pay-band function.** `errandPay(config, distance, tier)` lives in `packages/sim`
+   (`systems/commerce/errand.ts`, exported from `@crew/sim`) and both `checkErrandBand` (kernel)
+   and the translator (`payFor`'s errand case) call it; `translate.test.ts` pins that the kernel
+   accepts the translator's pay for each tier on the real content, as the passenger fare is pinned.
+7. **Schema-size discipline.** `plan.test.ts` holds the plan schema to 8 KiB. The five new
+   `offerJob` fields get descriptions of at most eight words each, and the capability block (not the
+   schema) explains them; if the budget still trips, `errandKind` and `wants` become two-value enums
+   plus `""` and the descriptions go.
+8. **Lift-off from a site must not reach the port's store.** `castOffDock` (`systems/travel/
+   travel.ts`) computes `portStoreLocation(ctx.defs.port(portId))` unconditionally and that throws
+   for a port with no external store, so every lift-off would crash at the end of `undocking`. At a
+   site `clearDock` is given no store: anything left on the floor (a dropped blaster, a dead cast
+   member's items are already gone) is deleted with `leftOnDock` as its event. Dead crew on the
+   floor are brought aboard by the existing straggler rule (`bringAboard`); the fiction is thin and
+   the spec says so.
+9. **No staging call at a site.** `stageDockIfDue` returns at once when `toPortId` is a site, and
+   `stagingAnswered` answers true for one (both in `systems/travel/staging.ts`); with only the
+   first, transit holds at the end of the route for ever. The site is dressed with the (empty) floor
+   set by `dressDockAlongside` as any dock is; the cast are the expedition's, not locals.
+10. **Config arrays and old saves.** `jobFailed` joins `narrator.hookOnEvents` and
+    `expeditionResolved` joins it too; config filling adds missing keys but never merges arrays
+    (§notable-event-hook), so games saved before tonight get neither hook, while
+    `priceBands.errand` fills. No schema bump: `Job.errand`, `Expedition.jobId` and
+    `Expedition.cards` are optional.
+11. **A captive put off is a failed job already.** `endPassageEarly` (`systems/commerce/passage.ts`)
+    sets `job.status = "failed"` for any passage ended early, so an `endPassage` side on a card
+    about the captive fails the errand with no new code; W1 pins it and `settleErrand` writes
+    `errand.outcome: "failed"` when the passage ends other than `completed`.
+12. **The expedition starts itself.** `startExpedition(ctx, plan)` (`systems/expedition/start.ts`,
+    extracted from `command.ts`'s apply minus the dock swap) is called by `scenarioStartExpedition`
+    as before and by the expedition system on the first tick the ship is `docked` at a site with
+    its site map alongside and an `inTransit` errand naming it whose `outcome` is unset
+    (`landedForErrand`). `Expedition.jobId` is set only on that path, so the A1 instrument and
+    every A1 test are unchanged.
+13. **The cast is the map's, with the errand's name on the target.** `castFor(job, site)`
+    (`start.ts`) copies `site.defaultCast` and sets the one `target` entry's `name` to
+    `errand.targetName`; for `fetchItem` the cast is untouched and the item is spawned at the `loot`
+    post. Caps and posts are the same checks the command runs.
+14. **The null narrator never offers an errand** (its `captainAshore` answer stays the port's
+    `jobTemplates`), so the default offline game is unchanged; the deep episode test and the
+    fixtures make the offer with a scenario `offerJob` carrying `errand`. The null narrator still
+    dresses the two new policy cards with their templates.
+15. **The turn card is once a fight and only in the fight.** Queued the tick of the first
+    `combatantBroke` of either side or the first party member `down` or `dead`, while
+    `phase === "fight"` and neither `objectiveTick` nor `withdrawTick` is set; never again that
+    expedition. `withdrawWhen` still fires on its own.
+
+### Gate (one agent, serial)
+
+All four checks green, `crew content validate` clean, every existing test literal fixed. Stubs are
+named functions in files their stream owns. After the gate no stream edits `core/types/**`,
+`core/places.ts`, `core/render.ts`, `core/decisions.ts`, `systems/travel/**`,
+`systems/commerce/jobs.ts`, `systems/commerce/command-handlers.ts`, `systems/expedition/command.ts`,
+`packages/content/src/**`, `packages/content/data/config/**`, `packages/narrator/src/contract.ts`
+or `docs/CONTRACTS.md`.
+
+**Sim types.**
+
+- `core/types/travel.ts`: `ERRAND_KINDS = ["fetchPerson", "fetchItem"]`, `ERRAND_WANTS = ["alive",
+  "either", "dead"]`, `ERRAND_OUTCOMES = ["broughtAlive", "broughtDead", "broughtItem", "failed"]`;
+  `JobErrand { kind: ErrandKind; siteId: PortDefId; targetName: string; itemDefId?: ItemDefId
+  (fetchItem only); wants: ErrandWants (fetchItem: "either"); returnToPortId: PortDefId; outcome?:
+  ErrandOutcome }`; `Job.errand?: JobErrand`. `core/types/commands/commerce.ts`: `JobDraft.errand?:
+  Readonly<Pick<JobErrand, "kind" | "siteId" | "targetName" | "itemDefId" | "wants">>`
+  (`returnToPortId` is `fromPortId`; `toPortId` must equal it).
+- `core/types/state.ts`: `Expedition.jobId?: JobId`; `Expedition.cards?: { arrival?: DecisionId;
+  turn?: DecisionId }`.
+- `core/types/content.ts`: `ConfigDef.commerce.priceBands` keyed by `CargoClass | "passenger" |
+  "errand"`.
+- `core/types/events/commerce.ts`: `jobFailed { jobId: JobId; outcome: ErrandOutcome |
+  PassageEndReason }`, significance `narrative`.
+- `core/places.ts`: `knownSites(state)`, `portGraph(content, state, "known" | "all")`,
+  `siteNearPort(content, siteId): PortDefId | undefined` (calls 1, 2); exported from
+  `packages/sim/src/index.ts`.
+- `core/render.ts`: ticker `jobFailed` → "The job for Ysolde Maren is lost: Corran Vale got away"
+  / "... the party came back without him" / "... <name> was put off" (by outcome; narrative);
+  `shipHeadline` reads "Setting down at <site>" on `approaching`/`docking` toward a site, "Lifting
+  off from <site>" on `undocking`/`departing` from one, and "Set down at <site> — lifting off for
+  <port>" when docked at a site with a course planned (never "Stopping at").
+- `core/decisions.ts`: nothing new; `queuePolicyDecision` is the cards' path (call 4).
+  `core/command-actor.ts`: `firstOfficerOf(state)`, moved from `passage.ts`'s private
+  `firstOfficerName` (which now calls it), so the cards and the overdue card name the same person.
+- `docs/CONTRACTS.md`: the errand is commerce's slice of the job; the expedition system reads
+  `job.errand` and writes `outcome` through `settleErrand` only.
+
+**Sim behaviour the gate completes (contract, not stream work).**
+
+- `systems/travel/travel.ts`: `beginDeparture` and `advanceStage` route by `portGraph(…, "known")`
+  (call 2); no `dockingFee` at a site; `castOffDock` at a site (call 8).
+  `travel/command-handlers.ts` `setCourse`: `shortestPath` over the known graph.
+  `travel/staging.ts`: call 9. `continueVoyageIfFree` over the known graph.
+- `systems/commerce/jobs.ts`: `checkErrandBand(ctx, fromPortId, siteId, pay)` (distance = the
+  `"all"` graph's path to the site and back, through `errandPay`, W1's file, gate-stubbed to the
+  passenger formula so the number is right from the start); `surfaceOfferCard` call 3 and
+  `offerPromptParams` gains `errand`, `target`, `site`, `wants` when the job has one; `jobFulfilled`
+  takes `Pick<state, "items" | "deck" | "travel">` and, for a job with `errand`, returns
+  `errandFulfilled(state, content, job)` (stub: false) unless the job has a passage (the passage
+  rule stands). `command-handlers.ts` `offerJob`: an errand needs `toPortId === fromPortId`, a known
+  `siteId` that `isSite`, a near port reachable from `fromPortId`, non-empty `targetName`,
+  `itemDefId` an existing item iff `fetchItem`, `wants` in the enum, cargo empty, and the errand
+  band; apply copies `errand` with `returnToPortId: fromPortId`.
+- `systems/expedition/`: `start.ts` (new; owner W2) with `startExpedition(ctx, plan: StartPlan)`
+  extracted from `command.ts` (which now calls `swapToSite` then `startExpedition`), plus stubs
+  `landedForErrand(ctx): void` (no-op) and `castFor(job, site)` (returns `site.defaultCast`);
+  `cards.ts` (new; owner W2) with stubs `queueArrivalCard(ctx, expedition)` and
+  `queueTurnCard(ctx, fight)` (no-ops); `errand.ts` (new; owner W1) with stubs `settleErrand(fight,
+  outcome)` (no-op) and `errandFulfilled` (false); `expedition.ts` calls `landedForErrand` at the
+  top of `run` when there is no expedition or it is `resolved`, `queueArrivalCard` from
+  `startExpedition` when `plan` is absent and `jobId` is set, `queueTurnCard` after `runCombat`, and
+  `settleErrand` in `resolve()` (call 5). `systems/commerce/errand.ts` (new; owner W1):
+  `errandPay(config, distance, tier)` and `PAY_TIER_FRACTION` (0.15, 0.5, 0.85, today a private
+  constant of the narrator's `lookups.ts`), both exported from `@crew/sim`; W3 makes `lookups.ts`
+  re-export the sim's so the two cannot drift (the narrator imports the sim, never the reverse).
+
+**Content (`packages/content`).**
+
+- `schemas/config.ts`: `priceBands.errand: band`. `data/config/default.json`: `"errand": { "min":
+  6, "max": 12 }` (per unit of path distance there and back; W1 tunes against the Hub → Meridian
+  site run so an errand pays about one and a half plain freight jobs); `narrator.hookOnEvents` +
+  `jobFailed`, `expeditionResolved`.
+- `src/templates.ts`: `job.offer` renders an errand ("bring back Corran Vale from the Boathouse,
+  alive" / "fetch the strongbox papers from …"), title "A job: Corran Vale"; `expedition.arrival`
+  (situation "<speaker> at the ramp head: Corran Vale is at the Boathouse, two of his people with
+  him. Hold the ramp, or go in?", speaker from `params.speaker`, title "At the Boathouse"), sides
+  `expedition.arrival.left` / `.right` rendered from `params.leftLabel` / `rightLabel` ("Hold the
+  ramp from cover", "Go in and take them") with `.aftermath` from `params.leftWhy` / `rightWhy`;
+  `expedition.turn` ("<speaker>: <name> is breaking. Press on, or pull back?"), sides
+  `expedition.turn.press` "Press on" / `expedition.turn.withdraw` "Pull back to the ship" and their
+  `.aftermath`. `SPEAKERS` and `TITLES` entries for both keys.
+- Nothing under `data/ports` or `data/docks`: the Meridian site is the content agent's, in flight.
+
+**Narrator (`packages/narrator/src/contract.ts` only).**
+
+- `offerJob` gains `errandKind: z.enum(["", ...ERRAND_KINDS])`, `site: idOf("Site id")`,
+  `targetName`, `targetItem: idOf("Item id")`, `wants: z.enum(["", ...ERRAND_WANTS])`, every one
+  empty for freight and passages (§narrator-authority), descriptions under eight words (call 7).
+  Every `offerJob` literal in `translate.test.ts`, `null.test.ts` and the fixtures' expected plans
+  gains the five empty fields; the translator ignores them until W3 (empty strings translate as
+  today).
+
+**Tests the gate fixes:** `contract.test.ts`/`plan.test.ts` size; `translate.test.ts` literals;
+`loader.test.ts`/`schemas.test.ts` only if the Meridian site has landed on `main` first (then ports
+8, docks 8); `commerce` price-band tests for the new key; `render.test.ts` headline cases.
+
+### Workstreams (parallel after the gate)
+
+No two streams edit the same file. `packages/content/data/**` is the content agent's (new site
+files) and the lead's (config, templates at integration); `packages/narrator/fixtures/*` and
+`docs/spec/**` are the lead's.
+
+**W1 — Sim: the errand.** Owns `systems/commerce/errand.ts`, `systems/commerce/passage.ts`,
+`systems/expedition/errand.ts`, `systems/commerce/fixtures-errand.ts` (new: the real bundle, docked
+at a port with an errand offered by a scenario command, helpers to accept, land and resolve by
+command), their tests.
+- `errandPay` and `checkErrandBand`'s number (gate stub replaced); `errandFulfilled`: `broughtDead`
+  when docked at `toPortId`; `broughtItem` through `deliveryComplete`; `broughtAlive` is the passage
+  rule; `failed` never.
+- `settleErrand(fight, outcome)` (call 5): the job by `expedition.jobId` (none: return); the target
+  by `disposition.part === "target"`. Outcome: `targetTaken` with the target alive → `broughtAlive`;
+  the target dead → `broughtDead` when `wants` is `dead` or `either`, else `failed`; `targetFled`,
+  `partyWithdrew`, `partyRouted`, `timedOut` → `failed`; `fetchItem` → `broughtItem` on
+  `targetTaken`, else `failed`. Writes `errand.outcome`; on `failed` sets `job.status = "failed"`,
+  `closedTick`, emits `jobFailed`; sets `travel.voyageDestinationId = returnToPortId` whatever the
+  outcome (the ship goes home; D49 plans the hop once nothing holds it).
+- `spawnCaptive(ctx, job, target)` in `passage.ts`: `newActor` from `crew.passenger`, `name` the
+  target's, on the target's tile, `crew: true`, `passenger: true`, `job.passage = { actorId,
+  roundTrip: false, leg: "out" }`, `passengerBoarded`; the cast actor and its carried items go first
+  (`removeCast`'s rule, re-stated here so expedition does not reach into commerce's table order).
+- `fetchItem` (stretch): the loot item (spawned at the `loot` post by W2's `startExpedition` when
+  the errand is a `fetchItem`, as `castFor`'s companion) is moved on `targetTaken` to the ship's
+  `cargoStowage` zone tile and recorded as the job's one `cargoItemIds` entry and `cargo` line, so
+  `raiseUnloadProblems` and `deliveryComplete` pay it at the return port.
+- Tests: the band accepts the translator's pay at each tier (with W3's number, cross-package pin in
+  `translate.test.ts` is W3's); an errand accepted at the Hub for the Meridian site sets course via
+  Green Meridian and the leg to the site has the authored distance; no fee, no `stageDock`, no
+  `captainAshore` at the site; the offer card's accept side validates whole (call 1); a captive
+  boards at resolution and walks off at the return port, `contractCompleted` and `paymentMade` once;
+  a target who fled fails the job with `jobFailed` and the ship still sets course home; a put-off
+  captive fails the job (call 11); lift-off with a dropped blaster on the floor does not throw
+  (call 8); `fetchItem` pays at the bay.
+Done when the sim suite is green and the fixture plays accept → land → resolve → home → paid by
+commands alone.
+
+**W2 — Sim: landing and the two cards.** Owns `systems/expedition/start.ts`, `cards.ts`,
+`expedition.ts`, `combat.ts`, `fixtures/landing.ts` (new: the real bundle docked at Green Meridian
+with an `inTransit` errand for the Meridian site, then travel to the site by advancing), their
+tests.
+- `landedForErrand` (call 12) and `castFor` (call 13); `startExpedition` writes `jobId`.
+- `queueArrivalCard`: perspective `commandActor`, speaker the first officer (the gate's
+  `firstOfficerOf` in `core/command-actor.ts`), prompt
+  `expedition.arrival` with params `jobId`, `site`, `target`, `speaker`, `leftPlan`, `rightPlan`,
+  `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`; sides `adoptPlan { planId }`; the pair is
+  `hold-lethal-armed` and `assault-lethal-armed` when both are available on `planMenu`, else the
+  first two available options, else no card and the expedition resolves `timedOut` at
+  `maxApproachSeconds` as now. `Expedition.cards.arrival` set.
+- `queueTurnCard` (call 15): speaker the first officer if in the party and up, else whoever leads
+  now; left "press" (no commands), right `withdrawParty`; `Expedition.cards.turn` set.
+- `combat.ts`: `targetMustLive` (unread today) set from `wants === "alive"` on the adopted plan's
+  copy in `adoptPlan`'s apply (W2 may edit `command.ts`'s apply for this one line; the gate notes
+  it) and honoured by never firing at the target.
+- Tests: docked at a site with its errand the expedition starts once, with the target renamed and
+  nobody moving; the arrival card is queued with no `jobId` and its `policyDecision` hook is raised
+  the next tick; choosing a side adopts the plan and the muster begins; the turn card appears once
+  at the first break and "pull back" withdraws; a `scenarioStartExpedition` run queues no card; the
+  arrival card is answered by `adoptPlan` with the ids it carries (both validate at resolve).
+Done when the sim suite is green and the landing fixture plays landing → card → fight → resolution.
+
+**W3 — Narrator.** Owns `packages/narrator/**` except `contract.ts`.
+- `translate.ts`: `translateOfferJob`'s errand branch: `errandKind` set ⇒ `site` is an authored site
+  reachable from `fromPort`'s `"all"` graph, `toPort === fromPort`, `targetName` passes the text
+  checks (fetchPerson), `targetItem` is an existing item (fetchItem) and `wants` is empty for it,
+  `passenger`/`roundTrip` false, cargo empty; pay by `errandPay` over the round-trip distance; the
+  draft carries `errand`. Freight and passages unchanged.
+- `capabilities.ts`: a "## Sites" section after the ports: each site under its near port (id,
+  name, description, character, the hop count and distance from here through the near port, and the
+  default cast in words: "a keeper, two of his people, one with a blaster"); `offerJob`'s text gains
+  the errand sentence (an errand is a job to a site: `errandKind`, `site`, `targetName` or
+  `targetItem`, `wants`; `toPort` is the port the ship is at; the ship goes, the crew fight, and the
+  job pays on the way back; a kill job is rare and its issuer is never clean). `reachLine` and
+  `portHereOrNext` measure from a site's near port when the ship is at or heading for a site.
+- `digest.ts`: the job line for an errand; `travelLine` "set down at" / "setting down at"; "On the
+  dock" becomes "At the site (<name>)" while a site is alongside: each cast member with role, arms,
+  where they stand (the post's name) and their visible bearing as a word (`combatant.state`, never
+  a number), the party and who leads once there is one, and the two plans on the arrival card with
+  their `why`. The "NPCs" line goes.
+- `prompts/hooks.ts` `policyDecision`: `expedition.arrival` is brought by the first officer at the
+  ramp head, the two sides are the two plans in the order given, the situation shows what the crew
+  can see of the site and its people; `expedition.turn` names who broke and what the party is doing.
+  `prompts/system.ts`: one errand paragraph (an errand is the kind of story that is about a person;
+  who is at the site is the sim's tonight; never state a wound, a death or a capture the digest does
+  not show; most expeditions should turn; a kill job is rare and dirty), `PROMPT_VERSION` v0.29.
+- `null.ts`: unchanged (call 14). `lookups.ts` `pathBetween` uses `portGraph(…, "all")` and no
+  longer excludes sites; the six-port count in `capabilities.test.ts` holds because sites are listed
+  under "Sites".
+- Tests: the errand offer translates and its pay is inside the kernel's band on the real bundle for
+  each tier (call 6); an errand with `toPort` elsewhere, an unknown site, a `fetchItem` with
+  `wants`, or `passenger` set is dropped with a reason; the "At the site" section never shows a
+  number; the Sites section lists every authored site once; the `policyDecision` instruction names
+  both keys.
+Done when the narrator suite is green; `pnpm test:live` is the lead's at integration.
+
+**W4 — CLI, web, the deep episode.** Owns `apps/cli/src/expedition-episode.deep.test.ts` (new),
+`apps/cli/src/episode.ts` (new: the harness), `apps/web/src/ui/**`, `apps/web/src/render/**`.
+- The harness: the real bundle and full registry (`createPacingRegistry`), a scenario `offerJob`
+  with `errand` at tick 0 for the authored site nearest the start port by the `"all"` graph (the
+  Meridian site when it has landed, else the Boathouse), the null narrator answering hooks and a
+  decision policy that takes the offer, picks `hold` on the arrival card and "press" on the turn
+  card, as `runBeats` answers cards.
+- The deep test: offer → accept → the leg (a waypoint docking at the near port) → landing →
+  arrival card → fight → resolution → lift-off → home → paid or failed, under the deep-test timeout,
+  with the events in order, no invariant violation, money up on a success, and the ticker telling
+  it in under thirty narrative-or-notable lines. Two seeds.
+- Web: the offer card for an errand reads from its template (no numbers); the inspector's job line
+  names the errand; nothing else is expected (the site look, the shore header and the tracers are
+  A1's; `TravelBar` and the scene read ports, and a site is one).
+Done when the CLI and web suites are green and the episode runs headless end to end.
+
+### Integration order (A2)
+
+1. **Gate** on `expeditions-a2`: the four checks, `crew content validate`, a browser smoke run (a
+   plain freight game unchanged).
+2. **The Meridian site** (content agent): `crew content validate`, `render-dock`, its README; the
+   lead fixes `loader.test.ts` counts.
+3. **W1**, **W2**, **W3**, **W4** in that order, the four checks after each.
+4. **Lead:** `pnpm test:live` once (prompt v0.29); regenerate `packages/narrator/fixtures/*` only if
+   a fixture's snapshot shape changed (none expected: no schema bump); tune `priceBands.errand`
+   against the deep test's balance; the spec sections below; a phone playtest at fast-forward: offer
+   at the Hub, the leg via Green Meridian, the landing, the arrival card, the fight, the turn card
+   if it comes, lift-off, home, the closing card.
+5. **Spec, same commit as the code it describes** (`docs/spec/README.md` rules): `commerce.md`
+   "### Errand job" (the shape, the band, the accept side's course, the captive as a passage, pay,
+   `jobFailed`); `travel.md` "### Known sites" (the graph rule, call 1) and the landing headline;
+   `expeditions.md`: "### Landing sites" loses "no course reaches one yet", new "### Landing and the
+   arrival card", "### The turn card", "### Settling the errand", "### Lift-off"; `cards.md`
+   "### Policy decision cards" lists the two; `narrator-story.md` "### The narrator and sites"
+   rewritten (what it sees and offers, what it still cannot do), "### Offer lever" gains the errand
+   sentence, the digest's "At the site" under "### Dock sections"; `narrator-calls.md`
+   "### Notable event hook" gains `jobFailed` and `expeditionResolved` with the old-save note.
+6. No D-entry: the owner's rulings stand as D103; the policy-card shape is call 4 and reversible.
+   The morning's note to the owner: the levers deferred under "Non-goals" and why.
