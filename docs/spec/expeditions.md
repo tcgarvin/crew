@@ -142,6 +142,28 @@ baton inside the west door (shaky, bound); Old Pell, a net mender at the net ben
 Why: posted at the east door, Hesk never guarded the bench and assault walked over it; and a
 keeper fleeing by the jetty ran past the ramp.
 
+### Harrow End
+
+`port.harrow_end` (planet, near Green Meridian, one route of 20) and its map `dock.harrow_end`, a
+disused silo yard, 44 x 30 with the Mk2 berthed at (4, 0); its README is the map. Below the apron
+lies open stubble with two bale rows of cover one tile thick (x 28 and 33, rows 21–23). A stone
+weigh-house (x 14–22, rows 23–27) has a north door at (18, 23), a back door at (18, 27) and seed
+sacks either side of the north door; two round silos and a grain auger stand to the west; a seed
+container and a drystone wall along row 25 hide the back lane from the yard. `noticeRadius` 5.
+
+Posts: `target` the weigh-house scale (16, 25), `loot` the seed container doors (23, 25), guards
+`bale_row` (27, 22), `weigh_door` (18, 24) and `back_door` (18, 26), `bystander` `gleaning` (31,
+27), `exit` `farm_track` out the west end at (0, 28), `flank` `back_lane` (18, 28). The default
+cast: Teodor Lusk, the co-op steward who sold the Collective's seed (target, unarmed, steady,
+bound, wants out); Rhee Castellan, the buyer's hired gun with a blaster at the bale row (steady,
+paid); Mattie Lusk, his daughter with a blaster inside the door (shaky, devoted); Amos Wray, the
+old silo keeper with a baton at the back door (shaky, bound); Wenna Brae, a gleaner (bystander).
+Why: the bale row keeps Rhee in cover seven tiles from the hold spots, so `hold` is a long
+exchange of fire where the Boathouse's is short; the weigh-house door stands within Mattie's
+reach of the ramp (§the-cast-in-the-fight), so `hold` can draw her out, where a tile or two
+further and every `hold` ends with the steward gone; and the yard wall keeps the flank's walk out
+of Rhee's sight. Cover two tiles thick blocks a line like a wall, so firing cover is one tile.
+
 ## The expedition
 
 ### Starting an expedition
