@@ -1,12 +1,19 @@
 import { FIELD_SEVERITIES, HAZARD_KINDS, isSite } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import { buildCapabilities, fieldExpectation } from "./capabilities";
-import { captainAshoreRequest, quietTooLongRequest } from "./fixtures";
+import {
+  captainAshoreRequest,
+  farCaptainAshoreRequest,
+  quietTooLongRequest,
+  siteArrivalRequest,
+} from "./fixtures";
 import { isArmsLocker, pathBetween, routeDistance } from "./lookups";
 import { content } from "./test-support";
 
-/** The ports the narrator knows: every port but a landing site (expeditions A1, call 4). */
+/** The ports the narrator lists as ports: every port but a landing site. */
 const ports = () => Object.values(content().ports).filter((p) => !isSite(content(), p.id));
+/** Expeditions A2: the landing sites, listed under "Sites". */
+const sites = () => Object.values(content().ports).filter((p) => isSite(content(), p.id));
 
 describe("buildCapabilities", () => {
   const req = quietTooLongRequest(content());
@@ -23,8 +30,9 @@ describe("buildCapabilities", () => {
     }
   });
 
-  it("lists every port with its routes and stores, and every freight item; never a landing site (expeditions A1)", () => {
-    expect(text).not.toContain("port.boathouse");
+  it("lists every port with its routes and stores, and every freight item; a landing site only under Sites (expeditions A2)", () => {
+    const galaxy = text.slice(text.indexOf("## The galaxy"), text.indexOf("## Sites"));
+    for (const site of sites()) expect(galaxy).not.toContain(site.id);
     expect(ports()).toHaveLength(6);
     for (const port of ports()) {
       expect(text).toContain(`- ${port.id} "${port.name}"`);
@@ -152,7 +160,8 @@ describe("buildCapabilities", () => {
     );
     // Distances come from content (spur legs are a watch long, §the-ships-day); the topology is
     // pinned.
-    const far = (to: string) => pathBetween(content(), "port.green_meridian", to)?.distance;
+    const far = (to: string) =>
+      pathBetween(content(), req.snapshot.state, "port.green_meridian", to)?.distance;
     expect(reach).toEqual({
       "port.crossroads_hub": `1 hop, ${far("port.crossroads_hub")}s transit in all`,
       "port.green_meridian": "here (the ship is at or heading for this port)",
@@ -172,7 +181,9 @@ describe("buildCapabilities", () => {
   });
 
   it("documents passenger and roundTrip on offerJob: the issuer rides, luggage, fare by distance, one job at a time (§4.1)", () => {
-    expect(text).toContain("## 1. offerJob: a freight contract, or a passenger");
+    expect(text).toContain(
+      "## 1. offerJob: a freight contract, a passenger, or an errand to a site",
+    );
     expect(text).toContain("passenger=true makes it a passage: the issuer rides");
     expect(text).toContain("cargoItem is their luggage");
     expect(text).toContain("or empty for none");
@@ -235,5 +246,79 @@ describe("buildCapabilities", () => {
     const field = text.slice(text.indexOf("## 7. scheduleField"));
     expect(hazard).toContain(sentence);
     expect(field).toContain(sentence);
+  });
+});
+
+describe("buildCapabilities: Sites and the errand (expeditions A2, §6, §10.2)", () => {
+  const req = farCaptainAshoreRequest(content());
+  const text = buildCapabilities(req.snapshot.state, content(), req.snapshot.config);
+  const section = text.slice(text.indexOf("## Sites"), text.indexOf("## Cargo items"));
+
+  it("lists every authored site once, under its near port, with its description, character and reach through the near port", () => {
+    expect(sites().length).toBeGreaterThanOrEqual(2);
+    for (const site of sites()) {
+      expect(text.split(`  - ${site.id} "${site.name}": `)).toHaveLength(2);
+      const entry = section.split(`  - ${site.id} "`)[1] ?? "";
+      expect(entry).toContain(site.description);
+      expect(entry).toContain(`    character: ${site.character}`);
+      const near = site.nearPortId ?? "";
+      const header = section.lastIndexOf("- near ", section.indexOf(`  - ${site.id} "`));
+      expect(section.slice(header)).toMatch(new RegExp(`^- near ${near.replace(".", "\\.")} `));
+    }
+    // From the Hub, Harrow End is two hops through Green Meridian; the Boathouse through Tern's Rest.
+    const there = pathBetween(
+      content(),
+      req.snapshot.state,
+      "port.crossroads_hub",
+      "port.harrow_end",
+    );
+    expect(section).toContain(
+      `    from here: 2 hops, ${there?.distance}s transit in all via port.green_meridian`,
+    );
+    expect(section).toMatch(/from here: 2 hops, \d+s transit in all via port\.terns_rest/);
+  });
+
+  it("gives each site's default cast in words, the target by role only and never a number", () => {
+    const boathouse = section.split('  - port.boathouse "')[1] ?? "";
+    expect(boathouse).toContain(
+      "    - the one a fetchPerson is after, under your targetName (else Corran Vale): boat-shed keeper, unarmed; grey, wiry, never still",
+    );
+    expect(boathouse).toContain("    - Hesk Marrow, hired hand, with a blaster;");
+    expect(boathouse).toContain("    - Darrow Finch, the keeper's nephew, with a club;");
+    expect(boathouse).toContain("    - Old Pell, net mender, a bystander, unarmed;");
+    const castLines = section.split("\n").filter((line) => line.startsWith("    - "));
+    expect(castLines.length).toBeGreaterThan(0);
+    for (const line of castLines) expect(line).not.toMatch(/\d/);
+    for (const tier of ["shaky", "steady", "devoted", "paid"]) {
+      expect(castLines.join("\n")).not.toContain(` ${tier}`);
+    }
+  });
+
+  it("says what an errand is on offerJob: its fields, toPort is the port the ship is at, the ship goes, the crew fight, it pays on the way back, a kill job is rare and dirty", () => {
+    const offer = text.slice(text.indexOf("## 1. offerJob"), text.indexOf("## 2."));
+    expect(offer).toContain("errandKind fetchPerson | fetchItem makes it an errand");
+    expect(offer).toContain("toPort is fromPort, the port the ship is at");
+    expect(offer).toContain("wants alive | either | dead is how");
+    expect(offer).toContain("targetItem is an item id");
+    expect(offer).toContain("the crew go out armed to whoever is there");
+    expect(offer).toContain("once the ship is home with what it went for");
+    expect(offer).toContain(
+      "A kill job (wants dead) is rare, and whoever offers one is never clean.",
+    );
+    expect(offer).toContain("the arrival card (two plans for going in)");
+    expect(offer).toContain("you never cause them");
+    expect(offer).toContain("never a site");
+  });
+
+  it("measures from a site's near port while the ship is set down at one", () => {
+    const at = siteArrivalRequest(content());
+    const there = buildCapabilities(at.snapshot.state, content(), at.snapshot.config);
+    expect(there).toContain(
+      '"From here" is measured from port.green_meridian (Green Meridian), the near port of Harrow End, where the ship is set down or heading.',
+    );
+    expect(there).toContain('  - port.harrow_end "Harrow End": ');
+    expect(there).toMatch(
+      /port\.harrow_end "Harrow End".*\n.*\n {4}from here: 1 hop, 20s transit in all$/m,
+    );
   });
 });

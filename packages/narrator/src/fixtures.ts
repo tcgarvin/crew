@@ -6,8 +6,11 @@
 import {
   type Actor,
   type ActorId,
+  type Command,
+  type CommandId,
   type ContentBundle,
   type CrewDefId,
+  DEFAULT_PLANS,
   type DecisionId,
   type EventId,
   type HullScar,
@@ -31,6 +34,9 @@ import {
   expectedDock,
   floorSet,
   personnelRampFoot,
+  planMenu,
+  registerExpedition,
+  registerSpatial,
 } from "@crew/sim";
 import type { NarratorRequest } from "./contract";
 
@@ -735,4 +741,130 @@ export function alertClearedRequest(content: ContentBundle, seed = 23): Narrator
     snapshot,
     recentEvents: [...base.recentEvents, cleared, stoodDown],
   };
+}
+
+/** Expeditions A2: the site of the site fixture, and the person its errand is for. */
+export const FIXTURE_SITE = "port.harrow_end" as PortDefId;
+export const FIXTURE_ERRAND_TARGET = "Teodor Lusk";
+
+/** "hold the ramp from cover (3 go)" → "Hold the ramp from cover": a plan's why as a side label. */
+function planLabel(why: string): string {
+  const words = why.split(" (")[0] ?? why;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Expeditions A2 (plan calls 4, 12): set down at Harrow End for an errand offered at the Hub, the
+ * expedition started on landing (the cast at their posts, no plan yet) and the arrival card up
+ * under its `policyDecision` hook, as `queueArrivalCard` raises it: the first officer brings it,
+ * its sides are the menu's default pair (`adoptPlan`), and each side's label and why ride in the
+ * side's own params as well as the prompt's. The sim's `scenarioStartExpedition` puts the site
+ * alongside and spawns the cast; the errand, `jobId` and the card are written by hand.
+ */
+export function siteArrivalRequest(content: ContentBundle, seed = 31): NarratorRequest {
+  const registry = createRegistry();
+  registerSpatial(registry);
+  registerExpedition(registry);
+  const kernel = createKernel(registry);
+  const world = kernel.createWorld(FIXTURE_SCENARIO, seed, content, {
+    values: content.config,
+    hash: content.hash,
+  });
+  const started = kernel.enqueueCommand(world, {
+    id: "cmd:fixture:site" as CommandId,
+    source: "scenario",
+    targetTick: world.state.tick + 1,
+    kind: "scenarioStartExpedition",
+    payload: { siteId: FIXTURE_SITE },
+  } as Command);
+  if (started.status === "rejected") {
+    throw new Error(`site fixture: the expedition did not start: ${started.rejection.reason}`);
+  }
+  kernel.advance(world, 1);
+  const state = world.state;
+  const expedition = state.expedition;
+  if (expedition === undefined) throw new Error("site fixture: no expedition");
+  const tick = state.tick;
+  const jobId = allocateId(state, "job");
+  state.jobs[jobId] = {
+    id: jobId,
+    origin: "narrator",
+    issuer: "Ysolde Maren",
+    issuerPerson: { name: "Ysolde Maren", role: "grower", org: "Meridian Growers Collective" },
+    pitch: { key: "job.pitch", params: {}, prose: "Bring Teodor home. He owes the Collective." },
+    urgency: "soon",
+    description: { key: "job.template", params: {}, prose: "The steward ran with the seed money." },
+    fromPortId: HUB,
+    toPortId: HUB,
+    cargo: [],
+    cargoClass: "general",
+    pay: 0,
+    status: "inTransit",
+    offeredTick: 0,
+    expiresAtTick: tick + 10_000,
+    cargoItemIds: [],
+    errand: {
+      kind: "fetchPerson",
+      siteId: FIXTURE_SITE,
+      targetName: FIXTURE_ERRAND_TARGET,
+      wants: "alive",
+      returnToPortId: HUB,
+    },
+  };
+  expedition.jobId = jobId;
+  const captain = Object.values(state.actors).find((a) => a.roleTags.includes("captain"));
+  const firstOfficer = Object.values(state.actors).find(
+    (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
+  );
+  if (captain === undefined || firstOfficer === undefined) throw new Error("fixture lacks crew");
+  const menu = planMenu(state, content, world.config.values);
+  const [left, right] = DEFAULT_PLANS.map((d) => menu.find((o) => o.id === d.id));
+  if (left === undefined || right === undefined) throw new Error("site fixture: no default pair");
+  const leftLabel = planLabel(left.why);
+  const rightLabel = planLabel(right.why);
+  const decisionId = allocateId(state, "decision");
+  const key = "expedition.arrival";
+  state.decisions.records[decisionId] = {
+    id: decisionId,
+    origin: "policy",
+    perspectiveActorId: captain.id,
+    prompt: {
+      key,
+      params: {
+        jobId,
+        site: FIXTURE_SITE,
+        target: FIXTURE_ERRAND_TARGET,
+        speaker: firstOfficer.name,
+        leftPlan: left.id,
+        rightPlan: right.id,
+        leftLabel,
+        rightLabel,
+        leftWhy: left.why,
+        rightWhy: right.why,
+      },
+    },
+    left: {
+      label: { key: `${key}.left`, params: { leftLabel } },
+      commands: [{ kind: "adoptPlan", payload: { planId: left.id } }],
+      aftermath: { key: `${key}.left.aftermath`, params: { leftWhy: left.why } },
+    },
+    right: {
+      label: { key: `${key}.right`, params: { rightLabel } },
+      commands: [{ kind: "adoptPlan", payload: { planId: right.id } }],
+      aftermath: { key: `${key}.right.aftermath`, params: { rightWhy: right.why } },
+    },
+    status: "pending",
+    createdTick: tick,
+  };
+  state.decisions.queue.push(decisionId);
+  expedition.cards = { arrival: decisionId };
+  const hook = {
+    id: allocateId(state, "hook"),
+    kind: "policyDecision" as const,
+    context: { decisionId },
+    tick,
+  };
+  state.narrator.pendingHook = hook;
+  const recentEvents = [event(1, tick, "decisionPending", { decisionId }, "narrative")];
+  return { gameId: "fixture-site-arrival", hook, snapshot: kernel.serialize(world), recentEvents };
 }

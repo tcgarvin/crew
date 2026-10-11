@@ -3,13 +3,17 @@
  * game, generated from content, config and the ship's machines so the prompt never promises what
  * the sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
- * count and distance of every port from the one the ship is at or heading for) change only
- * when the ship moves or the narrator restocks, so the cache still serves a run of calls.
- * Per-call limits (budgets) are in the digest.
+ * count and distance of every port, and since expeditions A2 of every landing site, from the one
+ * the ship is at or heading for, or that site's near port) change only when the ship moves or the
+ * narrator restocks, so the cache still serves a run of calls. Per-call limits (budgets) are in
+ * the digest.
  */
 import {
+  type CastArms,
   type ConfigDef,
   type ContentBundle,
+  ERRAND_KINDS,
+  ERRAND_WANTS,
   FIELD_SEVERITIES,
   type FaultEffect,
   type FieldSeverity,
@@ -17,9 +21,14 @@ import {
   JOB_URGENCIES,
   MARKET_PRICE_TIERS,
   type MarketPriceTier,
+  type PortDef,
+  type PortDefId,
+  type SiteCastEntryDef,
   basePriceFor,
+  dockForPort,
   effectiveMarket,
   isSite,
+  siteNearPort,
 } from "@crew/sim";
 import { FIELD_MOMENTS, HAZARD_DIFFICULTIES, SCRIPTED_EFFECTS } from "./contract";
 import {
@@ -33,6 +42,7 @@ import {
   machineName,
   pathBetween,
   portHereOrNext,
+  reachFrom,
   shipDeckOf,
 } from "./lookups";
 import { HAZARD_NAMES } from "./watch-digest";
@@ -96,14 +106,73 @@ export function marketLine(
  * §2.4: where a port stands from the ship: "here", or its hop count and path distance from the
  * port the ship is at or heading for, naming the waypoints of a multi-hop path.
  */
-function reachLine(content: ContentBundle, hereId: string, portId: string): string {
+function reachLine(content: ContentBundle, state: State, hereId: string, portId: string): string {
   if (portId === hereId) return "here (the ship is at or heading for this port)";
-  const path = pathBetween(content, hereId, portId);
+  const path = pathBetween(content, state, hereId, portId);
   if (path === undefined) return "unreachable from here";
   const legs = path.hops === 1 ? "1 hop" : `${path.hops} hops`;
   const via = path.path.slice(1, -1);
   const stops = via.length === 0 ? "" : ` via ${via.join(", ")}`;
   return `${legs}, ${seconds(path.distance)} transit in all${stops}`;
+}
+
+/** §6: how a cast member is armed, in words. */
+const ARMS_WORDS: Readonly<Record<CastArms, string>> = {
+  none: "unarmed",
+  melee: "with a club",
+  blaster: "with a blaster",
+};
+
+/**
+ * Expeditions A2 (§5.3): one person of a site's default cast in words: who they are, how they look
+ * and what they carry; the target by role only, since the errand's targetName becomes their name.
+ * Never a tier or a number: the fight is the sim's.
+ */
+function castWords(entry: SiteCastEntryDef): string {
+  const arms = ARMS_WORDS[entry.arms];
+  switch (entry.part) {
+    case "target":
+      return `the one a fetchPerson is after, under your targetName (else ${entry.name}): ${entry.role}, ${arms}; ${entry.look}`;
+    case "guard":
+      return `${entry.name}, ${entry.role}, ${arms}; ${entry.look}`;
+    case "ally":
+      return `${entry.name}, ${entry.role}, ${arms}, who would side with the crew; ${entry.look}`;
+    case "bystander":
+      return `${entry.name}, ${entry.role}, a bystander, ${arms}; ${entry.look}`;
+  }
+}
+
+/**
+ * Expeditions A2 (§3.1, §10.2): "Sites": every authored landing site under its near port, with its
+ * description, character, how far it is from here through the near port, and who is there by
+ * default. Near ports in id order, each site once.
+ */
+function sitesSection(state: State, content: ContentBundle, here: string): string[] {
+  const sites = Object.values(content.ports)
+    .filter((p) => isSite(content, p.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const byNear = new Map<string, PortDef[]>();
+  for (const site of sites) {
+    const near = siteNearPort(content, site.id);
+    if (near === undefined) continue;
+    byNear.set(near, [...(byNear.get(near) ?? []), site]);
+  }
+  const lines = [
+    "## Sites: where an errand goes",
+    "A landing site is not a port: nobody there sells, buys or offers work, and no freight, passage or card's course goes to one. The ship goes to a site only for an errand (errandKind on offerJob, below) and sets down on open ground there, one leg past its near port; the crew go out to whoever is waiting. Listed under each site's near port, with how far it is from here through that port.",
+  ];
+  for (const [near, atNear] of [...byNear].sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`- near ${near} (${content.ports[near as PortDefId]?.name ?? near}):`);
+    for (const site of atNear) {
+      const cast = dockForPort(content, site.id)?.defaultCast ?? [];
+      lines.push(`  - ${site.id} "${site.name}": ${site.description}`);
+      lines.push(`    character: ${site.character}`);
+      lines.push(`    from here: ${reachLine(content, state, here, site.id)}`);
+      lines.push(`    who is there: ${cast.length === 0 ? "nobody" : ""}`.trimEnd());
+      for (const entry of cast) lines.push(`    - ${castWords(entry)}`);
+    }
+  }
+  return lines;
 }
 
 /** §hazard-and-field-levers: the sixth lever, with its kinds, tiers and windows from config. */
@@ -194,11 +263,15 @@ function fieldLever(state: State, content: ContentBundle, config: ConfigDef): st
 }
 
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
-  // Expeditions A1 (call 4): a landing site is not the narrator's until A2.
+  // Expeditions A2: landing sites are listed under "Sites", not with the ports.
   const ports = Object.values(content.ports)
     .filter((p) => !isSite(content, p.id))
     .sort((a, b) => a.id.localeCompare(b.id));
-  const here = portHereOrNext(state);
+  const here = reachFrom(content, state);
+  const shipAt = portHereOrNext(state);
+  const measured = isSite(content, shipAt)
+    ? `the near port of ${content.ports[shipAt]?.name ?? shipAt}, where the ship is set down or heading`
+    : "the port the ship is at or heading for";
   const cargo = Object.values(content.items)
     .filter((i) => i.cargoClass !== undefined)
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -214,15 +287,15 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly seven levers. Anything not listed here does not exist in this game yet: no combat, no injuries, no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly seven levers. Anything not listed here does not exist in this game yet: no combat or injuries you cause (an errand's fight at a site is the sim's), no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
   lines.push(
-    "The ids below (ports, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
+    "The ids below (ports, sites, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
   );
   lines.push("");
   lines.push("## The galaxy: ports and legs");
   lines.push(
-    `${ports.length} ports joined by legs; a leg's transit time is listed with it. Any port is a possible destination for an offer or a course: beyond one hop the ship makes a voyage of it, docking at each port on the way (a real stop: the fee is paid, the ramps open, the market is open, and the dock is dressed as she comes alongside) and continuing on its own when nothing holds her. The long legs are where the far ports are, and where the quiet in-transit stretches happen. "From here" is measured from ${here} (${content.ports[here]?.name ?? here}), the port the ship is at or heading for.`,
+    `${ports.length} ports joined by legs; a leg's transit time is listed with it. Any port is a possible destination for an offer or a course: beyond one hop the ship makes a voyage of it, docking at each port on the way (a real stop: the fee is paid, the ramps open, the market is open, and the dock is dressed as she comes alongside) and continuing on its own when nothing holds her. The long legs are where the far ports are, and where the quiet in-transit stretches happen. "From here" is measured from ${here} (${content.ports[here]?.name ?? here}), ${measured}.`,
   );
   for (const port of ports) {
     const routes = port.routes
@@ -231,19 +304,21 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     const stores = port.externalStores.map((s) => `${s.key} (${s.kind})`).join(", ");
     lines.push(`- ${port.id} "${port.name}": ${port.description}`);
     lines.push(`  character: ${port.character}`);
-    lines.push(`  from here: ${reachLine(content, here, port.id)}`);
+    lines.push(`  from here: ${reachLine(content, state, here, port.id)}`);
     lines.push(`  legs to: ${routes || "none"}; store keys: ${stores || "none"}`);
     lines.push(`  market sells: ${marketLine(state, content, config, port.id)}`);
   }
+  lines.push("");
+  lines.push(...sitesSection(state, content, here));
   lines.push("");
   lines.push("## Cargo items and classes");
   for (const item of cargo) {
     lines.push(`- ${item.id} "${item.name}" (class ${item.cargoClass})`);
   }
   lines.push("");
-  lines.push("## 1. offerJob: a freight contract, or a passenger");
+  lines.push("## 1. offerJob: a freight contract, a passenger, or an errand to a site");
   lines.push(
-    '- fromPort must be the port the ship is docked at (see the digest): offers are made in person at the dock, never in flight. toPort may be any port reachable from fromPort (see "from here" above); a far port means a voyage with real stops on the way, which the ship routes by itself.',
+    '- fromPort must be the port the ship is docked at (see the digest): offers are made in person at the dock, never in flight, and never at a landing site. toPort may be any port reachable from fromPort (see "from here" above), never a site; a far port means a voyage with real stops on the way, which the ship routes by itself.',
   );
   lines.push(`- One cargo item kind per job. quantity: ${q(JOB_QUANTITY_UNITS)} units.`);
   lines.push(
@@ -257,6 +332,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   );
   lines.push(
     "- passenger=true makes it a passage: the issuer rides. They board at fromPort when the job is accepted, live aboard like crew (eat, sleep, walk the deck, talk) and never work; cargoItem is their luggage (one unit of a cargo item, hauled like freight) or empty for none, and quantity is ignored. roundTrip=true (passenger only) takes them to toPort, where they go ashore for a while and the ship waits for them, then home to fromPort; roundTrip without passenger is dropped. The fare is private, by distance (doubled for a round trip), placed by payTier. A passenger offer is always surfaced: it is a person at the ramp. The ship carries one job at a time, so a passenger competes with freight for the ship: any offerJob while a job is in hand (accepted, under way, or delivered and not yet paid) is dropped, and a port that is a waypoint of a voyage gets no offer. A passenger offer whose card is already taken this call is dropped, not posted quietly. The sim raises its own card, brought by the first officer, if a round-trip passenger is overdue ashore (Wait for them / Leave without them); you dress it on that policyDecision call, you never cause it.",
+  );
+  lines.push(
+    `- errandKind ${ERRAND_KINDS.join(" | ")} makes it an errand: a job to a landing site under Sites and back, about someone there. site is the site's id; toPort is fromPort, the port the ship is at, where the job comes home. fetchPerson: targetName is who is to be brought back (they are the one the errand is after at the site, under that name), and wants ${ERRAND_WANTS.join(" | ")} is how. fetchItem: targetItem is an item id (any item, as for stockMarket), targetName what it is called there (or empty for the item's name), and wants is empty. passenger and roundTrip are false and cargoItem and quantity are ignored; for freight and passages every errand field is empty. Accepted, the ship sets course for the site and sets down there; the crew go out armed to whoever is there, and how the fight goes is the sim's (who breaks, who is hurt or killed, whether the target gets away). It pays by the distance there and back, placed by payTier, once the ship is home with what it went for; a failed errand pays nothing. A kill job (wants dead) is rare, and whoever offers one is never clean. At the site the sim raises its own cards, brought by the first officer: the arrival card (two plans for going in) and at most one turn card in the fight (press on, or pull back to the ship); you dress them on those policyDecision calls, you never cause them.`,
   );
   lines.push("");
   lines.push("## 2. spawnAtBoundary: put existing items into a port store, off the ship");
@@ -293,7 +371,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push("## 4. surfaceDecision: a binary card for the captain");
   lines.push(
-    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here); endPassage; or privateTalk. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice; you do not script outcomes.",
+    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here, never a site); endPassage; or privateTalk. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice; you do not script outcomes.",
   );
   lines.push(
     '- endPassage puts the current passenger off: valid only while a passenger is aboard or ashore on a live passage (see "Aboard" under Crew). They leave at the next docking (now, if docked) with no fare and stay at that port as someone in your cast. That is the real side of a crew-friction card ("Put him off at Kessler." / "He stays."); the sim does the rest.',
