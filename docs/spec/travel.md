@@ -8,8 +8,8 @@ is `packages/sim/src/systems/travel/`. The dock itself and its people are in `do
 
 ### Port graph
 
-Six ports, and one landing site (§landing-sites) that no port lists and no course reaches yet: a
-core triangle (Crossroads Hub, Kessler Drift, Green Meridian) and three far spurs
+Six ports, and two landing sites that no port lists (§landing-sites, §known-sites): a core
+triangle (Crossroads Hub, Kessler Drift, Green Meridian) and three far spurs
 (Ossory Station off Kessler Drift, Vesper Gate off Green Meridian, Tern's Rest off the Hub). Port
 files are `packages/content/data/ports/*.json`; the legs there are the truth (the triangle's are
 25, 45 and 70, each spur's 400). Routes are listed on both ends with equal distance, and the
@@ -19,6 +19,26 @@ content and continuity for no new kind of story.
 
 `shortestPath` (`graph.ts`) is Dijkstra by route distance, ties broken by port key order, so a
 route is deterministic for a content bundle.
+
+### Known sites
+
+A site's one authored route runs to its near port, and no port lists it back, so the graph the
+ship flies is `portGraph(content, state, "known")` (`core/places.ts`): the authored ports with an
+extra route from each near port to each known site, at the site's own distance. A site is known
+(`knownSites`) while an errand names it with status `offered`, `accepted` or `inTransit`, and
+while the ship is docked at it or heading for it (`travel.portId`, `toPortId`,
+`voyageDestinationId`, `plannedDestinationId`). `setCourse`, voyage hops, `beginDeparture` and
+the leg into transit all route on it, so a course to a site is a voyage through its near port
+(D49) and the last leg has the authored distance. The errand price check measures on `"all"`,
+every authored site added (§errand-pay). Freight and passage pay still measure on the authored
+ports alone, so neither can name a site. Why `offered` counts: the offer card's accept side runs
+`acceptContract` and `setCourse` to the site, and both are validated before either applies, while
+the job is still offered.
+
+At a site there is no docking fee and no staging call (`stageDockIfDue` skips one and
+`stagingAnswered` reads true); lift-off clears the floor with no store, so anything left there is
+gone (`leftOnDock`). A site's cast are not crew: departure prep never calls or carries them
+aboard (`peopleAshore` and `clearDock` count crew only).
 
 ## Voyages and stages
 

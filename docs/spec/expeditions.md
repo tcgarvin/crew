@@ -92,8 +92,8 @@ tier (`expedition.castFighting`: shaky 1, steady 3, hard 5).
 
 A site is a `PortDef` of `kind: "site"` (`core/places.ts` `isSite`): a landing that sells
 nothing, with no market and no job templates, possibly no cast seeds or stores, a `nearPortId`
-and exactly one route, to that port. No port lists a site in its routes, so no course reaches one
-yet. At a site the headline reads "Set down at <site>" (§the-ship-headline), nobody goes looking
+and exactly one route, to that port. No port lists a site in its routes; a site is on the graph
+the ship flies only while it is known (§known-sites). At a site the headline reads "Set down at <site>" (§the-ship-headline), nobody goes looking
 for work (§looking-for-work), and the narrator is not told (§the-narrator-and-sites).
 
 ### Site maps
@@ -410,6 +410,28 @@ The party leave the fight and the planner has them again. The taken target and t
 dead are removed; the rest of the cast walk off by the exit and are removed there. The party's
 dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
 
+### Settling the errand
+
+When an expedition started for an errand (`Expedition.jobId`) resolves, the sim settles the errand
+before the party and cast leave the fight (`systems/expedition/errand.ts` `settleErrand`):
+
+- `targetTaken` with the target alive is `broughtAlive`: the cast actor is removed with what they
+  carry and boards anew as the captive, a fresh `crew.passenger` with their name on their tile
+  (whole, no combatant), riding home as the job's one-way passage (`spawnCaptive`,
+  `passengerBoarded`). Why a new actor: the aftermath removes every actor that still has a
+  combatant.
+- `targetTaken` with the target dead is `broughtDead` when the job wants them `dead` or `either`
+  way, else `failed`.
+- A `fetchItem` taken is `broughtItem` once its item is stowed aboard as the job's one manifest
+  line (from a party member's hands, else the floor nearest the loot post).
+- Every other outcome is `failed`: the job fails there and then (`jobFailed`, outcome `failed`).
+
+Whatever the outcome the voyage home (`returnToPortId`) is set, never the next hop, so travel
+plans it once nothing holds the ship and departure prep begins at once. A captive put off later
+fails the errand after all (`jobFailed` with the passage's end reason) and the voyage home
+stands; one put off at the site is gone there, since a site has no lounge. Payment is
+§errand-pay's.
+
 ### Thoughts and memories from a fight
 
 - `killedSomeone` (−0.4, 3 days) for a crew shooter whose hit killed; `sawCrewHurt` (−0.2, 1 day,
@@ -423,14 +445,15 @@ dead stay where they fell. `state.expedition` stays `resolved` until a new start
 
 ### Fight log lines
 
-The ticker (`core/render.ts`): "Mara Osei takes four down the ramp"; at contact "Shots at the
-boathouse"; "Jax Okonkwo is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is
-stunned"; "... is down"; "... is dead"; "... runs for the ship" or "runs for <the exit post's
-name>"; "... gives up"; "The party pulls back to the ramp"; and the end: "Corran Vale taken; two of
-ours hurt" (or "dead"), "Corran Vale got away", "The party came back without Corran Vale", "The
-party is driven back to the ship", "The fight at the boathouse peters out". Shots, the muster and
-healed wounds have no line. `expeditionContact` and `died` drop fast play to 1x
-(§auto-slowdown).
+The ticker (`core/render.ts`): "Set down at Harrow End" when the expedition starts; "Mara Osei
+takes four down the ramp" once the party is armed and walks out (`partyMustered`), since on a
+landing nobody moves until the plan is chosen; at contact "Shots at the Boathouse"; "Jax Okonkwo
+is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is stunned"; "... is down";
+"... is dead"; "... runs for the ship" or "runs for <the exit post's name>"; "... gives up"; "The
+party pulls back to the ramp"; and the end: "Corran Vale taken; two of ours hurt" (or "dead"),
+"Corran Vale got away", "The party came back without Corran Vale", "The party is driven back to
+the ship", "The fight at the Boathouse peters out". Shots and healed wounds have no line.
+`expeditionContact` and `died` drop fast play to 1x (§auto-slowdown).
 
 ### The plan menu
 

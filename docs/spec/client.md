@@ -145,7 +145,10 @@ saying what the ship is doing, derived from state: travel stage, destination, ET
 unloading counts, and what the ship waits for. The ticker is secondary. Why: the owner found "not
 clear what's happening at the top level."
 
-At a landing site it reads "Set down at <site>" and never "looking for work".
+At a landing site it reads "Set down at <site>" and never "looking for work"; with a course
+planned, "Set down at <site> — lifting off for <port>", naming the voyage's far end. Toward a site
+the approach and docking read "Setting down at <site>", and leaving one, both undocking and
+departing read "Lifting off from <site> — bound for <port>".
 
 Docked, the first match wins: the captain ashore ("Docked at <port> — <name> is ashore looking for
 work", or "... is talking with <name>"), then unloading or loading progress, then a passenger the

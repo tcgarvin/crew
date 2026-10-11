@@ -52,7 +52,8 @@ drops the whole card if it cannot):
 ### End passage effect
 
 `endPassage { jobId }` puts the passenger off with no fare (`putOff`, §ending-a-passage-early). It
-is a real side only while a passenger is aboard or ashore on an unended passage.
+is a real side only while a passenger is aboard or ashore on an unended passage. On an errand's
+captive it fails the errand too (§settling-the-errand), and the voyage home is kept.
 
 ### Private talk effect
 
