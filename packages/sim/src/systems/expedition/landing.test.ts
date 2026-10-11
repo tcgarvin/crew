@@ -131,8 +131,9 @@ describe("setting down for an errand (call 12)", () => {
     const events = toResolution(test);
     expect(test.world.state.expedition?.phase).toBe("resolved");
     const startedTick = test.world.state.expedition?.startedTick;
+    // Settling the errand sets the voyage home; the ship lifts off and never sets down again for it.
+    expect(test.world.state.travel).toMatchObject({ voyageDestinationId: TINY.port });
     events.push(...step(test, 60 * RATE));
-    expect(test.world.state.travel).toMatchObject({ stage: "docked", portId: SITE.port });
     expect(test.world.state.expedition?.startedTick).toBe(startedTick);
     expect(events.filter((e) => e.type === "expeditionStarted")).toHaveLength(0);
   });
@@ -426,16 +427,29 @@ describe("targetMustLive (A2)", () => {
 });
 
 describe("lifting off after the fight", () => {
-  it("takes the cast off the floor the tick a course is planned, so none is carried aboard", () => {
+  it("refuses a course while the expedition is under way", () => {
     const test = adopted("left");
-    toResolution(test);
-    expect(cast(test).length).toBeGreaterThan(0);
+    step(test, 5);
+    expect(test.world.state.expedition?.phase).not.toBe("resolved");
     const course = sendAs(test, {
       source: "player",
       kind: "setCourse",
       payload: { destinationPortId: TINY.port },
     });
-    expect(course.status).toBe("accepted");
+    expect(course).toMatchObject({ status: "rejected" });
+    expect(JSON.stringify(course)).toContain("an expedition is under way");
+  });
+
+  it("takes the cast off the floor the tick a course is planned, so none is carried aboard", () => {
+    const test = adopted("left");
+    toResolution(test);
+    // Settling the errand sets the voyage home, and travel plans the hop once nothing holds her.
+    const leaving = () => {
+      const travel = test.world.state.travel;
+      return travel.stage !== "docked" || travel.plannedDestinationId !== undefined;
+    };
+    step(test, 60 * RATE, leaving);
+    expect(leaving()).toBe(true);
     step(test, 2);
     expect(cast(test)).toEqual([]);
     step(test, 300 * RATE, () => test.world.state.travel.stage === "transit");

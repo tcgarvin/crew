@@ -89,11 +89,12 @@ cases (`apps/web/src/ui/rejectionMessage.ts`), never a silent failure.
 ### Policy decision cards
 
 A kernel-raised decision goes through `queuePolicyDecision` (the departure gate, a passenger
-overdue). When it reaches the head of the queue, phase 8 (`decisionPendingSystem`) raises a
-`policyDecision` hook for it, and the world does not halt on the card until it has, so the prose
-is ready before the modal opens (§policy-decision-hook). A policy card is brought by crew (the
-engineer for the gate, the first officer for a missing passenger) and is never held for delivery
-in person.
+overdue, an expedition's arrival and turn cards, §the-arrival-card, §the-turn-card). When it
+reaches the head of the queue, phase 8 (`decisionPendingSystem`) raises a `policyDecision` hook
+for it, and the world does not halt on the card until it has, so the prose is ready before the
+modal opens (§policy-decision-hook). A policy card is brought by crew (the engineer for the gate,
+the first officer for a missing passenger and for the arrival card, the first officer or whoever
+leads the party for the turn card) and is never held for delivery in person.
 
 ### Offer cards
 

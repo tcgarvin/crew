@@ -128,7 +128,7 @@ describe("an errand's site on the graph (expeditions A2, calls 1 and 2)", () => 
 });
 
 describe("setting down at the Boathouse and lifting off (expeditions A2, §3.3, §3.5)", () => {
-  it("flies the authored 20 from Tern's Rest, with no fee and no staging call, and lifts off clean", () => {
+  it("flies the authored 20 from Tern's Rest, with no fee and no staging call, and sets down for the errand", () => {
     const { kernel, world } = freshWorld(TERNS_REST);
     expect(world.state.travel).toMatchObject({ stage: "docked", portId: TERNS_REST });
     const offered = send(kernel, world, {
@@ -168,43 +168,19 @@ describe("setting down at the Boathouse and lifting off (expeditions A2, §3.3, 
     expect(getRenderFrame(world).headline).toBe("Set down at The Boathouse");
     expect(healthy(world)).toEqual([]);
 
-    // Lift off with something left lying on the site's floor: it goes nowhere, and nothing throws.
+    // Set down for the errand, the expedition starts itself with the arrival card up
+    // (§the-arrival-card), and no course can be set while it is under way. Lifting off after the
+    // fight is the episode's (`expedition-episode.deep.test.ts`) and the sim's errand tests'.
+    drive(kernel, world, 5, (w) => w.state.expedition !== undefined);
+    expect(world.state.expedition).toMatchObject({ siteId: BOATHOUSE, jobId });
+    expect(world.state.expedition?.cards?.arrival).toBeDefined();
     expect(
       send(kernel, world, {
         source: "player",
         kind: "setCourse",
         payload: { destinationPortId: TERNS_REST },
       }).status,
-    ).toBe("accepted");
-    drive(kernel, world, 300, (w) => w.state.travel.stage === "undocking");
-    expect(world.state.travel.stage).toBe("undocking");
-    expect(getRenderFrame(world).headline).toBe(
-      "Lifting off from The Boathouse — bound for Tern's Rest",
-    );
-    const foot = rampFoot(world.content, world.state);
-    const presence = world.state.deck.dock;
-    const dropped = Object.values(world.state.items).find(
-      (item) =>
-        item.stacking === "unique" && item.jobId === undefined && item.defId === "item.blaster",
-    )?.id as ItemId | undefined;
-    if (foot === undefined || presence === undefined || dropped === undefined) {
-      throw new Error("no site floor or no blaster to leave on it");
-    }
-    const item = world.state.items[dropped];
-    if (item === undefined) throw new Error("the blaster vanished");
-    item.location = { kind: "onDeck", deckId: presence.deckId, x: foot.x + 0.5, y: foot.y + 0.5 };
-    const leftBehind: SimEvent[] = [];
-    drive(
-      kernel,
-      world,
-      60,
-      (w) => w.state.travel.stage === "departing",
-      (_w, events) => leftBehind.push(...events.filter((e) => e.type === "leftOnDock")),
-    );
-    expect(world.state.travel.stage).toBe("departing");
-    expect(world.state.deck.dock).toBeUndefined();
-    expect(world.state.items[dropped]).toBeUndefined();
-    expect(leftBehind.map((e) => e.subjectIds[0])).toEqual([dropped]);
+    ).toBe("rejected");
     expect(healthy(world)).toEqual([]);
   }, 60_000);
 });

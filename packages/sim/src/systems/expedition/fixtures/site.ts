@@ -40,6 +40,7 @@ import type {
 } from "../../../core/types/ids";
 import { registerPlannerDefaults } from "../../../planner/index";
 import { registerBodies } from "../../bodies/index";
+import { PASSENGER_CREW_DEF_ID } from "../../commerce/passage";
 import { registerNeeds } from "../../needs/index";
 import { QUAY } from "../../spatial/fixtures/dock";
 import { registerSpatial } from "../../spatial/index";
@@ -233,6 +234,19 @@ export function siteContent(config: ConfigDef = docksideConfig()): ContentBundle
     ...base,
     ...armed(base),
     machines: { ...base.machines, [SITE.locker]: LOCKER },
+    // Expeditions A2: a target taken on an errand boards as a passenger from this template.
+    crew: {
+      ...base.crew,
+      [PASSENGER_CREW_DEF_ID]: {
+        id: PASSENGER_CREW_DEF_ID,
+        name: "Passenger",
+        roleTags: [],
+        skills: {},
+        startingInventory: [],
+        bio: "A paying passenger.",
+        voice: "Whoever they turn out to be.",
+      },
+    },
     ports: { ...base.ports, [SITE.port]: SITE_PORT },
     docks: { ...base.docks, [SITE.dock]: SITE_DOCK },
     items: {

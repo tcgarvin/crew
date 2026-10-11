@@ -736,6 +736,12 @@ function playerSide(label: string, command: CommandDraft, which: string): Outcom
 function setCourseSide(env: Env, side: Side, label: string, which: string): Outcome<SideCommands> {
   const travel = env.snapshot.state.travel;
   if (travel.stage !== "docked") return no(`${which}: setCourse is only possible while docked`);
+  const expedition = env.snapshot.state.expedition;
+  if (expedition !== undefined && expedition.phase !== "resolved") {
+    return no(
+      `${which}: setCourse waits until the expedition is over; the sim sets the course home`,
+    );
+  }
   if (side.coursePort.trim() === "") return no(`${which}: setCourse needs coursePort`);
   const course = knownPort(env.content, side.coursePort);
   if (!course.ok) return no(`${which}: coursePort: ${course.reason}`);

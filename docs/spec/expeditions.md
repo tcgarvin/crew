@@ -182,8 +182,9 @@ emitted.
 
 Without a plan nothing moves until `adoptPlan { planId }` names one from the menu; it picks the
 party again by the plan's squad rule. `withdrawParty` calls a party that is ashore back
-(§the-objective-and-resolution). Both are also the player's (A2's card sides); nothing issues them
-yet.
+(§the-objective-and-resolution). Both are also the player's: the sides of the arrival and turn
+cards (§the-arrival-card, §the-turn-card). While an expedition is under way `setCourse` is refused,
+so the ship never lifts off with the party ashore.
 
 ### Who goes
 
@@ -210,6 +211,48 @@ Phases (`Expedition.phase`): `mustering`; `walkingOut` once the whole party is a
 (`partyMustered`); `approach` once the leader stands on the site floor in the fight (or anyone,
 with the leader down); `fight` at contact; `resolved`. A party member on the site floor done with
 the muster goes into the fight.
+
+### The arrival card
+
+Set down at a site for an errand, the expedition starts itself (`systems/expedition/start.ts`
+`landedForErrand`): the first tick the ship is `docked` at a site with that site's map alongside
+and no course away planned, with an `inTransit` errand naming the site whose `outcome` is unset,
+and never twice for one errand. The cast is the map's `defaultCast` with the one `target` entry
+named for the errand's `targetName` (`castFor`); a `fetchItem` errand leaves the cast as authored
+and puts the item down at the `loot` post. The caps and posts are checked as for the start
+command, and a cast that fails is a content bug and throws. The expedition is written with no
+plan and `Expedition.jobId`; nobody moves until a plan is adopted.
+
+It queues the arrival card through `queuePolicyDecision` (§policy-decision-cards): prompt key
+`expedition.arrival`, no `jobId` on the record, so its `policyDecision` hook is raised the tick it
+is queued and the world halts on the hook and then on the card; nothing of the fight runs while it
+is up. The first officer brings it. Its sides are two plans from the menu (§the-plan-menu), each an
+`adoptPlan`: `hold-lethal-armed` and `assault-lethal-armed` when both are available, else the
+first two available. A side's label says what the plan does ("Hold the ramp from cover", "Go in
+and take them", with ", to stun", ", holding fire", ", all hands", ", blasters only" or ", a small
+team" when not the usual) and its aftermath what happens next ("We make them come to us."), with
+no numbers. The prompt params name the job, the site, the target, the speaker and both plans
+(`leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`), and each side's own
+refs carry its label and why. Choosing a side adopts the plan and the muster begins
+(§the-muster). A plan adopted for an errand that wants the target `alive` has `targetMustLive`
+(§fire-and-targets). With fewer than two plans available there is no card, and the expedition
+resolves `timedOut` `expedition.maxApproachSeconds` (90) after it started. Why a policy card and
+not a story hook: the narrator dresses the sim's pair and cannot choose the plans, a lever the
+owner has not ruled on (D6).
+
+### The turn card
+
+Once in an expedition that started itself for an errand, and only in the fight, the turn card is
+queued the tick the first fighter of either side breaks or gives up (the target giving up is the
+objective taken, not a turn) or the first party member goes down or dies (`systems/expedition/
+cards.ts` `queueTurnCard`). It is not queued once `objectiveTick` or `withdrawTick` is set, nor if
+the fight ends that tick; it is checked after the tick's withdrawal and objective, so a
+`withdrawWhen` that fires that tick asks nothing. A policy card with prompt key `expedition.turn`
+and no `jobId`, its params are `jobId`, `site`, `actorId`, `name`, `side` (`us` or `them`), `how`
+(`breaking`, `down` or `dead`) and `speaker`: the first officer if in the party and on their feet,
+else whoever leads now (§who-goes), never the one the card is about. "Press on" changes nothing;
+"Pull back to the ship" is `withdrawParty` (§the-objective-and-resolution). `Expedition.cards`
+records both cards. A `scenarioStartExpedition` run gets neither.
 
 ## The fight
 
@@ -345,7 +388,8 @@ stacked party read as one person.
 ### Fire and targets
 
 The party fires only at cast who are armed and can still fight: never a bystander, never the
-unarmed target, never someone running or giving up. The cast fire at any party member who can
+unarmed target, never someone running or giving up, and never the target at all under a plan's
+`targetMustLive` (an errand that wants them alive, §the-arrival-card). The cast fire at any party member who can
 fight. Each picks the nearest such mark in sight and reach.
 
 ### The cast in the fight
@@ -407,8 +451,9 @@ the start, the shots and the seconds from contact) at the first of:
 
 The alert stands down `expedition.alertClearSeconds` (60) later (`alertCleared`, cause `fight`).
 The party leave the fight and the planner has them again. The taken target and the cast's down and
-dead are removed; the rest of the cast walk off by the exit and are removed there. The party's
-dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
+dead are removed; the rest of the cast walk off by the exit and are removed there, or all at once
+the tick the ship plans her lift-off, so departure prep never meets them (§known-sites). The
+party's muster stops. The party's dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
 
 ### Settling the errand
 
@@ -439,7 +484,7 @@ stands; one put off at the site is gone there, since a site has no lounge. Payme
 - At resolution: `ranFromAFight` (−0.2, 1 day) for a living party member who broke on their own
   (not called back); `heldTheLine` (+0.2, 1 day) at a `targetTaken` for those who never did and
   can still fight.
-- Memories (§memories): `foughtBeside` (+1, 7 days) pairwise among the living party;
+- Memories (§memories): `foughtBeside` (+1, 7 days) pairwise among the living party who went;
   `carriedMeOut` (+3, 14 days) from a rescue; `leftMeBehind` (−3, 14 days) about the leader from a
   party member left down on the floor away from the ramp.
 
