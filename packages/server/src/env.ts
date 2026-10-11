@@ -100,6 +100,16 @@ export interface Env {
    */
   readonly stagingReasoningEffort: ReasoningEffort;
   /**
+   * §models-and-reasoning-effort: `CREW_NOTES_MODEL`, the notes turn's model (§notes-turn); unset =
+   * the story model.
+   */
+  readonly notesModel: string;
+  /**
+   * §models-and-reasoning-effort: `CREW_NOTES_REASONING_EFFORT`, the notes turn's effort; unset =
+   * the story call's. The notes turn is off the player's wait, so it can think longer.
+   */
+  readonly notesReasoningEffort: ReasoningEffort;
+  /**
    * §narrator-timeouts: `CREW_STAGING_TIMEOUT_MS`, how long one staging attempt may take before it
    * gives up (milliseconds); unset = the narrator's `STAGING_TIMEOUT_MS` (10 s). Story calls keep
    * 25 s.
@@ -161,6 +171,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     stagingReasoningEffort: readReasoningEffort(
       source,
       "CREW_STAGING_REASONING_EFFORT",
+      narratorReasoningEffort,
+    ),
+    notesModel: readModel(source, "CREW_NOTES_MODEL", narratorModel),
+    notesReasoningEffort: readReasoningEffort(
+      source,
+      "CREW_NOTES_REASONING_EFFORT",
       narratorReasoningEffort,
     ),
     stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),

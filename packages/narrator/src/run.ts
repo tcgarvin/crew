@@ -125,6 +125,16 @@ export interface RunNarratorCtx {
    * (nothing sent).
    */
   readonly reasoningEffort?: ReasoningEffort;
+  /**
+   * §models-and-reasoning-effort: the notes turn's model; absent = this call's `model`. The notes
+   * turn continues from the plan turn, so it reads that model's `reasoning_details`.
+   */
+  readonly notesModel?: string;
+  /**
+   * §models-and-reasoning-effort: the notes turn's reasoning effort; absent = this call's
+   * `reasoningEffort`. The notes turn runs after the reply, so it costs the player no wait.
+   */
+  readonly notesReasoningEffort?: ReasoningEffort;
   /** §repair-turn: repairs per model call (plan, notes or staging); absent = `DEFAULT_MAX_REPAIRS`. */
   readonly maxRepairs?: number;
   /**
@@ -809,11 +819,11 @@ export async function runNarratorWithTrace(
     const notesTurn = () =>
       runNotesTurn({
         transport,
-        model,
+        model: ctx.notesModel ?? model,
         prompt,
         planJsonSchema: jsonSchema,
         planTurns: reply.conversation,
-        reasoningEffort,
+        reasoningEffort: ctx.notesReasoningEffort ?? reasoningEffort,
         maxRepairs,
         logContext,
         request: notesRequest(translated, notes, req, tools.kind === "loop"),

@@ -343,7 +343,9 @@ export function registerNarratorRoutes(
         notes,
         model: staging ? env.stagingModel : env.narratorModel,
         reasoningEffort: staging ? env.stagingReasoningEffort : env.narratorReasoningEffort,
-        ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
+        ...(staging
+          ? { timeoutMs: env.stagingTimeoutMs }
+          : { notesModel: env.notesModel, notesReasoningEffort: env.notesReasoningEffort }),
         maxRepairs: env.narratorRepairs,
         maxToolRounds: env.narratorToolRounds,
       });

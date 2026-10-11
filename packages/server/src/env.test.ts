@@ -62,6 +62,39 @@ describe("loadEnv reasoning effort (§models-and-reasoning-effort)", () => {
   });
 });
 
+describe("loadEnv notes turn (§models-and-reasoning-effort)", () => {
+  it("follows the story call's model and effort unless CREW_NOTES_* is set", () => {
+    const story = loadEnv({
+      CREW_NARRATOR_MODEL: "a/story",
+      CREW_NARRATOR_REASONING_EFFORT: "minimal",
+    });
+    expect(story.notesModel).toBe("a/story");
+    expect(story.notesReasoningEffort).toBe("minimal");
+    expect(loadEnv({ CREW_NOTES_MODEL: "", CREW_NOTES_REASONING_EFFORT: "" })).toMatchObject({
+      notesModel: DEFAULT_NARRATOR_MODEL,
+      notesReasoningEffort: DEFAULT_NARRATOR_REASONING_EFFORT,
+    });
+    const own = loadEnv({
+      CREW_NARRATOR_MODEL: "a/story",
+      CREW_NOTES_MODEL: "b/notes",
+      CREW_NOTES_REASONING_EFFORT: "high",
+    });
+    expect(own).toMatchObject({
+      narratorModel: "a/story",
+      narratorReasoningEffort: DEFAULT_NARRATOR_REASONING_EFFORT,
+      stagingReasoningEffort: DEFAULT_NARRATOR_REASONING_EFFORT,
+      notesModel: "b/notes",
+      notesReasoningEffort: "high",
+    });
+  });
+
+  it("refuses a notes effort OpenRouter does not know", () => {
+    expect(() => loadEnv({ CREW_NOTES_REASONING_EFFORT: "max" })).toThrow(
+      /CREW_NOTES_REASONING_EFFORT/,
+    );
+  });
+});
+
 describe("loadEnv staging timeout (§narrator-timeouts)", () => {
   it("defaults to the narrator's 10 s staging timeout and reads CREW_STAGING_TIMEOUT_MS", () => {
     expect(loadEnv({}).stagingTimeoutMs).toBe(STAGING_TIMEOUT_MS);

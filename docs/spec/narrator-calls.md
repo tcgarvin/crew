@@ -275,7 +275,10 @@ prompt-token budget (12 KiB) and keeps per-game ids out of the cached prefix.
 `DEFAULT_NARRATOR_MODEL` is `openai/gpt-6-luna` and `DEFAULT_NARRATOR_REASONING_EFFORT` is `low`
 (`packages/narrator/src/run.ts`); the server and the live suite both read them. Overrides:
 `CREW_NARRATOR_MODEL`, `CREW_NARRATOR_REASONING_EFFORT`, `CREW_STAGING_MODEL`,
-`CREW_STAGING_REASONING_EFFORT`. The effort is sent as OpenRouter's `reasoning.effort`; `default`
+`CREW_STAGING_REASONING_EFFORT`, and `CREW_NOTES_MODEL`, `CREW_NOTES_REASONING_EFFORT` for the
+notes turn alone (§notes-turn; unset = the story call's, the route passes them only on story
+calls). The notes turn hands back the plan turn's `reasoning_details`, so a notes model other
+than the story's reads another model's reasoning. The effort is sent as OpenRouter's `reasoning.effort`; `default`
 sends nothing. Set it per model: on one that does not reason by default, any effort switches
 thinking on and makes the call slower. Why: latency tracked output tokens, and most of those were
 hidden reasoning.
@@ -364,6 +367,7 @@ The plan-quality harness (`plan-quality.live.test.ts`) sits beside it and is ski
 `CREW_PLAN_SAMPLES` is set: it samples the notes turn's season, arc and episode sketches that many
 times on three digests (game start, an episode opening under a standing season and arc, thin
 notes with a season to sketch), prints them with the plan's intents, and writes them to
-`CREW_PLAN_OUT` as JSON. It asserts only that the notes parse; the judging is by reading. Run it
+`CREW_PLAN_OUT` as JSON, with each turn's latency and tokens; `CREW_NOTES_REASONING_EFFORT` sets
+the notes turn's effort, so efforts can be compared. It asserts only that the notes parse; the judging is by reading. Run it
 (`CREW_PLAN_SAMPLES=3 pnpm exec vitest run --config vitest.live.config.ts plan-quality`) before
 and after a change to the plan's prompt text (§the-plan).
