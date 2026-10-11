@@ -86,7 +86,7 @@ function expectTheLanding(r: EpisodeResult): void {
 
 function expectTheCards(r: EpisodeResult): void {
   const [offer] = r.cards;
-  expect(offer).toMatchObject({ key: "job.offer", title: "A job: Corran Vale" });
+  expect(offer).toMatchObject({ key: "job.offer", title: "A job: Teodor Lusk" });
   expect(offer?.situation).not.toMatch(/\d/);
   const arrivals = r.cards.filter((c) => c.key === "expedition.arrival");
   expect(arrivals).toHaveLength(1);

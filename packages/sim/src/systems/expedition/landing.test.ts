@@ -5,6 +5,7 @@
  * landing.ts`), every invariant checked at every step.
  */
 import { describe, expect, it } from "vitest";
+import { commandActor } from "../../core/command-actor";
 import { findItemDef } from "../../core/defs";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY } from "../../core/fixtures/tiny-content";
@@ -78,11 +79,27 @@ function adopted(side: "left" | "right", options: Parameters<typeof landingWorld
 }
 
 /** Run until the turn card is on screen (or the expedition resolves); returns the events. */
-function toTurnCard(test: LandingWorld): SimEvent[] {
-  return step(test, 300 * RATE, () => {
-    const expedition = test.world.state.expedition;
-    return expedition?.phase === "resolved" || expedition?.cards?.turn !== undefined;
-  });
+/**
+ * Run into the fight, then take one of the party down (not the captain, not the first officer, Jon
+ * Reyes) as a hit would, and on until the turn card is up; returns the events and who went down.
+ */
+function toTurnCard(test: LandingWorld): { events: SimEvent[]; downed: ActorId } {
+  const events = step(test, 300 * RATE, () => test.world.state.expedition?.phase === "fight");
+  const expedition = test.world.state.expedition;
+  if (expedition?.phase !== "fight") throw new Error("no fight");
+  const downed = expedition.party
+    .map((id) => test.world.state.actors[id])
+    .find((a) => a !== undefined && a.defId !== CREW.jon && a.id !== expedition.leaderId);
+  if (downed === undefined) throw new Error("nobody in the party to take down");
+  downed.availability = "incapacitated";
+  downed.movement = { kind: "stationary" };
+  events.push(
+    ...step(test, 300 * RATE, () => {
+      const now = test.world.state.expedition;
+      return now?.phase === "resolved" || now?.cards?.turn !== undefined;
+    }),
+  );
+  return { events, downed: downed.id };
 }
 
 /** Run to the resolution, answering any card left (hooks acknowledged by `step`). */
@@ -332,13 +349,11 @@ describe("the arrival card's pair", () => {
 });
 
 describe("the turn card (call 15)", () => {
-  it("comes once, the tick of the first break, and pull back withdraws", () => {
+  it("comes once, when one of ours goes down, and pull back withdraws", () => {
     const test = adopted("right");
-    const events = toTurnCard(test);
+    const { downed } = toTurnCard(test);
     const expedition = test.world.state.expedition;
     const card = decision(test, expedition?.cards?.turn);
-    const broke = events.find((e) => e.type === "combatantBroke");
-    expect(broke?.tick).toBe(card.createdTick);
     expect(card.origin).toBe("policy");
     expect(card.jobId).toBeUndefined();
     expect(card.prompt).toMatchObject({
@@ -346,14 +361,12 @@ describe("the turn card (call 15)", () => {
       params: {
         jobId: test.jobId,
         site: SITE.port,
-        how: "breaking",
-        side: "them",
+        how: "down",
+        side: "us",
         speaker: "Jon Reyes",
       },
     });
-    expect(card.prompt.params.actorId).toBe(
-      broke?.payload && (broke.payload as { actorId: string }).actorId,
-    );
+    expect(card.prompt.params.actorId).toBe(downed);
     expect(card.left.commands).toEqual([]);
     expect(card.right.commands).toEqual([{ kind: "withdrawParty", payload: {} }]);
     expect(expedition?.phase).toBe("fight");
@@ -367,6 +380,19 @@ describe("the turn card (call 15)", () => {
     expect(cards(test, TURN_PROMPT_KEY)).toHaveLength(1);
   });
 
+  it("never comes for one of theirs breaking, and never in the captain's own voice", () => {
+    const test = adopted("right");
+    const events = toResolution(test);
+    // One of theirs breaking asks nothing: the fight going our way is the ticker's to tell.
+    expect(events.some((e) => e.type === "combatantBroke")).toBe(true);
+    const turn = cards(test, TURN_PROMPT_KEY);
+    for (const card of turn) {
+      expect(card.prompt.params.side).toBe("us");
+      const captain = test.world.state.actors[commandActor(test.world.state)];
+      expect(card.prompt.params.speaker).not.toBe(captain?.name);
+    }
+  });
+
   it("press on changes nothing, and it never comes again that expedition", () => {
     const test = adopted("right");
     toTurnCard(test);
@@ -376,7 +402,6 @@ describe("the turn card (call 15)", () => {
     if (card === undefined) throw new Error("no turn card");
     expect(answer(test, card, "left").status).toBe("accepted");
     const after = toResolution(test);
-    expect(after.filter((e) => e.type === "combatantBroke").length).toBeGreaterThan(0);
     expect(after.some((e) => e.type === "partyWithdrew")).toBe(false);
     expect(test.world.state.expedition?.phase).toBe("resolved");
     expect(cards(test, TURN_PROMPT_KEY)).toHaveLength(1);

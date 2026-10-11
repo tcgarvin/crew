@@ -130,7 +130,7 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
   const pair = arrivalPair(planMenu(ctx.state, ctx.content, ctx.config, expedition.siteId));
   if (pair === undefined) return;
   const [left, right] = pair;
-  const speaker = firstOfficerOf(ctx.state)?.name;
+  const speaker = arrivalSpeaker(ctx.state);
   const target = errand.targetName;
   const decisionId = queuePolicyDecision(ctx, {
     perspectiveActorId: commandActor(ctx.state),
@@ -156,23 +156,38 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
 }
 
 /**
- * Who brings the turn card: the first officer if in the party and on their feet, else whoever
- * leads now; never the one the card is about (then nobody is named).
+ * Who brings the arrival card: the first officer, unless they are the one in command (D8), since
+ * the captain never speaks a card (§captain-never-speaks); then nobody is named.
+ */
+function arrivalSpeaker(state: ReadonlyWorldState): string | undefined {
+  const firstOfficer = firstOfficerOf(state);
+  return firstOfficer === undefined || firstOfficer.id === commandActor(state)
+    ? undefined
+    : firstOfficer.name;
+}
+
+/**
+ * Who brings the turn card: the first officer if they can stand, in the party or calling it from
+ * the ramp head; else the first of the party in rank order (§who-goes) who is on their feet; never
+ * the one in command (§captain-never-speaks) nor the one the card is about (then nobody is named).
  */
 function turnSpeaker(
   state: ReadonlyWorldState,
   expedition: Expedition,
   about: ActorId,
 ): string | undefined {
+  const command = commandActor(state);
   const firstOfficer = firstOfficerOf(state);
-  const c = firstOfficer?.combatant;
-  const up =
-    firstOfficer !== undefined &&
-    expedition.party.includes(firstOfficer.id) &&
-    c !== undefined &&
-    upright(c);
-  const speakerId = up ? firstOfficer.id : leaderNow(state, expedition);
-  return speakerId === about ? undefined : state.actors[speakerId]?.name;
+  if (firstOfficer !== undefined && firstOfficer.id !== command && firstOfficer.id !== about) {
+    return firstOfficer.name;
+  }
+  const speaker = expedition.party
+    .map((id) => state.actors[id])
+    .find((a) => {
+      if (a === undefined || a.id === command || a.id === about) return false;
+      return a.combatant !== undefined && upright(a.combatant);
+    });
+  return speaker?.name;
 }
 
 /**
@@ -185,7 +200,9 @@ export function queueTurnCard(fight: Fight): void {
   if (expedition.jobId === undefined || expedition.cards?.turn !== undefined) return;
   if (expedition.phase !== "fight") return;
   if (expedition.objectiveTick !== undefined || expedition.withdrawTick !== undefined) return;
-  const turn = fight.turns[0];
+  // Only our own setbacks ask the captain anything: one of theirs breaking is the fight going our
+  // way, and the ticker tells it.
+  const turn = fight.turns.find((t) => t.side === "us");
   if (turn === undefined) return;
   const speaker = turnSpeaker(ctx.state, expedition, turn.actorId);
   const decisionId = queuePolicyDecision(ctx, {

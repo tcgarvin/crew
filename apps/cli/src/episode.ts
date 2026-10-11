@@ -186,9 +186,13 @@ const DEFAULT_MAX_SIM_SECONDS = 3 * 60 * 60;
 const RECENT_EVENTS_CAP = 60;
 
 const ERRAND_ISSUER = { name: "Ysolde Maren", role: "grower", org: "Meridian Growers" } as const;
-const ERRAND_TARGET = "Corran Vale";
-const ERRAND_PITCH =
-  "Corran Vale took the Growers' seed money and went to ground out past the east belt. I want him back here to answer for it.";
+/** Whoever the site's own map puts at its target post (the errand names them so). */
+function siteTarget(world: World, siteId: PortDefId): string {
+  const site = Object.values(world.content.docks ?? {}).find((dock) => dock.portId === siteId);
+  const target = site?.defaultCast?.find((entry) => entry.part === "target")?.name;
+  if (target === undefined) throw new Error(`episode: ${siteId} has no target in its cast`);
+  return target;
+}
 
 /** The event types that tell the episode itself (the rest of the ticker is ship life). */
 export const EPISODE_EVENT_TYPES: ReadonlySet<SimEvent["type"]> = new Set<SimEvent["type"]>([
@@ -248,11 +252,15 @@ function roundTripDistance(world: World, fromPortId: PortDefId, siteId: PortDefI
   return out.distance + back.distance;
 }
 
-/** The errand offered at tick 0: bring Corran Vale back alive, at the standard tier. */
+/** The errand offered at tick 0: bring the site's target back alive, at the standard tier. */
 export function episodeErrand(world: World, fromPortId: PortDefId, siteId: PortDefId): JobDraft {
   return {
     issuer: ERRAND_ISSUER,
-    pitch: { key: NARRATOR_TEXT_KEYS.jobPitch, params: {}, prose: ERRAND_PITCH },
+    pitch: {
+      key: NARRATOR_TEXT_KEYS.jobPitch,
+      params: {},
+      prose: `${siteTarget(world, siteId)} took the Growers' seed money and went to ground. I want them back here to answer for it.`,
+    },
     description: { key: "job.template", params: {} },
     urgency: "soon",
     fromPortId,
@@ -260,7 +268,7 @@ export function episodeErrand(world: World, fromPortId: PortDefId, siteId: PortD
     cargo: [],
     pay: errandPay(world.config.values, roundTripDistance(world, fromPortId, siteId), "standard")
       .pay,
-    errand: { kind: "fetchPerson", siteId, targetName: ERRAND_TARGET, wants: "alive" },
+    errand: { kind: "fetchPerson", siteId, targetName: siteTarget(world, siteId), wants: "alive" },
   };
 }
 
@@ -487,8 +495,9 @@ class EpisodeRun {
       this.milestones.event(event, this.jobId, (id) => this.decisionKey(id));
       const episode = EPISODE_EVENT_TYPES.has(event.type);
       if (episode) this.events.push(event);
-      if (event.significance === "trace") continue;
-      this.recentEvents.push(event);
+      if (event.significance !== "trace") this.recentEvents.push(event);
+      // The ticker decides what it shows (a few trace events, like the party going down the ramp,
+      // have lines), as the web's log does.
       const text = tickerLine(event, this.world.state, this.world.content);
       if (text === null) continue;
       const at = { tick: event.tick, seconds: this.seconds(event.tick) };

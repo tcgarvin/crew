@@ -59,10 +59,16 @@ export function commandActor(state: ActorTable): ActorId {
 /**
  * §spoken-cards: the ship's first officer (crew, not a passenger), who brings the cards that are
  * the ship's business rather than the captain's own: the overdue card, and (expeditions A2) the
- * expedition's arrival and turn cards. `undefined` when the ship has none.
+ * expedition's arrival and turn cards. `undefined` when the ship has none, or theirs is down or
+ * dead: someone who cannot stand cannot bring a card.
  */
 export function firstOfficerOf(state: ActorTable): DeepReadonly<Actor> | undefined {
   return Object.values(state.actors).find(
-    (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
+    (a) =>
+      a.crew &&
+      a.passenger !== true &&
+      a.roleTags.includes("firstOfficer") &&
+      a.availability !== "dead" &&
+      a.availability !== "incapacitated",
   );
 }

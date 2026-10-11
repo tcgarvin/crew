@@ -93,8 +93,9 @@ tier (`expedition.castFighting`: shaky 1, steady 3, hard 5).
 A site is a `PortDef` of `kind: "site"` (`core/places.ts` `isSite`): a landing that sells
 nothing, with no market and no job templates, possibly no cast seeds or stores, a `nearPortId`
 and exactly one route, to that port. No port lists a site in its routes; a site is on the graph
-the ship flies only while it is known (§known-sites). At a site the headline reads "Set down at <site>" (§the-ship-headline), nobody goes looking
-for work (§looking-for-work), and the narrator is not told (§the-narrator-and-sites).
+the ship flies only while it is known (§known-sites). At a site the headline reads "Set down at
+<site>" (§the-ship-headline) and nobody goes looking for work (§looking-for-work); what the
+narrator sees and may do there is §the-narrator-and-sites.
 
 ### Site maps
 
@@ -247,14 +248,18 @@ owner has not ruled on (D6).
 ### The turn card
 
 Once in an expedition that started itself for an errand, and only in the fight, the turn card is
-queued the tick the first fighter of either side breaks or gives up (the target giving up is the
-objective taken, not a turn) or the first party member goes down or dies (`systems/expedition/
-cards.ts` `queueTurnCard`). It is not queued once `objectiveTick` or `withdrawTick` is set, nor if
+queued the tick the first of the party breaks, goes down or dies (`systems/expedition/cards.ts`
+`queueTurnCard`). One of theirs breaking or giving up asks nothing: the fight going the party's
+way is the ticker's to tell. Why: a card asking whether to press on as a guard runs was no
+decision at all. It is not queued once `objectiveTick` or `withdrawTick` is set, nor if
 the fight ends that tick; it is checked after the tick's withdrawal and objective, so a
 `withdrawWhen` that fires that tick asks nothing. A policy card with prompt key `expedition.turn`
 and no `jobId`, its params are `jobId`, `site`, `actorId`, `name`, `side` (`us` or `them`), `how`
-(`breaking`, `down` or `dead`) and `speaker`: the first officer if in the party and on their feet,
-else whoever leads now (§who-goes), never the one the card is about. "Press on" changes nothing;
+(`breaking`, `down` or `dead`) and `speaker`: the first officer if they can stand, in the party or
+calling it from the ramp head, else the first of the party in rank order (§who-goes) on their
+feet; never the one in command (§captain-never-speaks) nor the one the card is about, and then
+nobody is named. The arrival card's first officer is likewise never the one in command, and a
+first officer who is down or dead brings no card (`firstOfficerOf`). "Press on" changes nothing;
 "Pull back to the ship" is `withdrawParty` (§the-objective-and-resolution). `Expedition.cards`
 records both cards. A `scenarioStartExpedition` run gets neither.
 
