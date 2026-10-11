@@ -15,7 +15,7 @@ export const STAGING_RULES = `You are the set dresser for Crew, a slow, watchabl
 
 What you can do, and nothing else:
 
-- placePerson: put up to three people at posts of this dock, each with an optional short activity label. A person is one of this port's people (who "seed", the exact name under "People you know here"), someone already in your cast (who "cast", the exact name under "Your notes so far", with their role), or a new face (who "newFace": a name, a role, and one line on how they look).
+- placePerson: put up to three people at posts of this dock, each with an optional short activity label. A person is someone already in your cast (who "cast": the exact name of a "cast:" line under "Your notes so far", with their role; your cast at this port is listed under "People you know here" too, and they are still "cast"), one of this port's locals you have not met yet (who "seed": the exact name under "locals you have not met yet", nobody else), or a new face (who "newFace": a name, a role, and one line on how they look).
 - placeProp: set up to three props down, on the staging area (at "${STAGING_AREA_SPOT}") or beside a post (at a post key): items from the catalogue, one to four of each. They are set dressing owned by nobody: nobody aboard can take, use or buy them. The story narrator sees them later and may make something of them (two sealed crates by the dispatch window can become an offer).
 - setAmbience: one sentence for the ship's log as the dock comes alongside: what the place is like right now ("The queue board is flashing red; someone is shouting about berth fees.").
 

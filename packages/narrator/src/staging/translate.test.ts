@@ -186,6 +186,23 @@ describe("translateStaging (§staging-prompt)", () => {
     expect(command.payload.ambience).toBe("Gulls everywhere.");
   });
 
+  it("drops a cast member placed as a seed with a reason that says to place them as cast, and keeps the rest", () => {
+    const { commands, dropped } = translate(
+      [
+        person({ who: "seed", name: "Ilse Brandt", role: "", look: "", post: "ore_store" }),
+        { kind: "setAmbience", line: "The shift board is flashing." },
+      ],
+      { notes: CAST_NOTES },
+    );
+    expect(dropped.map((d) => `${d.intentIndex} ${d.reason}`)).toEqual([
+      '0 placePerson: "Ilse Brandt" is in your cast; place them as cast',
+    ]);
+    const [command] = commands;
+    if (command?.kind !== "stageDock") throw new Error("not stageDock");
+    expect(command.payload.place).toEqual([]);
+    expect(command.payload.ambience).toBe("The shift board is flashing.");
+  });
+
   it("caps people and props at three each", () => {
     const names = ["Ann One", "Bea Two", "Cy Three", "Di Four"];
     const { commands, dropped } = translate([
