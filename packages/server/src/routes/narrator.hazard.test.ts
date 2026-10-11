@@ -82,7 +82,13 @@ describe("POST /api/games/:id/narrator, scheduleHazard (§debris-fields-and-ion-
   it("returns a translated scheduleHazard and logs it with the call", async () => {
     const { res, db, gameId } = await post(
       planWith([
-        { kind: "scheduleHazard", hazard: "debrisField", difficulty: "hard", window: "soon" },
+        {
+          kind: "scheduleHazard",
+          hazard: "debrisField",
+          difficulty: "hard",
+          window: "soon",
+          outcome: "",
+        },
       ]),
     );
     expect(res.status).toBe(200);
@@ -107,6 +113,7 @@ describe("POST /api/games/:id/narrator, scheduleHazard (§debris-fields-and-ion-
       hazard: "ionStorm",
       difficulty: "brutal",
       window: "soon",
+      outcome: "",
     };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { res } = await post(planWith([hazard, { ...hazard, hazard: "debrisField" }]));

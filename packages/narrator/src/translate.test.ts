@@ -1230,6 +1230,7 @@ describe("translateIntents: scheduleHazard, the sixth lever (§hazard-and-field-
     hazard: "debrisField",
     difficulty: "hard",
     window: "soon",
+    outcome: "",
   };
 
   /** In transit with `secondsLeft` of the leg to run at nominal speed. */

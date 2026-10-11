@@ -27,10 +27,12 @@ import {
   ERRAND_WANTS,
   FIELD_DETECTIONS,
   FIELD_SEVERITIES,
+  FORCED_HAZARD_OUTCOMES,
   HAZARD_KINDS,
   JOB_URGENCIES,
   MACHINE_EFFECTS,
   MARKET_PRICE_TIERS,
+  NARRATOR_MEMORY_KEYS,
   type NarratorCommand,
   type NarratorHook,
   ROCK_SIZES,
@@ -239,6 +241,12 @@ export type UnseenSide = (typeof UNSEEN_SIDES)[number];
  */
 export const STRIKE_PARTS = [...BODY_PARTS, ""] as const;
 
+/**
+ * §forced-faults-and-hazards: a hazard's decided outcome, empty to let the helm's roll decide
+ * (§narrator-authority: empty, not nullable).
+ */
+export const HAZARD_OUTCOMES = ["", ...FORCED_HAZARD_OUTCOMES] as const;
+
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
@@ -325,6 +333,7 @@ export function buildNarratorPlanSchema() {
     hazard: z.enum(HAZARD_KINDS),
     difficulty: z.enum(HAZARD_DIFFICULTIES),
     window: z.enum(FAULT_WINDOWS),
+    outcome: z.enum(HAZARD_OUTCOMES).describe("Decided outcome; empty to roll."),
   });
 
   // §scheduling-a-field: the seventh lever, an asteroid field on the leg. `scripted` hits are the
@@ -376,6 +385,31 @@ export function buildNarratorPlanSchema() {
     counterparty: z.string().describe(`Who pays or is paid; ${EMPTY_FOR_NONE}.`),
   });
 
+  // D106's other outcome levers: what is felt, what is noticed, what breaks now. The capability
+  // block explains the fields; descriptions stay short for the schema budget.
+  const fullName = z.string().describe("Full name.");
+  const plantMemory = z.strictObject({
+    kind: z.literal("plantMemory"),
+    from: z.string().describe("Who remembers, full name."),
+    to: fullName,
+    key: z.enum(NARRATOR_MEMORY_KEYS),
+    lasting: z.boolean(),
+  });
+  const fallOut = z.strictObject({
+    kind: z.literal("fallOut"),
+    a: fullName,
+    b: fullName,
+    over: z.string().describe("Who or what, a few words."),
+  });
+  const giveThought = z.strictObject({
+    kind: z.literal("giveThought"),
+    who: fullName,
+    key: idOf("Thought key"),
+    ref: z.string().describe(`About whom, full name; ${EMPTY_FOR_NONE}.`),
+  });
+  const faultNow = <K extends "reveal" | "injectFault">(kind: K) =>
+    z.strictObject({ kind: z.literal(kind), machine: idOf("Machine id"), faultKey: z.string() });
+
   // §aftermath-caption: shown for a moment after the choice, before the card closes.
   const aftermath = z.string().describe("What happens next if chosen; max 20 words, no numbers.");
 
@@ -424,6 +458,11 @@ export function buildNarratorPlanSchema() {
         scheduleField,
         strike,
         transact,
+        plantMemory,
+        fallOut,
+        giveThought,
+        faultNow("reveal"),
+        faultNow("injectFault"),
       ]),
     ),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */

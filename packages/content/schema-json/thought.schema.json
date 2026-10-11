@@ -36,7 +36,11 @@
         "sawCrewHurt",
         "heldTheLine",
         "ranFromAFight",
-        "wounded"
+        "wounded",
+        "worriedAbout",
+        "grieving",
+        "shaken",
+        "heartened"
       ]
     },
     "label": {

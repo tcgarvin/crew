@@ -81,7 +81,26 @@ describe("NarratorPlan structured-output schema", () => {
           quantity: "one",
         },
         { kind: "scheduleFault", machine: "m1", faultKey: "wornBearing", window: "later" },
-        { kind: "scheduleHazard", hazard: "ionStorm", difficulty: "brutal", window: "soon" },
+        {
+          kind: "scheduleHazard",
+          hazard: "ionStorm",
+          difficulty: "brutal",
+          window: "soon",
+          outcome: "",
+        },
+        // D106's outcome levers (§memory-levers, §thought-and-reveal-levers,
+        // §forced-faults-and-hazards).
+        {
+          kind: "plantMemory",
+          from: "Jax Okonkwo",
+          to: "Priya Kessler",
+          key: "betrayedMe",
+          lasting: true,
+        },
+        { kind: "fallOut", a: "Jax Okonkwo", b: "Priya Kessler", over: "Ysolde Maren" },
+        { kind: "giveThought", who: "Jax Okonkwo", key: "worriedAbout", ref: "Priya Kessler" },
+        { kind: "reveal", machine: "m1", faultKey: "wornBearing" },
+        { kind: "injectFault", machine: "m1", faultKey: "wornBearing" },
         {
           kind: "scheduleField",
           severity: "heavy",

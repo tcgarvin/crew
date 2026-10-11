@@ -132,8 +132,10 @@ describe("loadBundle", () => {
       "enjoyedMusic",
       "goodCompany",
       "gotLectured",
+      "grieving",
       "hatedTheNoise",
       "heardOut",
+      "heartened",
       "heldTheLine",
       "helmCleanPass",
       "helmScrape",
@@ -147,10 +149,12 @@ describe("loadBundle", () => {
       "ranFromAFight",
       "satWithTheCaptain",
       "sawCrewHurt",
+      "shaken",
       "sparringBruise",
       "spiritedTalk",
       "stoodLongWatch",
       "wonContest",
+      "worriedAbout",
       "wounded",
     ]);
   });

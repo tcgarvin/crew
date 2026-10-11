@@ -14,13 +14,16 @@ rules), and the separate staging call that dresses a dock. When and how it is ca
 The narrator may decide outcomes; it may not do the impossible (D106). It acts only through kernel
 commands on an allow-list (D6), each vetted by the translator against the snapshot and content and
 revalidated by the kernel on apply, and "impossible" is theirs to judge: the ids exist, the sim can
-execute the command now, the state stays coherent. It has exactly ten levers today: nine intents
-in its plan (offers, spawns, faults, markets, hazards, fields, cards, strikes and sums of money) and
-the unseen mark on the arrival card it dresses (§unseen-lever). Two of them set an outcome outright
-(§outcome-levers): `strike` wounds or kills a person by the body rules and `transact` moves the
-ship's money, and an offer may name its exact pay. Nothing yet sets a mood, a relationship, a
-position or a piece of knowledge (designed in `docs/design/narrator-arcs.md` §4, not built), and
-everything the ten do not reach is the sim's, shown in the digest. The
+execute the command now, the state stays coherent. It has exactly fifteen levers today: fourteen
+intents in its plan (offers, spawns, faults, markets, hazards, fields, cards, strikes, sums of
+money, memories, falling-outs, thoughts, reveals and faults now) and the unseen mark on the arrival
+card it dresses (§unseen-lever). Seven set an outcome outright (§outcome-levers): `strike` wounds
+or kills a person by the body rules, `transact` moves the ship's money, `plantMemory` and `fallOut`
+change who feels what about whom, `giveThought` puts something on someone's mind, `reveal` lets the
+crew notice a fault and `injectFault` breaks a machine now; an offer may name its exact pay and a
+hazard its outcome. Nothing sets a position, a mood outright or what anyone does next (designed in
+`docs/design/narrator-arcs.md` §4, not built), and everything the fifteen do not reach is the
+sim's, shown in the digest. The
 capability list (`buildCapabilities`) is generated from content, config and the ship's machines, so
 the prompt never promises what the sim cannot do. It carries every id the plan may use (ports and
 their legs, store keys, cargo items, machines and faults, each port's market); the plan's ids are
@@ -82,7 +85,8 @@ never hooks (§notable-event-hook); the fight's end and a failed errand do (`exp
 `narrator.maxSpawnsPerCommand` units. `scheduleFault` makes a machine develop one of its own
 catalogued faults inside a `soon | later | muchLater` window; not on a machine that has or awaits
 that fault. Both spend from the budgets shown in the digest (`spawns`, `faults`), which are advice
-(§narrator-lever-budgets).
+(§narrator-lever-budgets). A fault now, not in a window, is `injectFault`
+(§forced-faults-and-hazards).
 
 ### Narrator lever budgets
 
@@ -117,6 +121,7 @@ and scripted impacts (§scheduling-a-field). For both:
   no course, on approach or docking, or when the window opens after this leg's transit ends. The
   departure call the narrator requests with `callBack` is the natural moment.
 - One hazard may wait at a time. One field per leg.
+- A hazard's `outcome` is empty (the helm's roll decides) or decided (§forced-faults-and-hazards).
 - A scripted impact names a machine id, a room name, or a machine name unique aboard, and a moment
   (`early | middle | late` of the field's length, 15, 50 and 85%; impacts at one moment land 4 s
   apart). A field failing the command's guard is dropped whole, and one is refused once the ship
@@ -150,9 +155,13 @@ side went in and no fight came, "they were waiting" when the other did.
 ## Outcome levers
 
 Levers that decide an outcome rather than place a pressure (D106). Each is an allow-listed kernel
-command whose guards are the impossible only, run through the sim's own entry point, and emits a
-`narrative` event with a log line, so the player sees what was decided and the next digest's
-recent events show it. Code: `systems/bodies/strike.ts`, `systems/commerce/transact.ts`.
+command (narrator and scenario authority, never the player) whose guards are the impossible only,
+run through the sim's own entry point, and emits an event the next digest's recent events show.
+What happens in the world (a wound, a sum, a falling-out, a fault noticed or broken) has a log
+line; what someone feels (a planted memory, a thought) has none, because a feeling is shown on a
+card and in the crew lines, never stated by the log. Code: `systems/bodies/strike.ts`,
+`systems/commerce/transact.ts`, `systems/social/levers.ts`, `systems/equipment/levers.ts`,
+`systems/travel/hazards.ts`.
 
 ### Strike lever
 
@@ -197,6 +206,72 @@ dropped as ambiguous.
   crates it caps, and takes a named pay from the narrator or a scenario only.
 - No card text states a sum (§cards-never-mention-pay): the top bar and the log show money, and a
   card says "it costs us".
+
+### Memory levers
+
+- `plantMemory {from, to, key, lasting}` becomes the kernel's `plantMemory {fromActorId,
+  toActorId, key, lasting}`: `from` remembers `key` about `to` (§memories), one way. The keys are
+  the narrator's own (`NARRATOR_MEMORY_KEYS`, raised by nothing in the sim): `betrayedMe` (-5, 14
+  days), `savedMyLife` (+5, 14), `wrongedOverSomeone` (-4, 10), `madeItRight` (+3, 10), each stack
+  limit 1. With compatibility at most ±2, a betrayal or a life saved alone puts any pair past the
+  ±3 of "at odds with" / "close to" (§crew-lines) and of the seats' `avoidBelow`
+  (§seats-and-the-captains-table).
+- `lasting: false` is an ordinary memory (it stacks and expires as `addMemory`'s do). `lasting:
+  true` (owner) never expires, the season's grudge or debt: it takes the place of any timed memory
+  of its key between the pair, and is cleared only by another planted memory from the same `from`
+  about the same `to` (any key, lasting or not: `madeItRight` lays a grudge down). Planting first
+  drops every lasting memory `from` holds about `to`, so at most one is held.
+- `fallOut {a, b, over}` becomes `fallOut {aId, bId, over}`: `wrongedOverSomeone` planted both
+  ways (not lasting), then a debate's argument (`argue`: the `argued` thought about the other and
+  the `argued` memory, both ways), then an `argument` event (narrative) carrying `over` instead of
+  a topic, whose log line is "Jax Okonkwo and Priya Kessler have fallen out over Ysolde Maren". So
+  the pair is at odds both ways on the next digest and avoid each other at the table; the digest's
+  "rivalries" line is games only and does not show it. `over` is at most `FALL_OUT_OVER_MAX` (80)
+  characters and held to the text checks. Never violent (owner: the violent falling-out and its
+  brawl are deferred, narrator arcs §4.3); a blow is a `strike` as well.
+- Impossible, dropped by the translator and refused by the kernel: nobody by that name, someone
+  dead, someone not crew or a passenger, someone off the ship (`offShip`: ashore), one person named
+  twice, a key not in the set. `plantMemory` emits `memoryPlanted` (notable, no log line) and the
+  `affinityChanged` the memory makes.
+
+### Thought and reveal levers
+
+- `giveThought {who, key, ref}` becomes `giveThought {actorId, key, refId?}`: `addThought` as the
+  sim gives one (§thoughts), so it weighs on mood and work speed for its days
+  (§mood-and-work-speed). Any thought key content defines; four are the narrator's own
+  (`NARRATOR_THOUGHT_KEYS`): `worriedAbout` ("worried about {ref}", -0.15, 2 days), `grieving`
+  ("grieving for {ref}", -0.35, 7), `shaken` (-0.2, 1), `heartened` (+0.2, 2), none stacking. The
+  capability block lists those and the sim's own that a story may give off their path
+  (`nearMiss`, `sawCrewHurt`, `killedSomeone`, `heldTheLine`, `ranFromAFight`). Impossible: nobody,
+  the dead, someone not aboard, a key content lacks, a thought whose label names someone (`{ref}`)
+  with no `ref`, a `ref` who is nobody. Emits `thoughtGiven` (notable, no log line) besides
+  `thoughtAdded`.
+- `reveal {machine, faultKey}` lets the crew notice an active, undiagnosed fault now. The symptom
+  problem (§symptoms) is opened if missing and made `public`, as an intercom report makes the damage
+  it relays, so every crew member's view has it and the planner sends someone to inspect it; the
+  crew member aboard best at engineering (on their feet, crew not passengers, ties by id) is
+  written the problem and the `machineSymptom` fact, so the digest marks the fault "symptom
+  noticed"; `faultObserved` (notable) gives the log "Jax Okonkwo noticed grinding noise from the coolant pump".
+  Impossible: no such machine or fault in its catalogue, the machine does not have it now (a
+  scheduled fault, or one injected in the same plan, is revealed once it has happened), it is
+  diagnosed, and (translator) the crew already noticed it. A fault the plan reveals is no longer a
+  secret phrase for that plan's text checks (§player-facing-text-checks), so its card may name the
+  symptom.
+
+### Forced faults and hazards
+
+- `injectFault {machine, faultKey}`: one of the machine's catalogued faults now, through the one
+  fault path (`applyFault`: `faultOccurred` and the symptom problem by its channel, §symptoms),
+  where `scheduleFault` picks a moment in a window. Impossible: no such machine (the arms locker is
+  not the narrator's), a fault not in its catalogue, a machine that has or awaits it. It spends the
+  fault budget (advice, §narrator-lever-budgets). A fault the plan injects is a secret phrase for
+  that plan's text checks. `scenarioInjectFault` stays the scenario's.
+- `scheduleHazard.outcome` is empty or `clean | scrape | delay` (`FORCED_HAZARD_OUTCOMES`; the
+  kernel's payload omits it for empty). A decided hazard is placed and fires as any
+  (§debris-fields-and-ion-storms) but skips the roll and its draw (§hazard-roll): the outcome is
+  the decided one even at an empty helm (never the unattended scrape and delay), the stander still
+  takes `helmCleanPass` or `helmScrape`, and `navHazard` carries `forced`. The prompt keeps it for
+  when the story needs the result more than the pilot's skill.
 
 ## Translator
 
@@ -408,8 +483,10 @@ designer reasons about:
   it turns on: the sim's dice (a hazard, a field's rocks, the fight) decide, and the narrator never
   resolves a card's side for the captain. Let the sim run by default: between calls the narrator
   does not exist, and what the digest shows the sim has played is never re-decided. Today's levers
-  decide only what they reach (§narrator-authority), a wound, a death or a sum among them
-  (§outcome-levers); the prompt says so. Continuity over
+  decide only what they reach (§narrator-authority), a wound, a death, a sum, a grudge, a
+  falling-out, a worry, a fault noticed or broken now and a hazard's result among them
+  (§outcome-levers); the prompt says so, and keeps a decided hazard for when the story needs the
+  result more than the pilot's skill. Continuity over
   invention: reuse cast, ports and threads.
 - Pacing is the narrator's judgement, not a timer's. It reads "What the captain has seen" (with
   ticks) and the ship's state to choose forward motion (work, a thread beat, a consequence), a
@@ -433,16 +510,19 @@ designer reasons about:
 - No numbers or pay on any player-facing text. Nothing about an undiscovered fault until the crew
   notice it. What the narrator decides, it shows: a fault it made is a card from whoever found
   it, a field's scripted hit gets the crew's answer, a death gets a card from someone who saw it,
-  a sum paid or taken a word on a card and never the number. Never a fact in prose that neither the sim
+  a sum paid or taken a word on a card and never the number, a planted grudge or debt a card in the
+  holder's voice (never a log line), a falling-out the loser's card or the first officer's, a
+  revealed fault the card of whoever noticed it. Never a fact in prose that neither the sim
   nor a lever made true: a repair, delivery, purchase, meal, damage, passenger action or crew
   relationship the digest does not show. A card may state what someone intends or claims, never
   that it happened; the narrator may lie through a character, never through the ticker. Its levers
-  on a passenger are `endPassage` and, aboard, `strike`, so what else becomes of a passenger is the
-  sim's. The captain can die like anyone; a death is the strongest card and is spent rarely.
+  on a passenger are `endPassage` and, aboard, `strike` and the memory and thought levers, so what
+  else becomes of a passenger is the sim's. The captain can die like anyone; a death is the strongest card and is spent rarely.
 - Route choice is the ship's; a detour card only when the story makes it the captain's choice.
 - Weigh the hull before a field: never one the hull cannot survive unless the ship left port
-  damaged. Moods, thoughts, helm failures and filthy rooms are the sim's, out of reach of any lever
-  today: a reason for a card, never a fact stated on someone's behalf.
+  damaged. Helm failures and filthy rooms are the sim's, and so are moods and who likes whom except
+  through a memory, a falling-out or a thought the narrator plants (§memory-levers,
+  §thought-and-reveal-levers): a reason for a card, never a fact stated on someone's behalf.
 - Hooks: `captainAshore` expects an offer from someone who fits the port, a deliberately rare
   "nothing", and a different kind of story than the past arcs; `requestedCall` is where a leg gets
   its beat; aftermath calls (`alertCleared`, `navHazard`, `faultRepaired`) belong to the people in

@@ -229,6 +229,34 @@ export const FIXTURE_THOUGHTS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     durationDays: 0.5,
     stacks: false,
   },
+  worriedAbout: {
+    key: "worriedAbout",
+    label: "worried about {ref}",
+    value: -0.15,
+    durationDays: 2,
+    stacks: false,
+  },
+  grieving: {
+    key: "grieving",
+    label: "grieving for {ref}",
+    value: -0.35,
+    durationDays: 7,
+    stacks: false,
+  },
+  shaken: {
+    key: "shaken",
+    label: "shaken",
+    value: -0.2,
+    durationDays: 1,
+    stacks: false,
+  },
+  heartened: {
+    key: "heartened",
+    label: "heartened",
+    value: 0.2,
+    durationDays: 2,
+    stacks: false,
+  },
 };
 
 const keyedById = <Id extends string, T extends { readonly id: Id }>(
@@ -331,6 +359,15 @@ export const FIXTURE_MEMORIES: ConfigDef["social"]["memories"] = {
   foughtBeside: { label: "fought beside me", opinion: 1, durationDays: 7, stackLimit: 2 },
   carriedMeOut: { label: "carried me out", opinion: 3, durationDays: 14, stackLimit: 1 },
   leftMeBehind: { label: "left me behind", opinion: -3, durationDays: 14, stackLimit: 1 },
+  betrayedMe: { label: "betrayed me", opinion: -5, durationDays: 14, stackLimit: 1 },
+  savedMyLife: { label: "saved my life", opinion: 5, durationDays: 14, stackLimit: 1 },
+  wrongedOverSomeone: {
+    label: "wronged me over someone",
+    opinion: -4,
+    durationDays: 10,
+    stackLimit: 1,
+  },
+  madeItRight: { label: "made it right", opinion: 3, durationDays: 10, stackLimit: 1 },
 };
 
 /**

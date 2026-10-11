@@ -6,6 +6,7 @@
 import { configTicks } from "../../core/clock";
 import { type CommandHandler, NO_TEMP_REFS, ok, reject } from "../../core/commands";
 import type { KernelRegistry } from "../../core/registry";
+import { injectFault, reveal } from "./levers";
 
 const scheduleFault: CommandHandler<"scheduleFault", null> = {
   validate(ctx, command) {
@@ -53,4 +54,7 @@ const scheduleFault: CommandHandler<"scheduleFault", null> = {
 
 export function registerEquipmentCommandHandlers(registry: KernelRegistry): void {
   registry.registerCommandHandler("scheduleFault", scheduleFault);
+  // D106 (§forced-faults-and-hazards, §thought-and-reveal-levers).
+  registry.registerCommandHandler("injectFault", injectFault);
+  registry.registerCommandHandler("reveal", reveal);
 }

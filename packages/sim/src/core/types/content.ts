@@ -237,8 +237,24 @@ export const THOUGHT_KEYS = [
   "ranFromAFight",
   /** Expeditions A1 (§11): carrying an open wound (kept while one is open). */
   "wounded",
+  /**
+   * §memory-levers (D106): story-sized thoughts only the narrator gives (`giveThought`); nothing in
+   * the sim raises them. `worriedAbout` and `grieving` name someone (`refId`).
+   */
+  "worriedAbout",
+  "grieving",
+  "shaken",
+  "heartened",
 ] as const;
 export type ThoughtKey = (typeof THOUGHT_KEYS)[number];
+
+/** §thought-and-reveal-levers: the thoughts nothing but the narrator's `giveThought` raises. */
+export const NARRATOR_THOUGHT_KEYS = [
+  "worriedAbout",
+  "grieving",
+  "shaken",
+  "heartened",
+] as const satisfies readonly ThoughtKey[];
 
 /**
  * §memories: what one person remembers about another, each a closed key raised by sim code (a chat,
@@ -272,8 +288,25 @@ export const MEMORY_KEYS = [
   "carriedMeOut",
   /** Expeditions A1 (§11): they left me on the floor. */
   "leftMeBehind",
+  /**
+   * §memory-levers (D106): story-sized memories only the narrator plants (`plantMemory`,
+   * `fallOut`), each big enough to carry a pair past "close to" / "at odds with" on its own.
+   */
+  "betrayedMe",
+  "savedMyLife",
+  "wrongedOverSomeone",
+  "madeItRight",
 ] as const;
 export type MemoryKey = (typeof MEMORY_KEYS)[number];
+
+/** §memory-levers: the memories only the narrator plants; the sim's own code never raises them. */
+export const NARRATOR_MEMORY_KEYS = [
+  "betrayedMe",
+  "savedMyLife",
+  "wrongedOverSomeone",
+  "madeItRight",
+] as const satisfies readonly MemoryKey[];
+export type NarratorMemoryKey = (typeof NARRATOR_MEMORY_KEYS)[number];
 
 /** §memories: one kind of memory (`ConfigDef.social.memories`). */
 export interface MemoryDef {
@@ -308,6 +341,13 @@ export type MealQuality = (typeof MEAL_QUALITIES)[number];
  */
 export const HAZARD_KINDS = ["debrisField", "ionStorm"] as const;
 export type HazardKind = (typeof HAZARD_KINDS)[number];
+
+/**
+ * §forced-faults-and-hazards (D106): the outcomes of a hazard's roll the narrator may decide
+ * outright (`scheduleHazard.outcome`); `unattended` is the empty helm's, never chosen.
+ */
+export const FORCED_HAZARD_OUTCOMES = ["clean", "scrape", "delay"] as const;
+export type ForcedHazardOutcome = (typeof FORCED_HAZARD_OUTCOMES)[number];
 
 /**
  * §scheduling-a-field: how hard an asteroid field is (`ConfigDef.field.severities`: rate,

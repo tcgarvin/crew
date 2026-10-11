@@ -927,14 +927,14 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(PROMPT_VERSION).toBe("v0.34");
   });
 
-  it("tells the model its levers on a passenger are endPassage and strike aboard, and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
+  it("tells the model its levers on a passenger are endPassage, and aboard strike and the memory and thought levers, and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
     expect(STATIC_RULES).toContain("A passenger is a job with a person in it");
     expect(STATIC_RULES).not.toContain("You never decide a passenger's fate");
     expect(STATIC_RULES).toContain(
-      "Your levers on a passenger are endPassage and, aboard, strike (never ashore",
+      "Your levers on a passenger are endPassage and, aboard, strike, plantMemory, fallOut and giveThought (never ashore",
     );
     expect(STATIC_RULES).toContain("You never narrate what they did ashore as fact");
     expect(STATIC_RULES).toContain("The stated purpose of the trip is the description");
@@ -996,7 +996,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
-    expect(STATIC_RULES).toContain("Only use the ten levers");
+    expect(STATIC_RULES).toContain("Only use the fifteen levers");
     expect(STATIC_RULES).toContain("surfaceDecision, stockMarket, scheduleHazard");
     expect(STATIC_RULES).not.toContain("five levers");
   });
@@ -1004,12 +1004,14 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   it("tells the model about the watch, the empty helm and the hazard lever (§who-has-the-helm, §hazard-roll, §mood-and-work-speed, v0.21)", () => {
     expect(STATIC_RULES).toContain("The ship keeps watches. The day is three watches");
     expect(STATIC_RULES).toContain("who has the helm (and since when)");
-    expect(STATIC_RULES).toContain("No lever of yours sets moods or thoughts");
+    expect(STATIC_RULES).toContain("no lever sets a mood outright");
     expect(STATIC_RULES).toContain("An empty helm");
     expect(STATIC_RULES).toContain("is the ship's own failing");
     expect(STATIC_RULES).toContain("A hazard is the helm's stakes");
     expect(STATIC_RULES).toContain("never while another fault is unrepaired");
-    expect(STATIC_RULES).toContain("you never decide who that is or how it goes");
+    expect(STATIC_RULES).toContain(
+      "you never decide who that is, and by default not how it goes either",
+    );
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("scheduleHazard on a long leg");
   });
 
@@ -1026,7 +1028,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   it("tells the model off-watch life and rivalries are the crew's, and how privateTalk works (§activities-and-interests, §ship-life-lines, v0.23)", () => {
     expect(STATIC_RULES).toContain("The crew have lives off watch.");
     expect(STATIC_RULES).toContain(
-      "These are the sim's and the crew's story to tell; no lever of yours reaches them yet",
+      "These are the sim's and the crew's story to tell; your levers reach them only through a memory you plant",
     );
     expect(STATIC_RULES).toContain(
       "An argument or a rivalry is the kind of thing a card is made of",
@@ -1038,7 +1040,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "how it went shows next call in what they feel about the captain",
     );
-    expect(STATIC_RULES).toContain("Only use the ten levers");
+    expect(STATIC_RULES).toContain("Only use the fifteen levers");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("so can a rivalry or an argument");
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
   });
@@ -1059,7 +1061,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     );
     expect(STATIC_RULES).toContain("A field is the biggest pressure of all");
     expect(STATIC_RULES).toContain(
-      "stockMarket, scheduleHazard, scheduleField, strike, transact. An empty list",
+      "stockMarket, scheduleHazard, scheduleField, strike, transact, plantMemory",
     );
     // §notable-event-hook: the field's end calls at alertCleared, with the crew reported in, not
     // fieldCleared.
@@ -1118,7 +1120,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(PROMPT_VERSION).toBe("v0.34");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
     expect(STATIC_RULES).toContain("you have no lever yet that stages a site");
@@ -1154,7 +1156,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model to decide, roll or let the sim run, and to show what it decides (D106, v0.32)", () => {
-    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(PROMPT_VERSION).toBe("v0.34");
     expect(STATIC_RULES).not.toContain("do not decide outcomes");
     expect(STATIC_RULES).toContain("- Decide, roll, or let the sim run. You may decide outcomes");
     expect(STATIC_RULES).toContain("you cannot do the impossible");
@@ -1175,7 +1177,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model its outcome levers: strike by the body rules, transact and payCredits, the captain not special, budgets as advice (D106, v0.33)", () => {
-    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(PROMPT_VERSION).toBe("v0.34");
     expect(STATIC_RULES).toContain("wound or kill a person by the body rules (strike)");
     expect(STATIC_RULES).toContain("move money into or out of the ship's money (transact)");
     expect(STATIC_RULES).toContain("the death the season has been walking toward");
@@ -1184,14 +1186,34 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("payTier and payCredits are private levers");
     expect(STATIC_RULES).toContain("The captain is not special");
     expect(STATIC_RULES).toContain('"Your budget" is advice, not a limit');
-    expect(STATIC_RULES).toContain(
-      "scheduleHazard, scheduleField, strike, transact. An empty list is a valid answer.",
-    );
+    expect(STATIC_RULES).toContain("scheduleHazard, scheduleField, strike, transact,");
     expect(STATIC_RULES).not.toContain("eight levers");
   });
 
+  it("tells the model the rest of its outcome levers: memories, a falling-out, thoughts, a reveal, a fault now and a decided hazard (D106, v0.34)", () => {
+    expect(PROMPT_VERSION).toBe("v0.34");
+    for (const lever of [
+      "(plantMemory)",
+      "(fallOut)",
+      "(giveThought)",
+      "(reveal)",
+      "(injectFault)",
+      "(scheduleHazard's outcome)",
+    ]) {
+      expect(STATIC_RULES).toContain(lever);
+    }
+    expect(STATIC_RULES).toContain("the old grudge that breaks tonight");
+    expect(STATIC_RULES).toContain("the log never shows a feeling");
+    expect(STATIC_RULES).toContain("never state a feeling: plant it, then show it");
+    expect(STATIC_RULES).toContain("leave outcome empty");
+    expect(STATIC_RULES).toContain(
+      "transact, plantMemory, fallOut, giveThought, reveal, injectFault. An empty list is a valid answer.",
+    );
+    expect(STATIC_RULES).not.toContain("ten levers");
+  });
+
   it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
-    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(PROMPT_VERSION).toBe("v0.34");
     const policy = HOOK_INSTRUCTIONS.policyDecision;
     expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
     expect(policy).toContain("a guard asleep, a back way, a friend inside");
@@ -1205,7 +1227,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "One thing at a site you decide before the fight is which way in goes unseen",
     );
-    expect(STATIC_RULES).toContain("Only use the ten levers");
+    expect(STATIC_RULES).toContain("Only use the fifteen levers");
   });
 });
 

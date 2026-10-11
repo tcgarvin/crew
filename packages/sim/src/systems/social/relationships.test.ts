@@ -44,7 +44,9 @@ describe("addMemory (§memories)", () => {
     // Still two, still +2: the one from tick 0 now runs from 2 days on.
     expect(feel(world, JAX, TOMAS)).toBe(2);
     expect(
-      world.state.social.relationships[JAX]?.[TOMAS]?.memories.map((m) => m.expiresAtTick),
+      world.state.social.relationships[JAX]?.[TOMAS]?.memories.map((m) =>
+        "expiresAtTick" in m ? m.expiresAtTick : "lasting",
+      ),
     ).toEqual([2 * day + 1 + 5 * day, day + 1 + 5 * day]);
     expect(needsViolations(world)).toEqual([]);
   });
@@ -96,9 +98,9 @@ describe("pruneSocial and the social system", () => {
     const { world } = socialWorld();
     const { ctx } = galleyStepCtx(world);
     addMemory(ctx, JAX, TOMAS, "argued");
-    const expiresAtTick =
-      world.state.social.relationships[JAX]?.[TOMAS]?.memories[0]?.expiresAtTick;
-    if (expiresAtTick === undefined) throw new Error("no memory");
+    const memory = world.state.social.relationships[JAX]?.[TOMAS]?.memories[0];
+    if (memory === undefined || !("expiresAtTick" in memory)) throw new Error("no timed memory");
+    const { expiresAtTick } = memory;
     pruneSocial({ state: world.state, tick: expiresAtTick - 1 });
     expect(feel(world, JAX, TOMAS)).toBe(-2);
     pruneSocial({ state: world.state, tick: expiresAtTick });

@@ -472,10 +472,17 @@ function checkDayworkerWatches(bundle: ContentBundle, issues: ValidationIssue[])
 }
 
 /**
- * The thoughts the sim gives with a `refId` (the rival, the one argued with); the inspector and
- * the digest fill `{ref}` from it. Any other key would show the placeholder itself.
+ * The thoughts the sim gives with a `refId` (the rival, the one argued with; the narrator's
+ * `giveThought` of someone to worry about or grieve for, which refuses one without,
+ * §thought-and-reveal-levers); the inspector and the digest fill `{ref}` from it. Any other key
+ * would show the placeholder itself.
  */
-const THOUGHTS_WITH_REF: ReadonlySet<string> = new Set(["keepsBeatingMe", "argued"]);
+const THOUGHTS_WITH_REF: ReadonlySet<string> = new Set([
+  "keepsBeatingMe",
+  "argued",
+  "worriedAbout",
+  "grieving",
+]);
 
 /**
  * §thoughts: each thought def sits under its own key; §crew-lines: `{ref}` only where a `refId`

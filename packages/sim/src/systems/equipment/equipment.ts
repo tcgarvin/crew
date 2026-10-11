@@ -43,10 +43,10 @@ import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
 import type { ConfigDef, MachineDef } from "../../core/types/content";
 import type { DerateCause, EventDraft } from "../../core/types/events";
-import type { CommandId, ItemDefId, LocalKey, MachineId } from "../../core/types/ids";
+import type { CommandId, ItemDefId, LocalKey, MachineId, ProblemId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
-import type { ProblemOfKind } from "../../core/types/work";
+import type { Problem, ProblemOfKind } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
 import { repairShortfall, unitsAboard } from "./supplies";
@@ -193,8 +193,8 @@ function raiseSymptomProblem(
   ctx: StepCtx,
   machine: Machine,
   faultDef: MachineDef["faults"][number],
-): void {
-  const { event } = raiseProblem(ctx.state, ctx.tick, {
+): ProblemId {
+  const { problemId, event } = raiseProblem(ctx.state, ctx.tick, {
     kind: "machineSymptom",
     payload: { machineId: machine.id, symptomKey: faultDef.symptom.key },
     dedupeKey: `machineSymptom:${machine.id}:${faultDef.key}`,
@@ -203,6 +203,25 @@ function raiseSymptomProblem(
     location: { kind: "machine", machineId: machine.id },
   });
   if (event !== undefined) ctx.emit(event);
+  return problemId;
+}
+
+/**
+ * §thought-and-reveal-levers: the narrator's `reveal`. The symptom problem of `faultDef` on
+ * `machine` (opened if the fault has none yet) goes `public`, as an intercom report makes the damage
+ * it relays (`intercom/report.ts`), so every crew member's view has it and the planner sends
+ * someone to inspect. Returns the problem.
+ */
+export function revealSymptom(
+  ctx: StepCtx,
+  machine: Machine,
+  faultDef: MachineDef["faults"][number],
+): Problem {
+  const problemId = raiseSymptomProblem(ctx, machine, faultDef);
+  const problem = ctx.state.work.problems[problemId];
+  if (problem === undefined) throw new Error(`revealSymptom: problem ${problemId} vanished`);
+  problem.visibility = "public";
+  return problem;
 }
 
 /**

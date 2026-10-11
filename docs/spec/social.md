@@ -97,9 +97,11 @@ Memories are a closed set (`MEMORY_KEYS`) the sim raises; each has an opinion (n
 and stack limit (1 to 2) in `social.memories`. A memory past its stack limit
 refreshes the one expiring soonest, so repetition holds weight but never grows it. The social
 system drops expired memories each tick, and entries with nothing left (and no chat time), and
-people who have left. Between two crew, memories reach +7 at most (+9 with compatibility); only the
-captain's table and the private talk go past that. Why: DF-style limited close-friend slots are
-deferred until the narrator needs a lasting bond.
+people who have left. Between two crew, the sim's memories reach +7 at most (+9 with
+compatibility); only the captain's table and the private talk go past that. Why: DF-style limited
+close-friend slots are deferred until the narrator needs a lasting bond. The narrator's own keys
+(`betrayedMe`, `savedMyLife`, `wrongedOverSomeone`, `madeItRight`) are raised by nothing in the sim
+and may be lasting, never expiring (§memory-levers).
 
 ### Ambient chat
 

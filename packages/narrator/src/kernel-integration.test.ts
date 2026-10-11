@@ -192,7 +192,13 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     const { commands, dropped } = translateIntents(
       emptyPlan({
         intents: [
-          { kind: "scheduleHazard", hazard: "ionStorm", difficulty: "brutal", window: "later" },
+          {
+            kind: "scheduleHazard",
+            hazard: "ionStorm",
+            difficulty: "brutal",
+            window: "later",
+            outcome: "",
+          },
         ] as unknown as NarratorPlan["intents"],
       }),
       ctx,

@@ -7,7 +7,7 @@
  * none outlives its leg's transit. Pure over state and content.
  */
 import { dockForPort, expectedDock, isDockPoint } from "../../core/docks";
-import { HAZARD_KINDS } from "../../core/types/content";
+import { FORCED_HAZARD_OUTCOMES, HAZARD_KINDS } from "../../core/types/content";
 import type { World } from "../../core/types/kernel";
 import { HAZARD_DIFFICULTY_MAX, HAZARD_DIFFICULTY_MIN } from "./hazards";
 
@@ -46,6 +46,10 @@ function hazardViolations({ state }: Pick<World, "state">): string[] {
     const where = `hazard ${hazard.id}`;
     if (!(HAZARD_KINDS as readonly string[]).includes(hazard.kind)) {
       out.push(`${where} has unknown kind "${hazard.kind}"`);
+    }
+    const forced = hazard.outcome;
+    if (forced !== undefined && !(FORCED_HAZARD_OUTCOMES as readonly string[]).includes(forced)) {
+      out.push(`${where} has unknown forced outcome "${forced}"`);
     }
     const { difficulty } = hazard;
     if (

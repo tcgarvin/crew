@@ -1,7 +1,7 @@
 /**
  * Travel commands (SD §17.1).
  */
-import type { HazardKind } from "../content";
+import type { ForcedHazardOutcome, HazardKind } from "../content";
 import type { MachineId, PortDefId } from "../ids";
 
 export interface TravelCommandPayloads {
@@ -25,5 +25,10 @@ export interface TravelCommandPayloads {
     readonly kind: HazardKind;
     readonly difficulty: number;
     readonly windowTicks: readonly [number, number];
+    /**
+     * §forced-faults-and-hazards (D106): the outcome decided, so the hazard skips its roll when it
+     * fires; absent, the helm's piloting check decides.
+     */
+    readonly outcome?: ForcedHazardOutcome;
   };
 }

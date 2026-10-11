@@ -17,6 +17,7 @@ import {
   causedBy,
   ok,
   reject,
+  stepCtxOfApply,
 } from "../../core/commands";
 import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
@@ -25,7 +26,6 @@ import type { DeepReadonly } from "../../core/types/common";
 import { BODY_PARTS, DAMAGE_TYPES, WOUND_SEVERITIES } from "../../core/types/content";
 import { STRIKE_HOW_MAX } from "../../core/types/decisions";
 import type { ActorId, CompartmentId } from "../../core/types/ids";
-import type { StepCtx } from "../../core/types/pipeline";
 import { groundOf, onSite, tileOfActor } from "../expedition/ground";
 import { lineOfSight } from "../expedition/los";
 import { upright } from "../expedition/morale";
@@ -71,11 +71,6 @@ function strikeProblem(
     if (by !== undefined) return { code: "preconditionFailed", reason: by };
   }
   return undefined;
-}
-
-/** A command applies outside any system's run: no cadence, the caches' dirty flags. */
-function stepCtxOf(ctx: ApplyCtx): StepCtx {
-  return { ...ctx, elapsedTicks: 0, dirty: ctx.caches.dirty };
 }
 
 /** The room `actorId` stands in aboard, by the actor index. */
@@ -129,7 +124,7 @@ export const strike: CommandHandler<"strike", null> = {
       subjectIds: byActorId === undefined ? [actorId] : [actorId, byActorId],
       payload: { actorId, severity, type, how: how.trim(), inFight, ...by },
     });
-    const step = stepCtxOf(ctx);
+    const step = stepCtxOfApply(ctx);
     const result = applyDamage(step, actorId, {
       severity,
       type,

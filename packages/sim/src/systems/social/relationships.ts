@@ -5,18 +5,27 @@
  *   `durationDays`. Below its `stackLimit` a new one is added; at the limit the one expiring
  *   soonest is refreshed instead, so repetition holds a memory's weight but never grows it.
  *   `affinityChanged` (trace) when `affinityOf` actually moved.
+ * - `plantMemory(ctx, from, to, key, lasting)` (§memory-levers): the narrator's memory. Any lasting
+ *   one `from` holds about `to` goes first (only a planted memory clears one); then a timed one is
+ *   added as `addMemory` adds it, or a lasting one that never expires in place of the timed ones of
+ *   its key.
  * - `relationshipOf(ctx, from, to)`: the entry, created empty when absent (chat's `lastChatTick`).
- * - `pruneSocial(ctx)`: drops expired memories, entries (either side) and rivalries naming ids no
- *   longer in `actors`, and entries left with nothing in them.
+ * - `pruneSocial(ctx)`: drops expired memories (never a lasting one), entries (either side) and
+ *   rivalries naming ids no longer in `actors`, and entries left with nothing in them.
  *
  * Owner: W2 of ship life slice 4.
  */
 import { dayTicks } from "../../core/clock";
 import { affinityOf } from "../../core/social";
-import type { MemoryKey } from "../../core/types/content";
+import type { MemoryKey, NarratorMemoryKey } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
-import type { Relationship } from "../../core/types/state";
+import type {
+  LastingMemory,
+  Relationship,
+  SocialMemory,
+  TimedMemory,
+} from "../../core/types/state";
 import { emitSim } from "../work/events";
 
 type SocialCtx = Pick<StepCtx, "state" | "config" | "emit" | "tick">;
@@ -45,16 +54,26 @@ export function relationshipOf(ctx: SocialCtx, from: ActorId, to: ActorId): Rela
  */
 export function addMemory(ctx: SocialCtx, from: ActorId, to: ActorId, key: MemoryKey): void {
   const before = affinityOf(ctx.state, ctx.config.social, from, to);
+  remember(ctx, relationshipOf(ctx, from, to), key);
+  emitAffinityChange(ctx, from, to, before);
+}
+
+/** A timed `key` added below its stack limit, or the one expiring soonest refreshed at it. */
+function remember(ctx: SocialCtx, entry: Relationship, key: MemoryKey): void {
   const def = ctx.config.social.memories[key];
   const expiresAtTick = ctx.tick + dayTicks(ctx.config, def.durationDays);
-  const memories = relationshipOf(ctx, from, to).memories;
-  const held = memories.filter((memory) => memory.key === key);
+  const held = entry.memories.filter(
+    (memory): memory is TimedMemory => memory.key === key && !isLasting(memory),
+  );
   if (held.length < def.stackLimit) {
-    memories.push({ key, expiresAtTick });
-  } else {
-    const oldest = held.reduce((a, b) => (b.expiresAtTick < a.expiresAtTick ? b : a));
-    oldest.expiresAtTick = Math.max(oldest.expiresAtTick, expiresAtTick);
+    entry.memories.push({ key, expiresAtTick });
+    return;
   }
+  const oldest = held.reduce((a, b) => (b.expiresAtTick < a.expiresAtTick ? b : a));
+  oldest.expiresAtTick = Math.max(oldest.expiresAtTick, expiresAtTick);
+}
+
+function emitAffinityChange(ctx: SocialCtx, from: ActorId, to: ActorId, before: number): void {
   const after = affinityOf(ctx.state, ctx.config.social, from, to);
   if (after === before) return;
   emitSim(ctx, "affinityChanged", [from, to], {
@@ -63,6 +82,35 @@ export function addMemory(ctx: SocialCtx, from: ActorId, to: ActorId, key: Memor
     delta: after - before,
     affinity: after,
   });
+}
+
+/** §memory-levers: a memory that never expires. */
+export function isLasting(memory: SocialMemory): memory is LastingMemory {
+  return "lasting" in memory;
+}
+
+/**
+ * §memory-levers: the narrator's `plantMemory` (see the module comment). Throws on a self-pair or
+ * an id not in `actors`, as `addMemory` does; the command's validation keeps both out.
+ */
+export function plantMemory(
+  ctx: SocialCtx,
+  from: ActorId,
+  to: ActorId,
+  key: NarratorMemoryKey,
+  lasting: boolean,
+): void {
+  const before = affinityOf(ctx.state, ctx.config.social, from, to);
+  const entry = relationshipOf(ctx, from, to);
+  entry.memories = entry.memories.filter((memory) => !isLasting(memory));
+  if (lasting) {
+    // The lasting one takes the place of the timed ones of its key, so the stack limit holds.
+    entry.memories = entry.memories.filter((memory) => memory.key !== key);
+    entry.memories.push({ key, lasting: true });
+  } else {
+    remember(ctx, entry, key);
+  }
+  emitAffinityChange(ctx, from, to, before);
 }
 
 /** Drop expired memories, ids no longer in `actors`, and entries with nothing left in them. */
@@ -78,8 +126,10 @@ export function pruneSocial(ctx: Pick<StepCtx, "state" | "tick">): void {
         delete row[to as ActorId];
         continue;
       }
-      if (entry.memories.some((memory) => memory.expiresAtTick <= ctx.tick)) {
-        entry.memories = entry.memories.filter((memory) => memory.expiresAtTick > ctx.tick);
+      const expired = (memory: SocialMemory) =>
+        !isLasting(memory) && memory.expiresAtTick <= ctx.tick;
+      if (entry.memories.some(expired)) {
+        entry.memories = entry.memories.filter((memory) => !expired(memory));
       }
       if (entry.memories.length === 0 && entry.lastChatTick === undefined) {
         delete row[to as ActorId];
