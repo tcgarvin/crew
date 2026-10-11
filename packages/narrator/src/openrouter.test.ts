@@ -13,6 +13,7 @@ import { planJsonSchema } from "./plan";
 import { STATIC_RULES } from "./prompts/index";
 import { runNarrator } from "./run";
 import { FIXTURE_CALL_BACK, content, emptyPlan } from "./test-support";
+import { NO_TOOLS, ToolsRejectedError, TransportError } from "./transport";
 
 interface SentBody {
   readonly messages: readonly [
@@ -189,6 +190,7 @@ describe("OpenRouter continuation (§notes-turn)", () => {
     schemaName: "narrator_plan",
     jsonSchema: { type: "object" },
     maxTokens: 100,
+    tools: NO_TOOLS,
     signal: new AbortController().signal,
   };
   const reasoningDetails = [{ type: "reasoning.encrypted", data: "opaque" }];
@@ -247,5 +249,118 @@ describe("OpenRouter continuation (§notes-turn)", () => {
       ],
     });
     expect(bodies[0]).not.toHaveProperty("reasoning");
+  });
+});
+
+describe("OpenRouter tools (§notes-turn-tools)", () => {
+  const tool = { name: "thread", description: "one thread", parameters: { type: "object" } };
+  const offered = { kind: "offered" as const, tools: [tool], choice: "auto" as const };
+  const base = {
+    model: "openai/gpt-6-luna",
+    system: ["rules"],
+    user: "the ship",
+    schemaName: "narrator_plan",
+    jsonSchema: { type: "object" },
+    maxTokens: 100,
+    reasoningEffort: "low" as const,
+    signal: new AbortController().signal,
+  };
+  const ANSWER = { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] };
+
+  function answering(status: number, body: unknown) {
+    const bodies: Record<string, unknown>[] = [];
+    const fake = async (_url: unknown, init?: { body?: unknown }) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify(body), { status });
+    };
+    return { bodies, fetch: fake as unknown as typeof fetch };
+  }
+
+  it("sends the tools and tool_choice, and the tool turns as assistant tool_calls and tool messages", async () => {
+    const { bodies, fetch } = answering(200, ANSWER);
+    const reasoningDetails = [{ id: "r1" }];
+    await openRouterTransport({ apiKey: "k", fetch })({
+      ...base,
+      tools: offered,
+      continuation: [
+        { role: "user", content: "now your notes" },
+        {
+          role: "toolRequest",
+          content: "",
+          reasoningDetails,
+          toolCalls: [{ id: "c1", name: "thread", arguments: '{"title":"x"}' }],
+        },
+        { role: "toolResult", toolCallId: "c1", content: "No such thread" },
+      ],
+    });
+    const body = bodies[0];
+    expect(body?.tools).toEqual([
+      {
+        type: "function",
+        function: { name: "thread", description: "one thread", parameters: { type: "object" } },
+      },
+    ]);
+    expect(body?.tool_choice).toBe("auto");
+    expect((body?.messages as unknown[]).slice(2)).toEqual([
+      { role: "user", content: "now your notes" },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          { id: "c1", type: "function", function: { name: "thread", arguments: '{"title":"x"}' } },
+        ],
+        reasoning_details: reasoningDetails,
+      },
+      { role: "tool", tool_call_id: "c1", content: "No such thread" },
+    ]);
+    // Reasoning handed back on a tool turn is read too.
+    expect(body?.reasoning).toEqual({ effort: "low", context: "all_turns" });
+  });
+
+  it("sends no tools field when none are offered", async () => {
+    const { bodies, fetch } = answering(200, ANSWER);
+    await openRouterTransport({ apiKey: "k", fetch })({
+      ...base,
+      tools: NO_TOOLS,
+      continuation: [],
+    });
+    expect(bodies[0]).not.toHaveProperty("tools");
+    expect(bodies[0]).not.toHaveProperty("tool_choice");
+  });
+
+  it("returns the reply's tool calls with finish toolCalls", async () => {
+    const { fetch } = answering(200, {
+      choices: [
+        {
+          message: {
+            content: null,
+            tool_calls: [{ id: "c9", function: { name: "crew", arguments: '{"name":"Jax"}' } }],
+          },
+          finish_reason: "tool_calls",
+        },
+      ],
+    });
+    const result = await openRouterTransport({ apiKey: "k", fetch })({
+      ...base,
+      tools: offered,
+      continuation: [],
+    });
+    expect(result.finish).toBe("toolCalls");
+    expect(result.toolCalls).toEqual([{ id: "c9", name: "crew", arguments: '{"name":"Jax"}' }]);
+  });
+
+  it("throws ToolsRejectedError when the provider refuses the tools, a plain error otherwise", async () => {
+    const refusal = { error: { message: "No endpoints found that support tool use.", code: 404 } };
+    const rejected = openRouterTransport({ apiKey: "k", fetch: answering(404, refusal).fetch });
+    await expect(rejected({ ...base, tools: offered, continuation: [] })).rejects.toBeInstanceOf(
+      ToolsRejectedError,
+    );
+    const other = openRouterTransport({
+      apiKey: "k",
+      fetch: answering(500, { error: { message: "upstream tool server exploded" } }).fetch,
+    });
+    const failed = other({ ...base, tools: offered, continuation: [] });
+    await expect(failed).rejects.toBeInstanceOf(TransportError);
+    await expect(failed).rejects.not.toBeInstanceOf(ToolsRejectedError);
   });
 });

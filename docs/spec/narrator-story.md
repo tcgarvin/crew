@@ -710,5 +710,9 @@ sets the stage and nothing else. Its calling, budget and failure fallback are
   items and the text rules, clips labels, looks and the ambience line, refuses over-long names and
   roles, and drops each bad part alone so the kernel never refuses a whole plan for one placement.
   It reads the notes and never writes them.
+- Each placement says who the person is: `cast` for a name on a `cast:` line of the notes (cast
+  at this port are also listed under "People you know here", and are still `cast`), `seed` only
+  for a name under that section's "locals you have not met yet", `newFace` for anyone else. A
+  cast member placed as a seed is dropped with a reason that says to place them as cast.
 - Prompt guidance: less is more (one or two touches; an empty list is valid), continuity before new
   faces, stage what the story may do next without doing it, never place anyone aboard.

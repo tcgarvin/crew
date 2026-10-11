@@ -30,6 +30,7 @@ import {
   siteTurnRequest,
   stageDockRequest,
 } from "../fixtures";
+import type { ToolCallRecord } from "../model-call";
 import { NULL_NARRATOR_MODEL } from "../null";
 import { openRouterTransport } from "../openrouter";
 import {
@@ -80,6 +81,9 @@ const skipReason =
     ? " (skipped: no OPENROUTER_API_KEY in the environment or packages/narrator/.env.local)"
     : "";
 
+/** A live run with the notes turn's tool calls (§notes-turn-tools); none when it made none. */
+type LiveRun = NarratorRun & { readonly notesToolCalls: readonly ToolCallRecord[] };
+
 /**
  * One live call. §notes-turn: a story call the model answered is followed by its notes turn, as the
  * server runs it; the notes it writes replace the response's, and both latencies are logged.
@@ -87,7 +91,7 @@ const skipReason =
 async function liveRun(
   req: NarratorRequest,
   options: { readonly model?: string; readonly notes?: unknown } = {},
-): Promise<NarratorRun> {
+): Promise<LiveRun> {
   if (apiKey === undefined) throw new Error("no API key");
   const started = Date.now();
   const run = await runNarratorWithTrace(req, {
@@ -99,17 +103,22 @@ async function liveRun(
     ...(reasoningEffort ? { reasoningEffort } : {}),
   });
   const planMs = Date.now() - started;
-  if (run.notesTurn === undefined) return run;
+  if (run.notesTurn === undefined) return { ...run, notesToolCalls: [] };
   const notes = await run.notesTurn();
   const notesMs = Date.now() - started - planMs;
   expect(notes.ok, notes.ok ? "" : `notes turn failed (${notes.reason}): ${notes.error}`).toBe(
     true,
   );
-  if (!notes.ok) return run;
+  const tools = notes.toolCalls.map((c) => `${c.name}(${c.arguments})`).join(", ") || "none";
+  if (!notes.ok) return { ...run, notesToolCalls: notes.toolCalls };
   console.log(
-    `${req.hook.kind}: plan ${planMs} ms (${run.response.usage?.outputTokens} out), notes ${notesMs} ms (${notes.usage.outputTokens} out, ${notes.usage.cacheReadInputTokens}/${notes.usage.inputTokens} cached); repairs (§repair-turn) plan ${run.repairs.length}, notes ${notes.repairs.length}; summary: ${notes.notes.summary}`,
+    `${req.hook.kind}: plan ${planMs} ms (${run.response.usage?.outputTokens} out), notes ${notesMs} ms (${notes.usage.outputTokens} out, ${notes.usage.cacheReadInputTokens}/${notes.usage.inputTokens} cached); repairs (§repair-turn) plan ${run.repairs.length}, notes ${notes.repairs.length}; tools (§notes-turn-tools) ${tools}; summary: ${notes.notes.summary}`,
   );
-  return { ...run, response: { ...run.response, notesUpdate: notes.notes } };
+  return {
+    ...run,
+    response: { ...run.response, notesUpdate: notes.notes },
+    notesToolCalls: notes.toolCalls,
+  };
 }
 
 /**
@@ -422,6 +431,47 @@ function cardShape(intent: unknown): string {
   return `odds ${odds.join("/")}, failLevers ${JSON.stringify(levers)}, followUps ${JSON.stringify(followUps)}, ${thread}`;
 }
 
+/**
+ * §notes-turn-tools: thin notes at the Hub with no plan standing, whose season is to turn back to
+ * Kessler Drift and people the digest does not name there (the Drift's locals and its dock are not
+ * in a Hub call's digest): what the notes turn needs is reachable by tool (site, castMember,
+ * pastArcs, thread), never in the prompt.
+ */
+const THIN_NOTES = {
+  summary:
+    "Three plain cargo runs out of the Hub. The captain has promised to go back to Kessler Drift for the ledger someone at the assay window keeps; the notes never named who.",
+  threads: [
+    {
+      title: "The assay ledger",
+      scale: "season",
+      people: [],
+      arcNotes:
+        "Someone at Kessler Drift keeps a private ledger of who shorted whom on ore weights. The captain wants it; nobody aboard knows who keeps it or what they want for it.",
+      nextBeat:
+        "When the season turns to the Drift, the ledger's keeper comes into it, by name, with a price.",
+      lastBeatTick: 900,
+      beatCardShown: false,
+    },
+  ],
+  pastArcs: [
+    {
+      title: "The shorted ore",
+      scale: "episode",
+      people: ["Greta Lindholm"],
+      openedTick: 200,
+      closedTick: 800,
+      ending: "closingCard",
+      shape: "short weight, a grudge",
+      summary:
+        "The Drift's assay came in light on the ship's ore; Greta Lindholm blamed the ship. The captain paid the difference and left owing nobody, but not forgiven.",
+    },
+  ],
+  cardsShown: [],
+  cast: [],
+  lastUpdatedTick: 900,
+  lastRejections: [],
+};
+
 /** §outcome-levers: the kinds that decide an outcome outright. */
 const OUTCOME_KINDS: readonly string[] = [
   "strike",
@@ -583,6 +633,21 @@ suite(
         expect(plan?.arc.premise, "no arc sketched").not.toBe("");
         expect(plan?.episode.premise, "no episode sketched").not.toBe("");
         expect(plan?.episode.beats.length ?? 0).toBeGreaterThanOrEqual(3);
+      },
+      LIVE_TIMEOUT_MS * 2,
+    );
+
+    it(
+      "captainAshore with thin notes and a season to sketch: the notes turn may read by tool, and its notes parse (§notes-turn-tools)",
+      async () => {
+        const run = await liveRun(farCaptainAshoreRequest(content()), { notes: THIN_NOTES });
+        const response = expectModelAnswered(run);
+        // Lenient: whether it reaches for a tool is the model's call; the notes must parse.
+        console.log(
+          `thin notes: ${run.notesToolCalls.length} tool calls: ${JSON.stringify(run.notesToolCalls.map((c) => ({ round: c.round, name: c.name, arguments: c.arguments, result: c.result })))}`,
+        );
+        console.log("season written:", JSON.stringify(response.notesUpdate?.plan.season));
+        expect(response.notesUpdate?.summary ?? "").not.toBe("");
       },
       LIVE_TIMEOUT_MS * 2,
     );

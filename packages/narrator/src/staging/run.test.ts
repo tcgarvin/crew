@@ -131,3 +131,14 @@ describe("the staging call (§staging-call-on-the-server)", () => {
     expect(res).toMatchObject({ commands: [], fallback: "notConfigured" });
   });
 });
+
+describe("STAGING_RULES (§staging-prompt)", () => {
+  it("says a cast member listed under People you know here is still cast, and a seed is only an unmet local", () => {
+    expect(STAGING_RULES).toContain(
+      'your cast at this port is listed under "People you know here" too, and they are still "cast"',
+    );
+    expect(STAGING_RULES).toContain(
+      'who "seed": the exact name under "locals you have not met yet", nobody else',
+    );
+  });
+});

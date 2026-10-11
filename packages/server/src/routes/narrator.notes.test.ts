@@ -59,6 +59,7 @@ function twoTurns(notesReply: string): ModelTransport {
       cacheCreationInputTokens: 0,
     },
     reasoningDetails: [],
+    toolCalls: [],
   });
 }
 
@@ -106,6 +107,31 @@ describe("POST /api/games/:id/narrator, the notes turn (§notes-turn)", () => {
     expect(await db.listNarratorCalls({ gameId, kind: "story", limit: 5 })).toHaveLength(1);
   });
 
+  it("records the notes turn's tool calls in its logged response (§notes-turn-tools)", async () => {
+    const answer = twoTurns(JSON.stringify(WRITTEN));
+    const withTool: ModelTransport = async (request) => {
+      const reply = await answer(request);
+      const callable = request.tools.kind === "offered" && request.tools.choice === "auto";
+      const asked = request.continuation.some((m) => m.role === "toolRequest");
+      if (!callable || asked) return reply;
+      const toolCalls = [{ id: "t1", name: "thread", arguments: '{"title":"Nobody"}' }];
+      return { ...reply, content: null, finish: "toolCalls", toolCalls };
+    };
+    const { db, gameId, post } = await setUp(realNarrator(withTool));
+    expect((await post(quietTooLongRequest(content()))).status).toBe(200);
+    const [notesRow] = await db.listNarratorCalls({ gameId, hookKind: NOTES_HOOK_KIND, limit: 5 });
+    expect(notesRow?.status).toBe("ok");
+    expect((notesRow?.response as { toolCalls: unknown[] }).toolCalls).toEqual([
+      expect.objectContaining({
+        round: 1,
+        name: "thread",
+        result: expect.stringMatching(/^No such thread/),
+      }),
+    ]);
+    const game = await db.getGame(gameId);
+    expect(parseNotes(game?.narrativeNotes).summary).toBe(WRITTEN.summary);
+  });
+
   it("keeps the plan's notes and logs an error row when the notes turn fails", async () => {
     const { db, gameId, post } = await setUp(realNarrator(twoTurns("not json")));
     const res = await post(quietTooLongRequest(content()));
@@ -138,6 +164,7 @@ describe("POST /api/games/:id/narrator, the notes turn (§notes-turn)", () => {
           cacheCreationInputTokens: 0,
         },
         reasoningDetails: [],
+        toolCalls: [],
       };
     };
     const { db, gameId, post } = await setUp(realNarrator(transport));

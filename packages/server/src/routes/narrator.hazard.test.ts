@@ -44,6 +44,7 @@ function planWith(intents: unknown[]): ModelTransport {
       cacheCreationInputTokens: 0,
     },
     reasoningDetails: [],
+    toolCalls: [],
   });
 }
 

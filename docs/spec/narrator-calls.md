@@ -161,7 +161,8 @@ notes plus the server-kept changes from this call) and a `notesTurn` that contin
 conversation: the same cached system prefix, the plan's user turn, the plan as the assistant turn
 with the model's `reasoning_details`, then a user turn telling it what became of the plan (each
 dropped intent and why) and what the plan needs now, by the moment and never by advice
-(§seasons-and-stalls). The route logs the story row and a `notes` row (`pending`) before it
+(§seasons-and-stalls). The notes turn, and only it, offers read-only tools (§notes-turn-tools),
+which it may call before it answers; the reply after them is the notes. The route logs the story row and a `notes` row (`pending`) before it
 responds; the notes turn runs after the response (`waitUntil` on Vercel, inline elsewhere),
 stores the notes and finishes the row `ok` or `error`. A call that arrives while a `notes` row is
 pending polls (500 ms) for up to `NOTES_TIMEOUT_MS` + 5 s, then reads the notes as they stand; an
@@ -169,6 +170,67 @@ older pending row is a cut-off turn and is ignored. A failed notes turn keeps th
 The plan reply is the JSON object alone (`PLAN_ONLY` ends the plan's user turn). Why: the notes
 are only read by the next call, and two calls rather than one streamed reply was the owner's
 choice: no stream parsing, and the notes turn could move to a cheaper model.
+
+### Notes-turn tools
+
+The notes turn may read what the digest leaves out by calling tools before it writes its notes
+(`notes-tools.ts`), over what the server already holds for the call: the snapshot, the stored
+notes as the digest showed them, and the request's recent events. All are read-only and answer in
+compact text (each tool keeps itself under about 1,900 characters; the loop cuts any result at
+`MAX_TOOL_RESULT_CHARS` 2,000):
+
+- `pastArcs(scale?)`: the past arcs (§past-arcs), newest first, optionally one scale.
+- `thread(title)`: an open thread in full (scale, people, arc notes, next beat, ticks, the plan
+  beats whose `thread` names it), or an ended one's past arc.
+- `castMember(name)`: everything held on someone not crew: the cast entry, where they are a
+  port's local or a site's default person, the jobs they offered, and the open threads, past arcs
+  and cards they appear in. A crew name is pointed at `crew`.
+- `site(id)`: a port or site by id or name: description, character, locals, the cast placed there,
+  its dock or site map's posts and default people, and the "On the dock" or "At the site" lines
+  when the ship is alongside it.
+- `cardsShown(n)`: the last `n` cards (1 to 50) of the card history; asked for more than it holds,
+  it says it keeps the last 12 (§card-history) and how many it has.
+- `crew(name)`: one crew member's full digest line (§crew-lines), or a passenger's "Aboard" line,
+  by full, first or last name.
+- `eventsSince(tick, type?)`: the request's events since the tick, oldest first (trace events only
+  when asked for by type), with the span the request holds: events since the last story call.
+
+An unknown tool, arguments that are not JSON or fail the tool's schema, and a name, title, id or
+type that matches nothing each answer with what was wrong and what exists ("No such thread … Open
+threads: …"), never an exception.
+
+The loop is `callForValidReply`'s (`model-call.ts`; a transport stays one round trip): while tools
+are offered (`tool_choice: "auto"`) and the reply asks for tool calls, each call is run (at most
+`MAX_TOOL_CALLS_PER_ROUND` 6 a round; any more are answered "not run"), the reply goes back as an
+assistant turn with its `tool_calls` and `reasoning_details`, each result as a `tool` turn, and the
+model is called again. Tools are callable for at most `CREW_NARRATOR_TOOL_ROUNDS` rounds
+(`DEFAULT_MAX_TOOL_ROUNDS` 4; 0 offers none and leaves the tools line out of the notes request) and
+only while at least `TOOL_RESERVE_MS` (20 s) of the notes turn's `NOTES_TIMEOUT_MS` is left, the
+time the notes JSON itself needs. Past either limit the next call declares the tools with
+`tool_choice: "none"` (a conversation holding tool calls must still declare them) and, if the model
+has called any, adds a user turn opening `# No more tools` that asks for the JSON object only. The
+reply that asks for no tool call is the one validated; a malformed one is repaired as any other
+(§repair-turn), in the same conversation with the tool turns kept, and a repair offers no tools.
+A provider that refuses the request for its tools (OpenRouter 400, 404 or 422 naming tools:
+`ToolsRejectedError`) is asked again at once without them and without any tool turns, and logs
+`[narrator] tools rejected`; the notes turn does not fail for it.
+
+Each call logs `[narrator] tool` (game, call, round, name, arguments, result length), and closing
+the tools logs `[narrator] tools closed` (why, rounds). The calls (`{ round, name, arguments,
+resultChars, result }`, the result cut to 300 characters) ride in the notes row's
+`narrator_calls.response` jsonb as `toolCalls`, beside `repairs`; usage sums every round. The
+system rules ("Your notes") say the tools exist, that they belong to the notes turn only, when to
+use them (revising a season or an arc, bringing back a cast member or an old arc, checking who a
+beat falls on; most turns need none), and that the turn ends with the notes JSON alone; the notes
+request repeats it in a line when tools are offered. The story plan call stays one-shot, with no
+tools: it is on the player's wait (§narrator-timeouts). Why: the owner's "Plan at the usual time.
+Might need to make the planning agent more powerful (ie tool use) to be able to do everything
+we're asking it", read-only tools first (narrator arcs §6.7): the turn asked to think across the
+whole game had only the plan call's budget-trimmed digest. Rejected: declaring the tools on the
+plan call too with `tool_choice: "none"`, which would keep the notes turn's whole prefix cached
+from the plan call, but puts the tool definitions and a provider's refusal of them on the
+player's wait. The tools sit before the system blocks in the cached prefix, so the notes turn
+reads its static prefix from the cache of earlier notes turns rather than from the plan call.
 
 ### Staging call on the server
 
@@ -189,7 +251,11 @@ LLM calls go through OpenRouter's OpenAI-compatible chat-completions API (D15); 
 fake. The system prompt is sent as separate static content parts with `cache_control` breakpoints
 (at most four, counted back from the last); nothing volatile goes in `system`. A reasoning
 model's `reasoning_details` are sent back on the assistant turn of the notes turn, with
-`reasoning.context: "all_turns"` when an effort is set (they are billed as input).
+`reasoning.context: "all_turns"` when an effort is set (they are billed as input). The notes turn
+sends OpenAI-style function `tools` with `tool_choice` (`auto`, or `none` once they are closed);
+a reply's `tool_calls` come back as the result's tool calls (`finish_reason: "tool_calls"`), and go
+out again as an assistant turn with `tool_calls` and its `reasoning_details`, each answered by a
+`tool` message (§notes-turn-tools). Every other call sends no `tools`.
 
 ### Plan schema in the prompt
 
@@ -219,7 +285,8 @@ hidden reasoning.
 `NARRATOR_TIMEOUT_MS` 25 s for a story call (Vercel's function budget is about 30 s), no retry
 inside the call (a §repair-turn is not a retry: it spends the same budget);
 `STAGING_TIMEOUT_MS` 10 s for a staging call (`CREW_STAGING_TIMEOUT_MS` overrides, and the route
-passes it only for staging); `NOTES_TIMEOUT_MS` 45 s for the notes turn. The browser gives up on a request at 30 s.
+passes it only for staging); `NOTES_TIMEOUT_MS` 45 s for the notes turn, its tool rounds
+(§notes-turn-tools) and repairs included. The browser gives up on a request at 30 s.
 Why: a staging attempt that ran long held the ship at the end of transit on every retry.
 
 ## Failure and retries
@@ -246,7 +313,8 @@ each zod issue as `at <path>: <message>` (at most 20, then a count). An intent m
 of the intent union is spelled out: the missing or wrong fields of the kind it named, or the kinds
 allowed when it named none. The turn asks for the complete corrected JSON object only. This
 applies to the story plan, the notes turn (§notes-turn) and the staging call; the notes turn
-continues the plan's whole conversation, repairs included.
+continues the plan's whole conversation, repairs included. In the notes turn the reply repaired is
+the one after any tool rounds, and the repair keeps the tool turns (§notes-turn-tools).
 
 A call makes at most `CREW_NARRATOR_REPAIRS` repairs (`DEFAULT_MAX_REPAIRS` 2; 0 turns them off),
 all inside the call's own timeout (§narrator-timeouts): each attempt gets only what is left, and a

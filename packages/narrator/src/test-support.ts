@@ -54,6 +54,7 @@ export function okResult(content: string): ModelResult {
       cacheCreationInputTokens: 0,
     },
     reasoningDetails: [],
+    toolCalls: [],
   };
 }
 
