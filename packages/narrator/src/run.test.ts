@@ -46,6 +46,11 @@ const offer = {
   surface: false,
   passenger: false,
   roundTrip: false,
+  errandKind: "",
+  site: "",
+  targetName: "",
+  targetItem: "",
+  wants: "",
 };
 
 const assayThread = {

@@ -38,6 +38,7 @@ import type {
   CommandId,
   CompartmentId,
   CrewDefId,
+  DecisionId,
   DeckDefId,
   DoorId,
   FieldId,
@@ -434,6 +435,19 @@ export interface Expedition {
   outcome?: ExpeditionOutcome;
   shots: number;
   causeCommandId?: CommandId;
+  /**
+   * Expeditions A2 (call 12): the errand this expedition is for, set only when it started itself on
+   * landing (`landedForErrand`); absent for `scenarioStartExpedition`.
+   */
+  jobId?: JobId;
+  /** Expeditions A2 (call 4): the policy cards it has queued, each at most once. */
+  cards?: ExpeditionCards;
+}
+
+/** Expeditions A2 (call 4): the arrival card and the turn card, by decision id. */
+export interface ExpeditionCards {
+  arrival?: DecisionId;
+  turn?: DecisionId;
 }
 
 /** Work slice (W4): problems are written by their owning systems, tasks/claims by work. */

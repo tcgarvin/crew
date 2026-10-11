@@ -421,6 +421,7 @@ const config = {
       perishable: band,
       hazardous: band,
       passenger: band,
+      errand: band,
     },
     jobOfferTtlDays: 0.25,
     dockingFee: 0,

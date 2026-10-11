@@ -12,9 +12,19 @@ import {
   renderItems,
   renderTravel,
   shipHeadline,
+  tickerLine,
 } from "./render";
-import type { SimEvent } from "./types/events";
-import type { ActorId, EventId, HazardId, ItemId, JobId, MachineId, ProblemId } from "./types/ids";
+import { EVENT_SIGNIFICANCE, type SimEvent } from "./types/events";
+import type {
+  ActorId,
+  EventId,
+  HazardId,
+  ItemId,
+  JobId,
+  MachineId,
+  PortDefId,
+  ProblemId,
+} from "./types/ids";
 import type { WorldState } from "./types/state";
 import type { Job, JobPassage } from "./types/travel";
 import type { Problem } from "./types/work";
@@ -485,5 +495,138 @@ describe("ticker lines for the watch and the helm (§the-bell, §hazard-roll)", 
     expect(nav({ outcome: "unattended", scrapedMachineId: pump, lostSeconds: 60 })).toBe(
       "Debris field: nobody at the helm; scraped through and lost 60 s",
     );
+  });
+});
+
+describe("expeditions A2: setting down, lifting off, and the errand's lines", () => {
+  /** The tiny content with `portId` a landing site ("The Far Site" when it is `port2`). */
+  function withSite(portId: PortDefId) {
+    const { world } = tinyTestWorld();
+    const port = world.content.ports[portId];
+    if (port === undefined) throw new Error(`tiny content has no ${portId}`);
+    const content = {
+      ...world.content,
+      ports: { ...world.content.ports, [portId]: { ...port, kind: "site" as const } },
+    };
+    return { world, content };
+  }
+
+  it("sets down at a site on the approach and while docking, never 'Approaching' or 'Docking at'", () => {
+    const { world, content } = withSite(TINY.port2);
+    underway(world.state, "approaching");
+    expect(headline(world.state, content)).toBe("Setting down at Far Dock");
+    underway(world.state, "docking");
+    expect(headline(world.state, content)).toBe("Setting down at Far Dock");
+    world.state.watch.helm.unattendedSinceTick = 0;
+    expect(headline(world.state, content)).toBe(
+      "Setting down at Far Dock — waiting for someone at the helm",
+    );
+  });
+
+  it("lifts off from a site while undocking and departing", () => {
+    const { world, content } = withSite(TINY.port);
+    underway(world.state, "undocking");
+    expect(headline(world.state, content)).toBe("Lifting off from Tiny Dock — bound for Far Dock");
+    underway(world.state, "departing");
+    expect(headline(world.state, content)).toBe("Lifting off from Tiny Dock — bound for Far Dock");
+  });
+
+  it("is set down at a site with a course to lift off for, never 'Stopping at'", () => {
+    const { world, content } = withSite(TINY.port);
+    world.state.travel = { stage: "docked", portId: TINY.port, plannedDestinationId: TINY.port2 };
+    expect(headline(world.state, content)).toBe("Set down at Tiny Dock — lifting off for Far Dock");
+    world.state.travel.voyageDestinationId = TINY.port3;
+    expect(headline(world.state, content)).toBe(
+      "Set down at Tiny Dock — lifting off for Beyond Dock",
+    );
+    world.state.travel = { stage: "docked", portId: TINY.port, voyageDestinationId: TINY.port3 };
+    expect(headline(world.state, content)).toBe(
+      "Set down at Tiny Dock — lifting off for Beyond Dock",
+    );
+  });
+
+  describe("the ticker", () => {
+    const { world, content } = withSite(TINY.port2);
+    world.state.jobs[JOB] = {
+      ...job("offered"),
+      issuer: "Ysolde Maren, Meridian Growers",
+      issuerPerson: { name: "Ysolde Maren", role: "grower", org: "Meridian Growers" },
+      toPortId: TINY.port,
+      cargo: [],
+      errand: {
+        kind: "fetchPerson",
+        siteId: TINY.port2,
+        targetName: "Corran Vale",
+        wants: "alive",
+        returnToPortId: TINY.port,
+      },
+    };
+    let seq = 0;
+    const line = (draft: Pick<SimEvent, "type" | "payload" | "significance">): string =>
+      describeEvent(
+        {
+          id: `e${++seq}` as EventId,
+          tick: 1,
+          seq,
+          subjectIds: [],
+          causeIds: [],
+          source: "sim",
+          ...draft,
+        } as SimEvent,
+        world.state,
+        content,
+      );
+    const failed = (outcome: Extract<SimEvent, { type: "jobFailed" }>["payload"]["outcome"]) =>
+      line({ type: "jobFailed", significance: "narrative", payload: { jobId: JOB, outcome } });
+
+    it("says the job for the issuer is lost, and why", () => {
+      expect(failed("failed")).toBe(
+        "The job for Ysolde Maren is lost: the party came back without Corran Vale",
+      );
+      world.state.expedition = {
+        siteId: TINY.port2,
+        phase: "resolved",
+        party: [],
+        leaderId: "a1" as ActorId,
+        startedTick: 0,
+        shots: 0,
+        outcome: "targetFled",
+        jobId: JOB,
+      };
+      expect(failed("failed")).toBe("The job for Ysolde Maren is lost: Corran Vale got away");
+      expect(failed("putOff")).toBe("The job for Ysolde Maren is lost: Corran Vale was put off");
+      expect(failed("leftBehind")).toBe(
+        "The job for Ysolde Maren is lost: Corran Vale was left behind",
+      );
+    });
+
+    it("is a narrative event, so it reaches the ticker", () => {
+      expect(
+        tickerLine(
+          {
+            id: "e.failed" as EventId,
+            tick: 1,
+            seq: 1,
+            subjectIds: [JOB],
+            causeIds: [],
+            source: "sim",
+            type: "jobFailed",
+            significance: EVENT_SIGNIFICANCE.jobFailed,
+            payload: { jobId: JOB, outcome: "failed" },
+          },
+          world.state,
+          content,
+        ),
+      ).toMatch(/^The job for Ysolde Maren is lost: /);
+    });
+
+    it("tells an errand's offer and its completion by the target, not as freight or a fare", () => {
+      expect(line({ type: "jobOffered", significance: "notable", payload: { jobId: JOB } })).toBe(
+        "Ysolde Maren wants Corran Vale brought back from Far Dock",
+      );
+      expect(
+        line({ type: "contractCompleted", significance: "narrative", payload: { jobId: JOB } }),
+      ).toBe("Brought Corran Vale back for Ysolde Maren");
+    });
   });
 });

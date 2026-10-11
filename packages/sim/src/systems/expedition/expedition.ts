@@ -42,6 +42,7 @@ import { type DamageResult, type Hit, applyDamage } from "../bodies/damage";
 import { addMemory } from "../social/relationships";
 import { abortActivity } from "../work/execute";
 import { enterFight, goTo, heldWeapon, inFight, setDown, setLabel } from "./actions";
+import { queueTurnCard } from "./cards";
 import {
   AT_RAMP_TILES,
   type CombatDeps,
@@ -54,10 +55,12 @@ import {
   shaken,
   surrender,
 } from "./combat";
+import { settleErrand } from "./errand";
 import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
 import { adjacent8, lineOfSight } from "./los";
 import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
 import { handOutMuster } from "./muster";
+import { landedForErrand } from "./start";
 
 /** The objective is held only with no armed cast able to fight this close and in sight of it. */
 const GUARDED_TILES = 4;
@@ -68,6 +71,9 @@ export function makeExpeditionSystem(deps: CombatDeps): System {
     name: "expedition.expedition",
     phase: "actions",
     run(ctx) {
+      // A2 call 12: set down at a site for an errand, the expedition starts itself.
+      const last = ctx.state.expedition;
+      if (last === undefined || last.phase === "resolved") landedForErrand(ctx);
       const expedition = ctx.state.expedition;
       if (expedition === undefined) return;
       const ground = groundOf(ctx);
@@ -82,6 +88,8 @@ export function makeExpeditionSystem(deps: CombatDeps): System {
       const fight = fightOf(ctx, deps, ground);
       if (fight === undefined) return;
       const tick = runCombat(fight);
+      // A2 call 15: the turn card, the tick the fight first turns.
+      queueTurnCard(ctx, fight);
       checkContact(fight);
       checkWithdrawal(fight);
       checkObjective(fight);
@@ -349,6 +357,8 @@ function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | un
       ctx.tick + configTicks(ctx.config, ctx.config.expedition.alertClearSeconds);
   }
   afterTheFight(fight, outcome);
+  // A2 call 5: before the cast loop, which removes a taken target (the captive is spawned anew).
+  settleErrand(fight, outcome);
   for (const person of fight.people) {
     if (ctx.state.actors[person.id] === undefined) continue;
     if (isParty(person)) leaveFight(ctx, person);

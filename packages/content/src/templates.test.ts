@@ -280,3 +280,114 @@ describe("narrator card templates", () => {
     expect(templateCard(narratorCard({ title: "t" })).closesThread).toBeUndefined();
   });
 });
+
+describe("errand offer card templates (expeditions A2, §6)", () => {
+  const errand = (params: Decision["prompt"]["params"]) =>
+    templateCard(
+      offer({
+        issuer: "Ysolde Maren, Meridian Growers",
+        name: "Ysolde Maren",
+        role: "grower",
+        org: "Meridian Growers",
+        from: "port.terns_rest",
+        to: "port.terns_rest",
+        urgency: "soon",
+        pitch: "He took what was ours. Bring him back to answer for it.",
+        errand: "fetchPerson",
+        target: "Corran Vale",
+        site: "port.boathouse",
+        wants: "alive",
+        ...params,
+      }),
+      bundle(),
+    );
+
+  it("says who is fetched from where and how, titled with the target, spoken by the issuer", () => {
+    const card = errand({});
+    expect(card.title).toBe("A job: Corran Vale");
+    expect(card.speaker).toBe("Ysolde Maren");
+    expect(card.situation).toBe(
+      "“He took what was ours. Bring him back to answer for it.” Bring back Corran Vale from the Boathouse, alive, wanted soon.",
+    );
+    expect(card.leftLabel).toBe("Take the job");
+    expect(card.leftAftermath).not.toMatch(/load|hold/i);
+    expect(card.situation).not.toMatch(/\d/);
+    expect(errand({ wants: "either" }).situation).toMatch(
+      /Corran Vale from the Boathouse, alive or dead,/,
+    );
+  });
+
+  it("fetches a thing by its name", () => {
+    const card = errand({ errand: "fetchItem", target: "the strongbox papers", wants: "either" });
+    expect(card.situation).toMatch(/Fetch the strongbox papers from the Boathouse, wanted soon\.$/);
+    expect(card.title).toBe("A job: the strongbox papers");
+  });
+});
+
+describe("expedition card templates (expeditions A2, calls 4 and 15)", () => {
+  function card(
+    key: string,
+    params: Decision["prompt"]["params"],
+    sides: readonly [string, string],
+    sideParams: Decision["prompt"]["params"] = {},
+  ): Decision {
+    return {
+      ...offer({}),
+      prompt: { key, params },
+      left: {
+        label: { key: `${key}.${sides[0]}`, params: sideParams },
+        commands: [],
+        aftermath: { key: `${key}.${sides[0]}.aftermath`, params: sideParams },
+      },
+      right: {
+        label: { key: `${key}.${sides[1]}`, params: sideParams },
+        commands: [],
+        aftermath: { key: `${key}.${sides[1]}.aftermath`, params: sideParams },
+      },
+    };
+  }
+
+  it("brings the arrival card to the ramp head with the two plans as its sides", () => {
+    const plans = {
+      leftLabel: "Hold the ramp from cover",
+      rightLabel: "Go in and take them",
+      leftWhy: "We make them come to us.",
+      rightWhy: "We go in hard and bring him out.",
+    };
+    const params = { jobId: "j1", site: "port.boathouse", target: "Corran Vale" };
+    const text = templateCard(
+      card(
+        "expedition.arrival",
+        { ...params, speaker: "Sunniva Brandt", ...plans },
+        ["left", "right"],
+        plans,
+      ),
+      bundle(),
+    );
+    expect(text.title).toBe("At the Boathouse");
+    expect(text.speaker).toBe("Sunniva Brandt");
+    expect(text.situation).toBe(
+      "Sunniva Brandt at the ramp head: Corran Vale is at the Boathouse, and not alone. Hold the ramp from cover, or go in and take them?",
+    );
+    expect(text.leftLabel).toBe("Hold the ramp from cover");
+    expect(text.rightLabel).toBe("Go in and take them");
+    expect(text.leftAftermath).toBe("We make them come to us.");
+    expect(text.rightAftermath).toBe("We go in hard and bring him out.");
+  });
+
+  it("asks at the turn whether to press on or pull back", () => {
+    const turn = (params: Decision["prompt"]["params"]) =>
+      templateCard(card("expedition.turn", params, ["press", "withdraw"]), bundle());
+    const text = turn({ jobId: "j1", speaker: "Sunniva Brandt", name: "Hesk Marrow" });
+    expect(text.title).toBe("The fight turns");
+    expect(text.speaker).toBe("Sunniva Brandt");
+    expect(text.situation).toBe("Sunniva Brandt: Hesk Marrow is breaking. Press on, or pull back?");
+    expect(text.leftLabel).toBe("Press on");
+    expect(text.rightLabel).toBe("Pull back to the ship");
+    expect(text.leftAftermath).toBeTruthy();
+    expect(text.rightAftermath).toBeTruthy();
+    expect(turn({ name: "Jax Okonkwo", how: "down" }).situation).toBe(
+      "Jax Okonkwo is down. Press on, or pull back?",
+    );
+  });
+});

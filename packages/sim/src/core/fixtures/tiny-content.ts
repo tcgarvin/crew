@@ -159,6 +159,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
         perishable: { min: 2, max: 4 },
         hazardous: { min: 3, max: 8 },
         passenger: { min: 2, max: 4 },
+        errand: { min: 3, max: 6 },
       },
       jobOfferTtlDays: 120 / day,
       dockingFee: 0,

@@ -108,11 +108,44 @@ function offerSituation(p: Params, c: ContentBundle | undefined): string {
     p.pitch !== undefined
       ? String(p.pitch)
       : renderTextRef({ key: String(p.pitchKey ?? DEFAULT_PITCH_KEY), params: p }, c);
-  const urgency = URGENCY_WORDS[String(p.urgency)] ?? URGENCY_WORDS.relaxed;
-  const context = isPassage(p)
-    ? `${p.name} wants passage to ${portLabel(p.to, c)}${p.roundTrip === "true" ? " and back" : ""}, ${p.cargo === undefined ? "travelling light" : `with luggage (${cargoWords(p.cargo, c)})`}, ${urgency}.`
-    : `${capitalise(cargoWords(p.cargo, c))}, ${portLabel(p.from, c)} to ${portLabel(p.to, c)}, ${urgency}.`;
+  const urgency = URGENCY_WORDS[String(p.urgency)] ?? "no rush";
+  const context = isErrand(p)
+    ? errandContext(p, c, urgency)
+    : isPassage(p)
+      ? `${p.name} wants passage to ${portLabel(p.to, c)}${p.roundTrip === "true" ? " and back" : ""}, ${p.cargo === undefined ? "travelling light" : `with luggage (${cargoWords(p.cargo, c)})`}, ${urgency}.`
+      : `${capitalise(cargoWords(p.cargo, c))}, ${portLabel(p.from, c)} to ${portLabel(p.to, c)}, ${urgency}.`;
   return clipWords(`“${pitch}” ${context}`, SITUATION_MAX_WORDS);
+}
+
+/** "The Boathouse" → "the Boathouse": a place's name as it reads mid-sentence. */
+function placeLabel(value: string | number | undefined, content: ContentBundle | undefined) {
+  return value === undefined ? "the site" : portLabel(value, content).replace(/^The /, "the ");
+}
+
+/** Expeditions A2 (§6): how an errand's `wants` reads on its offer card. */
+const WANTS_WORDS: Readonly<Record<string, string>> = {
+  alive: "alive",
+  either: "alive or dead",
+  dead: "dead",
+};
+
+/**
+ * Expeditions A2 (§6): an errand's context line, "Bring back Corran Vale from the Boathouse, alive,
+ * no rush." or "Fetch the strongbox papers from the Boathouse, no rush.". The sim marks an errand
+ * offer with `errand` (its kind), `target`, `site` and `wants` in the prompt params
+ * (`offerPromptParams` in `systems/commerce`).
+ */
+function errandContext(p: Params, c: ContentBundle | undefined, urgency: string): string {
+  const target = p.target === undefined ? "what they're after" : String(p.target);
+  const site = placeLabel(p.site, c);
+  if (p.errand === "fetchItem") return `Fetch ${target} from ${site}, ${urgency}.`;
+  const wants = WANTS_WORDS[String(p.wants)] ?? WANTS_WORDS.alive;
+  return `Bring back ${target} from ${site}, ${wants}, ${urgency}.`;
+}
+
+/** Expeditions A2: the sim marks an errand offer with its kind in `errand`. */
+function isErrand(p: Params): boolean {
+  return p.errand !== undefined;
 }
 
 /**
@@ -132,6 +165,51 @@ const PASSAGE_SIDE_TEXT: Readonly<Record<string, string>> = {
     "They come up the ramp with what they carry. We leave once they're settled.",
   "job.decline.aftermath": "You pass. They go looking for another ship.",
 };
+
+/** Expeditions A2: the offer card's aftermaths when the job is an errand to a site. */
+const ERRAND_SIDE_TEXT: Readonly<Record<string, string>> = {
+  "job.accept.aftermath": "Taken. We set a course for the site and see what's waiting there.",
+  "job.decline.aftermath": "You pass. They'll find someone else to send.",
+};
+
+/** Expeditions A2 call 4: the arrival card's key (`systems/expedition/cards.ts`). */
+const ARRIVAL_KEY = "expedition.arrival";
+/** Expeditions A2 call 15: the turn card's key (`systems/expedition/cards.ts`). */
+const TURN_KEY = "expedition.turn";
+
+/** "Hold the ramp from cover" → "hold the ramp from cover", for the middle of a question. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * The arrival card: "Sunniva Brandt at the ramp head: Corran Vale is at the Boathouse, and not
+ * alone. Hold the ramp from cover, or go in and take them?" Params: `speaker`, `target`, `site`,
+ * and the two plans' `leftLabel` and `rightLabel`. No numbers.
+ */
+function arrivalSituation(p: Params, c: ContentBundle | undefined): string {
+  const speaker = p.speaker === undefined ? "" : `${p.speaker} at the ramp head: `;
+  const target = p.target === undefined ? "Whoever we came for" : String(p.target);
+  const question =
+    p.leftLabel !== undefined && p.rightLabel !== undefined
+      ? `${p.leftLabel}, or ${lowerFirst(String(p.rightLabel))}?`
+      : "Hold the ramp, or go in?";
+  return `${speaker}${target} is at ${placeLabel(p.site, c)}, and not alone. ${question}`;
+}
+
+/** How the turn card says what happened to `name` (`params.how`; anything else is "breaking"). */
+const TURN_HOW = new Set(["breaking", "down", "dead"]);
+
+/**
+ * The turn card: "Sunniva Brandt: Hesk Marrow is breaking. Press on, or pull back?" Params:
+ * `speaker`, `name` (who broke or went down) and `how` (`breaking`, `down` or `dead`).
+ */
+function turnSituation(p: Params): string {
+  const speaker = p.speaker === undefined ? "" : `${p.speaker}: `;
+  const name = p.name === undefined ? "One of them" : String(p.name);
+  const how = TURN_HOW.has(String(p.how)) ? String(p.how) : "breaking";
+  return `${speaker}${name} is ${how}. Press on, or pull back?`;
+}
 
 /**
  * §departure-gate: the gate card's reason, in plain words (no numbers, §cards-never-mention-pay).
@@ -184,6 +262,22 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
     "We hold the ship. The ramp stays down until they come up it.",
   [`${PASSENGER_OVERDUE_KEY}.leave.aftermath`]: () =>
     "We close up and go. Whatever kept them, it's their problem now, and there's no fare.",
+  // Expeditions A2: the arrival card; each side is a plan, its label and its why in the side's
+  // own params (`leftLabel`/`leftWhy`, `rightLabel`/`rightWhy`).
+  [ARRIVAL_KEY]: arrivalSituation,
+  [`${ARRIVAL_KEY}.left`]: (p) => (p.leftLabel === undefined ? "Hold back" : String(p.leftLabel)),
+  [`${ARRIVAL_KEY}.right`]: (p) => (p.rightLabel === undefined ? "Go in" : String(p.rightLabel)),
+  [`${ARRIVAL_KEY}.left.aftermath`]: (p) =>
+    p.leftWhy === undefined ? "We do it that way." : String(p.leftWhy),
+  [`${ARRIVAL_KEY}.right.aftermath`]: (p) =>
+    p.rightWhy === undefined ? "We do it that way." : String(p.rightWhy),
+  // Expeditions A2: the turn card.
+  [TURN_KEY]: turnSituation,
+  [`${TURN_KEY}.press`]: () => "Press on",
+  [`${TURN_KEY}.withdraw`]: () => "Pull back to the ship",
+  [`${TURN_KEY}.press.aftermath`]: () => "They keep going. It's in their hands now.",
+  [`${TURN_KEY}.withdraw.aftermath`]: () =>
+    "The word goes out. They fall back to the ramp and bring the hurt with them.",
   "job.offer.accept": () => "Take the job",
   "job.offer.decline": () => "Pass on it",
   // Aftermaths for the offer card (§aftermath-caption).
@@ -202,15 +296,20 @@ const TEMPLATES: Readonly<Record<string, (p: Params, c: ContentBundle | undefine
 };
 
 /** Title per prompt key; anything else gets a generic heading. */
-const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
+const TITLES: Readonly<
+  Record<string, (p: Params, c: ContentBundle | undefined) => string | undefined>
+> = {
   // §issuers-and-pitches: the offer card is titled with the person, "Ysolde Maren, Meridian Growers
   // Collective".
+  // Expeditions A2: an errand is titled with who (or what) it is after, "A job: Corran Vale".
   "job.offer": (p) =>
-    p.name !== undefined
-      ? `${p.name}, ${p.org ?? p.role ?? "shipper"}`
-      : p.issuer === undefined
-        ? "A job offer"
-        : String(p.issuer),
+    isErrand(p) && p.target !== undefined
+      ? `A job: ${p.target}`
+      : p.name !== undefined
+        ? `${p.name}, ${p.org ?? p.role ?? "shipper"}`
+        : p.issuer === undefined
+          ? "A job offer"
+          : String(p.issuer),
   // Narrator cards carry their heading in the prompt params (`translate.ts`).
   [NARRATOR_TEXT_KEYS.situation]: (p) => (p.title === undefined ? undefined : String(p.title)),
   // §departure-gate: "Before we leave: Main Engine".
@@ -218,6 +317,9 @@ const TITLES: Readonly<Record<string, (p: Params) => string | undefined>> = {
     p.machine === undefined ? "Before we leave" : `Before we leave: ${String(p.machine)}`,
   // Passengers §3.3: "Overdue: Halla Thorne".
   [PASSENGER_OVERDUE_KEY]: (p) => (p.name === undefined ? "Overdue" : `Overdue: ${String(p.name)}`),
+  // Expeditions A2: "At the Boathouse"; the turn card's heading is the moment itself.
+  [ARRIVAL_KEY]: (p, c) => capitalise(`at ${placeLabel(p.site, c)}`),
+  [TURN_KEY]: () => "The fight turns",
 };
 
 const speakerParam = (p: Params) => (p.speaker === undefined ? undefined : String(p.speaker));
@@ -232,6 +334,9 @@ const SPEAKERS: Readonly<Record<string, (p: Params) => string | undefined>> = {
   [DEPARTURE_GATE_KEY]: speakerParam,
   // Passengers §3.3: the first officer brings the overdue card (§spoken-cards).
   [PASSENGER_OVERDUE_KEY]: speakerParam,
+  // Expeditions A2: the first officer (or whoever leads) brings the expedition's cards.
+  [ARRIVAL_KEY]: speakerParam,
+  [TURN_KEY]: speakerParam,
 };
 
 const GENERIC_TITLE = "The captain's call";
@@ -266,18 +371,25 @@ export function templateCard(
   const leftAftermath = decision.left.aftermath;
   const rightAftermath = decision.right.aftermath;
   const speaker = SPEAKERS[decision.prompt.key]?.(decision.prompt.params);
-  const passage = decision.prompt.key === "job.offer" && isPassage(decision.prompt.params);
+  const offer = decision.prompt.key === "job.offer";
+  const sideText = !offer
+    ? undefined
+    : isErrand(decision.prompt.params)
+      ? ERRAND_SIDE_TEXT
+      : isPassage(decision.prompt.params)
+        ? PASSAGE_SIDE_TEXT
+        : undefined;
   const closes =
     decision.prompt.key === NARRATOR_TEXT_KEYS.situation
       ? decision.prompt.params.closesThread
       : undefined;
   const side = (ref: DeepReadonly<TextRef>): string => {
-    const text = passage ? PASSAGE_SIDE_TEXT[ref.key] : undefined;
+    const text = sideText?.[ref.key];
     return text === undefined || hasProse(ref) ? renderTextRef(ref, content) : text;
   };
   return {
     decisionId: decision.id,
-    title: TITLES[decision.prompt.key]?.(decision.prompt.params) ?? GENERIC_TITLE,
+    title: TITLES[decision.prompt.key]?.(decision.prompt.params, content) ?? GENERIC_TITLE,
     ...(speaker === undefined || speaker.trim() === "" ? {} : { speaker }),
     ...(closes === undefined ? {} : { closesThread: String(closes) }),
     situation: renderTextRef(decision.prompt, content),
