@@ -171,8 +171,13 @@
  * season or an arc, bringing back a cast member or an old arc, checking who a beat falls on), a few
  * rounds at most, and must end with the notes JSON alone; most turns need none. The notes request
  * says the tools are there when they are offered.
+ * v0.38 (2026-10-11): staging placements say which "who" a name is (§staging-prompt): "cast" is a
+ * "cast:" line under "Your notes so far", and cast at this port are still "cast" though "People you
+ * know here" lists them; "seed" is only a name under "locals you have not met yet". The model had
+ * been placing a cast member listed under "People you know here" as a seed, and the placement was
+ * dropped.
  */
-export const PROMPT_VERSION = "v0.37";
+export const PROMPT_VERSION = "v0.38";
 
 export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the nine people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain walking ashore to look for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 

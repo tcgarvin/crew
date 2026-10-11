@@ -131,6 +131,7 @@ function personOf(
   switch (intent.who) {
     case "seed":
       if (seed === undefined) {
+        if (cast !== undefined) return no(`"${name}" is in your cast; place them as cast`);
         return no(
           `"${name}" is not one of ${port}'s people; use a name under People you know here, or a newFace`,
         );
