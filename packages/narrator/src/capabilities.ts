@@ -382,7 +382,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push("## 4. surfaceDecision: a binary card for the captain");
   lines.push(
-    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here, never a site); endPassage; or privateTalk. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice; you do not script outcomes.",
+    "- Each side has a label and an effect: none; setCourse to coursePort (only while docked, to any port reachable from here, never a site); endPassage; or privateTalk. While the ship is on a voyage, setCourse to a neighbouring port is a detour: the voyage destination stays and the ship routes on from wherever it ends up. Use it only when the story makes the route a captain's choice; otherwise the ship picks its own way. The crew carry out the choice and the sim plays it out.",
   );
   lines.push(
     '- endPassage puts the current passenger off: valid only while a passenger is aboard or ashore on a live passage (see "Aboard" under Crew). They leave at the next docking (now, if docked) with no fare and stay at that port as someone in your cast. That is the real side of a crew-friction card ("Put him off at Kessler." / "He stays."); the sim does the rest. A captive an errand brought aboard (their "Aboard" line says where they were taken) is a passenger too, but putting them off fails the errand: it pays nothing and the ship still goes home. Offer it only when giving up the job is the real choice, and make that plain on the card (the job is lost, the issuer gets nothing), never in terms of pay.',
@@ -403,7 +403,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     `- port and cargoItem (any item id, including item ids not listed as cargo above, e.g. spare parts), count 0-${config.commerce.market.maxStockPerCommand} units on sale after this (0 withdraws it), priceTier ${MARKET_PRICE_TIERS.join(" | ")} against the port's usual price. The market line under each port above is what is on sale now.`,
   );
   lines.push(
-    "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; you never buy, deliver, repair or pay. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
+    "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; none of your levers buys, delivers, repairs or pays. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
   // §galley-provisions: the galley's stores are bought like parts; name them by id so the model can
   // stock them.

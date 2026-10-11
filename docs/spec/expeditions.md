@@ -253,8 +253,9 @@ narrator may mark one side as the way in unseen (§getting-in-unseen). Choosing 
 plan and the muster begins (§the-muster). A plan adopted for an errand that wants the target
 `alive` has `targetMustLive` (§fire-and-targets). With fewer than two plans available there is no
 card, and the expedition resolves `timedOut` `expedition.maxApproachSeconds` (90) after it
-started. Why a policy card and not a story hook: the narrator dresses the sim's pair and cannot
-choose the plans, a lever the owner has not ruled on (D6); its one mark on the card is
+started. Why a policy card and not a story hook: the narrator dresses the sim's pair; choosing
+which plans the card offers would be a new allow-listed lever (D6), in bounds since D106 and not
+built, and which side is taken is always the captain's. Its one mark on the card is
 §unseen-lever.
 
 ### The turn card

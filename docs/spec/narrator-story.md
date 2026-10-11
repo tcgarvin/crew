@@ -11,10 +11,16 @@ rules), and the separate staging call that dresses a dock. When and how it is ca
 
 ### Narrator authority
 
-The narrator sets things up; the sim decides outcomes (D6). It has exactly eight levers: seven
-intents in its plan (offers, spawns, faults, markets, hazards, fields and cards) and the unseen mark
-on the arrival card it dresses (§unseen-lever), and every one becomes a kernel command only through
-the translator. No lever sets a body, a health, a position, a piece of knowledge or money. The
+The narrator may decide outcomes; it may not do the impossible (D106). It acts only through kernel
+commands on an allow-list (D6), each vetted by the translator against the snapshot and content and
+revalidated by the kernel on apply, and "impossible" is theirs to judge: the ids exist, the sim can
+execute the command now, the state stays coherent. It has exactly eight levers today: seven intents
+in its plan (offers, spawns, faults, markets, hazards, fields and cards) and the unseen mark on the
+arrival card it dresses (§unseen-lever). None of them yet sets a body, a health, a position, a
+piece of knowledge or money (the outcome levers are designed in `docs/design/narrator-arcs.md` §4
+and not built), so the narrator decides through these: who offers what and why, a fault, a hazard,
+a field and its scripted hits, what is on sale, a card and its sides, the way in unseen. Everything
+the eight do not reach is the sim's, shown in the digest. The
 capability list (`buildCapabilities`) is generated from content, config and the ship's machines, so
 the prompt never promises what the sim cannot do. It carries every id the plan may use (ports and
 their legs, store keys, cargo items, machines and faults, each port's market); the plan's ids are
@@ -35,8 +41,9 @@ dropped, and nothing is offered while the ship is set down at one.
 At the site the narrator dresses the two kernel cards on `policyDecision` (§the-arrival-card,
 §the-turn-card): only the words change, each side keeps its commands, and on the arrival card it may
 mark one side as the way in unseen (§unseen-lever). It cannot choose the plans, stage the site, set
-a stance, script a turn or parley (deferred: each is a new lever, D6), and it never states a wound,
-a death or a capture the digest does not show. The arms locker stays out of the capability lists and
+a stance, script a turn or parley: none of those levers is built yet (each is a new allow-listed
+command, D6, in bounds since D106). With no lever that wounds, kills or captures, the fight's wounds,
+deaths and captures are the sim's, and a card never states one that has not happened. The arms locker stays out of the capability lists and
 the digest's machines, weapons out of the staging catalogue, and `fighting` out of a crew line's
 skills. No `captainAshore` is raised at a site (§looking-for-work), and a fight's `alertCleared`
 never hooks (§notable-event-hook); the fight's end and a failed errand do (`expeditionResolved`,
@@ -88,8 +95,9 @@ of one item (any item def, not only cargo; provisions included; §market-stock).
 to `commerce.market.maxStockPerCommand` (4) and 0 withdraws the item. The price is the content
 price for that item at that port times the tier's multiplier (`commerce.market.priceTiers`: cheap
 0.6, fair 1, dear 1.6; `defaultPrice` 100). It is the only way a part reaches a port: the crew buy
-for themselves from the ship's money (§buying-parts), and the narrator never buys, delivers,
-repairs or pays. There are no scheduled deliveries. Why: the owner, "let's just deal with things
+for themselves from the ship's money (§buying-parts); the narrator has no lever that buys,
+delivers, repairs or pays (a payment lever is designed, D106, not built). There are no scheduled
+deliveries. Why: the owner, "let's just deal with things
 that are already there."
 
 ### Hazard and field levers
@@ -337,7 +345,13 @@ The static system prompt (`prompts/system.ts`) and per-hook instructions (`promp
 carry the narrator's judgement; the translator enforces only what is mechanical. The rules a
 designer reasons about:
 
-- Set things up, never decide outcomes. Continuity over invention: reuse cast, ports and threads.
+- Decide, roll, or let the sim run (D106). Decide when the story needs a fact and the captain's
+  choice is not what it turns on, with a lever, and show it. Roll when the captain's choice is what
+  it turns on: the sim's dice (a hazard, a field's rocks, the fight) decide, and the narrator never
+  resolves a card's side for the captain. Let the sim run by default: between calls the narrator
+  does not exist, and what the digest shows the sim has played is never re-decided. Today's levers
+  decide only what they reach (§narrator-authority); the prompt says so. Continuity over
+  invention: reuse cast, ports and threads.
 - Pacing is the narrator's judgement, not a timer's. It reads "What the captain has seen" (with
   ticks) and the ship's state to choose forward motion (work, a thread beat, a consequence), a
   breath, or nothing. An idle docked captain gets work first. Faults, hazards and fields are
@@ -357,20 +371,23 @@ designer reasons about:
   their `voice`. A card shows one concrete moment, 35 to 55 words (never over 70), with a
   stage line and quoted speech; sides are two to six words, a line of dialogue or a concrete act.
 - No numbers or pay on any player-facing text. Nothing about an undiscovered fault until the crew
-  notice it. Never narrate what the digest does not show: a repair, delivery, purchase, meal,
-  damage, passenger action or crew relationship. A card may state what someone intends or claims,
-  never that it happened. A passenger's fate is the sim's; the narrator's one lever on a passenger
-  is `endPassage`.
+  notice it. What the narrator decides, it shows: a fault it made is a card from whoever found
+  it, a field's scripted hit gets the crew's answer. Never a fact in prose that neither the sim
+  nor a lever made true: a repair, delivery, purchase, meal, damage, passenger action or crew
+  relationship the digest does not show. A card may state what someone intends or claims, never
+  that it happened; the narrator may lie through a character, never through the ticker. Its one
+  lever on a passenger today is `endPassage`, so what becomes of a passenger otherwise is the sim's.
 - Route choice is the ship's; a detour card only when the story makes it the captain's choice.
 - Weigh the hull before a field: never one the hull cannot survive unless the ship left port
-  damaged. Moods, thoughts, helm failures and filthy rooms are the sim's failings, a reason for a
-  card, never a fact to cause or fix.
+  damaged. Moods, thoughts, helm failures and filthy rooms are the sim's, out of reach of any lever
+  today: a reason for a card, never a fact stated on someone's behalf.
 - Hooks: `captainAshore` expects an offer from someone who fits the port, a deliberately rare
   "nothing", and a different kind of story than the past arcs; `requestedCall` is where a leg gets
   its beat; aftermath calls (`alertCleared`, `navHazard`, `faultRepaired`) belong to the people in
   them and add no new pressure, and so does `expeditionResolved`, the site's aftermath (the party,
   the captive, the hurt, the crew on an execution); `policyDecision` dresses the existing card.
-- An errand is a story about a person; who is at the site is the sim's, and so is the fight. A
+- An errand is a story about a person; with no lever to stage a site, who is there is its default
+  cast and the fight is the sim's to roll. A
   kill job is rare and its issuer never clean, and its target taken alive is executed at the
   scene; errands are occasional among freight and passages. Putting off an errand's captive fails
   the errand, so a card offers it only when giving up the job is the real choice. On

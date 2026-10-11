@@ -926,16 +926,17 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.31");
+    expect(PROMPT_VERSION).toBe("v0.32");
   });
 
-  it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
+  it("tells the model endPassage is its one lever on a passenger and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
     expect(STATIC_RULES).toContain("A passenger is a job with a person in it");
-    expect(STATIC_RULES).toContain("You never decide a passenger's fate");
+    expect(STATIC_RULES).not.toContain("You never decide a passenger's fate");
+    expect(STATIC_RULES).toContain("Your one lever on a passenger is endPassage");
     expect(STATIC_RULES).toContain("You never narrate what they did ashore as fact");
     expect(STATIC_RULES).toContain("The stated purpose of the trip is the description");
     expect(STATIC_RULES).toContain("the truth may differ, and lives in your notes");
-    expect(STATIC_RULES).toContain("endPassage on a card side");
+    expect(STATIC_RULES).toContain("endPassage is a card side");
     expect(STATIC_RULES).toContain("never as the only side");
     // The six card kinds of §6.
     expect(STATIC_RULES).toContain("the offer (the passenger at the ramp");
@@ -983,11 +984,12 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(quiet).not.toContain("offer work if the captain is idle");
   });
 
-  it("tells the model parts come only from a port market and it never narrates a repair the digest does not show (§market-lever)", () => {
+  it("tells the model parts come only from a port market and no lever buys or pays (§market-lever)", () => {
     expect(STATIC_RULES).toContain("Parts come only from a port's market");
     expect(STATIC_RULES).toContain("the crew buy it themselves, from the ship's money");
     expect(STATIC_RULES).toContain("Your lever is stockMarket");
     expect(STATIC_RULES).toContain("Scarcity is a story");
+    expect(STATIC_RULES).toContain("none of your levers buys, delivers or installs anything");
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
@@ -999,7 +1001,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   it("tells the model about the watch, the empty helm and the hazard lever (§who-has-the-helm, §hazard-roll, §mood-and-work-speed, v0.21)", () => {
     expect(STATIC_RULES).toContain("The ship keeps watches. The day is three watches");
     expect(STATIC_RULES).toContain("who has the helm (and since when)");
-    expect(STATIC_RULES).toContain("You never set moods or thoughts");
+    expect(STATIC_RULES).toContain("No lever of yours sets moods or thoughts");
     expect(STATIC_RULES).toContain("An empty helm");
     expect(STATIC_RULES).toContain("is the ship's own failing");
     expect(STATIC_RULES).toContain("A hazard is the helm's stakes");
@@ -1021,7 +1023,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   it("tells the model off-watch life and rivalries are the crew's, and how privateTalk works (§activities-and-interests, §ship-life-lines, v0.23)", () => {
     expect(STATIC_RULES).toContain("The crew have lives off watch.");
     expect(STATIC_RULES).toContain(
-      "These are the sim's and the crew's story to tell, never yours to invent",
+      "These are the sim's and the crew's story to tell; no lever of yours reaches them yet",
     );
     expect(STATIC_RULES).toContain(
       "An argument or a rivalry is the kind of thing a card is made of",
@@ -1090,7 +1092,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
       "When the fight at a site is over (expeditionResolved), that is its aftermath",
     );
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
-      "never states a wound, a death, a capture or an execution the digest does not show",
+      "never claims a wound, a death, a capture or an execution that has not happened",
     );
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
       "Some calls are aftermath: alertCleared (the field's end, the crew reported in), navHazard (your hazard rolled, clean or not), faultRepaired (a fault you caused is mended).",
@@ -1109,11 +1111,12 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.31");
+    expect(PROMPT_VERSION).toBe("v0.32");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
+    expect(STATIC_RULES).toContain("you have no lever yet that stages a site or a fight");
     expect(STATIC_RULES).toContain(
-      "Never state a wound, a death or a capture the digest does not show",
+      "never claim a wound, a death or a capture that has not happened",
     );
     expect(STATIC_RULES).toContain(
       "A kill job (wants dead) is rare, and whoever offers one is never clean; its target dies in the fight or, taken alive, is executed by the party at the scene",
@@ -1137,13 +1140,34 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(policy).toContain("what the rest of the party is doing now");
     expect(policy).toContain("one concrete line in the speaker's voice of what the crew do next");
     expect(policy).toContain("never the plan restated, no numbers, no outcome claimed");
-    expect(policy).toContain("never state a wound, a death or a capture the digest does not show");
+    expect(policy).toContain("never claim a wound, a death or a capture that has not happened");
     // The existing rule still holds for them: dress the card, add none.
     expect(policy).toContain("Do not add intents that create new cards.");
   });
 
+  it("tells the model to decide, roll or let the sim run, and to show what it decides (D106, v0.32)", () => {
+    expect(PROMPT_VERSION).toBe("v0.32");
+    expect(STATIC_RULES).not.toContain("do not decide outcomes");
+    expect(STATIC_RULES).toContain("- Decide, roll, or let the sim run. You may decide outcomes");
+    expect(STATIC_RULES).toContain("you cannot do the impossible");
+    expect(STATIC_RULES).toContain(
+      "Decide when the story needs a fact and the captain's choice is not what it turns on",
+    );
+    expect(STATIC_RULES).toContain("Roll when the captain's choice is what it turns on");
+    expect(STATIC_RULES).toContain("Never resolve a card's side for the captain");
+    expect(STATIC_RULES).toContain("Let the sim run by default.");
+    expect(STATIC_RULES).toContain("Never re-decide what the digest shows has already happened");
+    expect(STATIC_RULES).toContain("- What you decide, you show.");
+    expect(STATIC_RULES).toContain(
+      "Never put a fact in prose that neither the sim nor one of your levers made true",
+    );
+    expect(STATIC_RULES).toContain(
+      "you may lie through a character, never through what a card says happened",
+    );
+  });
+
   it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
-    expect(PROMPT_VERSION).toBe("v0.31");
+    expect(PROMPT_VERSION).toBe("v0.32");
     const policy = HOOK_INSTRUCTIONS.policyDecision;
     expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
     expect(policy).toContain("a guard asleep, a back way, a friend inside");

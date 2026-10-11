@@ -155,7 +155,8 @@ by the narrator, and a dead captain's command passes to the first officer (D8); 
 allowed from the start, rare and dirty; the captain leads the away party. Rejected: sites reached
 on foot through a port, wounds that never kill, kill jobs held back to a later phase, a party sent
 without its captain. Why: the owner wants a place the ship goes, a fight with stakes, and the
-captain where the cards are. See §landing-sites, §going-down-and-death, §who-goes.
+captain where the cards are. See §landing-sites, §going-down-and-death, §who-goes. *"Never
+scripted by the narrator" is amended by D106; the rest stands.*
 
 **D104. A kill job's target taken alive is executed.** Owner: "Kill jobs should end in an
 execution if kills never happen." The party still never fires at an unarmed target in the fight;
