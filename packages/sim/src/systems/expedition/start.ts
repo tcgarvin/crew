@@ -10,19 +10,26 @@
  * `gen.crew.site_*` def at their post, a combatant of side `them` with their disposition and their
  * weapon in hand, and writes `state.expedition`, `mustering`, with the party the plan's squad rule
  * picks (`everyone` without a plan, call 11). With no plan and a `jobId` it queues the arrival card
- * (`queueArrivalCard`, A2 call 4).
+ * (`queueArrivalCard`, A2 call 4); for a `fetchItem` errand it also puts the item down at the
+ * site's `loot` post (call 13).
  *
- * Owner after the gate: W2 of expeditions A2. Gate stubs: `landedForErrand` starts nothing, and
- * `castFor` is the map's default cast unchanged.
+ * `landedForErrand` (call 12) starts one the first tick the ship is `docked` at a site with that
+ * site's map alongside, no course away planned, no expedition under way, and an `inTransit` errand
+ * naming the site whose `outcome` is unset and that the last expedition was not already for (once
+ * an errand, whatever the outcome). The cast is `castFor`'s; a cast that fails `castProblem` there
+ * is a content bug and throws.
+ *
+ * Owner after the gate: W2 of expeditions A2.
  */
 import { configTicks } from "../../core/clock";
 import { commandActor } from "../../core/command-actor";
 import { newActor } from "../../core/command-handlers";
 import { type ApplyCtx, type ValidateCtx, causedBy } from "../../core/commands";
 import { findCrewDef, findItemDef } from "../../core/defs";
-import { berthDock, dockToDeck } from "../../core/docks";
-import { allocateId } from "../../core/ids";
+import { berthDock, dockAlongsideAt, dockToDeck } from "../../core/docks";
+import { allocateId, byId } from "../../core/ids";
 import { postFacing } from "../../core/locals";
+import { isSite } from "../../core/places";
 import type { Command, CommandRejection } from "../../core/types/commands";
 import type { DeepReadonly } from "../../core/types/common";
 import {
@@ -41,9 +48,9 @@ import {
 import { STAGING_LIMITS } from "../../core/types/dockside";
 import type { EventDraft } from "../../core/types/events";
 import type { ActorId, CrewDefId, ItemDefId, JobId, PortDefId } from "../../core/types/ids";
-import type { StepCtx } from "../../core/types/pipeline";
+import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { BattlePlan, Expedition } from "../../core/types/state";
-import type { Job } from "../../core/types/travel";
+import type { Job, JobErrand } from "../../core/types/travel";
 import { shipDeckId } from "../../core/world";
 import { queueArrivalCard } from "./cards";
 import { dispositionOf, initialState } from "./morale";
@@ -269,6 +276,8 @@ export function startExpedition(ctx: ApplyCtx, plan: StartPlan, by: StartedBy): 
     ...(plan.jobId === undefined ? {} : { jobId: plan.jobId }),
   };
   ctx.state.expedition = expedition;
+  const errand = plan.jobId === undefined ? undefined : ctx.state.jobs[plan.jobId]?.errand;
+  if (errand?.kind === "fetchItem") spawnLoot(ctx, plan.site, errand);
   ctx.emit({
     ...(by.kind === "command" ? causedBy(by.command) : SIM_CAUSE),
     type: "expeditionStarted",
@@ -279,19 +288,112 @@ export function startExpedition(ctx: ApplyCtx, plan: StartPlan, by: StartedBy): 
   if (plan.plan === undefined && plan.jobId !== undefined) queueArrivalCard(ctx, expedition);
 }
 
+/** Call 13: a `fetchItem` errand's thing, lying at the site's `loot` post. */
+function spawnLoot(ctx: ApplyCtx, site: DockDef, errand: DeepReadonly<JobErrand>): void {
+  const post = site.posts.find((p) => p.kind === "loot");
+  const itemDefId = errand.itemDefId;
+  const def = itemDefId === undefined ? undefined : findItemDef(ctx.content, ctx.state, itemDefId);
+  if (post === undefined || def === undefined) {
+    throw new Error(`a fetchItem errand at "${site.id}" needs a loot post and a known item`);
+  }
+  const deckId = shipDeckId(ctx.state);
+  const deck = ctx.content.decks[deckId];
+  if (deck === undefined) throw new Error(`no deck "${deckId}" in content`);
+  const tile = dockToDeck(berthDock(site, deck), post.tile);
+  const location = { kind: "onDeck", deckId, x: tile.x + 0.5, y: tile.y + 0.5 } as const;
+  const id = allocateId(ctx.state, "item");
+  ctx.state.items[id] =
+    def.stacking === "unique"
+      ? { id, defId: def.id, stacking: "unique", location, condition: 1 }
+      : { id, defId: def.id, stacking: "stack", location, count: 1, reserved: 0 };
+  ctx.caches.dirty.inventory = true;
+}
+
+/**
+ * The errand this landing is for: `inTransit` to `siteId` with no outcome yet, and not the one the
+ * last (resolved) expedition was already for. The ship carries one job at a time; by id if more.
+ */
+function errandLandedFor(
+  state: ReadonlyWorldState,
+  siteId: PortDefId,
+): DeepReadonly<Job> | undefined {
+  const last = state.expedition?.jobId;
+  return Object.values(state.jobs)
+    .filter(
+      (job) =>
+        job.status === "inTransit" &&
+        job.errand?.siteId === siteId &&
+        job.errand.outcome === undefined &&
+        job.id !== last,
+    )
+    .sort(byId)[0];
+}
+
 /**
  * A2 call 12: the first tick the ship is docked at a site with its site map alongside and an
  * `inTransit` errand naming it whose `outcome` is unset, start the expedition for it (no plan, the
- * cast `castFor` gives). Called at the top of the expedition system's `run` while there is no
- * expedition or the last one is `resolved`. Gate stub: no-op.
+ * cast `castFor` gives, the party `everyone` picks until a plan is adopted). Called at the top of
+ * the expedition system's `run` while there is no expedition or the last one is `resolved`.
  */
-export function landedForErrand(_ctx: StepCtx): void {}
+export function landedForErrand(ctx: StepCtx): void {
+  const { state } = ctx;
+  const travel = state.travel;
+  if (travel.stage !== "docked" || !isSite(ctx.content, travel.portId)) return;
+  if (state.expedition !== undefined && state.expedition.phase !== "resolved") return;
+  // A course away already planned: she is lifting off, as the start command refuses then.
+  const voyage = travel.voyageDestinationId;
+  if (travel.plannedDestinationId !== undefined) return;
+  if (voyage !== undefined && voyage !== travel.portId) return;
+  const site = dockAlongsideAt(ctx.content, state, travel.portId)?.dock;
+  if (site === undefined || site.kind !== "site") return;
+  const job = errandLandedFor(state, travel.portId);
+  if (job === undefined) return;
+  const cast = castFor(job, site);
+  const weapons = castWeapons(ctx);
+  const problem = castProblem(cast, site, weapons);
+  if (problem !== undefined) {
+    throw new Error(`landing at "${site.id}" for ${job.id}: its cast: ${problem.reason}`);
+  }
+  const plan: StartPlan = {
+    siteId: travel.portId,
+    site,
+    cast,
+    weapons,
+    ...partyOf(ctx, undefined),
+    jobId: job.id,
+  };
+  startExpedition(ctx, plan, { kind: "landing" });
+}
 
 /**
  * A2 call 13: the site's cast for an errand: the map's `defaultCast` with the one `target` entry
- * named for the errand's `targetName` (a `fetchItem` leaves the cast as it is). Gate stub: the
- * default cast unchanged.
+ * named for the errand's `targetName` (a `fetchItem` leaves the cast as it is). A `fetchPerson`
+ * errand at a site whose default cast has no one target is a content bug and throws.
  */
-export function castFor(_job: DeepReadonly<Job>, site: DockDef): readonly SiteCastEntryDef[] {
-  return site.defaultCast ?? [];
+export function castFor(job: DeepReadonly<Job>, site: DockDef): readonly SiteCastEntryDef[] {
+  const errand = job.errand;
+  if (errand === undefined) throw new Error(`castFor: ${job.id} is not an errand`);
+  const cast = site.defaultCast ?? [];
+  if (errand.kind === "fetchItem") return cast;
+  const targets = cast.filter((entry) => entry.part === "target").length;
+  if (targets !== 1) {
+    throw new Error(`"${site.id}" has ${targets} targets in its default cast; an errand needs one`);
+  }
+  return cast.map((entry) =>
+    entry.part === "target" ? { ...entry, name: errand.targetName } : entry,
+  );
+}
+
+/**
+ * A2: the plan as an expedition adopts it (`adoptPlan`): `targetMustLive` when its errand wants
+ * the target alive, so the party never fires at them (`combat.ts`).
+ */
+export function planForErrand(
+  state: Pick<ReadonlyWorldState, "jobs">,
+  expedition: Pick<Expedition, "jobId">,
+  plan: BattlePlan,
+): BattlePlan {
+  const jobId = expedition.jobId;
+  const wants = jobId === undefined ? undefined : state.jobs[jobId]?.errand?.wants;
+  return { ...plan, targetMustLive: wants === "alive" };
 }

@@ -20,16 +20,23 @@
  * ramp) and the target are at the ramp foot or aboard; `partyWithdrew` once a called-back party
  * is aboard (anyone down left behind); `partyRouted` once every party member is down, dead or
  * fled aboard without being called back; `timedOut` `maxFightSeconds` after contact, or
- * `maxApproachSeconds` (ruling 3) after the approach began with no contact.
+ * `maxApproachSeconds` (ruling 3) after the approach began with no contact, or (A2) that long
+ * after an expedition that started itself on landing began with no plan adopted (no arrival card:
+ * the menu had no two plans available).
  * `expeditionResolved` carries the tally (wounds and deaths per side since the start); the alert
  * stands down `alertClearSeconds` later; thoughts and memories (`heldTheLine` at a taking for
  * those who never broke, `ranFromAFight` for those who broke, `foughtBeside` pairwise among the
  * living, `leftMeBehind` from a down party member left on the floor about the leader); the party
  * leaves the fight (the planner has them again); the taken target, the dead and the down of the
  * cast are removed (A1: the narrator says what then in A2); the rest of the cast walk off by the
- * exit and are removed there.
+ * exit and are removed there, or all at once when the ship plans her lift-off (a course planned,
+ * or under way): the scene ends when she lifts, and nobody of the cast is brought aboard.
  *
- * Owner after the gate: W2 of expeditions A1.
+ * **A2.** Set down at a site for an errand, the expedition starts itself (`landedForErrand`,
+ * `start.ts`); the turn card (`cards.ts`) is queued the tick the fight first turns, after the
+ * tick's checks and only when it does not resolve then.
+ *
+ * Owner after the gate: W2 of expeditions A2.
  */
 import { configTicks } from "../../core/clock";
 import { addThought } from "../../core/thoughts";
@@ -84,17 +91,23 @@ export function makeExpeditionSystem(deps: CombatDeps): System {
       if (ground === undefined) return;
       handOutMuster(ctx);
       advancePhase(ctx, expedition);
-      if (expedition.phase === "mustering") return;
+      if (expedition.phase === "mustering") {
+        if (unplannedTooLong(ctx, expedition)) {
+          const fight = fightOf(ctx, deps, ground);
+          if (fight !== undefined) resolve(fight, "timedOut", undefined);
+        }
+        return;
+      }
       const fight = fightOf(ctx, deps, ground);
       if (fight === undefined) return;
       const tick = runCombat(fight);
-      // A2 call 15: the turn card, the tick the fight first turns.
-      queueTurnCard(ctx, fight);
       checkContact(fight);
       checkWithdrawal(fight);
       checkObjective(fight);
       const outcome = tick.targetFled !== undefined ? "targetFled" : outcomeNow(fight);
       if (outcome !== undefined) resolve(fight, outcome, tick.targetFled);
+      // A2 call 15: the turn card, the tick the fight first turns (and goes on).
+      else queueTurnCard(fight);
     },
   };
 }
@@ -144,6 +157,17 @@ function advancePhase(ctx: StepCtx, expedition: Expedition): void {
     expedition.phase = "approach";
     expedition.approachTick = ctx.tick;
   }
+}
+
+/**
+ * A2: an expedition that started itself on landing and has had no plan for `maxApproachSeconds`
+ * (the menu offered no two plans, so no arrival card) gives up rather than hold the ship there.
+ * While the arrival card is up the world is halted, so this never runs out under it.
+ */
+function unplannedTooLong(ctx: StepCtx, expedition: Expedition): boolean {
+  if (expedition.jobId === undefined || expedition.plan !== undefined) return false;
+  const limit = configTicks(ctx.config, ctx.config.expedition.maxApproachSeconds);
+  return ctx.tick - expedition.startedTick >= limit;
 }
 
 /** §8.3 `withdrawWhen`, checked every tick in the fight. */
@@ -364,6 +388,27 @@ function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | un
     if (isParty(person)) leaveFight(ctx, person);
     else castAfter(fight, person, outcome);
   }
+  for (const id of expedition.party) {
+    const actor = ctx.state.actors[id];
+    if (actor !== undefined) stopMuster(ctx, actor);
+  }
+}
+
+/**
+ * Whoever is still on the muster when the fight ends stops: its `arm` step would make them a
+ * combatant after the fight, aboard a ship that may be lifting off.
+ */
+function stopMuster(ctx: StepCtx, actor: Actor): void {
+  const muster = (intent: Actor["pendingIntent"]) =>
+    intent?.kind === "personal" && intent.activity === "muster";
+  if (muster(actor.pendingIntent)) {
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete actor.pendingIntent;
+  }
+  const activity = actor.activity;
+  if (activity.kind === "personal" && activity.activity === "muster") {
+    abortActivity(ctx, actor, "cancelled");
+  }
 }
 
 /** Thoughts and memories of the fight (§11). */
@@ -381,7 +426,10 @@ function afterTheFight(fight: Fight, outcome: ExpeditionOutcome): void {
       addThought(ctx, actor, "heldTheLine");
     }
   }
-  const living = party.filter((a) => a.availability !== "dead" && a.crew);
+  // Only those who went: a party picked without a plan never mustered.
+  const living = party.filter(
+    (a) => a.availability !== "dead" && a.crew && a.combatant !== undefined,
+  );
   for (const a of living) {
     for (const b of living) if (a.id !== b.id) addMemory(ctx, a.id, b.id, "foughtBeside");
   }
@@ -427,7 +475,11 @@ function walkOff(ctx: StepCtx, ground: Ground | undefined, person: Actor): void 
   if (exit !== undefined && goTo(ctx, person, exit)) setLabel(person, "leaving");
 }
 
-/** After resolution: the cast walk off and go at the exit; the alert stands down when due. */
+/**
+ * After resolution: the cast walk off and go at the exit, or all go at once when the ship plans
+ * her lift-off (the departure prep would carry anyone still on the floor aboard); the alert stands
+ * down when due.
+ */
 function aftermath(ctx: StepCtx, ground: Ground | undefined): void {
   const alert = ctx.state.alert;
   if (
@@ -445,8 +497,13 @@ function aftermath(ctx: StepCtx, ground: Ground | undefined): void {
       payload: { cause: "fight" },
     });
   }
-  const leaving = Object.values(ctx.state.actors).filter((a) => a.combatant !== undefined);
+  const leaving = Object.values(ctx.state.actors).filter((a) => a.combatant?.side === "them");
   if (leaving.length === 0) return;
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) {
+    for (const person of leaving) removeCast(ctx, person);
+    return;
+  }
   const exit = ground?.posts.exit;
   for (const person of leaving) {
     const at = tileOfActor(ctx.state, person);
