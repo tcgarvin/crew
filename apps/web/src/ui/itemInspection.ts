@@ -11,15 +11,18 @@ import {
   type BerthedDock,
   type ContentBundle,
   type DeepReadonly,
+  type ErrandWants,
   type ItemId,
+  type JobErrand,
   type PhysicalLocation,
+  type PortDefId,
   type WorldState,
   dockAlongside,
   isOnDock,
 } from "@crew/sim";
 import type { DeckLayout } from "../render/deckLayout";
 import { isShipTile } from "../render/dock";
-import type { ItemInspection } from "./Inspector";
+import type { ErrandWords, ItemInspection } from "./Inspector";
 
 const AREA_WORDS = {
   freightStaging: "in the freight staging area",
@@ -107,6 +110,39 @@ function where(
   }
 }
 
+function portName(content: Pick<ContentBundle, "ports">, id: PortDefId): string {
+  return content.ports[id]?.name ?? id;
+}
+
+/** Expeditions A2 (§6): how an errand's `wants` reads, as on its offer card. */
+const WANTS_WORDS: Readonly<Record<ErrandWants, string>> = {
+  alive: "alive",
+  either: "alive or dead",
+  dead: "dead",
+};
+
+/**
+ * Expeditions A2 (§6): an errand in the inspector's words, as its offer card says it: who or what
+ * is fetched, from which site, and (a person) how; and the port it comes home to. No numbers.
+ */
+export function errandWords(
+  errand: DeepReadonly<JobErrand>,
+  content: Pick<ContentBundle, "ports" | "items">,
+): ErrandWords {
+  // "The Boathouse" reads "the Boathouse" mid-sentence.
+  const site = portName(content, errand.siteId).replace(/^The /, "the ");
+  const named = errand.targetName.trim();
+  if (errand.kind === "fetchItem") {
+    const item = errand.itemDefId === undefined ? undefined : content.items[errand.itemDefId];
+    const what = named !== "" ? named : (item?.name.toLowerCase() ?? "what they're after");
+    return { what: `Fetch ${what} from ${site}`, home: portName(content, errand.returnToPortId) };
+  }
+  return {
+    what: `Bring back ${named} from ${site}, ${WANTS_WORDS[errand.wants]}`,
+    home: portName(content, errand.returnToPortId),
+  };
+}
+
 export function inspectItem(
   state: DeepReadonly<WorldState>,
   itemId: ItemId,
@@ -117,7 +153,6 @@ export function inspectItem(
   if (item === undefined) return undefined;
   const def = content.items[item.defId] ?? state.defs.dynamic.items[item.defId];
   const job = item.jobId === undefined ? undefined : state.jobs[item.jobId];
-  const port = (id: string) => content.ports[id as keyof ContentBundle["ports"]]?.name ?? id;
   return {
     name: def?.name ?? "Cargo",
     count: item.stacking === "stack" ? item.count : 1,
@@ -127,9 +162,10 @@ export function inspectItem(
       : {
           job: {
             issuer: job.issuer,
-            from: port(job.fromPortId),
-            to: port(job.toPortId),
+            from: portName(content, job.fromPortId),
+            to: portName(content, job.toPortId),
             status: job.status,
+            ...(job.errand === undefined ? {} : { errand: errandWords(job.errand, content) }),
           },
         }),
   };

@@ -142,6 +142,34 @@ describe("dockInView (the render-frame seam)", () => {
     ).toThrow(/unknown dock/);
   });
 
+  it("treats a landing site as a port: its map in view setting down and lifting off (expeditions A2)", () => {
+    const harrow = "port.harrow_end" as PortDefId;
+    const meridian = "port.green_meridian" as PortDefId;
+    const site = dockOf(harrow);
+    expect(site.kind).toBe("site");
+    const stages: readonly [TravelStage, PortDefId, PortDefId][] = [
+      ["approaching", meridian, harrow],
+      ["docking", meridian, harrow],
+      ["docked", harrow, harrow],
+      ["undocking", harrow, meridian],
+      ["departing", harrow, meridian],
+    ];
+    for (const [stage, from, to] of stages) {
+      const t = travel(stage, 0.5, from, to);
+      expect(dockInView({ travel: t }, docks)).toBe(site);
+      // The real content's ports carry the site, so the scene neither throws nor reads as a
+      // station: Harrow End is a planet pad.
+      const scene = sceneAt(t, bundle.ports, { reducedMotion: false });
+      expect(scene.setting).toBe("planet");
+    }
+    // In transit the destination's map is the one in view (drawn nowhere): the site's on the way
+    // in, Green Meridian's on the way home.
+    expect(dockInView({ travel: travel("transit", 0.5, meridian, harrow) }, docks)).toBe(site);
+    expect(dockInView({ travel: travel("transit", 0.5, harrow, meridian) }, docks)).toBe(
+      dockOf(meridian),
+    );
+  });
+
   it("refuses content with two maps for one port", () => {
     const twin = { ...hubDock, id: "dock.twin" as DockDefId };
     const table = { [hubDock.id]: hubDock, [twin.id]: twin };
