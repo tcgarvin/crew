@@ -9,9 +9,13 @@ export { checkDockFitsDeck, compartmentAt, registerSpatial } from "./systems/spa
 export { rotateOffset } from "./systems/spatial/geometry";
 export { spatialViolations } from "./systems/spatial/invariants";
 export {
+  checkErrandBand,
   commerceTaskDerivations,
+  errandPay,
   marketBlock,
   PASSENGER_OVERDUE_PROMPT_KEY,
+  PAY_TIER_FRACTION,
+  type PayTier,
   registerCommerce,
 } from "./systems/commerce/index";
 export { commerceViolations } from "./systems/commerce/invariants";

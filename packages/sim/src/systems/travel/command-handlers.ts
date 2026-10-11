@@ -20,6 +20,7 @@ import {
   ok,
   reject,
 } from "../../core/commands";
+import { portGraph } from "../../core/places";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { MachineId, PortDefId } from "../../core/types/ids";
 import { coursePlotRequired } from "./course";
@@ -45,10 +46,18 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
     if (destinationPortId === travel.portId) {
       return reject("invalidPayload", "setCourse: destination must differ from the current port");
     }
+    // §settling-the-errand: the ship leaves a site when the expedition is over and the sim sets
+    // the voyage home; a course while it is under way would lift off with the party ashore.
+    const expedition = ctx.state.expedition;
+    if (expedition !== undefined && expedition.phase !== "resolved") {
+      return reject("preconditionFailed", "setCourse: an expedition is under way");
+    }
     if (ctx.content.ports[destinationPortId] === undefined) {
       return reject("unknownEntity", `setCourse: unknown port "${destinationPortId}"`);
     }
-    const route = shortestPath(ctx.content.ports, travel.portId, destinationPortId);
+    // Expeditions A2 call 2: a site is reachable only while it is known (an errand names it).
+    const graph = portGraph(ctx.content, ctx.state, "known");
+    const route = shortestPath(graph, travel.portId, destinationPortId);
     const nextHop = route?.path[1];
     if (route === undefined || nextHop === undefined) {
       return reject(

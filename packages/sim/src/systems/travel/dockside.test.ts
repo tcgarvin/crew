@@ -239,7 +239,7 @@ describe("departure waits for everyone on the dock (§calling-the-crew-aboard)",
     setCourse(test, TINY.port2);
     const out = run(test, 1_000, departed);
     expect(ofType(out, "leftOnDock").map((e) => e.payload)).toEqual([
-      { itemId: wrench.id as ItemId, portId: TINY.port },
+      { itemId: wrench.id as ItemId, defId: TINY.wrench, portId: TINY.port },
     ]);
     expect(wrench.location).toEqual({
       kind: "inExternalStore",

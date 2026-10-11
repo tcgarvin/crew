@@ -5,7 +5,10 @@ import {
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
   type PortDefId,
+  STAGING_LIMITS,
   type SaveEnvelope,
+  checkErrandBand,
+  errandPay,
 } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { CallBackPlan, NarratorPlan, NarratorRequest, TranslationCtx } from "./contract";
@@ -57,6 +60,11 @@ const job = {
   surface: true,
   passenger: false,
   roundTrip: false,
+  errandKind: "",
+  site: "",
+  targetName: "",
+  targetItem: "",
+  wants: "",
 };
 
 const decision = {
@@ -125,7 +133,7 @@ describe("translateIntents: far ports (passengers-and-galaxy §2.3)", () => {
     const draft = command.payload.job;
     expect(draft.toPortId).toBe(OSSORY);
     expect(routeDistance(content(), HUB, OSSORY)).toBeUndefined();
-    const path = pathBetween(content(), HUB, OSSORY);
+    const path = pathBetween(content(), req.snapshot.state, HUB, OSSORY);
     if (path === undefined) throw new Error("no path");
     expect(path.hops).toBe(2);
     expect(path.distance).toBe(
@@ -889,7 +897,12 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
 
   it("prices a passage by the passenger band over path distance, doubled for a round trip", () => {
     const config = farCaptainAshoreRequest(content()).snapshot.config;
-    const path = pathBetween(content(), "port.crossroads_hub", "port.ossory_station");
+    const path = pathBetween(
+      content(),
+      farCaptainAshoreRequest(content()).snapshot.state,
+      "port.crossroads_hub",
+      "port.ossory_station",
+    );
     if (path === undefined) throw new Error("no path");
     expect(path.hops).toBe(2);
     const round = translateIntents(plan([passage]), atHub()).commands[0];
@@ -1622,5 +1635,223 @@ describe("translateIntents: the call-back request (§requested-call-back)", () =
     );
     expect(res.commands).toEqual([]);
     expect(res.dropped).toEqual([expect.objectContaining({ intentIndex: -1, kind: "callBack" })]);
+  });
+});
+
+describe("translateIntents: errands (expeditions A2, §6)", () => {
+  const HUB = "port.crossroads_hub";
+  const TERNS = "port.terns_rest";
+  const HARROW = "port.harrow_end";
+  const BOATHOUSE = "port.boathouse";
+  const errand = {
+    ...job,
+    issuerName: "Ysolde Maren",
+    issuerRole: "grower",
+    issuerOrg: "Meridian Growers Collective",
+    pitch: "Teodor ran with the seed money. Bring him home and the Collective will remember it.",
+    description: "Fetch the co-op steward back from the old silo yard at Harrow End.",
+    fromPort: HUB,
+    toPort: HUB,
+    cargoItem: "",
+    quantity: "one",
+    payTier: "standard",
+    errandKind: "fetchPerson",
+    site: HARROW,
+    targetName: "Teodor Lusk",
+    targetItem: "",
+    wants: "alive",
+  };
+  const atHub = () => ctxOf(farCaptainAshoreRequest(content()));
+  const atPort = (portId: string) => ctxOf(docked(farCaptainAshoreRequest(content()), portId));
+  const offerOf = (result: ReturnType<typeof translateIntents>) => {
+    const command = result.commands[0];
+    if (command?.kind !== "offerJob") throw new Error("no offer");
+    return command.payload.job;
+  };
+
+  it("an errand → an offerJob draft that comes home: toPortId is fromPort, no cargo, nobody rides, the errand carried", () => {
+    const result = translateIntents(plan([errand]), atHub());
+    expect(result.dropped).toEqual([]);
+    expect(result.notes).toEqual([]);
+    const draft = offerOf(result);
+    expect(draft).toMatchObject({
+      fromPortId: HUB,
+      toPortId: HUB,
+      cargo: [],
+      errand: { kind: "fetchPerson", siteId: HARROW, targetName: "Teodor Lusk", wants: "alive" },
+    });
+    expect(draft.errand).not.toHaveProperty("itemDefId");
+    expect(draft.passenger).toBeUndefined();
+    expect(draft.roundTrip).toBeUndefined();
+  });
+
+  it("pays by the sim's errandPay over the path there and back, inside the kernel's checkErrandBand at every tier (plan call 6)", () => {
+    const routes = [
+      { from: HUB, site: HARROW },
+      { from: TERNS, site: BOATHOUSE },
+    ];
+    for (const { from, site } of routes) {
+      const ctx = atPort(from);
+      const state = ctx.snapshot.state;
+      const config = ctx.snapshot.config;
+      const there = pathBetween(content(), state, from, site);
+      const back = pathBetween(content(), state, site, from);
+      if (there === undefined || back === undefined) throw new Error(`no path ${from} ${site}`);
+      // Through the near port, and back the same way: the site's one authored leg each way.
+      const near = content().ports[site as PortDefId]?.nearPortId;
+      expect(there.path[0]).toBe(from);
+      expect(there.path.slice(-2)).toEqual([near, site]);
+      expect(back.path.slice(0, 2)).toEqual([site, near]);
+      for (const payTier of ["low", "standard", "generous"] as const) {
+        const intent = { ...errand, fromPort: from, toPort: from, site, payTier };
+        const draft = offerOf(translateIntents(plan([intent]), ctx));
+        const expected = errandPay(config, there.distance + back.distance, payTier);
+        expect(draft.pay, `${from} ${site} ${payTier}`).toBe(expected.pay);
+        const kernelCtx = { content: content(), config, state } as Parameters<
+          typeof checkErrandBand
+        >[0];
+        expect(checkErrandBand(kernelCtx, from as PortDefId, site as PortDefId, draft.pay)).toBe(
+          null,
+        );
+      }
+    }
+  });
+
+  it("takes the site written in toPort for the port it comes home to, with a note", () => {
+    const result = translateIntents(plan([{ ...errand, toPort: HARROW }]), atHub());
+    expect(result.dropped).toEqual([]);
+    expect(offerOf(result).toPortId).toBe(HUB);
+    expect(result.notes).toEqual([
+      "offerJob: an errand's toPort is the port it is offered at (port.crossroads_hub), where it comes home; the site goes in site only",
+    ]);
+  });
+
+  it("offers a fetchPerson with no wants as alive, and says so", () => {
+    const result = translateIntents(plan([{ ...errand, wants: "" }]), atHub());
+    expect(offerOf(result).errand?.wants).toBe("alive");
+    expect(result.notes).toEqual([
+      "offerJob: the errand for Teodor Lusk had no wants; it was offered as alive",
+    ]);
+  });
+
+  it("a kill job (wants dead) is accepted: rare by the prompt, not refused by the translator (D103)", () => {
+    const result = translateIntents(plan([{ ...errand, wants: "dead" }]), atHub());
+    expect(result.dropped).toEqual([]);
+    expect(offerOf(result).errand?.wants).toBe("dead");
+  });
+
+  it("a fetchItem names an existing item, wants it either way, and is called by the item's name when targetName is empty", () => {
+    const fetch = {
+      ...errand,
+      errandKind: "fetchItem",
+      targetName: "",
+      targetItem: "item.spare_parts_stack",
+      wants: "",
+    };
+    const result = translateIntents(plan([fetch]), atHub());
+    expect(result.dropped).toEqual([]);
+    expect(offerOf(result).errand).toEqual({
+      kind: "fetchItem",
+      siteId: HARROW,
+      targetName: content().items["item.spare_parts_stack" as never]?.name,
+      itemDefId: "item.spare_parts_stack",
+      wants: "either",
+    });
+    const named = offerOf(
+      translateIntents(
+        plan([{ ...fetch, targetName: "the seed ledger", wants: "either" }]),
+        atHub(),
+      ),
+    );
+    expect(named.errand?.targetName).toBe("the seed ledger");
+  });
+
+  it("clips the target's name to a cast name's length, since it becomes the target's name at the site", () => {
+    const long = `Teodor ${"Aurelian ".repeat(10)}Lusk`;
+    const draft = offerOf(translateIntents(plan([{ ...errand, targetName: long }]), atHub()));
+    expect(draft.errand?.targetName.length).toBeLessThanOrEqual(STAGING_LIMITS.nameChars);
+  });
+
+  it("drops an errand that cannot be offered, with the reason (the kernel's own rules)", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [
+        { toPort: "port.kessler_drift" },
+        "offerJob: toPort must be port.crossroads_hub, the port the ship is docked at: an errand comes home",
+      ],
+      [
+        { site: "port.nowhere" },
+        'offerJob: site: unknown site "port.nowhere"; use one listed under Sites',
+      ],
+      [
+        { site: "port.green_meridian" },
+        "offerJob: site: port.green_meridian is a port, not a landing site; use one listed under Sites",
+      ],
+      [
+        { errandKind: "fetchItem", targetItem: "item.spare_parts_stack", wants: "alive" },
+        'offerJob: wants: a fetchItem wants its item "either" way (or empty), not "alive"',
+      ],
+      [
+        { errandKind: "fetchItem", targetItem: "item.unobtainium", wants: "" },
+        'offerJob: targetItem: unknown item "item.unobtainium"; use one listed under What you can do',
+      ],
+      [{ passenger: true }, "offerJob: an errand is no passage: passenger and roundTrip are false"],
+      [{ roundTrip: true }, "offerJob: an errand is no passage: passenger and roundTrip are false"],
+      [{ targetName: "  " }, "offerJob: targetName: a fetchPerson names who is to be brought back"],
+      [
+        { targetName: "Teodor, owed 200 credits" },
+        "offerJob: targetName: player-facing text states a numeric consequence",
+      ],
+    ];
+    for (const [change, reason] of cases) {
+      const result = translateIntents(plan([{ ...errand, ...change }]), atHub());
+      expect(result.commands, reason).toEqual([]);
+      expect(result.dropped).toEqual([{ intentIndex: 0, kind: "offerJob", reason }]);
+    }
+  });
+
+  it("never offers at a landing site: nobody there has work", () => {
+    const result = translateIntents(plan([{ ...errand, fromPort: HARROW }]), atPort(HARROW));
+    expect(result.dropped[0]?.reason).toBe(
+      "offerJob: the ship is set down at Harrow End, a landing site; offers are made at ports",
+    );
+  });
+
+  it("drops freight or a passage to a site: only an errand goes there", () => {
+    const reason =
+      "offerJob: toPort port.harrow_end is a landing site: only an errand goes there (errandKind, with the site in site)";
+    const freight = { ...job, fromPort: HUB, toPort: HARROW, cargoItem: "item.crate_general" };
+    const passage = { ...freight, cargoItem: "", passenger: true };
+    for (const intent of [freight, passage]) {
+      const result = translateIntents(plan([intent]), atHub());
+      expect(result.commands).toEqual([]);
+      expect(result.dropped[0]?.reason).toBe(reason);
+    }
+  });
+
+  it("drops a card's setCourse to a site: a site is on the graph only for an errand", () => {
+    const card = {
+      ...decision,
+      left: {
+        label: "Go and look",
+        effect: "setCourse",
+        coursePort: HARROW,
+        talkWith: "",
+        tone: "",
+      },
+    };
+    const result = translateIntents(plan([card]), atHub());
+    expect(result.dropped[0]?.reason).toBe(
+      "surfaceDecision: left: coursePort port.harrow_end is a landing site; only an errand goes there",
+    );
+  });
+
+  it("an errand is still one job at a time and one card per call", () => {
+    const card = {
+      ...decision,
+      left: { label: "Fine by me", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    };
+    const result = translateIntents(plan([card, errand]), atHub());
+    expect(result.commands.map((c) => c.kind)).toEqual(["surfaceDecision"]);
+    expect(result.dropped[0]?.reason).toBe("offerJob: only one card per call");
   });
 });

@@ -61,7 +61,7 @@ export {
   partFunction,
   wholeBody,
 } from "./body";
-export { isSite } from "./places";
+export { isSite, knownSites, portGraph, siteNearPort } from "./places";
 export { isCover, postsOfKind, rampFoot, siteOf, tileKindAt } from "./sites";
 export { instantiatePlacement } from "./placement";
 export { createKernel, kernel } from "./kernel";

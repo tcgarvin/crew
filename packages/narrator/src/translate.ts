@@ -21,6 +21,7 @@ import {
   type ItemDef,
   type ItemDefId,
   type Job,
+  type JobDraft,
   type MachineId,
   NARRATOR_COMMAND_KINDS,
   type NarratorCommand,
@@ -28,11 +29,14 @@ import {
   type PortDef,
   type PortDefId,
   STAGING_COMMAND_KINDS,
+  STAGING_LIMITS,
   type ScriptedImpactDraft,
   type TempRef,
   basePriceFor,
   configTicks,
+  errandPay,
   isOnDock,
+  isSite,
   jobBlockingAcceptance,
   scriptedHullDamage,
 } from "@crew/sim";
@@ -65,6 +69,7 @@ import {
   type Snapshot,
   type State,
   compartmentName,
+  errandDistance,
   fareFor,
   faultDiscovery,
   faultWindowSeconds,
@@ -233,25 +238,27 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   if (inHand !== undefined) {
     return no(`a job is already in hand: ${inHand.id} to ${portName(content, inHand.toPortId)}`);
   }
+  // Expeditions A2: nobody at a landing site offers work; the ship is there for an errand.
+  if (isSite(content, here)) {
+    return no(
+      `the ship is set down at ${portName(content, here)}, a landing site; offers are made at ports`,
+    );
+  }
   const fromPort = knownPort(content, intent.fromPort);
   if (!fromPort.ok) return no(`fromPort: ${fromPort.reason}`);
-  const toPort = knownPort(content, intent.toPort);
-  if (!toPort.ok) return no(`toPort: ${toPort.reason}`);
+  // §6: an errand's toPort is fromPort (it comes home), so it is checked on its own branch.
+  const errand = intent.errandKind !== "";
+  if (!errand) {
+    const toPort = knownPort(content, intent.toPort);
+    if (!toPort.ok) return no(`toPort: ${toPort.reason}`);
+  }
   if (intent.fromPort !== here) {
     return no(
       `fromPort must be ${here} (${portName(content, here)}), the port the ship is docked at`,
     );
   }
-  if (intent.toPort === intent.fromPort) return no("toPort equals fromPort");
-  // Passengers-and-galaxy §2.3: any reachable port; a far one becomes a voyage when accepted,
-  // and the kernel prices it over the same path distance.
-  const path = pathBetween(content, intent.fromPort, intent.toPort);
-  if (path === undefined) return no(`no route from ${intent.fromPort} to ${intent.toPort}`);
-  const distance = path.distance;
-  // §4.1: roundTrip is a passenger's shape; freight has no return leg.
-  if (intent.roundTrip && !intent.passenger) {
-    return no("roundTrip needs passenger (freight has no return)");
-  }
+  const route = errand ? errandRoute(env, intent, here) : freightRoute(env, intent);
+  if (!route.ok) return route;
   // §4.1: a passenger offer is a person at the ramp, so it is always surfaced (§offer-lever: the
   // card comes up when the captain meets them).
   const surface = intent.passenger || intent.surface;
@@ -267,7 +274,8 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
         : "only one card per call",
     );
   }
-  const cargo = offerCargo(env, intent);
+  // §6: an errand carries nothing out; cargoItem and quantity are not its fields.
+  const cargo = route.value.errand === undefined ? offerCargo(env, intent) : ok(NO_CARGO);
   if (!cargo.ok) return no(`cargoItem: ${cargo.reason}`);
   const name = clipChars(intent.issuerName, ISSUER_MAX_CHARS);
   const role = clipChars(intent.issuerRole, ISSUER_MAX_CHARS).toLowerCase();
@@ -286,11 +294,22 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
     if (problem !== undefined) return no(`${field}: ${problem}`);
   }
   // §3.4: a passage is priced by the passenger band over path distance (doubled for a round
-  // trip), luggage adding nothing; freight by its class band per unit.
-  const { pay } = intent.passenger
-    ? fareFor(config, distance, intent.roundTrip, intent.payTier)
-    : payFor(config, cargo.value.cargoClass, distance, cargo.value.units, intent.payTier);
+  // trip), luggage adding nothing; freight by its class band per unit. §6, plan call 6: an errand
+  // by the sim's own `errandPay` over the path there and back, as `checkErrandBand` bands it.
+  const { distance } = route.value;
+  const { pay } =
+    route.value.errand !== undefined
+      ? errandPay(config, distance, intent.payTier)
+      : intent.passenger
+        ? fareFor(config, distance, intent.roundTrip, intent.payTier)
+        : payFor(config, cargo.value.cargoClass, distance, cargo.value.units, intent.payTier);
   if (surface) env.tally.cardUsed = true;
+  const shape =
+    route.value.errand !== undefined
+      ? { errand: route.value.errand }
+      : intent.passenger
+        ? { passenger: true, roundTrip: intent.roundTrip }
+        : {};
   return ok({
     kind: "offerJob",
     payload: {
@@ -300,14 +319,116 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
         urgency: intent.urgency,
         description: { key: NARRATOR_TEXT_KEYS.jobDescription, params: {}, prose: description },
         fromPortId: intent.fromPort as PortDefId,
-        toPortId: intent.toPort as PortDefId,
+        toPortId: route.value.toPortId,
         cargo: cargo.value.lines,
         pay,
-        ...(intent.passenger ? { passenger: true, roundTrip: intent.roundTrip } : {}),
+        ...shape,
       },
       surface,
     },
   });
+}
+
+/** Where an offer goes and the distance it is paid over; an errand's own fields when it is one. */
+interface OfferRoute {
+  readonly toPortId: PortDefId;
+  readonly distance: number;
+  readonly errand?: NonNullable<JobDraft["errand"]>;
+}
+
+/** An errand's cargo: none (its pay is not per unit). */
+const NO_CARGO: OfferCargo = { lines: [], cargoClass: "general", units: 0 };
+
+/**
+ * Freight and passages: any reachable port but the one the ship is at (§2.3: a far one becomes a
+ * voyage when accepted, and the kernel prices it over the same path distance), never a landing
+ * site (the kernel bands freight and passages over the ports alone, so one there could never be
+ * flown); `roundTrip` only with `passenger` (§4.1).
+ */
+function freightRoute(env: Env, intent: Intent<"offerJob">): Outcome<OfferRoute> {
+  const { content, snapshot } = env;
+  if (intent.toPort === intent.fromPort) return no("toPort equals fromPort");
+  if (isSite(content, intent.toPort as PortDefId)) {
+    return no(
+      `toPort ${intent.toPort} is a landing site: only an errand goes there (errandKind, with the site in site)`,
+    );
+  }
+  const path = pathBetween(content, snapshot.state, intent.fromPort, intent.toPort);
+  if (path === undefined) return no(`no route from ${intent.fromPort} to ${intent.toPort}`);
+  if (intent.roundTrip && !intent.passenger) {
+    return no("roundTrip needs passenger (freight has no return)");
+  }
+  return ok({ toPortId: intent.toPort as PortDefId, distance: path.distance });
+}
+
+/**
+ * Expeditions A2 (§6): an errand, mirroring the kernel's `offerJob` errand checks so nothing passed
+ * here is refused there. `site` is an authored landing site reachable from `here` and back over the
+ * `"all"` graph; the job comes home, so `toPortId` is `here` (the site written in `toPort` is
+ * corrected, with a note); nobody rides and nothing is carried. A `fetchPerson` names its target
+ * (clipped to a cast name's length: it becomes the target's name at the site) and wants them
+ * `alive` (when `wants` is empty, with a note), `either` or `dead`; a `fetchItem` names an existing
+ * item, is called by `targetName` or else the item's name, and wants it `either` way.
+ */
+function errandRoute(env: Env, intent: Intent<"offerJob">, here: PortDefId): Outcome<OfferRoute> {
+  const { content, snapshot } = env;
+  const kind = intent.errandKind;
+  if (kind === "") throw new Error("errandRoute: not an errand");
+  const site = content.ports[intent.site as PortDefId];
+  if (site === undefined) {
+    return no(`site: unknown site "${intent.site}"; use one listed under Sites`);
+  }
+  if (!isSite(content, site.id)) {
+    return no(`site: ${site.id} is a port, not a landing site; use one listed under Sites`);
+  }
+  if (intent.toPort === site.id) {
+    env.notes.push(
+      `offerJob: an errand's toPort is the port it is offered at (${here}), where it comes home; the site goes in site only`,
+    );
+  } else if (intent.toPort !== here) {
+    return no(`toPort must be ${here}, the port the ship is docked at: an errand comes home`);
+  }
+  if (intent.passenger || intent.roundTrip) {
+    return no("an errand is no passage: passenger and roundTrip are false");
+  }
+  const distance = errandDistance(content, snapshot.state, here, site.id);
+  if (distance === undefined) return no(`no route from ${here} to ${site.id} and back`);
+  const target = errandTarget(env, intent);
+  if (!target.ok) return target;
+  return ok({
+    toPortId: here,
+    distance,
+    errand: { kind, siteId: site.id, ...target.value },
+  });
+}
+
+type ErrandTarget = Pick<NonNullable<JobDraft["errand"]>, "targetName" | "itemDefId" | "wants">;
+
+/** §6: who or what the errand is after, and how they are wanted. */
+function errandTarget(env: Env, intent: Intent<"offerJob">): Outcome<ErrandTarget> {
+  const written = clipChars(intent.targetName, STAGING_LIMITS.nameChars);
+  if (intent.errandKind === "fetchItem") {
+    const item = env.content.items[intent.targetItem as ItemDefId];
+    if (item === undefined) return no(`targetItem: ${unknownId("item", intent.targetItem)}`);
+    if (intent.wants !== "" && intent.wants !== "either") {
+      return no(`wants: a fetchItem wants its item "either" way (or empty), not "${intent.wants}"`);
+    }
+    const targetName = written === "" ? clipChars(item.name, STAGING_LIMITS.nameChars) : written;
+    const problem = textProblem(targetName, env.secrets);
+    if (problem !== undefined) return no(`targetName: ${problem}`);
+    return ok({ targetName, itemDefId: item.id, wants: "either" });
+  }
+  if (written === "") return no("targetName: a fetchPerson names who is to be brought back");
+  const problem = textProblem(written, env.secrets);
+  if (problem !== undefined) return no(`targetName: ${problem}`);
+  if (intent.targetItem.trim() !== "") {
+    env.notes.push("offerJob: targetItem is for a fetchItem only; it was left off this errand");
+  }
+  if (intent.wants === "") {
+    env.notes.push(`offerJob: the errand for ${written} had no wants; it was offered as alive`);
+    return ok({ targetName: written, wants: "alive" });
+  }
+  return ok({ targetName: written, wants: intent.wants });
 }
 
 /** The cargo lines of an offer with the class and unit count the pay is figured from. */
@@ -615,14 +736,27 @@ function playerSide(label: string, command: CommandDraft, which: string): Outcom
 function setCourseSide(env: Env, side: Side, label: string, which: string): Outcome<SideCommands> {
   const travel = env.snapshot.state.travel;
   if (travel.stage !== "docked") return no(`${which}: setCourse is only possible while docked`);
+  const expedition = env.snapshot.state.expedition;
+  if (expedition !== undefined && expedition.phase !== "resolved") {
+    return no(
+      `${which}: setCourse waits until the expedition is over; the sim sets the course home`,
+    );
+  }
   if (side.coursePort.trim() === "") return no(`${which}: setCourse needs coursePort`);
   const course = knownPort(env.content, side.coursePort);
   if (!course.ok) return no(`${which}: coursePort: ${course.reason}`);
   if (side.coursePort === travel.portId)
     return no(`${which}: already docked at ${side.coursePort}`);
+  // Expeditions A2 (§3.2): a site is on the ship's graph only while an errand names it; a card's
+  // course never makes one known, so it never names one.
+  if (isSite(env.content, course.value.id)) {
+    return no(
+      `${which}: coursePort ${side.coursePort} is a landing site; only an errand goes there`,
+    );
+  }
   // §2.3: any reachable port. Beyond one hop the kernel makes it a voyage; a neighbour while a
   // voyage is already set is a detour the kernel routes on from. Nothing more to do here.
-  if (pathBetween(env.content, travel.portId, side.coursePort) === undefined) {
+  if (pathBetween(env.content, env.snapshot.state, travel.portId, side.coursePort) === undefined) {
     return no(`${which}: no route from ${travel.portId} to ${side.coursePort}`);
   }
   return playerSide(

@@ -19,11 +19,25 @@ import { findCrewDef, findItemDef } from "../../core/defs";
 import { heldCard } from "../../core/delivery";
 import { allocateId } from "../../core/ids";
 import { ensureMarket } from "../../core/markets";
-import type { BoundaryLocation, CommandOfKind } from "../../core/types/commands";
+import { siteNearPort } from "../../core/places";
+import type {
+  BoundaryLocation,
+  CommandOfKind,
+  CommandRejection,
+  JobDraft,
+} from "../../core/types/commands";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { CrewDef, ItemDef } from "../../core/types/content";
+import { STAGING_LIMITS } from "../../core/types/dockside";
 import type { EntityId, JobId, TempRef } from "../../core/types/ids";
-import type { CargoLine, Job } from "../../core/types/travel";
+import {
+  type CargoLine,
+  ERRAND_KINDS,
+  ERRAND_WANTS,
+  type Job,
+  type JobErrand,
+} from "../../core/types/travel";
+import { shortestPath } from "../travel/graph";
 import { jobBlockingAcceptance } from "../travel/in-hand";
 import { portStoreLocation } from "../travel/travel";
 import {
@@ -31,6 +45,7 @@ import {
   acceptJob,
   cargoClassOf,
   cargoStowageZoneKey,
+  checkErrandBand,
   checkPassageBand,
   checkPriceBand,
   clampCargoToMaxCrates,
@@ -77,6 +92,78 @@ function luggageOf(cargo: readonly CargoLine[]): CargoLine[] {
   return line === undefined ? [] : [{ itemDefId: line.itemDefId, count: 1 }];
 }
 
+type ErrandDraft = NonNullable<JobDraft["errand"]>;
+type Problem = { readonly code: CommandRejection["code"]; readonly reason: string };
+
+const oneOf = (list: readonly string[], value: unknown): boolean =>
+  typeof value === "string" && list.includes(value);
+
+/**
+ * Expeditions A2 (§6): why an errand draft cannot be offered, or undefined. It returns where it
+ * starts (`toPortId === fromPortId`) from a landing site whose near port that port reaches; it
+ * names its target (a name a cast entry may carry), names an item exactly when it fetches one (and
+ * then wants it `either` way), carries no cargo and nobody rides on it; and its pay is inside the
+ * errand band (`checkErrandBand`).
+ */
+function errandProblem(ctx: ValidateCtx, job: JobDraft, errand: ErrandDraft): Problem | undefined {
+  const invalid = (reason: string): Problem => ({ code: "invalidPayload", reason });
+  if (!oneOf(ERRAND_KINDS, errand.kind)) {
+    return invalid(`an errand's kind must be one of ${ERRAND_KINDS.join(", ")}`);
+  }
+  if (job.toPortId !== job.fromPortId) {
+    return invalid("an errand comes back where it starts (toPortId must be fromPortId)");
+  }
+  if (ctx.content.ports[job.fromPortId] === undefined) {
+    return { code: "unknownEntity", reason: `unknown port "${job.fromPortId}"` };
+  }
+  if (ctx.content.ports[errand.siteId] === undefined) {
+    return { code: "unknownEntity", reason: `unknown site "${errand.siteId}"` };
+  }
+  const near = siteNearPort(ctx.content, errand.siteId);
+  if (near === undefined) return invalid(`"${errand.siteId}" is a port, not a site`);
+  if (shortestPath(ctx.content.ports, job.fromPortId, near) === undefined) {
+    return {
+      code: "preconditionFailed",
+      reason: `no route from "${job.fromPortId}" to "${near}", the site's near port`,
+    };
+  }
+  const target = typeof errand.targetName === "string" ? errand.targetName.trim() : "";
+  if (target === "") return invalid("an errand names its target");
+  if (target.length > STAGING_LIMITS.nameChars) {
+    return invalid(`the target's name is longer than ${STAGING_LIMITS.nameChars} characters`);
+  }
+  if (errand.kind === "fetchItem") {
+    if (errand.itemDefId === undefined) return invalid("a fetchItem names its item");
+    if (findItemDef(ctx.content, ctx.state, errand.itemDefId) === undefined) {
+      return { code: "unknownEntity", reason: `unknown item "${errand.itemDefId}"` };
+    }
+  } else if (errand.itemDefId !== undefined) {
+    return invalid("only a fetchItem names an item");
+  }
+  if (!oneOf(ERRAND_WANTS, errand.wants)) {
+    return invalid(`an errand wants its target ${ERRAND_WANTS.join(", ")}`);
+  }
+  if (errand.kind === "fetchItem" && errand.wants !== "either") {
+    return invalid('a fetchItem wants its item "either" way');
+  }
+  if (job.cargo.length > 0) return invalid("an errand carries no cargo");
+  if (job.passenger === true || job.roundTrip === true) return invalid("an errand is no passage");
+  const band = checkErrandBand(ctx, job.fromPortId, errand.siteId, job.pay);
+  return band === null ? undefined : { code: "outOfBounds", reason: band };
+}
+
+/** The job's errand as offered: the draft's, trimmed, coming home to `fromPortId`. */
+function errandOf(draft: JobDraft, errand: ErrandDraft): JobErrand {
+  return {
+    kind: errand.kind,
+    siteId: errand.siteId,
+    targetName: errand.targetName.trim(),
+    ...(errand.itemDefId === undefined ? {} : { itemDefId: errand.itemDefId }),
+    wants: errand.wants,
+    returnToPortId: draft.fromPortId,
+  };
+}
+
 export const offerJob: CommandHandler<"offerJob", null> = {
   validate(ctx, command): Validation<null> {
     const { job } = command.payload;
@@ -101,7 +188,10 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         "offerJob: roundTrip needs passenger (freight has no return)",
       );
     }
-    if (passenger) {
+    if (job.errand !== undefined) {
+      const problem = errandProblem(ctx, job, job.errand);
+      if (problem !== undefined) return reject(problem.code, `offerJob: ${problem.reason}`);
+    } else if (passenger) {
       if (job.cargo.length > 1) {
         return reject("invalidPayload", "offerJob: a passage carries at most one line of luggage");
       }
@@ -159,6 +249,7 @@ export const offerJob: CommandHandler<"offerJob", null> = {
       ...(passenger
         ? { passage: { actorId: "" as never, roundTrip: draft.roundTrip === true, leg: "out" } }
         : {}),
+      ...(draft.errand === undefined ? {} : { errand: errandOf(draft, draft.errand) }),
     };
     ctx.state.jobs[jobId] = job;
     // §offered-freight, §dock-hand-errands: alongside the origin's dock, commerce's sweep this tick

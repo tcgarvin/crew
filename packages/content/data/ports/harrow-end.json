@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.harrow_end",
+  "name": "Harrow End",
+  "setting": "planet",
+  "kind": "site",
+  "nearPortId": "port.green_meridian",
+  "description": "A disused silo yard at the dry end of the Meridian's east belt",
+  "character": "Two old seed silos and a stone weigh-house at the end of the east belt, left standing when the Collective built the new silo by the pad. Open stubble runs right up to the yard, so whoever is living there now sees a landing long before anyone from it reaches the door.",
+  "castSeed": [],
+  "externalStores": [],
+  "market": [],
+  "jobTemplates": [],
+  "routes": [
+    {
+      "toPortId": "port.green_meridian",
+      "distance": 20
+    }
+  ]
+}

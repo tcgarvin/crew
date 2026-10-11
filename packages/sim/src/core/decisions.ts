@@ -29,8 +29,15 @@ interface PolicyDecisionDraft {
   readonly machineId?: MachineId;
 }
 
-/** Create and queue a policy decision, emitting `policyDecisionNeeded`. Returns its id. */
-export function queuePolicyDecision(ctx: StepCtx, draft: PolicyDecisionDraft): DecisionId {
+/**
+ * Create and queue a policy decision, emitting `policyDecisionNeeded`. Returns its id. Needs only
+ * the state, the tick and `emit`, so code shared by a command's apply and a system (expeditions A2:
+ * `startExpedition`, which queues the arrival card) may queue one.
+ */
+export function queuePolicyDecision(
+  ctx: Pick<StepCtx, "state" | "tick" | "emit">,
+  draft: PolicyDecisionDraft,
+): DecisionId {
   const decisionId: DecisionId = allocateId(ctx.state, "decision");
   ctx.state.decisions.records[decisionId] = {
     id: decisionId,

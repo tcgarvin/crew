@@ -22,7 +22,7 @@ import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
 import type { Door, Item, Machine } from "./types/ship";
 import type { SessionVenue } from "./types/state";
-import type { PassageEndReason, TravelState } from "./types/travel";
+import type { ErrandKind, PassageEndReason, TravelState } from "./types/travel";
 import type {
   RenderActor,
   RenderDock,
@@ -167,6 +167,8 @@ const TICKER_TRACE_TYPES: ReadonlySet<SimEvent["type"]> = new Set([
   // Expeditions A1 (§8.6): every shot reaches the frame's tracers (`RenderFrame.shots`); its
   // line is null, so the log never shows it.
   "shotFired",
+  // The party armed and walking out: the "takes four down the ramp" line.
+  "partyMustered",
 ]);
 
 /** Notable events whose information another ticker line already carries. */
@@ -181,6 +183,8 @@ const TICKER_HIDDEN: ReadonlySet<SimEvent["type"]> = new Set([
   "navHazardMissed",
   // §field-lifecycle: likewise for a field whose leg ended before it began.
   "fieldMissed",
+  // §policy-decision-cards: the card itself follows at once; the line read like a dev string.
+  "policyDecisionNeeded",
 ]);
 
 /** Should `event` reach the ticker at all? (`describeEvent` may still drop it with `null`.) */
@@ -202,6 +206,13 @@ const STAGE_LINES: Readonly<Record<string, string>> = {
   transit: "Under way",
   approaching: "On approach",
   docking: "Docking",
+};
+
+/** Expeditions A2 (§known-sites): a ship sets down at a site and lifts off from one. */
+const SITE_STAGE_LINES: Readonly<Record<string, string>> = {
+  undocking: "Lifting off",
+  approaching: "Coming in to land",
+  docking: "Setting down",
 };
 
 /** §debris-fields-and-ion-storms: how each navigation hazard kind reads in the ticker. */
@@ -251,6 +262,10 @@ type Names = {
   /** The machine's name in lower case, or "machine", for mid-sentence use. */
   machineLower(id: string): string;
   port(id: string): string;
+  /** Expeditions A2: is this port a landing site (§landing-sites)? */
+  isSite(id: string): boolean;
+  /** Expeditions A2: is the ship setting down at, or lifting off from, a site right now? */
+  atSite(): boolean;
   item(id: string): string;
   itemDef(defId: string): string;
   faultName(machineId: string, faultKey: string): string;
@@ -276,6 +291,13 @@ type Names = {
   isCrew(actorId: string): boolean;
   /** Expeditions A1: the site's exit post's name ("the jetty"), or "the way out". */
   siteExit(): string;
+  /**
+   * Expeditions A2: a job's errand, for its lines: what it fetches, the site mid-sentence ("the
+   * Boathouse"), and whether the expedition for it ended with the target gone by the exit.
+   */
+  errand(
+    jobId: string,
+  ): { kind: ErrandKind; target: string; site: string; targetFled: boolean } | undefined;
 };
 
 function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
@@ -324,9 +346,27 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       const exit = siteOf(content, state)?.dock.posts.find((p) => p.kind === "exit");
       return exit?.name ?? "the way out";
     },
+    errand: (id) => {
+      const errand = state.jobs[id as keyof ReadonlyWorldState["jobs"]]?.errand;
+      if (errand === undefined) return undefined;
+      const expedition = state.expedition;
+      return {
+        kind: errand.kind,
+        target: errand.targetName,
+        site: midSentence(portName(content, errand.siteId)),
+        targetFled: expedition?.jobId === id && expedition.outcome === "targetFled",
+      };
+    },
     machine,
     machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
     port: (id) => portName(content, id as PortDefId),
+    isSite: (id) => isSite(content, id as PortDefId),
+    atSite: () => {
+      const travel = state.travel;
+      if (travel.stage === "docked") return isSite(content, travel.portId);
+      const leaving = travel.stage === "preparingDeparture" || travel.stage === "undocking";
+      return isSite(content, leaving ? travel.fromPortId : travel.toPortId);
+    },
     item: (id) => {
       const item = state.items[id as keyof ReadonlyWorldState["items"]];
       const def = item === undefined ? undefined : findItemDef(content, state, item.defId);
@@ -413,11 +453,19 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
         : `${worker} carried ${n.item(haul.itemId)} ashore`;
     }
     case "travelStageChanged":
-      return STAGE_LINES[event.payload.to] ?? null;
+      return (
+        (n.atSite() ? SITE_STAGE_LINES[event.payload.to] : undefined) ??
+        STAGE_LINES[event.payload.to] ??
+        null
+      );
     case "departed":
-      return `Left ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`;
+      return n.isSite(event.payload.fromPortId)
+        ? `Lifted off from ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`
+        : `Left ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`;
     case "arrived":
-      return `Docked at ${n.port(event.payload.portId)}`;
+      return n.isSite(event.payload.portId)
+        ? `Set down at ${n.port(event.payload.portId)}`
+        : `Docked at ${n.port(event.payload.portId)}`;
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
     case "shipLimping": {
@@ -439,8 +487,12 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "broughtAboard":
       return `The dock crew brought ${event.payload.name} back aboard at ${n.port(event.payload.portId)}`;
-    case "leftOnDock":
-      return `Left ${n.item(event.payload.itemId)} on the dock at ${n.port(event.payload.portId)}`;
+    case "leftOnDock": {
+      // A site keeps nothing: the item is gone by the time the line is read, so name its def.
+      const { itemId, defId, portId } = event.payload;
+      if (n.isSite(portId)) return `Left ${n.itemDef(defId)} behind at ${n.port(portId)}`;
+      return `Left ${n.item(itemId)} on the dock at ${n.port(portId)}`;
+    }
     case "dockAmbience":
       return event.payload.line;
     case "lookingForWork":
@@ -458,6 +510,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "jobOffered": {
       const job = n.job(event.payload.jobId);
       if (job === undefined) return "A job is on offer";
+      const errand = n.errand(event.payload.jobId);
+      if (errand !== undefined) {
+        const how = errand.kind === "fetchPerson" ? "brought back" : "fetched";
+        return `${job.name} wants ${errand.target} ${how} from ${errand.site}`;
+      }
       return job.passenger
         ? `${job.name} wants passage to ${job.to}`
         : `${job.issuer} has freight for ${job.to}`;
@@ -471,8 +528,13 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "contractCompleted": {
       const job = n.job(event.payload.jobId);
       if (job === undefined) return "Delivery complete";
+      // Expeditions A2: an errand's captive rides as its passage, but the job is the issuer's.
+      const errand = n.errand(event.payload.jobId);
+      if (errand !== undefined) return `Brought ${errand.target} back for ${job.name}`;
       return job.passenger ? `${job.name}'s fare is paid` : `Delivered for ${job.issuer}`;
     }
+    case "jobFailed":
+      return jobFailedLine(event, n);
     case "passengerBoarded":
       return `${event.payload.name} came aboard`;
     case "passengerAshore":
@@ -634,9 +696,14 @@ const PART_WORDS: Readonly<Record<BodyPart, string>> = {
  */
 function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
   switch (event.type) {
-    case "expeditionStarted": {
+    // The party goes down the ramp once it is armed, not when the ship sets down: on a landing
+    // nobody moves until the arrival card's plan is chosen, and the plan picks the party again.
+    // The landing has its own line ("Set down at Harrow End"), so the start has none.
+    case "expeditionStarted":
+      return null;
+    case "partyMustered": {
       const [leaderId] = event.payload.party;
-      if (leaderId === undefined) return `Set down at ${n.port(event.payload.siteId)}`;
+      if (leaderId === undefined) return null;
       const leader = n.actor(leaderId) ?? "The captain";
       const others = event.payload.party.length - 1;
       return others === 0
@@ -644,9 +711,8 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
         : `${leader} takes ${countWord(others)} down the ramp`;
     }
     case "expeditionContact":
-      return `Shots at ${n.port(event.payload.siteId).toLowerCase()}`;
+      return `Shots at ${midSentence(n.port(event.payload.siteId))}`;
     case "shotFired":
-    case "partyMustered":
       return null;
     case "wounded": {
       const who = n.actor(event.payload.actorId) ?? "Someone";
@@ -679,15 +745,15 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
 
 /** "Corran Vale taken; two of ours hurt", "Corran Vale got away", and the rest. */
 function resolvedLine(event: Extract<SimEvent, { type: "expeditionResolved" }>, n: Names): string {
-  const { outcome, targetName, woundsUs, deadUs, siteId } = event.payload;
+  const { outcome, targetName, hurtUs, deadUs, siteId } = event.payload;
   const target = targetName ?? "The target";
   switch (outcome) {
     case "targetTaken": {
       const cost =
         deadUs > 0
           ? `; ${countWord(deadUs)} of ours dead`
-          : woundsUs > 0
-            ? `; ${countWord(woundsUs)} of ours hurt`
+          : hurtUs > 0
+            ? `; ${countWord(hurtUs)} of ours hurt`
             : "";
       return `${target} taken${cost}`;
     }
@@ -698,8 +764,46 @@ function resolvedLine(event: Extract<SimEvent, { type: "expeditionResolved" }>, 
     case "partyWithdrew":
       return `The party came back without ${targetName ?? "the target"}`;
     case "timedOut":
-      return `The fight at ${n.port(siteId).toLowerCase()} peters out`;
+      return `The fight at ${midSentence(n.port(siteId))} peters out`;
   }
+}
+
+/**
+ * Expeditions A2: "The job for Ysolde Maren is lost: Corran Vale got away", "... the party came
+ * back without Corran Vale", "... Corran Vale was put off" (the name table has no pronouns).
+ */
+function jobFailedLine(event: Extract<SimEvent, { type: "jobFailed" }>, n: Names): string {
+  const { jobId, outcome } = event.payload;
+  const job = n.job(jobId);
+  const errand = n.errand(jobId);
+  const head = `The job for ${job?.name ?? "the client"} is lost`;
+  const target = errand?.target ?? job?.name ?? "the passenger";
+  switch (outcome) {
+    case "failed":
+      return errand?.targetFled === true
+        ? `${head}: ${target} got away`
+        : `${head}: the party came back without ${target}`;
+    case "putOff":
+      return `${head}: ${target} was put off`;
+    case "leftBehind":
+      return `${head}: ${target} was left behind`;
+    // A success never fails a job; the line still reads.
+    case "broughtAlive":
+    case "broughtDead":
+    case "broughtItem":
+    case "completed":
+      return head;
+  }
+}
+
+/** "Docked at Crossroads Hub" → "docked at Crossroads Hub": only the first letter goes down. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/** "The Boathouse" → "the Boathouse": a place's name as it reads mid-sentence. */
+function midSentence(name: string): string {
+  return name.replace(/^The /, "the ");
 }
 
 function capitalise(text: string): string {
@@ -1114,15 +1218,28 @@ export function shipHeadline(
     const loading = freightProgress(state, content, "cargoToLoad");
     if (loading !== undefined) return `${here} — ${loadingLine(loading)}`;
     const awaited = passengerAshoreHere(state);
-    if (awaited !== undefined) return `Waiting for ${awaited} — ${here.toLowerCase()}`;
+    if (awaited !== undefined) return `Waiting for ${awaited} — ${lowerFirst(here)}`;
     const voyage = travel.voyageDestinationId;
-    if (voyage !== undefined && voyage !== travel.portId) {
-      // §2.3: a waypoint is a stop on the way, whether or not the next hop is planned yet.
+    // Expeditions A2 (§3.5): a site is never a stop on the way; the ship lifts off from it.
+    const bound = voyage ?? travel.plannedDestinationId;
+    if (site && bound !== undefined && bound !== travel.portId) {
+      return `${here} — lifting off for ${portName(content, bound)}`;
+    }
+    // §voyages: a waypoint is a stop on the way, whether or not the next hop is planned yet; the
+    // port a job in hand starts from is not one (the ship has not left it yet).
+    const atOrigin = Object.values(state.jobs).some(
+      (job) => job.status === "accepted" && job.fromPortId === travel.portId,
+    );
+    if (voyage !== undefined && voyage !== travel.portId && !atOrigin) {
       const stop = `Stopping at ${portName(content, travel.portId)} on the way to ${portName(content, voyage)}`;
       return travel.holdForRepairs === true ? `${stop} — holding for repairs` : stop;
     }
     if (travel.plannedDestinationId !== undefined) {
-      const to = portName(content, travel.plannedDestinationId);
+      const hop = portName(content, travel.plannedDestinationId);
+      const to =
+        voyage !== undefined && voyage !== travel.plannedDestinationId
+          ? `${hop}, bound for ${portName(content, voyage)}`
+          : hop;
       if (travel.holdForRepairs === true) {
         return `${here} — holding for repairs before departing for ${to}`;
       }
@@ -1137,6 +1254,9 @@ export function shipHeadline(
   }
 
   const to = portName(content, travel.toPortId);
+  // Expeditions A2 (§3.3, §3.5): a ship sets down at a site and lifts off from one.
+  const fromSite = isSite(content, travel.fromPortId);
+  const toSite = isSite(content, travel.toPortId);
   switch (travel.stage) {
     case "preparingDeparture": {
       if (travel.holdForRepairs === true) return `Holding for repairs before departing for ${to}`;
@@ -1153,9 +1273,13 @@ export function shipHeadline(
       return `Preparing to depart for ${to}`;
     }
     case "undocking":
-      return `Undocking from ${portName(content, travel.fromPortId)} — bound for ${to}`;
-    case "departing":
-      return `Departing ${portName(content, travel.fromPortId)} for ${to}`;
+    case "departing": {
+      const from = portName(content, travel.fromPortId);
+      if (fromSite) return `Lifting off from ${from} — bound for ${to}`;
+      return travel.stage === "undocking"
+        ? `Undocking from ${from} — bound for ${to}`
+        : `Departing ${from} for ${to}`;
+    }
     case "transit": {
       const remaining = Math.max(0, travel.routeDistance - travel.routeProgress);
       if (travel.limping === true) {
@@ -1173,11 +1297,11 @@ export function shipHeadline(
       return `${leg} — ${formatEta(remaining / speed)}`;
     }
     case "approaching":
-      return `Approaching ${to}`;
-    case "docking":
-      return helmWaiting(state)
-        ? `Docking at ${to} — waiting for someone at the helm`
-        : `Docking at ${to}`;
+      return toSite ? `Setting down at ${to}` : `Approaching ${to}`;
+    case "docking": {
+      const arriving = toSite ? `Setting down at ${to}` : `Docking at ${to}`;
+      return helmWaiting(state) ? `${arriving} — waiting for someone at the helm` : arriving;
+    }
   }
 }
 
@@ -1469,6 +1593,11 @@ export function renderExpedition(
   const expedition = state.expedition;
   if (expedition === undefined) return undefined;
   if (siteOf(content, state)?.dock.portId !== expedition.siteId) return undefined;
+  // Before contact nobody is in the fight yet: a shaky cast member starts out wavering, and the
+  // header would give that away behind the arrival card (§the-shore-header).
+  if (expedition.fightStartedTick === undefined) {
+    return { phase: expedition.phase, us: "steady", them: "steady" };
+  }
   return { phase: expedition.phase, us: sideWord(state, "us"), them: sideWord(state, "them") };
 }
 

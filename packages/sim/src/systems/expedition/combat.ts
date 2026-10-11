@@ -38,12 +38,17 @@
  *   blood fights if armed. A bystander gets clear at the first shot.
  *
  * **Fire selection** (ruling 5): the party fires only at armed cast who can still fight (never a
- *   bystander, never the unarmed target, never someone running); the cast at any party member up.
- *   The nearest in sight and range is chosen. **A shot** lands `aimSeconds` after the aim began if
- *   the target is still in sight and range: `weapon.hit × (hitSkillBase + hitPerFighting ×
- *   fighting) × rangeFalloff × cover × moving`, clamped to [0.05, 0.95], drawn keyed by shooter,
- *   target and tick on the `failures` stream; a hit goes through the damage entry point (stun under
- *   `fire: stun` with a weapon that can). `holdFire` holds the party's fire until contact.
+ *   bystander, never the unarmed target, never someone running), and never at the target at all
+ *   under a plan whose `targetMustLive` is set (A2: the errand wants them alive); the cast at any
+ *   party member up. The nearest in sight and range is chosen. **A shot** lands `aimSeconds` after
+ *   the aim began if the target is still in sight and range: `weapon.hit × (hitSkillBase +
+ *   hitPerFighting × fighting) × rangeFalloff × cover × moving`, clamped to [0.05, 0.95], drawn
+ *   keyed by shooter, target and tick on the `failures` stream; a hit goes through the damage entry
+ *   point (stun under `fire: stun` with a weapon that can). `holdFire` holds the party's fire until
+ *   contact.
+ *
+ * **Turns** (A2 call 15): a tick's fight records, in order, each fighter who broke or gave up and
+ * each party member who went down or died (`Fight.turns`), for the turn card (`cards.ts`).
  *
  * Owner after the gate: W2 of expeditions A1.
  */
@@ -115,6 +120,18 @@ export const AT_RAMP_TILES = 2;
 /** A cast member this close to the exit is gone. */
 const AT_EXIT_TILES = 1;
 
+/** A2 call 15: how the fight turned for someone, as the turn card says it. */
+export type TurnHow = "breaking" | "down" | "dead";
+
+/** A2 call 15: a fighter who broke or gave up, or a party member who went down or died. */
+export interface FightTurn {
+  readonly actorId: ActorId;
+  /** Their name then (a cast member who reaches the exit is gone from `state.actors`). */
+  readonly name: string;
+  readonly side: "us" | "them";
+  readonly how: TurnHow;
+}
+
 /** One tick's fight: the ground, the expedition and everyone in it. */
 export interface Fight {
   readonly ctx: StepCtx;
@@ -124,6 +141,8 @@ export interface Fight {
   readonly plan: BattlePlan | undefined;
   /** Everyone with a combatant, by id. */
   readonly people: readonly Actor[];
+  /** This tick's turns so far, in order; appended to by the combat loop (`turned`). */
+  readonly turns: FightTurn[];
 }
 
 /** What a tick of the fight reports to the expedition system. */
@@ -138,7 +157,7 @@ export function fightOf(ctx: StepCtx, deps: CombatDeps, ground: Ground): Fight |
   const people = Object.values(ctx.state.actors)
     .filter((a) => a.combatant !== undefined)
     .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
-  return { ctx, deps, ground, expedition, plan: expedition.plan, people };
+  return { ctx, deps, ground, expedition, plan: expedition.plan, people, turns: [] };
 }
 
 const combatantOf = (actor: Actor): Combatant => {
@@ -148,6 +167,11 @@ const combatantOf = (actor: Actor): Combatant => {
 };
 
 const isParty = (actor: Actor) => actor.combatant?.side === "us";
+
+/** A2 call 15: note that the fight turned for `actor` this tick. */
+function turned(fight: Fight, actor: Actor, how: TurnHow): void {
+  fight.turns.push({ actorId: actor.id, name: actor.name, side: combatantOf(actor).side, how });
+}
 
 /** Is a tile free of `self`'s side: nobody else on it, or walking to it? */
 type Free = (tile: TileCoord) => boolean;
@@ -216,10 +240,12 @@ function syncBody(fight: Fight, person: Actor): void {
   if (person.availability === "dead" && combatant.state !== "dead") {
     combatant.state = "dead";
     lowerAim(person);
+    if (isParty(person)) turned(fight, person, "dead");
   } else if (person.availability === "incapacitated" && combatant.state !== "down") {
     if (combatant.state === "dead") return;
     combatant.state = "down";
     lowerAim(person);
+    if (isParty(person)) turned(fight, person, "down");
   } else if (person.availability === "available" && combatant.state === "down") {
     combatant.state = "wavering";
     if (person.location.kind === "carriedBy") return;
@@ -270,12 +296,17 @@ function fairGame(fight: Fight, other: Actor): boolean {
   return armed(fight, other);
 }
 
+/** A2: the errand wants the target alive, so the party never fires at them (`targetMustLive`). */
+function spared(fight: Fight, other: Actor): boolean {
+  return fight.plan?.targetMustLive === true && other.combatant?.disposition.part === "target";
+}
+
 /** Whom `self` would shoot now: the nearest fair target in sight and reach. */
 function markFor(fight: Fight, self: Actor, from: TileCoord, seen: readonly Seen[]) {
   const weapon = weaponOf(fight, self);
   if (weapon === undefined) return undefined;
   for (const s of seen) {
-    if (isParty(self) && !fairGame(fight, s.actor)) continue;
+    if (isParty(self) && (!fairGame(fight, s.actor) || spared(fight, s.actor))) continue;
     if (!isParty(self) && !canAct(combatantOf(s.actor))) continue;
     if (inReach(weapon, from, s)) return s;
   }
@@ -353,6 +384,7 @@ function onHit(fight: Fight, shooter: Actor, weapon: WeaponDef, target: Actor): 
   );
   if (result.died) {
     victim.state = "dead";
+    if (side === "us") turned(fight, target, "dead");
     for (const ally of allies) {
       shaken(fight, ally, morale.allyDead);
     }
@@ -361,6 +393,7 @@ function onHit(fight: Fight, shooter: Actor, weapon: WeaponDef, target: Actor): 
     }
   } else if (result.incapacitated) {
     victim.state = "down";
+    if (side === "us") turned(fight, target, "down");
     for (const ally of allies) {
       shaken(fight, ally, morale.allyDown);
     }
@@ -414,6 +447,7 @@ export function shaken(fight: Fight, actor: Actor, delta: number): void {
 function breakIf(fight: Fight, actor: Actor, broke: boolean): void {
   if (!broke) return;
   lowerAim(actor);
+  turned(fight, actor, "breaking");
   fight.ctx.emit({
     type: "combatantBroke",
     subjectIds: [actor.id],
@@ -675,6 +709,8 @@ export function surrender(fight: Fight, person: Actor): void {
   lowerAim(person);
   halt(fight.ctx, person);
   if (inFight(person)) setLabel(person, "surrendered");
+  // The target giving up is the objective taken, not the fight turning.
+  if (fights(person)) turned(fight, person, "breaking");
   fight.ctx.emit({
     type: "combatantBroke",
     subjectIds: [person.id],

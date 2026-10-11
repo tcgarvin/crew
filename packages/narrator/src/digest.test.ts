@@ -38,7 +38,7 @@ const HUB_PORT = "port.crossroads_hub";
  * (spur legs are a watch long, §the-ships-day), so tests derive them rather than pin them.
  */
 function pathWords(from: string, to: string): { hops: string; via: string } {
-  const path = pathBetween(content(), from, to);
+  const path = pathBetween(content(), quietTooLongRequest(content()).snapshot.state, from, to);
   if (path === undefined) throw new Error(`no path ${from} -> ${to}`);
   const via = path.path
     .slice(1, -1)

@@ -44,4 +44,16 @@ describe("Headline", () => {
     expect(html).toContain("Docked at The Boathouse");
     expect(html).toContain("headline-alert");
   });
+
+  it("shows the sim's landing and lift-off words for a site as they come (expeditions A2)", () => {
+    // §the-ship-headline: the words are the sim's; the client adds nothing of its own.
+    for (const text of [
+      "Setting down at Harrow End",
+      "Set down at Harrow End — lifting off for Crossroads Hub",
+      "Lifting off from Harrow End — bound for Crossroads Hub",
+    ]) {
+      const html = renderToStaticMarkup(<Headline text={text} alert={false} />);
+      expect(html).toBe(`<div class="headline">${text}</div>`);
+    }
+  });
 });

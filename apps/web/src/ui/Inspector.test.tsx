@@ -359,6 +359,37 @@ describe("Inspector item sheet", () => {
     expect(html).toContain('class="inspector-subtitle">freight<');
     expect(html).not.toContain("nobody loads it");
   });
+
+  it("names an errand's job by the errand, not as freight (expeditions A2)", () => {
+    const errand = (status: string) => ({
+      kind: "item" as const,
+      item: {
+        name: "Strongbox",
+        count: 1,
+        where: "in the cargo hold",
+        job: {
+          issuer: "Ysolde Maren, Meridian Growers",
+          from: "Crossroads Hub",
+          to: "Crossroads Hub",
+          status,
+          errand: { what: "Fetch the strongbox papers from Harrow End", home: "Crossroads Hub" },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<Inspector data={errand("accepted")} onClose={() => {}} />);
+    expect(html).toContain('class="inspector-subtitle">an errand<');
+    expect(html).toContain("<dt>Errand</dt><dd>Fetch the strongbox papers from Harrow End</dd>");
+    expect(html).toContain("<dt>Back to</dt><dd>Crossroads Hub</dd>");
+    expect(html).toContain("<dt>For</dt><dd>Ysolde Maren, Meridian Growers</dd>");
+    expect(html).toContain("<dt>Contract</dt><dd>taken</dd>");
+    for (const freightWords of ["Going to", "waiting to ship", "freight"]) {
+      expect(html).not.toContain(freightWords);
+    }
+    // On offer, it is still not freight set out on the dock.
+    const offered = renderToStaticMarkup(<Inspector data={errand("offered")} onClose={() => {}} />);
+    expect(offered).toContain("<dd>on offer</dd>");
+    expect(offered).not.toContain("nobody loads it");
+  });
 });
 
 describe("Inspector local sheet (§items-places-and-locals)", () => {

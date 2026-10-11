@@ -95,6 +95,11 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
             surface: false,
             passenger: true,
             roundTrip: true,
+            errandKind: "",
+            site: "",
+            targetName: "",
+            targetItem: "",
+            wants: "",
           },
         ] as unknown as NarratorPlan["intents"],
       }),
@@ -252,5 +257,76 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     // Sorted by the second they land: the galley early, the engine late.
     expect(field?.scripted.map((s) => s.target.kind)).toEqual(["compartment", "machine"]);
     expect(field?.scripted[1]).toMatchObject({ rock: "small", effect: "knockout" });
+  });
+
+  it("accepts a translated errand at every pay tier, from the Hub to Harrow End and from Tern's Rest to the Boathouse (expeditions A2, plan call 6)", () => {
+    const bundle = content();
+    const scenario = bundle.scenarios[FIXTURE_SCENARIO];
+    if (scenario === undefined) throw new Error("no fixture scenario");
+    const routes = [
+      { from: "port.crossroads_hub", site: "port.harrow_end", target: "Teodor Lusk" },
+      { from: "port.terns_rest", site: "port.boathouse", target: "Corran Vale" },
+    ] as const;
+    for (const { from, site, target } of routes) {
+      const startedHere = {
+        ...bundle,
+        scenarios: { ...bundle.scenarios, [FIXTURE_SCENARIO]: { ...scenario, startPortId: from } },
+      };
+      const registry = createRegistry();
+      registerCommerce(registry);
+      const kernel = createKernel(registry);
+      const world = kernel.createWorld(FIXTURE_SCENARIO, 7, startedHere, {
+        values: bundle.config,
+        hash: bundle.hash,
+      });
+      expect(world.state.travel).toMatchObject({ stage: "docked", portId: from });
+      const ctx: TranslationCtx = {
+        snapshot: kernel.serialize(world),
+        content: startedHere,
+        hookTick: world.state.tick,
+        callId: `call-errand-${from}`,
+      };
+      const intents = (["low", "standard", "generous"] as const).map((payTier) => ({
+        kind: "offerJob",
+        issuerName: "Ysolde Maren",
+        issuerRole: "grower",
+        issuerOrg: "",
+        pitch: `Bring ${target} home.`,
+        description: `Fetch ${target} back from the site.`,
+        fromPort: from,
+        toPort: from,
+        cargoItem: "",
+        quantity: "one",
+        payTier,
+        urgency: "soon",
+        surface: false,
+        passenger: false,
+        roundTrip: false,
+        errandKind: "fetchPerson",
+        site,
+        targetName: target,
+        targetItem: "",
+        wants: payTier === "generous" ? "either" : "alive",
+      }));
+      const { commands, dropped } = translateIntents(
+        emptyPlan({ intents: intents as unknown as NarratorPlan["intents"] }),
+        ctx,
+      );
+      expect(dropped).toEqual([]);
+      expect(commands).toHaveLength(3);
+      for (const command of commands) {
+        const result = kernel.enqueueCommand(world, command);
+        expect(result.status === "rejected" ? result.rejection.reason : "accepted").toBe(
+          "accepted",
+        );
+      }
+      kernel.advance(world, 2);
+      const errands = Object.values(world.state.jobs).map((job) => job.errand);
+      expect(errands).toEqual(
+        Array.from({ length: 3 }, () =>
+          expect.objectContaining({ siteId: site, targetName: target, returnToPortId: from }),
+        ),
+      );
+    }
   });
 });

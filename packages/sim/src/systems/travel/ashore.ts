@@ -63,14 +63,18 @@ function onDock(ctx: Ctx, actor: Actor): boolean {
 }
 
 /**
- * Everyone the ramps must stay down for, in id order: on the dock, aboard and walking onto it,
- * or out through the gate on a market errand (§dock-market-and-passengers). Empty with no dock
- * alongside.
+ * Everyone the ramps must stay down for, in id order: crew (passengers included) on the dock,
+ * aboard and walking onto it, or out through the gate on a market errand
+ * (§dock-market-and-passengers). Empty with no dock alongside. A site's cast are not crew and are
+ * never the ship's to call or carry aboard (§the-objective-and-resolution).
  */
 export function peopleAshore(ctx: Ctx): Actor[] {
   if (ctx.state.deck.dock === undefined) return [];
   return Object.values(ctx.state.actors)
-    .filter((actor) => onDock(ctx, actor) || headedAshore(ctx, actor) || isOutThroughGate(actor))
+    .filter(
+      (actor) =>
+        actor.crew && (onDock(ctx, actor) || headedAshore(ctx, actor) || isOutThroughGate(actor)),
+    )
     .sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
 }
 
@@ -217,12 +221,14 @@ function handAboard(ctx: Ctx, item: Item, portId: PortDefId): void {
 }
 
 /**
- * Clear the dock before it detaches at the end of `undocking`: anyone still on it is brought
- * aboard, and anything still on it stays at the port, in `store` (its warehouse).
+ * Clear the dock before it detaches at the end of `undocking`: crew still on it are brought
+ * aboard, and anything still on it stays at the port, in `store` (its warehouse). `"none"`
+ * (expeditions A2 call 8: a landing site, which keeps no store): what is left is gone with it.
  */
-export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation): void {
+export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation | "none"): void {
   if (ctx.state.deck.dock === undefined) return;
   for (const actor of Object.values(ctx.state.actors)) {
+    if (!actor.crew) continue;
     if (onDock(ctx, actor) || isOutThroughGate(actor)) bringAboard(ctx, actor, portId);
   }
   for (const item of Object.values(ctx.state.items)) {
@@ -231,7 +237,8 @@ export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation):
       handAboard(ctx, item, portId);
       continue;
     }
-    item.location = store;
+    if (store === "none") delete ctx.state.items[item.id];
+    else item.location = store;
     ctx.dirty.inventory = true;
     ctx.emit({
       type: "leftOnDock",
@@ -239,7 +246,7 @@ export function clearDock(ctx: Ctx, portId: PortDefId, store: PhysicalLocation):
       locationRef: { kind: "port", portId },
       causeIds: [],
       source: "sim",
-      payload: { itemId: item.id, portId },
+      payload: { itemId: item.id, defId: item.defId, portId },
     });
   }
 }

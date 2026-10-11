@@ -37,6 +37,8 @@ export interface ExpeditionEventPayloads {
     readonly seconds: number;
     readonly shots: number;
     readonly woundsUs: number;
+    /** The living party members wounded since the start (people, where `woundsUs` counts wounds). */
+    readonly hurtUs: number;
     readonly woundsThem: number;
     readonly deadUs: number;
     readonly deadThem: number;

@@ -13,10 +13,11 @@
  * on withdrawal, in after delivery) is a dock hand's walk (§dock-hand-errands, `dock-hands.ts`). A
  * port without a dock keeps the store and the transfer tiles.
  */
-import type { ApplyCtx } from "../../core/commands";
+import type { ApplyCtx, ValidateCtx } from "../../core/commands";
 import { queueOrHold } from "../../core/delivery";
 import { type BerthedDock, dockAlongsideAt, dockAreaTiles, isInDockArea } from "../../core/docks";
 import { allocateId } from "../../core/ids";
+import { isSite, portGraph } from "../../core/places";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { CargoClass, ExternalStoreDef, PortDef } from "../../core/types/content";
 import type { EventDraft } from "../../core/types/events";
@@ -33,11 +34,13 @@ import type { Item } from "../../core/types/ship";
 import type { CargoLine, Job, JobIssuer } from "../../core/types/travel";
 import type { ProblemOfKind } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
+import { errandFulfilled } from "../expedition/errand";
 import { shortestPath } from "../travel/graph";
 import { commandActor } from "../travel/roster";
 import { portStoreLocation } from "../travel/travel";
 import { writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
+import { errandPay } from "./errand";
 
 // ---------------------------------------------------------------------------------------------
 // Issuers (§issuers-and-pitches)
@@ -182,6 +185,31 @@ export function checkPassageBand(
   const min = Math.round(band.min * fareDistance);
   const max = Math.round(band.max * fareDistance);
   if (pay < min || pay > max) return `fare ${pay} outside passenger band [${min}, ${max}]`;
+  return null;
+}
+
+/**
+ * Expeditions A2 (§6, plan call 6): an errand's pay is banded by `priceBands.errand` (`errandPay`)
+ * over the shortest path to the site and back on the `"all"` graph, since the site is not known
+ * until the offer exists. Returns a reason string on failure.
+ */
+export function checkErrandBand(
+  ctx: Pick<ValidateCtx, "content" | "config" | "state">,
+  fromPortId: PortDefId,
+  siteId: PortDefId,
+  pay: number,
+): string | null {
+  if (!Number.isInteger(pay) || pay < 0) return "pay must be a nonnegative integer";
+  if (ctx.content.ports[fromPortId] === undefined) return `unknown port "${fromPortId}"`;
+  if (!isSite(ctx.content, siteId)) return `"${siteId}" is not a landing site`;
+  const graph = portGraph(ctx.content, ctx.state, "all");
+  const out = shortestPath(graph, fromPortId, siteId);
+  const back = shortestPath(graph, siteId, fromPortId);
+  if (out === undefined || back === undefined) {
+    return `no route from "${fromPortId}" to "${siteId}" and back`;
+  }
+  const { min, max } = errandPay(ctx.config, out.distance + back.distance, "low");
+  if (pay < min || pay > max) return `pay ${pay} outside errand band [${min}, ${max}]`;
   return null;
 }
 
@@ -513,14 +541,19 @@ export function deliveryComplete(
 /**
  * Pure: what a job must have done to earn its pay. Freight: every manifest item delivered
  * (`deliveryComplete`). A passage (§3.4): the passenger's journey ended `completed`, plus the
- * luggage delivered when there is any.
+ * luggage delivered when there is any. An errand (expeditions A2, §6) without a passage: what
+ * `errandFulfilled` says; one carrying its captive is paid as the passage is.
  */
 export function jobFulfilled(
-  state: CustodyState,
+  state: CustodyState & Pick<ReadonlyWorldState, "travel">,
   content: Pick<StepCtx["content"], "docks" | "decks">,
-  job: Pick<Job, "cargoItemIds" | "toPortId" | "passage">,
+  job: Pick<Job, "cargoItemIds" | "toPortId" | "passage" | "errand">,
 ): boolean {
-  if (job.passage === undefined) return deliveryComplete(state, content, job);
+  if (job.passage === undefined) {
+    return job.errand === undefined
+      ? deliveryComplete(state, content, job)
+      : errandFulfilled(state, content, job);
+  }
   if (job.passage.endReason !== "completed") return false;
   return job.cargoItemIds.length === 0 || deliveryComplete(state, content, job);
 }
@@ -603,6 +636,15 @@ function offerPromptParams(job: Readonly<Job>): Record<string, string> {
     ...(job.passage === undefined
       ? {}
       : { passenger: "true", roundTrip: job.passage.roundTrip ? "true" : "false" }),
+    // Expeditions A2 (§6): an errand says who or what is fetched, from which site, and how.
+    ...(job.errand === undefined
+      ? {}
+      : {
+          errand: job.errand.kind,
+          target: job.errand.targetName,
+          site: job.errand.siteId,
+          wants: job.errand.wants,
+        }),
   };
 }
 
@@ -622,6 +664,10 @@ export function dockedAtOrigin(
  * (`core/delivery.ts`), unless the issuer is aboard already.
  */
 export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
+  // Expeditions A2 call 3: an errand's course is the site; its `toPortId` is home, where the ship
+  // is now, which `setCourse` would refuse. Both sides validate before either applies, so the site
+  // is still known (the job still `offered`) when `setCourse` checks the route.
+  const destinationPortId = job.errand === undefined ? job.toPortId : job.errand.siteId;
   const decisionId: DecisionId = allocateId(ctx.state, "decision");
   ctx.state.decisions.records[decisionId] = {
     id: decisionId,
@@ -635,7 +681,7 @@ export function surfaceOfferCard(ctx: ApplyCtx, job: Job): DecisionId {
       label: { key: "job.offer.accept", params: {} },
       commands: [
         { kind: "acceptContract", payload: { jobId: job.id } },
-        { kind: "setCourse", payload: { destinationPortId: job.toPortId } },
+        { kind: "setCourse", payload: { destinationPortId } },
       ],
       aftermath: { key: "job.accept.aftermath", params: {} },
     },

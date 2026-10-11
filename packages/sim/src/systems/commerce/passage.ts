@@ -18,6 +18,11 @@
  * `endPassage` (§4.2) ends a passage early: `leftBehind` for a passenger already ashore,
  * `putOff` for one aboard, who then leaves at the next docking (now, if docked). Neither pays.
  *
+ * Expeditions A2 (§6): an errand's target taken alive is its captive, a one-way passage home
+ * (`spawnCaptive`, called by `settleErrand` as the expedition resolves). Put off, the captive
+ * fails the errand (`jobFailed`) and walks free at the next docking, at a site too; the voyage home
+ * stands.
+ *
  * Walking off: the passenger is handed a `wander` intent to a personnel transfer tile and the
  * planner leaves them alone while `disembarking` is set (`planner/select.ts`). Where the walk
  * cannot be planned (no nav cache, no route, a failed move) they step off at once, so the
@@ -29,6 +34,7 @@
  * one coming back from ashore appears at the gate and walks aboard the same way.
  */
 import { configTicks, dayTicks, daysToSeconds } from "../../core/clock";
+import { firstOfficerOf } from "../../core/command-actor";
 import { newActor } from "../../core/command-handlers";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
@@ -36,6 +42,7 @@ import { findCrewDef } from "../../core/defs";
 import { localNamed } from "../../core/delivery";
 import { gateTileAt, isDockPoint, isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
+import { isSite, portGraph } from "../../core/places";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { DeckDef, PortDef } from "../../core/types/content";
@@ -187,6 +194,65 @@ export function spawnPassenger(ctx: ApplyCtx, job: Job, cause: Cause): ActorId {
   return id;
 }
 
+/**
+ * Expeditions A2 (§6, plan call 5): an errand's target taken alive rides home as the job's
+ * passenger, the captive. The cast actor goes, with what they carry (`removeCast`'s rule, restated
+ * so the expedition need not know commerce's tables), and a fresh `crew.passenger` actor with their
+ * name stands on their tile: `crew`, `passenger`, no `combatant` (the expedition's aftermath
+ * removes every actor that still has one), whole. The passage is one-way to the job's `toPortId`
+ * (home), where they walk off and the job is paid as a passage is. Emits `entitySpawned` and
+ * `passengerBoarded`.
+ */
+export function spawnCaptive(ctx: ApplyCtx, job: Job, target: Actor): ActorId {
+  const def = findCrewDef(ctx.content, ctx.state, PASSENGER_CREW_DEF_ID);
+  if (def === undefined) throw new Error(`passage: no "${PASSENGER_CREW_DEF_ID}" crew template`);
+  const at = target.location;
+  if (at.kind !== "onDeck") {
+    throw new Error(`spawnCaptive: target ${target.id} is not on the map (${at.kind})`);
+  }
+  removeTarget(ctx, target);
+  const id: ActorId = allocateId(ctx.state, "actor");
+  const actor = newActor(id, def, {
+    kind: "onDeck",
+    deckId: at.deckId,
+    x: Math.floor(at.x) + 0.5,
+    y: Math.floor(at.y) + 0.5,
+  });
+  actor.name = target.name;
+  actor.crew = true;
+  actor.passenger = true;
+  ctx.state.actors[id] = actor;
+  job.passage = { actorId: id, roundTrip: false, leg: "out" };
+  ctx.emit({
+    ...SIM_CAUSE,
+    type: "entitySpawned",
+    subjectIds: [id],
+    payload: { entityId: id, defId: def.id },
+  });
+  ctx.emit({
+    ...SIM_CAUSE,
+    type: "passengerBoarded",
+    subjectIds: [id, job.id],
+    payload: passengerEvent(job, actor),
+  });
+  return id;
+}
+
+/** The taken cast member leaves the map with what they carry (their weapon is never the ship's). */
+function removeTarget(ctx: ApplyCtx, target: Actor): void {
+  if (target.movement.kind === "moving") stopMovement(ctx.state, ctx.caches, target.id);
+  for (const item of Object.values(ctx.state.items)) {
+    const held = item.location;
+    if ((held.kind !== "carriedBy" && held.kind !== "equippedBy") || held.actorId !== target.id) {
+      continue;
+    }
+    delete ctx.state.items[item.id];
+    ctx.caches.dirty.inventory = true;
+  }
+  releaseReservations(ctx.caches, target.id);
+  delete ctx.state.actors[target.id];
+}
+
 // ---------------------------------------------------------------------------------------------
 // Leaving the deck
 // ---------------------------------------------------------------------------------------------
@@ -328,7 +394,11 @@ function endPassageWith(
 function planVoyageHome(ctx: StepCtx, job: Job): void {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) return;
-  const route = shortestPath(ctx.content.ports, travel.portId, job.fromPortId);
+  const route = shortestPath(
+    portGraph(ctx.content, ctx.state, "known"),
+    travel.portId,
+    job.fromPortId,
+  );
   const hop = route?.path[1];
   if (route === undefined || hop === undefined) return;
   travel.plannedDestinationId = hop;
@@ -389,9 +459,7 @@ function overdueCardPending(state: ReadonlyWorldState, jobId: JobId): boolean {
 
 /** §spoken-cards: the first officer brings the overdue card, when the ship has one. */
 function firstOfficerName(state: ReadonlyWorldState): string | undefined {
-  return Object.values(state.actors).find(
-    (a) => a.crew && a.passenger !== true && a.roleTags.includes("firstOfficer"),
-  )?.name;
+  return firstOfficerOf(state)?.name;
 }
 
 function raiseOverdueCard(ctx: StepCtx, job: Job, actor: Actor, portId: PortDefId): void {
@@ -488,7 +556,10 @@ function sweepPutOff(ctx: StepCtx, job: Job, actor: Actor): void {
   const travel = ctx.state.travel;
   if (travel.stage !== "docked" || actor.location.kind !== "onDeck") return;
   if (!walkOff(ctx, actor)) return;
-  stepAshore(ctx, actor, ctx.defs.port(travel.portId));
+  const port = ctx.defs.port(travel.portId);
+  // Expeditions A2: a captive put off at the site walks free; a site keeps no lounge to hold them.
+  if (isSite(ctx.content, port.id)) despawn(ctx, actor);
+  else stepAshore(ctx, actor, port);
   raiseUnloadProblems(ctx, job, travel.portId, luggageAboard(ctx, job));
 }
 
@@ -570,7 +641,8 @@ export function endPassageEarly(ctx: ApplyCtx, job: Job, cause: Cause): void {
   const reason: PassageEndReason = passage.leg === "ashore" || !aboard ? "leftBehind" : "putOff";
   // Docked: they walk off here, and travel (which runs before the sweep) must not leave first.
   if (aboard && travel.stage === "docked") actor.disembarking = true;
-  if (reason === "putOff") {
+  // Expeditions A2: an errand's voyage home is the ship's, not the captive's, so it stands.
+  if (reason === "putOff" && job.errand === undefined) {
     // The passage was the voyage: putting them off cancels it. Docked, the course goes too (the
     // captain gets a `captainAshore` once they are off and nothing else holds); in transit the ship
     // finishes the leg it is on, and stops there instead of routing on to the far end.
@@ -598,4 +670,14 @@ export function endPassageEarly(ctx: ApplyCtx, job: Job, cause: Cause): void {
     portId,
     cause,
   );
+  // Expeditions A2 call 11: a captive put off (or left behind) loses the errand after all.
+  if (job.errand !== undefined) {
+    job.errand.outcome = "failed";
+    ctx.emit({
+      ...cause,
+      type: "jobFailed",
+      subjectIds: [job.id],
+      payload: { jobId: job.id, outcome: reason },
+    });
+  }
 }

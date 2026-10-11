@@ -25,6 +25,8 @@ All sim contracts live under `packages/sim/src/core/types/` and are re-exported 
 | `Expedition`, `BattlePlan`, `PlanOption`, the site map (`DockDef.kind: "site"`, `SiteCastEntryDef`, `SITE_LIMITS`), `PortDef.kind: "site"` | `core/types/state.ts`, `core/types/view.ts`, `core/types/content.ts`; readers `core/sites.ts`, `core/places.ts` | expedition (`systems/expedition/`), plan menu (`view/planMenu.ts`) | web, the instrument, narrator (A2) |
 | `Machine`, `MachineFault`, `Door`, `Compartment`, `DeckState`, `Item`, `PowerState` | `core/types/ship.ts` | W3 (deck, doors), W5 (machines, power), transfers (items) | W3–W7, W9 |
 | `TravelState`, `Job`, `MoneyState` | `core/types/travel.ts` | W6 | W7, W9 |
+| `Job.errand` (`JobErrand`, `ERRAND_KINDS`, `ERRAND_WANTS`, `ERRAND_OUTCOMES`; expeditions A2) | `core/types/travel.ts`; band `systems/commerce/errand.ts` `errandPay` | commerce (`offerJob` writes it); expedition writes only `errand.outcome`, through `settleErrand` | travel (the course), narrator, render, web |
+| Known sites and the port graph: `knownSites`, `portGraph`, `siteNearPort` (expeditions A2) | `core/places.ts` | — (pure, over `jobs` and `travel`) | travel, commerce, narrator |
 | **Work contract**: `Problem`, `Task`, `Claim`, `Action`, `Activity`, `Intent`, `UrgencyClass`, `TaskDerivationTable` | `core/types/work.ts` | problems: owning system (W5, W6); tasks/claims/activity: W4 | W4, W5, W6, W7 |
 | `Decision`, `NarratorHook`, `NarratorState` | `core/types/decisions.ts` | W6 (hook points, decisions) + W2 (quiet timer) | W7, W8, W9 |
 | `Command` union, `CommandSource`, `EnqueueResult`, `CommandRejection`, `CommandsState` | `core/types/commands/index.ts` (+ one file per system) | W2 applies; each system validates its own kinds | W6, W7, W9 |
@@ -97,6 +99,18 @@ holds a `hullImpact` fact about the field, with the compartment only for those w
 `advance` returns the `AdvanceHalt` `{ kind: "lost" }` without stepping, every time; nothing
 un-loses a ship, and a restored lost save halts at once. Every `switch` on `halt.kind` handles it:
     the worker host posts `shipLost { tick }` once, `crew pacing` and `crew beats` end the run.
+14. **Errands and known sites (expeditions A2).** The errand is commerce's slice of the job:
+    `offerJob` validates and writes `Job.errand` (home to `fromPortId`, which is `toPortId`; no
+    cargo; pay by `checkErrandBand` through `errandPay`, the one band function the translator also
+    calls). The expedition system reads `job.errand` and writes `errand.outcome` only, through
+    `settleErrand` (`systems/expedition/errand.ts`); commerce asks `errandFulfilled` whether an
+    errand without a passage is paid. A site is on the graph only while known (an errand names it
+    `offered`, `accepted` or `inTransit`, or the ship is set down at or bound for it): every route
+    lookup that flies (`setCourse`, a voyage's next hop, the leg's distance, the voyage home) reads
+    `portGraph(…, "known")`, and the errand band reads `portGraph(…, "all")`; nothing else adds a
+    near port's route to a site. No fee, no staging call and no store at a site. The expedition's
+    two cards are policy decisions (`queuePolicyDecision`, no `jobId` on the record), queued from
+    `systems/expedition/cards.ts` and recorded in `Expedition.cards`.
 
 ## How work is advertised
 

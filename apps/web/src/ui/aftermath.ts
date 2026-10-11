@@ -1,9 +1,9 @@
 /**
  * §aftermath-caption: the one line shown for a moment after the player picks a side, saying plainly
- * what happens next. Narrator prose wins, then the option's own `aftermath`, then a built-in line
- * for job offers, then a generic line.
+ * what happens next. Narrator prose wins, then the option's own `aftermath` (its prose, else its
+ * template as the card reads it), then a built-in line for job offers, then a generic line.
  */
-import { type DecisionCardText, renderTextRef } from "@crew/content";
+import { type DecisionCardText, templateCard } from "@crew/content";
 import type { ContentBundle, Decision, DeepReadonly } from "@crew/sim";
 
 /** How long the card stays up with the caption before it closes. */
@@ -39,10 +39,13 @@ export function aftermathCaption(
 ): string {
   const fromNarrator = narratorAftermath(narratorCard, side);
   if (fromNarrator !== undefined) return fromNarrator;
-  const ref = decision[side].aftermath;
-  if (ref !== undefined) {
-    const text = ref.prose ?? renderTextRef(ref, content);
-    if (text.trim() !== "") return text;
+  if (decision[side].aftermath !== undefined) {
+    // The template card, not the bare key: an offer's sides keep the freight keys, and the card
+    // reads an errand or a passage from the prompt's params (expeditions A2, passengers §6), so an
+    // errand taken never says the crew start loading.
+    const card = templateCard(decision, content);
+    const text = side === "left" ? card.leftAftermath : card.rightAftermath;
+    if (text !== undefined && text.trim() !== "") return text;
   }
   if (decision.prompt.key === "job.offer") return JOB_OFFER_AFTERMATH[side];
   return GENERIC_AFTERMATH;

@@ -195,6 +195,38 @@ export interface JobPassage {
   endReason?: PassageEndReason;
 }
 
+/** Expeditions A2 (§6): what an errand sends the crew to a site for. */
+export const ERRAND_KINDS = ["fetchPerson", "fetchItem"] as const;
+export type ErrandKind = (typeof ERRAND_KINDS)[number];
+
+/** Expeditions A2 (§6): how the issuer wants the target brought back (a `fetchItem` is `either`). */
+export const ERRAND_WANTS = ["alive", "either", "dead"] as const;
+export type ErrandWants = (typeof ERRAND_WANTS)[number];
+
+/** Expeditions A2 (§6): how an errand ended, written once by `settleErrand`. */
+export const ERRAND_OUTCOMES = ["broughtAlive", "broughtDead", "broughtItem", "failed"] as const;
+export type ErrandOutcome = (typeof ERRAND_OUTCOMES)[number];
+
+/**
+ * Expeditions A2 (§6): a job to a landing site and back. Commerce's slice of the job: the
+ * expedition system reads it and writes `outcome` through `settleErrand` only. `toPortId` and
+ * `returnToPortId` are both `fromPortId`; the course goes to `siteId`, and pay is banded by
+ * `priceBands.errand` over the path there and back. A target brought alive rides home as the job's
+ * `passage` (the captive). Optional on `Job`, so older saves load.
+ */
+export interface JobErrand {
+  kind: ErrandKind;
+  siteId: PortDefId;
+  /** The person to fetch, or (fetchItem) what the thing is called. */
+  targetName: string;
+  /** `fetchItem` only: the item to bring back. */
+  itemDefId?: ItemDefId;
+  wants: ErrandWants;
+  returnToPortId: PortDefId;
+  /** Set once, when the expedition resolves (or the captive's passage ends); absent until then. */
+  outcome?: ErrandOutcome;
+}
+
 /**
  * A commercial job (SD §17.3). Its cargo is real items: staged on the origin's dock while on
  * offer there (§offered-freight), or spawned in the origin's warehouse store on acceptance at a
@@ -250,6 +282,8 @@ export interface Job {
    * banded by `config.commerce.priceBands.passenger` instead.
    */
   passage?: JobPassage;
+  /** Expeditions A2 (§6): present when the job is an errand to a landing site. */
+  errand?: JobErrand;
 }
 
 // ---------------------------------------------------------------------------------------------

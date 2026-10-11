@@ -81,10 +81,11 @@ import traitRestless from "../data/traits/restless.json";
 import traitSocialButterfly from "../data/traits/social-butterfly.json";
 import traitSteady from "../data/traits/steady.json";
 
-// Expeditions A1 (§3.1): the one landing site
+// Expeditions A1 (§3.1): the landing sites
 import portBoathouse from "../data/ports/boathouse.json";
 import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
+import portHarrowEnd from "../data/ports/harrow-end.json";
 import portKesslerDrift from "../data/ports/kessler-drift.json";
 import portOssoryStation from "../data/ports/ossory-station.json";
 import portTernsRest from "../data/ports/terns-rest.json";
@@ -95,6 +96,7 @@ import dockBoathouse from "../data/docks/boathouse.json";
 // Docks (Dockside §3)
 import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
 import dockGreenMeridian from "../data/docks/green-meridian.json";
+import dockHarrowEnd from "../data/docks/harrow-end.json";
 import dockKesslerDrift from "../data/docks/kessler-drift.json";
 import dockOssoryStation from "../data/docks/ossory-station.json";
 import dockTernsRest from "../data/docks/terns-rest.json";
@@ -246,6 +248,7 @@ const PORTS = [
   portVesperGate,
   portTernsRest,
   portBoathouse,
+  portHarrowEnd,
 ];
 const DOCKS = [
   dockCrossroadsHub,
@@ -255,6 +258,7 @@ const DOCKS = [
   dockVesperGate,
   dockTernsRest,
   dockBoathouse,
+  dockHarrowEnd,
 ];
 const SCENARIOS = [scenarioDefault];
 const THOUGHTS = [

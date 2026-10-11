@@ -137,13 +137,47 @@ withdrawn. Names carry no pronouns, so cards say "them".
 - `leftBehind`: the passenger is ashore (the overdue card's "leave"). They stay at that port as an
   off-ship actor, the narrator's to use as cast; the voyage home is kept.
 - `putOff`: the card-side effect (§end-passage-effect) puts an aboard passenger off at the next
-  docking (now, if docked). The voyage, and the course when docked, is cancelled; luggage is
-  unloaded where they leave and holds the ship until it is on the dock.
+  docking (now, if docked). The voyage, and the course when docked, is cancelled (not for an
+  errand's captive, §settling-the-errand); luggage is unloaded where they leave and holds the ship
+  until it is on the dock.
 
 Either way the passenger leaves the roster and the digest's Aboard line and appears in the
 narrator's people section at that port. The narrator never decides a passenger's fate and never
 narrates what they did ashore as fact; the null narrator never offers passages. Events:
 `passageEnded {reason}`.
+
+## Errands
+
+### Errand job
+
+An errand is a job to a landing site (§landing-sites) to bring something back: `Job.errand`
+(`kind`, `siteId`, `targetName`, `itemDefId`, `wants`, `returnToPortId`, and `outcome` once
+settled). Two kinds: `fetchPerson` (bring back the named person, `wants` `alive`, `either` or
+`dead`; `dead` is a kill job) and `fetchItem` (bring back the named item, which always wants
+`either`). It is offered through `offerJob` with an `errand` draft
+(`systems/commerce/command-handlers.ts` `errandProblem`), refused unless it comes back where it
+starts (`toPortId` is `fromPortId`, which is `returnToPortId`), the site is an authored site whose
+near port the origin reaches, it names its target in at most `STAGING_LIMITS.nameChars`
+characters (the name goes on a cast entry), it names an existing item exactly when it fetches one,
+it carries no cargo and nobody rides on it, and its pay is in the errand band (§errand-pay).
+
+The offer card reads "Bring back Corran Vale from the Boathouse, alive" ("alive or dead" for
+`either`), or "Fetch <item> from <site>", titled "A job: <target>". Its accept side runs
+`acceptContract` then `setCourse` to the site (§known-sites), so the ship flies there through the
+near port as a voyage; the site stays known for the whole episode. One job in hand holds as for
+any job (§one-job-in-hand). The null narrator never offers an errand; only the narrator and
+scenario commands do.
+
+### Errand pay
+
+`commerce.priceBands.errand` (6..12) credits per unit of path distance out to the site and back,
+both measured on the graph with every authored site added (`checkErrandBand`, `errandPay` in
+`systems/commerce/errand.ts`, shared with the translator so the two cannot drift); the offer's pay
+tier picks a point inside it. Paid once, by how it was settled (§settling-the-errand): a captive
+as a passage (they walk off at the return port, `completed`, `contractCompleted` and `paymentMade`
+once); a target brought dead when the ship docks at the return port; a fetched item as freight,
+once delivered to that port's bay or store. A failed errand is never paid. Why the band: an errand
+to the nearest site pays about one and a half plain freight jobs after its three dockings' fees.
 
 ## Port markets
 

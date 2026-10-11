@@ -92,9 +92,10 @@ tier (`expedition.castFighting`: shaky 1, steady 3, hard 5).
 
 A site is a `PortDef` of `kind: "site"` (`core/places.ts` `isSite`): a landing that sells
 nothing, with no market and no job templates, possibly no cast seeds or stores, a `nearPortId`
-and exactly one route, to that port. No port lists a site in its routes, so no course reaches one
-yet. At a site the headline reads "Set down at <site>" (§the-ship-headline), nobody goes looking
-for work (§looking-for-work), and the narrator is not told (§the-narrator-and-sites).
+and exactly one route, to that port. No port lists a site in its routes; a site is on the graph
+the ship flies only while it is known (§known-sites). At a site the headline reads "Set down at
+<site>" (§the-ship-headline) and nobody goes looking for work (§looking-for-work); what the
+narrator sees and may do there is §the-narrator-and-sites.
 
 ### Site maps
 
@@ -142,6 +143,28 @@ baton inside the west door (shaky, bound); Old Pell, a net mender at the net ben
 Why: posted at the east door, Hesk never guarded the bench and assault walked over it; and a
 keeper fleeing by the jetty ran past the ramp.
 
+### Harrow End
+
+`port.harrow_end` (planet, near Green Meridian, one route of 20) and its map `dock.harrow_end`, a
+disused silo yard, 44 x 30 with the Mk2 berthed at (4, 0); its README is the map. Below the apron
+lies open stubble with two bale rows of cover one tile thick (x 28 and 33, rows 21–23). A stone
+weigh-house (x 14–22, rows 23–27) has a north door at (18, 23), a back door at (18, 27) and seed
+sacks either side of the north door; two round silos and a grain auger stand to the west; a seed
+container and a drystone wall along row 25 hide the back lane from the yard. `noticeRadius` 5.
+
+Posts: `target` the weigh-house scale (16, 25), `loot` the seed container doors (23, 25), guards
+`bale_row` (27, 22), `weigh_door` (18, 24) and `back_door` (18, 26), `bystander` `gleaning` (31,
+27), `exit` `farm_track` out the west end at (0, 28), `flank` `back_lane` (18, 28). The default
+cast: Teodor Lusk, the co-op steward who sold the Collective's seed (target, unarmed, steady,
+bound, wants out); Rhee Castellan, the buyer's hired gun with a blaster at the bale row (steady,
+paid); Mattie Lusk, his daughter with a blaster inside the door (shaky, devoted); Amos Wray, the
+old silo keeper with a baton at the back door (shaky, bound); Wenna Brae, a gleaner (bystander).
+Why: the bale row keeps Rhee in cover seven tiles from the hold spots, so `hold` is a long
+exchange of fire where the Boathouse's is short; the weigh-house door stands within Mattie's
+reach of the ramp (§the-cast-in-the-fight), so `hold` can draw her out, where a tile or two
+further and every `hold` ends with the steward gone; and the yard wall keeps the flank's walk out
+of Rhee's sight. Cover two tiles thick blocks a line like a wall, so firing cover is one tile.
+
 ## The expedition
 
 ### Starting an expedition
@@ -160,8 +183,9 @@ emitted.
 
 Without a plan nothing moves until `adoptPlan { planId }` names one from the menu; it picks the
 party again by the plan's squad rule. `withdrawParty` calls a party that is ashore back
-(§the-objective-and-resolution). Both are also the player's (A2's card sides); nothing issues them
-yet.
+(§the-objective-and-resolution). Both are also the player's: the sides of the arrival and turn
+cards (§the-arrival-card, §the-turn-card). While an expedition is under way `setCourse` is refused,
+so the ship never lifts off with the party ashore.
 
 ### Who goes
 
@@ -182,12 +206,62 @@ giving way to survival. They walk to the arms locker's `use` tile, `arm` for 2 s
 foot of the personnel ramp. Arming gives the best weapon left: among the party not yet armed,
 ranked by `fighting`, the top as many as there are blasters take one, the next as many as batons
 a baton, the rest nothing, so whoever reaches the locker first never takes a better fighter's
-blaster. Arming makes them a combatant of side `us`.
+blaster. Arming makes them a combatant of side `us`, and the weapon is recorded as the ship's
+(`Expedition.arms`). When the ship plans her lift-off after the fight, every one of the ship's
+weapons goes back into the locker wherever it ended up (in hand, dropped on the site's floor), and
+the cast's weapons left on the ground stay there, so no "left behind" line. Why: nobody puts a
+weapon back on their own and the muster arms only from the locker, so every fight emptied it.
 
 Phases (`Expedition.phase`): `mustering`; `walkingOut` once the whole party is armed
 (`partyMustered`); `approach` once the leader stands on the site floor in the fight (or anyone,
 with the leader down); `fight` at contact; `resolved`. A party member on the site floor done with
 the muster goes into the fight.
+
+### The arrival card
+
+Set down at a site for an errand, the expedition starts itself (`systems/expedition/start.ts`
+`landedForErrand`): the first tick the ship is `docked` at a site with that site's map alongside
+and no course away planned, with an `inTransit` errand naming the site whose `outcome` is unset,
+and never twice for one errand. The cast is the map's `defaultCast` with the one `target` entry
+named for the errand's `targetName` (`castFor`); a `fetchItem` errand leaves the cast as authored
+and puts the item down at the `loot` post. The caps and posts are checked as for the start
+command, and a cast that fails is a content bug and throws. The expedition is written with no
+plan and `Expedition.jobId`; nobody moves until a plan is adopted.
+
+It queues the arrival card through `queuePolicyDecision` (§policy-decision-cards): prompt key
+`expedition.arrival`, no `jobId` on the record, so its `policyDecision` hook is raised the tick it
+is queued and the world halts on the hook and then on the card; nothing of the fight runs while it
+is up. The first officer brings it. Its sides are two plans from the menu (§the-plan-menu), each an
+`adoptPlan`: `hold-lethal-armed` and `assault-lethal-armed` when both are available, else the
+first two available. A side's label says what the plan does ("Hold the ramp from cover", "Go in
+and take them", with ", to stun", ", holding fire", ", all hands", ", blasters only" or ", a small
+team" when not the usual) and its aftermath what happens next ("We make them come to us."), with
+no numbers. The prompt params name the job, the site, the target, the speaker and both plans
+(`leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`), and each side's own
+refs carry its label and why. Choosing a side adopts the plan and the muster begins
+(§the-muster). A plan adopted for an errand that wants the target `alive` has `targetMustLive`
+(§fire-and-targets). With fewer than two plans available there is no card, and the expedition
+resolves `timedOut` `expedition.maxApproachSeconds` (90) after it started. Why a policy card and
+not a story hook: the narrator dresses the sim's pair and cannot choose the plans, a lever the
+owner has not ruled on (D6).
+
+### The turn card
+
+Once in an expedition that started itself for an errand, and only in the fight, the turn card is
+queued the tick the first of the party breaks, goes down or dies (`systems/expedition/cards.ts`
+`queueTurnCard`). One of theirs breaking or giving up asks nothing: the fight going the party's
+way is the ticker's to tell. Why: a card asking whether to press on as a guard runs was no
+decision at all. It is not queued once `objectiveTick` or `withdrawTick` is set, nor if
+the fight ends that tick; it is checked after the tick's withdrawal and objective, so a
+`withdrawWhen` that fires that tick asks nothing. A policy card with prompt key `expedition.turn`
+and no `jobId`, its params are `jobId`, `site`, `actorId`, `name`, `side` (`us` or `them`), `how`
+(`breaking`, `down` or `dead`) and `speaker`: the first officer if they can stand, in the party or
+calling it from the ramp head, else the first of the party in rank order (§who-goes) on their
+feet; never the one in command (§captain-never-speaks) nor the one the card is about, and then
+nobody is named. The arrival card's first officer is likewise never the one in command, and a
+first officer who is down or dead brings no card (`firstOfficerOf`). "Press on" changes nothing;
+"Pull back to the ship" is `withdrawParty` (§the-objective-and-resolution). `Expedition.cards`
+records both cards. A `scenarioStartExpedition` run gets neither.
 
 ## The fight
 
@@ -323,7 +397,8 @@ stacked party read as one person.
 ### Fire and targets
 
 The party fires only at cast who are armed and can still fight: never a bystander, never the
-unarmed target, never someone running or giving up. The cast fire at any party member who can
+unarmed target, never someone running or giving up, and never the target at all under a plan's
+`targetMustLive` (an errand that wants them alive, §the-arrival-card). The cast fire at any party member who can
 fight. Each picks the nearest such mark in sight and reach.
 
 ### The cast in the fight
@@ -385,8 +460,31 @@ the start, the shots and the seconds from contact) at the first of:
 
 The alert stands down `expedition.alertClearSeconds` (60) later (`alertCleared`, cause `fight`).
 The party leave the fight and the planner has them again. The taken target and the cast's down and
-dead are removed; the rest of the cast walk off by the exit and are removed there. The party's
-dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
+dead are removed; the rest of the cast walk off by the exit and are removed there, or all at once
+the tick the ship plans her lift-off, so departure prep never meets them (§known-sites). The
+party's muster stops. The party's dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
+
+### Settling the errand
+
+When an expedition started for an errand (`Expedition.jobId`) resolves, the sim settles the errand
+before the party and cast leave the fight (`systems/expedition/errand.ts` `settleErrand`):
+
+- `targetTaken` with the target alive is `broughtAlive`: the cast actor is removed with what they
+  carry and boards anew as the captive, a fresh `crew.passenger` with their name on their tile
+  (whole, no combatant), riding home as the job's one-way passage (`spawnCaptive`,
+  `passengerBoarded`). Why a new actor: the aftermath removes every actor that still has a
+  combatant.
+- `targetTaken` with the target dead is `broughtDead` when the job wants them `dead` or `either`
+  way, else `failed`.
+- A `fetchItem` taken is `broughtItem` once its item is stowed aboard as the job's one manifest
+  line (from a party member's hands, else the floor nearest the loot post).
+- Every other outcome is `failed`: the job fails there and then (`jobFailed`, outcome `failed`).
+
+Whatever the outcome the voyage home (`returnToPortId`) is set, never the next hop, so travel
+plans it once nothing holds the ship and departure prep begins at once. A captive put off later
+fails the errand after all (`jobFailed` with the passage's end reason) and the voyage home
+stands; one put off at the site is gone there, since a site has no lounge. Payment is
+§errand-pay's.
 
 ### Thoughts and memories from a fight
 
@@ -395,20 +493,22 @@ dead stay where they fell. `state.expedition` stays `resolved` until a new start
 - At resolution: `ranFromAFight` (−0.2, 1 day) for a living party member who broke on their own
   (not called back); `heldTheLine` (+0.2, 1 day) at a `targetTaken` for those who never did and
   can still fight.
-- Memories (§memories): `foughtBeside` (+1, 7 days) pairwise among the living party;
+- Memories (§memories): `foughtBeside` (+1, 7 days) pairwise among the living party who went;
   `carriedMeOut` (+3, 14 days) from a rescue; `leftMeBehind` (−3, 14 days) about the leader from a
   party member left down on the floor away from the ramp.
 
 ### Fight log lines
 
-The ticker (`core/render.ts`): "Mara Osei takes four down the ramp"; at contact "Shots at the
-boathouse"; "Jax Okonkwo is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is
-stunned"; "... is down"; "... is dead"; "... runs for the ship" or "runs for <the exit post's
-name>"; "... gives up"; "The party pulls back to the ramp"; and the end: "Corran Vale taken; two of
-ours hurt" (or "dead"), "Corran Vale got away", "The party came back without Corran Vale", "The
-party is driven back to the ship", "The fight at the boathouse peters out". Shots, the muster and
-healed wounds have no line. `expeditionContact` and `died` drop fast play to 1x
-(§auto-slowdown).
+The ticker (`core/render.ts`): "Set down at Harrow End" on landing and "Lifted off from Harrow
+End for Green Meridian" on leaving (the start itself has no line); "Mara Osei takes four down the
+ramp" once the party is armed and walks out (`partyMustered`), since on a landing nobody moves
+until the plan is chosen; at contact "Shots at the Boathouse"; "Jax Okonkwo
+is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is stunned"; "... is down";
+"... is dead"; "... runs for the ship" or "runs for <the exit post's name>"; "... gives up"; "The
+party pulls back to the ramp"; and the end: "Corran Vale taken; two of ours hurt" (or "dead"),
+"Corran Vale got away", "The party came back without Corran Vale", "The party is driven back to
+the ship", "The fight at the Boathouse peters out". Shots and healed wounds have no line.
+`expeditionContact` and `died` drop fast play to 1x (§auto-slowdown).
 
 ### The plan menu
 

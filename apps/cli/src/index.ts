@@ -15,6 +15,7 @@ import {
 } from "@crew/content";
 import { type ContentBundle, type DeckDefId, type DockDefId, checkDockFitsDeck } from "@crew/sim";
 import { runBeatsCli } from "./beats";
+import { runEpisodeCli } from "./episode";
 import { runExpeditionsCli } from "./expeditions";
 import { runPacingCli } from "./pacing";
 import { renderDeck } from "./render-deck";
@@ -202,6 +203,9 @@ export function crew(argv: readonly string[]): CliResult {
   }
   if (command === "expeditions") {
     return runExpeditionsCli(sub === undefined ? rest : [sub, ...rest]);
+  }
+  if (command === "episode") {
+    return runEpisodeCli(sub === undefined ? rest : [sub, ...rest]);
   }
   return fail(`crew: unknown command "${command}"`);
 }

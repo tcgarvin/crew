@@ -3,7 +3,7 @@
  */
 import type { TextRef } from "../common";
 import type { ItemDefId, JobId, PortDefId } from "../ids";
-import type { CargoLine, JobIssuer, JobUrgency } from "../travel";
+import type { CargoLine, JobErrand, JobIssuer, JobUrgency } from "../travel";
 
 /**
  * A job as proposed by the narrator or the deterministic job source. The kernel rejects it if
@@ -37,6 +37,14 @@ export interface JobDraft {
   readonly passenger?: boolean;
   /** There and back (`toPortId`, then home to `fromPortId`). Requires `passenger`. */
   readonly roundTrip?: boolean;
+  /**
+   * Expeditions A2 (§6): an errand to a landing site. `toPortId` must equal `fromPortId` (the job
+   * returns there: `returnToPortId`), `cargo` is empty, and pay is banded by `priceBands.errand`
+   * over the path to the site and back. Absent = freight or a passage.
+   */
+  readonly errand?: Readonly<
+    Pick<JobErrand, "kind" | "siteId" | "targetName" | "itemDefId" | "wants">
+  >;
 }
 
 export interface CommerceCommandPayloads {
