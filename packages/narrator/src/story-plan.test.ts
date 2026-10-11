@@ -16,6 +16,7 @@ import {
   type StoryPlan,
   parseNotes,
 } from "./notes";
+import { STATIC_RULES } from "./prompts/index";
 import {
   type BeatAttribution,
   KEEP_PLAN,
@@ -563,10 +564,21 @@ describe("the notes turn asks for the plan at its moments (§seasons-and-stalls,
     expect(withSeason.request).toContain("No arc stands");
   });
 
+  it("at an episode's opening asks for a different kind of story and points any sketch at the craft rules (v0.40)", async () => {
+    const { request } = await callWith(planOf({ season: SEASON, arc: ARC }));
+    expect(request).toContain('Read "Past arcs" and your cast first');
+    expect(request).toContain("a different kind of story from the last ones");
+    expect(request).not.toContain("leave it empty if neither opens one");
+    expect(request).toContain('as "Pitch the plan" and "Decide some beats" under "Your notes" say');
+    expect(STATIC_RULES).toContain("- Pitch the plan as a writers' room would");
+    expect(STATIC_RULES).toContain("- Decide some beats and leave some open.");
+  });
+
   it("asks for nothing more of a plan that stands with a live episode", async () => {
     const { request } = await callWith(planOf({ season: SEASON, arc: ARC, episode: EPISODE }));
     expect(request).not.toContain("No season stands");
     expect(request).not.toContain("No episode is live");
+    expect(request).not.toContain("Pitch the plan");
   });
 
   it("keeps an ended season and its arc as past arcs, then asks for the next season", async () => {

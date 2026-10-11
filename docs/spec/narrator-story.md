@@ -501,10 +501,13 @@ with scale `season` or `arc`, its premise as the title, `<tempo> <tier>` as the 
 and each beat with how it ended as the summary, and ending `planEnded`; a tier written in the same
 reply starts fresh (no revisions), otherwise it stands empty. An ended episode is not kept. The
 notes turn is asked (§notes-turn) for a season and an arc whenever none stands, for the episode
-when the captain is ashore with none live (the offer it makes is the setup), and at an episode's
+when the captain is ashore with none live (the offer or card it makes is the setup; it is asked to
+read "Past arcs" and the cast and make it a different kind of story), and at an episode's
 end (`contractCompleted`, `passageEnded` or `jobFailed` on a notable-event call, or a closing
 card) whether the arc moved: the arc beat it landed in `landed`, the arc revised if its next
-episode changed, and `episode` in `ended` once the closing card is up.
+episode changed, and `episode` in `ended` once the closing card is up. A request that asks for a
+sketch points it at the prompt's craft rules ("Pitch the plan", "Decide some beats",
+§prompt-rules) and never says what to plan (D46).
 
 An arc stalls when episodes end without an arc beat landing: the server counts episodes ended
 since an arc beat last landed (`episodesSinceArcBeat`; an arc beat landing or an arc ending
@@ -642,9 +645,19 @@ designer reasons about:
   checklist: "I don't want the narrator to think we are asking it specifically to solve that."
   Hence `quietTooLong` is a neutral check-in listing what is available.
 - The plan is the shape the narrator means, not a script (§the-plan). It sketches a season, an
-  arc and an episode, mixes decided beats with beats the captain and the dice may bend ("an
-  episode with every beat decided is a cutscene"), and names the episode beat each intent serves
-  (§beat-attribution). It revises from the bottom up: the episode first when the captain or the
+  arc and an episode, three sizes of story: a season's movements each change the crew's situation
+  for good; an arc's beats are whole episodes of different kinds, the one now playing at most its
+  first. It is pitched about this crew, the cast and these ports: a premise names who wants what,
+  where, and what stands in the way, never a theme; a beat is an event with a person or a thing in
+  it, never a stage direction ("pay for a choice", "close the delivery"), and never hedged "if
+  accepted". Every episode has at least one decided beat whose intent names the lever that lands
+  it, not only faults and hazards (a sum, a fine, a grudge, a falling-out, a worry, a fall), and at
+  least one the captain and the dice may bend ("every beat decided is a cutscene; none decided is
+  a hope"); the strongest levers are spent rarely but really. A short worked example with invented
+  people shows the three tiers. It names the episode beat each intent serves
+  (§beat-attribution).
+  Why: live sketches at v0.39 were generic ("can this freighter keep earning trust", "settle the
+  account"), the arc repeated the episode, and almost no beat was decided or planned a lever. It revises from the bottom up: the episode first when the captain or the
   dice went the other way (dropped beats become `changed`, landed beats are never rewritten), the
   arc only if the episode's ending changed, the season only if the arc's premise broke, with why
   in `revised`. A stalled arc is brought to the captain (the next offer, its people at the next

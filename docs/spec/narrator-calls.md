@@ -359,3 +359,11 @@ any fallback, printing the provider's error text. It reads the key from `OPENROU
 before deploying prompt, schema or transport changes. Why: the unit suite fakes every transport, so
 a provider rejecting the real request left production failing while `pnpm test` was green. Owner:
 "a suite of LLM tests to use not all the time, but for these kinds of situations."
+
+The plan-quality harness (`plan-quality.live.test.ts`) sits beside it and is skipped unless
+`CREW_PLAN_SAMPLES` is set: it samples the notes turn's season, arc and episode sketches that many
+times on three digests (game start, an episode opening under a standing season and arc, thin
+notes with a season to sketch), prints them with the plan's intents, and writes them to
+`CREW_PLAN_OUT` as JSON. It asserts only that the notes parse; the judging is by reading. Run it
+(`CREW_PLAN_SAMPLES=3 pnpm exec vitest run --config vitest.live.config.ts plan-quality`) before
+and after a change to the plan's prompt text (§the-plan).

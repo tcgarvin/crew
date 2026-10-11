@@ -504,7 +504,7 @@ function planRequest(
   const lines: string[] = [];
   if (plan.season.premise === "") {
     lines.push(
-      'No season stands: sketch one in plan.season (its premise is the question it asks, three to five movements, until, tempo), and an arc in plan.arc to start it. "Past arcs" is what you have told so far.',
+      'No season stands: sketch one in plan.season (its premise is the question it asks of these people, three to five movements, until, tempo), and an arc in plan.arc to start it. "Past arcs" is what you have told so far.',
     );
   } else if (plan.arc.premise === "") {
     lines.push("No arc stands: sketch the season's next arc in plan.arc.");
@@ -515,7 +515,14 @@ function planRequest(
     lines.push(
       offered
         ? "No episode is live and the captain is looking for work: sketch the episode in plan.episode. The offer you just made is its setup beat; know its turn before the captain takes it."
-        : "No episode is live and the captain is looking for work: sketch the episode your next offer opens in plan.episode, or leave it empty until you make one.",
+        : "No episode is live and the captain is looking for work: sketch in plan.episode the story your card opens, or the one your next offer will.",
+      'Read "Past arcs" and your cast first: make it a different kind of story from the last ones, about someone in it.',
+    );
+  }
+  // §prompt-rules: the craft lives in the static rules; the request only points at it.
+  if (lines.length > 0) {
+    lines.push(
+      'Write what you sketch as "Pitch the plan" and "Decide some beats" under "Your notes" say.',
     );
   }
   const closingEvent =
