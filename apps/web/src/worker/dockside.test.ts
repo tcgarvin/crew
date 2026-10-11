@@ -258,7 +258,8 @@ describe("the dock alongside on real content (§dock-alongside)", { timeout: 20_
     const here = travel.stage === "docked" ? travel.portId : undefined;
     const due = Object.values(bundle.docks ?? {}).find((d) => d.portId === here);
     expect(restored.state.deck.dock?.dockId).toBe(due?.id);
-  });
+    // ~4 s alone, but near 20 s under the full suite's load on a 16-core machine.
+  }, 60_000);
 });
 
 const KESSLER = "port.kessler_drift" as PortDefId;

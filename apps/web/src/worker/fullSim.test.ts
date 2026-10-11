@@ -298,7 +298,8 @@ describe(
       expect(count(log, "alertRaised")).toBe(0);
       expect(world.state.hull.scars).toEqual([]);
       expect(world.state.hull.integrity).toBe(world.state.hull.max);
-    }, 60_000);
+      // ~14 s alone since Expeditions A1, but past 60 s under the full suite's load.
+    }, 120_000);
 
     it("does not stall preparingDeparture waiting for the pilot to walk to the console", () => {
       // Owner feedback 2026-09-30: `stationToStaff` used to open only once `preparingDeparture`
