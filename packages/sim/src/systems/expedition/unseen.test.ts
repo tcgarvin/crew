@@ -27,8 +27,12 @@ import { SITE, siteWorld } from "./fixtures/site";
 const RATE = 20;
 
 /** Set down for an errand of `kind`: the arrival card queued, its hook raised, not acknowledged. */
-function landed(kind: ErrandKind = "fetchPerson"): LandingWorld {
-  const test = landingWorld({ scenario: CREW.scenario8, kind });
+function landed(kind: ErrandKind = "fetchPerson", seed?: number): LandingWorld {
+  const test = landingWorld({
+    scenario: CREW.scenario8,
+    kind,
+    ...(seed === undefined ? {} : { seed }),
+  });
   flyToSite(test);
   test.kernel.advance(test.world, 1);
   expect(violations(test)).toEqual([]);
@@ -47,8 +51,9 @@ function mark(
   planId: string,
   decisionId: DecisionId = arrival(test).id,
   source: "narrator" | "scenario" | "player" = "narrator",
+  odds = 100,
 ): EnqueueResult {
-  return sendAs(test, { source, kind: "markUnseen", payload: { decisionId, planId } });
+  return sendAs(test, { source, kind: "markUnseen", payload: { decisionId, planId, odds } });
 }
 
 const refusal = (result: EnqueueResult) =>
@@ -238,5 +243,81 @@ describe("a fetchItem errand's plans (D105)", () => {
       "assault-lethal-armed",
     ]);
     expect(new Set(after.map((o) => o.plan.objective))).toEqual(new Set(["takeTarget"]));
+  });
+});
+
+describe("the way in unseen is a chance (§unseen-odds)", () => {
+  const rolled = (events: readonly SimEvent[]) => events.filter((e) => e.type === "unseenRolled");
+
+  /** Mark the assault side at `odds` on a world of `seed`, choose it, and return what came of it. */
+  function tryAt(odds: number, seed?: number) {
+    const test = landed("fetchPerson", seed);
+    expect(mark(test, "assault-lethal-armed", undefined, "narrator", odds).status).toBe("accepted");
+    const events = choose(test, "right");
+    const expedition = test.world.state.expedition;
+    if (expedition === undefined) throw new Error("no expedition");
+    return { expedition, events: rolled(events) };
+  }
+
+  it("at 100 always gets in unseen and at 0 never does, rolling once either way", () => {
+    for (const seed of [1, 2, 3]) {
+      const certain = tryAt(100, seed);
+      expect(certain.expedition).toMatchObject({
+        notice: "unseen",
+        unseenOdds: 100,
+        unseenRoll: { odds: 100, worked: true },
+      });
+      expect(certain.events.map((e) => e.payload)).toEqual([
+        expect.objectContaining({ planId: "assault-lethal-armed", odds: 100, worked: true }),
+      ]);
+      const hopeless = tryAt(0, seed);
+      expect(hopeless.expedition).toMatchObject({
+        notice: "seen",
+        unseenRoll: { odds: 0, worked: false },
+      });
+      expect(hopeless.events.map((e) => e.payload.worked)).toEqual([false]);
+    }
+  });
+
+  it("rolls the same way for the same seed, and both ways across seeds at an even chance", () => {
+    const seeds = Array.from({ length: 8 }, (_, i) => i + 1);
+    const first = seeds.map((seed) => tryAt(50, seed));
+    const outcomes = first.map((t) => t.expedition.unseenRoll?.worked);
+    expect(seeds.map((seed) => tryAt(50, seed).expedition.unseenRoll?.worked)).toEqual(outcomes);
+    expect(new Set(outcomes)).toEqual(new Set([true, false]));
+    for (const [i, t] of first.entries()) {
+      expect(t.expedition.notice).toBe(outcomes[i] === true ? "unseen" : "seen");
+      expect(t.events[0]?.significance).toBe("notable");
+    }
+  });
+
+  it("rolls nothing when the captain takes the other side: they were waiting", () => {
+    const test = landed();
+    mark(test, "assault-lethal-armed", undefined, "narrator", 70);
+    const events = choose(test, "left");
+    expect(rolled(events)).toEqual([]);
+    expect(test.world.state.expedition?.notice).toBe("seen");
+    expect(test.world.state.expedition).not.toHaveProperty("unseenRoll");
+  });
+
+  it("refuses odds that are not a whole percent from 0 to 100", () => {
+    for (const odds of [-1, 101, 2.5, Number.NaN]) {
+      const result = refusal(mark(landed(), "assault-lethal-armed", undefined, "narrator", odds));
+      expect(result?.code).toBe("invalidPayload");
+      expect(result?.reason).toMatch(/whole percent/);
+    }
+  });
+
+  it("reads a mark saved before odds as certain (D105's mark)", () => {
+    const test = landed();
+    const expedition = test.world.state.expedition;
+    if (expedition === undefined) throw new Error("no expedition");
+    // A save from before odds: the mark with no chance on it.
+    expedition.unseenPlanId = "assault-lethal-armed";
+    choose(test, "right");
+    expect(test.world.state.expedition).toMatchObject({
+      notice: "unseen",
+      unseenRoll: { odds: 100, worked: true },
+    });
   });
 });

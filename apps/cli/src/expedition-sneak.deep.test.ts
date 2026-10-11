@@ -68,6 +68,7 @@ async function sneak(
   seed: number,
   arrival: Posture,
   unseen: Posture | undefined,
+  unseenOdds?: number,
 ): Promise<{ r: EpisodeResult; watch: SiteWatch; world: World; transcript: string }> {
   const kernel: Kernel = createKernel(createPacingRegistry());
   const world = createEpisodeWorld(kernel, seed);
@@ -78,6 +79,7 @@ async function sneak(
     fetchItem: CRATE,
     arrivalCard: arrival,
     ...(unseen === undefined ? {} : { markUnseen: unseen }),
+    ...(unseenOdds === undefined ? {} : { unseenOdds }),
     ticksPerAdvance: (w) => (planned(w) ? 1 : 10),
     afterStep: (w) => {
       const expedition = w.state.expedition;
@@ -131,6 +133,7 @@ for (const seed of SEEDS) {
       const { r, watch, world, transcript } = await sneak(seed, "creep", "creep");
       expectHealthy(r, transcript, CREEP_PLAN);
       expect(r.unseenPlanId, transcript).toBe(CREEP_PLAN);
+      expect(r.unseenRoll, transcript).toEqual({ odds: 100, worked: true });
       expect(watch.firstOnFloorTick, transcript).toBeDefined();
       const resolved = resolvedOf(r, transcript);
       expect(resolved.notice, transcript).toBe("unseen");
@@ -161,6 +164,18 @@ for (const seed of SEEDS) {
         (t) => t.jobId === r.jobId && t.reason === "jobPayment",
       );
       expect(payments.map((t) => t.amount)).toEqual([r.pay]);
+    }, 300_000);
+
+    it("A2: marked creep at no chance, the captain picks it: the roll fails, they were waiting (§unseen-odds)", async () => {
+      const { r, watch, transcript } = await sneak(seed, "creep", "creep", 0);
+      expectHealthy(r, transcript, CREEP_PLAN);
+      expect(r.unseenRoll, transcript).toEqual({ odds: 0, worked: false });
+      expect(resolvedOf(r, transcript).notice, transcript).toBe("seen");
+      const floor = watch.firstOnFloorTick;
+      const contact = contactTick(r);
+      expect(contact, transcript).toBeDefined();
+      expect((contact as number) - (floor as number), transcript).toBeLessThanOrEqual(1);
+      expect(transcript).toContain("unseen (0%): they were waiting.");
     }, 300_000);
 
     it("B: marked creep, the captain picks assault: they were waiting, contact on the floor", async () => {

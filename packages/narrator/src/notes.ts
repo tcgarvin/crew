@@ -8,6 +8,7 @@
  * the digest can bound each part separately. Dropped intents from the previous call are carried
  * in `lastRejections` so the model learns why its commands did not happen.
  */
+import type { UnseenRoll } from "@crew/sim";
 import { z } from "zod";
 
 export interface NarratorCastEntry {
@@ -83,6 +84,11 @@ export interface CardShown {
    * card.
    */
   readonly closedThread: string | null;
+  /**
+   * §unseen-odds: on an arrival card whose marked way in the captain chose, the roll of the chance
+   * the narrator set (server-kept); absent on every other card.
+   */
+  readonly tried?: UnseenRoll;
 }
 
 /**
@@ -304,6 +310,7 @@ const storedCardSchema = z.object({
   chosen: z.enum(["left", "right"]).nullable(),
   /** Cards stored before closing cards (§closing-cards) closed nothing. */
   closedThread: z.string().nullable().optional(),
+  tried: z.object({ odds: z.number().int(), worked: z.boolean() }).optional(),
 });
 
 const storedBeatSchema = z.object({
@@ -426,6 +433,7 @@ function boundCard(card: CardShown): CardShown {
     rightLabel: clip(card.rightLabel, 48),
     chosen: card.chosen,
     closedThread: card.closedThread === null ? null : clip(card.closedThread, 80),
+    ...(card.tried === undefined ? {} : { tried: card.tried }),
   };
 }
 
@@ -553,7 +561,11 @@ export function parseNotes(raw: unknown): NarratorNotes {
         openedTick: openedTick ?? t.lastBeatTick ?? lastTick,
         beatCardShown: t.beatCardShown ?? false,
       })) ?? (openThreads ?? []).map((text) => threadFromLegacy(text, lastTick)),
-    cardsShown: (cardsShown ?? []).map((c) => ({ ...c, closedThread: c.closedThread ?? null })),
+    cardsShown: (cardsShown ?? []).map(({ tried, ...c }) => ({
+      ...c,
+      closedThread: c.closedThread ?? null,
+      ...(tried === undefined ? {} : { tried }),
+    })),
     pastArcs: pastArcs ?? [],
     plan: plan ?? EMPTY_PLAN,
     // Notes stored before cast ports (§issuers-and-pitches) have no port or sighting for their

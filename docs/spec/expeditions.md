@@ -317,19 +317,21 @@ the arrival card replaces these rules for the fight it starts (§getting-in-unse
 
 ### Getting in unseen
 
-While the arrival card is up, the narrator may mark one of its sides as the way in unseen
-(`markUnseen { decisionId, planId }`, narrator and scenario authority; the lever is
-§unseen-lever). The kernel refuses it, with the reason, unless an expedition is under way with no
-plan and nothing marked yet, `decisionId` is its arrival card (`Expedition.cards.arrival`) and
-still pending, and `planId` is that card's `leftPlan` or `rightPlan`, on the menu and not a `hold`
-plan. Apply writes `Expedition.unseenPlanId`; the card does not change and the captain still
+While the arrival card is up, the narrator may mark one of its sides as the way in unseen, with
+the chance it works (`markUnseen { decisionId, planId, odds }`, narrator and scenario authority;
+the lever is §unseen-lever, the chance §unseen-odds). The kernel refuses it, with the reason,
+unless an expedition is under way with no plan and nothing marked yet, `decisionId` is its arrival
+card (`Expedition.cards.arrival`) and still pending, `planId` is that card's `leftPlan` or
+`rightPlan`, on the menu and not a `hold` plan, and `odds` is a whole percent from 0 to 100. Apply
+writes `Expedition.unseenPlanId` and `unseenOdds`; the card does not change and the captain still
 chooses. The world is halted on the card, so the mark applies in the tick the captain's answer
 does, just ahead of it. Why no `hold`: a party holding the ramp never goes for the objective, so
 unseen it could only wait out the clock.
 
-`adoptPlan` then writes `Expedition.notice` (`NOTICE_RULES`): `unseen` when the marked plan is
-adopted, `seen` when the other is. With nothing marked it is absent and contact comes by the
-ordinary rules (§contact-and-the-alert).
+`adoptPlan` then writes `Expedition.notice` (`NOTICE_RULES`): when the marked plan is adopted it
+rolls the mark's odds once (§unseen-odds), `unseen` if the roll works and `seen` if not; `seen`
+when the other plan is. With nothing marked it is absent and contact comes by the ordinary rules
+(§contact-and-the-alert).
 
 - **`unseen`**: the cast never notice the party. No guard or ally's sight, no loud landing and no
   creeper beside the objective bring contact; only the party's own first shot does (even one fired

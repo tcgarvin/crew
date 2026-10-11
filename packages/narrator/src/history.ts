@@ -4,14 +4,15 @@ import { templateCard } from "@crew/content";
  * (`NarratorNotes.cardsShown`). The model never writes it. Two sources feed it:
  *  - this call's own output (the policy `card` prose and every translated `surfaceDecision`);
  *  - the kernel's decision events since the previous call (`decisionPending` for cards the
- *    kernel surfaced itself, such as job offers; `decisionResolved` for the side chosen).
+ *    kernel surfaced itself, such as job offers; `decisionResolved` for the side chosen), and
+ *    `unseenRolled` for the roll on the arrival card's way in unseen (§unseen-odds).
  *
  * The events carry only a decision ID, so the decision record in the snapshot (which the kernel
  * keeps after resolution) supplies the title through `templateCard`. A narrator-surfaced card
  * has no decision ID when it is recorded (the kernel mints it on apply), so it is matched to its
  * decision later by title and the ID is filled in then.
  */
-import type { ContentBundle, DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
+import type { ContentBundle, DecisionId, NarratorCommand, SimEvent, UnseenRoll } from "@crew/sim";
 import type { DecisionCardProse } from "./contract";
 import type { State } from "./lookups";
 import { type CardShown, NOTES_LIMITS, clipWords } from "./notes";
@@ -52,6 +53,24 @@ function cap(cards: CardShown[]): CardShown[] {
  * snapshot are the durable truth: every unresolved entry is checked against them, by ID or (for
  * an entry still waiting for its ID) by the title of a resolved record.
  */
+/**
+ * §unseen-odds: the roll on the expedition's way in unseen, put on its arrival card's entry, from
+ * the event or, if that was lost, from the expedition in the snapshot.
+ */
+function withRoll(cards: readonly CardShown[], decisionId: string, tried: UnseenRoll): CardShown[] {
+  return cards.map((c) =>
+    c.decisionId === decisionId && c.tried === undefined ? { ...c, tried } : c,
+  );
+}
+
+function rollFromSnapshot(cards: readonly CardShown[], state: State): CardShown[] {
+  const expedition = state.expedition;
+  const arrival = expedition?.cards?.arrival;
+  const roll = expedition?.unseenRoll;
+  if (arrival === undefined || roll === undefined) return [...cards];
+  return withRoll(cards, arrival, { odds: roll.odds, worked: roll.worked });
+}
+
 function reconcileWithSnapshot(
   cards: readonly CardShown[],
   state: State,
@@ -88,8 +107,13 @@ export function applyDecisionEvents(
   state: State,
   content: ContentBundle,
 ): CardShown[] {
-  const next = [...cards];
+  let next = [...cards];
   for (const event of events) {
+    if (event.type === "unseenRolled") {
+      const { decisionId, odds, worked } = event.payload;
+      next = withRoll(next, decisionId, { odds, worked });
+      continue;
+    }
     if (event.type === "decisionDropped") {
       // §card-history: a card held for delivery in person that never came up (its offer closed
       // first) was never seen: forget it, by ID or, for an entry still waiting for its ID, by
@@ -122,7 +146,7 @@ export function applyDecisionEvents(
     }
     next.push({ ...record, tick: event.type === "decisionPending" ? event.tick : record.tick });
   }
-  return cap(reconcileWithSnapshot(next, state, content));
+  return cap(rollFromSnapshot(reconcileWithSnapshot(next, state, content), state));
 }
 
 function fromCard(card: DecisionCardProse, tick: number): CardShown {
@@ -182,7 +206,14 @@ export function recordCardsFromCall(
     const known = next.findIndex((c) => c.decisionId === card.decisionId);
     const previous = next[known];
     if (previous === undefined) next.push(entry);
-    else next[known] = { ...entry, tick: previous.tick, chosen: previous.chosen };
+    else {
+      next[known] = {
+        ...entry,
+        tick: previous.tick,
+        chosen: previous.chosen,
+        ...(previous.tried === undefined ? {} : { tried: previous.tried }),
+      };
+    }
   }
   for (const command of commands) {
     const entry = fromSurfaced(command, tick, closedThread);

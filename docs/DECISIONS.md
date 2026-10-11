@@ -111,7 +111,9 @@ A new lever (D6): while an expedition's arrival card is pending the narrator may
 never a `hold`, as the way in unseen (`markUnseen`); the captain still chooses, and the sim fights
 the chosen side unseen or expected. Rejected: leaving noticing to the sim alone, which gives the
 story no way to set up a quiet way in, and letting the narrator choose the plan. See
-§getting-in-unseen, §unseen-lever.
+§getting-in-unseen, §unseen-lever. *D106 and the owner's odds ruling ("constrain the narrator as
+little as possible") make the mark a chance: the narrator names the odds, 0 to 100, and the sim
+rolls them when the captain takes the marked side (§unseen-odds).*
 
 **D106. The narrator may decide outcomes; it may not do the impossible.** Owner: "the narrator
 can't do anything impossible. But it can and should influence the sim and bend it to its will when

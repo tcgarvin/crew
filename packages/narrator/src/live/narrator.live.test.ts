@@ -719,8 +719,9 @@ suite(
         expect(response.card?.decisionId).toBe(decisionId);
         const plan = run.trace.plan;
         const unseen = plan !== undefined && "card" in plan ? plan.card?.unseen : undefined;
+        const unseenOdds = plan !== undefined && "card" in plan ? plan.card?.unseenOdds : undefined;
         console.log(
-          `item arrival card (unseen ${JSON.stringify(unseen)}; rationale: ${plan?.rationale}):`,
+          `item arrival card (unseen ${JSON.stringify(unseen)}, odds ${JSON.stringify(unseenOdds)}; rationale: ${plan?.rationale}):`,
           JSON.stringify(response.card, null, 2),
         );
         const decision = request.snapshot.state.decisions.records[decisionId as DecisionId];
@@ -732,7 +733,10 @@ suite(
         if (unseen === "left" || unseen === "right") {
           expect(marks).toHaveLength(1);
           const planId = decision?.prompt.params[`${unseen}Plan`];
-          expect(marks[0]?.payload).toEqual({ decisionId, planId });
+          // §unseen-odds: the narrator's chance, "" read as certain.
+          const odds =
+            unseenOdds === undefined || unseenOdds.trim() === "" ? 100 : Number(unseenOdds);
+          expect(marks[0]?.payload).toEqual({ decisionId, planId, odds });
         } else {
           expect(marks).toEqual([]);
         }
@@ -744,7 +748,14 @@ suite(
         expect(decision?.right.commands).toEqual([
           { kind: "adoptPlan", payload: { planId: decision?.prompt.params.rightPlan } },
         ]);
-        expect(playerText(response.card), "a digit on the card").not.toMatch(/\d/);
+        // §unseen-odds: the one number a card may carry is the stated chance on the way in.
+        const odds = marks[0]?.payload.odds;
+        const stated = new RegExp(`(?<![\\d.,+-])${odds}\\s*(?:%|per\\s?cent\\b)`, "gi");
+        const text = playerText(response.card);
+        expect(
+          odds === undefined ? text : text.replace(stated, ""),
+          "a digit on the card",
+        ).not.toMatch(/\d/);
       },
       LIVE_TIMEOUT_MS,
     );

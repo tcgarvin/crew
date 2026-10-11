@@ -29,6 +29,8 @@ export interface SneakOptions {
   readonly kind: ErrandKind;
   /** The arrival card side the narrator marks to get in unseen; none when absent. */
   readonly mark?: "left" | "right";
+  /** §unseen-odds: the mark's chance, a whole percent; 100 (certain) when absent. */
+  readonly odds?: number;
   /** The side the captain answers. */
   readonly choose: "left" | "right";
   readonly seed?: number;
@@ -73,7 +75,7 @@ export function sneakIn(options: SneakOptions): { test: LandingWorld; events: Si
     const marked = sendAs(test, {
       source: "narrator",
       kind: "markUnseen",
-      payload: { decisionId: card.id, planId: String(planId) },
+      payload: { decisionId: card.id, planId: String(planId), odds: options.odds ?? 100 },
     });
     if (marked.status !== "accepted") throw new Error(`mark refused: ${JSON.stringify(marked)}`);
   }

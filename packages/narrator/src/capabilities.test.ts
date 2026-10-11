@@ -217,14 +217,20 @@ describe("buildCapabilities", () => {
   });
 
   it("documents the way in unseen: the arrival card only, what each side means, never a hold side (D105)", () => {
-    expect(text).toContain("## 8. card.unseen: the way in unseen, on a site's arrival card");
+    expect(text).toContain(
+      "## 8. card.unseen and card.unseenOdds: the way in unseen, on a site's arrival card",
+    );
     expect(text).toContain("Only on the policyDecision call for a site's arrival card");
     expect(text).toContain("empty for neither, and empty on every other card");
-    expect(text).toContain("the party slips in unseen: nobody there notices them");
+    expect(text).toContain("the party slips in unseen (nobody there notices them");
     expect(text).toContain("the people there were waiting");
     expect(text).toContain("never a side that holds the ramp (dropped)");
-    expect(text).toContain("never given away on the card");
     expect(text).toContain("you never choose the plan");
+    // §unseen-odds: the chance, rolled once on the marked side; voiced as the speaker likes.
+    expect(text).toContain("unseenOdds is the chance it works, a whole percent from 0 to 100");
+    expect(text).toContain("the sim rolls it once");
+    expect(text).toContain("a 0 or a 100 is a decision dressed as a gamble");
+    expect(text).toContain("equal to unseenOdds is allowed, any other number is refused");
     expect(text).toContain("may name the arrival card's way in unseen, lever 8");
   });
 

@@ -258,6 +258,7 @@ function chosen(
   req: NarratorRequest & { snapshot: SaveEnvelope },
   planId: string,
   notice: "unseen" | "seen" | undefined,
+  roll?: { odds: number; worked: boolean },
 ) {
   const state = req.snapshot.state;
   const expedition = state.expedition;
@@ -274,6 +275,10 @@ function chosen(
   if (notice !== undefined) {
     expedition.unseenPlanId = "creep-holdFire-armed";
     expedition.notice = notice;
+  }
+  if (roll !== undefined) {
+    expedition.unseenOdds = roll.odds;
+    expedition.unseenRoll = roll;
   }
   expedition.phase = "approach";
   return req;
@@ -318,15 +323,39 @@ describe("buildDigest: At the site, the way in unseen (D105)", () => {
     expect(siteSection(marked)).not.toMatch(AFTER);
   });
 
-  it("shows no notice while the expedition is on, whichever side was chosen", () => {
-    for (const [planId, notice] of [
-      ["creep-holdFire-armed", "unseen"],
-      ["assault-lethal-armed", "seen"],
-    ] as const) {
-      const section = siteSection(digestOf(chosen(itemArrival(), planId, notice)));
-      expect(section).toContain("the party is out on the ground, not yet in a fight");
-      expect(section).not.toMatch(AFTER);
-    }
+  it("once the captain chose the other side, says they were waiting, with no number (§unseen-odds)", () => {
+    const section = siteSection(digestOf(chosen(itemArrival(), "assault-lethal-armed", "seen")));
+    expect(section).toContain("the party is out on the ground, not yet in a fight");
+    expect(section).toContain(
+      "the way in unseen you named: the captain took the other side; they were waiting for the party",
+    );
+    expect(section).not.toMatch(/\d/);
+  });
+
+  it("once the captain chose the marked side, says the roll at the narrator's own odds (§unseen-odds)", () => {
+    const worked = chosen(itemArrival(), "creep-holdFire-armed", "unseen", {
+      odds: 70,
+      worked: true,
+    });
+    expect(siteSection(digestOf(worked))).toContain(
+      "the way in unseen you named (70%): the captain took it and it worked; the people here did not see the party come",
+    );
+    const failed = chosen(itemArrival(), "creep-holdFire-armed", "seen", {
+      odds: 70,
+      worked: false,
+    });
+    const section = siteSection(digestOf(failed));
+    expect(section).toContain(
+      "the way in unseen you named (70%): the captain took it and it failed; they were waiting for the party",
+    );
+    // The odds are the section's only digits: the rest still has none.
+    expect(section.replace("(70%)", "")).not.toMatch(/\d/);
+  });
+
+  it("says nothing of a marked side taken with no roll (a mark saved before odds) until it is over", () => {
+    const section = siteSection(digestOf(chosen(itemArrival(), "creep-holdFire-armed", "unseen")));
+    expect(section).toContain("the party is out on the ground, not yet in a fight");
+    expect(section).not.toMatch(AFTER);
   });
 
   it("once it is over: nobody saw them come or go when the marked side went in and no fight started", () => {

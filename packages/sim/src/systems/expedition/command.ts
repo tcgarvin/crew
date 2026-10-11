@@ -22,14 +22,17 @@ import { configTicks } from "../../core/clock";
  *
  * **adoptPlan** chooses the plan for an expedition that has none (an available menu id) and picks
  * its party by the plan's squad rule; when the narrator marked a side (`markUnseen`) it writes
- * `Expedition.notice`: `unseen` for the marked plan, `seen` for any other, and nothing when no side
- * was marked. **withdrawParty** calls a party that is out back to the ramp (`orderWithdrawal`).
+ * `Expedition.notice`: for the marked plan it rolls the mark's odds once on the `narrator` stream
+ * (§unseen-odds), writes `Expedition.unseenRoll` and emits `unseenRolled`, and the notice is
+ * `unseen` if it worked and `seen` if not; `seen` for any other plan, and nothing when no side was
+ * marked. **withdrawParty** calls a party that is out back to the ramp (`orderWithdrawal`).
  *
  * **markUnseen** (D105, narrator and scenario) marks one side of the arrival card as the way in
  * unseen: valid while the expedition is under way with no plan, `decisionId` is its arrival card
  * (`Expedition.cards.arrival`) and still pending, `planId` is that card's `leftPlan` or
- * `rightPlan`, on the menu and not a `hold` plan, and nothing is marked yet. Apply writes
- * `Expedition.unseenPlanId`; nothing else changes until the captain chooses.
+ * `rightPlan`, on the menu and not a `hold` plan, `odds` a whole percent from 0 to 100, and nothing
+ * is marked yet. Apply writes `Expedition.unseenPlanId` and `unseenOdds`; nothing else changes
+ * until the captain chooses.
  *
  * Owner after the gate: W2 of expeditions A1 (extends the validation tests).
  */
@@ -48,7 +51,12 @@ import { clearDockside, dressDock } from "../../core/locals";
 import { isSite } from "../../core/places";
 import type { CommandOfKind, CommandRejection } from "../../core/types/commands";
 import type { ActorId, PortDefId } from "../../core/types/ids";
-import type { BattlePlan, PlanId } from "../../core/types/state";
+import {
+  type BattlePlan,
+  type Expedition,
+  type PlanId,
+  UNSEEN_ODDS_CERTAIN,
+} from "../../core/types/state";
 import { shipDeckId } from "../../core/world";
 import { planMenu } from "../../view/planMenu";
 import { attachDock, detachDock } from "../spatial/dock";
@@ -202,17 +210,43 @@ export const adoptPlan: CommandHandler<"adoptPlan", AdoptPlan> = {
     if (typeof chosen === "string") return fail(kind, "preconditionFailed", chosen);
     return ok({ plan: chosen, ...partyOf(ctx, chosen) });
   },
-  apply(ctx, _command, plan) {
+  apply(ctx, command, plan) {
     const expedition = ctx.state.expedition;
     if (expedition === undefined) throw new Error("validated expedition vanished");
     expedition.plan = planForErrand(ctx.state, expedition, plan.plan);
     expedition.party = [...plan.party];
     expedition.leaderId = plan.leaderId;
     const marked = expedition.unseenPlanId;
-    if (marked !== undefined) expedition.notice = marked === plan.plan.id ? "unseen" : "seen";
+    if (marked === undefined) return NO_TEMP_REFS;
+    expedition.notice =
+      marked === plan.plan.id && rollUnseen(ctx, command, expedition, marked) ? "unseen" : "seen";
     return NO_TEMP_REFS;
   },
 };
+
+/**
+ * §unseen-odds: the captain chose the marked side; roll its odds once on the seeded `narrator`
+ * stream, record the roll and say so (`unseenRolled`). Whether the party got in unseen.
+ */
+function rollUnseen(
+  ctx: ApplyCtx,
+  command: CommandOfKind<"adoptPlan">,
+  expedition: Expedition,
+  planId: PlanId,
+): boolean {
+  const decisionId = expedition.cards?.arrival;
+  if (decisionId === undefined) throw new Error("a marked way in without an arrival card");
+  const odds = expedition.unseenOdds ?? UNSEEN_ODDS_CERTAIN;
+  const worked = ctx.rng.chance("narrator", odds / 100);
+  expedition.unseenRoll = { odds, worked };
+  ctx.emit({
+    ...causedBy(command),
+    subjectIds: [decisionId],
+    type: "unseenRolled",
+    payload: { siteId: expedition.siteId, decisionId, planId, odds, worked },
+  });
+  return worked;
+}
 
 /** Why `planId` cannot be marked unseen on the expedition's arrival card `decisionId`, if not. */
 function unseenProblem(ctx: ValidateCtx, decisionId: string, planId: string): string | undefined {
@@ -242,20 +276,29 @@ function unseenProblem(ctx: ValidateCtx, decisionId: string, planId: string): st
   return undefined;
 }
 
-export const markUnseen: CommandHandler<"markUnseen", PlanId> = {
+interface UnseenMark {
+  readonly planId: PlanId;
+  readonly odds: number;
+}
+
+export const markUnseen: CommandHandler<"markUnseen", UnseenMark> = {
   validate(ctx, command) {
-    const { decisionId, planId } = command.payload;
+    const { decisionId, planId, odds } = command.payload;
     if (typeof decisionId !== "string" || typeof planId !== "string") {
       return fail("markUnseen", "invalidPayload", "decisionId and planId must be strings");
     }
+    if (typeof odds !== "number" || !Number.isInteger(odds) || odds < 0 || odds > 100) {
+      return fail("markUnseen", "invalidPayload", "odds must be a whole percent from 0 to 100");
+    }
     const problem = unseenProblem(ctx, decisionId, planId);
     if (problem !== undefined) return fail("markUnseen", "preconditionFailed", problem);
-    return ok(planId);
+    return ok({ planId, odds });
   },
-  apply(ctx, _command, planId) {
+  apply(ctx, _command, mark) {
     const expedition = ctx.state.expedition;
     if (expedition === undefined) throw new Error("validated expedition vanished");
-    expedition.unseenPlanId = planId;
+    expedition.unseenPlanId = mark.planId;
+    expedition.unseenOdds = mark.odds;
     return NO_TEMP_REFS;
   },
 };
