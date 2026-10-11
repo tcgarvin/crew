@@ -457,16 +457,21 @@ async function askModel(
   now: () => number,
   log: Readonly<Record<string, unknown>>,
 ): Promise<ModelResult> {
+  // The turn's first call gets the whole budget exactly; the clock may have ticked since the
+  // deadline was set, and every later call gets only what is left (§repair-turn).
+  let firstCall = firstAttempt;
   for (;;) {
     const offer = convo.offer(firstAttempt, deadline - now(), log);
     convo.lastCallStartedAt = now();
+    const timeoutMs = firstCall ? call.timeoutMs : Math.max(1, deadline - convo.lastCallStartedAt);
+    firstCall = false;
     let result: ModelResult;
     try {
       result = await callModel(transport, {
         ...call,
         continuation: convo.turns,
         tools: offer,
-        timeoutMs: Math.max(1, deadline - convo.lastCallStartedAt),
+        timeoutMs,
       });
     } catch (err) {
       if (!(err instanceof ToolsRejectedError)) throw err;
