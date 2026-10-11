@@ -65,7 +65,8 @@ hidden by run-ahead (D14), not solved.
 spawns, faults on machines with the kernel sampling the tick, messages through in-world channels,
 jobs within price bands, decisions, bounded nudges, and the few levers added since by owner
 approval. No command sets a body, health, position, knowledge or money directly. Adding a lever
-is an owner decision.
+is an owner decision. *The content ban ("No command sets…") is superseded by D106; the
+allow-list stands.*
 
 **D40. The narrator is the only source of work.** There is no deterministic job board; the
 narrator offers work when the captain looks for it, and the null narrator answers with a
@@ -111,6 +112,18 @@ never a `hold`, as the way in unseen (`markUnseen`); the captain still chooses, 
 the chosen side unseen or expected. Rejected: leaving noticing to the sim alone, which gives the
 story no way to set up a quiet way in, and letting the narrator choose the plan. See
 §getting-in-unseen, §unseen-lever.
+
+**D106. The narrator may decide outcomes; it may not do the impossible.** Owner: "the narrator
+can't do anything impossible. But it can and should influence the sim and bend it to its will when
+needed … The sim exists to service the narrative and bring it to life and to add some spice and
+structure, not to try to limit the narration." Supersedes D6's content ban and amends D103's
+"never scripted by the narrator": the allow-list stays, each command vetted by the translator and
+the kernel, but it may now set an outcome (a wound or death, a sum of money, a memory between two
+people, a roll's result, a fact learned). "Impossible" is the kernel's word: the actor exists and
+is alive, the post is on the map, the balance covers it. Odds on a card side are the narrator's
+stated chance, 0 to 100 and unclamped, rolled by the sim when the captain chooses. Rejected: a
+narrator that only sets things up, which left a planned death a hope; direct state writes with no
+allow-list. See `docs/design/narrator-arcs.md`.
 
 ## Play
 
