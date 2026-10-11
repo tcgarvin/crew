@@ -22,7 +22,7 @@ import { decisionShownTick, describeEvent } from "@crew/sim";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApiHealth } from "./health";
 import { type SimConnection, createSimConnection } from "./host/connection";
-import { devExpeditionCommand, devExpeditionFromSearch } from "./host/devExpedition";
+import { devStartCommand } from "./host/devExpedition";
 import { DirtQueue } from "./host/dirtQueue";
 import {
   type NarratorFailure,
@@ -522,19 +522,20 @@ export function App() {
       setTimeout(() => resolve(undefined), SERVER_OPEN_GRACE_MS),
     );
     // Dev only: `?expedition=<siteId>[&plan=<planId>]` starts a fresh game set down at that site,
-    // so a reload replays the fight rather than restoring the save it left behind.
-    const devExpedition = import.meta.env.DEV
-      ? devExpeditionFromSearch(window.location.search)
+    // and `?errand=<siteId>` one with an errand to that site on a card, so a reload replays it
+    // rather than restoring the save it left behind.
+    const devCommand = import.meta.env.DEV
+      ? devStartCommand(window.location.search, bundle, config.values, scenarioId)
       : undefined;
     void Promise.all([readLocalSave(), Promise.race([serverOpen, grace])]).then(
       ([local, opened]) => {
         if (disposed) return;
-        if (devExpedition !== undefined) {
+        if (devCommand !== undefined) {
           connection.send({
             type: "load",
             source: { kind: "scenario", scenarioId, seed: Math.floor(Math.random() * 1_000_000) },
           });
-          const command = devExpeditionCommand(devExpedition);
+          const command = devCommand;
           const requestId = nextRequestId();
           // Toasted on rejection like a player's command: a mistyped site or plan should show.
           playerCommands.current.set(requestId, command.kind);
@@ -569,7 +570,17 @@ export function App() {
       connection.dispose();
     };
     // `scenarioId`/`saveEveryTicks` come from the content bundle loaded once, so they never change.
-  }, [scenarioId, saveEveryTicks, bundle, showToast, applyPause, onSetSpeed, request, sendCommand]);
+  }, [
+    scenarioId,
+    saveEveryTicks,
+    bundle,
+    config.values,
+    showToast,
+    applyPause,
+    onSetSpeed,
+    request,
+    sendCommand,
+  ]);
 
   // -------------------------------------------------------------- pause
   const onTogglePause = useCallback(() => {
