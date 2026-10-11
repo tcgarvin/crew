@@ -1407,6 +1407,21 @@ describe("the notes turn (§notes-turn)", () => {
     expect(notesRun.notes.cast.map((c) => c.name)).toEqual(["Halla Iyer"]);
   });
 
+  it("runs the notes turn on its own model and effort when given, the plan on the story's (§models-and-reasoning-effort)", async () => {
+    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan())));
+    const run = await runNarratorWithTrace(captainAshoreRequest(content()), {
+      ...ctx(transport),
+      model: "story/model",
+      reasoningEffort: "low",
+      notesModel: "notes/model",
+      notesReasoningEffort: "high",
+    });
+    await run.notesTurn?.();
+    const [planCall, notesCall] = transport.calls;
+    expect(planCall).toMatchObject({ model: "story/model", reasoningEffort: "low" });
+    expect(notesCall).toMatchObject({ model: "notes/model", reasoningEffort: "high" });
+  });
+
   it("tells the notes turn to write a thread a beat card started", async () => {
     const beat = {
       ...stranger,

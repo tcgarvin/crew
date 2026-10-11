@@ -37,6 +37,10 @@ export interface NarratorCtx {
    * `stageDock`).
    */
   readonly reasoningEffort: ReasoningEffort;
+  /** §models-and-reasoning-effort: `CREW_NOTES_MODEL`; absent = this call's model. */
+  readonly notesModel?: string;
+  /** §models-and-reasoning-effort: `CREW_NOTES_REASONING_EFFORT`; absent = `reasoningEffort`. */
+  readonly notesReasoningEffort?: ReasoningEffort;
   /** §repair-turn: `CREW_NARRATOR_REPAIRS`; absent = the narrator's default. */
   readonly maxRepairs?: number;
   /** §notes-turn-tools: `CREW_NARRATOR_TOOL_ROUNDS`; absent = the narrator's default. */
@@ -110,6 +114,10 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
     reasoningEffort: ctx.reasoningEffort,
+    ...(ctx.notesModel === undefined ? {} : { notesModel: ctx.notesModel }),
+    ...(ctx.notesReasoningEffort === undefined
+      ? {}
+      : { notesReasoningEffort: ctx.notesReasoningEffort }),
     ...(ctx.maxRepairs === undefined ? {} : { maxRepairs: ctx.maxRepairs }),
     ...(ctx.maxToolRounds === undefined ? {} : { maxToolRounds: ctx.maxToolRounds }),
   });

@@ -8,7 +8,9 @@
  *
  * Without `CREW_PLAN_SAMPLES` (or without an `OPENROUTER_API_KEY`) the suite is skipped, so the
  * ordinary `pnpm test:live` is unchanged. `CREW_PLAN_OUT` names a file to write the samples to as
- * JSON, beside the console log.
+ * JSON, beside the console log. `CREW_NOTES_REASONING_EFFORT` sets the notes turn's effort alone
+ * (§models-and-reasoning-effort; unset = the story call's), and each sample prints its turns'
+ * latency and tokens, so efforts can be compared on quality, time and cost.
  */
 import { existsSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -23,6 +25,7 @@ import {
   runNarratorWithTrace,
 } from "../run";
 import { content } from "../test-support";
+import { REASONING_EFFORTS, type ReasoningEffort } from "../transport";
 
 const ENV_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "../../.env.local");
 if (process.env.OPENROUTER_API_KEY === undefined && existsSync(ENV_FILE)) {
@@ -34,6 +37,14 @@ if (Number.isNaN(samples) || samples < 0) {
   throw new Error(`Invalid CREW_PLAN_SAMPLES: ${process.env.CREW_PLAN_SAMPLES}`);
 }
 const model = process.env.CREW_NARRATOR_MODEL ?? DEFAULT_NARRATOR_MODEL;
+
+function readNotesEffort(raw: string | undefined): ReasoningEffort {
+  if (raw === undefined || raw === "") return DEFAULT_NARRATOR_REASONING_EFFORT;
+  const effort = REASONING_EFFORTS.find((e) => e === raw);
+  if (effort === undefined) throw new Error(`Invalid CREW_NOTES_REASONING_EFFORT: ${raw}`);
+  return effort;
+}
+const notesEffort = readNotesEffort(process.env.CREW_NOTES_REASONING_EFFORT);
 
 function beat(name: string, what: string, tension: string, decided: boolean, status = "planned") {
   return {
@@ -263,12 +274,13 @@ function renderIntents(plan: unknown): string[] {
 
 const suite = apiKey === "" || samples === 0 ? describe.skip : describe;
 
-suite(`plan quality (${model}, ${samples} samples a case)`, () => {
+suite(`plan quality (${model}, notes effort ${notesEffort}, ${samples} samples a case)`, () => {
   it("samples the notes turn's sketches on each case", async () => {
     const transport = openRouterTransport({ apiKey, appTitle: "Crew plan-quality harness" });
     const jobs = CASES.flatMap((c) => Array.from({ length: samples }, (_, n) => ({ c, n }))).map(
       async ({ c, n }) => {
         const req = c.request();
+        const planStarted = Date.now();
         const run = await runNarratorWithTrace(req, {
           gameId: req.gameId,
           content: content(),
@@ -276,22 +288,37 @@ suite(`plan quality (${model}, ${samples} samples a case)`, () => {
           model,
           notes: c.notes,
           reasoningEffort: DEFAULT_NARRATOR_REASONING_EFFORT,
+          notesReasoningEffort: notesEffort,
         });
+        const planMs = Date.now() - planStarted;
         if (run.notesTurn === undefined) {
           return { case: c.name, n, error: `no notes turn: ${run.error ?? run.response.fallback}` };
         }
+        const notesStarted = Date.now();
         const notes = await run.notesTurn();
-        if (!notes.ok) return { case: c.name, n, error: `${notes.reason}: ${notes.error}` };
+        const notesMs = Date.now() - notesStarted;
+        const cost = {
+          planMs,
+          planUsage: run.response.usage,
+          notesMs,
+          ...(notes.ok ? { notesUsage: notes.usage } : {}),
+          notesToolCalls: notes.toolCalls.length,
+          notesRepairs: notes.repairs.length,
+        };
+        if (!notes.ok) {
+          return { case: c.name, n, cost, error: `${notes.reason}: ${notes.error}` };
+        }
         const plan = notes.notes.plan as unknown as Record<string, StoredSketch>;
         const text = [
           `=== ${c.name} #${n + 1}`,
+          `plan ${planMs} ms, ${run.response.usage?.inputTokens ?? 0} in / ${run.response.usage?.outputTokens ?? 0} out; notes ${notesMs} ms, ${notes.usage.inputTokens} in / ${notes.usage.outputTokens} out, ${cost.notesToolCalls} tool calls, ${cost.notesRepairs} repairs`,
           `rationale: ${run.trace.plan?.rationale ?? ""}`,
           ...renderIntents(run.trace.plan),
           ...renderSketch("SEASON", plan.season),
           ...renderSketch("ARC", plan.arc),
           ...renderSketch("EPISODE", plan.episode),
         ].join("\n");
-        return { case: c.name, n, text, intents: run.trace.plan, plan: notes.notes.plan };
+        return { case: c.name, n, text, cost, intents: run.trace.plan, plan: notes.notes.plan };
       },
     );
     const results = await Promise.all(jobs);

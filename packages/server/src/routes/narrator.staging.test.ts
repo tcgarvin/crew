@@ -244,4 +244,28 @@ describe("POST /api/games/:id/narrator, stageDock (§staging-call-on-the-server)
     await post(storyBody(gameId, 5000));
     expect(seen[0]?.timeoutMs).toBeUndefined();
   });
+
+  it("hands a story call the notes turn's model and effort, and a staging call neither (§models-and-reasoning-effort)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const seen: NarratorCtx[] = [];
+    const { gameId, post } = await setup(
+      loadEnv({
+        CREW_DB: "memory",
+        CREW_NARRATOR_MODEL: "story/model",
+        CREW_NOTES_MODEL: "notes/model",
+        CREW_NOTES_REASONING_EFFORT: "high",
+      }),
+      realNarrator(staged, seen),
+    );
+    await post(storyBody(gameId, 5000));
+    await post(stagingBody(gameId, 6000));
+    expect(seen[0]).toMatchObject({
+      model: "story/model",
+      reasoningEffort: "low",
+      notesModel: "notes/model",
+      notesReasoningEffort: "high",
+    });
+    expect(seen[1]?.notesModel).toBeUndefined();
+    expect(seen[1]?.notesReasoningEffort).toBeUndefined();
+  });
 });
