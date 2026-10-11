@@ -3,9 +3,10 @@
 Bodies and arms, landing sites, and the fight a party walks into when the ship sets down at one.
 Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
 `systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*` and `expedition.*` in
-`packages/content/data/config/default.json`. Until the captain's card exists (phase A2) an
-expedition starts only from `scenarioStartExpedition`, and the narrator never sees a site
-(§the-narrator-and-sites). The owner's rulings that shape all of it are D103.
+`packages/content/data/config/default.json`. An expedition starts when the ship sets down at a
+site for an errand (§errand-job, §the-arrival-card), or from `scenarioStartExpedition` in tests and
+dev tools; what the narrator sees and may do is §the-narrator-and-sites. The owner's rulings that
+shape it are D103, D104 and D105.
 
 ## Bodies
 
