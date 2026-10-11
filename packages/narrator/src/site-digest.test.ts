@@ -103,7 +103,7 @@ describe("buildDigest: At the site (expeditions A2, §10.2)", () => {
       a.roleTags.includes("firstOfficer"),
     );
     expect(text).toContain(
-      `At Harrow End (brought by ${firstOfficer?.name}): ${firstOfficer?.name} at the ramp head: ${FIXTURE_ERRAND_TARGET} is at Harrow End, and not alone. Hold the ramp from cover, or go in and take them? Left: "Hold the ramp from cover". Right: "Go in and take them".`,
+      `At Harrow End (brought by ${firstOfficer?.name}): ${FIXTURE_ERRAND_TARGET} is at Harrow End, and not alone. Hold the ramp from cover, or go in and take them? Left: "Hold the ramp from cover". Right: "Go in and take them".`,
     );
     expect(text).toContain(`; ${firstOfficer?.name} brings it: write the card in their voice`);
   });

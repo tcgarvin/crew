@@ -9,6 +9,7 @@ import {
   describeEvent,
   doorOpenFraction,
   formatEta,
+  isTickerEvent,
   renderItems,
   renderTravel,
   shipHeadline,
@@ -17,6 +18,7 @@ import {
 import { EVENT_SIGNIFICANCE, type SimEvent } from "./types/events";
 import type {
   ActorId,
+  DecisionId,
   EventId,
   HazardId,
   ItemId,
@@ -151,7 +153,7 @@ describe("shipHeadline", () => {
       passage,
     };
     world.state.travel = { stage: "docked", portId: TINY.port, plannedDestinationId: TINY.port2 };
-    expect(headline(world.state)).toBe("Waiting for Mara Voss — docked at tiny dock");
+    expect(headline(world.state)).toBe("Waiting for Mara Voss — docked at Tiny Dock");
     // Ended passages (left behind) no longer hold the headline.
     passage.endReason = "leftBehind";
     expect(headline(world.state)).toBe("Preparing to depart for Far Dock");
@@ -543,6 +545,58 @@ describe("expeditions A2: setting down, lifting off, and the errand's lines", ()
     expect(headline(world.state, content)).toBe(
       "Set down at Tiny Dock — lifting off for Beyond Dock",
     );
+  });
+
+  it("at the port a job starts from, is preparing to depart on the voyage, not stopping on the way", () => {
+    const { world, content } = withSite(TINY.port3);
+    world.state.jobs[JOB] = { ...job("accepted"), fromPortId: TINY.port, toPortId: TINY.port };
+    world.state.travel = {
+      stage: "docked",
+      portId: TINY.port,
+      plannedDestinationId: TINY.port2,
+      voyageDestinationId: TINY.port3,
+    };
+    expect(headline(world.state, content)).toBe(
+      "Preparing to depart for Far Dock, bound for Beyond Dock",
+    );
+    world.state.jobs[JOB] = { ...job("inTransit"), fromPortId: TINY.port, toPortId: TINY.port };
+    expect(headline(world.state, content)).toMatch(/^Stopping at Tiny Dock on the way to /);
+  });
+
+  it("tells setting down and lifting off in the stage lines, and keeps the header steady until contact", () => {
+    const { world, content } = withSite(TINY.port2);
+    underway(world.state, "docking");
+    const stage = (to: "docking" | "undocking") =>
+      describeEvent(
+        {
+          id: "e.stage" as EventId,
+          tick: 1,
+          seq: 1,
+          subjectIds: [],
+          causeIds: [],
+          source: "sim",
+          type: "travelStageChanged",
+          significance: "trace",
+          payload: { from: "approaching", to },
+        } as SimEvent,
+        world.state,
+        content,
+      );
+    expect(stage("docking")).toBe("Setting down");
+    world.state.travel = { stage: "docked", portId: TINY.port2 };
+    expect(
+      isTickerEvent({
+        id: "e.p" as EventId,
+        tick: 1,
+        seq: 1,
+        subjectIds: [],
+        causeIds: [],
+        source: "sim",
+        type: "policyDecisionNeeded",
+        significance: "narrative",
+        payload: { decisionId: "d1" as DecisionId },
+      }),
+    ).toBe(false);
   });
 
   describe("the ticker", () => {

@@ -329,6 +329,7 @@ function returned(fight: Fight, party: readonly Actor[]): boolean {
 
 interface Tally {
   readonly woundsUs: number;
+  readonly hurtUs: number;
   readonly woundsThem: number;
   readonly deadUs: number;
   readonly deadThem: number;
@@ -337,6 +338,7 @@ interface Tally {
 function tally(fight: Fight): Tally {
   const since = fight.expedition.startedTick;
   let woundsUs = 0;
+  let hurtUs = 0;
   let woundsThem = 0;
   let deadUs = 0;
   let deadThem = 0;
@@ -345,13 +347,14 @@ function tally(fight: Fight): Tally {
     const dead = p.availability === "dead" ? 1 : 0;
     if (isParty(p)) {
       woundsUs += wounds;
+      if (wounds > 0 && dead === 0) hurtUs += 1;
       deadUs += dead;
     } else {
       woundsThem += wounds;
       deadThem += dead;
     }
   }
-  return { woundsUs, woundsThem, deadUs, deadThem };
+  return { woundsUs, hurtUs, woundsThem, deadUs, deadThem };
 }
 
 function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | undefined): void {

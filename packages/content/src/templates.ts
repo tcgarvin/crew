@@ -185,32 +185,30 @@ function lowerFirst(text: string): string {
 }
 
 /**
- * The arrival card: "Sunniva Brandt at the ramp head: Corran Vale is at the Boathouse, and not
- * alone. Hold the ramp from cover, or go in and take them?" Params: `speaker`, `target`, `site`,
- * and the two plans' `leftLabel` and `rightLabel`. No numbers.
+ * The arrival card: "Corran Vale is at the Boathouse, and not alone. Hold the ramp from cover, or
+ * go in and take them?" Params: `speaker` (on the card's own speaker line, so not named here),
+ * `target`, `site`, and the two plans' `leftLabel` and `rightLabel`. No numbers.
  */
 function arrivalSituation(p: Params, c: ContentBundle | undefined): string {
-  const speaker = p.speaker === undefined ? "" : `${p.speaker} at the ramp head: `;
   const target = p.target === undefined ? "Whoever we came for" : String(p.target);
   const question =
     p.leftLabel !== undefined && p.rightLabel !== undefined
       ? `${p.leftLabel}, or ${lowerFirst(String(p.rightLabel))}?`
       : "Hold the ramp, or go in?";
-  return `${speaker}${target} is at ${placeLabel(p.site, c)}, and not alone. ${question}`;
+  return `${target} is at ${placeLabel(p.site, c)}, and not alone. ${question}`;
 }
 
 /** How the turn card says what happened to `name` (`params.how`; anything else is "breaking"). */
 const TURN_HOW = new Set(["breaking", "down", "dead"]);
 
 /**
- * The turn card: "Sunniva Brandt: Hesk Marrow is breaking. Press on, or pull back?" Params:
- * `speaker`, `name` (who broke or went down) and `how` (`breaking`, `down` or `dead`).
+ * The turn card: "Hesk Marrow is breaking. Press on, or pull back?" Params: `speaker` (on the
+ * card's speaker line), `name` (who broke or went down) and `how` (`breaking`, `down` or `dead`).
  */
 function turnSituation(p: Params): string {
-  const speaker = p.speaker === undefined ? "" : `${p.speaker}: `;
   const name = p.name === undefined ? "One of them" : String(p.name);
   const how = TURN_HOW.has(String(p.how)) ? String(p.how) : "breaking";
-  return `${speaker}${name} is ${how}. Press on, or pull back?`;
+  return `${name} is ${how}. Press on, or pull back?`;
 }
 
 /**

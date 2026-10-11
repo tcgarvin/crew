@@ -272,7 +272,7 @@ describe("null narrator and errands (expeditions A2, plan call 14)", () => {
     );
     expect(res.card).toMatchObject({
       title: "The fight turns",
-      situation: "Dane Whitcross: Mattie Lusk is down. Press on, or pull back?",
+      situation: "Mattie Lusk is down. Press on, or pull back?",
       leftLabel: "Press on",
       rightLabel: "Pull back to the ship",
     });

@@ -394,7 +394,7 @@ describe("expedition card templates (expeditions A2, calls 4 and 15)", () => {
     expect(text.title).toBe("At the Boathouse");
     expect(text.speaker).toBe("Sunniva Brandt");
     expect(text.situation).toBe(
-      "Sunniva Brandt at the ramp head: Corran Vale is at the Boathouse, and not alone. Hold the ramp from cover, or go in and take them?",
+      "Corran Vale is at the Boathouse, and not alone. Hold the ramp from cover, or go in and take them?",
     );
     expect(text.leftLabel).toBe("Hold the ramp from cover");
     expect(text.rightLabel).toBe("Go in and take them");
@@ -408,7 +408,7 @@ describe("expedition card templates (expeditions A2, calls 4 and 15)", () => {
     const text = turn({ jobId: "j1", speaker: "Sunniva Brandt", name: "Hesk Marrow" });
     expect(text.title).toBe("The fight turns");
     expect(text.speaker).toBe("Sunniva Brandt");
-    expect(text.situation).toBe("Sunniva Brandt: Hesk Marrow is breaking. Press on, or pull back?");
+    expect(text.situation).toBe("Hesk Marrow is breaking. Press on, or pull back?");
     expect(text.leftLabel).toBe("Press on");
     expect(text.rightLabel).toBe("Pull back to the ship");
     expect(text.leftAftermath).toBeTruthy();
