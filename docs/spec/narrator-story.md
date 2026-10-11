@@ -196,8 +196,9 @@ card, and the narrator is responsible for its own arcs.
   ("a thread closes once"). A title matching no stored thread does not drop the card: it goes up
   closing nothing and the model is told. Why: models wrote the offer's title or the issuer's name,
   and the captain lost the ending.
-- The `notableEvent` hook names `contractCompleted` and `passageEnded` as the moment for a job's
-  closing card, or the next call if a card is already waiting.
+- The `notableEvent` hook names `contractCompleted`, `passageEnded` and a failed errand's
+  `jobFailed` as the moment for a job's closing card, or the next call if a card is already
+  waiting.
 
 ### Thread keeping and retirement
 
@@ -346,10 +347,15 @@ designer reasons about:
 - Hooks: `captainAshore` expects an offer from someone who fits the port, a deliberately rare
   "nothing", and a different kind of story than the past arcs; `requestedCall` is where a leg gets
   its beat; aftermath calls (`alertCleared`, `navHazard`, `faultRepaired`) belong to the people in
-  them and add no new pressure; `policyDecision` dresses the existing card.
+  them and add no new pressure, and so does `expeditionResolved`, the site's aftermath (the party,
+  the captive, the hurt, the crew on an execution); `policyDecision` dresses the existing card.
 - An errand is a story about a person; who is at the site is the sim's, and so is the fight. A
-  kill job is rare and its issuer never clean; errands are occasional among freight and passages.
-  On `policyDecision` the arrival and turn cards are dressed, never replaced.
+  kill job is rare and its issuer never clean, and its target taken alive is executed at the
+  scene; errands are occasional among freight and passages. Putting off an errand's captive fails
+  the errand, so a card offers it only when giving up the job is the real choice. On
+  `policyDecision` the arrival and turn cards are dressed, never replaced: each side's aftermath is
+  one concrete line of what the crew do next, in the speaker's voice, and the turn card (our side's
+  setback) is never the captain's to bring.
 
 ## Staging prompt
 

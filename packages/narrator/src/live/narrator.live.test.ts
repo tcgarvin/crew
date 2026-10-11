@@ -13,6 +13,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { DecisionId } from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest, NarratorResponse } from "../contract";
 import {
@@ -25,6 +26,7 @@ import {
   quietTooLongRequest,
   requestedCallRequest,
   siteArrivalRequest,
+  siteTurnRequest,
   stageDockRequest,
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
@@ -211,6 +213,19 @@ function callBackOf(run: NarratorRun): string {
   const plan = run.trace.plan;
   if (plan === undefined || !("callBack" in plan)) return "none";
   return JSON.stringify(plan.callBack);
+}
+
+/** A dressed card's player-facing text, every field, for the no-numbers check. */
+function playerText(card: NarratorResponse["card"]): string {
+  if (card === undefined) return "";
+  return [
+    card.title,
+    card.situation,
+    card.leftLabel,
+    card.rightLabel,
+    card.leftAftermath,
+    card.rightAftermath,
+  ].join("\n");
 }
 
 /** The checks every hook shares: the model answered, the plan parsed, nothing fell back. */
@@ -451,6 +466,37 @@ suite(
         );
         expect(response.card?.speaker?.toLowerCase()).toBe(firstOfficer?.name.toLowerCase());
         expect(response.commands.filter((c) => c.kind === "surfaceDecision")).toEqual([]);
+        expect(playerText(response.card), "a digit on the card").not.toMatch(/\d/);
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "policyDecision: the turn card when one of ours is down, brought by the first officer, sides kept (expeditions A2)",
+      async () => {
+        const request = siteTurnRequest(content());
+        const run = await liveRun(request);
+        const response = expectModelAnswered(run);
+        if (request.hook.kind !== "policyDecision") throw new Error("fixture hook kind");
+        const decisionId = request.hook.context.decisionId;
+        expect(
+          response.card,
+          `no card translated (rejections: ${JSON.stringify(response.notesUpdate?.lastRejections)})`,
+        ).toBeDefined();
+        expect(response.card?.decisionId).toBe(decisionId);
+        console.log("turn card:", JSON.stringify(response.card, null, 2));
+        const captain = captainName(request.snapshot, content());
+        expect(response.card?.speaker, "card has no speaker").toBeDefined();
+        expect(response.card?.speaker?.toLowerCase()).not.toBe(captain?.toLowerCase());
+        const decision = request.snapshot.state.decisions.records[decisionId as DecisionId];
+        expect(response.card?.speaker?.toLowerCase()).toBe(
+          String(decision?.prompt.params.speaker).toLowerCase(),
+        );
+        // The card is dressed, never replaced: no new card, and the sides' commands are the sim's.
+        expect(response.commands.filter((c) => c.kind === "surfaceDecision")).toEqual([]);
+        expect(decision?.left.commands).toEqual([]);
+        expect(decision?.right.commands).toEqual([{ kind: "withdrawParty", payload: {} }]);
+        expect(playerText(response.card), "a digit on the card").not.toMatch(/\d/);
       },
       LIVE_TIMEOUT_MS,
     );
