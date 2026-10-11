@@ -4,6 +4,7 @@
 import { loadBundle } from "@crew/content";
 import type { ContentBundle } from "@crew/sim";
 import type { NarratorPlan, NarratorRequest, NarratorResponse, WrittenNotes } from "./contract";
+import { REPAIR_HEADING } from "./model-call";
 import { type RunNarratorCtx, runNarratorWithTrace } from "./run";
 import type { ModelResult, ModelTransport } from "./transport";
 
@@ -64,7 +65,9 @@ function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): M
   }
   if (parsed === null || typeof parsed !== "object" || !("notes" in parsed)) return result;
   const { notes, ...plan } = parsed as Record<string, unknown>;
-  const notesTurn = request.continuation.length > 0;
+  // §repair-turn: a repair request continues the plan's own turn, not the notes turn.
+  const last = request.continuation.at(-1);
+  const notesTurn = last !== undefined && !last.content.startsWith(REPAIR_HEADING);
   return { ...result, content: JSON.stringify(notesTurn ? notes : withCallBack(plan)) };
 }
 

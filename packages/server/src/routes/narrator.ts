@@ -142,7 +142,11 @@ async function finishNotesTurn(
         outputTokens: run.usage.outputTokens,
         latencyMs,
         status: "ok",
-        response: { notes: run.notes, usage: run.usage },
+        response: {
+          notes: run.notes,
+          usage: run.usage,
+          ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
+        },
         error: null,
       });
       return;
@@ -154,7 +158,13 @@ async function finishNotesTurn(
       outputTokens: null,
       latencyMs,
       status: "error",
-      response: run.rawContent === undefined ? null : { rawContent: run.rawContent },
+      response:
+        run.rawContent === undefined && run.repairs.length === 0
+          ? null
+          : {
+              ...(run.rawContent === undefined ? {} : { rawContent: run.rawContent }),
+              ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
+            },
       error: `${run.reason}: ${run.error}`,
     });
   } catch (err) {
@@ -331,7 +341,10 @@ export function registerNarratorRoutes(
         model: staging ? env.stagingModel : env.narratorModel,
         reasoningEffort: staging ? env.stagingReasoningEffort : env.narratorReasoningEffort,
         ...(staging ? { timeoutMs: env.stagingTimeoutMs } : {}),
+        maxRepairs: env.narratorRepairs,
       });
+      // §repair-turn: repairs ride in the logged response jsonb (no column of their own).
+      const repairs = outcome.repairs ?? [];
       const response: NarratorResponse = outcome.response;
       const latencyMs = Date.now() - startedAt;
       const failure = narratorFailure(outcome);
@@ -350,6 +363,7 @@ export function registerNarratorRoutes(
           promptVersion: response.promptVersion,
           latencyMs,
           status: "error",
+          ...(repairs.length === 0 ? {} : { response: { repairs } }),
           error: `${failure.reason}: ${failure.message}`,
         });
         const retryable = isRetryableFailure(failure);
@@ -370,7 +384,7 @@ export function registerNarratorRoutes(
         outputTokens: response.usage?.outputTokens ?? null,
         latencyMs,
         status: "ok",
-        response,
+        response: repairs.length === 0 ? response : { ...response, repairs },
         error: null,
       });
       // §staging-call-on-the-server: the staging call never writes notes (the narrator sends none

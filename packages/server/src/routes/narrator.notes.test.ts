@@ -74,6 +74,7 @@ function realNarrator(transport: ModelTransport, notesSeen: unknown[] = []): Run
       response: run.response,
       ...(run.error === undefined ? {} : { error: run.error }),
       ...(run.notesTurn === undefined ? {} : { notesTurn: run.notesTurn }),
+      ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
     };
   };
 }
@@ -110,9 +111,43 @@ describe("POST /api/games/:id/narrator, the notes turn (§notes-turn)", () => {
     const [notesRow] = await db.listNarratorCalls({ gameId, hookKind: NOTES_HOOK_KIND, limit: 5 });
     expect(notesRow?.status).toBe("error");
     expect(notesRow?.error).toContain("schemaInvalid");
+    // §repair-turn: the notes reply was handed back twice before the turn gave up.
+    expect((notesRow?.response as { repairs: unknown[] }).repairs).toHaveLength(2);
     const game = await db.getGame(gameId);
     expect(game?.narrativeNotes).not.toBeNull();
     expect(parseNotes(game?.narrativeNotes).summary).not.toBe(WRITTEN.summary);
+  });
+
+  it("records the story call's repairs in its logged response, not in the reply (§repair-turn)", async () => {
+    let planCalls = 0;
+    const transport: ModelTransport = async (request) => {
+      const notesTurn =
+        request.continuation.at(-1)?.content.startsWith("# Now your notes") === true;
+      if (!notesTurn) planCalls += 1;
+      const plan = planCalls === 1 ? "{" : JSON.stringify(PLAN);
+      return {
+        model: request.model,
+        content: notesTurn ? JSON.stringify(WRITTEN) : plan,
+        finish: "stop",
+        usage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
+        reasoningDetails: [],
+      };
+    };
+    const { db, gameId, post } = await setUp(realNarrator(transport));
+    const res = await post(quietTooLongRequest(content()));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.repairs).toBeUndefined();
+    const [storyRow] = await db.listNarratorCalls({ gameId, kind: "story", limit: 1 });
+    expect(storyRow?.status).toBe("ok");
+    expect((storyRow?.response as { repairs: unknown[] }).repairs).toEqual([
+      { attempt: 1, problems: [expect.stringContaining("not valid JSON")] },
+    ]);
   });
 
   it("waits for a pending notes turn and hands the call the notes it wrote", async () => {
