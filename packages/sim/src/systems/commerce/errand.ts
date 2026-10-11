@@ -3,8 +3,14 @@
  * (`checkErrandBand`, `jobs.ts`) and by the narrator's translator, so the two cannot drift; the
  * narrator imports it from `@crew/sim`, never the reverse.
  *
- * Owner after the gate: W1 of expeditions A2 (the number). The gate's formula is the passenger
- * fare's over the `errand` band: per unit of path distance, there and back.
+ * The number is the passenger fare's shape over its own band: `priceBands.errand` credits per unit
+ * of path distance, there and back, with no per-head or per-crate factor (one target, one item).
+ * At the default 6..12 a first errand from the Hub (via Green Meridian to Harrow End and back, 130)
+ * is 780..1560, 1170 at the standard tier: about one and a half plain freight jobs out of the Hub
+ * (four general crates to Green Meridian at the standard tier is 630), before the three dockings'
+ * fees the round trip costs.
+ *
+ * Owner after the gate: W1 of expeditions A2.
  */
 import type { ConfigDef } from "../../core/types/content";
 
