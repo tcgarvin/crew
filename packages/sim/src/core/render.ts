@@ -453,9 +453,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
         : `${worker} carried ${n.item(haul.itemId)} ashore`;
     }
     case "travelStageChanged":
-      return (n.atSite() ? SITE_STAGE_LINES[event.payload.to] : undefined) ??
+      return (
+        (n.atSite() ? SITE_STAGE_LINES[event.payload.to] : undefined) ??
         STAGE_LINES[event.payload.to] ??
-        null;
+        null
+      );
     case "departed":
       return n.isSite(event.payload.fromPortId)
         ? `Lifted off from ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`
