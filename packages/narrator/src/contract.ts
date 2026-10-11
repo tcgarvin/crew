@@ -42,12 +42,23 @@ import {
   WOUND_SEVERITIES,
 } from "@crew/sim";
 import { z } from "zod";
-import { type NarratorNotes, THREAD_SCALES, type Thread } from "./notes";
+import {
+  BEAT_TENSIONS,
+  type NarratorNotes,
+  PLAN_TIERS,
+  TEMPOS,
+  THREAD_SCALES,
+  type Thread,
+} from "./notes";
+import type { BeatAttribution } from "./story-plan";
 
 export type {
+  ArcSketch,
   CardShown,
   NarratorCastEntry,
   NarratorNotes,
+  PlannedBeat,
+  StoryPlan,
   Thread,
   ThreadScale,
   WrittenThread,
@@ -249,6 +260,12 @@ export const HAZARD_OUTCOMES = ["", ...FORCED_HAZARD_OUTCOMES] as const;
 
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
+  /**
+   * §beat-attribution: the episode beat an intent serves, copied from "Your plan", empty for none.
+   * Described once (on surfaceDecision, and in the prompt): it is on every intent, and the schema
+   * rides in every call's prompt under D53's budget.
+   */
+  const beat = z.string();
   const decisionSide = z.strictObject({
     label: z.string().describe("What the captain says or does, two to six words."),
     /**
@@ -270,6 +287,7 @@ export function buildNarratorPlanSchema() {
   // §cards-never-mention-pay: nobody talks pay.
   const offerJob = z.strictObject({
     kind: z.literal("offerJob"),
+    beat,
     issuerName: z.string().describe("Given and family name."),
     issuerRole: z.string().describe("What they do, lower case."),
     issuerOrg: z.string().describe(`Who they work for; ${EMPTY_FOR_NONE}.`),
@@ -313,6 +331,7 @@ export function buildNarratorPlanSchema() {
   // instead.
   const spawnAtBoundary = z.strictObject({
     kind: z.literal("spawnAtBoundary"),
+    beat,
     port: port,
     store: idOf("Store key of that port"),
     cargoItem: idOf("Item id"),
@@ -321,6 +340,7 @@ export function buildNarratorPlanSchema() {
 
   const scheduleFault = z.strictObject({
     kind: z.literal("scheduleFault"),
+    beat,
     machine: idOf("Machine id"),
     faultKey: idOf("faultKey of that machine"),
     window: z.enum(FAULT_WINDOWS),
@@ -330,6 +350,7 @@ export function buildNarratorPlanSchema() {
   // fires. The hazard's own kind is `hazard` because `kind` is the intent's discriminant.
   const scheduleHazard = z.strictObject({
     kind: z.literal("scheduleHazard"),
+    beat,
     hazard: z.enum(HAZARD_KINDS),
     difficulty: z.enum(HAZARD_DIFFICULTIES),
     window: z.enum(FAULT_WINDOWS),
@@ -340,6 +361,7 @@ export function buildNarratorPlanSchema() {
   // narrator's chosen outcomes; the translator resolves each target by name and caps the count.
   const scheduleField = z.strictObject({
     kind: z.literal("scheduleField"),
+    beat,
     severity: z.enum(FIELD_SEVERITIES),
     detection: z.enum(FIELD_DETECTIONS),
     window: z.enum(FAULT_WINDOWS),
@@ -359,6 +381,7 @@ export function buildNarratorPlanSchema() {
   // themselves.
   const stockMarket = z.strictObject({
     kind: z.literal("stockMarket"),
+    beat,
     port: port,
     cargoItem: idOf("Item id"),
     count: z.enum(STOCK_COUNTS),
@@ -369,6 +392,7 @@ export function buildNarratorPlanSchema() {
   // the fields, so the descriptions stay short.
   const strike = z.strictObject({
     kind: z.literal("strike"),
+    beat,
     who: z.string().describe("Full name as the digest lists them."),
     severity: z.enum(WOUND_SEVERITIES),
     type: z.enum(DAMAGE_TYPES),
@@ -380,6 +404,7 @@ export function buildNarratorPlanSchema() {
   // §money-levers: a sum into (positive) or out of (negative) the ship's money.
   const transact = z.strictObject({
     kind: z.literal("transact"),
+    beat,
     amount: z.number().describe("Credits, + into the ship's money, - out of it. Never 0."),
     memo: z.string().describe("What it is for, a few words."),
     counterparty: z.string().describe(`Who pays or is paid; ${EMPTY_FOR_NONE}.`),
@@ -390,6 +415,7 @@ export function buildNarratorPlanSchema() {
   const fullName = z.string().describe("Full name.");
   const plantMemory = z.strictObject({
     kind: z.literal("plantMemory"),
+    beat,
     from: z.string().describe("Who remembers, full name."),
     to: fullName,
     key: z.enum(NARRATOR_MEMORY_KEYS),
@@ -397,18 +423,25 @@ export function buildNarratorPlanSchema() {
   });
   const fallOut = z.strictObject({
     kind: z.literal("fallOut"),
+    beat,
     a: fullName,
     b: fullName,
     over: z.string().describe("Who or what, a few words."),
   });
   const giveThought = z.strictObject({
     kind: z.literal("giveThought"),
+    beat,
     who: fullName,
     key: idOf("Thought key"),
     ref: z.string().describe(`About whom, full name; ${EMPTY_FOR_NONE}.`),
   });
   const faultNow = <K extends "reveal" | "injectFault">(kind: K) =>
-    z.strictObject({ kind: z.literal(kind), machine: idOf("Machine id"), faultKey: z.string() });
+    z.strictObject({
+      kind: z.literal(kind),
+      beat,
+      machine: idOf("Machine id"),
+      faultKey: z.string(),
+    });
 
   // §aftermath-caption: shown for a moment after the choice, before the card closes.
   const aftermath = z.string().describe("What happens next if chosen; max 20 words, no numbers.");
@@ -433,6 +466,9 @@ export function buildNarratorPlanSchema() {
 
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
+    beat: z
+      .string()
+      .describe('On every intent: the episode beat it serves, from "Your plan"; else empty.'),
     title: z.string().describe("Card heading, two to six words."),
     speaker,
     situation,
@@ -506,6 +542,27 @@ export function buildNarratorPlanSchema() {
  * §past-arcs: a thread carries its arc notes, and one that ends gets its summary in `endedArcs`.
  */
 export function buildNotesSchema() {
+  const beat = z.strictObject({
+    name: z.string().describe("Two to six words; its identity."),
+    what: z.string().describe("One line of intent. Max 160 characters."),
+    tension: z.enum(BEAT_TENSIONS),
+    thread: z.string().describe('Exact title from "Open threads" it advances; empty for none.'),
+    decided: z.boolean().describe("You will make it so with a lever, not hope for it."),
+  });
+  const sketch = (what: string) =>
+    z
+      .strictObject({
+        premise: z
+          .string()
+          .describe(
+            "One or two sentences. Empty keeps this tier as it stands. Max 300 characters.",
+          ),
+        beats: z.array(beat).describe("In order, at most 6; keep landed beats."),
+        until: z.string().describe("When it is done; empty for the episode."),
+        tempo: z.enum(TEMPOS),
+        revised: z.string().describe("Why it last changed; empty on a first sketch."),
+      })
+      .describe(what);
   return z.strictObject({
     summary: z.string(),
     threads: z
@@ -558,6 +615,21 @@ export function buildNotesSchema() {
       .describe(
         "One for every thread that ends this call: the one your closing card closed and each one in retired; usually empty.",
       ),
+    plan: z
+      .strictObject({
+        season: sketch("A movement a beat; the premise is the question the season asks."),
+        arc: sketch("Each beat a whole episode to come."),
+        episode: sketch("A card, an offer, a pressure or a lever a beat."),
+        ended: z
+          .array(z.enum(PLAN_TIERS))
+          .describe(
+            "Tiers that finished this call; write the next in the same tier, or leave it empty.",
+          ),
+        landed: z
+          .array(z.string())
+          .describe("Exact names of arc or season beats that happened this call; usually empty."),
+      })
+      .describe('Your plan (see "Your plan"); the server keeps each beat\'s status.'),
   });
 }
 
@@ -622,6 +694,8 @@ export interface TranslationResult {
    * notes merge retires it and the card history records it.
    */
   readonly closedThread?: string;
+  /** §beat-attribution: the intents that named a beat, with the command each became. */
+  readonly beats: readonly BeatAttribution[];
 }
 
 /**

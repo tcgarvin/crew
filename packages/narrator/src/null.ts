@@ -177,6 +177,8 @@ function offerIntent(
   const urgency = rng.pick("social", JOB_URGENCIES);
   return {
     kind: "offerJob",
+    // §beat-attribution: the null narrator keeps no plan.
+    beat: "",
     ...withDockIssuer(rng, snapshot, drawPerson(rng, content, portId, template, words)),
     description,
     fromPort: portId,

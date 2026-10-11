@@ -85,9 +85,16 @@ export interface CardShown {
   readonly closedThread: string | null;
 }
 
-/** §past-arcs: how a thread ended: on its closing card, or named in `retired` without one. */
-export const ARC_ENDINGS = ["closingCard", "retired"] as const;
+/**
+ * §past-arcs: how a thread ended: on its closing card, or named in `retired` without one.
+ * §seasons-and-stalls: `planEnded` is a season or an arc of the plan the narrator ended.
+ */
+export const ARC_ENDINGS = ["closingCard", "retired", "planEnded"] as const;
 export type ArcEnding = (typeof ARC_ENDINGS)[number];
+
+/** §seasons-and-stalls: a past arc's scale: a thread's, or `arc` for an ended arc of the plan. */
+export const PAST_ARC_SCALES = [...THREAD_SCALES, "arc"] as const;
+export type PastArcScale = (typeof PAST_ARC_SCALES)[number];
 
 /**
  * §past-arcs: a thread that has ended, kept for the rest of the game so the narrator can see the
@@ -96,7 +103,7 @@ export type ArcEnding = (typeof ARC_ENDINGS)[number];
  */
 export interface PastArc {
   readonly title: string;
-  readonly scale: ThreadScale;
+  readonly scale: PastArcScale;
   readonly people: readonly string[];
   readonly openedTick: number;
   readonly closedTick: number;
@@ -106,6 +113,104 @@ export interface PastArc {
   /** What happened, what went wrong or changed, what the captain chose, how it came out. */
   readonly summary: string;
 }
+
+// ---------------------------------------------------------------------------------------------
+// §the-plan: season, arc and episode sketches
+// ---------------------------------------------------------------------------------------------
+
+/** §the-plan: a beat's tension tier, in the order an episode usually runs them. */
+export const BEAT_TENSIONS = ["setup", "breath", "rising", "turn", "peak", "release"] as const;
+export type BeatTension = (typeof BEAT_TENSIONS)[number];
+
+/** §the-plan: where a beat stands; server-kept, never written by the model. */
+export const BEAT_STATUSES = ["planned", "landed", "skipped", "changed"] as const;
+export type BeatStatus = (typeof BEAT_STATUSES)[number];
+
+/** §the-plan: how thick the breaths are between forward beats. Advice, never a timer (D46). */
+export const TEMPOS = ["slowBurn", "steady", "headlong"] as const;
+export type Tempo = (typeof TEMPOS)[number];
+
+/** §the-plan: the three tiers, widest first. */
+export const PLAN_TIERS = ["season", "arc", "episode"] as const;
+export type PlanTier = (typeof PLAN_TIERS)[number];
+
+/**
+ * §beat-attribution: a pressure or an outcome lever put in motion for a beat. The beat lands when
+ * the command's event fires (matched by the translator-minted command id the kernel keeps as the
+ * event's cause), and goes back to planned if the kernel refused it or it never fired.
+ */
+export interface BeatInMotion {
+  readonly commandId: string;
+  /** The intent's kind, for the line that says what became of it. */
+  readonly kind: string;
+  /** The hook tick of the call that put it in motion. */
+  readonly sinceTick: number;
+}
+
+/** §the-plan: one named beat of a sketch. */
+export interface PlannedBeat {
+  /** Two to six words: "Jax dies at Harrow End". */
+  readonly name: string;
+  /** One line of intent. */
+  readonly what: string;
+  readonly tension: BeatTension;
+  /** Empty, or the exact title of the open thread it advances. */
+  readonly thread: string;
+  /** D106: the narrator means to make it so with a lever, rather than hope for it. */
+  readonly decided: boolean;
+  /** Server-kept (§beat-attribution). */
+  readonly status: BeatStatus;
+  /** Server-kept: the tick it landed, or (changed, skipped) was set aside; null while planned. */
+  readonly landedTick: number | null;
+  /** Server-kept: levers put in motion for it that have not fired yet. */
+  readonly inMotion: readonly BeatInMotion[];
+}
+
+/** §the-plan: one tier of the plan. An empty premise is no sketch at all. */
+export interface ArcSketch {
+  /** One or two sentences; for the season, the question it asks. Empty: no sketch stands. */
+  readonly premise: string;
+  readonly beats: readonly PlannedBeat[];
+  /** When this sketch is done; empty for the episode, which ends on its closing card. */
+  readonly until: string;
+  readonly tempo: Tempo;
+  /** Why it last changed; empty when never. */
+  readonly revised: string;
+  /** Server-kept: how many times the premise has been rewritten. */
+  readonly revisions: number;
+  /** Server-kept: the premise before this call's rewrite, shown for one call; empty otherwise. */
+  readonly previousPremise: string;
+  /** Server-kept: the hook tick of the call that first wrote it; -1 for no sketch. */
+  readonly openedTick: number;
+}
+
+/** §the-plan: the narrator's intent, kept beside the threads (its memory). */
+export interface StoryPlan {
+  readonly season: ArcSketch;
+  readonly arc: ArcSketch;
+  readonly episode: ArcSketch;
+  /** §seasons-and-stalls: server-kept, episodes ended since an arc beat last landed. */
+  readonly episodesSinceArcBeat: number;
+}
+
+export const EMPTY_SKETCH: ArcSketch = {
+  premise: "",
+  beats: [],
+  until: "",
+  tempo: "steady",
+  revised: "",
+  revisions: 0,
+  previousPremise: "",
+  openedTick: -1,
+};
+
+/** No plan yet: every tier an explicit empty sketch (notes stored before §the-plan load as this). */
+export const EMPTY_PLAN: StoryPlan = {
+  season: EMPTY_SKETCH,
+  arc: EMPTY_SKETCH,
+  episode: EMPTY_SKETCH,
+  episodesSinceArcBeat: 0,
+};
 
 export interface NarratorNotes {
   /** The story so far, a few sentences. */
@@ -120,6 +225,8 @@ export interface NarratorNotes {
   readonly pastArcs: readonly PastArc[];
   /** Supporting characters the narrator has introduced (not the crew). */
   readonly cast: readonly NarratorCastEntry[];
+  /** §the-plan: season, arc and episode sketches. */
+  readonly plan: StoryPlan;
   /** Tick of the hook that produced these notes; -1 before the first call. */
   readonly lastUpdatedTick: number;
   /** Why intents from the previous call were dropped, so the model can adjust. */
@@ -140,6 +247,13 @@ export const NOTES_LIMITS = {
   cast: 12,
   castNoteChars: 160,
   rejections: 6,
+  /** §the-plan */
+  planBeats: 6,
+  beatNameChars: 60,
+  beatWhatChars: 160,
+  premiseChars: 300,
+  untilChars: 200,
+  revisedChars: 200,
 } as const;
 
 export const EMPTY_NOTES: NarratorNotes = {
@@ -148,6 +262,7 @@ export const EMPTY_NOTES: NarratorNotes = {
   cardsShown: [],
   pastArcs: [],
   cast: [],
+  plan: EMPTY_PLAN,
   lastUpdatedTick: -1,
   lastRejections: [],
 };
@@ -169,7 +284,7 @@ const storedThreadSchema = z.object({
 
 const storedPastArcSchema = z.object({
   title: z.string(),
-  scale: z.enum(THREAD_SCALES),
+  scale: z.enum(PAST_ARC_SCALES),
   people: z.array(z.string()),
   openedTick: z.number().int(),
   closedTick: z.number().int(),
@@ -191,6 +306,37 @@ const storedCardSchema = z.object({
   closedThread: z.string().nullable().optional(),
 });
 
+const storedBeatSchema = z.object({
+  name: z.string(),
+  what: z.string(),
+  tension: z.enum(BEAT_TENSIONS),
+  thread: z.string(),
+  decided: z.boolean(),
+  status: z.enum(BEAT_STATUSES),
+  landedTick: z.number().int().nullable(),
+  inMotion: z.array(
+    z.object({ commandId: z.string(), kind: z.string(), sinceTick: z.number().int() }),
+  ),
+});
+
+const storedSketchSchema = z.object({
+  premise: z.string(),
+  beats: z.array(storedBeatSchema),
+  until: z.string(),
+  tempo: z.enum(TEMPOS),
+  revised: z.string(),
+  revisions: z.number().int().nonnegative(),
+  previousPremise: z.string(),
+  openedTick: z.number().int(),
+});
+
+const storedPlanSchema = z.object({
+  season: storedSketchSchema,
+  arc: storedSketchSchema,
+  episode: storedSketchSchema,
+  episodesSinceArcBeat: z.number().int().nonnegative(),
+});
+
 const storedNotesSchema = z.object({
   summary: z.string(),
   /** Notes stored before structured threads (§threads-and-scales). */
@@ -207,6 +353,8 @@ const storedNotesSchema = z.object({
       lastSeenTick: z.number().int().optional(),
     }),
   ),
+  /** Notes stored before the plan (§the-plan) have none. */
+  plan: storedPlanSchema.optional(),
   lastUpdatedTick: z.number().int(),
   lastRejections: z.array(z.string()).optional(),
 });
@@ -281,6 +429,36 @@ function boundCard(card: CardShown): CardShown {
   };
 }
 
+function boundBeat(beat: PlannedBeat): PlannedBeat {
+  return {
+    ...beat,
+    name: clip(beat.name, NOTES_LIMITS.beatNameChars),
+    what: clip(beat.what, NOTES_LIMITS.beatWhatChars),
+    thread: clip(beat.thread, 80),
+  };
+}
+
+function boundSketch(sketch: ArcSketch): ArcSketch {
+  return {
+    ...sketch,
+    premise: clip(sketch.premise, NOTES_LIMITS.premiseChars),
+    beats: sketch.beats.slice(0, NOTES_LIMITS.planBeats).map(boundBeat),
+    until: clip(sketch.until, NOTES_LIMITS.untilChars),
+    revised: clip(sketch.revised, NOTES_LIMITS.revisedChars),
+    previousPremise: clip(sketch.previousPremise, NOTES_LIMITS.premiseChars),
+  };
+}
+
+/** §the-plan: every tier held to its limits. */
+export function boundPlan(plan: StoryPlan): StoryPlan {
+  return {
+    season: boundSketch(plan.season),
+    arc: boundSketch(plan.arc),
+    episode: boundSketch(plan.episode),
+    episodesSinceArcBeat: plan.episodesSinceArcBeat,
+  };
+}
+
 /** Over the cast limit, the people seen longest ago go first; order is otherwise kept. */
 function keepRecentCast(cast: readonly NarratorCastEntry[]): readonly NarratorCastEntry[] {
   if (cast.length <= NOTES_LIMITS.cast) return cast;
@@ -344,6 +522,7 @@ export function boundNotes(notes: NarratorNotes): NarratorNotes {
       portId: c.portId,
       lastSeenTick: c.lastSeenTick,
     })),
+    plan: boundPlan(notes.plan),
     lastUpdatedTick: notes.lastUpdatedTick,
     lastRejections: notes.lastRejections.slice(0, NOTES_LIMITS.rejections).map((r) => clip(r, 200)),
   };
@@ -360,7 +539,7 @@ export function parseNotes(raw: unknown): NarratorNotes {
   }
   const parsed = storedNotesSchema.safeParse(raw);
   if (!parsed.success) return EMPTY_NOTES;
-  const { openThreads, threads, cardsShown, pastArcs, ...rest } = parsed.data;
+  const { openThreads, threads, cardsShown, pastArcs, plan, ...rest } = parsed.data;
   const lastTick = parsed.data.lastUpdatedTick;
   return boundNotes({
     ...rest,
@@ -376,6 +555,7 @@ export function parseNotes(raw: unknown): NarratorNotes {
       })) ?? (openThreads ?? []).map((text) => threadFromLegacy(text, lastTick)),
     cardsShown: (cardsShown ?? []).map((c) => ({ ...c, closedThread: c.closedThread ?? null })),
     pastArcs: pastArcs ?? [],
+    plan: plan ?? EMPTY_PLAN,
     // Notes stored before cast ports (§issuers-and-pitches) have no port or sighting for their
     // cast.
     cast: parsed.data.cast.map((c) => ({

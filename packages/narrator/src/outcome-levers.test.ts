@@ -54,6 +54,7 @@ function nthCrew(snapshot: SaveEnvelope, n: number): Actor {
 
 const strikeOf = (who: string, overrides: Record<string, unknown> = {}) => ({
   kind: "strike",
+  beat: "",
   who,
   severity: "grave",
   type: "blunt",
@@ -65,6 +66,7 @@ const strikeOf = (who: string, overrides: Record<string, unknown> = {}) => ({
 
 const transactOf = (amount: number, overrides: Record<string, unknown> = {}) => ({
   kind: "transact",
+  beat: "",
   amount,
   memo: "the gate fine",
   counterparty: "Harbourmaster Osei",

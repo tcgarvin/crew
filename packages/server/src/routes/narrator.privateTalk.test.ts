@@ -24,6 +24,7 @@ function content(): ContentBundle {
 function cardCallingIn(talkWith: string): ModelTransport {
   const card = {
     kind: "surfaceDecision",
+    beat: "",
     title: "Words at the card table",
     speaker: "Dane Whitcross",
     situation:
