@@ -6,16 +6,22 @@
  * **Phases.** `mustering` (with a plan: the party to the locker) → `walkingOut` once every party
  * member is armed (`partyMustered`) → `approach` once the leader stands on the site floor in the
  * fight (`approachTick`) → `fight` at contact → `resolved`. A party member on the site floor done
- * with the muster goes into the `fight` activity.
+ * with the muster goes into the `fight` activity. D105 `seen`: contact comes the first tick a party
+ * member stands on the site floor, while mustering too; the fight then runs from `mustering`
+ * straight to `fight` (no `partyMustered`, no approach), the rest arming and walking out into it,
+ * and a party called back before they are armed leaves them aboard (`standDown`).
  *
  * **The objective** (held from `objectiveTick` on): `takeTarget` once a party member who presses
  * stands beside the target and no armed cast member who can fight is within four tiles with a line
  * to it (the target
  * surrenders and walks to the ramp with them; the cast take `morale.targetTaken`); `takeItem` the
- * same beside the loot post; `breakThem` once no armed cast member can fight. From then the party
- * falls back to the ramp foot, the down carried.
+ * same beside the loot post, where the presser takes the errand's item in hand (`pickUpLoot`) and
+ * the target is left alone; `breakThem` once no armed cast member can fight. From then the party
+ * falls back to the ramp foot, the down carried. D105: got in `unseen` and before contact, no
+ * guard guards the objective and none takes the shock of it.
  *
- * **Resolution**, checked every tick: `targetFled` when the target leaves by the exit;
+ * **Resolution**, checked every tick: `targetFled` when the target leaves by the exit under
+ * `takeTarget` (going for an item, he is one more of the cast leaving);
  * `targetTaken` once the objective is held and the party (the down carried or set down at the
  * ramp) and the target are at the ramp foot or aboard; `partyWithdrew` once a called-back party
  * is aboard (anyone down left behind); `partyRouted` once every party member is down, dead or
@@ -23,7 +29,8 @@
  * `maxApproachSeconds` (ruling 3) after the approach began with no contact, or (A2) that long
  * after an expedition that started itself on landing began with no plan adopted (no arrival card:
  * the menu had no two plans available).
- * `expeditionResolved` carries the tally (wounds and deaths per side since the start); the alert
+ * `expeditionResolved` carries the tally (wounds and deaths per side since the start) and names the
+ * target (an item errand's thing by the errand's name); the alert
  * stands down `alertClearSeconds` later; thoughts and memories (`heldTheLine` at a taking for
  * those who never broke, `ranFromAFight` for those who broke, `foughtBeside` pairwise among the
  * living, `leftMeBehind` from a down party member left on the floor about the leader); the party
@@ -65,7 +72,7 @@ import {
   shaken,
   surrender,
 } from "./combat";
-import { settleErrand } from "./errand";
+import { pickUpLoot, settleErrand } from "./errand";
 import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
 import { adjacent8, lineOfSight } from "./los";
 import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
@@ -94,12 +101,18 @@ export function makeExpeditionSystem(deps: CombatDeps): System {
       if (ground === undefined) return;
       handOutMuster(ctx);
       advancePhase(ctx, expedition);
+      standDown(ctx, expedition);
       if (expedition.phase === "mustering") {
+        const mustering = fightOf(ctx, deps, ground);
+        if (mustering === undefined) return;
         if (unplannedTooLong(ctx, expedition)) {
-          const fight = fightOf(ctx, deps, ground);
-          if (fight !== undefined) resolve(fight, "timedOut", undefined);
+          resolve(mustering, "timedOut", undefined);
+          return;
         }
-        return;
+        // D105 `seen`: the first of the party on the site floor is contact though the rest are
+        // still mustering, and the fight runs from then.
+        checkContact(mustering);
+        if (!fightBegun(expedition)) return;
       }
       const fight = fightOf(ctx, deps, ground);
       if (fight === undefined) return;
@@ -160,6 +173,34 @@ function advancePhase(ctx: StepCtx, expedition: Expedition): void {
     expedition.phase = "approach";
     expedition.approachTick = ctx.tick;
   }
+}
+
+/** Has contact come (read through a call: `checkContact` moves the phase on)? */
+function fightBegun(expedition: Readonly<Expedition>): boolean {
+  return expedition.phase === "fight";
+}
+
+/**
+ * Called back while some of the party are still on the muster (a fight that began during it, D105
+ * `seen`, or one still walking down): they stop it. Whoever is not armed yet stays aboard and never
+ * went (`outcomeNow`); an armed one already on the site floor runs for the ship with the rest.
+ */
+function standDown(ctx: StepCtx, expedition: Expedition): void {
+  if (expedition.withdrawTick === undefined) return;
+  for (const actor of partyActors(ctx, expedition)) {
+    if (!onMuster(actor)) continue;
+    stopMuster(ctx, actor);
+    if (actor.combatant !== undefined && onSite(ctx, actor)) enterFight(ctx, actor, "running");
+  }
+}
+
+function onMuster(actor: Actor): boolean {
+  const muster = (intent: Actor["pendingIntent"]) =>
+    intent?.kind === "personal" && intent.activity === "muster";
+  const activity = actor.activity;
+  return (
+    muster(actor.pendingIntent) || (activity.kind === "personal" && activity.activity === "muster")
+  );
 }
 
 /**
@@ -239,23 +280,33 @@ function pressedBeside(fight: Fight, tile: { x: number; y: number }): boolean {
   });
 }
 
+/**
+ * D105: the party got in unseen (`Expedition.notice`) and nobody has made contact yet: no guard is
+ * looking, so none guards the objective, and none feels it taken.
+ */
+function unnoticed(fight: Fight): boolean {
+  return fight.expedition.notice === "unseen" && fight.expedition.phase === "approach";
+}
+
 function checkObjective(fight: Fight): void {
   const { ctx, expedition, plan } = fight;
   if (plan === undefined || expedition.objectiveTick !== undefined) return;
   if (expedition.withdrawTick !== undefined) return;
   if (expedition.phase !== "fight" && expedition.phase !== "approach") return;
+  const open = (tile: { x: number; y: number }) => unnoticed(fight) || !guarded(fight, tile);
   let held = false;
   if (plan.objective === "takeTarget") {
     const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
     const at = target === undefined ? undefined : tileOfActor(ctx.state, target);
     const c = target?.combatant;
     if (target !== undefined && at !== undefined && c !== undefined && upright(c)) {
-      held = pressedBeside(fight, at) && !guarded(fight, at);
+      held = pressedBeside(fight, at) && open(at);
       if (held) surrender(fight, target);
     }
   } else if (plan.objective === "takeItem") {
     const loot = fight.ground.posts.loot;
-    held = loot !== undefined && pressedBeside(fight, loot) && !guarded(fight, loot);
+    held = loot !== undefined && pressedBeside(fight, loot) && open(loot);
+    if (held) pickUpLoot(fight);
   } else {
     held =
       expedition.phase === "fight" &&
@@ -269,6 +320,7 @@ function checkObjective(fight: Fight): void {
   }
   if (!held) return;
   expedition.objectiveTick = ctx.tick;
+  if (unnoticed(fight)) return;
   const morale = ctx.config.expedition.morale;
   for (const p of fight.people) {
     const c = p.combatant;
@@ -296,6 +348,8 @@ function outcomeNow(fight: Fight): ExpeditionOutcome | undefined {
   if (expedition.phase === "approach" || expedition.phase === "fight") {
     const out = party.every((a) => {
       const s = a.combatant?.state;
+      // Not armed when the party was called back (`standDown`): they never went.
+      if (s === undefined) return expedition.withdrawTick !== undefined;
       return s === "down" || s === "dead" || s === "fled";
     });
     if (party.length > 0 && out) {
@@ -357,10 +411,22 @@ function tally(fight: Fight): Tally {
   return { woundsUs, hurtUs, woundsThem, deadUs, deadThem };
 }
 
+/**
+ * Whom or what the expedition was for, as `expeditionResolved` names it: an item errand's thing by
+ * the errand's name ("the strongbox papers"), else the target who got away, else the cast's target.
+ */
+function resolvedTargetName(fight: Fight, fledName: string | undefined): string | undefined {
+  const { ctx, expedition } = fight;
+  const errand =
+    expedition.jobId === undefined ? undefined : ctx.state.jobs[expedition.jobId]?.errand;
+  if (errand?.kind === "fetchItem") return errand.targetName;
+  const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
+  return fledName ?? target?.name;
+}
+
 function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | undefined): void {
   const { ctx, expedition } = fight;
-  const target = fight.people.find((p) => p.combatant?.disposition.part === "target");
-  const targetName = fledName ?? target?.name;
+  const targetName = resolvedTargetName(fight, fledName);
   const from = expedition.fightStartedTick ?? expedition.approachTick ?? expedition.startedTick;
   const counts = tally(fight);
   expedition.phase = "resolved";
@@ -379,6 +445,7 @@ function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | un
       seconds: (ctx.tick - from) / ctx.config.time.tickRate,
       shots: expedition.shots,
       ...counts,
+      ...(expedition.notice === undefined ? {} : { notice: expedition.notice }),
     },
   });
   const alert = ctx.state.alert;
@@ -458,11 +525,17 @@ function leaveFight(ctx: StepCtx, actor: Actor): void {
   delete actor.combatant;
 }
 
-/** The cast after the fight: the taken, the dead and the down are gone; the rest walk off. */
+/**
+ * The cast after the fight: the taken, the dead and the down are gone; the rest walk off. Only a
+ * plan that goes for the target takes him: going for an item, he walks off with the rest.
+ */
 function castAfter(fight: Fight, person: Actor, outcome: ExpeditionOutcome): void {
   const c = person.combatant;
   if (c === undefined) return;
-  const taken = outcome === "targetTaken" && c.disposition.part === "target";
+  const taken =
+    outcome === "targetTaken" &&
+    c.disposition.part === "target" &&
+    fight.plan?.objective === "takeTarget";
   const gone = !upright(c) && c.state !== "surrendered";
   if (taken || gone || person.availability !== "available") {
     removeCast(fight.ctx, person);

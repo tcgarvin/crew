@@ -11,13 +11,14 @@ rules), and the separate staging call that dresses a dock. When and how it is ca
 
 ### Narrator authority
 
-The narrator sets things up; the sim decides outcomes (D6). It has exactly seven levers, each an
-intent in its plan, and every one becomes a kernel command only through the translator. No lever
-sets a body, a health, a position, a piece of knowledge or money. The capability list
-(`buildCapabilities`) is generated from content, config and the ship's machines, so the prompt
-never promises what the sim cannot do. It carries every id the plan may use (ports and their legs,
-store keys, cargo items, machines and faults, each port's market); the plan's ids are plain
-strings the translator checks against it (§plan-schema-in-the-prompt).
+The narrator sets things up; the sim decides outcomes (D6). It has exactly eight levers: seven
+intents in its plan (offers, spawns, faults, markets, hazards, fields and cards) and the unseen mark
+on the arrival card it dresses (§unseen-lever), and every one becomes a kernel command only through
+the translator. No lever sets a body, a health, a position, a piece of knowledge or money. The
+capability list (`buildCapabilities`) is generated from content, config and the ship's machines, so
+the prompt never promises what the sim cannot do. It carries every id the plan may use (ports and
+their legs, store keys, cargo items, machines and faults, each port's market); the plan's ids are
+plain strings the translator checks against it (§plan-schema-in-the-prompt).
 
 ### The narrator and sites
 
@@ -32,14 +33,14 @@ site is reached through its near port. Freight, a passage or a card's `setCourse
 dropped, and nothing is offered while the ship is set down at one.
 
 At the site the narrator dresses the two kernel cards on `policyDecision` (§the-arrival-card,
-§the-turn-card): only the words change, each side keeps its commands. It cannot choose the plans,
-stage the site, set a stance, script a turn or parley (deferred: each is a new lever, D6), and it
-never states a wound, a death or a capture the digest does not show. The arms locker stays out of
-the capability lists and the digest's machines, weapons out of the staging catalogue, and
-`fighting` out of a crew line's skills. No `captainAshore` is raised at a site
-(§looking-for-work), and a fight's `alertCleared` never hooks (§notable-event-hook); the fight's
-end and a failed errand do (`expeditionResolved`, `jobFailed`). The digest sees the crew's bodies
-(§crew-lines) and the site (§dock-sections).
+§the-turn-card): only the words change, each side keeps its commands, and on the arrival card it may
+mark one side as the way in unseen (§unseen-lever). It cannot choose the plans, stage the site, set
+a stance, script a turn or parley (deferred: each is a new lever, D6), and it never states a wound,
+a death or a capture the digest does not show. The arms locker stays out of the capability lists and
+the digest's machines, weapons out of the staging catalogue, and `fighting` out of a crew line's
+skills. No `captainAshore` is raised at a site (§looking-for-work), and a fight's `alertCleared`
+never hooks (§notable-event-hook); the fight's end and a failed errand do (`expeditionResolved`,
+`jobFailed`). The digest sees the crew's bodies (§crew-lines) and the site (§dock-sections).
 
 ### Offer lever
 
@@ -110,9 +111,26 @@ and scripted impacts (§scheduling-a-field). For both:
 
 `surfaceDecision` puts a two-sided card in front of the captain (§cards-and-sides). Each side has an
 effect (§side-effects). The card also carries `speaker`, an aftermath per side, `beatOfThread` and
-`closesThread`. A reply's `card` field is only for dressing a pending policy decision;
-`beatOfThread` or `closesThread` written on it are stripped before validation and fed back as a
-correction.
+`closesThread`. A reply's `card` field is only for dressing a pending policy decision (and its
+`unseen` mark, §unseen-lever); `beatOfThread` or `closesThread` written on it are stripped before
+validation and fed back as a correction.
+
+### Unseen lever
+
+On the `policyDecision` hook for an expedition's arrival card the narrator may let the crew get in
+unseen by one side: the card's `unseen` field (`UNSEEN_SIDES`: `left`, `right`, or empty for
+neither) becomes `markUnseen` with that side's plan (`leftPlan` or `rightPlan`). The captain still
+chooses, and the fight follows the choice: the marked side unseen, the other expected
+(§getting-in-unseen). The translator drops the mark with a reason on any other card or on a side
+that holds the ramp (a `hold` plan); an empty field sends nothing. Why: the owner, "if the player
+picks the right option, the narrator says they sneak in and get the box, but another option the
+narrator triggers defenders" (D105).
+
+The prompt keeps it for a quiet way in the story has set up (a guard asleep, a back way, a friend
+inside), and the card never gives it away: neither side's words say which is marked. The digest
+never shows the mark before a plan is chosen; once the expedition is over its line at the site
+(§dock-sections) says how the site noticed them: "nobody saw them come or go" when the marked
+side went in and no fight came, "they were waiting" when the other did.
 
 ## Translator
 
@@ -299,16 +317,19 @@ by where they stand, then freight by job (on offer, waiting to be loaded, delive
 unloading). The story prompt tells the narrator those people are really there and make natural
 issuers and speakers; a new face is cast only if the story wants them.
 
-While a site map is alongside, "On the dock" becomes "At the site (<name>)"
-(`site-digest.ts`): the place's ambience line; the errand it is for (who is sought, how they are
-wanted, for whom, and home where); where the expedition stands (waiting on the captain's plan,
-arming, going down the ramp, out on the ground, the fight, or over with how it ended); the party
-and who leads once a plan is chosen; and each person at the site with their role, what they are to
-the errand (the one it is after, one of theirs, a bystander, on the crew's side), what they carry,
-where they stand by the map's posts, and their bearing as a word (steady, wavering, breaking,
-fled, has given up, down, dead). It shows the arrival card's two plans with their why while it is
-up (the chosen plan after), and the turn card's sides while it is up. No digit appears in the
-section; a head count is written in words.
+While a site map is alongside, "On the dock" becomes "At the site (<name>)" (`site-digest.ts`): the
+place's ambience line; the errand it is for (who is sought, how they are wanted, for whom, and home
+where); where the expedition stands (waiting on the captain's plan, arming, going down the ramp, out
+on the ground, the fight, or over with how it ended and, after a mark, how the site noticed them,
+§unseen-lever); the party and who leads once a plan is chosen; and each person at the site with
+their role, what they are to the errand (the one it is after, one of theirs, a bystander, on the
+crew's side), what they carry, where they stand by the map's posts, and their bearing as a word
+(steady, wavering, breaking, fled, has given up, down, dead). It shows the arrival card's two plans
+with their why while it is up (the chosen plan after), and the turn card's sides while it is up.
+For an item errand it adds where the thing lies by the nearest post, or who carries it, or that it
+is not in sight; the site's own target reads as "the one at the heart of it here (the errand is
+after a thing, not them)", and a taken item errand ends "the party took what it went for". No digit
+appears in the section; a head count is written in words.
 
 ## Prompt rules
 
@@ -355,7 +376,8 @@ designer reasons about:
   the errand, so a card offers it only when giving up the job is the real choice. On
   `policyDecision` the arrival and turn cards are dressed, never replaced: each side's aftermath is
   one concrete line of what the crew do next, in the speaker's voice, and the turn card (our side's
-  setback) is never the captain's to bring.
+  setback) is never the captain's to bring. Whether a side of the arrival card gets in unseen is
+  the story's call, made only when it set one up (§unseen-lever).
 
 ## Staging prompt
 

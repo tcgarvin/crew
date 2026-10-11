@@ -5,7 +5,9 @@
  *   errand it is for, where the expedition stands, the party and who leads once the captain has
  *   chosen a plan, each person at the site (who they are, what they carry, where they stand by the
  *   map's posts, their bearing as the crew can see it), and the expedition's two cards. Never a
- *   number: the fight is the sim's, and the narrator writes from what the crew can see.
+ *   number: the fight is the sim's, and the narrator writes from what the crew can see. An item
+ *   errand's thing is placed too. D105: a side the narrator marked unseen never shows; once it is
+ *   over the expedition line says whether the site saw the party come.
  * - The job line's errand phrase, and how an errand reads for the person it brought aboard.
  */
 import { templateCard } from "@crew/content";
@@ -15,6 +17,7 @@ import {
   type CombatantState,
   type ContentBundle,
   type DeepReadonly,
+  type ErrandKind,
   type ErrandOutcome,
   type ErrandWants,
   type ExpeditionOutcome,
@@ -136,7 +139,12 @@ function standing(berth: BerthedDock, state: State, content: ContentBundle, acto
   if (location.kind !== "onDeck") return location.kind === "carriedBy" ? "being carried" : "gone";
   if (!isOnDock(content, state, location))
     return `aboard the ship${placePhrase(content, state, location)}`;
-  const tile = deckToDock(berth, { x: Math.floor(location.x), y: Math.floor(location.y) });
+  return postPhrase(berth, location);
+}
+
+/** A spot on the site floor by the map's nearest post: "at the weigh-house scale", "near ...". */
+function postPhrase(berth: BerthedDock, at: { readonly x: number; readonly y: number }): string {
+  const tile = deckToDock(berth, { x: Math.floor(at.x), y: Math.floor(at.y) });
   const gap = (p: { readonly tile: { readonly x: number; readonly y: number } }) =>
     Math.max(Math.abs(p.tile.x - tile.x), Math.abs(p.tile.y - tile.y));
   const nearest = [...berth.dock.posts].sort((a, b) => gap(a) - gap(b))[0];
@@ -155,16 +163,53 @@ function roleOf(state: State, content: ContentBundle, actor: Actor): string | un
   return (content.crew[actor.defId] ?? state.defs.dynamic.crew[actor.defId])?.bio;
 }
 
-function castLine(berth: BerthedDock, state: State, content: ContentBundle, actor: Actor): string {
+/**
+ * An item errand is after a thing, not the site's own target (`castFor` leaves the cast as it is),
+ * so the target reads as who they are to the place.
+ */
+const ITEM_TARGET_WORDS = "the one at the heart of it here (the errand is after a thing, not them)";
+
+function castLine(
+  berth: BerthedDock,
+  state: State,
+  content: ContentBundle,
+  actor: Actor,
+  kind: ErrandKind | undefined,
+): string {
   const combatant = actor.combatant;
   const role = roleOf(state, content, actor);
-  const part = combatant === undefined ? "" : `, ${PART_WORDS[combatant.disposition.part]}`;
+  const partOf = (part: CastPart) =>
+    part === "target" && kind === "fetchItem" ? ITEM_TARGET_WORDS : PART_WORDS[part];
+  const part = combatant === undefined ? "" : `, ${partOf(combatant.disposition.part)}`;
   const bearing = combatant === undefined ? "" : `: ${BEARING[combatant.state]}`;
   return `- ${actor.name}${role === undefined ? "" : ` (${role})`}${part}, ${armsOf(state, content, actor)}, ${standing(berth, state, content, actor)}${bearing}`;
 }
 
+/**
+ * D105: how the site noticed the party, once it is over: "nobody saw them come or go" when
+ * the marked way in was taken and no fight started, "they were waiting for the party" when the
+ * other side was. Never before: the mark is the narrator's own, and until it is over the fight is
+ * the sim's to tell.
+ */
+function noticeWords(expedition: DeepReadonly<Expedition>): string {
+  if (expedition.notice === "seen") return "; they were waiting for the party";
+  if (expedition.notice === "unseen" && expedition.fightStartedTick === undefined) {
+    return "; nobody saw them come or go";
+  }
+  return "";
+}
+
+/** How it ended; for an item errand, taking the site is taking the thing, not the site's target. */
+function outcomeWords(expedition: DeepReadonly<Expedition>, kind: ErrandKind | undefined): string {
+  if (expedition.outcome === undefined) return "it ended";
+  if (expedition.outcome === "targetTaken" && kind === "fetchItem") {
+    return "the party took what it went for";
+  }
+  return OUTCOME_WORDS[expedition.outcome];
+}
+
 /** Where the expedition stands, in words. */
-function phaseLine(expedition: DeepReadonly<Expedition>): string {
+function phaseLine(expedition: DeepReadonly<Expedition>, kind: ErrandKind | undefined): string {
   if (expedition.plan === undefined && expedition.phase !== "resolved") {
     return "the expedition: nobody has gone out yet; the crew wait on the captain's plan";
   }
@@ -178,7 +223,7 @@ function phaseLine(expedition: DeepReadonly<Expedition>): string {
     case "fight":
       return "the expedition: the fight is on";
     case "resolved":
-      return `the expedition: it is over; ${expedition.outcome === undefined ? "it ended" : OUTCOME_WORDS[expedition.outcome]}`;
+      return `the expedition: it is over; ${outcomeWords(expedition, kind)}${noticeWords(expedition)}`;
   }
 }
 
@@ -191,6 +236,33 @@ function partyLine(state: State, content: ContentBundle, expedition: DeepReadonl
     return `${actor.name} (${leads}${armsOf(state, content, actor)}${bearing})`;
   });
   return `the party: ${members.join(", ")}`;
+}
+
+/**
+ * An item errand's thing while the expedition is on: who of those at the site carries it, else
+ * where it lies on the site floor by the nearest post, else "not in sight".
+ */
+function soughtLine(
+  berth: BerthedDock,
+  state: State,
+  content: ContentBundle,
+  errand: DeepReadonly<JobErrand>,
+): string | undefined {
+  if (errand.kind !== "fetchItem" || errand.itemDefId === undefined) return undefined;
+  const items = Object.values(state.items).filter((item) => item.defId === errand.itemDefId);
+  for (const item of items) {
+    const at = item.location;
+    if (at.kind !== "carriedBy") continue;
+    const holder = state.actors[at.actorId];
+    if (holder?.combatant !== undefined) return `${errand.targetName}: carried by ${holder.name}`;
+  }
+  for (const item of items) {
+    const at = item.location;
+    if (at.kind === "onDeck" && isOnDock(content, state, at)) {
+      return `${errand.targetName}: lying ${postPhrase(berth, at)}`;
+    }
+  }
+  return `${errand.targetName}: not in sight`;
 }
 
 /** A string param of a decision's prompt, or undefined. */
@@ -253,10 +325,15 @@ export function atSiteLines(state: State, content: ContentBundle): DockLines | u
   if (!here) {
     lines.push("the expedition: nobody has gone out");
   } else {
-    lines.push(phaseLine(expedition));
+    lines.push(phaseLine(expedition, job?.errand?.kind));
     if (expedition.plan !== undefined && expedition.party.length > 0) {
       lines.push(partyLine(state, content, expedition));
     }
+    const sought =
+      job?.errand === undefined || expedition.phase === "resolved"
+        ? undefined
+        : soughtLine(berth, state, content, job.errand);
+    if (sought !== undefined) lines.push(`what the errand is after: ${sought}`);
   }
   const people = Object.values(state.actors)
     .filter((a) => a.combatant?.side === "them")
@@ -266,7 +343,8 @@ export function atSiteLines(state: State, content: ContentBundle): DockLines | u
       ? "people at the site: nobody in sight"
       : "people at the site (what the crew can see of them; how they fight is the sim's):",
   );
-  for (const actor of people) lines.push(castLine(berth, state, content, actor));
+  const kind = job?.errand?.kind;
+  for (const actor of people) lines.push(castLine(berth, state, content, actor, kind));
   if (here) lines.push(...cardLines(state, content, expedition));
   return { heading: `At the site (${berth.dock.name})`, lines: lines.map(withoutDigits) };
 }

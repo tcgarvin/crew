@@ -4,7 +4,7 @@ import type { ActorId, PortDefId } from "../ids";
  * shot (trace, for the tracers), someone breaking, the party pulling back, and the end with its
  * tally. The alert reuses the field's `alertRaised`/`alertCleared` with `cause: "fight"`.
  */
-import type { ExpeditionOutcome } from "../state";
+import type { ExpeditionOutcome, NoticeRule } from "../state";
 import type { SignificanceCatalog } from "./significance";
 
 export interface ExpeditionEventPayloads {
@@ -47,6 +47,8 @@ export interface ExpeditionEventPayloads {
     readonly woundsThem: number;
     readonly deadUs: number;
     readonly deadThem: number;
+    /** D105: the plan's `Expedition.notice`, when the narrator marked the arrival card. */
+    readonly notice?: NoticeRule;
   };
 }
 

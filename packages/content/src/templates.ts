@@ -186,16 +186,23 @@ function lowerFirst(text: string): string {
 
 /**
  * The arrival card: "Corran Vale is at the Boathouse, and not alone. Hold the ramp from cover, or
- * go in and take them?" Params: `speaker` (on the card's own speaker line, so not named here),
- * `target`, `site`, and the two plans' `leftLabel` and `rightLabel`. No numbers.
+ * go in and take them?" For a `fetchItem` errand (`kind`, §the-arrival-card) `target` is the
+ * item's name and the card reads "General Cargo Crate is at Harrow End, and guarded. ...".
+ * Params: `speaker` (on the card's own speaker line, so not named here), `kind`, `target`,
+ * `site`, and the two plans' `leftLabel` and `rightLabel`. No numbers.
  */
 function arrivalSituation(p: Params, c: ContentBundle | undefined): string {
-  const target = p.target === undefined ? "Whoever we came for" : String(p.target);
+  const item = p.kind === "fetchItem";
+  const target =
+    p.target !== undefined ? String(p.target) : item ? "What we came for" : "Whoever we came for";
   const question =
     p.leftLabel !== undefined && p.rightLabel !== undefined
       ? `${p.leftLabel}, or ${lowerFirst(String(p.rightLabel))}?`
-      : "Hold the ramp, or go in?";
-  return `${target} is at ${placeLabel(p.site, c)}, and not alone. ${question}`;
+      : item
+        ? "Creep in, or go in?"
+        : "Hold the ramp, or go in?";
+  const company = item ? "guarded" : "not alone";
+  return `${target} is at ${placeLabel(p.site, c)}, and ${company}. ${question}`;
 }
 
 /** How the turn card says what happened to `name` (`params.how`; anything else is "breaking"). */

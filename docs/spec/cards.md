@@ -95,7 +95,9 @@ for it, and the world does not halt on the card until it has, so the prose is re
 modal opens (§policy-decision-hook). A policy card is brought by crew (the engineer for the gate,
 the first officer for a missing passenger and for the arrival card, the first officer or a
 standing member of the party for the turn card, never the captain) and is never held for delivery
-in person.
+in person. The narrator's answer only dresses it, except for one mark: on the arrival card it may
+name a side as the way in unseen (§unseen-lever), which changes the fight that side starts and
+nothing on the card.
 
 ### Offer cards
 

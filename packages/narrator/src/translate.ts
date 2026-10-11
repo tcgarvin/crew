@@ -38,6 +38,7 @@ import {
   isOnDock,
   isSite,
   jobBlockingAcceptance,
+  planMenu,
   scriptedHullDamage,
 } from "@crew/sim";
 import {
@@ -84,6 +85,7 @@ import {
   transitSecondsLeft,
 } from "./lookups";
 import { clipWords } from "./notes";
+import { EXPEDITION_ARRIVAL_KEY } from "./site-digest";
 
 const LABEL_MAX_CHARS = 48;
 const TITLE_MAX_CHARS = 60;
@@ -1109,6 +1111,49 @@ function policyCard(
   return card;
 }
 
+/**
+ * D105: the card's `unseen` side as `markUnseen` with that side's plan, checked by the kernel's own
+ * rules (`markUnseen` in `systems/expedition/command.ts`) so the kernel never refuses what passes
+ * here. `ok(undefined)` when nothing is marked; a side on anything but the pending arrival card of
+ * the expedition under way, before its plan, is dropped, as is one whose plan holds the ramp. The
+ * card's prose is `policyCard`'s and does not depend on this.
+ */
+function unseenCommand(env: Env, plan: NarratorPlan): Outcome<NarratorDraft | undefined> {
+  const side = plan.card?.unseen ?? "";
+  if (side === "") return ok(undefined);
+  const notHere = (why: string) => no(`card.unseen "${side}": ${why}`);
+  const hook = env.hook;
+  if (hook?.kind !== "policyDecision") {
+    return notHere("only the arrival card at a site has a way in unseen");
+  }
+  const decisionId = hook.context.decisionId as DecisionId;
+  const decision = env.snapshot.state.decisions.records[decisionId];
+  if (decision?.prompt.key !== EXPEDITION_ARRIVAL_KEY) {
+    return notHere("only the arrival card at a site has a way in unseen");
+  }
+  if (decision.status !== "pending") return notHere("the arrival card is no longer pending");
+  const expedition = env.snapshot.state.expedition;
+  if (expedition === undefined || expedition.phase === "resolved") {
+    return notHere("no expedition is under way");
+  }
+  if (expedition.cards?.arrival !== decisionId) {
+    return notHere("this is not the expedition's arrival card");
+  }
+  if (expedition.plan !== undefined) return notHere("the captain has already chosen the plan");
+  if (expedition.unseenPlanId !== undefined) return notHere("a side is already marked unseen");
+  const planId = decision.prompt.params[`${side}Plan`];
+  if (typeof planId !== "string" || planId === "") {
+    return notHere(`the card names no plan for its ${side} side`);
+  }
+  const menu = planMenu(env.snapshot.state, env.content, env.snapshot.config, expedition.siteId);
+  const option = menu.find((o) => o.id === planId);
+  if (option === undefined) return notHere(`"${planId}" is not on the plan menu`);
+  if (option.plan.posture === "hold") {
+    return notHere("that side holds the ramp; holding the ramp never goes unseen");
+  }
+  return ok({ kind: "markUnseen", payload: { decisionId, planId } });
+}
+
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -1233,6 +1278,18 @@ export const translateIntents: TranslateIntents = (
       ...draft,
     } as NarratorCommand);
   });
+
+  const unseen = unseenCommand(env, plan);
+  if (!unseen.ok) {
+    dropped.push({ intentIndex: -1, kind: "card", reason: unseen.reason });
+  } else if (unseen.value !== undefined) {
+    commands.push({
+      id: commandIdFor(ctx.callId, commands.length),
+      source: "narrator",
+      targetTick: ctx.hookTick + 1,
+      ...unseen.value,
+    } as NarratorCommand);
+  }
 
   const callBack = translateCallBack(ctx, plan.callBack, commands.length, dropped);
   if (callBack !== undefined) commands.push(callBack);

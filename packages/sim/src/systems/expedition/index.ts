@@ -6,7 +6,7 @@
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import type { CombatDeps } from "./combat";
-import { adoptPlan, scenarioStartExpedition, withdrawParty } from "./command";
+import { adoptPlan, markUnseen, scenarioStartExpedition, withdrawParty } from "./command";
 import { expeditionSystem, makeExpeditionSystem } from "./expedition";
 
 /**
@@ -26,16 +26,17 @@ export function registerExpedition(
     registry.registerCommandHandler("scenarioStartExpedition", scenarioStartExpedition),
     registry.registerCommandHandler("adoptPlan", adoptPlan),
     registry.registerCommandHandler("withdrawParty", withdrawParty),
+    registry.registerCommandHandler("markUnseen", markUnseen),
   ];
   return () => {
     for (const undo of unregister) undo();
   };
 }
 
-export { adoptPlan, scenarioStartExpedition, withdrawParty } from "./command";
+export { adoptPlan, markUnseen, scenarioStartExpedition, withdrawParty } from "./command";
 export type { CombatDeps, DamageFn } from "./combat";
 export { expeditionSystem, makeExpeditionSystem, orderWithdrawal } from "./expedition";
 export { inCover, lineOfSight } from "./los";
 export { fightLabel, musterLabel } from "./labels";
 export { type LockerWeapon, handOutMuster, lockerWeapons, musterPlan, runArm } from "./muster";
-export { DEFAULT_PLANS, fitToGo, squadFor } from "./plans";
+export { DEFAULT_PLANS, ITEM_DEFAULT_PLANS, defaultPairFor, fitToGo, squadFor } from "./plans";

@@ -3,7 +3,7 @@
  * handlers are the expedition system's (`systems/expedition/command.ts`).
  */
 import type { SiteCastEntryDef } from "../content";
-import type { PortDefId } from "../ids";
+import type { DecisionId, PortDefId } from "../ids";
 import type { PlanId } from "../state";
 
 export interface ExpeditionCommandPayloads {
@@ -22,4 +22,10 @@ export interface ExpeditionCommandPayloads {
   adoptPlan: { readonly planId: PlanId };
   /** Call the party back to the ramp (§8.3 `withdrawWhen`, by order). */
   withdrawParty: Record<string, never>;
+  /**
+   * D105, the narrator's (and scenario's): mark one side of the pending arrival card `decisionId`
+   * as the way in unseen, `planId` being that side's plan (never a `hold` plan). Choosing that side
+   * then gets the party in unnoticed; choosing the other, the cast were waiting (`Expedition.notice`).
+   */
+  markUnseen: { readonly decisionId: DecisionId; readonly planId: PlanId };
 }

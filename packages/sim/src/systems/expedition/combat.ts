@@ -12,7 +12,9 @@
  * decision, so `creep` can work against a shaky cast); the first shot; or (ruling 1) the party
  * ashore `contactAfterSeconds` under any posture but `creep`; or a creeper beside the objective
  * (they spring: the taking needs no guard within four tiles in sight of it, so one there makes it a
- * fight).
+ * fight). D105 (`Expedition.notice`): `unseen` leaves only the party's own first shot (in
+ * `walkingOut` too); `seen` makes contact the first tick any party member stands on the site
+ * floor, even while the rest are still mustering.
  *
  * **A decision** moves resolve by the interval's terms (after contact; `morale.ts`; "leader near"
  * reads the leader now, `plans.ts` `leaderNow`, so the lead passes on when the leader is down), and
@@ -49,6 +51,9 @@
  *
  * **Turns** (A2 call 15): a tick's fight records, in order, each fighter who broke or gave up and
  * each party member who went down or died (`Fight.turns`), for the turn card (`cards.ts`).
+ *
+ * **Arrivals**: a cast member at the exit leaves; it is `targetFled` only when the plan goes for the
+ * target (`takeTarget`): going for an item, the target leaving is one more of the cast gone.
  *
  * Owner after the gate: W2 of expeditions A1.
  */
@@ -363,8 +368,17 @@ function resolveShot(fight: Fight, shooter: Actor): void {
     source: "sim",
     payload: { byActorId: shooter.id, atActorId: target.id, hit },
   });
-  if (fight.expedition.phase === "approach") startFight(fight);
+  if (shotMakesContact(fight.expedition)) startFight(fight);
   if (hit) onHit(fight, shooter, weapon, target);
+}
+
+/**
+ * The first shot is contact in the approach. Got in unseen (D105) it is the only way to contact,
+ * so one fired before the leader is ashore (`walkingOut`) is contact too.
+ */
+function shotMakesContact(expedition: Expedition): boolean {
+  if (expedition.phase === "approach") return true;
+  return expedition.phase === "walkingOut" && expedition.notice === "unseen";
 }
 
 function onHit(fight: Fight, shooter: Actor, weapon: WeaponDef, target: Actor): void {
@@ -537,10 +551,21 @@ function noticed(fight: Fight): boolean {
  * Contact by noticing, by (ruling 1) the party standing ashore long enough, or by a creeper
  * springing: beside the objective unnoticed, they show themselves (a guard still within reach of
  * it means the taking is a fight at arm's length).
+ *
+ * D105 overrides all three by the expedition's notice: `seen`, the cast were waiting and contact
+ * comes the first tick any party member stands on the site floor, though the rest may still be
+ * mustering (the expedition system checks it then too: the fight runs from contact, and
+ * `walkingOut` and the approach never come); `unseen`, nobody notices, nobody hears the landing
+ * and a creeper beside the objective stays hidden, so only the party's own first shot
+ * (`resolveShot`) makes contact.
  */
 export function checkContact(fight: Fight): void {
   const { ctx, expedition } = fight;
-  if (expedition.phase !== "approach") return;
+  if (expedition.notice === "seen") {
+    if (expedition.plan !== undefined && partyOnFloor(fight)) startFight(fight);
+    return;
+  }
+  if (expedition.phase !== "approach" || expedition.notice === "unseen") return;
   const since = expedition.approachTick;
   const creeping = fight.plan?.posture === "creep";
   const loud =
@@ -548,6 +573,14 @@ export function checkContact(fight: Fight): void {
     since !== undefined &&
     ctx.tick - since >= configTicks(ctx.config, ctx.config.expedition.contactAfterSeconds);
   if (loud || noticed(fight) || (creeping && sprung(fight))) startFight(fight);
+}
+
+/** D105 `seen`: is a party member on the site floor, in the fight or still on the muster? */
+function partyOnFloor(fight: Fight): boolean {
+  return fight.expedition.party.some((id) => {
+    const actor = fight.ctx.state.actors[id];
+    return actor !== undefined && onSite(fight.ctx, actor);
+  });
 }
 
 /** Is a party member standing beside the objective? */
@@ -1239,9 +1272,10 @@ function arrivals(fight: Fight): CombatTick {
     }
     const exit = ground.posts.exit;
     if (exit === undefined || !upright(combatant) || distance(at, exit) > AT_EXIT_TILES) continue;
-    if (combatant.disposition.part === "target" && fight.expedition.phase !== "resolved") {
-      targetFled = person.name;
-    }
+    // Only a fight for the target ends when he gets away; going for an item, he is one more of the
+    // cast leaving (§the-objective-and-resolution).
+    const fled = combatant.disposition.part === "target" && fight.plan?.objective === "takeTarget";
+    if (fled && fight.expedition.phase !== "resolved") targetFled = person.name;
     removeCast(ctx, person);
   }
   return targetFled === undefined ? {} : { targetFled };

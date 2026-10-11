@@ -103,6 +103,15 @@ there to save the wallet", and the OpenRouter key has its own credit limit. A ca
 application-wide and far above the worst case, if that stops being enough. The story-call spacing
 rule stays because it paces the story, not the budget.
 
+**D105. The narrator decides whether a sneak-in works.** Owner: "There should be an opportunity
+for the narrator to let the crew sneak in. For example if the player picks the right option, the
+narrator says they sneak in and get the box, but another option the narrator triggers defenders."
+A new lever (D6): while an expedition's arrival card is pending the narrator may mark one side,
+never a `hold`, as the way in unseen (`markUnseen`); the captain still chooses, and the sim fights
+the chosen side unseen or expected. Rejected: leaving noticing to the sim alone, which gives the
+story no way to set up a quiet way in, and letting the narrator choose the plan. See
+§getting-in-unseen, §unseen-lever.
+
 ## Play
 
 **D7. The player's map shows truth.** Owner decision: one render layer. A per-person view is a

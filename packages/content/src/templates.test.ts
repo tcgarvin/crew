@@ -402,6 +402,40 @@ describe("expedition card templates (expeditions A2, calls 4 and 15)", () => {
     expect(text.rightAftermath).toBe("We go in hard and bring him out.");
   });
 
+  it("says an item errand's thing is guarded and asks creep or take it (D105)", () => {
+    const plans = {
+      leftLabel: "Creep in quietly, holding fire",
+      rightLabel: "Go in and take it",
+    };
+    const params = { jobId: "j1", kind: "fetchItem", site: "port.harrow_end", target: "Crate" };
+    const text = templateCard(
+      card("expedition.arrival", { ...params, ...plans }, ["left", "right"], plans),
+      bundle(),
+    );
+    expect(text.situation).toBe(
+      "Crate is at Harrow End, and guarded. Creep in quietly, holding fire, or go in and take it?",
+    );
+    expect(text.title).toBe("At Harrow End");
+    // A person's errand keeps "not alone", whatever the kind param says or omits.
+    const person = templateCard(
+      card("expedition.arrival", { ...params, kind: "fetchPerson", target: "Teodor Lusk" }, [
+        "left",
+        "right",
+      ]),
+      bundle(),
+    );
+    expect(person.situation).toBe(
+      "Teodor Lusk is at Harrow End, and not alone. Hold the ramp, or go in?",
+    );
+    const bare = templateCard(
+      card("expedition.arrival", { kind: "fetchItem", site: "port.harrow_end" }, ["left", "right"]),
+      bundle(),
+    );
+    expect(bare.situation).toBe(
+      "What we came for is at Harrow End, and guarded. Creep in, or go in?",
+    );
+  });
+
   it("asks at the turn whether to press on or pull back", () => {
     const turn = (params: Decision["prompt"]["params"]) =>
       templateCard(card("expedition.turn", params, ["press", "withdraw"]), bundle());

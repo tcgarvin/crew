@@ -3,9 +3,10 @@
 Bodies and arms, landing sites, and the fight a party walks into when the ship sets down at one.
 Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
 `systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*` and `expedition.*` in
-`packages/content/data/config/default.json`. Until the captain's card exists (phase A2) an
-expedition starts only from `scenarioStartExpedition`, and the narrator never sees a site
-(§the-narrator-and-sites). The owner's rulings that shape all of it are D103.
+`packages/content/data/config/default.json`. An expedition starts when the ship sets down at a
+site for an errand (§errand-job, §the-arrival-card), or from `scenarioStartExpedition` in tests and
+dev tools; what the narrator sees and may do is §the-narrator-and-sites. The owner's rulings that
+shape it are D103, D104 and D105.
 
 ## Bodies
 
@@ -232,18 +233,29 @@ It queues the arrival card through `queuePolicyDecision` (§policy-decision-card
 `expedition.arrival`, no `jobId` on the record, so its `policyDecision` hook is raised the tick it
 is queued and the world halts on the hook and then on the card; nothing of the fight runs while it
 is up. The first officer brings it. Its sides are two plans from the menu (§the-plan-menu), each an
-`adoptPlan`: `hold-lethal-armed` and `assault-lethal-armed` when both are available, else the
-first two available. A side's label says what the plan does ("Hold the ramp from cover", "Go in
-and take them", with ", to stun", ", holding fire", ", all hands", ", blasters only" or ", a small
-team" when not the usual) and its aftermath what happens next ("We make them come to us."), with
-no numbers. The prompt params name the job, the site, the target, the speaker and both plans
-(`leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`), and each side's own
-refs carry its label and why. Choosing a side adopts the plan and the muster begins
-(§the-muster). A plan adopted for an errand that wants the target `alive` has `targetMustLive`
-(§fire-and-targets). With fewer than two plans available there is no card, and the expedition
-resolves `timedOut` `expedition.maxApproachSeconds` (90) after it started. Why a policy card and
-not a story hook: the narrator dresses the sim's pair and cannot choose the plans, a lever the
-owner has not ruled on (D6).
+`adoptPlan`: the errand kind's pair when both are available (`plans.ts` `defaultPairFor`), else
+the first two available. A `fetchPerson`'s pair is `hold-lethal-armed` and `assault-lethal-armed`;
+a `fetchItem`'s is `creep-holdFire-armed` and `assault-lethal-armed`. Why creep for an item: the
+owner's sneak-in is one where "they sneak in and get the box" (D105), and a `hold` side can never
+be the way in unseen (§getting-in-unseen).
+
+The situation names what the errand is after and asks the pair: "Teodor Lusk is at Harrow End,
+and not alone. Hold the ramp from cover, or go in and take them?"; for an item, by the item's
+name, "General Cargo Crate is at Harrow End, and guarded. Creep in quietly, holding fire, or go
+in and take it?". A side's label says what the plan does ("Hold the ramp from cover", "Creep in
+quietly", "Go in and take them", or "Go in and take it" for an item, with ", to stun", ", holding
+fire", ", all hands", ", blasters only" or ", a small team" when not the usual) and its aftermath
+what happens next ("We make them come to us."), with no numbers. The prompt params name the job,
+the errand's `kind` (`fetchPerson` or `fetchItem`), the site, the target (the person, or the
+item's name), the speaker and both plans (`leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`,
+`leftWhy`, `rightWhy`), and each side's own refs carry its label and why. While the card is up the
+narrator may mark one side as the way in unseen (§getting-in-unseen). Choosing a side adopts the
+plan and the muster begins (§the-muster). A plan adopted for an errand that wants the target
+`alive` has `targetMustLive` (§fire-and-targets). With fewer than two plans available there is no
+card, and the expedition resolves `timedOut` `expedition.maxApproachSeconds` (90) after it
+started. Why a policy card and not a story hook: the narrator dresses the sim's pair and cannot
+choose the plans, a lever the owner has not ruled on (D6); its one mark on the card is
+§unseen-lever.
 
 ### The turn card
 
@@ -299,7 +311,41 @@ Contact (`expeditionContact`, the fight phase) comes at the first of:
 
 Contact raises the alert with cause `fight` (`alertRaised`), which works aboard as the field's
 does (§sighting-and-the-alert), and puts the cast into the fight. An approach with no contact
-`expedition.maxApproachSeconds` (90) after it began ends `timedOut`.
+`expedition.maxApproachSeconds` (90) after it began ends `timedOut`. A side the narrator marked on
+the arrival card replaces these rules for the fight it starts (§getting-in-unseen).
+
+### Getting in unseen
+
+While the arrival card is up, the narrator may mark one of its sides as the way in unseen
+(`markUnseen { decisionId, planId }`, narrator and scenario authority; the lever is
+§unseen-lever). The kernel refuses it, with the reason, unless an expedition is under way with no
+plan and nothing marked yet, `decisionId` is its arrival card (`Expedition.cards.arrival`) and
+still pending, and `planId` is that card's `leftPlan` or `rightPlan`, on the menu and not a `hold`
+plan. Apply writes `Expedition.unseenPlanId`; the card does not change and the captain still
+chooses. The world is halted on the card, so the mark applies in the tick the captain's answer
+does, just ahead of it. Why no `hold`: a party holding the ramp never goes for the objective, so
+unseen it could only wait out the clock.
+
+`adoptPlan` then writes `Expedition.notice` (`NOTICE_RULES`): `unseen` when the marked plan is
+adopted, `seen` when the other is. With nothing marked it is absent and contact comes by the
+ordinary rules (§contact-and-the-alert).
+
+- **`unseen`**: the cast never notice the party. No guard or ally's sight, no loud landing and no
+  creeper beside the objective bring contact; only the party's own first shot does (even one fired
+  before the leader is ashore), so a fight that fires none has no contact, no alert and no
+  `alertCleared`. During the approach the objective is held without its guard rule
+  (§the-objective-and-resolution): nobody armed within four tiles stops the party taking it, and
+  the cast take no target-taken shock from it. A plan that fires, such as an `assault` marked for a
+  person, gets the drop: its first shot is contact. Why: a creeper beside the box who showed
+  themselves would undo the sneak-in the owner asked for (D105).
+- **`seen`**: they were waiting. Contact comes the first tick any party member stands on the site
+  floor, even while the rest are still at the muster: the fight runs from then, the rest arm and
+  walk out into it, and there is no walk-out (`partyMustered`, so no "down the ramp" line) and no
+  approach. A party called back then leaves those not yet armed aboard.
+
+`expeditionResolved` carries `notice`, and the end's ticker line adds "; nobody saw us" under
+`unseen` when no shot was fired, or "; they were waiting for us" under `seen`: "General Cargo
+Crate taken; nobody saw us".
 
 ### Shots and hits
 
@@ -420,8 +466,8 @@ Before contact the cast keep their posts. After it:
   when a party member is beside them (`surrenderIfCornered`), with no way out, or as a guard with
   no weapon.
 
-A cast member who reaches the exit leaves the site with what they carry. The target leaving is
-`targetFled`.
+A cast member who reaches the exit leaves the site with what they carry; the target leaving can
+end the expedition (`targetFled`, §the-objective-and-resolution).
 
 ### Rescue
 
@@ -434,35 +480,41 @@ one set down there remembers `carriedMeOut` about the carrier.
 The objective is held when, during the approach or the fight:
 
 - `takeTarget`: a party member going for the objective stands beside the target and no armed cast
-  member who can fight is within four tiles with a line to it. The target gives up and walks to
-  the ramp with them. Why: once the party spread round the target (§one-to-a-tile), a guard who
-  stepped back into cover past two tiles let it take him from the other side before any exchange
-  of fire, and `assault` lost half its shots.
-- `takeItem`: the same beside the loot post (no item is taken yet).
+  member who can fight is within four tiles with a line to it (the guard rule, waived during an
+  unseen approach, §getting-in-unseen). The target gives up and walks to the ramp with them. Why:
+  once the party spread round the target (§one-to-a-tile), a guard who stepped back into cover
+  past two tiles let it take him from the other side before any exchange of fire, and `assault`
+  lost half its shots.
+- `takeItem`: the same beside the loot post. The party member there picks the errand's item up
+  (`carriedBy`, `errand.ts` `pickUpLoot`) and carries it back to the ramp. The target person is
+  never taken under `takeItem`: they are cast like the rest, and leave or are removed with them.
 - `breakThem`: after contact, no armed cast member can fight.
 
 The cast still fighting take the target-taken shock. From then the party fires only where it
-stands and falls back to the ramp foot, the down carried.
+stands and falls back to the ramp foot, the down and the item carried.
 
 The party withdraws by its plan's `withdrawWhen` (`expedition.withdrawWhen`: `firstDown` at the
 first party member down or dead, `halfDown` once 0.5 of the party is) or by `withdrawParty`: every
 party member still fighting breaks for the ship and `partyWithdrew` says so once.
 
 The expedition resolves (`expeditionResolved` with the tally of wounds and deaths per side since
-the start, the shots and the seconds from contact) at the first of:
+the start, the shots, the seconds from contact and `targetName`: the target's, or on an item
+errand the errand's `targetName`, so the end reads "General Cargo Crate taken") at the first of:
 
-- `targetFled`: the target leaves by the exit;
-- `targetTaken`: the objective held and the party (the down carried or set down) and the target at
-  the ramp foot or aboard;
+- `targetFled`: under `takeTarget`, the target leaves by the exit; under any other objective the
+  target leaving is one more of the cast gone, and the expedition goes on;
+- `targetTaken`: the objective held and the party (the down carried or set down) and the target or
+  the item at the ramp foot or aboard;
 - `partyWithdrew`: a called-back party all aboard, down or dead;
 - `partyRouted`: after contact, every party member down, dead or fled aboard uncalled;
 - `timedOut`: `expedition.maxFightSeconds` (120) after contact.
 
-The alert stands down `expedition.alertClearSeconds` (60) later (`alertCleared`, cause `fight`).
-The party leave the fight and the planner has them again. The taken target and the cast's down and
-dead are removed; the rest of the cast walk off by the exit and are removed there, or all at once
-the tick the ship plans her lift-off, so departure prep never meets them (§known-sites). The
-party's muster stops. The party's dead stay where they fell. `state.expedition` stays `resolved` until a new start replaces it.
+The alert stands down `expedition.alertClearSeconds` (60) later (`alertCleared`, cause `fight`). The
+party leave the fight and the planner has them again. A target taken under `takeTarget` and the
+cast's down and dead are removed; the rest of the cast walk off by the exit and are removed there,
+or all at once the tick the ship plans her lift-off, so departure prep never meets them
+(§known-sites). The party's muster stops. The party's dead stay where they fell. `state.expedition`
+stays `resolved` until a new start replaces it.
 
 ### Settling the errand
 
@@ -483,7 +535,8 @@ before the party and cast leave the fight (`systems/expedition/errand.ts` `settl
   target, so a kill job could never be a kill; owner: "Kill jobs should end in an execution if
   kills never happen." (D104)
 - A `fetchItem` taken is `broughtItem` once its item is stowed aboard as the job's one manifest
-  line (from a party member's hands, else the floor nearest the loot post).
+  line: the one the party carried home (§the-objective-and-resolution), else the one on the site
+  floor nearest the loot post.
 - Every other outcome is `failed`: the job fails there and then (`jobFailed`, outcome `failed`).
 
 Whatever the outcome the voyage home (`returnToPortId`) is set, never the next hop, so travel
@@ -513,7 +566,8 @@ is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is stunned"
 "... is dead"; "... runs for the ship" or "runs for <the exit post's name>"; "... gives up"; "The
 party pulls back to the ramp"; and the end: "Corran Vale taken; two of ours hurt" (or "dead"),
 "Corran Vale got away", "The party came back without Corran Vale", "The party is driven back to
-the ship", "The fight at the Boathouse peters out". Shots and healed wounds have no line.
+the ship", "The fight at the Boathouse peters out", each with the notice's ending under a narrator's
+mark (§getting-in-unseen). Shots and healed wounds have no line.
 `expeditionContact` and `died` drop fast play to 1x (§auto-slowdown).
 
 ### The plan menu
@@ -522,10 +576,13 @@ the ship", "The fight at the Boathouse peters out". Shots and healed wounds have
 chosen id against the same menu the narrator will read. It is the cross product of the five
 postures, `lethal` and `stun` (and `holdFire` for `bait` and `creep`) and the four squad rules,
 dropping a squad rule that picks the same people as an earlier one for the same posture and fire.
-Ids read `<posture>-<fire>-<squad>` (`all`, `armed`, `blasters`, `small`). Order: the default
-pair `hold-lethal-armed` and `assault-lethal-armed`, then the other postures' lethal-armed, then
-`assault-stun-armed`, then the rest; eight at most. Every plan's objective is `takeTarget` on a
-site with a target post, else `breakThem`, and it withdraws at `halfDown`.
+Ids read `<posture>-<fire>-<squad>` (`all`, `armed`, `blasters`, `small`). Every plan's
+objective follows the live expedition's errand (`Expedition.jobId`): `takeItem` for a
+`fetchItem`, else `takeTarget` on a site with a target post, else `breakThem`; a resolved
+expedition's errand, or a scenario start's lack of one, counts as none. Every plan withdraws at
+`halfDown`. Order: the errand kind's pair (`defaultPairFor`, §the-arrival-card; the person's pair
+with no errand), then the other postures' lethal-armed, then `assault-stun-armed`, then the rest;
+eight at most, so the item pair's `creep-holdFire-armed` is always on an item errand's menu.
 
 An option is unavailable, with the reason as its `why`, when the squad is empty or the locker has
 none of what it needs, when `flank` has no flank post or fewer than four go, when `bait` has fewer

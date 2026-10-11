@@ -222,6 +222,14 @@ export const SCRIPTED_ROCKS = [...ROCK_SIZES, ""] as const;
  */
 export const SCRIPTED_EFFECTS = [...MACHINE_EFFECTS, ""] as const;
 
+/**
+ * D105: the side of the expedition's arrival card the narrator lets the crew get in unseen by,
+ * empty for neither (§narrator-authority: empty, not nullable); the translator turns a side into
+ * `markUnseen` with that side's plan.
+ */
+export const UNSEEN_SIDES = ["", "left", "right"] as const;
+export type UnseenSide = (typeof UNSEEN_SIDES)[number];
+
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
@@ -392,6 +400,8 @@ export function buildNarratorPlanSchema() {
         rightLabel: z.string(),
         leftAftermath: aftermath,
         rightAftermath: aftermath,
+        // D105: the description stays under eight words; the capability block explains it.
+        unseen: z.enum(UNSEEN_SIDES).describe("Arrival card side that sneaks in; else empty."),
       })
       .nullable(),
     /**
