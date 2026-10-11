@@ -26,6 +26,7 @@ import {
   quietTooLongRequest,
   requestedCallRequest,
   siteArrivalRequest,
+  siteItemArrivalRequest,
   siteTurnRequest,
   stageDockRequest,
 } from "../fixtures";
@@ -205,6 +206,46 @@ const ERRAND_NOTES = {
     },
   ],
   lastUpdatedTick: 1_200,
+  lastRejections: [],
+};
+
+/**
+ * D105: notes for the item errand's arrival card: the story has set up a quiet way in (the gleaner
+ * Wenna Brae told Ysolde of the back lane to the seed container doors, and that old Amos at the back
+ * door is deaf on that side), so the model has a reason to name the creep side unseen.
+ */
+const ITEM_ERRAND_NOTES = {
+  summary:
+    "Ysolde Maren of the Meridian Growers Collective sent the ship from the Hub to Harrow End for the Collective's seed stock, which Teodor Lusk sold to an off-world buyer. The ship has just set down at the silo yard.",
+  threads: [
+    {
+      title: "The Collective's seed",
+      scale: "episode",
+      people: ["Ysolde Maren", "Teodor Lusk", "Wenna Brae"],
+      arcNotes:
+        "Teodor sold the Collective's seed stock to an off-world buyer; it sits crated at the seed container doors at Harrow End, watched by the buyer's hired gun Rhee Castellan. Wenna Brae, who gleans the yard, told Ysolde the back lane runs behind the weigh-house to the container doors, and that old Amos Wray at the back door is deaf on that side.",
+      nextBeat:
+        "At Harrow End the crew choose how to go in; Wenna's back lane is the quiet way to the seed.",
+      lastBeatTick: 0,
+      beatCardShown: false,
+    },
+  ],
+  cardsShown: [],
+  cast: [
+    {
+      name: "Ysolde Maren",
+      note: "grower with the Meridian Growers Collective; wants the seed stock home",
+      portId: "port.crossroads_hub",
+      lastSeenTick: 0,
+    },
+    {
+      name: "Wenna Brae",
+      note: "gleaner at Harrow End; told Ysolde of the back lane behind the weigh-house",
+      portId: "",
+      lastSeenTick: 0,
+    },
+  ],
+  lastUpdatedTick: 0,
   lastRejections: [],
 };
 
@@ -466,6 +507,51 @@ suite(
         );
         expect(response.card?.speaker?.toLowerCase()).toBe(firstOfficer?.name.toLowerCase());
         expect(response.commands.filter((c) => c.kind === "surfaceDecision")).toEqual([]);
+        expect(playerText(response.card), "a digit on the card").not.toMatch(/\d/);
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "policyDecision: the item errand's arrival card with a back way set up: the way in unseen translates, the sides are the sim's (D105)",
+      async () => {
+        const request = siteItemArrivalRequest(content());
+        const run = await liveRun(request, { notes: ITEM_ERRAND_NOTES });
+        const response = expectModelAnswered(run);
+        if (request.hook.kind !== "policyDecision") throw new Error("fixture hook kind");
+        const decisionId = request.hook.context.decisionId;
+        expect(
+          response.card,
+          `no card translated (rejections: ${JSON.stringify(response.notesUpdate?.lastRejections)})`,
+        ).toBeDefined();
+        expect(response.card?.decisionId).toBe(decisionId);
+        const plan = run.trace.plan;
+        const unseen = plan !== undefined && "card" in plan ? plan.card?.unseen : undefined;
+        console.log(
+          `item arrival card (unseen ${JSON.stringify(unseen)}; rationale: ${plan?.rationale}):`,
+          JSON.stringify(response.card, null, 2),
+        );
+        const decision = request.snapshot.state.decisions.records[decisionId as DecisionId];
+        const marks = response.commands.filter((c) => c.kind === "markUnseen");
+        const unseenDrops = (response.dropped ?? []).filter((d) =>
+          d.reason.startsWith("card.unseen"),
+        );
+        expect(unseenDrops, "the way in unseen was dropped").toEqual([]);
+        if (unseen === "left" || unseen === "right") {
+          expect(marks).toHaveLength(1);
+          const planId = decision?.prompt.params[`${unseen}Plan`];
+          expect(marks[0]?.payload).toEqual({ decisionId, planId });
+        } else {
+          expect(marks).toEqual([]);
+        }
+        // The card is dressed, never replaced: no new card, and each side keeps its adoptPlan.
+        expect(response.commands.filter((c) => c.kind === "surfaceDecision")).toEqual([]);
+        expect(decision?.left.commands).toEqual([
+          { kind: "adoptPlan", payload: { planId: decision?.prompt.params.leftPlan } },
+        ]);
+        expect(decision?.right.commands).toEqual([
+          { kind: "adoptPlan", payload: { planId: decision?.prompt.params.rightPlan } },
+        ]);
         expect(playerText(response.card), "a digit on the card").not.toMatch(/\d/);
       },
       LIVE_TIMEOUT_MS,

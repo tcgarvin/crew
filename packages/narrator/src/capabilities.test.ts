@@ -71,8 +71,8 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the seven narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field)", () => {
-    const levers = [...text.matchAll(/^## \d\. (\w+)/gm)].map((m) => m[1]);
+  it("names exactly the eight narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field, card.unseen D105)", () => {
+    const levers = [...text.matchAll(/^## \d\. ([\w.]+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
       "spawnAtBoundary",
@@ -81,9 +81,10 @@ describe("buildCapabilities", () => {
       "stockMarket",
       "scheduleHazard",
       "scheduleField",
+      "card.unseen",
     ]);
-    expect(text).toContain("You have exactly seven levers");
-    expect(text).not.toContain("six levers");
+    expect(text).toContain("You have exactly eight levers");
+    expect(text).not.toContain("seven levers");
   });
 
   it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (§hazard-and-field-levers)", () => {
@@ -206,13 +207,25 @@ describe("buildCapabilities", () => {
     expect(text).toContain("you never cause it");
   });
 
+  it("documents the way in unseen: the arrival card only, what each side means, never a hold side (D105)", () => {
+    expect(text).toContain("## 8. card.unseen: the way in unseen, on a site's arrival card");
+    expect(text).toContain("Only on the policyDecision call for a site's arrival card");
+    expect(text).toContain("empty for neither, and empty on every other card");
+    expect(text).toContain("the party slips in unseen: nobody there notices them");
+    expect(text).toContain("the people there were waiting");
+    expect(text).toContain("never a side that holds the ramp (dropped)");
+    expect(text).toContain("never given away on the card");
+    expect(text).toContain("you never choose the plan");
+    expect(text).toContain("may name the arrival card's way in unseen, lever 8");
+  });
+
   it("documents privateTalk as a card side effect, warm or stern, and not as a lever (§private-talk)", () => {
     expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
     expect(text).toContain("the talk moves how they feel about the captain");
     expect(text).toContain("never the captain herself, a passenger or someone ashore");
-    expect(text).toContain("You have exactly seven levers.");
-    expect(text.match(/^## \d\. /gm)).toHaveLength(7);
+    expect(text).toContain("You have exactly eight levers.");
+    expect(text.match(/^## \d\. /gm)).toHaveLength(8);
   });
 
   it("measures distance from the docked port when docked", () => {
