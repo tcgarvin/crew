@@ -4,13 +4,22 @@
  * (no commands; a template card for a policy decision). §staging-hook-and-the-hold: it stages
  * nothing, so a dock is the sim's floor set, and it never offers on the way in.
  */
-import type { ActorId, ContentBundle, NarratorHook, PortDefId, SaveEnvelope } from "@crew/sim";
+import type {
+  ActorId,
+  ContentBundle,
+  DecisionId,
+  NarratorHook,
+  PortDefId,
+  SaveEnvelope,
+} from "@crew/sim";
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import {
+  FIXTURE_ERRAND_TARGET,
   approachRequest,
   quietTooLongRequest,
   requestedCallRequest,
+  siteArrivalRequest,
   stageDockRequest,
 } from "./fixtures";
 import { pathBetween, payFor, routeDistance } from "./lookups";
@@ -168,7 +177,7 @@ describe("null narrator offers work (D40)", () => {
     expect(routeDistance(bundle, TERNS, DRIFT)).toBeUndefined();
     const line = job.cargo[0];
     if (line === undefined) throw new Error("no cargo");
-    const distance = pathBetween(bundle, TERNS, DRIFT)?.distance;
+    const distance = pathBetween(bundle, snapshot.state, TERNS, DRIFT)?.distance;
     if (distance === undefined) throw new Error("no path");
     const { min, max } = payFor(bundle.config, "hazardous", distance, line.count, "standard");
     expect(job.pay).toBeGreaterThanOrEqual(min);
@@ -201,5 +210,71 @@ describe("null narrator offers work (D40)", () => {
     expect(res.commands).toEqual([]);
     expect(res.card).toBeUndefined();
     expect(res.model).toBe(NULL_NARRATOR_MODEL);
+  });
+});
+
+describe("null narrator and errands (expeditions A2, plan call 14)", () => {
+  it("never offers an errand: its offers are the port's freight templates", () => {
+    for (const tick of [2_400, 2_401, 2_402, 2_403, 2_404]) {
+      const { command } = offerOf(captainAshoreRequest(tick));
+      expect(command.payload.job.errand).toBeUndefined();
+      expect(command.payload.job.toPortId).not.toBe(command.payload.job.fromPortId);
+    }
+  });
+
+  it("dresses the arrival card from its template: the first officer at the ramp head, the two plans as sides", () => {
+    const req = siteArrivalRequest(content());
+    const res = nullNarratorResponse(req, { callId: "c", content: content() });
+    const firstOfficer = Object.values(req.snapshot.state.actors).find((a) =>
+      a.roleTags.includes("firstOfficer"),
+    );
+    expect(res.commands).toEqual([]);
+    expect(res.card).toMatchObject({
+      title: "At Harrow End",
+      speaker: firstOfficer?.name,
+      leftLabel: "Hold the ramp from cover",
+      rightLabel: "Go in and take them",
+    });
+    expect(res.card?.situation).toContain(
+      `${FIXTURE_ERRAND_TARGET} is at Harrow End, and not alone.`,
+    );
+    expect(res.card?.leftAftermath).toMatch(/^hold the ramp from cover \(\d+ go\)$/);
+  });
+
+  it("dresses the turn card from its template", () => {
+    const req = siteArrivalRequest(content());
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const state = snapshot.state;
+    const arrival = state.decisions.queue[0];
+    const card = arrival === undefined ? undefined : state.decisions.records[arrival];
+    if (card === undefined) throw new Error("no arrival card");
+    const turnId = "d-turn" as DecisionId;
+    const key = "expedition.turn";
+    state.decisions.records[turnId] = {
+      ...card,
+      id: turnId,
+      prompt: { key, params: { speaker: "Dane Whitcross", name: "Mattie Lusk", how: "down" } },
+      left: { label: { key: `${key}.press`, params: {} }, commands: [] },
+      right: {
+        label: { key: `${key}.withdraw`, params: {} },
+        commands: [{ kind: "withdrawParty", payload: {} }],
+      },
+    };
+    state.decisions.queue = [turnId];
+    const hook: NarratorHook = {
+      ...req.hook,
+      kind: "policyDecision",
+      context: { decisionId: turnId },
+    };
+    const res = nullNarratorResponse(
+      { ...req, hook, snapshot },
+      { callId: "c", content: content() },
+    );
+    expect(res.card).toMatchObject({
+      title: "The fight turns",
+      situation: "Dane Whitcross: Mattie Lusk is down. Press on, or pull back?",
+      leftLabel: "Press on",
+      rightLabel: "Pull back to the ship",
+    });
   });
 });

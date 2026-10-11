@@ -24,6 +24,7 @@ import {
   passengerOverdueRequest,
   quietTooLongRequest,
   requestedCallRequest,
+  siteArrivalRequest,
   stageDockRequest,
 } from "../fixtures";
 import { NULL_NARRATOR_MODEL } from "../null";
@@ -169,6 +170,39 @@ const REQUESTED_CALL_NOTES = {
     },
   ],
   lastUpdatedTick: 2_900,
+  lastRejections: [],
+};
+
+/**
+ * Expeditions A2: notes for the errand case, at the Hub: a thread whose next beat is an errand, so
+ * the model has a reason to reach for one (and the test sees whether it translates).
+ */
+const ERRAND_NOTES = {
+  summary:
+    "The crew have run two plain cargo jobs out of the Hub. At Green Meridian the growers talk of a co-op steward who ran with the seed money.",
+  threads: [
+    {
+      title: "The steward who ran",
+      scale: "episode",
+      people: ["Ysolde Maren", "Teodor Lusk"],
+      arcNotes:
+        "Teodor Lusk, steward of the Meridian Growers Collective, vanished with the seed fund; word is he is holed up at the old silo yard at Harrow End with people of his own.",
+      nextBeat:
+        "When the captain is next looking for work at the Hub, Ysolde Maren asks the ship to bring Teodor back from Harrow End, alive.",
+      lastBeatTick: 1_200,
+      beatCardShown: false,
+    },
+  ],
+  cardsShown: [],
+  cast: [
+    {
+      name: "Ysolde Maren",
+      note: "grower with the Meridian Growers Collective; wants the steward brought home",
+      portId: "port.crossroads_hub",
+      lastSeenTick: 1_200,
+    },
+  ],
+  lastUpdatedTick: 1_200,
   lastRejections: [],
 };
 
@@ -369,6 +403,54 @@ suite(
         );
         expect(firstOfficer, "fixture has no first officer").toBeDefined();
         expect(response.card?.speaker?.toLowerCase()).toBe(firstOfficer?.name.toLowerCase());
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "captainAshore at the hub with an errand thread due: an errand offer that translates, or a rationale (expeditions A2)",
+      async () => {
+        const run = await liveRun(farCaptainAshoreRequest(content()), { notes: ERRAND_NOTES });
+        const response = expectModelAnswered(run);
+        const errand = response.commands.find(
+          (c) => c.kind === "offerJob" && c.payload.job.errand !== undefined,
+        );
+        const rationale = run.trace.plan?.rationale ?? "";
+        const droppedOffers = (response.dropped ?? []).filter((d) => d.kind === "offerJob");
+        console.log(
+          `errand captainAshore: ${errand === undefined ? "no errand" : JSON.stringify(errand.kind === "offerJob" ? errand.payload.job.errand : undefined)}; dropped ${JSON.stringify(droppedOffers)}; rationale: ${rationale}`,
+        );
+        expect(droppedOffers, "an offer was dropped by the translator").toEqual([]);
+        expect(
+          errand !== undefined || rationale.length > 0,
+          "no errand offered and no rationale explaining the choice",
+        ).toBe(true);
+        if (errand?.kind === "offerJob") {
+          expect(errand.payload.job.toPortId).toBe(errand.payload.job.fromPortId);
+          expect(errand.payload.job.cargo).toEqual([]);
+        }
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "policyDecision: the first officer brings the arrival card at a site, the two plans in order (expeditions A2)",
+      async () => {
+        const request = siteArrivalRequest(content());
+        const run = await liveRun(request);
+        const response = expectModelAnswered(run);
+        if (request.hook.kind !== "policyDecision") throw new Error("fixture hook kind");
+        expect(
+          response.card,
+          `no card translated (rejections: ${JSON.stringify(response.notesUpdate?.lastRejections)})`,
+        ).toBeDefined();
+        expect(response.card?.decisionId).toBe(request.hook.context.decisionId);
+        console.log("arrival card:", JSON.stringify(response.card, null, 2));
+        const firstOfficer = Object.values(request.snapshot.state.actors).find(
+          (a) => a.passenger !== true && a.roleTags.includes("firstOfficer"),
+        );
+        expect(response.card?.speaker?.toLowerCase()).toBe(firstOfficer?.name.toLowerCase());
+        expect(response.commands.filter((c) => c.kind === "surfaceDecision")).toEqual([]);
       },
       LIVE_TIMEOUT_MS,
     );

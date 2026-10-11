@@ -917,7 +917,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.28");
+    expect(PROMPT_VERSION).toBe("v0.29");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -1089,6 +1089,37 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     );
     expect(STATIC_RULES).toContain('retired: titles copied from "Open threads"');
     expect(STATIC_RULES).not.toContain("moot before the captain ever saw it");
+  });
+
+  it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
+    expect(PROMPT_VERSION).toBe("v0.29");
+    expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
+    expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
+    expect(STATIC_RULES).toContain(
+      "Never state a wound, a death or a capture the digest does not show",
+    );
+    expect(STATIC_RULES).toContain(
+      "A kill job (wants dead) is rare, and whoever offers one is never clean.",
+    );
+    expect(STATIC_RULES).toContain(
+      "Errands are occasional among the freight and passages, not the usual work",
+    );
+  });
+
+  it("tells the model how to dress the arrival and the turn card on policyDecision (expeditions A2, plan calls 4, 15)", () => {
+    const policy = HOOK_INSTRUCTIONS.policyDecision;
+    expect(policy).toContain("expedition.arrival");
+    expect(policy).toContain("expedition.turn");
+    expect(policy).toContain("the first officer brings it at the ramp head");
+    expect(policy).toContain(
+      "the two sides are the two plans the sim put on it, in the order given",
+    );
+    expect(policy).toContain("keep each side to its plan and rewrite only the words");
+    expect(policy).toContain("says who broke or went down");
+    expect(policy).toContain("what the party is doing now");
+    expect(policy).toContain("never state a wound, a death or a capture the digest does not show");
+    // The existing rule still holds for them: dress the card, add none.
+    expect(policy).toContain("Do not add intents that create new cards.");
   });
 });
 

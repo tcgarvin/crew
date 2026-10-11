@@ -10,6 +10,7 @@ import {
   type Job,
   type Machine,
   type MachineFault,
+  PAY_TIER_FRACTION,
   type PhysicalLocation,
   type PortDefId,
   type SaveEnvelope,
@@ -17,10 +18,18 @@ import {
   configTicks,
   hopCount,
   isOnDock,
-  isSite,
+  portGraph,
   roomPhrase,
   shortestPath,
+  siteNearPort,
 } from "@crew/sim";
+
+/**
+ * Fraction of the price band each pay tier sits at (W9 decision). The sim's own table
+ * (`systems/commerce/errand.ts`), re-exported so the translator's pay and the kernel's bands
+ * cannot drift (expeditions A2, plan call 6).
+ */
+export { PAY_TIER_FRACTION };
 
 export type Snapshot = DeepReadonly<SaveEnvelope>;
 export type State = DeepReadonly<WorldState>;
@@ -164,27 +173,56 @@ export function routeDistance(
  * and summed distance, or `undefined` when either port is unknown or no chain joins them. The
  * same `shortestPath` the kernel prices jobs by, so the translator's pay matches the kernel's
  * band and the digest's "N hops" matches the voyage the sim will actually run.
+ *
+ * Expeditions A2 (§3.2, plan call 2): over `portGraph`'s `"all"` graph, so a landing site is
+ * reached through its near port (and left by its own route back) whether or not it is known yet.
+ * Freight, passages and a card's course never go to a site: the translator refuses those itself.
  */
 export function pathBetween(
   content: ContentBundle,
+  state: State,
   fromPortId: string,
   toPortId: string,
 ):
   | { readonly path: readonly PortDefId[]; readonly hops: number; readonly distance: number }
   | undefined {
-  // Expeditions A1 (call 4): no chain of legs reaches a landing site for the narrator until A2.
-  if (isSite(content, fromPortId as PortDefId) || isSite(content, toPortId as PortDefId)) {
-    return undefined;
-  }
-  const found = shortestPath(content.ports, fromPortId as PortDefId, toPortId as PortDefId);
+  const graph = portGraph(content, state, "all");
+  const found = shortestPath(graph, fromPortId as PortDefId, toPortId as PortDefId);
   if (found === undefined) return undefined;
   return { path: found.path, hops: hopCount(found.path), distance: found.distance };
+}
+
+/**
+ * Expeditions A2 (§6): the distance an errand from `fromPortId` to `siteId` is paid over, the path
+ * out plus the path back, as the kernel's `checkErrandBand` measures it; `undefined` when either
+ * way is missing.
+ */
+export function errandDistance(
+  content: ContentBundle,
+  state: State,
+  fromPortId: string,
+  siteId: string,
+): number | undefined {
+  const out = pathBetween(content, state, fromPortId, siteId);
+  const back = pathBetween(content, state, siteId, fromPortId);
+  return out === undefined || back === undefined ? undefined : out.distance + back.distance;
 }
 
 /** The port the ship is at or heading for next: the docked port, or the far end of the leg. */
 export function portHereOrNext(state: State): PortDefId {
   const travel = state.travel;
   return travel.stage === "docked" ? travel.portId : travel.toPortId;
+}
+
+/**
+ * §2.4, expeditions A2: where the capability block measures "from here": the port the ship is at
+ * or heading for, or that site's near port when it is a landing site, so the block reads the same
+ * on the way to a site, at it and on the way back (the cached prefix keeps), and every distance is
+ * from a place an offer can be made.
+ */
+export function reachFrom(content: ContentBundle, state: State): PortDefId {
+  const here = portHereOrNext(state);
+  return siteNearPort(content, here) ?? here;
 }
 
 /**
@@ -212,7 +250,7 @@ export function voyageAhead(
   if (destinationId === undefined) return undefined;
   const from = portHereOrNext(state);
   if (from === destinationId) return undefined;
-  const path = pathBetween(content, from, destinationId);
+  const path = pathBetween(content, state, from, destinationId);
   if (path === undefined) return undefined;
   return { destinationId, hops: path.hops, distance: path.distance };
 }
@@ -242,9 +280,6 @@ export const JOB_QUANTITY_UNITS = { one: 1, few: 3, several: 6 } as const;
 
 /** Units per quantity tier for a boundary spawn, before the `maxSpawnsPerCommand` clamp. */
 export const SPAWN_QUANTITY_UNITS = { one: 1, few: 2, several: 3 } as const;
-
-/** Fraction of the price band each pay tier sits at. W9 decision. */
-export const PAY_TIER_FRACTION = { low: 0.15, standard: 0.5, generous: 0.85 } as const;
 
 /**
  * Credits for a job, mirroring the kernel's `checkPriceBand` (systems/commerce/jobs.ts): the band

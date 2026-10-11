@@ -26,8 +26,10 @@ import {
   dayTicks,
   describeEvent,
   effectiveMarket,
+  isSite,
   jobBlockingAcceptance,
   marketBlock,
+  siteNearPort,
   ticksToSeconds,
 } from "@crew/sim";
 import { onDockLines, personLine, stagingDockLines } from "./dockside-digest";
@@ -57,6 +59,13 @@ import {
 } from "./lookups";
 import type { ArcEnding, NarratorNotes } from "./notes";
 import { crewOffWatchClauses, offWatchLine, rivalriesLine } from "./offwatch-digest";
+import {
+  EXPEDITION_ARRIVAL_KEY,
+  EXPEDITION_TURN_KEY,
+  atSiteLines,
+  captiveAboard,
+  errandJobPhrase,
+} from "./site-digest";
 import { bodyPhrase, dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
 /**
@@ -66,6 +75,9 @@ import { bodyPhrase, dutyTag, helmEventLines, moodPhrase, watchLine } from "./wa
 const TEMPLATED_PROMPT_KEYS: ReadonlySet<string> = new Set([
   "travel.departureGate",
   PASSENGER_OVERDUE_PROMPT_KEY,
+  // Expeditions A2 (plan calls 4 and 15): the arrival and turn cards.
+  EXPEDITION_ARRIVAL_KEY,
+  EXPEDITION_TURN_KEY,
 ]);
 
 /** ~2.5k tokens at ~4 characters per token. */
@@ -255,11 +267,21 @@ function travelLine(state: State, content: ContentBundle): string {
   if (t.stage === "docked") {
     const next =
       t.plannedDestinationId === undefined ? "" : portName(content, t.plannedDestinationId);
+    // Expeditions A2 (§3.3): a site is set down at, not docked at, and left by lifting off.
+    const near = siteNearPort(content, t.portId);
+    const setDown =
+      near === undefined
+        ? undefined
+        : `travel: set down at ${portName(content, t.portId)} (${t.portId}), a landing site off ${portName(content, near)}`;
     if (voyage !== undefined) {
       const nextLeg = next === "" ? "" : `; next leg to ${next}`;
+      if (setDown !== undefined) {
+        return `${setDown}; bound for ${portName(content, voyage.destinationId)} (${voyage.destinationId}), ${hopsWord(voyage.hops, voyage.distance)} still to go${nextLeg}; the ship lifts off on her own once nothing holds her here`;
+      }
       return `travel: stopping at ${portName(content, t.portId)} (${t.portId}) on the way to ${portName(content, voyage.destinationId)} (${voyage.destinationId}); ${hopsWord(voyage.hops, voyage.distance)} still to go${nextLeg}; the ship continues on her own once nothing holds her here`;
     }
     const course = next === "" ? "" : `; course set for ${next}`;
+    if (setDown !== undefined) return `${setDown}${course}`;
     return `travel: docked at ${portName(content, t.portId)} (${t.portId})${course}`;
   }
   const progress = t.routeDistance > 0 ? t.routeProgress / t.routeDistance : 0;
@@ -270,7 +292,14 @@ function travelLine(state: State, content: ContentBundle): string {
       : t.drifting
         ? ", DRIFTING (propulsion lost)"
         : "";
-  return `travel: ${t.stage}, under way ${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId}), ${pct(progress)} of route${drifting}${bound}`;
+  const leg = `${portName(content, t.fromPortId)} -> ${portName(content, t.toPortId)} (${t.toPortId})`;
+  const how =
+    isSite(content, t.toPortId) && (t.stage === "approaching" || t.stage === "docking")
+      ? `setting down at ${portName(content, t.toPortId)} (${t.toPortId}), a landing site`
+      : isSite(content, t.fromPortId) && (t.stage === "undocking" || t.stage === "departing")
+        ? `lifting off from ${portName(content, t.fromPortId)}, under way ${leg}`
+        : `under way ${leg}`;
+  return `travel: ${t.stage}, ${how}, ${pct(progress)} of route${drifting}${bound}`;
 }
 
 function shipSection(
@@ -318,7 +347,9 @@ function shipSection(
   lines.push(
     offerPort === undefined
       ? "job offers possible now: none (not docked; offers are made in person at the dock)"
-      : `job offers possible now: fromPort ${offerPort}`,
+      : isSite(content, offerPort)
+        ? "job offers possible now: none (set down at a landing site; offers are made at ports)"
+        : `job offers possible now: fromPort ${offerPort}`,
   );
   return section("Ship", lines, NEVER_DROPS);
 }
@@ -402,6 +433,15 @@ function aboardLine(
           : `bound for ${portName(content, job.toPortId)} and back to ${portName(content, job.fromPortId)}`
         : `bound for ${portName(content, job.toPortId)}, one way`;
   const purpose = job?.description.prose === undefined ? "" : ` Says: ${job.description.prose}`;
+  // Expeditions A2 (§6): the errand's target, brought aboard alive, rides home on its passage.
+  const captive = job === undefined ? undefined : captiveAboard(content, job);
+  if (captive !== undefined) {
+    const now =
+      actor.disembarking === true
+        ? "going down the ramp"
+        : `${actionLabel(actor, state, content)}${placePhrase(content, state, actor.location)}`;
+    return `- Aboard: ${actor.name}, ${captive}; now ${now}.`;
+  }
   if (passage?.leg === "ashore" && job !== undefined) {
     const dueAt = passage.returnsAtTick;
     const back =
@@ -521,10 +561,6 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
       );
     }
   }
-  const npcs = Object.values(state.actors).filter((a) => !a.crew);
-  if (npcs.length > 0) {
-    lines.push(`- NPCs: ${npcs.map((a) => a.name).join(", ")}`);
-  }
   return section(`Crew (${actors.length})`, lines, 6);
 }
 
@@ -625,7 +661,9 @@ function jobSection(state: State, content: ContentBundle): Section {
     .map((j) => {
       const cargo = j.cargo.map((c) => `${c.count}x ${itemName(content, c.itemDefId)}`).join(", ");
       // §2.3: a far destination says how far, so the model knows the job is a voyage.
-      const path = pathBetween(content, j.fromPortId, j.toPortId);
+      // Expeditions A2 (§6): an errand's far end is its site.
+      const farEnd = j.errand?.siteId ?? j.toPortId;
+      const path = pathBetween(content, state, j.fromPortId, farEnd);
       const far =
         path === undefined || path.hops <= 1
           ? ""
@@ -636,19 +674,28 @@ function jobSection(state: State, content: ContentBundle): Section {
       // §cards-never-mention-pay: pay is left out; the model has no use for the amount and must
       // never repeat it. §3.1: a passage says so, with the leg it is on; its cargo line is luggage.
       const passage = j.passage;
-      const kind =
+      const passageWords =
         passage === undefined
-          ? cargo
-          : `${passage.roundTrip ? "round-trip passage" : "one-way passage"} (${passage.endReason ?? `leg ${passage.leg}`})${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
+          ? undefined
+          : `${passage.roundTrip ? "round-trip passage" : "one-way passage"} (${passage.endReason ?? `leg ${passage.leg}`})`;
+      const kind =
+        j.errand !== undefined
+          ? `${errandJobPhrase(content, j.errand)}${passageWords === undefined ? "" : `; ${j.errand.targetName} aboard on a ${passageWords}`}`
+          : passageWords === undefined
+            ? cargo
+            : `${passageWords}${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
       const finishing = j.status !== "offered" && blocking === undefined ? FINISHING_HERE : "";
-      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, j.toPortId)}${far}, ${kind}${finishing}`;
+      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, farEnd)}${far}, ${kind}${finishing}`;
     });
   return section("Jobs", lines, 7);
 }
 
-/** §dock-sections: "On the dock" with a dock alongside; none in flight. */
+/**
+ * §dock-sections: "On the dock" with a dock alongside; none in flight. Expeditions A2: with a site
+ * map alongside it is "At the site" instead.
+ */
 function dockSections(state: State, content: ContentBundle): Section[] {
-  const dock = onDockLines(state, content);
+  const dock = atSiteLines(state, content) ?? onDockLines(state, content);
   return dock === undefined ? [] : [section(dock.heading, dock.lines, 6)];
 }
 
