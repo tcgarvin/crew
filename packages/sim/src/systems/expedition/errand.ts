@@ -19,7 +19,7 @@
 import { isOnDock } from "../../core/docks";
 import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
-import type { PhysicalLocation } from "../../core/types/common";
+import type { PhysicalLocation, TileCoord } from "../../core/types/common";
 import type { ItemDefId, ItemId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { ExpeditionOutcome } from "../../core/types/state";
@@ -27,8 +27,9 @@ import type { ErrandOutcome, Job, JobErrand } from "../../core/types/travel";
 import { shipDeckId } from "../../core/world";
 import { cargoStowageZoneKey, deliveryComplete } from "../commerce/jobs";
 import { spawnCaptive } from "../commerce/passage";
-import type { Fight } from "./combat";
-import { distance } from "./ground";
+import { type Fight, presses } from "./combat";
+import { distance, onSite, tileOfActor } from "./ground";
+import { adjacent8 } from "./los";
 import { leaderNow } from "./plans";
 
 /**
@@ -77,12 +78,53 @@ export function settleErrand(fight: Fight, outcome: ExpeditionOutcome): void {
 }
 
 /**
- * The `takeItem` objective is held this tick (`checkObjective`, `expedition.ts`): the party member
- * pressing beside the loot post is to pick the errand's item up, so `stowFetchedItem` finds it in
- * their hands. Gate stub (D105): nothing is picked up yet and the item stays on the floor, where
- * `fetchedItem` still finds it.
+ * The `takeItem` objective is held this tick (`checkObjective`, `expedition.ts`): the first party
+ * member by id pressing beside the loot post with the errand's item within reach (on their tile or
+ * beside it, on the site floor, nearest the post first) takes it in hand (`carriedBy`), so it goes
+ * back to the ramp with them and `stowFetchedItem` finds it there. There is no limit to what hands
+ * hold: the presser keeps their weapon. Nothing to pick up for an expedition with no item errand;
+ * with the item out of every presser's reach it stays where it lies, and settling takes it from the
+ * floor nearest the post.
  */
-export function pickUpLoot(_fight: Fight): void {}
+export function pickUpLoot(fight: Fight): void {
+  const { ctx, expedition } = fight;
+  const jobId = expedition.jobId;
+  const errand = jobId === undefined ? undefined : ctx.state.jobs[jobId]?.errand;
+  const loot = fight.ground.posts.loot;
+  if (errand?.kind !== "fetchItem" || loot === undefined) return;
+  const itemDefId = errand.itemDefId;
+  if (itemDefId === undefined) throw new Error(`pickUpLoot: fetchItem "${jobId}" names no item`);
+  const lying = itemsOnFloor(fight, itemDefId).sort(
+    (a, b) => distance(a.tile, loot) - distance(b.tile, loot),
+  );
+  for (const person of fight.people) {
+    if (!presses(fight, person) || !onSite(ctx, person)) continue;
+    const at = tileOfActor(ctx.state, person);
+    if (at === undefined || !adjacent8(at, loot)) continue;
+    const reach = lying.find((l) => adjacent8(l.tile, at));
+    const item = reach === undefined ? undefined : ctx.state.items[reach.id];
+    if (item === undefined) continue;
+    item.location = { kind: "carriedBy", actorId: person.id };
+    ctx.caches.dirty.inventory = true;
+    return;
+  }
+}
+
+/** Items of `itemDefId` lying on the site floor, no job's yet, with their tiles (deck frame). */
+function itemsOnFloor(
+  fight: Fight,
+  itemDefId: ItemDefId,
+): { readonly id: ItemId; readonly tile: TileCoord }[] {
+  const { ctx } = fight;
+  const out: { id: ItemId; tile: TileCoord }[] = [];
+  for (const item of Object.values(ctx.state.items)) {
+    if (item.defId !== itemDefId || item.jobId !== undefined) continue;
+    const at = item.location;
+    if (at.kind !== "onDeck" || !isOnDock(ctx.content, ctx.state, at)) continue;
+    out.push({ id: item.id, tile: { x: Math.floor(at.x), y: Math.floor(at.y) } });
+  }
+  return out;
+}
 
 /** Grave wounds to the head at most this many times; one is enough under the default tolerances. */
 const EXECUTION_SHOTS = 4;
