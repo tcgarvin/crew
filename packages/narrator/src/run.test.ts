@@ -917,7 +917,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.29");
+    expect(PROMPT_VERSION).toBe("v0.30");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -1073,7 +1073,15 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
 
   it("tells the model about the aftermath calls (§notable-event-hook, v0.27)", () => {
     expect(STATIC_RULES).toContain(
-      "You are also called in the aftermath: when the alert stands down after a field, when a hazard has been rolled, and when a fault you caused is repaired.",
+      "You are also called in the aftermath: when the alert stands down after a field, when a hazard has been rolled, when a fault you caused is repaired, and when the fight at a site is over.",
+    );
+    // Expeditions A2 (v0.30): a failed errand closes its arc; the fight's end is its aftermath.
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain("or an errand failed (jobFailed");
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
+      "When the fight at a site is over (expeditionResolved), that is its aftermath",
+    );
+    expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
+      "never states a wound, a death, a capture or an execution the digest does not show",
     );
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain(
       "Some calls are aftermath: alertCleared (the field's end, the crew reported in), navHazard (your hazard rolled, clean or not), faultRepaired (a fault you caused is mended).",
@@ -1092,14 +1100,14 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.29");
+    expect(PROMPT_VERSION).toBe("v0.30");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
     expect(STATIC_RULES).toContain(
       "Never state a wound, a death or a capture the digest does not show",
     );
     expect(STATIC_RULES).toContain(
-      "A kill job (wants dead) is rare, and whoever offers one is never clean.",
+      "A kill job (wants dead) is rare, and whoever offers one is never clean; its target dies in the fight or, taken alive, is executed by the party at the scene",
     );
     expect(STATIC_RULES).toContain(
       "Errands are occasional among the freight and passages, not the usual work",
@@ -1115,8 +1123,11 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
       "the two sides are the two plans the sim put on it, in the order given",
     );
     expect(policy).toContain("keep each side to its plan and rewrite only the words");
-    expect(policy).toContain("says who broke or went down");
-    expect(policy).toContain("what the party is doing now");
+    expect(policy).toContain("The turn card (expedition.turn) is our setback");
+    expect(policy).toContain("never the captain");
+    expect(policy).toContain("what the rest of the party is doing now");
+    expect(policy).toContain("one concrete line in the speaker's voice of what the crew do next");
+    expect(policy).toContain("never the plan restated, no numbers, no outcome claimed");
     expect(policy).toContain("never state a wound, a death or a capture the digest does not show");
     // The existing rule still holds for them: dress the card, add none.
     expect(policy).toContain("Do not add intents that create new cards.");
