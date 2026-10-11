@@ -1575,7 +1575,8 @@ export interface ConfigDef {
     readonly maxFaultWindowSeconds: Seconds;
     /**
      * Narrator budget (review §D.3), refilled to these values (and `hazardBudget`) every
-     * `budgetRefillDays` (§the-ships-day; `core/pipeline.ts` runs the refill).
+     * `budgetRefillDays` (§the-ships-day; `core/pipeline.ts` runs the refill). Advice, never a
+     * refusal (§narrator-lever-budgets).
      */
     readonly spawnBudget: number;
     readonly faultBudget: number;
@@ -1599,6 +1600,13 @@ export interface ConfigDef {
      * (`scheduleHazard`), a budget of their own beside spawns and faults.
      */
     readonly hazardBudget: number;
+    /**
+     * §money-levers: the largest credit one `transact` may pay the ship (a windfall, a reward, a
+     * bribe taken); a debit is bounded by the balance instead.
+     */
+    readonly maxWindfall: number;
+    /** §money-levers: the largest sum an offer's named pay (`offerJob.payCredits`) may be. */
+    readonly maxOfferPay: number;
   };
   readonly host: {
     /** D14: max sim-seconds the worker may run ahead of the viewer. */

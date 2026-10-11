@@ -184,6 +184,7 @@ function offerIntent(
     cargoItem: line.itemDefId,
     quantity: quantityFor(count),
     payTier,
+    payCredits: 0,
     urgency,
     // A surfaced offer is the card; while another card is already queued it posts quietly, as a
     // model's offer would.

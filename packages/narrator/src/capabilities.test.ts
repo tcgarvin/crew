@@ -71,8 +71,8 @@ describe("buildCapabilities", () => {
     );
   });
 
-  it("names exactly the eight narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field, card.unseen D105)", () => {
-    const levers = [...text.matchAll(/^## \d\. ([\w.]+)/gm)].map((m) => m[1]);
+  it("names exactly the ten narrator levers (stockMarket §market-lever, scheduleHazard §hazard-and-field-levers, scheduleField §scheduling-a-field, card.unseen D105, strike and transact §outcome-levers)", () => {
+    const levers = [...text.matchAll(/^## \d+\. ([\w.]+)/gm)].map((m) => m[1]);
     expect(levers).toEqual([
       "offerJob",
       "spawnAtBoundary",
@@ -82,9 +82,11 @@ describe("buildCapabilities", () => {
       "scheduleHazard",
       "scheduleField",
       "card.unseen",
+      "strike",
+      "transact",
     ]);
-    expect(text).toContain("You have exactly eight levers");
-    expect(text).not.toContain("seven levers");
+    expect(text).toContain("You have exactly ten levers");
+    expect(text).not.toContain("eight levers");
   });
 
   it("documents scheduleHazard: kinds, tiers and windows from config, the budget, and that the sim rolls it (§hazard-and-field-levers)", () => {
@@ -127,7 +129,9 @@ describe("buildCapabilities", () => {
     expect(lever).toContain(`up to ${config.field.maxScripted} hits you choose`);
     expect(lever).toContain("at (early | middle | late in the field)");
     expect(lever).toContain("(none | graze | damage | knockout | fault, or empty to roll)");
-    expect(lever).toContain("Never a person: nobody can be hurt yet");
+    expect(lever).toContain(
+      "Never a person (a name is dropped): to have a rock hurt someone, strike them (9)",
+    );
     expect(lever).toContain("Scripted hits alone must leave the hull above zero");
     expect(lever).toContain("One field per leg, no budget");
     expect(lever).toContain("leaving with repairs unfinished is a story");
@@ -219,13 +223,33 @@ describe("buildCapabilities", () => {
     expect(text).toContain("may name the arrival card's way in unseen, lever 8");
   });
 
+  it("documents strike by the body rules: who, byWho, the tiers from content, how for the log, the captain not special (§strike-lever)", () => {
+    expect(text).toContain("## 9. strike: wound, down or kill a person, by the body rules");
+    expect(text).toContain("severity: graze | serious | grave; type: blaster | blunt | stun");
+    expect(text).toContain("a grave one to the head kills at once");
+    expect(text).toContain('You never write "dead"');
+    expect(text).toContain("The captain is not special");
+    expect(text).toContain(
+      "a passenger ashore, someone in a port's lounge or the dead are dropped",
+    );
+  });
+
+  it("documents transact and payCredits with the caps from config, and no sum on a card (§money-levers)", () => {
+    const { maxWindfall, maxOfferPay } = req.snapshot.config.narrator;
+    expect(text).toContain("## 10. transact: money into or out of the ship's money");
+    expect(text).toContain(`a credit above ${maxWindfall} is dropped`);
+    expect(text).toContain("- payCredits: 0 lets payTier place the pay.");
+    expect(text).toContain(`at most ${maxOfferPay}, otherwise the offer is dropped`);
+    expect(text).toContain("a card still never states a sum");
+  });
+
   it("documents privateTalk as a card side effect, warm or stern, and not as a lever (§private-talk)", () => {
     expect(text).toContain("endPassage; or privateTalk");
     expect(text).toContain("privateTalk is a private word in the captain's cabin, warm or stern");
     expect(text).toContain("the talk moves how they feel about the captain");
     expect(text).toContain("never the captain herself, a passenger or someone ashore");
-    expect(text).toContain("You have exactly eight levers.");
-    expect(text.match(/^## \d\. /gm)).toHaveLength(8);
+    expect(text).toContain("You have exactly ten levers.");
+    expect(text.match(/^## \d+\. /gm)).toHaveLength(10);
   });
 
   it("measures distance from the docked port when docked", () => {

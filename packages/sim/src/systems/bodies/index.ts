@@ -4,11 +4,20 @@
  */
 import type { KernelRegistry, Unregister } from "../../core/registry";
 import { bodiesSystem } from "./bodies";
+import { strike } from "./strike";
 
+/** The bodies system and the narrator's `strike` (§strike-lever). */
 export function registerBodies(registry: KernelRegistry): Unregister {
-  return registry.registerSystem(bodiesSystem);
+  const unregister = [
+    registry.registerSystem(bodiesSystem),
+    registry.registerCommandHandler("strike", strike),
+  ];
+  return () => {
+    for (const undo of unregister) undo();
+  };
 }
 
 export { bodiesSystem } from "./bodies";
 export { type DamageResult, type Hit, applyDamage } from "./damage";
 export { goDown } from "./down";
+export { strike } from "./strike";

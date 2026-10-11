@@ -1,7 +1,8 @@
 /**
  * §narrator-authority, D53: the schema rides in the cached system prefix of every call (no longer a
  * grammar, so no provider-side size cap), so it must stay small and game-independent: no per-game
- * enums.
+ * enums. D106's outcome levers raised the budget from 8 to 12 KiB: the schema is cached and the
+ * levers are the point.
  */
 import { describe, expect, it } from "vitest";
 import { buildNarratorPlanSchema } from "./contract";
@@ -9,7 +10,7 @@ import { approachRequest } from "./fixtures";
 import { planJsonSchema } from "./plan";
 import { content } from "./test-support";
 
-const MAX_SCHEMA_BYTES = 8 * 1024;
+const MAX_SCHEMA_BYTES = 12 * 1024;
 const MAX_ENUM_ENTRIES = 8;
 
 function enumArrays(node: unknown, found: unknown[][] = []): unknown[][] {

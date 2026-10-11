@@ -45,6 +45,12 @@ export interface JobDraft {
   readonly errand?: Readonly<
     Pick<JobErrand, "kind" | "siteId" | "targetName" | "itemDefId" | "wants">
   >;
+  /**
+   * §money-levers (D106): the narrator named the sum (`offerJob.payCredits`). The kernel then
+   * checks `pay` against `config.narrator.maxOfferPay` instead of the price band, never scales it
+   * to the crates it caps, and takes it from the narrator or a scenario only. Absent = banded.
+   */
+  readonly payNamed?: true;
 }
 
 export interface CommerceCommandPayloads {
@@ -74,5 +80,17 @@ export interface CommerceCommandPayloads {
     readonly itemDefId: ItemDefId;
     readonly count: number;
     readonly price: number;
+  };
+  /**
+   * §money-levers, D106 (narrator and scenario): `amount` signed integer credits into (positive)
+   * or out of (negative) the ship's money, written to the ledger as a `narrator` transaction with
+   * its `memo` (what it was for) and `counterparty` (who paid or was paid), each at most
+   * `TRANSACT_TEXT_MAX` characters. Never zero; a debit
+   * the balance cannot cover and a credit above `config.narrator.maxWindfall` are refused.
+   */
+  transact: {
+    readonly amount: number;
+    readonly memo: string;
+    readonly counterparty: string;
   };
 }

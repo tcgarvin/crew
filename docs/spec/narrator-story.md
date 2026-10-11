@@ -14,13 +14,13 @@ rules), and the separate staging call that dresses a dock. When and how it is ca
 The narrator may decide outcomes; it may not do the impossible (D106). It acts only through kernel
 commands on an allow-list (D6), each vetted by the translator against the snapshot and content and
 revalidated by the kernel on apply, and "impossible" is theirs to judge: the ids exist, the sim can
-execute the command now, the state stays coherent. It has exactly eight levers today: seven intents
-in its plan (offers, spawns, faults, markets, hazards, fields and cards) and the unseen mark on the
-arrival card it dresses (§unseen-lever). None of them yet sets a body, a health, a position, a
-piece of knowledge or money (the outcome levers are designed in `docs/design/narrator-arcs.md` §4
-and not built), so the narrator decides through these: who offers what and why, a fault, a hazard,
-a field and its scripted hits, what is on sale, a card and its sides, the way in unseen. Everything
-the eight do not reach is the sim's, shown in the digest. The
+execute the command now, the state stays coherent. It has exactly ten levers today: nine intents
+in its plan (offers, spawns, faults, markets, hazards, fields, cards, strikes and sums of money) and
+the unseen mark on the arrival card it dresses (§unseen-lever). Two of them set an outcome outright
+(§outcome-levers): `strike` wounds or kills a person by the body rules and `transact` moves the
+ship's money, and an offer may name its exact pay. Nothing yet sets a mood, a relationship, a
+position or a piece of knowledge (designed in `docs/design/narrator-arcs.md` §4, not built), and
+everything the ten do not reach is the sim's, shown in the digest. The
 capability list (`buildCapabilities`) is generated from content, config and the ship's machines, so
 the prompt never promises what the sim cannot do. It carries every id the plan may use (ports and
 their legs, store keys, cargo items, machines and faults, each port's market); the plan's ids are
@@ -42,8 +42,9 @@ At the site the narrator dresses the two kernel cards on `policyDecision` (§the
 §the-turn-card): only the words change, each side keeps its commands, and on the arrival card it may
 mark one side as the way in unseen (§unseen-lever). It cannot choose the plans, stage the site, set
 a stance, script a turn or parley: none of those levers is built yet (each is a new allow-listed
-command, D6, in bounds since D106). With no lever that wounds, kills or captures, the fight's wounds,
-deaths and captures are the sim's, and a card never states one that has not happened. The arms locker stays out of the capability lists and
+command, D6, in bounds since D106). It may strike anyone on the site floor, the party, the cast or
+the target, and the strike lands like a shot (§strike-lever); nothing captures, so a capture is the
+sim's and a card never states one that has not happened. The arms locker stays out of the capability lists and
 the digest's machines, weapons out of the staging catalogue, and `fighting` out of a crew line's
 skills. No `captainAshore` is raised at a site (§looking-for-work), and a fight's `alertCleared`
 never hooks (§notable-event-hook); the fight's end and a failed errand do (`expeditionResolved`,
@@ -56,7 +57,8 @@ never hooks (§notable-event-hook); the fight's end and a failed errand do (`exp
 - Every offer comes from a person (§issuers-and-pitches): `issuerName`, `issuerRole`, optional
   `issuerOrg`, and a `pitch` they say to the captain. Neither pitch nor description ever mentions
   pay; `payTier` (low, standard, generous) places the pay inside the class price band
-  (§offer-command-and-price-bands) and the engine computes it.
+  (§offer-command-and-price-bands) and the engine computes it, unless `payCredits` names the sum
+  (§money-levers).
 - `fromPort` must be the port the ship is docked at (offers are made in person). `toPort` may be
   any reachable port; beyond one hop the accepted job is a voyage.
 - One job at a time: the translator drops an offer by the kernel's own rule (§one-job-in-hand).
@@ -79,14 +81,19 @@ never hooks (§notable-event-hook); the fight's end and a failed errand do (`exp
 `spawnAtBoundary` puts existing cargo items into a port's external store, never aboard, at most
 `narrator.maxSpawnsPerCommand` units. `scheduleFault` makes a machine develop one of its own
 catalogued faults inside a `soon | later | muchLater` window; not on a machine that has or awaits
-that fault. Both spend from the budgets shown in the digest (`spawns`, `faults`).
+that fault. Both spend from the budgets shown in the digest (`spawns`, `faults`), which are advice
+(§narrator-lever-budgets).
 
 ### Narrator lever budgets
 
-Spawns, faults and hazards each spend from a budget the digest shows. Every
-`narrator.budgetRefillDays` (0.25) the three refill to their config values, counted from the last
-refill (world creation in a fresh game); the refill runs before the quiet timer, so a hook raised
-in the same tick sees the refilled budget. Fields have no budget (one per leg).
+Spawns, faults and hazards each spend from a budget the digest shows under "Your budget", and the
+budget is advice, never a refusal: neither the translator nor the kernel drops a lever for it, the
+counter goes below zero, and the digest shows a spent one as "0 (n past it)" under a line that
+says it is advice. The prompt reads it as the pacing rule's measure of how much pressure the stretch
+has had. Every `narrator.budgetRefillDays` (0.25) the three refill to their config values, counted
+from the last refill (world creation in a fresh game); the refill runs before the quiet timer, so a
+hook raised in the same tick sees the refilled budget. Fields have no budget (one per leg). Why: the
+owner, budgets are advice; hard caps were D6(b) by another name (D106).
 
 ### Market lever
 
@@ -96,7 +103,7 @@ to `commerce.market.maxStockPerCommand` (4) and 0 withdraws the item. The price 
 price for that item at that port times the tier's multiplier (`commerce.market.priceTiers`: cheap
 0.6, fair 1, dear 1.6; `defaultPrice` 100). It is the only way a part reaches a port: the crew buy
 for themselves from the ship's money (§buying-parts); the narrator has no lever that buys,
-delivers, repairs or pays (a payment lever is designed, D106, not built). There are no scheduled
+delivers or repairs (it moves money only through `transact`, §money-levers). There are no scheduled
 deliveries. Why: the owner, "let's just deal with things
 that are already there."
 
@@ -139,6 +146,57 @@ inside), and the card never gives it away: neither side's words say which is mar
 never shows the mark before a plan is chosen; once the expedition is over its line at the site
 (§dock-sections) says how the site noticed them: "nobody saw them come or go" when the marked
 side went in and no fight came, "they were waiting" when the other did.
+
+## Outcome levers
+
+Levers that decide an outcome rather than place a pressure (D106). Each is an allow-listed kernel
+command whose guards are the impossible only, run through the sim's own entry point, and emits a
+`narrative` event with a log line, so the player sees what was decided and the next digest's
+recent events show it. Code: `systems/bodies/strike.ts`, `systems/commerce/transact.ts`.
+
+### Strike lever
+
+`strike {who, severity graze|serious|grave, type blaster|blunt|stun, part (or empty), byWho (or
+empty), how}` becomes the kernel's `strike {actorId, severity, type, part?, byActorId?, how}`: one
+hit through `applyDamage` (§wounds-and-the-damage-entry-point), so the body rules decide whether
+the person goes down or dies (a grave head hit kills at once, §bleeding-and-healing does the rest)
+and the narrator never writes `dead`. `who` and `byWho` are full names as the digest lists them
+(crew, passengers, the dock's and the site's people) or actor ids; a name two people share is
+dropped as ambiguous.
+
+- Impossible, and dropped by the translator and refused by the kernel: nobody by that name, someone
+  already dead, someone not on the ship's floor or the site's (off the ship, in a port's lounge,
+  a passenger ashore), and a `byWho` who is dead or off the floor. The captain is not special
+  (owner: "Captain can die any way a regular crew member can die"); command passes by D8.
+- `how` is one line of what happened, at most `STRIKE_HOW_MAX` (120) characters, held to the
+  player-facing text checks (§player-facing-text-checks). Apply emits `struck` (narrative) before
+  the hit's `wounded` and any `died` or `incapacitated`. Off the fight the log line is `how` and
+  the hit's `wounded` carries `narrated` so the log does not tell it twice; in the fight
+  (`struck.inFight`, the person has a combatant) `struck` has no line and the fight's own
+  ("Corran Vale is hit", "is dead") tell it, and the next combat tick takes the down and the dead
+  out of the fight (`syncBody`).
+- Reactions as for a shot that hits (§thoughts-and-memories-from-a-fight): crew who see a
+  crewmate hurt (not stunned) take `sawCrewHurt`, by line of sight for the party in the fight and
+  in the same room aboard; a crew `byWho` whose blow killed takes `killedSomeone`. Bleeding,
+  healing and incapacity are the bodies system's. A strike shakes no one's morale in the fight;
+  the down and the dead leave it by the body sync.
+
+### Money levers
+
+- `transact {amount, memo, counterparty}`: `amount` signed whole credits into (positive) or out of
+  (negative) the ship's money, written to the ledger as a `narrator` transaction with its `memo`
+  and `counterparty` (each at most `TRANSACT_TEXT_MAX`, 80 characters, held to the text checks;
+  the counterparty may be empty), and a `transacted` event (narrative) whose log line is "Paid
+  Osei 200 cr: the gate fine" or "Received 500 cr from Ysolde Maren: a reward". Impossible: zero or
+  a fraction, a debit the balance cannot cover (the translator counts the call's earlier sums), a
+  credit above `narrator.maxWindfall` (2000). It applies with the plan, not on a card's side: a
+  card side that pays is not built (narrator arcs §7.6).
+- `offerJob.payCredits`: 0 lets `payTier` place the pay; any other number is the exact pay, a
+  positive whole number at most `narrator.maxOfferPay` (10000), sent as the draft's `payNamed`.
+  The kernel then checks the sum against that cap instead of the band, never scales it to the
+  crates it caps, and takes a named pay from the narrator or a scenario only.
+- No card text states a sum (§cards-never-mention-pay): the top bar and the log show money, and a
+  card says "it costs us".
 
 ## Translator
 
@@ -350,12 +408,14 @@ designer reasons about:
   it turns on: the sim's dice (a hazard, a field's rocks, the fight) decide, and the narrator never
   resolves a card's side for the captain. Let the sim run by default: between calls the narrator
   does not exist, and what the digest shows the sim has played is never re-decided. Today's levers
-  decide only what they reach (§narrator-authority); the prompt says so. Continuity over
+  decide only what they reach (§narrator-authority), a wound, a death or a sum among them
+  (§outcome-levers); the prompt says so. Continuity over
   invention: reuse cast, ports and threads.
 - Pacing is the narrator's judgement, not a timer's. It reads "What the captain has seen" (with
   ticks) and the ship's state to choose forward motion (work, a thread beat, a consequence), a
   breath, or nothing. An idle docked captain gets work first. Faults, hazards and fields are
   pressure, never filler: never twice in a row, never on an unrepaired fault, a field the biggest.
+  The budgets are advice the pacing reads, not a limit (§narrator-lever-budgets).
   Why: after ten maintenance events in a row, the owner: "first there's an opportunity for work,
   then we pause, one or two small things happen, then we come back and move the story forward. The
   narrator ought to be able to govern that on its own." The owner withdrew timers and an ordered
@@ -372,11 +432,13 @@ designer reasons about:
   stage line and quoted speech; sides are two to six words, a line of dialogue or a concrete act.
 - No numbers or pay on any player-facing text. Nothing about an undiscovered fault until the crew
   notice it. What the narrator decides, it shows: a fault it made is a card from whoever found
-  it, a field's scripted hit gets the crew's answer. Never a fact in prose that neither the sim
+  it, a field's scripted hit gets the crew's answer, a death gets a card from someone who saw it,
+  a sum paid or taken a word on a card and never the number. Never a fact in prose that neither the sim
   nor a lever made true: a repair, delivery, purchase, meal, damage, passenger action or crew
   relationship the digest does not show. A card may state what someone intends or claims, never
-  that it happened; the narrator may lie through a character, never through the ticker. Its one
-  lever on a passenger today is `endPassage`, so what becomes of a passenger otherwise is the sim's.
+  that it happened; the narrator may lie through a character, never through the ticker. Its levers
+  on a passenger are `endPassage` and, aboard, `strike`, so what else becomes of a passenger is the
+  sim's. The captain can die like anyone; a death is the strongest card and is spent rarely.
 - Route choice is the ship's; a detour card only when the story makes it the captain's choice.
 - Weigh the hull before a field: never one the hull cannot survive unless the ship left port
   damaged. Moods, thoughts, helm failures and filthy rooms are the sim's, out of reach of any lever
@@ -387,7 +449,8 @@ designer reasons about:
   them and add no new pressure, and so does `expeditionResolved`, the site's aftermath (the party,
   the captive, the hurt, the crew on an execution); `policyDecision` dresses the existing card.
 - An errand is a story about a person; with no lever to stage a site, who is there is its default
-  cast and the fight is the sim's to roll. A
+  cast and the fight is the sim's to roll by default; a strike in it (the target too) is the
+  narrator's to land when the story needs it, with why in its rationale. A
   kill job is rare and its issuer never clean, and its target taken alive is executed at the
   scene; errands are occasional among freight and passages. Putting off an errand's captive fails
   the errand, so a card offers it only when giving up the job is the real choice. On

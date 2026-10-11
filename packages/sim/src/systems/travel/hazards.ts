@@ -71,9 +71,6 @@ export const scheduleHazard: CommandHandler<"scheduleHazard", null> = {
         `scheduleHazard: window ${latest - earliest} ticks exceeds max ${maxWindow}`,
       );
     }
-    if (ctx.state.narrator.budget.hazardsRemaining <= 0) {
-      return reject("budgetExhausted", "scheduleHazard: narrator hazard budget exhausted");
-    }
     const travel = ctx.state.travel;
     if (travel.stage === "docked" && travel.plannedDestinationId === undefined) {
       return reject(
@@ -95,6 +92,7 @@ export const scheduleHazard: CommandHandler<"scheduleHazard", null> = {
     const fireAtTick = ctx.rng.int("failures", ctx.tick + earliest, ctx.tick + latest);
     const id = allocateId(ctx.state, "hazard");
     ctx.state.hazards.push({ id, kind, difficulty, fireAtTick, causeCommandId: command.id });
+    // §narrator-lever-budgets: advice, never a refusal; it may go below zero.
     ctx.state.narrator.budget.hazardsRemaining -= 1;
     ctx.emit({
       ...causedBy(command),

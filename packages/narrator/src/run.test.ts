@@ -42,6 +42,7 @@ const offer = {
   cargoItem: "item.crate_fragile",
   quantity: "one",
   payTier: "standard",
+  payCredits: 0,
   urgency: "relaxed",
   surface: false,
   passenger: false,
@@ -926,13 +927,15 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.32");
+    expect(PROMPT_VERSION).toBe("v0.33");
   });
 
-  it("tells the model endPassage is its one lever on a passenger and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
+  it("tells the model its levers on a passenger are endPassage and strike aboard, and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
     expect(STATIC_RULES).toContain("A passenger is a job with a person in it");
     expect(STATIC_RULES).not.toContain("You never decide a passenger's fate");
-    expect(STATIC_RULES).toContain("Your one lever on a passenger is endPassage");
+    expect(STATIC_RULES).toContain(
+      "Your levers on a passenger are endPassage and, aboard, strike (never ashore",
+    );
     expect(STATIC_RULES).toContain("You never narrate what they did ashore as fact");
     expect(STATIC_RULES).toContain("The stated purpose of the trip is the description");
     expect(STATIC_RULES).toContain("the truth may differ, and lives in your notes");
@@ -993,7 +996,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
-    expect(STATIC_RULES).toContain("Only use the eight levers");
+    expect(STATIC_RULES).toContain("Only use the ten levers");
     expect(STATIC_RULES).toContain("surfaceDecision, stockMarket, scheduleHazard");
     expect(STATIC_RULES).not.toContain("five levers");
   });
@@ -1035,7 +1038,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "how it went shows next call in what they feel about the captain",
     );
-    expect(STATIC_RULES).toContain("Only use the eight levers");
+    expect(STATIC_RULES).toContain("Only use the ten levers");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("so can a rivalry or an argument");
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
   });
@@ -1043,7 +1046,9 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   it("tells the model it shapes a field the sim plays, weighs the hull first, and uses damage as hooks (§scheduling-a-field, v0.24)", () => {
     expect(STATIC_RULES).toContain("You shape it and the sim plays it.");
     expect(STATIC_RULES).toContain("unseen means nobody does, whatever the helm");
-    expect(STATIC_RULES).toContain("Aim them at a machine or a room, never a person");
+    expect(STATIC_RULES).toContain(
+      "Aim them at a machine or a room; a rock that hurts someone is a strike on them",
+    );
     expect(STATIC_RULES).toContain(
       "Never schedule a field the hull cannot survive (a severity whose cost is near or above the hull left), unless the ship left port damaged",
     );
@@ -1053,7 +1058,9 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
       "Nothing in the sim holds the ship for her hull; only a card can.",
     );
     expect(STATIC_RULES).toContain("A field is the biggest pressure of all");
-    expect(STATIC_RULES).toContain("stockMarket, scheduleHazard, scheduleField. An empty list");
+    expect(STATIC_RULES).toContain(
+      "stockMarket, scheduleHazard, scheduleField, strike, transact. An empty list",
+    );
     // §notable-event-hook: the field's end calls at alertCleared, with the crew reported in, not
     // fieldCleared.
     for (const type of ["fieldSighted", "fieldEntered", "shipStuck", "alertCleared"]) {
@@ -1111,13 +1118,14 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.32");
+    expect(PROMPT_VERSION).toBe("v0.33");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
-    expect(STATIC_RULES).toContain("you have no lever yet that stages a site or a fight");
-    expect(STATIC_RULES).toContain(
-      "never claim a wound, a death or a capture that has not happened",
-    );
+    expect(STATIC_RULES).toContain("you have no lever yet that stages a site");
+    expect(STATIC_RULES).toContain("by default so is the fight");
+    expect(STATIC_RULES).toContain("In the fight you may strike someone on the floor");
+    expect(STATIC_RULES).toContain("say why in rationale");
+    expect(STATIC_RULES).toContain("never claim a capture that has not happened");
     expect(STATIC_RULES).toContain(
       "A kill job (wants dead) is rare, and whoever offers one is never clean; its target dies in the fight or, taken alive, is executed by the party at the scene",
     );
@@ -1146,7 +1154,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model to decide, roll or let the sim run, and to show what it decides (D106, v0.32)", () => {
-    expect(PROMPT_VERSION).toBe("v0.32");
+    expect(PROMPT_VERSION).toBe("v0.33");
     expect(STATIC_RULES).not.toContain("do not decide outcomes");
     expect(STATIC_RULES).toContain("- Decide, roll, or let the sim run. You may decide outcomes");
     expect(STATIC_RULES).toContain("you cannot do the impossible");
@@ -1166,8 +1174,24 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     );
   });
 
+  it("tells the model its outcome levers: strike by the body rules, transact and payCredits, the captain not special, budgets as advice (D106, v0.33)", () => {
+    expect(PROMPT_VERSION).toBe("v0.33");
+    expect(STATIC_RULES).toContain("wound or kill a person by the body rules (strike)");
+    expect(STATIC_RULES).toContain("move money into or out of the ship's money (transact)");
+    expect(STATIC_RULES).toContain("the death the season has been walking toward");
+    expect(STATIC_RULES).toContain("a death gets a card from someone who saw it");
+    expect(STATIC_RULES).toContain('("it cost us", never the number)');
+    expect(STATIC_RULES).toContain("payTier and payCredits are private levers");
+    expect(STATIC_RULES).toContain("The captain is not special");
+    expect(STATIC_RULES).toContain('"Your budget" is advice, not a limit');
+    expect(STATIC_RULES).toContain(
+      "scheduleHazard, scheduleField, strike, transact. An empty list is a valid answer.",
+    );
+    expect(STATIC_RULES).not.toContain("eight levers");
+  });
+
   it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
-    expect(PROMPT_VERSION).toBe("v0.32");
+    expect(PROMPT_VERSION).toBe("v0.33");
     const policy = HOOK_INSTRUCTIONS.policyDecision;
     expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
     expect(policy).toContain("a guard asleep, a back way, a friend inside");
@@ -1177,11 +1201,11 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(policy).toContain("never name a side that holds the ramp");
     expect(policy).toContain("a hint the captain could read in the story is fine, a tell is not");
     expect(policy).toContain("unseen is empty on every other card");
-    expect(STATIC_RULES).toContain("or name the way in unseen on a site's arrival card");
+    expect(STATIC_RULES).toContain("name the way in unseen on a site's arrival card");
     expect(STATIC_RULES).toContain(
-      "The one thing at a site you decide is which way in goes unseen",
+      "One thing at a site you decide before the fight is which way in goes unseen",
     );
-    expect(STATIC_RULES).toContain("Only use the eight levers");
+    expect(STATIC_RULES).toContain("Only use the ten levers");
   });
 });
 

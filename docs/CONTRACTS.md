@@ -20,7 +20,7 @@ All sim contracts live under `packages/sim/src/core/types/` and are re-exported 
 | Content defs: `DeckDef`, `MachineDef`, `ItemDef`, `CrewDef`, `TraitDef`, `PortDef`, `ScenarioDef`, `ConfigDef`, `ContentBundle`, closed vocabularies (`SKILLS`, `MACHINE_TAGS`, …) | `core/types/content.ts` | W10 authors data | W2–W6, W9, W10 |
 | `WorldState`, `SCHEMA_VERSION`, `WorkState`, `DynamicDefs` | `core/types/state.ts` | W2 | everyone |
 | `Actor`, `Needs`, `MovementState`, `KnownFact`, `KnowledgeTable` | `core/types/actor.ts` | W3 (location/movement), W4a (needs), W4 (activity), perception (knowledge) | W3, W4, W7, W9 |
-| `Body`, `Wound`, `Combatant`, `Disposition` (expeditions A1) | `core/types/actor.ts` | bodies (`systems/bodies/`: `Actor.body`, through `applyDamage` and the bodies system); expedition (`Actor.combatant`) | combat, AgentView, render, narrator (A2) |
+| `Body`, `Wound`, `Combatant`, `Disposition` (expeditions A1) | `core/types/actor.ts` | bodies (`systems/bodies/`: `Actor.body`, through `applyDamage`, the bodies system and the narrator's `strike`); expedition (`Actor.combatant`) | combat, AgentView, render, narrator (A2) |
 | Body formulas: `wholeBody`, `bodyCapacities`, `applyCapacities`, `isDeadBy`, `incapacityOf` | `core/body.ts` | bodies | needs, bodies, AgentView, invariants |
 | `Expedition`, `BattlePlan`, `PlanOption`, the site map (`DockDef.kind: "site"`, `SiteCastEntryDef`, `SITE_LIMITS`), `PortDef.kind: "site"` | `core/types/state.ts`, `core/types/view.ts`, `core/types/content.ts`; readers `core/sites.ts`, `core/places.ts` | expedition (`systems/expedition/`), plan menu (`view/planMenu.ts`) | web, the instrument, narrator (A2) |
 | `Machine`, `MachineFault`, `Door`, `Compartment`, `DeckState`, `Item`, `PowerState` | `core/types/ship.ts` | W3 (deck, doors), W5 (machines, power), transfers (items) | W3–W7, W9 |
@@ -112,9 +112,11 @@ un-loses a ship, and a restored lost save halts at once. Every `switch` on `halt
     two cards are policy decisions (`queuePolicyDecision`, no `jobId` on the record), queued from
     `systems/expedition/cards.ts` and recorded in `Expedition.cards`. The plan menu reads the live
     expedition's errand kind (`planMenu`: a `fetchItem` is fought for `takeItem`, its default pair
-    `defaultPairFor`). D105: the narrator's one lever at a site is `markUnseen` on the pending
+    `defaultPairFor`). D105: the narrator marks the way in with `markUnseen` on the pending
     arrival card, written to `Expedition.unseenPlanId`; `adoptPlan` turns it into
-    `Expedition.notice` (`unseen` or `seen`), which `expeditionResolved` carries.
+    `Expedition.notice` (`unseen` or `seen`), which `expeditionResolved` carries. D106: it may
+    also `strike` anyone on the site floor (`systems/bodies/strike.ts`, through `applyDamage`);
+    the fight's `syncBody` takes the down and the dead out on its next tick.
 
 ## How work is advertised
 

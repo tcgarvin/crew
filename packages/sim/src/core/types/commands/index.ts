@@ -9,6 +9,7 @@
  */
 import type { Tick } from "../common";
 import type { CommandId } from "../ids";
+import type { BodiesCommandPayloads } from "./bodies";
 import type { CabinsCommandPayloads } from "./cabins";
 import type { CallBackCommandPayloads } from "./callback";
 import type { CommerceCommandPayloads } from "./commerce";
@@ -21,6 +22,7 @@ import type { ScenarioCommandPayloads } from "./scenario";
 import type { SpawnCommandPayloads } from "./spawn";
 import type { TravelCommandPayloads } from "./travel";
 
+export type * from "./bodies";
 export type * from "./cabins";
 export type * from "./callback";
 export type * from "./commerce";
@@ -45,7 +47,8 @@ export interface CommandPayloadMap
     CabinsCommandPayloads,
     FieldCommandPayloads,
     CallBackCommandPayloads,
-    ExpeditionCommandPayloads {}
+    ExpeditionCommandPayloads,
+    BodiesCommandPayloads {}
 
 export type CommandKind = keyof CommandPayloadMap;
 

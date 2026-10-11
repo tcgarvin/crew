@@ -15,6 +15,8 @@ export interface BodiesEventPayloads {
     readonly severity: WoundSeverity;
     readonly type: DamageType;
     readonly byActorId?: ActorId;
+    /** §strike-lever: the narrator's strike off the fight; its `struck` line is the ticker's. */
+    readonly narrated?: true;
   };
   /** `actorId` is down: unconscious (blood, pain or stun) or unable to move. */
   incapacitated: {
@@ -29,6 +31,19 @@ export interface BodiesEventPayloads {
   };
   /** A wound closed and is gone from the body. */
   woundHealed: { readonly actorId: ActorId; readonly woundId: WoundId };
+  /**
+   * §strike-lever: the narrator's `strike` landed on `actorId`, just before the `wounded` (and any
+   * `died` or `incapacitated`) it causes. `inFight`: they were in the site's fight, where the
+   * fight's own lines tell it; off the fight `how` is the ticker's line.
+   */
+  struck: {
+    readonly actorId: ActorId;
+    readonly severity: WoundSeverity;
+    readonly type: DamageType;
+    readonly how: string;
+    readonly inFight: boolean;
+    readonly byActorId?: ActorId;
+  };
 }
 
 export const BODIES_EVENT_SIGNIFICANCE = {
@@ -36,4 +51,5 @@ export const BODIES_EVENT_SIGNIFICANCE = {
   incapacitated: "notable",
   died: "narrative",
   woundHealed: "trace",
+  struck: "narrative",
 } as const satisfies SignificanceCatalog<BodiesEventPayloads>;

@@ -24,6 +24,7 @@ import type {
   BoundaryLocation,
   CommandOfKind,
   CommandRejection,
+  CommandSource,
   JobDraft,
 } from "../../core/types/commands";
 import type { PhysicalLocation } from "../../core/types/common";
@@ -103,7 +104,7 @@ const oneOf = (list: readonly string[], value: unknown): boolean =>
  * starts (`toPortId === fromPortId`) from a landing site whose near port that port reaches; it
  * names its target (a name a cast entry may carry), names an item exactly when it fetches one (and
  * then wants it `either` way), carries no cargo and nobody rides on it; and its pay is inside the
- * errand band (`checkErrandBand`).
+ * errand band (`checkErrandBand`) unless the narrator named it.
  */
 function errandProblem(ctx: ValidateCtx, job: JobDraft, errand: ErrandDraft): Problem | undefined {
   const invalid = (reason: string): Problem => ({ code: "invalidPayload", reason });
@@ -148,6 +149,8 @@ function errandProblem(ctx: ValidateCtx, job: JobDraft, errand: ErrandDraft): Pr
   }
   if (job.cargo.length > 0) return invalid("an errand carries no cargo");
   if (job.passenger === true || job.roundTrip === true) return invalid("an errand is no passage");
+  // §money-levers: a named pay stands in for the band (`namedPayProblem`).
+  if (job.payNamed === true) return undefined;
   const band = checkErrandBand(ctx, job.fromPortId, errand.siteId, job.pay);
   return band === null ? undefined : { code: "outOfBounds", reason: band };
 }
@@ -162,6 +165,31 @@ function errandOf(draft: JobDraft, errand: ErrandDraft): JobErrand {
     wants: errand.wants,
     returnToPortId: draft.fromPortId,
   };
+}
+
+/**
+ * §money-levers: why a named pay (`JobDraft.payNamed`) cannot stand, or undefined. Only the
+ * narrator and a scenario name a sum; it is a whole number of credits, positive and at most
+ * `config.narrator.maxOfferPay`, and it then replaces the band check.
+ */
+function namedPayProblem(
+  ctx: ValidateCtx,
+  source: CommandSource,
+  job: JobDraft,
+): Problem | undefined {
+  if (job.payNamed === undefined) return undefined;
+  if (job.payNamed !== true) return { code: "invalidPayload", reason: "payNamed must be true" };
+  if (source !== "narrator" && source !== "scenario") {
+    return { code: "unauthorized", reason: `a ${source} offer cannot name its pay` };
+  }
+  const max = ctx.config.narrator.maxOfferPay;
+  if (!Number.isInteger(job.pay) || job.pay <= 0) {
+    return { code: "invalidPayload", reason: "a named pay is a positive whole number of credits" };
+  }
+  if (job.pay > max) {
+    return { code: "outOfBounds", reason: `a named pay of ${job.pay} is over the cap of ${max}` };
+  }
+  return undefined;
 }
 
 export const offerJob: CommandHandler<"offerJob", null> = {
@@ -188,6 +216,8 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         "offerJob: roundTrip needs passenger (freight has no return)",
       );
     }
+    const named = namedPayProblem(ctx, command.source, job);
+    if (named !== undefined) return reject(named.code, `offerJob: ${named.reason}`);
     if (job.errand !== undefined) {
       const problem = errandProblem(ctx, job, job.errand);
       if (problem !== undefined) return reject(problem.code, `offerJob: ${problem.reason}`);
@@ -199,10 +229,12 @@ export const offerJob: CommandHandler<"offerJob", null> = {
         return reject("unknownEntity", `offerJob: no "${PASSENGER_CREW_DEF_ID}" crew template`);
       }
       const fare = checkPassageBand(ctx, job.fromPortId, job.toPortId, roundTrip, job.pay);
-      if (fare !== null) return reject("outOfBounds", `offerJob: ${fare}`);
+      if (fare !== null && job.payNamed !== true) return reject("outOfBounds", `offerJob: ${fare}`);
     } else {
       const problem = checkPriceBand(ctx, job.fromPortId, job.toPortId, job.cargo, job.pay);
-      if (problem !== null) return reject("outOfBounds", `offerJob: ${problem}`);
+      if (problem !== null && job.payNamed !== true) {
+        return reject("outOfBounds", `offerJob: ${problem}`);
+      }
     }
     for (const line of job.cargo) {
       if (!Number.isInteger(line.count) || line.count < 1) {
@@ -224,9 +256,15 @@ export const offerJob: CommandHandler<"offerJob", null> = {
     const issuerPerson = normaliseIssuer(draft.issuer);
     // Owner feedback 2026-09-30: freight now spawns as individual crates on acceptance
     // (`acceptJob`), so a haul stays short by capping units here, at offer time.
+    // §money-levers: a named pay is the sum the narrator chose, so capping the crates keeps it.
+    const clamped = clampCargoToMaxCrates(
+      draft.cargo,
+      draft.pay,
+      ctx.config.commerce.maxCratesPerJob,
+    );
     const { cargo, pay } = passenger
       ? { cargo: luggageOf(draft.cargo), pay: draft.pay }
-      : clampCargoToMaxCrates(draft.cargo, draft.pay, ctx.config.commerce.maxCratesPerJob);
+      : { cargo: clamped.cargo, pay: draft.payNamed === true ? draft.pay : clamped.pay };
     const job: Job = {
       id: jobId,
       origin: command.source === "narrator" ? "narrator" : "portBoard",
@@ -553,10 +591,6 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
       }
     }
 
-    if (spawns.length > ctx.state.narrator.budget.spawnsRemaining) {
-      return reject("budgetExhausted", "spawnAtBoundary: narrator spawn budget exhausted");
-    }
-
     return ok({ newItemDefs: defs.items, newCrewDefs: defs.crew, location });
   },
   apply(
@@ -568,6 +602,7 @@ export const spawnAtBoundary: CommandHandler<"spawnAtBoundary", SpawnBoundaryPla
     for (const def of plan.newItemDefs) state.defs.dynamic.items[def.id] = def;
     for (const def of plan.newCrewDefs) state.defs.dynamic.crew[def.id] = def;
 
+    // §narrator-lever-budgets: advice, never a refusal; it may go below zero.
     state.narrator.budget.spawnsRemaining -= command.payload.spawns.length;
 
     const cause = causedBy(command);

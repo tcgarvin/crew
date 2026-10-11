@@ -374,7 +374,8 @@ describe("buildDigest: the helm's stakes (§hazard-roll)", () => {
     expect(text).toContain(
       "hazard scheduled: ion storm (brutal), due in ~50s [scheduled; nobody aboard knows]",
     );
-    expect(text).toContain("## Your budget\nspawns remaining: ");
+    expect(text).toContain("## Your budget\nAdvice, not a limit");
+    expect(text).toContain("\nspawns remaining: ");
     expect(text).toContain("\nhazards remaining: 1");
     state.travel = {
       stage: "docked",

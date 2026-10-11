@@ -17,9 +17,11 @@
  * - `NarratorCommand`: the kernel's strict command subset. Only the translator produces these.
  */
 import {
+  BODY_PARTS,
   CALL_BACK_WHEN,
   type ConfigDef,
   type ContentBundle,
+  DAMAGE_TYPES,
   type DeepReadonly,
   ERRAND_KINDS,
   ERRAND_WANTS,
@@ -35,6 +37,7 @@ import {
   type SaveEnvelope,
   type SimEvent,
   type Tick,
+  WOUND_SEVERITIES,
 } from "@crew/sim";
 import { z } from "zod";
 import { type NarratorNotes, THREAD_SCALES, type Thread } from "./notes";
@@ -230,6 +233,12 @@ export const SCRIPTED_EFFECTS = [...MACHINE_EFFECTS, ""] as const;
 export const UNSEEN_SIDES = ["", "left", "right"] as const;
 export type UnseenSide = (typeof UNSEEN_SIDES)[number];
 
+/**
+ * §strike-lever: where a strike lands, empty for the body's own draw (§narrator-authority: empty,
+ * not nullable).
+ */
+export const STRIKE_PARTS = [...BODY_PARTS, ""] as const;
+
 export function buildNarratorPlanSchema() {
   const port = idOf("Port id");
   const decisionSide = z.strictObject({
@@ -263,6 +272,11 @@ export function buildNarratorPlanSchema() {
     cargoItem: idOf("Item id"),
     quantity: z.enum(QUANTITIES),
     payTier: z.enum(PAY_TIERS),
+    /**
+     * §money-levers: the exact pay in credits when the story is the sum, 0 for the tier's. A plain
+     * number: structured outputs reject `minimum`/`maximum`, so the translator bounds it.
+     */
+    payCredits: z.number().describe("Exact pay in credits; 0 to use payTier."),
     urgency: z.enum(JOB_URGENCIES),
     /** Present it as an accept/decline card now. */
     surface: z.boolean(),
@@ -342,6 +356,26 @@ export function buildNarratorPlanSchema() {
     priceTier: z.enum(MARKET_PRICE_TIERS),
   });
 
+  // §strike-lever: a wound, a down or a death through the body rules; the capability block explains
+  // the fields, so the descriptions stay short.
+  const strike = z.strictObject({
+    kind: z.literal("strike"),
+    who: z.string().describe("Full name as the digest lists them."),
+    severity: z.enum(WOUND_SEVERITIES),
+    type: z.enum(DAMAGE_TYPES),
+    part: z.enum(STRIKE_PARTS).describe("Where it lands; empty to let the body decide."),
+    byWho: z.string().describe(`Who did it, full name; ${EMPTY_FOR_NONE}.`),
+    how: z.string().describe("One line of what happened, for the log. Max 120 characters."),
+  });
+
+  // §money-levers: a sum into (positive) or out of (negative) the ship's money.
+  const transact = z.strictObject({
+    kind: z.literal("transact"),
+    amount: z.number().describe("Credits, + into the ship's money, - out of it. Never 0."),
+    memo: z.string().describe("What it is for, a few words."),
+    counterparty: z.string().describe(`Who pays or is paid; ${EMPTY_FOR_NONE}.`),
+  });
+
   // §aftermath-caption: shown for a moment after the choice, before the card closes.
   const aftermath = z.string().describe("What happens next if chosen; max 20 words, no numbers.");
 
@@ -388,6 +422,8 @@ export function buildNarratorPlanSchema() {
         stockMarket,
         scheduleHazard,
         scheduleField,
+        strike,
+        transact,
       ]),
     ),
     /** Prose for the pending decision, when the hook is `policyDecision`; otherwise null. */

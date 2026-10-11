@@ -295,8 +295,13 @@ export interface Transaction {
   tick: Tick;
   /** Signed integer credits. */
   amount: number;
-  reason: "jobPayment" | "purchase" | "fee" | "scenario";
+  /** §money-levers: `narrator` is the narrator's `transact`, with its `memo` and `counterparty`. */
+  reason: "jobPayment" | "purchase" | "fee" | "scenario" | "narrator";
   jobId?: JobId;
+  /** `narrator` only: what it was for. */
+  memo?: string;
+  /** `narrator` only: who paid the ship or was paid. */
+  counterparty?: string;
 }
 
 /**

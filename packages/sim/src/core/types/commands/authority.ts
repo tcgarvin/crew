@@ -6,8 +6,8 @@
 import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./index";
 
 /**
- * The V1 narrator vocabulary, exactly (PLAN §6 W9). Nothing here can set a body, need, position,
- * knowledge or money directly; no such command exists. §market-lever (owner-approved vocabulary
+ * The narrator vocabulary, exactly (PLAN §6 W9). No command writes a body, need, position,
+ * knowledge or money as raw state: each goes through the sim's own entry point. §market-lever (owner-approved vocabulary
  * change, D6): `stockMarket` sets what a port sells, never what the ship has or owes.
  * §debris-fields-and-ion-storms: the sixth lever, `scheduleHazard`, places a piloting check the sim
  * rolls; it never decides the outcome. §hazard-and-field-levers: the seventh, `scheduleField`,
@@ -15,6 +15,9 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
  * alone sink the ship. §requested-call-back: the eighth, `requestCall`, asks when the narrator is
  * called next; it changes nothing in the world. D105: `markUnseen` marks one side of a pending
  * arrival card as the way in unseen; the player still chooses, and the sim runs the fight.
+ * D106 (§outcome-levers): the narrator may decide outcomes, so `strike` wounds a person through
+ * the one damage entry point (the body rules say whether they go down or die) and `transact` moves
+ * the ship's money; each is refused only when it is impossible.
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
@@ -27,6 +30,8 @@ export const NARRATOR_COMMAND_KINDS = [
   "scheduleField",
   "requestCall",
   "markUnseen",
+  "strike",
+  "transact",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
@@ -104,5 +109,7 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "adoptPlan",
     "withdrawParty",
     "markUnseen",
+    "strike",
+    "transact",
   ],
 };
