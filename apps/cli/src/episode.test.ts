@@ -78,6 +78,18 @@ describe("episodeChoice: how the episode answers each card", () => {
     );
   });
 
+  it("adopts the creep or the assault side of an item errand's arrival card when told to", () => {
+    const creep = adopt("creep-holdFire-armed");
+    const assault = adopt("assault-lethal-armed");
+    const arrival = card("expedition.arrival", [creep], [assault]);
+    expect(episodeChoice(arrival, JOB, "pressOn", "creep")).toBe("left");
+    expect(episodeChoice(arrival, JOB, "pressOn", "assault")).toBe("right");
+    // Untold, the item card has no hold side: its left side.
+    expect(episodeChoice(arrival, JOB)).toBe("left");
+    // A posture the card does not offer is a harness error, not a quiet left side.
+    expect(() => episodeChoice(arrival, JOB, "pressOn", "flank")).toThrow(/no "flank" side/);
+  });
+
   it("presses on at the turn card", () => {
     expect(episodeChoice(card("expedition.turn", [], [withdraw]), JOB)).toBe("left");
     expect(episodeChoice(card("expedition.turn", [withdraw], []), JOB)).toBe("right");
@@ -132,9 +144,35 @@ describe("crew episode: arguments", () => {
     });
   });
 
+  it("reads --item, --arrival and --unseen for an item errand and the narrator's mark", () => {
+    expect(
+      parseEpisodeArgs([
+        "--item",
+        "item.crate_general",
+        "--arrival",
+        "assault",
+        "--unseen",
+        "creep",
+      ]),
+    ).toEqual({
+      seed: 1,
+      all: false,
+      fetchItem: "item.crate_general",
+      arrivalCard: "assault",
+      markUnseen: "creep",
+    });
+  });
+
   it("refuses a bad seed, an unknown argument and a port that is not a site", () => {
     expect(parseEpisodeArgs(["--seed", "x"])).toMatchObject({ error: expect.any(String) });
     expect(parseEpisodeArgs(["--fast"])).toMatchObject({ error: expect.any(String) });
+    expect(parseEpisodeArgs(["--unseen", "sneak"])).toMatchObject({
+      error: expect.stringContaining("needs a posture"),
+    });
+    expect(parseEpisodeArgs(["--item"])).toMatchObject({ error: expect.any(String) });
+    const noItem = crew(["episode", "--item", "item.nothing"]);
+    expect(noItem.exitCode).toBe(1);
+    expect(noItem.output).toContain('no item "item.nothing"');
     const notSite = crew(["episode", "--site", "port.crossroads_hub"]);
     expect(notSite.exitCode).toBe(1);
     expect(notSite.output).toContain("is not a landing site");
@@ -192,5 +230,12 @@ describe("the episode transcript", () => {
 
   it("shows ship life too, marked, with --all", () => {
     expect(formatEpisodeTranscript(result, { all: true })).toContain("00:45 · The bell rings");
+  });
+
+  it("names the plan the narrator marked unseen, only when one was", () => {
+    expect(formatEpisodeTranscript(result)).not.toContain("unseen");
+    expect(formatEpisodeTranscript({ ...result, unseenPlanId: "creep-holdFire-armed" })).toContain(
+      "The narrator marked creep-holdFire-armed unseen.",
+    );
   });
 });
