@@ -33,4 +33,4 @@ jobs:
         run: pnpm depcruise
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:unit

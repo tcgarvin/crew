@@ -5,11 +5,16 @@ the choices that shape it. This file holds only what those don't.
 
 ## Checks
 
-Run before calling work done (CI runs the same four):
+Run before calling work done:
 
 ```
 pnpm typecheck && pnpm lint && pnpm depcruise && pnpm test
 ```
+
+CI runs the same but `pnpm test:unit`, which leaves out the deep real-content sims
+(`*.deep.test.ts`: whole-ship runs of minutes of sim time); `pnpm test` runs them, so they are
+checked locally before work is called done. Name a test file `.deep.test.ts` when it runs the real
+game for long enough to cost seconds.
 
 `pnpm test:live` hits OpenRouter for real (needs `OPENROUTER_API_KEY` in `.env.local`); run it only
 when narrator prompts or plan parsing change.

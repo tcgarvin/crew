@@ -178,8 +178,9 @@ production uses Neon's `main` branch; each preview gets its own Neon branch,
 Deployment: Preview" setting — Production must stay unchecked). Neon does not delete a preview
 branch when its git branch goes away; remove it with
 `neonctl branches delete preview/<git-branch> --project-id restless-voice-83603994`. GitHub
-Actions (`.github/workflows/ci.yml`) runs typecheck, lint, depcruise and tests on every push and
-PR, independently of the Vercel build. `vercel deploy` from a laptop still works but is no longer
+Actions (`.github/workflows/ci.yml`) runs typecheck, lint, depcruise and the unit tests
+(`pnpm test:unit`, without the deep `*.deep.test.ts` sims, which `pnpm test` runs locally) on
+every push and PR, independently of the Vercel build. `vercel deploy` from a laptop still works but is no longer
 the normal path.
 
 ## Operations reference

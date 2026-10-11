@@ -37,7 +37,8 @@ pnpm install
 pnpm typecheck   # tsc -b across the whole workspace
 pnpm lint        # biome check .
 pnpm depcruise   # dependency boundary rules
-pnpm test        # vitest run, one project per package/app
+pnpm test        # vitest run, one project per package/app, deep sims included
+pnpm test:unit   # the same without the deep real-content sims (*.deep.test.ts); what CI runs
 pnpm build       # tsc -b (compiles all packages/apps)
 
 pnpm --filter @crew/server dev   # Hono API on :3001

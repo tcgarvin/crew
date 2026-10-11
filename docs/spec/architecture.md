@@ -237,8 +237,9 @@ the muster to contact, wounds per side by severity, people down and dead, how th
 cast's fled and surrendered shares, shots and hit rate per side, party wavers and breaks, and log
 lines per fight.
 
-Its CI test (`expeditions.test.ts`) runs `hold-lethal-armed` and `assault-lethal-armed` against
-the default cast, four fights on each of seeds 1 and 2, and asserts bounds, not values: party
+Its deep test (`expeditions.deep.test.ts`, run by `pnpm test` but not CI) runs
+`hold-lethal-armed` and `assault-lethal-armed` against the default cast, four fights on each of
+seeds 1 and 2, and asserts bounds, not values: party
 deaths at most 0.25 a fight for each, no timeouts, `assault` taking the target in at least 60%,
 `hold` ending `targetFled` or `targetTaken` in at least 80%, `hold`'s party wounds at most 0.75 of
 `assault`'s, and `assault`'s fight at most 0.8 of `hold`'s long. Seeded, so the same code and seed
