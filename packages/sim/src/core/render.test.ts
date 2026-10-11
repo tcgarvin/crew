@@ -637,16 +637,29 @@ describe("expeditions A2: setting down, lifting off, and the errand's lines", ()
       ).toBe("Shots at Far Dock");
     });
 
-    it("sets down on starting, and goes down the ramp once the party is armed", () => {
+    it("says nothing on starting, and goes down the ramp once the party is armed", () => {
       const leader = Object.values(world.state.actors).find((a) => a.crew);
       if (leader === undefined) throw new Error("fixture has no crew");
       const party = [leader.id, "a.second" as ActorId, "a.third" as ActorId];
       expect(
-        line({
-          type: "expeditionStarted",
-          significance: "narrative",
-          payload: { siteId: TINY.port2, party },
-        }),
+        tickerLine(
+          {
+            id: "e.started" as EventId,
+            tick: 1,
+            seq: 1,
+            subjectIds: [],
+            causeIds: [],
+            source: "sim",
+            type: "expeditionStarted",
+            significance: EVENT_SIGNIFICANCE.expeditionStarted,
+            payload: { siteId: TINY.port2, party },
+          },
+          world.state,
+          content,
+        ),
+      ).toBeNull();
+      expect(
+        line({ type: "arrived", significance: "notable", payload: { portId: TINY.port2 } }),
       ).toBe("Set down at Far Dock");
       expect(
         line({ type: "partyMustered", significance: "trace", payload: { party, armed: party } }),

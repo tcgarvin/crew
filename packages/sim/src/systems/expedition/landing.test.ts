@@ -5,6 +5,7 @@
  * landing.ts`), every invariant checked at every step.
  */
 import { describe, expect, it } from "vitest";
+import { findItemDef } from "../../core/defs";
 import type { TestWorld } from "../../core/fixtures/test-world";
 import { TINY } from "../../core/fixtures/tiny-content";
 import type { Actor } from "../../core/types/actor";
@@ -29,6 +30,7 @@ import {
   step,
 } from "./fixtures/landing";
 import { SITE, SITE_CAST, siteWorld } from "./fixtures/site";
+import { lockerWeapons } from "./muster";
 import { DEFAULT_PLANS } from "./plans";
 import { castFor } from "./start";
 
@@ -455,5 +457,22 @@ describe("lifting off after the fight", () => {
     step(test, 300 * RATE, () => test.world.state.travel.stage === "transit");
     expect(test.world.state.travel.stage).toBe("transit");
     expect(Object.values(test.world.state.actors).filter((a) => !a.crew)).toEqual([]);
+  });
+
+  it("puts the ship's arms back in the locker and leaves the cast's on the ground", () => {
+    const test = adopted("right");
+    const before = lockerWeapons(test.world.state, test.world.content).map((w) => w.itemId);
+    expect(before.length).toBeGreaterThan(0);
+    const events = toResolution(test);
+    events.push(...step(test, 300 * RATE, () => test.world.state.travel.stage === "transit"));
+    expect(test.world.state.travel.stage).toBe("transit");
+    const after = lockerWeapons(test.world.state, test.world.content).map((w) => w.itemId);
+    expect([...after].sort()).toEqual([...before].sort());
+    expect(test.world.state.expedition?.arms).toBeUndefined();
+    const weapons = Object.values(test.world.state.items).filter(
+      (item) => findItemDef(test.world.content, test.world.state, item.defId)?.weapon !== undefined,
+    );
+    expect(weapons.map((w) => w.id).sort()).toEqual([...before].sort());
+    expect(events.filter((e) => e.type === "leftOnDock")).toEqual([]);
   });
 });

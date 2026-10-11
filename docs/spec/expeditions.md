@@ -205,7 +205,11 @@ giving way to survival. They walk to the arms locker's `use` tile, `arm` for 2 s
 foot of the personnel ramp. Arming gives the best weapon left: among the party not yet armed,
 ranked by `fighting`, the top as many as there are blasters take one, the next as many as batons
 a baton, the rest nothing, so whoever reaches the locker first never takes a better fighter's
-blaster. Arming makes them a combatant of side `us`.
+blaster. Arming makes them a combatant of side `us`, and the weapon is recorded as the ship's
+(`Expedition.arms`). When the ship plans her lift-off after the fight, every one of the ship's
+weapons goes back into the locker wherever it ended up (in hand, dropped on the site's floor), and
+the cast's weapons left on the ground stay there, so no "left behind" line. Why: nobody puts a
+weapon back on their own and the muster arms only from the locker, so every fight emptied it.
 
 Phases (`Expedition.phase`): `mustering`; `walkingOut` once the whole party is armed
 (`partyMustered`); `approach` once the leader stands on the site floor in the fight (or anyone,
@@ -490,9 +494,10 @@ stands; one put off at the site is gone there, since a site has no lounge. Payme
 
 ### Fight log lines
 
-The ticker (`core/render.ts`): "Set down at Harrow End" when the expedition starts; "Mara Osei
-takes four down the ramp" once the party is armed and walks out (`partyMustered`), since on a
-landing nobody moves until the plan is chosen; at contact "Shots at the Boathouse"; "Jax Okonkwo
+The ticker (`core/render.ts`): "Set down at Harrow End" on landing and "Lifted off from Harrow
+End for Green Meridian" on leaving (the start itself has no line); "Mara Osei takes four down the
+ramp" once the party is armed and walks out (`partyMustered`), since on a landing nobody moves
+until the plan is chosen; at contact "Shots at the Boathouse"; "Jax Okonkwo
 is hit in the leg" for crew, "Hesk Marrow is hit" for the cast, "... is stunned"; "... is down";
 "... is dead"; "... runs for the ship" or "runs for <the exit post's name>"; "... gives up"; "The
 party pulls back to the ramp"; and the end: "Corran Vale taken; two of ours hurt" (or "dead"),

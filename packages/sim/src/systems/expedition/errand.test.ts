@@ -367,17 +367,18 @@ describe("the errand end to end, by commands (fixtures-errand)", () => {
     expect(ofType(home, "paymentMade")).toEqual([]);
   }, 30_000);
 
-  it("lifts off with a blaster left on the site's floor: it stays behind, and nothing throws (call 8)", () => {
+  it("lifts off with a crate left on the site's floor: it stays behind, and nothing throws (call 8)", () => {
     const { test, jobId } = atTheSite();
     fightIt(test);
     const presence = test.world.state.deck.dock;
     const { ctx } = stepCtxOf(test);
     const foot = groundOf(ctx)?.foot;
     if (presence === undefined || foot === undefined) throw new Error("no site floor");
-    const blaster = dropOnFloor(test, SITE.blaster, foot);
+    // A weapon would go back to the locker (§the-muster); anything else stays on the ground.
+    const crate = dropOnFloor(test, TINY.crate, foot);
     const home = flyHome(test, jobId);
-    expect(ofType(home, "leftOnDock").map((e) => e.subjectIds[0])).toEqual([blaster]);
-    expect(test.world.state.items[blaster]).toBeUndefined();
+    expect(ofType(home, "leftOnDock").map((e) => e.subjectIds[0])).toEqual([crate]);
+    expect(test.world.state.items[crate]).toBeUndefined();
     expect(jobOf(test, jobId).status).toBe("paid");
   }, 30_000);
 });

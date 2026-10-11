@@ -16,7 +16,7 @@ import { findItemDef } from "../../core/defs";
 import { isOnDock } from "../../core/docks";
 import { rampFoot } from "../../core/sites";
 import type { Actor } from "../../core/types/actor";
-import type { DeepReadonly } from "../../core/types/common";
+import type { DeepReadonly, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
 import type { ItemId, MachineId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
@@ -32,6 +32,15 @@ export interface LockerWeapon {
   readonly kind: "blaster" | "baton";
 }
 
+/** The ship deck's `armsLocker` zone tiles, in zone order; empty on a deck without a locker. */
+export function lockerTiles(state: ReadonlyWorldState, content: ContentBundle): TileCoord[] {
+  const deck = content.decks[shipDeckId(state)];
+  if (deck === undefined) return [];
+  return deck.zones
+    .filter((zone) => zone.tags.includes("armsLocker"))
+    .flatMap((zone) => zone.tiles.map((t) => ({ x: t.x, y: t.y })));
+}
+
 /**
  * The weapons lying on the ship deck's `armsLocker` zones (by item id), blasters first. Empty on a
  * deck without a locker.
@@ -39,11 +48,7 @@ export interface LockerWeapon {
 export function lockerWeapons(state: ReadonlyWorldState, content: ContentBundle): LockerWeapon[] {
   const deck = content.decks[shipDeckId(state)];
   if (deck === undefined) return [];
-  const tiles = new Set(
-    deck.zones
-      .filter((zone) => zone.tags.includes("armsLocker"))
-      .flatMap((zone) => zone.tiles.map((t) => `${t.x},${t.y}`)),
-  );
+  const tiles = new Set(lockerTiles(state, content).map((t) => `${t.x},${t.y}`));
   const out: LockerWeapon[] = [];
   for (const item of Object.values(state.items)) {
     const location = item.location;
@@ -177,6 +182,7 @@ export function runArm(
     const item = ctx.state.items[pick.itemId];
     if (item !== undefined) {
       item.location = { kind: "carriedBy", actorId: self.id };
+      expedition.arms = [...(expedition.arms ?? []), item.id];
       ctx.caches.dirty.inventory = true;
     }
   }

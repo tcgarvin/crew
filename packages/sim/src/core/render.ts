@@ -438,9 +438,13 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     case "travelStageChanged":
       return STAGE_LINES[event.payload.to] ?? null;
     case "departed":
-      return `Left ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`;
+      return n.isSite(event.payload.fromPortId)
+        ? `Lifted off from ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`
+        : `Left ${n.port(event.payload.fromPortId)} for ${n.port(event.payload.toPortId)}`;
     case "arrived":
-      return `Docked at ${n.port(event.payload.portId)}`;
+      return n.isSite(event.payload.portId)
+        ? `Set down at ${n.port(event.payload.portId)}`
+        : `Docked at ${n.port(event.payload.portId)}`;
     case "driftingChanged":
       return event.payload.drifting ? "Engines down: drifting" : "Engines back: under way again";
     case "shipLimping": {
@@ -673,8 +677,9 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
   switch (event.type) {
     // The party goes down the ramp once it is armed, not when the ship sets down: on a landing
     // nobody moves until the arrival card's plan is chosen, and the plan picks the party again.
+    // The landing has its own line ("Set down at Harrow End"), so the start has none.
     case "expeditionStarted":
-      return `Set down at ${n.port(event.payload.siteId)}`;
+      return null;
     case "partyMustered": {
       const [leaderId] = event.payload.party;
       if (leaderId === undefined) return null;

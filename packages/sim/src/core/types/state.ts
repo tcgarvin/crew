@@ -442,6 +442,11 @@ export interface Expedition {
   jobId?: JobId;
   /** Expeditions A2 (call 4): the policy cards it has queued, each at most once. */
   cards?: ExpeditionCards;
+  /**
+   * Expeditions A2: the ship's weapons the party took from the arms locker at the muster, put back
+   * there when the ship plans her lift-off (§the-muster); absent once stowed or if none was taken.
+   */
+  arms?: ItemId[];
 }
 
 /** Expeditions A2 (call 4): the arrival card and the turn card, by decision id. */

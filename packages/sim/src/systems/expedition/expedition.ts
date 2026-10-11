@@ -39,12 +39,15 @@
  * Owner after the gate: W2 of expeditions A2.
  */
 import { configTicks } from "../../core/clock";
+import { findItemDef } from "../../core/defs";
+import { isOnDock } from "../../core/docks";
 import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { EventDraft } from "../../core/types/events";
 import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Expedition, ExpeditionOutcome } from "../../core/types/state";
+import { shipDeckId } from "../../core/world";
 import { type DamageResult, type Hit, applyDamage } from "../bodies/damage";
 import { addMemory } from "../social/relationships";
 import { abortActivity } from "../work/execute";
@@ -66,7 +69,7 @@ import { settleErrand } from "./errand";
 import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
 import { adjacent8, lineOfSight } from "./los";
 import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
-import { handOutMuster } from "./muster";
+import { handOutMuster, lockerTiles } from "./muster";
 import { landedForErrand } from "./start";
 
 /** The objective is held only with no armed cast able to fight this close and in sight of it. */
@@ -85,7 +88,7 @@ export function makeExpeditionSystem(deps: CombatDeps): System {
       if (expedition === undefined) return;
       const ground = groundOf(ctx);
       if (expedition.phase === "resolved") {
-        aftermath(ctx, ground);
+        aftermath(ctx, expedition, ground);
         return;
       }
       if (ground === undefined) return;
@@ -480,7 +483,36 @@ function walkOff(ctx: StepCtx, ground: Ground | undefined, person: Actor): void 
  * her lift-off (the departure prep would carry anyone still on the floor aboard); the alert stands
  * down when due.
  */
-function aftermath(ctx: StepCtx, ground: Ground | undefined): void {
+/**
+ * §the-muster: as the ship plans her lift-off, the arms the party took from the locker go back
+ * into it, wherever they ended up (in hand, dropped on the site's floor, carried aboard); the
+ * cast's weapons left on the ground stay there with them. Why: nobody puts a weapon back on their
+ * own, and the muster arms only from the locker, so every fight would empty it.
+ */
+function stowArms(ctx: StepCtx, expedition: Expedition): void {
+  const arms = expedition.arms;
+  const tiles = lockerTiles(ctx.state, ctx.content);
+  const deckId = shipDeckId(ctx.state);
+  if (arms !== undefined && tiles.length > 0) {
+    arms.forEach((id, index) => {
+      const item = ctx.state.items[id];
+      const tile = tiles[index % tiles.length];
+      if (item === undefined || tile === undefined) return;
+      item.location = { kind: "onDeck", deckId, x: tile.x + 0.5, y: tile.y + 0.5 };
+    });
+    // biome-ignore lint/performance/noDelete: state must omit the key, never hold `undefined`.
+    delete expedition.arms;
+    ctx.caches.dirty.inventory = true;
+  }
+  for (const item of Object.values(ctx.state.items)) {
+    if (!isOnDock(ctx.content, ctx.state, item.location)) continue;
+    if (findItemDef(ctx.content, ctx.state, item.defId)?.weapon === undefined) continue;
+    delete ctx.state.items[item.id];
+    ctx.caches.dirty.inventory = true;
+  }
+}
+
+function aftermath(ctx: StepCtx, expedition: Expedition, ground: Ground | undefined): void {
   const alert = ctx.state.alert;
   if (
     alert?.cause === "fight" &&
@@ -497,10 +529,12 @@ function aftermath(ctx: StepCtx, ground: Ground | undefined): void {
       payload: { cause: "fight" },
     });
   }
+  const travel = ctx.state.travel;
+  const liftingOff = travel.stage !== "docked" || travel.plannedDestinationId !== undefined;
+  if (liftingOff) stowArms(ctx, expedition);
   const leaving = Object.values(ctx.state.actors).filter((a) => a.combatant?.side === "them");
   if (leaving.length === 0) return;
-  const travel = ctx.state.travel;
-  if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) {
+  if (liftingOff) {
     for (const person of leaving) removeCast(ctx, person);
     return;
   }
