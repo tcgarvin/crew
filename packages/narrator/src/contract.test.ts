@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { buildNarratorPlanSchema, buildNotesSchema } from "./contract";
+import { SYSTEM_PROMPT } from "./prompts/system";
 
 const schema = buildNarratorPlanSchema();
 /** §requested-call-back: every plan the model writes carries a call-back request. */
-const callBack = { when: "nextPort", why: "" };
+const callBack = { when: "nextPort", why: "", holdQuiet: false };
+/** §tried-sides: a side that is not a try, as the model writes it. */
+const NO_TRY = { odds: "", failEffect: "none", failLevers: [] };
+/** §tried-sides, §follow-up-cards: a card with no failure aftermaths and no follow-ups. */
+const NO_FOLLOW = { leftFailAftermath: "", rightFailAftermath: "", followUps: [] };
 
 /** Walk a JSON Schema and collect every object node. */
 function walk(node: unknown, visit: (n: Record<string, unknown>) => void): void {
@@ -140,12 +145,21 @@ describe("NarratorPlan structured-output schema", () => {
             coursePort: "port.b",
             talkWith: "",
             tone: "",
+            ...NO_TRY,
           },
-          right: { label: "Refuse", effect: "none", coursePort: "", talkWith: "", tone: "" },
+          right: {
+            label: "Refuse",
+            effect: "none",
+            coursePort: "",
+            talkWith: "",
+            tone: "",
+            ...NO_TRY,
+          },
           leftAftermath: "She comes aboard and we plot for Port B.",
           rightAftermath: "She walks back into the crowd.",
           beatOfThread: "",
           closesThread: "",
+          ...NO_FOLLOW,
         },
       ],
       card: null,
@@ -237,12 +251,27 @@ describe("NarratorPlan structured-output schema", () => {
       title: "About our passenger",
       speaker: "Dane Whitcross",
       situation: "Dane has a word about the passenger.",
-      left: { label: "Put her off", effect: "endPassage", coursePort: "", talkWith: "", tone: "" },
-      right: { label: "She stays", effect: "none", coursePort: "", talkWith: "", tone: "" },
+      left: {
+        label: "Put her off",
+        effect: "endPassage",
+        coursePort: "",
+        talkWith: "",
+        tone: "",
+        ...NO_TRY,
+      },
+      right: {
+        label: "She stays",
+        effect: "none",
+        coursePort: "",
+        talkWith: "",
+        tone: "",
+        ...NO_TRY,
+      },
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
       closesThread: "",
+      ...NO_FOLLOW,
     };
     const plan = { ...base, intents: [passage, putOff] };
     expect(schema.parse(plan)).toEqual(plan);
@@ -277,12 +306,21 @@ describe("NarratorPlan structured-output schema", () => {
         coursePort: "",
         talkWith: "Jax Okonkwo",
         tone: "stern",
+        ...NO_TRY,
       },
-      right: { label: "Let them be.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+      right: {
+        label: "Let them be.",
+        effect: "none",
+        coursePort: "",
+        talkWith: "",
+        tone: "",
+        ...NO_TRY,
+      },
       leftAftermath: "",
       rightAftermath: "",
       beatOfThread: "",
       closesThread: "",
+      ...NO_FOLLOW,
     };
     const plan = { ...base, intents: [word] };
     expect(schema.parse(plan)).toEqual(plan);
@@ -307,7 +345,8 @@ describe("NarratorPlan structured-output schema", () => {
     expect(unions).toBe(2);
     const text = JSON.stringify(json);
     expect(text).not.toContain("port.a");
-    expect(text).toContain('from \\"What you can do\\"');
+    // §plan-schema-in-the-prompt: the rules say once where every id comes from.
+    expect(SYSTEM_PROMPT).toContain('must be copied exactly from "What you can do"');
   });
 
   it("accepts an empty or named speaker on the card, never a missing one (§spoken-cards, §narrator-authority)", () => {
@@ -379,11 +418,20 @@ describe("NarratorPlan structured-output schema", () => {
     expect(schema.safeParse({ ...plan, card: withoutOdds }).success).toBe(false);
   });
 
-  it("requires callBack, with when one of nextPort, departure, midLeg (§requested-call-back)", () => {
+  it("requires callBack, with when one of its moments and holdQuiet (§requested-call-back)", () => {
     const plan = { rationale: "", intents: [], card: null };
     expect(schema.safeParse(plan).success).toBe(false);
-    const departure = { when: "departure", why: "A debris field on the junior pilot's watch." };
+    const departure = {
+      when: "departure",
+      why: "A debris field on the junior pilot's watch.",
+      holdQuiet: false,
+    };
     expect(schema.safeParse({ ...plan, callBack: departure }).success).toBe(true);
+    for (const when of ["nextPort", "midLeg", "arrival", "afterCard"]) {
+      expect(schema.safeParse({ ...plan, callBack: { ...departure, when } }).success).toBe(true);
+    }
+    const { holdQuiet: _h, ...noHold } = departure;
+    expect(schema.safeParse({ ...plan, callBack: noHold }).success).toBe(false);
     expect(schema.safeParse({ ...plan, callBack: { ...departure, when: "never" } }).success).toBe(
       false,
     );

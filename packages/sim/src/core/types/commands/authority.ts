@@ -45,6 +45,22 @@ export const NARRATOR_COMMAND_KINDS = [
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
 
 /**
+ * §tried-sides: the outcome levers a tried side's failure branch may carry (D106): the narrator's
+ * own kinds that decide an outcome, never one that surfaces a card, places a pressure or stages.
+ * They run as `narrator` when the roll fails, so `AUTHORITY.player` never grows for them.
+ */
+export const FAIL_LEVER_KINDS = [
+  "strike",
+  "transact",
+  "plantMemory",
+  "fallOut",
+  "giveThought",
+  "reveal",
+  "injectFault",
+] as const satisfies readonly NarratorCommandKind[];
+export type FailLeverKind = (typeof FAIL_LEVER_KINDS)[number];
+
+/**
  * §staging-plan-command (owner ruling D57, Dockside §6.1): the staging call sets the stage and
  * never moves the plot. These kinds are valid from the narrator only while a `stageDock` hook is
  * pending, and while one is, they are the only narrator kinds the kernel accepts

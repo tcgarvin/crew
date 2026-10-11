@@ -31,7 +31,7 @@ import type {
   NarratorMemoryKey,
   RockSize,
 } from "./content";
-import type { DecisionsState, NarratorState } from "./decisions";
+import type { ChanceRoll, DecisionsState, NarratorState } from "./decisions";
 import type { DocksideState } from "./dockside";
 import type {
   ActivityDefId,
@@ -435,10 +435,7 @@ export type NoticeRule = (typeof NOTICE_RULES)[number];
  * when the captain chose the marked side: `odds` the whole percent it was rolled at, `worked`
  * whether the party got in unseen.
  */
-export interface UnseenRoll {
-  readonly odds: number;
-  readonly worked: boolean;
-}
+export type UnseenRoll = ChanceRoll;
 
 /** §unseen-odds: a mark's chance when none was named, D105's certain way in. */
 export const UNSEEN_ODDS_CERTAIN = 100;

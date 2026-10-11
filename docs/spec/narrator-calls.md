@@ -62,7 +62,8 @@ debt standing. Why: a hook raised by travel the tick after the event would other
 `quietTooLong` fires when `narrator.quietTooLongDays` (0.3333, 400 s) pass since the last narrator
 contact: the later of the last `narrative` event and the last hook raised of any kind. It runs
 last in the tick and yields to any other hook, so a tick raises at most one hook and a check-in
-only follows a real silence.
+only follows a real silence. A standing call-back request with `holdQuiet` doubles the window
+(§requested-call-back).
 
 ### Policy decision hook
 
@@ -96,13 +97,22 @@ raises the ask on the first idle docked tick. It is a story hook, so raising it 
 
 ### Requested call-back
 
-Every story plan carries `callBack { when, why }`, which the translator turns into the
+Every story plan carries `callBack { when, why, holdQuiet }`, which the translator turns into the
 `requestCall` command (allow-listed, D6). `when` is `nextPort` (the default; raises nothing),
-`departure` or `midLeg`; `why` is one private line of at most 200 characters, read back on the
-call it asked for. `NarratorState.callBack` holds one standing request; every story call's plan
-replaces it. Travel raises `requestedCall { when, why, requestedTick }` for `departure` once the
-ship has cast off on a stage that started after the request (`departing` or `transit`), and for
-`midLeg` at half a hop's transit, per hop, never the whole voyage. A `nextPort` request is served
+`departure`, `midLeg`, `arrival` or `afterCard`; `why` is one private line of at most 200
+characters, read back on the call it asked for. `NarratorState.callBack` holds one standing
+request; every story call's plan replaces it. Travel raises `requestedCall { when, why,
+requestedTick }` for `departure` once the ship has cast off on a stage that started after the
+request (`departing` or `transit`), and for `midLeg` at half a hop's transit, per hop, never the
+whole voyage. `arrival` comes due at the approach lead point (`narrator.approachHookLeadSeconds`
+of route left at `travel.nominalSpeed`, where §staging-hook-and-the-hold raises `stageDock`), and
+stays due through `approaching` and `docking` while another hook holds it: at a port with a dock
+map the staging call comes first and the arrival call the tick after it is answered. Asked past
+that point of the leg in flight (`CallBackRequest.afterDocking`), it means the next leg's, from the
+ship's next docking. `afterCard` comes due the tick after a card is answered with no follow-up to
+come (`cardResolvedTick`, written by `resolveDecision`; §follow-up-cards), docked or not.
+`holdQuiet: true` doubles the quiet window (§quiet-check-in) while the request stands, which is
+until the next story call replaces it: the narrator owns its own quiet (D46). A `nextPort` request is served
 by the first story hook raised while docked somewhere other than where it was asked. A served
 request is cleared when its hook is acknowledged; a replacement applied in the same tick
 survives. A request that never comes due stands until the next story call replaces it; the quiet

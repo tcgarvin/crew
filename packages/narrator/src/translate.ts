@@ -17,8 +17,11 @@ import {
   type CommandDraft,
   type CommandId,
   type ContentBundle,
+  type DecisionCardSide,
+  type DecisionCardSpec,
   type DecisionId,
   type DeepReadonly,
+  FAIL_LEVER_KINDS,
   FALL_OUT_OVER_MAX,
   type ImpactTarget,
   type ItemDef,
@@ -38,6 +41,7 @@ import {
   type ScriptedImpactDraft,
   TRANSACT_TEXT_MAX,
   type TempRef,
+  type TextRef,
   type ThoughtKey,
   UNSEEN_ODDS_CERTAIN,
   basePriceFor,
@@ -59,6 +63,7 @@ import {
   type NarratorIntent,
   type NarratorPlan,
   PITCH_MAX_WORDS,
+  type SideEffect,
   type TranslateIntents,
   type TranslationCtx,
   type TranslationResult,
@@ -207,16 +212,18 @@ export function textProblem(text: string, secrets: readonly string[]): string | 
 const STATED_PERCENT = /(?<![\d.,+-])(\d+)\s*(?:%|per\s?cent\b)/gi;
 
 /**
- * `textProblem` for a text that may state `odds`, the marked side's chance: a percentage equal to
- * it is exempt, and every other number is still refused (§player-facing-text-checks).
+ * `textProblem` for a text that may state `odds`, the chances the narrator set on it (the marked
+ * side's, a tried side's): a percentage equal to one is exempt, and every other number is still
+ * refused (§player-facing-text-checks).
  */
 function textProblemStating(
   text: string,
   secrets: readonly string[],
-  odds: number,
+  odds: readonly number[],
 ): string | undefined {
+  if (odds.length === 0) return textProblem(text, secrets);
   const exempt = text.replace(STATED_PERCENT, (match, digits: string) =>
-    Number(digits) === odds ? "" : match,
+    odds.includes(Number(digits)) ? "" : match,
   );
   return exempt.trim() === "" ? textProblem(text, secrets) : textProblem(exempt, secrets);
 }
@@ -264,6 +271,14 @@ interface Env {
   readonly tally: Tally;
   /** §captain-never-speaks: non-fatal corrections, reported back to the model next call. */
   readonly notes: string[];
+  /**
+   * §tried-sides: the outcome-lever intents a card's `failLevers` name, by intent index, already
+   * translated (or dropped with a reason); they go onto the card's failure branch, never into the
+   * plan's own commands.
+   */
+  readonly failLevers: ReadonlyMap<number, Outcome<CommandDraft>>;
+  /** §tried-sides: the `failLevers` indexes a card that went up has taken. */
+  readonly usedFailLevers: Set<number>;
 }
 
 /**
@@ -1036,6 +1051,8 @@ function revealOutcome(
 }
 
 type Side = Intent<"surfaceDecision">["left"];
+/** A side's label and effect fields, as a card's side and a follow-up's side both have them. */
+type PlainSide = Pick<Side, "label" | "effect" | "coursePort" | "talkWith" | "tone">;
 
 type SideCommands = { label: string; commands: CommandDraft[] };
 
@@ -1047,7 +1064,12 @@ function playerSide(label: string, command: CommandDraft, which: string): Outcom
   return ok({ label, commands: [command] });
 }
 
-function setCourseSide(env: Env, side: Side, label: string, which: string): Outcome<SideCommands> {
+function setCourseSide(
+  env: Env,
+  side: PlainSide,
+  label: string,
+  which: string,
+): Outcome<SideCommands> {
   const travel = env.snapshot.state.travel;
   if (travel.stage !== "docked") return no(`${which}: setCourse is only possible while docked`);
   const expedition = env.snapshot.state.expedition;
@@ -1101,7 +1123,7 @@ function endPassageSide(env: Env, label: string, which: string): Outcome<SideCom
  */
 function privateTalkSide(
   env: Env,
-  side: Side,
+  side: PlainSide,
   label: string,
   which: string,
 ): Outcome<SideCommands> {
@@ -1138,11 +1160,18 @@ function privateTalkSide(
   );
 }
 
-function translateSide(env: Env, side: Side, which: string): Outcome<SideCommands> {
-  const label = clipChars(side.label, LABEL_MAX_CHARS);
-  const problem = textProblem(label, env.secrets);
-  if (problem !== undefined) return no(`${which} label: ${problem}`);
-  switch (side.effect) {
+/**
+ * §side-effects: `effect`'s commands with the side's own parameters (`coursePort`, `talkWith`,
+ * `tone`); a tried side's `failEffect` reads the same ones (§tried-sides).
+ */
+function effectCommands(
+  env: Env,
+  side: PlainSide,
+  effect: SideEffect,
+  label: string,
+  which: string,
+): Outcome<SideCommands> {
+  switch (effect) {
     case "none":
       return ok({ label, commands: [] });
     case "setCourse":
@@ -1152,6 +1181,24 @@ function translateSide(env: Env, side: Side, which: string): Outcome<SideCommand
     case "privateTalk":
       return privateTalkSide(env, side, label, which);
   }
+}
+
+/**
+ * A side's clipped label and its effect, without the label's text checks: a card's own labels are
+ * checked with the card (`cardTextProblem`), since a tried side's label may state its odds.
+ */
+function sideEffectOf(env: Env, side: PlainSide, which: string): Outcome<SideCommands> {
+  const label = clipChars(side.label, LABEL_MAX_CHARS);
+  if (label.trim() === "") return no(`${which} label: empty text`);
+  return effectCommands(env, side, side.effect, label, which);
+}
+
+/** A side with its label held to the text checks: a follow-up card's (§follow-up-cards). */
+function translateSide(env: Env, side: PlainSide, which: string): Outcome<SideCommands> {
+  const label = clipChars(side.label, LABEL_MAX_CHARS);
+  const problem = textProblem(label, env.secrets);
+  if (problem !== undefined) return no(`${which} label: ${problem}`);
+  return effectCommands(env, side, side.effect, label, which);
 }
 
 /**
@@ -1248,6 +1295,249 @@ function closedLabel(env: Env, title: string): string {
   return textProblem(title, env.secrets) === undefined ? title : "";
 }
 
+/** A card side's text, as the kernel stores narrator prose. */
+const sideText = (key: string, prose: string): TextRef => ({ key, params: {}, prose });
+
+/** `{ aftermath }` for a non-blank caption, else nothing (§aftermath-caption: blank is none). */
+function aftermathRef(text: string): { aftermath?: TextRef } {
+  return text === "" ? {} : { aftermath: sideText(NARRATOR_TEXT_KEYS.aftermath, text) };
+}
+
+/** §tried-sides: a side's try as the translator vetted it, before it becomes `attempt`. */
+interface TryDraft {
+  readonly odds: number;
+  readonly failCommands: CommandDraft[];
+  readonly failLevers: CommandDraft[];
+  readonly failAftermath: string;
+  /** The plan's intent indexes the levers came from, marked used once the card goes up. */
+  readonly leverIndexes: readonly number[];
+}
+
+const FAIL_AFTERMATH_FIELD = { left: "leftFailAftermath", right: "rightFailAftermath" } as const;
+
+/**
+ * §tried-sides: the levers a tried side's failure branch names by intent index: each must be an
+ * outcome lever (`FAIL_LEVER_KINDS`) in this plan, translated without a problem, and named once.
+ */
+function failLeverDrafts(
+  env: Env,
+  indexes: readonly number[],
+  which: string,
+): Outcome<{ drafts: CommandDraft[]; indexes: number[] }> {
+  const drafts: CommandDraft[] = [];
+  const seen: number[] = [];
+  for (const index of indexes) {
+    const lever = env.failLevers.get(index);
+    if (lever === undefined) {
+      return no(
+        `${which}.failLevers: intent ${index} is not one of ${FAIL_LEVER_KINDS.join(", ")} in this plan`,
+      );
+    }
+    if (seen.includes(index) || env.usedFailLevers.has(index)) {
+      return no(`${which}.failLevers: intent ${index} is named twice`);
+    }
+    if (!lever.ok) return no(`${which}.failLevers: intent ${index} was dropped (${lever.reason})`);
+    seen.push(index);
+    drafts.push(lever.value);
+  }
+  return ok({ drafts, indexes: seen });
+}
+
+/**
+ * §tried-sides: a side with `odds` is a try: the odds a whole percent from 0 to 100, its failure
+ * branch (`failEffect`, `failLevers`, the side's fail aftermath) vetted like a side. Without odds
+ * there is no failure branch, so one written anyway is a mistake. Never on a beat or closing card:
+ * those sides are the captain's attitude.
+ */
+function tryOf(
+  env: Env,
+  intent: Intent<"surfaceDecision">,
+  which: "left" | "right",
+  label: string,
+): Outcome<TryDraft | undefined> {
+  const side = intent[which];
+  const written = side.odds.trim();
+  const failAftermath = intent[FAIL_AFTERMATH_FIELD[which]];
+  if (written === "") {
+    const stray = side.failEffect !== "none" || side.failLevers.length > 0;
+    return stray || failAftermath.trim() !== ""
+      ? no(`${which}: failEffect, failLevers and ${FAIL_AFTERMATH_FIELD[which]} need odds`)
+      : ok(undefined);
+  }
+  if (!UNSEEN_ODDS_PATTERN.test(written)) {
+    return no(`${which}.odds "${written}" is not a whole percent from 0 to 100`);
+  }
+  if (intent.beatOfThread.trim() !== "" || intent.closesThread.trim() !== "") {
+    return no(
+      `${which}.odds: a beat or closing card's sides are the captain's attitude, never a try`,
+    );
+  }
+  const fail = effectCommands(env, side, side.failEffect, label, `${which}.failEffect`);
+  if (!fail.ok) return fail;
+  const levers = failLeverDrafts(env, side.failLevers, which);
+  if (!levers.ok) return levers;
+  const aftermath = aftermathText(env, failAftermath, FAIL_AFTERMATH_FIELD[which]);
+  if (!aftermath.ok) return aftermath;
+  return ok({
+    odds: Number(written),
+    failCommands: fail.value.commands,
+    failLevers: levers.value.drafts,
+    failAftermath: aftermath.value,
+    leverIndexes: levers.value.indexes,
+  });
+}
+
+type FollowUpIntent = Intent<"surfaceDecision">["followUps"][number];
+
+/** §follow-up-cards: where each follow-up hangs: after a side, or after a tried side fails. */
+interface FollowUpSlots {
+  left?: DecisionCardSpec;
+  right?: DecisionCardSpec;
+  leftFail?: DecisionCardSpec;
+  rightFail?: DecisionCardSpec;
+}
+
+/**
+ * §follow-up-cards: a follow-up card, vetted as a card is (title, situation, speaker, sides,
+ * aftermaths, the text checks), with plain sides: no odds of its own and no follow-up.
+ */
+function followUpSpec(
+  env: Env,
+  card: FollowUpIntent["card"],
+  where: string,
+): Outcome<DecisionCardSpec> {
+  const title = clipChars(card.title, TITLE_MAX_CHARS);
+  const situation = clipWords(card.situation, CARD_SITUATION_MAX_WORDS);
+  const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
+  if (problem !== undefined) return no(`${where}: ${problem}`);
+  const speaker = speakerName(env, card.speaker);
+  if (!speaker.ok) return no(`${where}: ${speaker.reason}`);
+  const left = translateSide(env, card.left, `${where} left`);
+  if (!left.ok) return left;
+  const right = translateSide(env, card.right, `${where} right`);
+  if (!right.ok) return right;
+  if (left.value.label.toLowerCase() === right.value.label.toLowerCase()) {
+    return no(`${where}: both sides have the same label`);
+  }
+  const leftAftermath = aftermathText(env, card.leftAftermath, `${where} leftAftermath`);
+  if (!leftAftermath.ok) return leftAftermath;
+  const rightAftermath = aftermathText(env, card.rightAftermath, `${where} rightAftermath`);
+  if (!rightAftermath.ok) return rightAftermath;
+  const side = (s: SideCommands, aftermath: string) => ({
+    label: sideText(NARRATOR_TEXT_KEYS.side, s.label),
+    commands: s.commands,
+    ...aftermathRef(aftermath),
+  });
+  return ok({
+    prompt: {
+      key: NARRATOR_TEXT_KEYS.situation,
+      params: { title, ...(speaker.value === undefined ? {} : { speaker: speaker.value }) },
+      prose: situation,
+    },
+    left: side(left.value, leftAftermath.value),
+    right: side(right.value, rightAftermath.value),
+  });
+}
+
+/**
+ * §follow-up-cards: place each follow-up: `left`, `right`, `either` (the same card after both),
+ * `failed` (after each tried side's failure). One per place; `failed` needs a tried side.
+ */
+function followUpSlots(
+  env: Env,
+  followUps: readonly FollowUpIntent[],
+  tried: { readonly left: boolean; readonly right: boolean },
+): Outcome<FollowUpSlots> {
+  const slots: FollowUpSlots = {};
+  for (const [index, entry] of followUps.entries()) {
+    const where = `followUps[${index}]`;
+    const spec = followUpSpec(env, entry.card, where);
+    if (!spec.ok) return spec;
+    const places: (keyof FollowUpSlots)[] =
+      entry.on === "either"
+        ? ["left", "right"]
+        : entry.on === "failed"
+          ? [
+              ...(tried.left ? ["leftFail" as const] : []),
+              ...(tried.right ? ["rightFail" as const] : []),
+            ]
+          : [entry.on];
+    if (places.length === 0) return no(`${where}: on failed needs a side with odds`);
+    for (const place of places) {
+      if (slots[place] !== undefined) return no(`${where}: a second follow-up after ${place}`);
+      slots[place] = spec.value;
+    }
+  }
+  return ok(slots);
+}
+
+/**
+ * §tried-sides: a try whose failure would look and play exactly like its success is no try: same
+ * commands, no lever, no failure aftermath of its own, and no follow-up on either branch.
+ */
+function identicalBranches(
+  success: SideCommands,
+  aftermath: string,
+  attempt: TryDraft,
+  next: DecisionCardSpec | undefined,
+  failNext: DecisionCardSpec | undefined,
+): boolean {
+  return (
+    JSON.stringify(success.commands) === JSON.stringify(attempt.failCommands) &&
+    attempt.failLevers.length === 0 &&
+    (attempt.failAftermath === "" || attempt.failAftermath === aftermath) &&
+    next === undefined &&
+    failNext === undefined
+  );
+}
+
+/** One side as the kernel takes it, with its follow-up and, for a try, its failure branch. */
+function sideSpec(
+  side: SideCommands,
+  aftermath: string,
+  attempt: TryDraft | undefined,
+  next: DecisionCardSpec | undefined,
+  failNext: DecisionCardSpec | undefined,
+): DecisionCardSide {
+  return {
+    label: sideText(NARRATOR_TEXT_KEYS.side, side.label),
+    commands: side.commands,
+    ...aftermathRef(aftermath),
+    ...(next === undefined ? {} : { next }),
+    ...(attempt === undefined
+      ? {}
+      : {
+          attempt: {
+            odds: attempt.odds,
+            failCommands: attempt.failCommands,
+            failLevers: attempt.failLevers,
+            ...(attempt.failAftermath === ""
+              ? {}
+              : { failAftermath: sideText(NARRATOR_TEXT_KEYS.aftermath, attempt.failAftermath) }),
+            ...(failNext === undefined ? {} : { failNext }),
+          },
+        }),
+  };
+}
+
+/**
+ * §tried-sides: the text checks for a card with tries: the situation may state any tried side's
+ * odds, a side's label only its own; every other number is still refused.
+ */
+function cardTextProblem(
+  env: Env,
+  situation: string,
+  labels: { readonly left: string; readonly right: string },
+  tries: { readonly left: TryDraft | undefined; readonly right: TryDraft | undefined },
+): string | undefined {
+  const odds = (t: TryDraft | undefined) => (t === undefined ? [] : [t.odds]);
+  return (
+    textProblemStating(situation, env.secrets, [...odds(tries.left), ...odds(tries.right)]) ??
+    textProblemStating(labels.left, env.secrets, odds(tries.left)) ??
+    textProblemStating(labels.right, env.secrets, odds(tries.right))
+  );
+}
+
 function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome<NarratorDraft> {
   if (env.hook?.kind === "policyDecision") {
     return no("a policy decision is pending; dress it with `card` instead");
@@ -1259,14 +1549,26 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   if (!closing.ok) return closing;
   const title = clipChars(intent.title, TITLE_MAX_CHARS);
   const situation = clipWords(intent.situation, CARD_SITUATION_MAX_WORDS);
-  const problem = textProblem(title, env.secrets) ?? textProblem(situation, env.secrets);
-  if (problem !== undefined) return no(problem);
+  const titleProblem = textProblem(title, env.secrets);
+  if (titleProblem !== undefined) return no(titleProblem);
   const speaker = speakerName(env, intent.speaker);
   if (!speaker.ok) return speaker;
-  const left = translateSide(env, intent.left, "left");
+  const left = sideEffectOf(env, intent.left, "left");
   if (!left.ok) return left;
-  const right = translateSide(env, intent.right, "right");
+  const right = sideEffectOf(env, intent.right, "right");
   if (!right.ok) return right;
+  const leftTry = tryOf(env, intent, "left", left.value.label);
+  if (!leftTry.ok) return leftTry;
+  const rightTry = tryOf(env, intent, "right", right.value.label);
+  if (!rightTry.ok) return rightTry;
+  const tries = { left: leftTry.value, right: rightTry.value };
+  const problem = cardTextProblem(
+    env,
+    situation,
+    { left: left.value.label, right: right.value.label },
+    tries,
+  );
+  if (problem !== undefined) return no(problem);
   const leftAftermath = aftermathText(env, intent.leftAftermath, "leftAftermath");
   if (!leftAftermath.ok) return leftAftermath;
   const rightAftermath = aftermathText(env, intent.rightAftermath, "rightAftermath");
@@ -1274,8 +1576,27 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
   if (left.value.label.toLowerCase() === right.value.label.toLowerCase()) {
     return no("both sides have the same label");
   }
+  const slots = followUpSlots(env, intent.followUps, {
+    left: tries.left !== undefined,
+    right: tries.right !== undefined,
+  });
+  if (!slots.ok) return slots;
+  for (const [which, side, aftermath, next, failNext] of [
+    ["left", left.value, leftAftermath.value, slots.value.left, slots.value.leftFail],
+    ["right", right.value, rightAftermath.value, slots.value.right, slots.value.rightFail],
+  ] as const) {
+    const attempt = tries[which];
+    if (attempt !== undefined && identicalBranches(side, aftermath, attempt, next, failNext)) {
+      return no(
+        `${which}: a try whose failure is the same as its success; give it a failEffect, a failLever, a ${FAIL_AFTERMATH_FIELD[which]} or a follow-up, or drop the odds`,
+      );
+    }
+  }
   env.tally.cardUsed = true;
   env.tally.beatCardThread = beat.value;
+  for (const attempt of [tries.left, tries.right]) {
+    for (const index of attempt?.leverIndexes ?? []) env.usedFailLevers.add(index);
+  }
   const closed = closing.value.kind === "closes" ? closing.value.title : undefined;
   env.tally.closedThread = closed;
   if (closing.value.kind === "unmatched") {
@@ -1283,13 +1604,6 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
       `closesThread: "${closing.value.written}" matches no title under "Open threads", so the card went up closing nothing; copy the title exactly`,
     );
   }
-  const sideSpec = (s: SideCommands, aftermath: string) => ({
-    label: { key: NARRATOR_TEXT_KEYS.side, params: {}, prose: s.label },
-    commands: s.commands,
-    ...(aftermath === ""
-      ? {}
-      : { aftermath: { key: NARRATOR_TEXT_KEYS.aftermath, params: {}, prose: aftermath } }),
-  });
   return ok({
     kind: "surfaceDecision",
     payload: {
@@ -1305,8 +1619,20 @@ function translateDecision(env: Env, intent: Intent<"surfaceDecision">): Outcome
           },
           prose: situation,
         },
-        left: sideSpec(left.value, leftAftermath.value),
-        right: sideSpec(right.value, rightAftermath.value),
+        left: sideSpec(
+          left.value,
+          leftAftermath.value,
+          tries.left,
+          slots.value.left,
+          slots.value.leftFail,
+        ),
+        right: sideSpec(
+          right.value,
+          rightAftermath.value,
+          tries.right,
+          slots.value.right,
+          slots.value.rightFail,
+        ),
       },
     },
   });
@@ -1431,7 +1757,7 @@ function policyCard(
   const mayState = (text: string) =>
     stated === undefined
       ? textProblem(text, env.secrets)
-      : textProblemStating(text, env.secrets, stated.odds);
+      : textProblemStating(text, env.secrets, [stated.odds]);
   const markedLabel = (side: "left" | "right", text: string) =>
     stated?.side === side ? mayState(text) : textProblem(text, env.secrets);
   const problem = [
@@ -1544,7 +1870,9 @@ function translateCallBack(
   dropped: DroppedIntent[],
 ): NarratorCommand | undefined {
   if (raw === undefined) return undefined;
-  const parsed = buildNarratorPlanSchema().shape.callBack.safeParse(raw);
+  // A plan built in code may leave out `holdQuiet` (see `withBeat`); the model always writes it.
+  const written = raw !== null && typeof raw === "object" ? { holdQuiet: false, ...raw } : raw;
+  const parsed = buildNarratorPlanSchema().shape.callBack.safeParse(written);
   if (!parsed.success) {
     dropped.push({
       intentIndex: -1,
@@ -1559,7 +1887,7 @@ function translateCallBack(
     source: "narrator",
     targetTick: ctx.hookTick + 1,
     kind: "requestCall",
-    payload: { when: parsed.data.when, why },
+    payload: { when: parsed.data.when, why, ...(parsed.data.holdQuiet ? { holdQuiet: true } : {}) },
   };
 }
 
@@ -1572,12 +1900,15 @@ function plannedFaults(
   snapshot: Snapshot,
   content: ContentBundle,
   rawIntents: readonly unknown[],
-  intentSchema: ReturnType<typeof buildNarratorPlanSchema>["shape"]["intents"]["element"],
+  intentSchema: IntentSchema,
+  failLevers: ReadonlySet<number>,
 ): PlannedFaults {
   const revealed = new Set<string>();
   const injected: string[] = [];
-  for (const raw of rawIntents) {
+  for (const [index, raw] of rawIntents.entries()) {
     const parsed = intentSchema.safeParse(withBeat(raw));
+    // §tried-sides: a reveal on a failure branch may never happen, so it reveals nothing yet.
+    if (failLevers.has(index) && parsed.success && parsed.data.kind === "reveal") continue;
     if (!parsed.success) continue;
     const intent = parsed.data;
     if (intent.kind === "reveal" && revealOutcome({ snapshot, content }, intent).ok) {
@@ -1588,14 +1919,74 @@ function plannedFaults(
   return { revealed, injected };
 }
 
+type IntentSchema = ReturnType<typeof buildNarratorPlanSchema>["shape"]["intents"]["element"];
+
+/**
+ * §tried-sides: the intents a card's sides name in `failLevers` that are outcome levers
+ * (`FAIL_LEVER_KINDS`): they belong to that card's failure branch, not to the plan's commands. An
+ * index naming anything else stays an ordinary intent, and the card is dropped for it.
+ */
+function failLeverIndexes(rawIntents: readonly unknown[], intentSchema: IntentSchema): Set<number> {
+  const indexes = new Set<number>();
+  for (const raw of rawIntents) {
+    const parsed = intentSchema.safeParse(withBeat(raw));
+    if (!parsed.success || parsed.data.kind !== "surfaceDecision") continue;
+    for (const index of [...parsed.data.left.failLevers, ...parsed.data.right.failLevers]) {
+      const kind = kindOf(rawIntents[index]);
+      if ((FAIL_LEVER_KINDS as readonly string[]).includes(kind)) indexes.add(index);
+    }
+  }
+  return indexes;
+}
+
+/**
+ * §tried-sides: translate the failure-branch levers first, wherever they sit in the plan, so the
+ * card that names them finds them whatever the order; a lever that cannot be made is dropped with
+ * its reason, and so is the card that needs it.
+ */
+function translateFailLevers(
+  env: Env,
+  failLevers: Map<number, Outcome<CommandDraft>>,
+  rawIntents: readonly unknown[],
+  intentSchema: IntentSchema,
+  indexes: ReadonlySet<number>,
+  dropped: DroppedIntent[],
+): void {
+  for (const index of [...indexes].sort((a, b) => a - b)) {
+    const raw = rawIntents[index];
+    const kind = kindOf(raw);
+    const parsed = intentSchema.safeParse(withBeat(raw));
+    const outcome: Outcome<CommandDraft> = parsed.success
+      ? translateOne(env, parsed.data)
+      : no(invalidIntentReason(kind, parsed.error.issues));
+    failLevers.set(index, outcome);
+    if (!outcome.ok) dropped.push({ intentIndex: index, kind, reason: outcome.reason });
+  }
+}
+
 /**
  * §beat-attribution: the model always writes `beat` (the schema requires it); a plan built in code
  * (the null narrator, a scenario, a test) may leave it out, and then the intent serves no beat, as
- * a plan without `callBack` asks for no call.
+ * a plan without `callBack` asks for no call. Likewise a card built in code may leave out what
+ * §tried-sides and §follow-up-cards added: no odds, no failure branch, no follow-ups.
  */
 function withBeat(raw: unknown): unknown {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw) || "beat" in raw) return raw;
-  return { ...raw, beat: "" };
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const record = raw as Record<string, unknown>;
+  const withIt = "beat" in record ? record : { ...record, beat: "" };
+  return withIt.kind === "surfaceDecision" ? withCardDefaults(withIt) : withIt;
+}
+
+const SIDE_DEFAULTS = { odds: "", failEffect: "none", failLevers: [] } as const;
+const CARD_DEFAULTS = { leftFailAftermath: "", rightFailAftermath: "", followUps: [] } as const;
+
+/** A code-built card with the fields it left out at their "none" (see `withBeat`). */
+function withCardDefaults(card: Record<string, unknown>): Record<string, unknown> {
+  const side = (value: unknown) =>
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? { ...SIDE_DEFAULTS, ...value }
+      : value;
+  return { ...CARD_DEFAULTS, ...card, left: side(card.left), right: side(card.right) };
 }
 
 /**
@@ -1612,6 +2003,8 @@ export const translateIntents: TranslateIntents = (
   const hook = ctx.hook ?? snapshot.state.narrator.pendingHook;
   const intentSchema = buildNarratorPlanSchema().shape.intents.element;
   const rawIntents: readonly unknown[] = Array.isArray(plan.intents) ? plan.intents : [];
+  const diverted = failLeverIndexes(rawIntents, intentSchema);
+  const failLevers = new Map<number, Outcome<CommandDraft>>();
   const env: Env = {
     snapshot,
     content: ctx.content,
@@ -1619,7 +2012,7 @@ export const translateIntents: TranslateIntents = (
     secrets: secretPhrases(
       snapshot,
       ctx.content,
-      plannedFaults(snapshot, ctx.content, rawIntents, intentSchema),
+      plannedFaults(snapshot, ctx.content, rawIntents, intentSchema, diverted),
     ),
     threads: (ctx.threads ?? []).map((t) => ({ ...t, stored: true })),
     closedThreads: (ctx.closedThreads ?? []).map((t) => t.trim().toLowerCase()),
@@ -1635,12 +2028,17 @@ export const translateIntents: TranslateIntents = (
       closedThread: undefined,
     },
     notes: [],
+    failLevers,
+    usedFailLevers: new Set(),
   };
   const commands: NarratorCommand[] = [];
   const dropped: DroppedIntent[] = [];
   const beats: BeatAttribution[] = [];
+  translateFailLevers(env, failLevers, rawIntents, intentSchema, diverted, dropped);
 
   rawIntents.forEach((raw, intentIndex) => {
+    // §tried-sides: a failure-branch lever rides on its card, translated above.
+    if (diverted.has(intentIndex)) return;
     const kind = kindOf(raw);
     if (!isNarratorKind(kind)) {
       dropped.push({ intentIndex, kind, reason: `"${kind}" is not something you can do` });
@@ -1678,6 +2076,15 @@ export const translateIntents: TranslateIntents = (
       beats.push({ beat, kind: parsed.data.kind, commandId: id, lands });
     }
   });
+
+  for (const [index, outcome] of failLevers) {
+    if (!outcome.ok || env.usedFailLevers.has(index)) continue;
+    dropped.push({
+      intentIndex: index,
+      kind: outcome.value.kind,
+      reason: `${outcome.value.kind}: a failLever of a card that did not go up, so it never applies`,
+    });
+  }
 
   const unseen = unseenCommand(env, plan);
   if (!unseen.ok) {

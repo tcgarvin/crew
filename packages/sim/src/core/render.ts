@@ -557,6 +557,11 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "decisionResolved":
       return null;
+    // §tried-sides: the roll shows in the aftermath and the card that follows; the number stays the
+    // narrator's to say. A refused failure lever is the narrator's bookkeeping.
+    case "attemptRolled":
+    case "failLeverRefused":
+      return null;
     case "bell": {
       const key = event.payload.sectionKey;
       return key === undefined ? "Bell." : `Bell. ${sectionName(key)} section has the watch.`;

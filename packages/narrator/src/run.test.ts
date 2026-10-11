@@ -930,7 +930,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
   });
 
   it("tells the model its levers on a passenger are endPassage, and aboard strike and the memory and thought levers, and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
@@ -1077,7 +1077,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
 
   it("tells the model to ask for its next call, and what to do on it (§requested-call-back, v0.27)", () => {
     expect(STATIC_RULES).toContain(
-      "- callBack: when you want to be called next (when: nextPort, departure or midLeg) and why",
+      "- callBack: when you want to be called next and why, one private line read back to you on that call. when is nextPort",
     );
     expect(STATIC_RULES).toContain(
       "when you offer a job, ask for a departure call and say in why what you mean to do with the leg",
@@ -1123,7 +1123,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
     expect(STATIC_RULES).toContain("you have no lever yet that stages a site");
@@ -1159,7 +1159,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model to decide, roll or let the sim run, and to show what it decides (D106, v0.32)", () => {
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
     expect(STATIC_RULES).not.toContain("do not decide outcomes");
     expect(STATIC_RULES).toContain("- Decide, roll, or let the sim run. You may decide outcomes");
     expect(STATIC_RULES).toContain("you cannot do the impossible");
@@ -1180,7 +1180,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model its outcome levers: strike by the body rules, transact and payCredits, the captain not special, budgets as advice (D106, v0.33)", () => {
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
     expect(STATIC_RULES).toContain("wound or kill a person by the body rules (strike)");
     expect(STATIC_RULES).toContain("move money into or out of the ship's money (transact)");
     expect(STATIC_RULES).toContain("the death the season has been walking toward");
@@ -1194,7 +1194,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model the rest of its outcome levers: memories, a falling-out, thoughts, a reveal, a fault now and a decided hazard (D106, v0.34)", () => {
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
     for (const lever of [
       "(plantMemory)",
       "(fallOut)",
@@ -1216,7 +1216,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
-    expect(PROMPT_VERSION).toBe("v0.38");
+    expect(PROMPT_VERSION).toBe("v0.39");
     const policy = HOOK_INSTRUCTIONS.policyDecision;
     expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
     expect(policy).toContain("a guard asleep, a back way, a friend inside");
@@ -1244,6 +1244,19 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("a stated chance is a promise the dice keep");
     expect(STATIC_RULES).toContain("A 0 or a 100 is a decision dressed as a gamble");
     expect(STATIC_RULES).toContain("that is a story, not a punishment");
+  });
+
+  it("tells the model about tries, follow-up cards and the new call-back moments (§tried-sides, §follow-up-cards, v0.39)", () => {
+    expect(STATIC_RULES).toContain("make that side a try: odds on the side");
+    expect(STATIC_RULES).toContain("A card side can be a try");
+    expect(STATIC_RULES).toContain("they happen only if it fails, never otherwise");
+    expect(STATIC_RULES).toContain("never on a beat card or a closing card");
+    expect(STATIC_RULES).toContain("A failed try is a story, not a punishment");
+    expect(STATIC_RULES).toContain("A card can have a second panel: followUps");
+    expect(STATIC_RULES).toContain("counts as the call's one card; a follow-up has no follow-up");
+    expect(STATIC_RULES).toContain("arrival (as the ship comes in to the next port");
+    expect(STATIC_RULES).toContain("afterCard (the tick after the captain answers the next card");
+    expect(STATIC_RULES).toContain("holdQuiet true makes the quiet check-in wait twice as long");
   });
 });
 
@@ -1414,7 +1427,7 @@ describe("the notes turn (§notes-turn)", () => {
     // A plan without notes: the fake gives the notes turn the same reply, which is no notes.
     const transport = fakeTransport(
       okResult(
-        '{"rationale": "", "intents": [], "card": null, "callBack": {"when": "nextPort", "why": ""}}',
+        '{"rationale": "", "intents": [], "card": null, "callBack": {"when": "nextPort", "why": "", "holdQuiet": false}}',
       ),
     );
     const run = await runNarratorWithTrace(captainAshoreRequest(content()), ctx(transport));

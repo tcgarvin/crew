@@ -21,6 +21,9 @@ function content(): ContentBundle {
   return bundle;
 }
 
+/** §tried-sides: a side that is not a try, as the model writes it. */
+const NO_TRY = { odds: "", failEffect: "none", failLevers: [] } as const;
+
 function cardCallingIn(talkWith: string): ModelTransport {
   const card = {
     kind: "surfaceDecision",
@@ -29,12 +32,29 @@ function cardCallingIn(talkWith: string): ModelTransport {
     speaker: "Dane Whitcross",
     situation:
       "Dane stops the captain in the corridor. “Jax and Tomas are at it again over the cards, Captain. Someone should have a word.”",
-    left: { label: "Send Jax up.", effect: "privateTalk", coursePort: "", talkWith, tone: "stern" },
-    right: { label: "Let it go.", effect: "none", coursePort: "", talkWith: "", tone: "" },
+    left: {
+      label: "Send Jax up.",
+      effect: "privateTalk",
+      coursePort: "",
+      talkWith,
+      tone: "stern",
+      ...NO_TRY,
+    },
+    right: {
+      label: "Let it go.",
+      effect: "none",
+      coursePort: "",
+      talkWith: "",
+      tone: "",
+      ...NO_TRY,
+    },
     leftAftermath: "Dane goes to fetch Jax.",
     rightAftermath: "Dane shrugs and goes back to his station.",
+    leftFailAftermath: "",
+    rightFailAftermath: "",
     beatOfThread: "",
     closesThread: "",
+    followUps: [],
   };
   // §notes-turn: the plan turn, then the notes turn (the one with a continuation).
   return async (request) => ({
@@ -47,7 +67,7 @@ function cardCallingIn(talkWith: string): ModelTransport {
             intents: [card],
             card: null,
             // §requested-call-back: every plan the model writes carries its call-back request.
-            callBack: { when: "nextPort", why: "" },
+            callBack: { when: "nextPort", why: "", holdQuiet: false },
           },
     ),
     finish: "stop",

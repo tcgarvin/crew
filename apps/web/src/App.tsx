@@ -62,7 +62,7 @@ import { Toast, useToast } from "./ui/Toast";
 import { TopBar } from "./ui/TopBar";
 import { TravelBar } from "./ui/TravelBar";
 import { personWords } from "./ui/actorWords";
-import { AFTERMATH_MS, aftermathCaption } from "./ui/aftermath";
+import { AFTERMATH_MS, aftermathCaption, isTriedSide, rollOf } from "./ui/aftermath";
 import { clockSections, shipClock } from "./ui/clock";
 import { dockInspection } from "./ui/dockInspection";
 import { gatheringLine } from "./ui/gathering";
@@ -209,6 +209,18 @@ export function App() {
   }>();
   const closingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(closingTimer.current), []);
+  /**
+   * §tried-sides: a tried side the captain just chose, waiting for the kernel's roll; its caption
+   * is the branch the roll takes, so the card stays up without one until `attemptRolled` arrives.
+   */
+  const pendingTry = useRef<
+    | {
+        readonly decision: Decision;
+        readonly side: "left" | "right";
+        readonly narrated: DecisionCardText | undefined;
+      }
+    | undefined
+  >(undefined);
 
   /** Send `message` (built around a fresh request id); the worker's reply to it goes to `onReply`. */
   const request = useCallback(
@@ -399,6 +411,13 @@ export function App() {
         }
         case "events": {
           appendRecentEvents(recentEventsRef.current, message.events);
+          const tried = pendingTry.current;
+          const worked =
+            tried === undefined ? undefined : rollOf(message.events, tried.decision.id);
+          if (tried !== undefined && worked !== undefined) {
+            pendingTry.current = undefined;
+            showAftermathRef.current(tried.decision, tried.side, tried.narrated, worked);
+          }
           slowdownRef.current.add(message.events);
           if (message.events.some((e) => e.type === "arrived")) save("milestone");
           else if (message.events.some((e) => e.type === "decisionResolved")) save("routine");
@@ -436,6 +455,11 @@ export function App() {
             console.warn("[sim worker] command rejected", message.result.rejection);
             // §decision-queue-and-halts: a player's own command failing is shown, not just logged.
             if (kind !== undefined) showToast(rejectionMessage(kind, message.result.rejection));
+            // §tried-sides: a refused choice rolls nothing, so the card waiting for its roll closes.
+            if (kind === "resolveDecision" && pendingTry.current !== undefined) {
+              pendingTry.current = undefined;
+              setClosingCard(undefined);
+            }
           }
           return;
         }
@@ -697,6 +721,26 @@ export function App() {
   }, []);
 
   // -------------------------------------------------------------- decisions
+  /** §aftermath-caption: show the answered card with its caption, then close it after a moment. */
+  const showAftermath = useCallback(
+    (
+      answered: Decision,
+      side: "left" | "right",
+      narrated: DecisionCardText | undefined,
+      worked: boolean,
+    ) => {
+      const caption = aftermathCaption(answered, side, narrated, bundle, worked);
+      setClosingCard({ card: narrated ?? templateCard(answered, bundle), side, caption });
+      setLog((prev) => answerDecision(prev, answered.id, { side, caption }));
+      clearTimeout(closingTimer.current);
+      closingTimer.current = setTimeout(() => setClosingCard(undefined), AFTERMATH_MS);
+    },
+    [bundle],
+  );
+  // The worker's message handler is set up once; it reaches the current callback through a ref.
+  const showAftermathRef = useRef(showAftermath);
+  showAftermathRef.current = showAftermath;
+
   const onChooseDecision = useCallback(
     (side: "left" | "right") => {
       const connection = connectionRef.current;
@@ -710,15 +754,18 @@ export function App() {
       // §aftermath-caption: keep the answered card up for a moment with a line on what happens
       // next. The sim resumes behind it straight away; only the card lingers.
       const narrated = prose[decision.id];
-      const caption = aftermathCaption(decision, side, narrated, bundle);
-      setClosingCard({ card: narrated ?? templateCard(decision, bundle), side, caption });
-      setLog((prev) => answerDecision(prev, decision.id, { side, caption }));
-      clearTimeout(closingTimer.current);
-      closingTimer.current = setTimeout(() => setClosingCard(undefined), AFTERMATH_MS);
+      if (isTriedSide(decision, side)) {
+        // §tried-sides: the caption is the branch the roll takes; the card waits up without one.
+        pendingTry.current = { decision, side, narrated };
+        clearTimeout(closingTimer.current);
+        setClosingCard({ card: narrated ?? templateCard(decision, bundle), side, caption: "" });
+      } else {
+        showAftermath(decision, side, narrated, true);
+      }
       setDecision(undefined);
       setDecisionHidden(false);
     },
-    [decision, prose, bundle, sendCommand],
+    [decision, prose, bundle, sendCommand, showAftermath],
   );
 
   const onNewGame = useCallback(() => {

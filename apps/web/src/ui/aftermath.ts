@@ -2,9 +2,12 @@
  * §aftermath-caption: the one line shown for a moment after the player picks a side, saying plainly
  * what happens next. Narrator prose wins, then the option's own `aftermath` (its prose, else its
  * template as the card reads it), then a built-in line for job offers, then a generic line.
+ *
+ * §tried-sides: a tried side's caption is the branch the roll took, so it waits for the kernel's
+ * `attemptRolled` (`rollOf`): its `aftermath` if it worked, its `failAftermath` if not.
  */
-import { type DecisionCardText, templateCard } from "@crew/content";
-import type { ContentBundle, Decision, DeepReadonly } from "@crew/sim";
+import { type DecisionCardText, renderTextRef, templateCard } from "@crew/content";
+import type { ContentBundle, Decision, DeepReadonly, SimEvent } from "@crew/sim";
 
 /** How long the card stays up with the caption before it closes. */
 export const AFTERMATH_MS = 2_500;
@@ -31,12 +34,41 @@ function narratorAftermath(
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
+/** §tried-sides: whether `side` of `decision` is a try, so its caption waits for the roll. */
+export function isTriedSide(decision: DeepReadonly<Decision>, side: "left" | "right"): boolean {
+  return decision[side].attempt !== undefined;
+}
+
+/** §tried-sides: how the roll on `decisionId` went, if `events` carry its `attemptRolled`. */
+export function rollOf(events: readonly SimEvent[], decisionId: string): boolean | undefined {
+  for (const event of events) {
+    if (event.type === "attemptRolled" && event.payload.decisionId === decisionId) {
+      return event.payload.worked;
+    }
+  }
+  return undefined;
+}
+
+/** §tried-sides: what a tried side reads when its roll failed. */
+const GENERIC_FAILED = "It does not come off.";
+
+/**
+ * The caption for `side`. `worked` is the roll on a tried side (§tried-sides): `false` reads the
+ * failure branch's own aftermath; `true`, or a side that is no try, reads as below.
+ */
 export function aftermathCaption(
   decision: DeepReadonly<Decision>,
   side: "left" | "right",
   narratorCard: DecisionCardText | undefined,
   content?: ContentBundle,
+  worked = true,
 ): string {
+  const attempt = decision[side].attempt;
+  if (attempt !== undefined && !worked) {
+    const failed =
+      attempt.failAftermath === undefined ? "" : renderTextRef(attempt.failAftermath, content);
+    return failed.trim() === "" ? GENERIC_FAILED : failed;
+  }
   const fromNarrator = narratorAftermath(narratorCard, side);
   if (fromNarrator !== undefined) return fromNarrator;
   if (decision[side].aftermath !== undefined) {

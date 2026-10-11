@@ -2,7 +2,7 @@
 
 Everything the captain decides on screen: what a card is, what its sides can do, how the queue
 halts the world, and how cards from the port arrive in person. Code is in
-`packages/sim/src/core/` (`decisions.ts`, `delivery.ts`, `command-handlers.ts`), the card text
+`packages/sim/src/core/` (`decisions.ts`, `delivery.ts`, `decision-handlers.ts`), the card text
 contract in `packages/narrator/src/contract.ts` and `translate.ts`, and the modal in
 `apps/web/src/ui/DecisionModal.tsx`. What the narrator writes and why is in `narrator-story.md`.
 
@@ -13,8 +13,9 @@ contract in `packages/narrator/src/contract.ts` and `translate.ts`, and the moda
 A `Decision` has a prompt, a left and a right `DecisionOption`, a status (`pending`, `resolved`,
 `dropped`) and an origin (`policy` for kernel-raised cards, `narrator` for the rest, job offers
 included). Each option is a label, the commands it runs, an optional `nextDecisionId` (the next
-card, shown straight after) and an optional aftermath. The perspective actor is the captain, or
-the first officer while the captain is asleep or incapacitated (D8), fixed at creation.
+card, shown straight after, §follow-up-cards), an optional aftermath, and for a tried side an
+`attempt` (§tried-sides). The perspective actor is the captain, or the first officer while the
+captain is asleep or incapacitated (D8), fixed at creation.
 
 Choosing a side runs its commands as source `player`, so each must be a player-authority command.
 All of them are validated first; if any is rejected the whole choice is rejected and the card
@@ -49,6 +50,9 @@ drops the whole card if it cannot):
 - `endPassage`: see below.
 - `privateTalk` (`talkWith`, `tone`): see below.
 
+A tried side's `failEffect` is one of the same four, with the side's own `coursePort`, `talkWith`
+and `tone`; it runs instead of `effect` when the roll fails (§tried-sides).
+
 ### End passage effect
 
 `endPassage { jobId }` puts the passenger off with no fare (`putOff`, §ending-a-passage-early). It
@@ -61,6 +65,61 @@ captive it fails the errand too (§settling-the-errand), and the voyage home is 
 `stern` (§private-talk). The translator offers the side only for crew aboard who are not the
 captain, a passenger, ashore or on the dock, and only when no talk is pending.
 
+### Follow-up cards
+
+A card side may carry a `next` card (`DecisionCardSide.next`), and a tried side a `failNext`: the
+second panel of a scene, shown straight after its branch is taken. `surfaceDecision` mints each as
+its own `pending` record, neither queued nor held (only its branch brings it up), framed from its
+own perspective if it names one, else the card's, and links it as the option's `nextDecisionId`
+or `attempt.failNextDecisionId`. Every side and lever on it is checked when the card goes up, and
+again when its own side is chosen. `resolveDecision` puts the follow-up of the branch taken at the
+head of the queue and drops every other follow-up the card carried (`decisionDropped`, status
+`dropped`, after `decisionResolved`), so no pending record is left that nothing can reach; a held
+card dropped as stale takes its follow-ups with it. A follow-up card has no follow-ups of its own
+(the kernel refuses one, and the plan schema has none) and carries no job.
+
+The narrator writes them as `surfaceDecision.followUps`, each `{ on, card }`: `on` is `left`,
+`right`, `either` (the same card after both; the kernel mints one per side and drops the unused
+one) or `failed` (after each tried side's failure); `card` is a card without thread fields or
+follow-ups, with plain sides (no odds). At most one per place. Its text is held to the same checks
+as the card's, its speaker may differ (the guard who answers the bluff), and the whole scene is the
+call's one card (§one-card-per-call). Why: narrator arcs §7.2; the design's recommendation, adopted
+by the owner, that a follow-up counts as the call's card and has none of its own.
+
+### Tried sides
+
+A side with an `attempt { odds, failCommands, failLevers, failAftermath?, failNext? }` is a try:
+the narrator's honest chance, a whole percent from 0 to 100 with no clamp (narrator arcs §8.4),
+that the captain's choice comes off. When it is chosen `resolveDecision` rolls once,
+`rng.chance("narrator", odds / 100)` on the seeded `narrator` stream, writes `Decision.tried
+{ odds, worked }` and emits `attemptRolled { decisionId, side, odds, worked }` (`notable`, not
+hooked, no ticker line: the aftermath and the follow-up are the reaction). Worked, the side runs as
+any: its `commands`, `aftermath` and `nextDecisionId`. Failed, its failure branch runs instead:
+`failCommands` as `player`, then `failLevers` as `narrator`, then `failAftermath` and
+`failNextDecisionId`. Choosing the other side rolls nothing.
+
+Both branches' player commands are validated before the roll, as one side's are, so a stale one
+refuses the choice and the card stays up. The failure levers are outcome levers only
+(`FAIL_LEVER_KINDS`: `strike`, `transact`, `plantMemory`, `fallOut`, `giveThought`, `reveal`,
+`injectFault`), allowed only on a card the narrator or a scenario surfaced, minted at translation
+and checked against the state when the card goes up; on failure each is checked again and applied,
+or refused alone with `failLeverRefused { decisionId, kind, reason }` (`notable`) when it is no
+longer possible, so the captain's choice is never undone by one. Because they run as `narrator`,
+`AUTHORITY.player` is unchanged. Why: narrator arcs §8.1-§8.3, D106; "the narrator loads the dice;
+the sim throws them".
+
+The narrator sets it on `surfaceDecision`'s sides (§card-lever): `odds` ("" for no try, else a
+whole percent as a string), `failEffect`, `failLevers` (the indexes in the plan's `intents` of the
+outcome-lever intents that belong to the failure branch; the translator takes them out of the
+plan's own commands, whatever their order) and the card's `leftFailAftermath` and
+`rightFailAftermath`. The translator refuses odds that are not a whole percent, a failure branch
+written without odds, odds on a beat or closing card (those sides are the captain's attitude), a
+`failLevers` index that names no outcome lever in the plan or a lever that was itself dropped, and
+a try whose branches are identical (same commands, no lever, no failure aftermath of its own, no
+follow-up on either branch). A lever on a card that does not go up is reported dropped. A lever on
+a failure branch serves the card's beat (§beat-attribution), not its own. The card shows no number:
+a stated chance is the speaker's to voice (§player-facing-text-checks).
+
 ## Aftermath
 
 ### Aftermath caption
@@ -69,7 +128,11 @@ Every side can carry a one-line caption, shown for a moment (`AFTERMATH_MS`, 2.5
 and before the card closes, saying plainly what happens next (caps: §player-facing-text-checks). The
 caption is the narrator's prose when it wrote one, else the option's own `aftermath`
 (`apps/web/src/ui/aftermath.ts`), else a built-in line for job offers, else a generic one. A blank
-narrator caption means none, not a reason to drop the card.
+narrator caption means none, not a reason to drop the card. A tried side's caption is the branch
+the roll took (§tried-sides): the card stays up without a caption until the worker's
+`attemptRolled` arrives, then shows the side's `aftermath` if it worked or its `failAftermath`
+("It does not come off." when it has none) if not, and the timer starts from then; a refused
+choice closes it.
 
 Why: the owner declined a job and "it really wasn't sure what was going to happen next."
 
@@ -81,7 +144,8 @@ Why: the owner declined a job and "it really wasn't sure what was going to happe
 "on screen now". The world halts (`haltReason`) while the queue is non-empty, unless the head's
 `resolveDecision` is already queued for the next tick; a pending hook outranks a decision.
 `resolveDecision` is accepted only for the head. A card whose chosen side names a
-`nextDecisionId` puts that card at the head.
+`nextDecisionId` (or, for a failed try, `failNextDecisionId`) puts that card at the head
+(§follow-up-cards).
 
 A rejected player command raises a toast with the kernel's reason, friendlier for the common
 cases (`apps/web/src/ui/rejectionMessage.ts`), never a silent failure.

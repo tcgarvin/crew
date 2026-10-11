@@ -33,7 +33,7 @@ function planWith(intents: unknown[]): ModelTransport {
             intents,
             card: null,
             // §requested-call-back: every plan the model writes carries its call-back request.
-            callBack: { when: "nextPort", why: "" },
+            callBack: { when: "nextPort", why: "", holdQuiet: false },
           },
     ),
     finish: "stop",

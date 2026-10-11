@@ -83,7 +83,7 @@ describe("strike in the plan schema and the translator (§strike-lever)", () => 
       rationale: "r",
       intents: [strikeOf("Jax Okonkwo"), transactOf(-200)],
       card: null,
-      callBack: { when: "nextPort", why: "" },
+      callBack: { when: "nextPort", why: "", holdQuiet: false },
     };
     expect(schema.safeParse(valid).success).toBe(true);
     const { how: _how, ...noHow } = strikeOf("Jax Okonkwo");

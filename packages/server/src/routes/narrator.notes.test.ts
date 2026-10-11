@@ -35,7 +35,7 @@ const PLAN = {
   rationale: "Nothing yet.",
   intents: [],
   card: null,
-  callBack: { when: "nextPort", why: "" },
+  callBack: { when: "nextPort", why: "", holdQuiet: false },
 };
 const WRITTEN = {
   summary: "A quiet leg, written after the plan.",

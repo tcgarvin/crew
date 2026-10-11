@@ -8,8 +8,18 @@
  * the digest can bound each part separately. Dropped intents from the previous call are carried
  * in `lastRejections` so the model learns why its commands did not happen.
  */
-import type { UnseenRoll } from "@crew/sim";
+import type { ChanceRoll } from "@crew/sim";
 import { z } from "zod";
+
+/**
+ * §card-history: what was rolled on a card the captain answered: the way in unseen on an arrival
+ * card (§unseen-odds) or a tried side (§tried-sides).
+ */
+export const CARD_ROLL_KINDS = ["unseen", "try"] as const;
+export type CardRollKind = (typeof CARD_ROLL_KINDS)[number];
+export interface CardRoll extends ChanceRoll {
+  readonly kind: CardRollKind;
+}
 
 export interface NarratorCastEntry {
   readonly name: string;
@@ -85,10 +95,11 @@ export interface CardShown {
    */
   readonly closedThread: string | null;
   /**
-   * §unseen-odds: on an arrival card whose marked way in the captain chose, the roll of the chance
-   * the narrator set (server-kept); absent on every other card.
+   * §card-history: the roll of the chance the narrator set, on an arrival card whose marked way in
+   * the captain chose (§unseen-odds) or a card whose tried side they chose (§tried-sides);
+   * server-kept, absent on every other card.
    */
-  readonly tried?: UnseenRoll;
+  readonly tried?: CardRoll;
 }
 
 /**
@@ -310,7 +321,14 @@ const storedCardSchema = z.object({
   chosen: z.enum(["left", "right"]).nullable(),
   /** Cards stored before closing cards (§closing-cards) closed nothing. */
   closedThread: z.string().nullable().optional(),
-  tried: z.object({ odds: z.number().int(), worked: z.boolean() }).optional(),
+  // A roll stored before tried sides was the way in unseen.
+  tried: z
+    .object({
+      odds: z.number().int(),
+      worked: z.boolean(),
+      kind: z.enum(CARD_ROLL_KINDS).default("unseen"),
+    })
+    .optional(),
 });
 
 const storedBeatSchema = z.object({

@@ -217,7 +217,9 @@ const quietTimerSystem: System = {
   run(ctx) {
     const narrator = ctx.state.narrator;
     if (narrator.pendingHook !== undefined) return;
-    const quietTicks = dayTicks(ctx.config, ctx.config.narrator.quietTooLongDays);
+    // §requested-call-back: a standing request may ask the check-in to wait twice as long.
+    const held = narrator.callBack?.holdQuiet === true ? 2 : 1;
+    const quietTicks = held * dayTicks(ctx.config, ctx.config.narrator.quietTooLongDays);
     if (ctx.tick - narrator.lastNarrativeTick < quietTicks) return;
     raiseHookIfIdle(ctx, "quietTooLong", { quietSinceTick: narrator.lastNarrativeTick });
   },

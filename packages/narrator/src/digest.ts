@@ -21,6 +21,7 @@ import {
   PASSENGER_OVERDUE_PROMPT_KEY,
   type PortDefId,
   type Problem,
+  type RaisedCallBackWhen,
   type SimEvent,
   actionLabel,
   dayTicks,
@@ -192,6 +193,14 @@ const AFTERMATH_SUFFIX: Readonly<Partial<Record<string, string>>> = {
   faultRepaired: "; the fault you caused is repaired",
 };
 
+/** §requested-call-back: the moment a requested call came due, as the hook line says it. */
+const CALL_BACK_WORDS: Readonly<Record<RaisedCallBackWhen, string>> = {
+  departure: "when the ship cast off",
+  midLeg: "mid-leg",
+  arrival: "as the ship comes in to the next port",
+  afterCard: "once the captain had answered the next card",
+};
+
 /**
  * §requested-call-back: the call the model asked for, read back with where the ship is: the leg and
  * the transit still ahead (what the hazard and field windows must fit), and the voyage beyond it.
@@ -203,7 +212,7 @@ function requestedCallHookLine(
   config: DeepReadonly<ConfigDef>,
 ): string {
   const { when, why, requestedTick } = hook.context;
-  const asked = `requestedCall: you asked at t${requestedTick} to be called ${when === "departure" ? "when the ship cast off" : "mid-leg"}: "${why}"`;
+  const asked = `requestedCall: you asked at t${requestedTick} to be called ${CALL_BACK_WORDS[when]}: "${why}"`;
   const t = state.travel;
   if (t.stage === "docked") return `${asked}. The ship is docked at ${portName(content, t.portId)}`;
   const voyage = voyageAhead(state, content);
@@ -229,7 +238,9 @@ function callBackLine(state: State, hook: DeepReadonly<NarratorHook>): string | 
       : undefined;
   }
   if (request.servedByHookId !== undefined) return undefined;
-  return `Your standing request: ${request.when} — "${request.why}" (asked t${request.requestedTick}). This call's callBack replaces it.`;
+  const held =
+    request.holdQuiet === true ? " The quiet check-in waits twice as long while it stands." : "";
+  return `Your standing request: ${request.when} — "${request.why}" (asked t${request.requestedTick}).${held} This call's callBack replaces it.`;
 }
 
 function hookLine(
@@ -998,13 +1009,15 @@ function openThreadsSection(notes: NarratorNotes): Section {
  * outranks the machine list in the trim order.
  */
 /**
- * §unseen-odds: the roll on the way in unseen the captain chose, after the choice: ` (70%): it
- * worked, they got in unseen` or ` (70%): it failed, they were waiting`.
+ * §card-history: the roll after the choice: on the way in unseen, ` (the way in unseen, 70%): it
+ * worked, they got in unseen` (§unseen-odds); on a tried side, ` (70%): it failed` (§tried-sides).
  */
 function triedWords(card: CardShown): string {
-  if (card.tried === undefined) return "";
-  const how = card.tried.worked ? "it worked, they got in unseen" : "it failed, they were waiting";
-  return ` (the way in unseen, ${card.tried.odds}%): ${how}`;
+  const tried = card.tried;
+  if (tried === undefined) return "";
+  if (tried.kind === "try") return ` (${tried.odds}%): it ${tried.worked ? "worked" : "failed"}`;
+  const how = tried.worked ? "it worked, they got in unseen" : "it failed, they were waiting";
+  return ` (the way in unseen, ${tried.odds}%): ${how}`;
 }
 
 /** §card-history: one card the captain saw (§notes-turn-tools: `cardsShown` too). */

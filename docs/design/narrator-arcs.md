@@ -1,6 +1,6 @@
 # Narrator arcs, outcome levers and narrator-set odds
 
-Status: agreed with the owner 2026-10-11 (D106); slices 1-5 built. Reworked after the owner's ruling on the narrator's
+Status: agreed with the owner 2026-10-11 (D106); slices 1-6 built. Reworked after the owner's ruling on the narrator's
 authority (§2). Owner inputs are marked **(owner)**; everything else is a design-partner call.
 The ruling becomes D106 in `docs/DECISIONS.md`; mechanics go into `docs/spec/narrator-story.md`,
 `cards.md`, `expeditions.md` and `social.md` as each slice lands. Companions:

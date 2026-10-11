@@ -86,7 +86,7 @@ function forTurn(result: ModelResult, request: Parameters<ModelTransport>[0]): M
  * §requested-call-back: the model always writes `callBack` (the schema requires it); a fixture plan
  * built without one answers with the plain request, nextPort, so it still parses.
  */
-export const FIXTURE_CALL_BACK = { when: "nextPort", why: "" } as const;
+export const FIXTURE_CALL_BACK = { when: "nextPort", why: "", holdQuiet: false } as const;
 
 function withPlan(notes: unknown): unknown {
   if (notes === null || typeof notes !== "object" || "plan" in notes) return notes;
@@ -95,15 +95,43 @@ function withPlan(notes: unknown): unknown {
 
 function withCallBack(plan: Record<string, unknown>): Record<string, unknown> {
   const beats = { ...plan, intents: withBeats(plan.intents) };
-  return "callBack" in plan ? beats : { ...beats, callBack: FIXTURE_CALL_BACK };
+  const callBack = plan.callBack;
+  if (callBack === undefined) return { ...beats, callBack: FIXTURE_CALL_BACK };
+  // §requested-call-back: a fixture written before holdQuiet holds nothing.
+  return callBack !== null && typeof callBack === "object" && !("holdQuiet" in callBack)
+    ? { ...beats, callBack: { ...callBack, holdQuiet: false } }
+    : beats;
 }
 
-/** §beat-attribution: a fixture intent without `beat` serves none, as the model writes "". */
+/**
+ * §beat-attribution: a fixture intent without `beat` serves none, as the model writes "". A fixture
+ * card written before §tried-sides and §follow-up-cards has no odds, failure branch or follow-ups.
+ */
 export function withBeats(intents: unknown): unknown {
   if (!Array.isArray(intents)) return intents;
-  return intents.map((i: unknown) =>
-    i !== null && typeof i === "object" && !("beat" in i) ? { ...i, beat: "" } : i,
-  );
+  return intents.map((i: unknown) => {
+    if (i === null || typeof i !== "object") return i;
+    const withBeat = "beat" in i ? i : { ...i, beat: "" };
+    return (withBeat as { kind?: unknown }).kind === "surfaceDecision"
+      ? withCardFields(withBeat as Record<string, unknown>)
+      : withBeat;
+  });
+}
+
+/** The fields §tried-sides and §follow-up-cards added to a card, at "none", under `card`'s own. */
+export function withCardFields(card: Record<string, unknown>): Record<string, unknown> {
+  const side = (value: unknown) =>
+    value !== null && typeof value === "object"
+      ? { odds: "", failEffect: "none", failLevers: [], ...value }
+      : value;
+  return {
+    leftFailAftermath: "",
+    rightFailAftermath: "",
+    followUps: [],
+    ...card,
+    left: side(card.left),
+    right: side(card.right),
+  };
 }
 
 /**

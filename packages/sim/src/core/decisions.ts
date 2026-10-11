@@ -99,3 +99,43 @@ export function raisePolicyDecisionHookIfDue(ctx: StepCtx): boolean {
   if (hook !== undefined) decision.narratorHookId = hook.id;
   return true;
 }
+
+/**
+ * §follow-up-cards: the follow-up records a card links to: each side's `nextDecisionId` and, for a
+ * tried side, the one after its failure.
+ */
+export function followUpIds(decision: Pick<Decision, "left" | "right">): DecisionId[] {
+  const ids: DecisionId[] = [];
+  for (const option of [decision.left, decision.right]) {
+    if (option.nextDecisionId !== undefined) ids.push(option.nextDecisionId);
+    const failNext = option.attempt?.failNextDecisionId;
+    if (failNext !== undefined) ids.push(failNext);
+  }
+  return ids;
+}
+
+/**
+ * §follow-up-cards: drop every follow-up `decision` links to except `keep` (the one coming up), so
+ * no pending record is left that nothing can bring up. Each still pending is marked `dropped` with
+ * a `decisionDropped` event, which the card history reads as never seen.
+ */
+export function dropFollowUps(
+  ctx: Pick<StepCtx, "state" | "emit">,
+  decision: Pick<Decision, "left" | "right">,
+  keep: DecisionId | undefined,
+  reason: string,
+): void {
+  for (const id of followUpIds(decision)) {
+    if (id === keep) continue;
+    const record = ctx.state.decisions.records[id];
+    if (record === undefined || record.status !== "pending") continue;
+    record.status = "dropped";
+    ctx.emit({
+      type: "decisionDropped",
+      subjectIds: [id],
+      causeIds: [],
+      source: "sim",
+      payload: { decisionId: id, reason },
+    });
+  }
+}

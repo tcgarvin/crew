@@ -382,6 +382,56 @@ const FALLING_OUT_NOTES = {
 };
 
 /**
+ * §tried-sides, §follow-up-cards: a thread whose next beat is the captain's gamble, with a chance
+ * the story has set up and a consequence if it fails, so a try (and a follow-up) is the natural card.
+ */
+const GAMBLE_NOTES = {
+  summary:
+    "The crew are on the Meridian run. Tomas Ruiz stowed a few crates of undeclared ore in the aft hold at Kessler, and the captain does not know yet.",
+  threads: [
+    {
+      title: "The customs launch",
+      scale: "episode",
+      people: ["Tomas Ruiz", "Dane Whitcross", "Ines Varga"],
+      arcNotes:
+        "A customs launch out of Kessler has been shadowing the ship. Its officer, Ines Varga, is by the book but tired and near the end of her shift. Dane Whitcross has seen the ore and thinks a bluff about a sealed medical cargo might work, maybe half the time.",
+      nextBeat:
+        "Now: Varga hails and asks to board and inspect the aft hold. The first officer brings it to the captain: open the hold, or bluff her off. The bluff is a real gamble the captain chooses; if it fails, she fines the ship and her report follows them, and what Varga says next is its own decision.",
+      lastBeatTick: 3_000,
+      beatCardShown: false,
+    },
+  ],
+  cardsShown: [],
+  cast: [
+    {
+      name: "Ines Varga",
+      note: "Kessler customs officer on the launch; by the book, tired.",
+      portId: "port.kessler_drift",
+    },
+  ],
+  lastUpdatedTick: 3_000,
+  lastRejections: [],
+};
+
+/** §tried-sides, §follow-up-cards: what a written card used of the slice-6 fields, for the log. */
+function cardShape(intent: unknown): string {
+  const card = intent as {
+    left?: { odds?: string; failLevers?: number[] };
+    right?: { odds?: string; failLevers?: number[] };
+    followUps?: { on: string }[];
+    beatOfThread?: string;
+    closesThread?: string;
+  };
+  const odds = [card.left?.odds, card.right?.odds].map((o) =>
+    o === undefined || o === "" ? "-" : o,
+  );
+  const levers = [...(card.left?.failLevers ?? []), ...(card.right?.failLevers ?? [])];
+  const followUps = (card.followUps ?? []).map((f) => f.on);
+  const thread = `beatOfThread "${card.beatOfThread ?? ""}", closesThread "${card.closesThread ?? ""}"`;
+  return `odds ${odds.join("/")}, failLevers ${JSON.stringify(levers)}, followUps ${JSON.stringify(followUps)}, ${thread}`;
+}
+
+/**
  * §notes-turn-tools: thin notes at the Hub with no plan standing, whose season is to turn back to
  * Kessler Drift and people the digest does not name there (the Drift's locals and its dock are not
  * in a Hub call's digest): what the notes turn needs is reachable by tool (site, castMember,
@@ -645,6 +695,27 @@ suite(
           OUTCOME_KINDS.includes(d.kind),
         );
         expect(droppedOutcome, JSON.stringify(droppedOutcome)).toEqual([]);
+      },
+      LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "quietTooLong with the captain's gamble due: a tried side or a follow-up, if written, translates (§tried-sides, §follow-up-cards)",
+      async () => {
+        const run = await liveRun(quietTooLongRequest(content()), { notes: GAMBLE_NOTES });
+        const response = expectModelAnswered(run);
+        const plan = run.trace.plan;
+        const story = plan !== undefined && "intents" in plan ? plan : undefined;
+        const cards = (story?.intents ?? []).filter(
+          (i) => (i as { kind: string }).kind === "surfaceDecision",
+        );
+        console.log(
+          `gamble call: wrote ${JSON.stringify((story?.intents ?? []).map((i) => (i as { kind: string }).kind))}; cards: ${cards.map(cardShape).join(" | ") || "none"}; callBack ${callBackOf(run)}; rationale: ${story?.rationale ?? ""}`,
+        );
+        const surfaced = response.commands.find((c) => c.kind === "surfaceDecision");
+        if (surfaced?.kind === "surfaceDecision") {
+          console.log("gamble card as sent:", JSON.stringify(surfaced.payload.card, null, 2));
+        }
       },
       LIVE_TIMEOUT_MS,
     );

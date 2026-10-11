@@ -177,8 +177,13 @@ export interface NarratorResponse {
  * translator validates every one against the snapshot and content, with a drop reason the model
  * sees next call.
  */
-const ID_HINT = 'from "What you can do"';
-const idOf = (what: string) => z.string().describe(`${what} ${ID_HINT}.`);
+/**
+ * §plan-schema-in-the-prompt: the rules say once that every id is copied from "What you can do",
+ * so a field's description names only what it is (the schema rides in every call's prompt, D53).
+ */
+const idOf = (what: string) => z.string().describe(`${what}.`);
+/** A plain id field whose name says what it is (`fromPort`, `cargoItem`, `machine`, `site`). */
+const plainId = () => z.string();
 
 /**
  * §narrator-authority: optional strings are plain strings where empty means "none", not
@@ -264,8 +269,25 @@ export const STRIKE_PARTS = [...BODY_PARTS, ""] as const;
  */
 export const HAZARD_OUTCOMES = ["", ...FORCED_HAZARD_OUTCOMES] as const;
 
+/** §side-effects: what a card side does when chosen, as the model writes it. */
+export const SIDE_EFFECTS = ["none", "setCourse", "endPassage", "privateTalk"] as const;
+export type SideEffect = (typeof SIDE_EFFECTS)[number];
+
+/**
+ * §follow-up-cards: which side a follow-up card comes after: `left`, `right`, or `either` (the
+ * same card after whichever side the captain picks).
+ */
+export const FOLLOW_UP_SIDES = ["left", "right", "either"] as const;
+export type FollowUpSide = (typeof FOLLOW_UP_SIDES)[number];
+/**
+ * §follow-up-cards, §tried-sides: a follow-up's `on` as the model writes it: after a side (for a
+ * try, after it worked), or `failed`, after a tried side's roll fails.
+ */
+export const FOLLOW_UP_ON = [...FOLLOW_UP_SIDES, "failed"] as const;
+export type FollowUpOn = (typeof FOLLOW_UP_ON)[number];
+
 export function buildNarratorPlanSchema() {
-  const port = idOf("Port id");
+  const port = plainId();
   /**
    * §beat-attribution: the episode beat an intent serves, copied from "Your plan", empty for none.
    * Described once (on surfaceDecision, and in the prompt): it is on every intent, and the schema
@@ -273,20 +295,23 @@ export function buildNarratorPlanSchema() {
    */
   const beat = z.string();
   const decisionSide = z.strictObject({
-    label: z.string().describe("What the captain says or does, two to six words."),
+    label: z.string().describe("What the captain says or does, 2-6 words."),
     /**
      * Side effect when chosen; `setCourse` needs `coursePort`. Passengers-and-galaxy §4.2:
      * `endPassage` puts the current passenger off at the next docking (no fare). §private-talk:
      * `privateTalk` calls a crew member (`talkWith`) to the captain's cabin for a word in `tone`.
      */
-    effect: z.enum(["none", "setCourse", "endPassage", "privateTalk"]),
-    coursePort: z.string().describe("Port id if effect is setCourse; else empty."),
-    talkWith: z
-      .string()
-      .describe("Crew member's full name, as Crew lists it, if effect is privateTalk; else empty."),
-    tone: z
-      .enum(PRIVATE_TALK_TONES)
-      .describe("warm or stern if effect is privateTalk; else empty."),
+    effect: z.enum(SIDE_EFFECTS),
+    coursePort: z.string().describe("If setCourse; else empty."),
+    talkWith: z.string().describe("Full name if privateTalk."),
+    tone: z.enum(PRIVATE_TALK_TONES),
+    /**
+     * §tried-sides: a whole percent as a string, so empty can mean "not a try"; the failure branch
+     * is `failEffect`, the levers named by index in `failLevers`, and the card's `*FailAftermath`.
+     */
+    odds: z.string().describe("0-100 for a try; else empty."),
+    failEffect: z.enum(SIDE_EFFECTS),
+    failLevers: z.array(z.number()).describe("Intent indexes, only on failure."),
   });
 
   // §issuers-and-pitches: every offer comes from a named person who says something;
@@ -301,7 +326,7 @@ export function buildNarratorPlanSchema() {
     description: z.string().describe("One or two sentences about the job. No pay."),
     fromPort: port,
     toPort: port,
-    cargoItem: idOf("Item id"),
+    cargoItem: plainId(),
     quantity: z.enum(QUANTITIES),
     payTier: z.enum(PAY_TIERS),
     /**
@@ -326,9 +351,9 @@ export function buildNarratorPlanSchema() {
      * under eight words (plan call 7: the schema's size).
      */
     errandKind: z.enum(["", ...ERRAND_KINDS]).describe(`Errand to a site; ${EMPTY_FOR_NONE}.`),
-    site: idOf("Site id"),
+    site: plainId(),
     targetName: z.string().describe(`Who to fetch; ${EMPTY_FOR_NONE}.`),
-    targetItem: idOf("Item id"),
+    targetItem: plainId(),
     wants: z.enum(["", ...ERRAND_WANTS]).describe(`Target alive or dead; ${EMPTY_FOR_NONE}.`),
   });
 
@@ -340,14 +365,14 @@ export function buildNarratorPlanSchema() {
     beat,
     port: port,
     store: idOf("Store key of that port"),
-    cargoItem: idOf("Item id"),
+    cargoItem: plainId(),
     quantity: z.enum(QUANTITIES),
   });
 
   const scheduleFault = z.strictObject({
     kind: z.literal("scheduleFault"),
     beat,
-    machine: idOf("Machine id"),
+    machine: plainId(),
     faultKey: idOf("faultKey of that machine"),
     window: z.enum(FAULT_WINDOWS),
   });
@@ -374,7 +399,7 @@ export function buildNarratorPlanSchema() {
     scripted: z
       .array(
         z.strictObject({
-          target: z.string().describe(`Machine id or room name ${ID_HINT}.`),
+          target: z.string().describe("Machine id or room name."),
           at: z.enum(FIELD_MOMENTS),
           rock: z.enum(SCRIPTED_ROCKS),
           effect: z.enum(SCRIPTED_EFFECTS),
@@ -389,7 +414,7 @@ export function buildNarratorPlanSchema() {
     kind: z.literal("stockMarket"),
     beat,
     port: port,
-    cargoItem: idOf("Item id"),
+    cargoItem: plainId(),
     count: z.enum(STOCK_COUNTS),
     priceTier: z.enum(MARKET_PRICE_TIERS),
   });
@@ -402,23 +427,23 @@ export function buildNarratorPlanSchema() {
     who: z.string().describe("Full name as the digest lists them."),
     severity: z.enum(WOUND_SEVERITIES),
     type: z.enum(DAMAGE_TYPES),
-    part: z.enum(STRIKE_PARTS).describe("Where it lands; empty to let the body decide."),
+    part: z.enum(STRIKE_PARTS).describe("Empty for the body's draw."),
     byWho: z.string().describe(`Who did it, full name; ${EMPTY_FOR_NONE}.`),
-    how: z.string().describe("One line of what happened, for the log. Max 120 characters."),
+    how: z.string().describe("For the log. Max 120 characters."),
   });
 
   // §money-levers: a sum into (positive) or out of (negative) the ship's money.
   const transact = z.strictObject({
     kind: z.literal("transact"),
     beat,
-    amount: z.number().describe("Credits, + into the ship's money, - out of it. Never 0."),
+    amount: z.number().describe("+ into the ship's money, - out. Never 0."),
     memo: z.string().describe("What it is for, a few words."),
     counterparty: z.string().describe(`Who pays or is paid; ${EMPTY_FOR_NONE}.`),
   });
 
   // D106's other outcome levers: what is felt, what is noticed, what breaks now. The capability
   // block explains the fields; descriptions stay short for the schema budget.
-  const fullName = z.string().describe("Full name.");
+  const fullName = z.string();
   const plantMemory = z.strictObject({
     kind: z.literal("plantMemory"),
     beat,
@@ -445,17 +470,15 @@ export function buildNarratorPlanSchema() {
     z.strictObject({
       kind: z.literal(kind),
       beat,
-      machine: idOf("Machine id"),
+      machine: plainId(),
       faultKey: z.string(),
     });
 
   // §aftermath-caption: shown for a moment after the choice, before the card closes.
-  const aftermath = z.string().describe("What happens next if chosen; max 20 words, no numbers.");
+  const aftermath = z.string().describe("Max 20 words, no numbers.");
 
   // §spoken-cards: a named person brings the card and speaks; empty only for an observed scene.
-  const speaker = z
-    .string()
-    .describe("Who speaks, full name as the digest lists them; empty if observed.");
+  const speaker = z.string().describe("Full name; empty if observed.");
   const situation = z
     .string()
     .describe("A stage line, then their words in quotes. 35-55 words, max 70. No numbers.");
@@ -470,6 +493,29 @@ export function buildNarratorPlanSchema() {
     .string()
     .describe("Empty, or for a closing card the exact title of the thread it ends.");
 
+  // §follow-up-cards: the second panel of a scene, the same card shape without its own follow-up
+  // or thread fields. No descriptions: they are the card's own, and the schema rides in every
+  // call's prompt (D53).
+  const plainSide = z.strictObject({
+    label: z.string(),
+    effect: z.enum(SIDE_EFFECTS),
+    coursePort: z.string(),
+    talkWith: z.string(),
+    tone: z.enum(PRIVATE_TALK_TONES),
+  });
+  const followUpCard = z.strictObject({
+    title: z.string(),
+    speaker: z.string(),
+    situation: z.string(),
+    left: plainSide,
+    right: plainSide,
+    leftAftermath: z.string(),
+    rightAftermath: z.string(),
+  });
+  const followUps = z
+    .array(z.strictObject({ on: z.enum(FOLLOW_UP_ON), card: followUpCard }))
+    .describe("Usually empty.");
+
   const surfaceDecision = z.strictObject({
     kind: z.literal("surfaceDecision"),
     beat: z
@@ -482,8 +528,11 @@ export function buildNarratorPlanSchema() {
     right: decisionSide,
     leftAftermath: aftermath,
     rightAftermath: aftermath,
+    leftFailAftermath: z.string(),
+    rightFailAftermath: z.string(),
     beatOfThread,
     closesThread,
+    followUps,
   });
 
   return z.strictObject({
@@ -529,16 +578,10 @@ export function buildNarratorPlanSchema() {
      * for nothing).
      */
     callBack: z.strictObject({
-      when: z
-        .enum(CALL_BACK_WHEN)
-        .describe(
-          "When you want your next call: nextPort (the docking calls come anyway), departure (the tick the ship casts off with a course: the whole leg ahead, for a hazard, a field or a card as the port falls away), midLeg (halfway through the next transit, or this one if it is not halfway yet).",
-        ),
-      why: z
-        .string()
-        .describe(
-          "One private line: what you mean to do on that call. Read back to you then. Max 200 characters.",
-        ),
+      // §requested-call-back: the moments are explained in the rules (callBack), not here.
+      when: z.enum(CALL_BACK_WHEN).describe("When you want your next call."),
+      why: z.string().describe("Private: what you mean to do then. Max 200 characters."),
+      holdQuiet: z.boolean().describe("Doubles the quiet wait once."),
     }),
   });
 }
@@ -652,7 +695,9 @@ export type CallBackPlan = ModelPlan["callBack"];
  * schema requires it); a plan built in code (the null narrator, tests) may leave it out, and then
  * no call-back request is made and the standing one stays.
  */
-export type NarratorPlan = Omit<ModelPlan, "callBack"> & { readonly callBack?: CallBackPlan };
+export type NarratorPlan = Omit<ModelPlan, "callBack"> & {
+  readonly callBack?: Omit<CallBackPlan, "holdQuiet"> & { readonly holdQuiet?: boolean };
+};
 export type NarratorIntent = NarratorPlan["intents"][number];
 
 // ---------------------------------------------------------------------------------------------
