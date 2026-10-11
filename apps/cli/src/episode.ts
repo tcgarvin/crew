@@ -9,8 +9,8 @@
  * narrator (`nullNarratorResponse` with the content, as the server answers when no model is
  * configured): its commands are sent, then `acknowledgeHook`, and a policy card's template prose is
  * kept for the transcript. Every card is answered by `episodeChoice`: the errand's offer is taken,
- * any other offer passed, the arrival card's `hold-` plan adopted, the turn card's "Press on", and
- * anything else its left side (as `crew beats` answers cards).
+ * any other offer passed, the arrival card's `hold-` plan adopted (else its left side), the turn
+ * card's "Press on", and anything else its left side (as `crew beats` answers cards).
  *
  * Invariants (`checkInvariants`, `travelViolations`) are checked after every step. The run stops
  * once the job is closed (paid or failed) with the ship docked at home, when the hull is lost, or
@@ -19,16 +19,20 @@
  * ticker as it read with sim times, the cards and how they were answered, money before and after,
  * and any violation. `formatEpisodeTranscript` prints it for a reader judging the pacing:
  *
- *     pnpm --filter @crew/cli dev episode [--seed N] [--site <port id>] [--all]
+ *     pnpm --filter @crew/cli dev episode [--seed N] [--site <port id>] [--item <item id>]
+ *       [--arrival <posture>] [--unseen <posture>] [--all]
  *
  * (`--all` adds ship life, meals and bells and talk, to the episode's own lines.)
  *
- * Tests may vary it (`EpisodeOptions`): `fetchItem` offers a `fetchItem` errand instead, `turnCard`
- * `pullBack` takes the turn card's other side, and `world` plays a further errand on a world an
- * earlier run left (made by `createEpisodeWorld`, run with the same kernel).
+ * Tests may vary it (`EpisodeOptions`): `fetchItem` (`--item`) offers a `fetchItem` errand
+ * instead, `turnCard` `pullBack` takes the turn card's other side, `arrivalCard` (`--arrival`)
+ * adopts the arrival card's side of another posture (`creep` or `assault` on an item errand's
+ * card), `markUnseen` (`--unseen`) has the narrator mark the side of that posture as the way in
+ * unseen (§unseen-lever), and `world` plays a further errand on a world an earlier run left (made
+ * by `createEpisodeWorld`, run with the same kernel).
  */
 import { type DecisionCardText, NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
-import { NULL_NARRATOR_MODEL, nullNarratorResponse } from "@crew/narrator";
+import { NULL_NARRATOR_MODEL, commandIdFor, nullNarratorResponse } from "@crew/narrator";
 import {
   type Command,
   type CommandId,
@@ -41,7 +45,9 @@ import {
   type JobId,
   type Kernel,
   type NarratorHook,
+  POSTURES,
   type PortDefId,
+  type Posture,
   type SimEvent,
   type World,
   checkInvariants,
@@ -72,6 +78,17 @@ export interface EpisodeOptions {
   /** How the turn card is answered: "Press on" (the default) or "Pull back to the ship". */
   readonly turnCard?: TurnCardAnswer;
   /**
+   * How the arrival card is answered: the side adopting a plan of this posture (it must be on the
+   * card). Absent, the side adopting a `hold` plan, else the left.
+   */
+  readonly arrivalCard?: Posture;
+  /**
+   * D105 (§unseen-lever): the null narrator's answer to the arrival card's `policyDecision` hook
+   * also marks the side adopting a plan of this posture as the way in unseen, a `markUnseen` sent
+   * as the narrator's other commands are (it must be on the card). Absent, nothing is marked.
+   */
+  readonly markUnseen?: Posture;
+  /**
    * Play on this world (made by `createEpisodeWorld` with the same kernel) rather than a new one:
    * a second errand after the first, the ship where the first left her. Absent, a new world.
    */
@@ -84,6 +101,12 @@ export interface EpisodeOptions {
     world: World,
     send: (command: Omit<Command, "id">) => EnqueueResult,
   ) => void;
+  /**
+   * The ticks the next advance runs, asked before each one; absent, half a sim second. A test that
+   * must see every tick of a stretch (`afterStep` and the invariants run after every advance), say
+   * the party stepping onto the site floor, returns 1 there.
+   */
+  readonly ticksPerAdvance?: (world: World) => number;
 }
 
 /** The turn card's two answers (`EpisodeOptions.turnCard`). */
@@ -171,6 +194,8 @@ export interface EpisodeResult {
   }[];
   /** The plan the expedition fought with, read when it resolved. */
   readonly planAdopted?: string;
+  /** The arrival card's plan the narrator marked unseen (`EpisodeOptions.markUnseen`). */
+  readonly unseenPlanId?: string;
   /** Commands the null narrator answered with that the kernel rejected (should be none). */
   readonly narratorRejections: readonly string[];
   readonly moneyStart: number;
@@ -326,19 +351,38 @@ function sideWith(
   return SIDES.find((side) => decision[side].commands.some(test) === want);
 }
 
-const adoptsHold = (c: SideCommand): boolean =>
-  c.kind === "adoptPlan" && String((c.payload as { planId?: unknown }).planId).startsWith("hold-");
+/** The plan a side's command adopts, if it is an `adoptPlan`. */
+function adoptedPlan(c: SideCommand): string | undefined {
+  return c.kind === "adoptPlan" ? String((c.payload as { planId?: unknown }).planId) : undefined;
+}
+
+/** Whether `c` adopts a plan of `posture` (plan ids read `<posture>-<fire>-<squad>`). */
+const adopts =
+  (posture: Posture) =>
+  (c: SideCommand): boolean =>
+    adoptedPlan(c)?.startsWith(`${posture}-`) === true;
+
+/** The arrival card's side adopting a plan of `posture`; the card having none is a harness error. */
+function arrivalSideOf(decision: DeepReadonly<Decision>, posture: Posture): Side {
+  const side = sideWith(decision, adopts(posture));
+  if (side === undefined) {
+    throw new Error(`episode: the arrival card has no "${posture}" side`);
+  }
+  return side;
+}
 
 /**
  * How the episode answers a card: take the errand's offer (its `acceptContract` side) and pass any
- * other; on the arrival card the side adopting a `hold-` plan; on the turn card "Press on" (the side
- * with no `withdrawParty`), or with `turnCard` `pullBack` the side with it; anything else its left
- * side, as `crew beats` does.
+ * other; on the arrival card the side adopting a plan of `arrivalCard`'s posture, or absent the
+ * side adopting a `hold-` plan, else the left; on the turn card "Press on" (the side with no
+ * `withdrawParty`), or with `turnCard` `pullBack` the side with it; anything else its left side,
+ * as `crew beats` does.
  */
 export function episodeChoice(
   decision: DeepReadonly<Decision>,
   errandJobId: JobId | undefined,
   turnCard: TurnCardAnswer = "pressOn",
+  arrivalCard?: Posture,
 ): Side {
   const accepts = (c: SideCommand) => c.kind === "acceptContract";
   switch (decision.prompt.key) {
@@ -347,7 +391,9 @@ export function episodeChoice(
       return sideWith(decision, accepts, ours) ?? "left";
     }
     case "expedition.arrival":
-      return sideWith(decision, adoptsHold) ?? "left";
+      return arrivalCard === undefined
+        ? (sideWith(decision, adopts("hold")) ?? "left")
+        : arrivalSideOf(decision, arrivalCard);
     case "expedition.turn":
       return (
         sideWith(decision, (c) => c.kind === "withdrawParty", turnCard === "pullBack") ?? "left"
@@ -481,6 +527,7 @@ class EpisodeRun {
   readonly milestones: Milestones;
   jobId: JobId | undefined;
   planAdopted: string | undefined;
+  unseenPlanId: string | undefined;
   readonly events: SimEvent[] = [];
   readonly transcript: TranscriptLine[] = [];
   readonly cards: EpisodeCard[] = [];
@@ -605,7 +652,8 @@ class EpisodeRun {
     if (response.card !== undefined) {
       this.prose.set(response.card.decisionId as DecisionId, response.card);
     }
-    for (const command of response.commands) {
+    const unseen = this.unseenMark(hook, response.callId, response.commands.length);
+    for (const command of [...response.commands, ...(unseen === undefined ? [] : [unseen])]) {
       // The hook's tick has passed in the halted world; the command applies at the next one.
       const { targetTick: _hookTick, ...rest } = command as Command & { targetTick?: number };
       const answer = this.kernel.enqueueCommand(world, rest as Command);
@@ -617,6 +665,28 @@ class EpisodeRun {
     this.sendOrThrow({ source: "system", kind: "acknowledgeHook", payload: { hookId: hook.id } });
   }
 
+  /**
+   * D105: with `markUnseen`, the narrator's mark on the arrival card's side of that posture, for
+   * the card's `policyDecision` hook; nothing for any other hook or without the option.
+   */
+  private unseenMark(hook: NarratorHook, callId: string, n: number): Command | undefined {
+    const posture = this.options.markUnseen;
+    if (posture === undefined || hook.kind !== "policyDecision") return undefined;
+    const decisionId = hook.context.decisionId as DecisionId;
+    const decision = this.world.state.decisions.records[decisionId];
+    if (decision?.prompt.key !== "expedition.arrival") return undefined;
+    const side = arrivalSideOf(decision, posture);
+    const planId = decision[side].commands.map(adoptedPlan).find((id) => id !== undefined);
+    if (planId === undefined) throw new Error(`episode: the arrival card's ${side} adopts no plan`);
+    this.unseenPlanId = planId;
+    return {
+      id: commandIdFor(callId, n),
+      source: "narrator",
+      kind: "markUnseen",
+      payload: { decisionId, planId },
+    };
+  }
+
   /** `episodeChoice` answers the card at the head of the queue; the card goes in the transcript. */
   answerDecision(): void {
     const { world } = this;
@@ -625,7 +695,12 @@ class EpisodeRun {
     if (head === undefined || decision === undefined) {
       throw new Error("decision halt without a queued decision");
     }
-    const side = episodeChoice(decision, this.jobId, this.options.turnCard);
+    const side = episodeChoice(
+      decision,
+      this.jobId,
+      this.options.turnCard,
+      this.options.arrivalCard,
+    );
     const narrated = this.prose.get(head);
     const card = narrated ?? templateCard(decision, world.content);
     const commands = decision[side].commands;
@@ -713,6 +788,7 @@ class EpisodeRun {
       hooks: this.hooks,
       transactions,
       ...(this.planAdopted === undefined ? {} : { planAdopted: this.planAdopted }),
+      ...(this.unseenPlanId === undefined ? {} : { unseenPlanId: this.unseenPlanId }),
       narratorRejections: this.narratorRejections,
       moneyStart: this.moneyStart,
       moneyEnd: state.money.balance,
@@ -736,7 +812,11 @@ function* episodeRun(options: EpisodeOptions, kernel?: Kernel): ChunkedRun<Episo
   for (let advances = 1; ; advances += 1) {
     if (advances % ADVANCES_PER_CHUNK === 0) yield;
     const before = world.state.tick;
-    const step = run.kernel.advance(world, ADVANCE_TICKS);
+    const ticks = options.ticksPerAdvance?.(world) ?? ADVANCE_TICKS;
+    if (!Number.isInteger(ticks) || ticks < 1) {
+      throw new Error(`episode: ticksPerAdvance gave ${ticks}, not a whole number of ticks`);
+    }
+    const step = run.kernel.advance(world, ticks);
     run.read(step.events);
     // Every step: invariants are what catch a cast member dragged aboard at lift-off and its kin.
     run.checkHealth();
@@ -783,6 +863,7 @@ function transcriptHeader(r: EpisodeResult): string[] {
     `Money ${r.moneyStart} → ${r.moneyEnd} (offered pay ${r.pay}). Ticker: ${r.episodeTickerLines} episode lines of ${r.tickerLines}.`,
     `Milestones: ${milestones.join(", ") || "none"}.`,
     `Hooks: ${hooks.join(", ") || "none"}.`,
+    ...(r.unseenPlanId === undefined ? [] : [`The narrator marked ${r.unseenPlanId} unseen.`]),
     ...(r.violations.length === 0 ? [] : [`Violations: ${r.violations.join("; ")}`]),
     ...(r.narratorRejections.length === 0
       ? []
@@ -813,37 +894,74 @@ export function formatEpisodeTranscript(r: EpisodeResult, format: TranscriptForm
 // CLI
 // ---------------------------------------------------------------------------------------------
 
-const USAGE = "usage: crew episode [--seed N] [--site <port id>] [--all]";
+const USAGE =
+  "usage: crew episode [--seed N] [--site <port id>] [--item <item id>] [--arrival <posture>] " +
+  "[--unseen <posture>] [--all]";
 
 export interface EpisodeCliOptions extends EpisodeOptions {
   readonly all: boolean;
 }
 
-export function parseEpisodeArgs(args: readonly string[]): EpisodeCliOptions | { error: string } {
-  let seed = 1;
-  let siteId: PortDefId | undefined;
-  let all = false;
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    const value = args[i + 1];
-    if (arg === "--all") {
-      all = true;
-    } else if (arg === "--seed") {
+const isPosture = (value: string | undefined): value is Posture =>
+  (POSTURES as readonly (string | undefined)[]).includes(value);
+
+/** The flags that take a value. */
+type ValueFlag = "--seed" | "--site" | "--item" | "--arrival" | "--unseen";
+const VALUE_FLAGS: ReadonlySet<string> = new Set<ValueFlag>([
+  "--seed",
+  "--site",
+  "--item",
+  "--arrival",
+  "--unseen",
+]);
+
+/** One flag's value read into the options, or why it is refused. */
+function readFlag(
+  flag: ValueFlag,
+  value: string | undefined,
+): Partial<EpisodeCliOptions> | { error: string } {
+  switch (flag) {
+    case "--seed": {
       const n = Number(value);
       if (value === undefined || !Number.isInteger(n)) {
         return { error: `--seed needs an integer. ${USAGE}` };
       }
-      seed = n;
-      i += 1;
-    } else if (arg === "--site") {
-      if (value === undefined) return { error: `--site needs a port id. ${USAGE}` };
-      siteId = value as PortDefId;
+      return { seed: n };
+    }
+    case "--site":
+      return value === undefined
+        ? { error: `--site needs a port id. ${USAGE}` }
+        : { siteId: value as PortDefId };
+    case "--item":
+      return value === undefined
+        ? { error: `--item needs an item id. ${USAGE}` }
+        : { fetchItem: value as ItemDefId };
+    case "--arrival":
+    case "--unseen": {
+      if (!isPosture(value)) {
+        return { error: `${flag} needs a posture (${POSTURES.join(", ")}). ${USAGE}` };
+      }
+      return flag === "--arrival" ? { arrivalCard: value } : { markUnseen: value };
+    }
+  }
+}
+
+export function parseEpisodeArgs(args: readonly string[]): EpisodeCliOptions | { error: string } {
+  let options: EpisodeCliOptions = { seed: 1, all: false };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--all") {
+      options = { ...options, all: true };
+    } else if (arg !== undefined && VALUE_FLAGS.has(arg)) {
+      const read = readFlag(arg as ValueFlag, args[i + 1]);
+      if ("error" in read) return read;
+      options = { ...options, ...read };
       i += 1;
     } else {
       return { error: `unknown argument "${arg}". ${USAGE}` };
     }
   }
-  return { seed, all, ...(siteId === undefined ? {} : { siteId }) };
+  return options;
 }
 
 export function runEpisodeCli(args: readonly string[]): { output: string; exitCode: 0 | 1 } {
@@ -855,6 +973,9 @@ export function runEpisodeCli(args: readonly string[]): { output: string; exitCo
       output: `crew episode: "${parsed.siteId}" is not a landing site. ${USAGE}`,
       exitCode: 1,
     };
+  }
+  if (parsed.fetchItem !== undefined && bundle.items[parsed.fetchItem] === undefined) {
+    return { output: `crew episode: no item "${parsed.fetchItem}". ${USAGE}`, exitCode: 1 };
   }
   const result = runEpisode(parsed);
   const ok =

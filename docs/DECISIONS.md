@@ -109,7 +109,8 @@ narrator says they sneak in and get the box, but another option the narrator tri
 A new lever (D6): while an expedition's arrival card is pending the narrator may mark one side,
 never a `hold`, as the way in unseen (`markUnseen`); the captain still chooses, and the sim fights
 the chosen side unseen or expected. Rejected: leaving noticing to the sim alone, which gives the
-story no way to set up a quiet way in, and letting the narrator choose the plan.
+story no way to set up a quiet way in, and letting the narrator choose the plan. See
+§getting-in-unseen, §unseen-lever.
 
 ## Play
 
