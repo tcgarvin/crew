@@ -33,6 +33,8 @@ import {
   type PlacedLabel,
   boxesOverlap,
   centredBox,
+  fitLabelText,
+  maxPlateWidth,
   placeLabels,
 } from "./labels";
 import {
@@ -792,6 +794,9 @@ interface PersonPlate extends PlacedLabel {
   readonly dotY: number;
 }
 
+/** A person label's plate is its text's width plus this. */
+const LABEL_PLATE_PAD_PX = 8;
+
 function personFontPx(t: ViewTransform): number {
   return Math.max(MIN_LABEL_FONT_PX, t.scale * 0.32);
 }
@@ -822,10 +827,16 @@ function placePersonLabels(
     // off the canvas, and a label clamped onto the edge would float there on its own.
     .filter(({ at: [x, y] }) => x >= 0 && x <= viewportWidth && y >= 0 && y <= viewportHeight)
     .sort((a, b) => a.entry.rank - b.entry.rank || b.at[1] - a.at[1] || a.at[0] - b.at[0]);
+  // §label-placement: a plate wider than the canvas is cut to fit, so it never runs off an edge.
+  const measure = (text: string) => ctx.measureText(text).width;
+  const maxText = maxPlateWidth(viewportWidth) - LABEL_PLATE_PAD_PX;
   const requests: LabelRequest[] = shown.map(({ entry, at: [dotX, dotY] }) => ({
     dotX,
     dotY,
-    texts: entry.texts.map((text): LabelText => ({ text, width: ctx.measureText(text).width + 8 })),
+    texts: entry.texts.map((full): LabelText => {
+      const text = fitLabelText(full, maxText, measure);
+      return { text, width: measure(text) + LABEL_PLATE_PAD_PX };
+    }),
     lift: entry.pushing ? truckLift : 0,
   }));
   const space = { viewportWidth, viewportHeight, plateHeight: fontPx + 4, dotRadius: radius };

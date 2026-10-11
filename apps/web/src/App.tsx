@@ -195,7 +195,8 @@ export function App() {
   const [decisionHidden, setDecisionHidden] = useState(false);
   const [prose, setProse] = useState<Readonly<Record<string, DecisionCardText>>>({});
   const health = useApiHealth();
-  const [toast, showToast] = useToast();
+  const [toast, toastControls] = useToast();
+  const showToast = toastControls.show;
   const [stale, setStale] = useState(false);
   /**
    * §aftermath-caption: the card just answered, kept up with its aftermath caption until the timer
@@ -473,14 +474,14 @@ export function App() {
             if (msg.type !== "snapshot") {
               const why = msg.type === "error" ? msg.message : `unexpected ${msg.type}`;
               console.warn(`[slowdown] could not name ${event.type} at ${event.tick}: ${why}`);
-              if (index === 0) showToast(slowdownToast(event.type));
+              if (index === 0) showToast(slowdownToast(event.type), "slowdown");
               return;
             }
             const text = describeEvent(event, msg.state, bundle);
             // A line missing from the log (dropped past LOG_LIMIT) leaves it as it was; the toast
             // below still says what happened.
             setLog((prev) => highlightEvent(prev, event.tick, text).log);
-            if (index === 0) showToast(slowdownToast(text));
+            if (index === 0) showToast(slowdownToast(text), "slowdown");
           },
         );
       });
@@ -743,6 +744,18 @@ export function App() {
   const travelState = frame?.travel.state ?? "docked";
   const showCard = card !== undefined && decisionDue && !decisionHidden && !thinking;
   const runAheadSeconds = runAhead.buffered / tickRate;
+  // §toasts: a card coming up dismisses the toast, and none is drawn while one is up.
+  const cardUp = showCard || closingCard !== undefined;
+  useEffect(() => {
+    if (cardUp) toastControls.dismiss();
+  }, [cardUp, toastControls]);
+  const onPlayerSetSpeed = useCallback(
+    (next: number) => {
+      toastControls.onPlayerSpeedChange();
+      onSetSpeed(next);
+    },
+    [toastControls, onSetSpeed],
+  );
 
   // §the-log-in-playback-order: the log follows playback, not the worker.
   const visible = useMemo(() => visibleLog(log, viewTick), [log, viewTick]);
@@ -756,7 +769,7 @@ export function App() {
       <TopBar
         speed={speed}
         paused={paused}
-        onSetSpeed={onSetSpeed}
+        onSetSpeed={onPlayerSetSpeed}
         onTogglePause={onTogglePause}
         clock={clock}
         hull={hull}
@@ -826,7 +839,7 @@ export function App() {
         )
       )}
       {decisionDue && decisionHidden && <DecisionPill onClick={() => setDecisionHidden(false)} />}
-      <Toast message={toast} />
+      <Toast note={toast} cardUp={cardUp} />
       {frame?.hull.lost === true && (
         // §hull-scars-and-ship-loss: the hull gave way; nothing goes on but a new game. A save that
         // loads already lost shows this from its first frame.

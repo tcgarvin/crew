@@ -124,9 +124,12 @@ and are pickable. Hull and field rules are in `hull-and-field.md`.
 ### Fight drawing
 
 Each `RenderShot` (`RenderFrame.shots`, from the tick's `shotFired`) is a tracer from shooter to
-target for 120 ms and, on a hit, a flash at the target for 360 ms (`render/shots.ts`), keyed by
+target for 200 ms and, on a hit, a flash at the target for 360 ms (`render/shots.ts`), keyed by
 its tick so it plays once from the moment playback first shows it, on a real-time clock held while
-paused. The other side's dots take a local's hue and darker rim, stable per person
+paused. A tracer is sized to the dot and drawn over a dark edge, so it reads on a site's light sand
+as on a dark deck (`tracerStrokes`): a hit is a thick warm line in an orange glow, a miss a
+thinner, pale blue dashed line with no glow. A hit's flash is a bright core and an expanding red
+ring. The other side's dots take a local's hue and darker rim, stable per person
 (§locals-and-props: never crew gold); the down are dimmed toward grey and the dead more so with a
 cross. A fighter's label is the combat system's (§the-combat-system-owns-its-combatants), "down"
 for someone incapacitated in the fight.
@@ -207,7 +210,8 @@ list is in `render/sessions.ts`).
 `placeLabels` (`render/labels.ts`) is pure geometry over measured plate sizes. Each label tries a
 few spots around its dot (above, below, beside, then further up or down with a leader line) and, if
 crowded everywhere, a shorter text; it never covers another person's label, avoids dots and room
-plates where it can, and stays on the canvas. Order is session plates, crew, then locals, lowest on
+plates where it can, and stays on the canvas, 2 px in from each edge; a text wider than that is cut
+with an ellipsis to fit (`fitLabelText`). Order is session plates, crew, then locals, lowest on
 screen first. Machine names and room plates under a placed label are left undrawn. Labels are only
 drawn for dots on the canvas, so a dock sliding in has no stray labels.
 
@@ -259,6 +263,17 @@ Every person's sheet has a body line from their agent view (`SelfView.body`): "u
 "dead"; marked when not "unhurt". One of a site's cast (`combatant.side` `them`) shows only name,
 their role there, the body line and their state in the fight, with none of the crew's watch,
 needs, weighing, problems or roster.
+
+## Notices
+
+### Toasts
+
+A toast (`ui/Toast.tsx`) is a one-line notice above the bottom edge for 4 s: a rejected player
+command (§decision-queue-and-halts) or an auto-slowdown (§auto-slowdown). It never covers a
+decision card: a card coming up (or closing with its aftermath) dismisses it, and none is drawn
+while one is up. An auto-slowdown's toast clears as soon as the player sets a speed, since it no
+longer says what the game is doing. Why: a stale "Slowed to 1×" sat over the turn card and the log
+lines it named.
 
 ## The phone
 
