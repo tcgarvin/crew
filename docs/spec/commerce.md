@@ -138,8 +138,8 @@ withdrawn. Names carry no pronouns, so cards say "them".
   off-ship actor, the narrator's to use as cast; the voyage home is kept.
 - `putOff`: the card-side effect (§end-passage-effect) puts an aboard passenger off at the next
   docking (now, if docked). The voyage, and the course when docked, is cancelled (not for an
-errand's captive, §settling-the-errand); luggage is
-  unloaded where they leave and holds the ship until it is on the dock.
+  errand's captive, §settling-the-errand); luggage is unloaded where they leave and holds the ship
+  until it is on the dock.
 
 Either way the passenger leaves the roster and the digest's Aboard line and appears in the
 narrator's people section at that port. The narrator never decides a passenger's fate and never
