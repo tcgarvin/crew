@@ -407,6 +407,15 @@ export const EXPEDITION_OUTCOMES = [
 export type ExpeditionOutcome = (typeof EXPEDITION_OUTCOMES)[number];
 
 /**
+ * D105: how the site notices the party under the adopted plan, written by `adoptPlan` once the
+ * narrator has marked a side of the arrival card (`markUnseen`). `unseen`: the marked plan was
+ * chosen, and the party gets in without the cast noticing; `seen`: the other side was, and they
+ * were waiting. With no mark the sim's ordinary noticing applies and `Expedition.notice` is absent.
+ */
+export const NOTICE_RULES = ["unseen", "seen"] as const;
+export type NoticeRule = (typeof NOTICE_RULES)[number];
+
+/**
  * Expeditions A1 (§2, §8): the expedition at the site alongside, from `scenarioStartExpedition` on.
  * Owner: the expedition system (`systems/expedition/`). `party` is set when the plan is adopted
  * (call 11; empty before); `leaderId` leads (the captain by default, §8.5); `shots` counts every
@@ -442,6 +451,16 @@ export interface Expedition {
   jobId?: JobId;
   /** Expeditions A2 (call 4): the policy cards it has queued, each at most once. */
   cards?: ExpeditionCards;
+  /**
+   * D105: the arrival card's plan the narrator marked to get in unseen (`markUnseen`), at most one
+   * and never a `hold` plan; absent when nothing was marked.
+   */
+  unseenPlanId?: PlanId;
+  /**
+   * D105: written by `adoptPlan` when a plan was marked: `unseen` if the adopted plan is the marked
+   * one, else `seen`; absent when nothing was marked (the sim's ordinary noticing).
+   */
+  notice?: NoticeRule;
   /**
    * Expeditions A2: the ship's weapons the party took from the arms locker at the muster, put back
    * there when the ship plans her lift-off (§the-muster); absent once stowed or if none was taken.

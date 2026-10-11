@@ -76,6 +76,14 @@ export function settleErrand(fight: Fight, outcome: ExpeditionOutcome): void {
   ctx.state.travel.voyageDestinationId = errand.returnToPortId;
 }
 
+/**
+ * The `takeItem` objective is held this tick (`checkObjective`, `expedition.ts`): the party member
+ * pressing beside the loot post is to pick the errand's item up, so `stowFetchedItem` finds it in
+ * their hands. Gate stub (D105): nothing is picked up yet and the item stays on the floor, where
+ * `fetchedItem` still finds it.
+ */
+export function pickUpLoot(_fight: Fight): void {}
+
 /** Grave wounds to the head at most this many times; one is enough under the default tolerances. */
 const EXECUTION_SHOTS = 4;
 

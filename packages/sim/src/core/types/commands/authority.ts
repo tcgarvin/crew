@@ -13,7 +13,8 @@ import type { Command, CommandEnvelope, CommandKind, CommandSource } from "./ind
  * rolls; it never decides the outcome. §hazard-and-field-levers: the seventh, `scheduleField`,
  * places an asteroid field; the sim rolls the impacts, and the narrator's scripted ones can never
  * alone sink the ship. §requested-call-back: the eighth, `requestCall`, asks when the narrator is
- * called next; it changes nothing in the world.
+ * called next; it changes nothing in the world. D105: `markUnseen` marks one side of a pending
+ * arrival card as the way in unseen; the player still chooses, and the sim runs the fight.
  */
 export const NARRATOR_COMMAND_KINDS = [
   "offerJob",
@@ -25,6 +26,7 @@ export const NARRATOR_COMMAND_KINDS = [
   "scheduleHazard",
   "scheduleField",
   "requestCall",
+  "markUnseen",
 ] as const satisfies readonly CommandKind[];
 
 export type NarratorCommandKind = (typeof NARRATOR_COMMAND_KINDS)[number];
@@ -101,5 +103,6 @@ export const AUTHORITY: Readonly<Record<CommandSource, readonly CommandKind[]>> 
     "scenarioStartExpedition",
     "adoptPlan",
     "withdrawParty",
+    "markUnseen",
   ],
 };

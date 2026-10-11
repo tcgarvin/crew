@@ -466,7 +466,9 @@ describe("runNarrator", () => {
       leftAftermath: "The clerk hands over the manifest and the crew start on it.",
       rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
-    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
+    const transport = fakeTransport(
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+    );
     const res = await runBothTurns(policyRequest(), ctx(transport));
     expect(res.card).toEqual({ decisionId: "d1", ...card });
   });
@@ -481,7 +483,10 @@ describe("runNarrator", () => {
       leftAftermath: "The clerk hands over the manifest and the crew start on it.",
       rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
-    const plan = { ...emptyPlan(), card: { ...card, beatOfThread: "", closesThread: "" } };
+    const plan = {
+      ...emptyPlan(),
+      card: { ...card, unseen: "", beatOfThread: "", closesThread: "" },
+    };
     const res = await runBothTurns(
       policyRequest(),
       ctx(fakeTransport(okResult(JSON.stringify(plan)))),
@@ -492,7 +497,7 @@ describe("runNarrator", () => {
       "card: beatOfThread and closesThread ignored; they belong on surfaceDecision only",
     );
     // Anything else unknown on the card still fails the schema.
-    const odd = { ...emptyPlan(), card: { ...card, mood: "tense" } };
+    const odd = { ...emptyPlan(), card: { ...card, unseen: "", mood: "tense" } };
     const failed = await runBothTurns(
       policyRequest(),
       ctx(fakeTransport(okResult(JSON.stringify(odd)))),
@@ -513,7 +518,9 @@ describe("policy decisions are narrated (§policy-decision-hook)", () => {
       leftAftermath: "Priya gets to work and we leave when she says so.",
       rightAftermath: "Priya seals the hatch and we go as we are.",
     };
-    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
+    const transport = fakeTransport(
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+    );
     const req = departureGateRequest(content());
     const res = await runBothTurns(req, ctx(transport));
     expect(res.fallback).toBeUndefined();
@@ -702,7 +709,9 @@ describe("what the captain has seen (§card-history)", () => {
       leftAftermath: "",
       rightAftermath: "",
     };
-    const transport = fakeTransport(okResult(JSON.stringify(emptyPlan({ card }))));
+    const transport = fakeTransport(
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+    );
     const req = policyRequest();
     const res = await runBothTurns(req, ctx(transport));
     expect(res.notesUpdate?.cardsShown).toEqual([

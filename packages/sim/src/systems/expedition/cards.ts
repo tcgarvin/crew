@@ -7,12 +7,15 @@
  * recorded in `Expedition.cards`.
  *
  * - The arrival card, from `startExpedition` when the expedition started itself on landing with no
- *   plan: two plans from the menu (`hold-lethal-armed` and `assault-lethal-armed` when both are
- *   available, else the first two available, else no card), brought by the first officer
- *   (`firstOfficerOf`), each side an `adoptPlan`. Prompt params: `jobId`, `site`, `target`,
- *   `speaker`, `leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`; each
- *   side's label ref carries its own label and its aftermath ref its own why (the templates read
- *   the ref, not the prompt). No numbers in any of them.
+ *   plan: two plans from the menu (the errand kind's default pair, `defaultPairFor`, when both are
+ *   available: `hold-lethal-armed` and `assault-lethal-armed`, or for a `fetchItem`
+ *   `creep-holdFire-armed` and `assault-lethal-armed`; else the first two available, else no card),
+ *   brought by the first officer (`firstOfficerOf`), each side an `adoptPlan`. Prompt params:
+ *   `jobId`, `kind` (the errand's), `site`, `target`, `speaker`, `leftPlan`, `rightPlan`,
+ *   `leftLabel`, `rightLabel`, `leftWhy`, `rightWhy`; each side's label ref carries its own label
+ *   and its aftermath ref its own why (the templates read the ref, not the prompt). No numbers in
+ *   any of them. While it is pending the narrator may mark one side the way in unseen
+ *   (`markUnseen`, D105).
  * - The turn card, once a fight and only in the fight: the tick of the first fighter of either
  *   side to break or give up, or the first party member down or dead (`Fight.turns`), while
  *   neither the objective nor a withdrawal has come and the fight does not end that tick. Brought
@@ -29,11 +32,12 @@ import type { DecisionOption } from "../../core/types/decisions";
 import type { ActorId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import type { Expedition, FireRule, Posture, SquadRule } from "../../core/types/state";
+import type { ErrandKind } from "../../core/types/travel";
 import type { PlanOption } from "../../core/types/view";
 import { planMenu } from "../../view/planMenu";
 import type { Fight } from "./combat";
 import { upright } from "./morale";
-import { DEFAULT_PLANS, leaderNow } from "./plans";
+import { defaultPairFor, leaderNow } from "./plans";
 
 /** Call 4: the arrival card's prompt key (its templates are `@crew/content`'s). */
 export const ARRIVAL_PROMPT_KEY = "expedition.arrival";
@@ -90,13 +94,17 @@ function sideWhy(option: PlanOption, target: string): string {
   return `${POSTURE_WHYS[posture](target)}${FIRE_WHYS[fire]}${SQUAD_WHYS[squad]}`;
 }
 
-/** The arrival card's two plans: the default pair if both are available, else the first two. */
+/**
+ * The arrival card's two plans: the errand kind's default pair (`defaultPairFor`) if both are
+ * available, else the first two.
+ */
 export function arrivalPair(
   menu: readonly PlanOption[],
+  kind: ErrandKind,
 ): readonly [PlanOption, PlanOption] | undefined {
   const available = menu.filter((o) => o.available);
-  const [hold, assault] = DEFAULT_PLANS.map((d) => available.find((o) => o.id === d.id));
-  if (hold !== undefined && assault !== undefined) return [hold, assault];
+  const [left, right] = defaultPairFor(kind).map((d) => available.find((o) => o.id === d.id));
+  if (left !== undefined && right !== undefined) return [left, right];
   const [first, second] = available;
   return first === undefined || second === undefined ? undefined : [first, second];
 }
@@ -127,7 +135,8 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
   if (jobId === undefined || errand === undefined) {
     throw new Error(`queueArrivalCard: the expedition at ${expedition.siteId} has no errand`);
   }
-  const pair = arrivalPair(planMenu(ctx.state, ctx.content, ctx.config, expedition.siteId));
+  const menu = planMenu(ctx.state, ctx.content, ctx.config, expedition.siteId);
+  const pair = arrivalPair(menu, errand.kind);
   if (pair === undefined) return;
   const [left, right] = pair;
   const speaker = arrivalSpeaker(ctx.state);
@@ -138,6 +147,7 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
       key: ARRIVAL_PROMPT_KEY,
       params: {
         jobId,
+        kind: errand.kind,
         site: expedition.siteId,
         target,
         ...(speaker === undefined ? {} : { speaker }),

@@ -50,6 +50,8 @@ export {
 } from "./systems/bodies/index";
 export {
   DEFAULT_PLANS,
+  ITEM_DEFAULT_PLANS,
+  defaultPairFor,
   lockerWeapons,
   registerExpedition,
   squadFor,

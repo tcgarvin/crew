@@ -21,8 +21,15 @@ import { configTicks } from "../../core/clock";
  * at a site.
  *
  * **adoptPlan** chooses the plan for an expedition that has none (an available menu id) and picks
- * its party by the plan's squad rule. **withdrawParty** calls a party that is out back to the ramp
- * (`orderWithdrawal`).
+ * its party by the plan's squad rule; when the narrator marked a side (`markUnseen`) it writes
+ * `Expedition.notice`: `unseen` for the marked plan, `seen` for any other, and nothing when no side
+ * was marked. **withdrawParty** calls a party that is out back to the ramp (`orderWithdrawal`).
+ *
+ * **markUnseen** (D105, narrator and scenario) marks one side of the arrival card as the way in
+ * unseen: valid while the expedition is under way with no plan, `decisionId` is its arrival card
+ * (`Expedition.cards.arrival`) and still pending, `planId` is that card's `leftPlan` or
+ * `rightPlan`, on the menu and not a `hold` plan, and nothing is marked yet. Apply writes
+ * `Expedition.unseenPlanId`; nothing else changes until the captain chooses.
  *
  * Owner after the gate: W2 of expeditions A1 (extends the validation tests).
  */
@@ -41,7 +48,7 @@ import { clearDockside, dressDock } from "../../core/locals";
 import { isSite } from "../../core/places";
 import type { CommandOfKind, CommandRejection } from "../../core/types/commands";
 import type { ActorId, PortDefId } from "../../core/types/ids";
-import type { BattlePlan } from "../../core/types/state";
+import type { BattlePlan, PlanId } from "../../core/types/state";
 import { shipDeckId } from "../../core/world";
 import { planMenu } from "../../view/planMenu";
 import { attachDock, detachDock } from "../spatial/dock";
@@ -201,6 +208,54 @@ export const adoptPlan: CommandHandler<"adoptPlan", AdoptPlan> = {
     expedition.plan = planForErrand(ctx.state, expedition, plan.plan);
     expedition.party = [...plan.party];
     expedition.leaderId = plan.leaderId;
+    const marked = expedition.unseenPlanId;
+    if (marked !== undefined) expedition.notice = marked === plan.plan.id ? "unseen" : "seen";
+    return NO_TEMP_REFS;
+  },
+};
+
+/** Why `planId` cannot be marked unseen on the expedition's arrival card `decisionId`, if not. */
+function unseenProblem(ctx: ValidateCtx, decisionId: string, planId: string): string | undefined {
+  const expedition = ctx.state.expedition;
+  if (expedition === undefined || expedition.phase === "resolved") {
+    return "no expedition is under way";
+  }
+  if (expedition.plan !== undefined) return `the plan is already "${expedition.plan.id}"`;
+  if (expedition.unseenPlanId !== undefined) {
+    return `"${expedition.unseenPlanId}" is already marked unseen`;
+  }
+  const arrival = expedition.cards?.arrival;
+  if (arrival === undefined) return "the expedition has no arrival card";
+  if (decisionId !== arrival) return `"${decisionId}" is not the expedition's arrival card`;
+  const card = ctx.state.decisions.records[arrival];
+  if (card?.status !== "pending") return "the arrival card is no longer pending";
+  const { leftPlan, rightPlan } = card.prompt.params;
+  if (planId !== leftPlan && planId !== rightPlan) {
+    return `"${planId}" is not a side of the arrival card`;
+  }
+  const option = planMenu(ctx.state, ctx.content, ctx.config, expedition.siteId).find(
+    (o) => o.id === planId,
+  );
+  if (option === undefined) return `"${planId}" is not on the plan menu`;
+  // A party holding the ramp never goes for the objective: unseen, it would only wait out the clock.
+  if (option.plan.posture === "hold") return `"${option.id}" holds the ramp; it cannot go unseen`;
+  return undefined;
+}
+
+export const markUnseen: CommandHandler<"markUnseen", PlanId> = {
+  validate(ctx, command) {
+    const { decisionId, planId } = command.payload;
+    if (typeof decisionId !== "string" || typeof planId !== "string") {
+      return fail("markUnseen", "invalidPayload", "decisionId and planId must be strings");
+    }
+    const problem = unseenProblem(ctx, decisionId, planId);
+    if (problem !== undefined) return fail("markUnseen", "preconditionFailed", problem);
+    return ok(planId);
+  },
+  apply(ctx, _command, planId) {
+    const expedition = ctx.state.expedition;
+    if (expedition === undefined) throw new Error("validated expedition vanished");
+    expedition.unseenPlanId = planId;
     return NO_TEMP_REFS;
   },
 };
