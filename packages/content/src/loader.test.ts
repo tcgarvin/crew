@@ -27,6 +27,15 @@ describe("loadBundle", () => {
     expect(narrator.hookOnEvents).not.toContain("fieldCleared");
   });
 
+  it("gates every docking-fee chat line on a paid fee, so none comes up at a site (§ambient-chat)", () => {
+    const lines = authoredBundle().config.social.templateLines;
+    const aboutTheFee = lines.filter((line) =>
+      (typeof line === "string" ? line : line.line).includes("docking fee"),
+    );
+    expect(aboutTheFee.length).toBeGreaterThan(0);
+    for (const line of aboutTheFee) expect(line).toMatchObject({ when: "paidDockingFee" });
+  });
+
   it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (§scenario-tools)", () => {
     const raw = rawBundle() as { scenarios: Record<string, { startingItems: unknown[] }> };
     const scenario = raw.scenarios["scenario.default_freighter_run"];
