@@ -8,7 +8,7 @@ import {
 import { describe, expect, it } from "vitest";
 import type { NarratorRequest } from "./contract";
 import { buildDigest } from "./digest";
-import { FIXTURE_ERRAND_TARGET, siteArrivalRequest } from "./fixtures";
+import { FIXTURE_ERRAND_TARGET, siteArrivalRequest, siteItemArrivalRequest } from "./fixtures";
 import { EMPTY_NOTES } from "./notes";
 import { withoutDigits } from "./site-digest";
 import { content } from "./test-support";
@@ -246,3 +246,115 @@ function inTheFight(req: NarratorRequest & { snapshot: SaveEnvelope }) {
   expedition.cards = { arrival: arrivalId, turn: turnId };
   return req;
 }
+
+/** A copy of the item arrival fixture to change. */
+function itemArrival(): NarratorRequest & { snapshot: SaveEnvelope } {
+  const req = siteItemArrivalRequest(content());
+  return { ...req, snapshot: structuredClone(req.snapshot) as SaveEnvelope };
+}
+
+/** The item fixture marked for the creep side, `planId` chosen, the party out, `notice` set. */
+function chosen(
+  req: NarratorRequest & { snapshot: SaveEnvelope },
+  planId: string,
+  notice: "unseen" | "seen" | undefined,
+) {
+  const state = req.snapshot.state;
+  const expedition = state.expedition;
+  const arrivalId = expedition?.cards?.arrival;
+  const card = arrivalId === undefined ? undefined : state.decisions.records[arrivalId];
+  const plan = planMenu(state, content(), req.snapshot.config).find((o) => o.id === planId);
+  if (expedition === undefined || card === undefined || plan === undefined) {
+    throw new Error("no expedition, card or plan");
+  }
+  card.status = "resolved";
+  card.chosen = card.prompt.params.leftPlan === planId ? "left" : "right";
+  state.decisions.queue = state.decisions.queue.filter((id) => id !== arrivalId);
+  expedition.plan = plan.plan;
+  if (notice !== undefined) {
+    expedition.unseenPlanId = "creep-holdFire-armed";
+    expedition.notice = notice;
+  }
+  expedition.phase = "approach";
+  return req;
+}
+
+/** Over: the party took what it went for, with a fight first if `fought`. */
+function over(req: NarratorRequest & { snapshot: SaveEnvelope }, fought: boolean) {
+  const expedition = req.snapshot.state.expedition;
+  if (expedition === undefined) throw new Error("no expedition");
+  expedition.phase = "resolved";
+  expedition.outcome = "targetTaken";
+  expedition.resolvedTick = req.snapshot.state.tick;
+  if (fought) expedition.fightStartedTick = req.snapshot.state.tick;
+  return req;
+}
+
+describe("buildDigest: At the site, the way in unseen (D105)", () => {
+  const AFTER = /nobody saw|waiting for the party|unseen/;
+
+  it("an item errand: what it is after and where it lies, and the site's own target not taken for it", () => {
+    const section = siteSection(digestOf(itemArrival()));
+    expect(section).toContain(
+      "the errand: fetch the Collective's seed stock (Perishable Cargo Crate) from Harrow End",
+    );
+    expect(section).toContain(
+      "what the errand is after: the Collective's seed stock: lying at the seed container doors",
+    );
+    expect(section).toContain(
+      `- ${FIXTURE_ERRAND_TARGET} (co-op steward gone to ground), the one at the heart of it here (the errand is after a thing, not them), unarmed`,
+    );
+    expect(section).not.toContain("the one the errand is after");
+  });
+
+  it("never shows the mark while the card is up: the section is the same marked or not", () => {
+    const plain = siteSection(digestOf(itemArrival()));
+    const req = itemArrival();
+    if (req.snapshot.state.expedition === undefined) throw new Error("no expedition");
+    req.snapshot.state.expedition.unseenPlanId = "creep-holdFire-armed";
+    const marked = digestOf(req);
+    expect(siteSection(marked)).toBe(plain);
+    expect(marked).not.toContain("creep-holdFire-armed");
+    expect(siteSection(marked)).not.toMatch(AFTER);
+  });
+
+  it("shows no notice while the expedition is on, whichever side was chosen", () => {
+    for (const [planId, notice] of [
+      ["creep-holdFire-armed", "unseen"],
+      ["assault-lethal-armed", "seen"],
+    ] as const) {
+      const section = siteSection(digestOf(chosen(itemArrival(), planId, notice)));
+      expect(section).toContain("the party is out on the ground, not yet in a fight");
+      expect(section).not.toMatch(AFTER);
+    }
+  });
+
+  it("once it is over: nobody saw them come or go when the marked side went in and no fight started", () => {
+    const section = siteSection(
+      digestOf(over(chosen(itemArrival(), "creep-holdFire-armed", "unseen"), false)),
+    );
+    expect(section).toContain(
+      "the expedition: it is over; the party took what it went for; nobody saw them come or go",
+    );
+    expect(section).not.toContain("what the errand is after");
+  });
+
+  it("once it is over: nothing said of the notice when the marked side went in but a fight started", () => {
+    const req = over(chosen(itemArrival(), "creep-holdFire-armed", "unseen"), true);
+    const section = siteSection(digestOf(req));
+    expect(section).toContain("the expedition: it is over; the party took what it went for\n");
+    expect(section).not.toMatch(AFTER);
+  });
+
+  it("once it is over: they were waiting for the party when the other side went in", () => {
+    const req = over(chosen(itemArrival(), "assault-lethal-armed", "seen"), true);
+    expect(siteSection(digestOf(req))).toContain(
+      "the expedition: it is over; the party took what it went for; they were waiting for the party",
+    );
+  });
+
+  it("once it is over with no side marked: nothing said of the notice", () => {
+    const req = over(chosen(itemArrival(), "assault-lethal-armed", undefined), false);
+    expect(siteSection(digestOf(req))).not.toMatch(AFTER);
+  });
+});

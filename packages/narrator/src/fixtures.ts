@@ -14,6 +14,7 @@ import {
   type DecisionId,
   type EventId,
   type HullScar,
+  type ItemDefId,
   type JobId,
   type KernelRegistry,
   type MachineId,
@@ -29,6 +30,7 @@ import {
   createKernel,
   createRegistry,
   dayTicks,
+  defaultPairFor,
   dockAlongside,
   dockForPort,
   dressDock,
@@ -38,6 +40,7 @@ import {
   planMenu,
   registerExpedition,
   registerSpatial,
+  siteOf,
 } from "@crew/sim";
 import type { NarratorRequest } from "./contract";
 
@@ -822,15 +825,77 @@ function writeFixtureErrand(state: WorldState, jobId: JobId): void {
 }
 
 /**
+ * D105: the item errand of the item-arrival fixture: Ysolde Maren's, from the Hub, for the
+ * Collective's seed stock (a perishable crate) at Harrow End, wanted either way.
+ */
+export const FIXTURE_ERRAND_ITEM = "item.crate_perishable" as ItemDefId;
+export const FIXTURE_ERRAND_ITEM_NAME = "the Collective's seed stock";
+
+function writeItemErrand(state: WorldState, jobId: JobId): void {
+  writeFixtureErrand(state, jobId);
+  const job = state.jobs[jobId];
+  if (job === undefined) throw new Error("site fixture: no errand");
+  state.jobs[jobId] = {
+    ...job,
+    pitch: {
+      key: "job.pitch",
+      params: {},
+      prose: "Teodor sold our seed out from under us. Bring it home before it lifts off-world.",
+    },
+    description: {
+      key: "job.template",
+      params: {},
+      prose: "The Collective's seed stock, crated at the old silo yard for an off-world buyer.",
+    },
+    errand: {
+      kind: "fetchItem",
+      siteId: FIXTURE_SITE,
+      targetName: FIXTURE_ERRAND_ITEM_NAME,
+      itemDefId: FIXTURE_ERRAND_ITEM,
+      wants: "either",
+      returnToPortId: HUB,
+    },
+  };
+}
+
+/**
+ * The item errand's thing at the site's loot post, as the landing start lays it there
+ * (`scenarioStartExpedition` does not).
+ */
+function placeLoot(state: WorldState, content: ContentBundle, itemDefId: ItemDefId): void {
+  const berth = siteOf(content, state);
+  const post = berth?.dock.posts.find((p) => p.kind === "loot");
+  const def = content.items[itemDefId];
+  const { captain } = captainAndFirstOfficer(state);
+  if (berth === undefined || post === undefined || def === undefined) {
+    throw new Error("site fixture: no loot post or item");
+  }
+  if (captain.location.kind !== "onDeck") throw new Error("site fixture: captain not on deck");
+  const location = {
+    kind: "onDeck",
+    deckId: captain.location.deckId,
+    x: post.tile.x - berth.shipAt.x + 0.5,
+    y: post.tile.y - berth.shipAt.y + 0.5,
+  } as const;
+  const id = allocateId(state, "item");
+  state.items[id] =
+    def.stacking === "unique"
+      ? { id, defId: def.id, stacking: "unique", location, condition: 1 }
+      : { id, defId: def.id, stacking: "stack", location, count: 1, reserved: 0 };
+}
+
+/**
  * The arrival card, pending, as `queueArrivalCard` raises it: brought by the first officer, its
- * sides the menu's default pair (`adoptPlan`), each side's label and why in the side's own params
- * as well as the prompt's.
+ * sides the errand kind's default pair (`defaultPairFor`, each an `adoptPlan`), each side's label
+ * and why in the side's own params as well as the prompt's, with the errand's kind.
  */
 function writeArrivalCard(world: World, content: ContentBundle, jobId: JobId): DecisionId {
   const state = world.state;
+  const errand = state.jobs[jobId]?.errand;
+  if (errand === undefined) throw new Error("site fixture: no errand");
   const { captain, firstOfficer } = captainAndFirstOfficer(state);
   const menu = planMenu(state, content, world.config.values);
-  const [left, right] = DEFAULT_PLANS.map((d) => menu.find((o) => o.id === d.id));
+  const [left, right] = defaultPairFor(errand.kind).map((d) => menu.find((o) => o.id === d.id));
   if (left === undefined || right === undefined) throw new Error("site fixture: no default pair");
   const leftLabel = planLabel(left.why);
   const rightLabel = planLabel(right.why);
@@ -844,8 +909,9 @@ function writeArrivalCard(world: World, content: ContentBundle, jobId: JobId): D
       key,
       params: {
         jobId,
+        kind: errand.kind,
         site: FIXTURE_SITE,
-        target: FIXTURE_ERRAND_TARGET,
+        target: errand.targetName,
         speaker: firstOfficer.name,
         leftPlan: left.id,
         rightPlan: right.id,
@@ -907,6 +973,38 @@ export function siteArrivalRequest(content: ContentBundle, seed = 31): NarratorR
   const hook = policyHook(state, decisionId);
   const recentEvents = [event(1, state.tick, "decisionPending", { decisionId }, "narrative")];
   return { gameId: "fixture-site-arrival", hook, snapshot: kernel.serialize(world), recentEvents };
+}
+
+/**
+ * D105: the arrival fixture for an item errand: the Collective's seed stock at Harrow End's loot
+ * post (the seed container doors), the cast as the site has them (`castFor` leaves an item
+ * errand's cast alone, so Teodor Lusk is there under his own name), and the item errand's pair on
+ * the card: creep in quietly holding fire (left) or go in hard (right). The narrator may mark a
+ * side the way in unseen on this call.
+ */
+export function siteItemArrivalRequest(content: ContentBundle, seed = 31): NarratorRequest {
+  const registry = createRegistry();
+  registerSpatial(registry);
+  registerExpedition(registry);
+  const { kernel, world } = siteWorld(content, registry, seed);
+  setDownAtSite(kernel, world);
+  const state = world.state;
+  const expedition = state.expedition;
+  if (expedition === undefined) throw new Error("site fixture: no expedition");
+  const jobId = allocateId(state, "job");
+  writeItemErrand(state, jobId);
+  placeLoot(state, content, FIXTURE_ERRAND_ITEM);
+  expedition.jobId = jobId;
+  const decisionId = writeArrivalCard(world, content, jobId);
+  expedition.cards = { arrival: decisionId };
+  const hook = policyHook(state, decisionId);
+  const recentEvents = [event(1, state.tick, "decisionPending", { decisionId }, "narrative")];
+  return {
+    gameId: "fixture-site-item-arrival",
+    hook,
+    snapshot: kernel.serialize(world),
+    recentEvents,
+  };
 }
 
 /**

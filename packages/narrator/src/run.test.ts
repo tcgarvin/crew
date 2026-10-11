@@ -926,7 +926,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.30");
+    expect(PROMPT_VERSION).toBe("v0.31");
   });
 
   it("tells the model it never decides a passenger's fate or narrates what they did ashore (passengers §4.3, §6)", () => {
@@ -991,7 +991,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "it never states that a repair, delivery, purchase or payment has happened unless the digest shows it",
     );
-    expect(STATIC_RULES).toContain("Only use the seven levers");
+    expect(STATIC_RULES).toContain("Only use the eight levers");
     expect(STATIC_RULES).toContain("surfaceDecision, stockMarket, scheduleHazard");
     expect(STATIC_RULES).not.toContain("five levers");
   });
@@ -1033,7 +1033,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain(
       "how it went shows next call in what they feel about the captain",
     );
-    expect(STATIC_RULES).toContain("Only use the seven levers");
+    expect(STATIC_RULES).toContain("Only use the eight levers");
     expect(HOOK_INSTRUCTIONS.quietTooLong).toContain("so can a rivalry or an argument");
     expect(HOOK_INSTRUCTIONS.notableEvent).toContain("An argument or a rivalry among the crew");
   });
@@ -1109,7 +1109,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.30");
+    expect(PROMPT_VERSION).toBe("v0.31");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
     expect(STATIC_RULES).toContain(
@@ -1140,6 +1140,24 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(policy).toContain("never state a wound, a death or a capture the digest does not show");
     // The existing rule still holds for them: dress the card, add none.
     expect(policy).toContain("Do not add intents that create new cards.");
+  });
+
+  it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
+    expect(PROMPT_VERSION).toBe("v0.31");
+    const policy = HOOK_INSTRUCTIONS.policyDecision;
+    expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
+    expect(policy).toContain("a guard asleep, a back way, a friend inside");
+    expect(policy).toContain("the crew slip in and nobody there notices them");
+    expect(policy).toContain("the people there are waiting for them");
+    expect(policy).toContain("Leave it empty when nothing in the story says either way");
+    expect(policy).toContain("never name a side that holds the ramp");
+    expect(policy).toContain("a hint the captain could read in the story is fine, a tell is not");
+    expect(policy).toContain("unseen is empty on every other card");
+    expect(STATIC_RULES).toContain("or name the way in unseen on a site's arrival card");
+    expect(STATIC_RULES).toContain(
+      "The one thing at a site you decide is which way in goes unseen",
+    );
+    expect(STATIC_RULES).toContain("Only use the eight levers");
   });
 });
 

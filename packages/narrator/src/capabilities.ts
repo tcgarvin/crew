@@ -1,5 +1,5 @@
 /**
- * The capability list (§narrator-authority): exactly what the seven narrator levers can do in this
+ * The capability list (§narrator-authority): exactly what the eight narrator levers can do in this
  * game, generated from content, config and the ship's machines so the prompt never promises what
  * the sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
@@ -262,6 +262,17 @@ function fieldLever(state: State, content: ContentBundle, config: ConfigDef): st
   ];
 }
 
+/**
+ * D105: the eighth lever, the way in unseen on a site's arrival card. Not an intent: a field of the
+ * card the narrator dresses, which the translator turns into `markUnseen`.
+ */
+const UNSEEN_LEVER: readonly string[] = [
+  "## 8. card.unseen: the way in unseen, on a site's arrival card",
+  "- Only on the policyDecision call for a site's arrival card (expedition.arrival): left or right names the side that gets in without the people there noticing; empty for neither, and empty on every other card.",
+  "- If the captain picks that side, the party slips in unseen: nobody there notices them unless they fire first. If the captain picks the other side, the people there were waiting: they are on the party the moment it is on the ground. Empty leaves it to the sim, which rolls who notices and when.",
+  "- Only when the story has set it up (a guard asleep, a back way, a friend inside, the people there looking the other way), never a side that holds the ramp (dropped), and never given away on the card: both sides read as plausible, a hint is fine, a tell is not. The captain still chooses and the sim fights the chosen side; you never choose the plan.",
+];
+
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
   // Expeditions A2: landing sites are listed under "Sites", not with the ports.
   const ports = Object.values(content.ports)
@@ -287,7 +298,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly seven levers. Anything not listed here does not exist in this game yet: no combat or injuries you cause (an errand's fight at a site is the sim's), no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly eight levers. Anything not listed here does not exist in this game yet: no combat or injuries you cause (an errand's fight at a site is the sim's), no direct changes to money, needs, moods or positions, no messages, no new places.",
   );
   lines.push(
     "The ids below (ports, sites, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -334,7 +345,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     "- passenger=true makes it a passage: the issuer rides. They board at fromPort when the job is accepted, live aboard like crew (eat, sleep, walk the deck, talk) and never work; cargoItem is their luggage (one unit of a cargo item, hauled like freight) or empty for none, and quantity is ignored. roundTrip=true (passenger only) takes them to toPort, where they go ashore for a while and the ship waits for them, then home to fromPort; roundTrip without passenger is dropped. The fare is private, by distance (doubled for a round trip), placed by payTier. A passenger offer is always surfaced: it is a person at the ramp. The ship carries one job at a time, so a passenger competes with freight for the ship: any offerJob while a job is in hand (accepted, under way, or delivered and not yet paid) is dropped, and a port that is a waypoint of a voyage gets no offer. A passenger offer whose card is already taken this call is dropped, not posted quietly. The sim raises its own card, brought by the first officer, if a round-trip passenger is overdue ashore (Wait for them / Leave without them); you dress it on that policyDecision call, you never cause it.",
   );
   lines.push(
-    `- errandKind ${ERRAND_KINDS.join(" | ")} makes it an errand: a job to a landing site under Sites and back, about someone there. site is the site's id; toPort is fromPort, the port the ship is at, where the job comes home. fetchPerson: targetName is who is to be brought back (they are the one the errand is after at the site, under that name), and wants ${ERRAND_WANTS.join(" | ")} is how. fetchItem: targetItem is an item id (any item, as for stockMarket), targetName what it is called there (or empty for the item's name), and wants is empty. passenger and roundTrip are false and cargoItem and quantity are ignored; for freight and passages every errand field is empty. Accepted, the ship sets course for the site and sets down there; the crew go out armed to whoever is there, and how the fight goes is the sim's (who breaks, who is hurt or killed, whether the target gets away). It pays by the distance there and back, placed by payTier, once the ship is home with what it went for; a failed errand pays nothing. A kill job (wants dead) is rare, and whoever offers one is never clean: its target dies in the fight or, taken alive, is executed by the party at the scene. At the site the sim raises its own cards: the arrival card (two plans for going in), brought by the first officer, and at most one turn card in the fight when one of the party goes down, dies or breaks (press on, or pull back to the ship), brought by the first officer or else the senior of the party still on their feet, never the captain; you dress them on those policyDecision calls, you never cause them.`,
+    `- errandKind ${ERRAND_KINDS.join(" | ")} makes it an errand: a job to a landing site under Sites and back, about someone there. site is the site's id; toPort is fromPort, the port the ship is at, where the job comes home. fetchPerson: targetName is who is to be brought back (they are the one the errand is after at the site, under that name), and wants ${ERRAND_WANTS.join(" | ")} is how. fetchItem: targetItem is an item id (any item, as for stockMarket), targetName what it is called there (or empty for the item's name), and wants is empty. passenger and roundTrip are false and cargoItem and quantity are ignored; for freight and passages every errand field is empty. Accepted, the ship sets course for the site and sets down there; the crew go out armed to whoever is there, and how the fight goes is the sim's (who breaks, who is hurt or killed, whether the target gets away). It pays by the distance there and back, placed by payTier, once the ship is home with what it went for; a failed errand pays nothing. A kill job (wants dead) is rare, and whoever offers one is never clean: its target dies in the fight or, taken alive, is executed by the party at the scene. At the site the sim raises its own cards: the arrival card (two plans for going in), brought by the first officer, and at most one turn card in the fight when one of the party goes down, dies or breaks (press on, or pull back to the ship), brought by the first officer or else the senior of the party still on their feet, never the captain; you dress them on those policyDecision calls (and may name the arrival card's way in unseen, lever 8), you never cause them.`,
   );
   lines.push("");
   lines.push("## 2. spawnAtBoundary: put existing items into a port store, off the ship");
@@ -376,7 +387,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(
     '- endPassage puts the current passenger off: valid only while a passenger is aboard or ashore on a live passage (see "Aboard" under Crew). They leave at the next docking (now, if docked) with no fare and stay at that port as someone in your cast. That is the real side of a crew-friction card ("Put him off at Kessler." / "He stays."); the sim does the rest. A captive an errand brought aboard (their "Aboard" line says where they were taken) is a passenger too, but putting them off fails the errand: it pays nothing and the ship still goes home. Offer it only when giving up the job is the real choice, and make that plain on the card (the job is lost, the issuer gets nothing), never in terms of pay.',
   );
-  // §private-talk: a side effect of a card, not a seventh lever.
+  // §private-talk: a side effect of a card, not a lever of its own.
   lines.push(
     '- privateTalk is a private word in the captain\'s cabin, warm or stern (tone warm | stern), with the crew member named in talkWith (their full name as "Crew" lists it): the crew member walks there and the talk moves how they feel about the captain, which shows next call ("close to" / "at odds with", their mood). Only crew aboard, never the captain herself, a passenger or someone ashore, and one talk at a time. It is the real side of a card about someone\'s conduct ("Send Jax up." / "Let it go."); the crew carry it out, and whether it lands is the sim\'s.',
   );
@@ -409,5 +420,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(...hazardLever(config));
   lines.push("");
   lines.push(...fieldLever(state, content, config));
+  lines.push("");
+  lines.push(...UNSEEN_LEVER);
   return lines.join("\n");
 }
