@@ -47,7 +47,14 @@ import { planMenu } from "../../view/planMenu";
 import { attachDock, detachDock } from "../spatial/dock";
 import { syncRampPassability } from "../spatial/geometry";
 import { orderWithdrawal } from "./expedition";
-import { type StartPlan, castProblem, castWeapons, partyOf, startExpedition } from "./start";
+import {
+  type StartPlan,
+  castProblem,
+  castWeapons,
+  partyOf,
+  planForErrand,
+  startExpedition,
+} from "./start";
 
 type StartPayload = CommandOfKind<"scenarioStartExpedition">["payload"];
 
@@ -191,7 +198,7 @@ export const adoptPlan: CommandHandler<"adoptPlan", AdoptPlan> = {
   apply(ctx, _command, plan) {
     const expedition = ctx.state.expedition;
     if (expedition === undefined) throw new Error("validated expedition vanished");
-    expedition.plan = plan.plan;
+    expedition.plan = planForErrand(ctx.state, expedition, plan.plan);
     expedition.party = [...plan.party];
     expedition.leaderId = plan.leaderId;
     return NO_TEMP_REFS;
