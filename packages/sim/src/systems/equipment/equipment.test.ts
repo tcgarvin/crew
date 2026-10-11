@@ -112,7 +112,7 @@ describe("scheduleFault", () => {
     expect(byDef(world, W5.engine).scheduledFaults).toEqual([]);
   });
 
-  it("spends the narrator's fault budget, and is rejected once it is spent ", () => {
+  it("spends the narrator's fault budget, and past zero still schedules: the budget is advice (§narrator-lever-budgets)", () => {
     const { kernel, world } = w5TestWorld();
     const engine = byDef(world, W5.engine);
     const schedule = (faultKey: string) =>
@@ -124,14 +124,10 @@ describe("scheduleFault", () => {
           payload: { machineId: engine.id, faultKey, windowTicks: [50, 60] },
         }),
       );
-    const full = world.config.values.narrator.faultBudget;
-    expect(world.state.narrator.budget.faultsRemaining).toBe(full);
+    world.state.narrator.budget.faultsRemaining = 0;
     expect(schedule("wornBearing").status).toBe("accepted");
     kernel.advance(world, 1);
-    expect(world.state.narrator.budget.faultsRemaining).toBe(full - 1);
-    world.state.narrator.budget.faultsRemaining = 0;
-    const refused = schedule("wornBearing");
-    expect(refused.status === "rejected" && refused.rejection.code).toBe("budgetExhausted");
+    expect(world.state.narrator.budget.faultsRemaining).toBe(-1);
   });
 
   it("is rejected for an unknown fault key", () => {

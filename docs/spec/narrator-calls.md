@@ -190,7 +190,7 @@ strings validated by the translator, with drop reasons fed back to the model; th
 block lists the valid ids. Why (D53): strict structured output compiles the schema into a grammar
 with a provider-side size cap the plan outgrew three times, and OpenRouter sends a `json_schema`
 to Anthropic as a grammar even with `strict: false`. A schema-size test holds the schema to a
-prompt-token budget (8 KiB) and keeps per-game ids out of the cached prefix.
+prompt-token budget (12 KiB) and keeps per-game ids out of the cached prefix.
 
 ### Models and reasoning effort
 

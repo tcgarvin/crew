@@ -4,13 +4,15 @@ import { NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
  *
  * Every intent becomes exactly one allow-listed `NarratorCommand` with `source: "narrator"`, or
  * is dropped with a reason. The translator pre-validates with the same rules the kernel enforces
- * (price bands, fault catalogs, window bounds, known ports and stores, boundary-only spawns,
- * budgets) plus the narrator's own presentation rules (one card per call, no numbers or
+ * (price bands, fault catalogs, window bounds, known ports and stores, boundary-only spawns, the
+ * living and the balance) plus the narrator's own presentation rules (one card per call, no numbers or
  * undiscovered facts in player-facing text), so a rejection is explained to the model in the
  * next call's notes instead of disappearing in the kernel. The kernel still revalidates on apply.
  */
 import {
   AUTHORITY,
+  type Actor,
+  type ActorId,
   CALL_BACK_WHY_MAX,
   type CommandDraft,
   type CommandId,
@@ -30,7 +32,9 @@ import {
   type PortDefId,
   STAGING_COMMAND_KINDS,
   STAGING_LIMITS,
+  STRIKE_HOW_MAX,
   type ScriptedImpactDraft,
+  TRANSACT_TEXT_MAX,
   type TempRef,
   basePriceFor,
   configTicks,
@@ -172,9 +176,10 @@ export function textProblem(text: string, secrets: readonly string[]): string | 
 // ---------------------------------------------------------------------------------------------
 
 interface Tally {
-  spawns: number;
-  faults: number;
+  /** §hazard-and-field-levers: hazards placed this call (one waits at a time). */
   hazards: number;
+  /** §money-levers: this call's `transact` sums so far, so two debits cannot overdraw together. */
+  money: number;
   /** §scheduling-a-field: fields placed this call (one per leg). */
   fields: number;
   cardUsed: boolean;
@@ -299,12 +304,15 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
   // trip), luggage adding nothing; freight by its class band per unit. §6, plan call 6: an errand
   // by the sim's own `errandPay` over the path there and back, as `checkErrandBand` bands it.
   const { distance } = route.value;
-  const { pay } =
+  const named = namedPay(env, intent.payCredits);
+  if (!named.ok) return no(`payCredits: ${named.reason}`);
+  const { pay: banded } =
     route.value.errand !== undefined
       ? errandPay(config, distance, intent.payTier)
       : intent.passenger
         ? fareFor(config, distance, intent.roundTrip, intent.payTier)
         : payFor(config, cargo.value.cargoClass, distance, cargo.value.units, intent.payTier);
+  const pay = named.value ?? banded;
   if (surface) env.tally.cardUsed = true;
   const shape =
     route.value.errand !== undefined
@@ -324,11 +332,26 @@ function translateOfferJob(env: Env, intent: Intent<"offerJob">): Outcome<Narrat
         toPortId: route.value.toPortId,
         cargo: cargo.value.lines,
         pay,
+        ...(named.value === undefined ? {} : { payNamed: true as const }),
         ...shape,
       },
       surface,
     },
   });
+}
+
+/**
+ * §money-levers: `offerJob.payCredits` as the kernel takes it: undefined (0, the tier's pay), or a
+ * positive whole number of credits at most `config.narrator.maxOfferPay`.
+ */
+function namedPay(env: Env, credits: number): Outcome<number | undefined> {
+  if (credits === 0) return ok(undefined);
+  if (!Number.isInteger(credits) || credits < 0) {
+    return no("a positive whole number of credits, or 0 for the tier's pay");
+  }
+  const max = env.snapshot.config.narrator.maxOfferPay;
+  if (credits > max) return no(`${credits} is over the most an offer pays (${max})`);
+  return ok(credits);
 }
 
 /** Where an offer goes and the distance it is paid over; an errand's own fields when it is one. */
@@ -462,8 +485,7 @@ function offerCargo(env: Env, intent: Intent<"offerJob">): Outcome<OfferCargo> {
 function translateSpawn(env: Env, intent: Intent<"spawnAtBoundary">): Outcome<NarratorDraft> {
   const { snapshot, content } = env;
   const config = snapshot.config;
-  const budget = snapshot.state.narrator.budget.spawnsRemaining - env.tally.spawns;
-  if (budget <= 0) return no("spawn budget exhausted");
+  // §narrator-lever-budgets: the spawn budget is advice the digest shows, never a refusal.
   const known = knownPort(content, intent.port);
   if (!known.ok) return no(`port: ${known.reason}`);
   const port = known.value;
@@ -480,7 +502,6 @@ function translateSpawn(env: Env, intent: Intent<"spawnAtBoundary">): Outcome<Na
     item.stacking === "unique"
       ? 1
       : Math.max(1, Math.min(wanted, config.narrator.maxSpawnsPerCommand, item.maxStack));
-  env.tally.spawns += 1;
   return ok({
     kind: "spawnAtBoundary",
     payload: {
@@ -510,14 +531,12 @@ function translateFault(env: Env, intent: Intent<"scheduleFault">): Outcome<Narr
   ) {
     return no(`${intent.machine} already has or awaits "${intent.faultKey}"`);
   }
-  const budget = snapshot.state.narrator.budget.faultsRemaining - env.tally.faults;
-  if (budget <= 0) return no("fault budget exhausted");
+  // §narrator-lever-budgets: the fault budget is advice the digest shows, never a refusal.
   const windowTicks = faultWindowTicks(config, intent.window);
   const maxWindow = configTicks(config, config.narrator.maxFaultWindowSeconds);
   if (windowTicks[1] - windowTicks[0] > maxWindow || windowTicks[0] < 0) {
     return no("window outside config bounds");
   }
-  env.tally.faults += 1;
   return ok({
     kind: "scheduleFault",
     payload: {
@@ -557,7 +576,7 @@ function legProblem(env: Env, window: FaultWindow, what: "hazard" | "field"): st
 /**
  * §hazard-and-field-levers: `scheduleHazard`, the sixth lever. The tier becomes
  * `config.hazards.difficulty`, the window is the fault windows' (same kernel bound), it spends the
- * hazard budget, and one hazard waits at a time: a second on top of one not yet fired is the "never
+ * hazard budget (advice, §narrator-lever-budgets), and one hazard waits at a time: a second on top of one not yet fired is the "never
  * twice in a row" rule made firm.
  */
 function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<NarratorDraft> {
@@ -566,8 +585,7 @@ function translateHazard(env: Env, intent: Intent<"scheduleHazard">): Outcome<Na
   if (snapshot.state.hazards.length > 0 || env.tally.hazards > 0) {
     return no("a hazard is already waiting on the ship's path; let it fire first");
   }
-  const budget = snapshot.state.narrator.budget.hazardsRemaining - env.tally.hazards;
-  if (budget <= 0) return no("hazard budget exhausted");
+  // §narrator-lever-budgets: the hazard budget is advice the digest shows, never a refusal.
   const leg = legProblem(env, intent.window, "hazard");
   if (leg !== undefined) return no(leg);
   const windowTicks = faultWindowTicks(config, intent.window);
@@ -607,7 +625,7 @@ function personNamed(env: Env, name: string): boolean {
 /**
  * §scheduling-a-field: a scripted impact's target by what the model wrote: a machine id aboard, a
  * room's name, or a machine's name when only one machine aboard has it. A person is refused by name
- * (bodies arrive in slice 6), anything else as unknown.
+ * (§strike-lever is how a rock hurts someone), anything else as unknown.
  */
 function fieldTarget(env: Env, written: string): Outcome<ImpactTarget> {
   const { snapshot, content } = env;
@@ -639,7 +657,7 @@ function fieldTarget(env: Env, written: string): Outcome<ImpactTarget> {
   }
   if (personNamed(env, name)) {
     return no(
-      `"${name}" is a person: people are not targets until bodies; aim at a machine or a room`,
+      `"${name}" is a person: a scripted hit aims at a machine or a room; to hurt them, strike them too`,
     );
   }
   return no(`no machine or room "${name}" aboard; use an id or room name from What you can do`);
@@ -721,6 +739,105 @@ function translateField(env: Env, intent: Intent<"scheduleField">): Outcome<Narr
       scripted: scripted.value,
     },
   });
+}
+
+/**
+ * §strike-lever: the person a strike names, by full name as the digest lists them (crew,
+ * passengers, the dock's and the site's people) or by actor id; a name two people share is
+ * ambiguous.
+ */
+function personByName(env: Env, written: string): Outcome<DeepReadonly<Actor>> {
+  const state = env.snapshot.state;
+  const name = written.trim();
+  const byId = state.actors[name as ActorId];
+  if (byId !== undefined) return ok(byId);
+  const wanted = name.toLowerCase();
+  const named = Object.values(state.actors).filter((a) => a.name.toLowerCase() === wanted);
+  const [only] = named;
+  if (only === undefined) return no(`nobody called "${name}"; use a name the digest lists`);
+  if (named.length > 1) return no(`${named.length} people are called "${name}"`);
+  return ok(only);
+}
+
+/**
+ * §strike-lever: why `actor` cannot be struck or strike now, or undefined: the dead, and anyone not
+ * on the ship's floor or the site's (a passenger ashore, someone in a port's lounge).
+ */
+function strikeProblem(env: Env, actor: DeepReadonly<Actor>): string | undefined {
+  if (actor.availability === "dead") return `${actor.name} is already dead`;
+  const location = actor.location;
+  const onFloor = location.kind === "onDeck" || location.kind === "carriedBy";
+  if (actor.availability === "offShip" || !onFloor) {
+    const where =
+      location.kind === "inExternalStore"
+        ? ` (ashore at ${portName(env.content, location.portId)})`
+        : "";
+    return `${actor.name} is not on the ship or the site${where}`;
+  }
+  return undefined;
+}
+
+/**
+ * §strike-lever: `strike`, a wound through the body rules. Guards are the impossible only: the
+ * person exists, is alive and is on the ship's floor or the site's; so is whoever did it. `how` is
+ * the log's line for it off the fight, so it takes the player-facing text checks.
+ */
+function translateStrike(env: Env, intent: Intent<"strike">): Outcome<NarratorDraft> {
+  const target = personByName(env, intent.who);
+  if (!target.ok) return no(`who: ${target.reason}`);
+  const problem = strikeProblem(env, target.value);
+  if (problem !== undefined) return no(`who: ${problem}`);
+  let byActorId: ActorId | undefined;
+  if (intent.byWho.trim() !== "") {
+    const by = personByName(env, intent.byWho);
+    if (!by.ok) return no(`byWho: ${by.reason}`);
+    const byProblem = strikeProblem(env, by.value);
+    if (byProblem !== undefined) return no(`byWho: ${byProblem}`);
+    byActorId = by.value.id;
+  }
+  const how = clipChars(intent.how, STRIKE_HOW_MAX);
+  const text = textProblem(how, env.secrets);
+  if (text !== undefined) return no(`how: ${text}`);
+  return ok({
+    kind: "strike",
+    payload: {
+      actorId: target.value.id,
+      severity: intent.severity,
+      type: intent.type,
+      ...(intent.part === "" ? {} : { part: intent.part }),
+      ...(byActorId === undefined ? {} : { byActorId }),
+      how,
+    },
+  });
+}
+
+/**
+ * §money-levers: `transact`, a sum into or out of the ship's money. Guards are the impossible only:
+ * a non-zero whole number of credits, a debit the balance covers (with this call's earlier sums), a
+ * credit at most `config.narrator.maxWindfall`. The memo and counterparty are the log's words, so
+ * they take the player-facing text checks.
+ */
+function translateTransact(env: Env, intent: Intent<"transact">): Outcome<NarratorDraft> {
+  const { amount } = intent;
+  if (!Number.isInteger(amount) || amount === 0) {
+    return no("amount must be a non-zero whole number of credits");
+  }
+  const balance = env.snapshot.state.money.balance + env.tally.money;
+  if (amount < 0 && balance + amount < 0) {
+    return no(`the ship has ${balance} credits and cannot pay ${-amount}`);
+  }
+  const max = env.snapshot.config.narrator.maxWindfall;
+  if (amount > max) return no(`a credit of ${amount} is over the most one sum may be (${max})`);
+  const memo = clipChars(intent.memo, TRANSACT_TEXT_MAX);
+  const memoProblem = textProblem(memo, env.secrets);
+  if (memoProblem !== undefined) return no(`memo: ${memoProblem}`);
+  const counterparty = clipChars(intent.counterparty, TRANSACT_TEXT_MAX);
+  if (counterparty !== "") {
+    const problem = textProblem(counterparty, env.secrets);
+    if (problem !== undefined) return no(`counterparty: ${problem}`);
+  }
+  env.tally.money += amount;
+  return ok({ kind: "transact", payload: { amount, memo, counterparty } });
 }
 
 type Side = Intent<"surfaceDecision">["left"];
@@ -1044,6 +1161,10 @@ function translateByKind(env: Env, intent: NarratorIntent): Outcome<NarratorDraf
       return translateHazard(env, intent);
     case "scheduleField":
       return translateField(env, intent);
+    case "strike":
+      return translateStrike(env, intent);
+    case "transact":
+      return translateTransact(env, intent);
   }
 }
 
@@ -1232,9 +1353,8 @@ export const translateIntents: TranslateIntents = (
     closedThreads: (ctx.closedThreads ?? []).map((t) => t.trim().toLowerCase()),
     captainName: captainName(snapshot, ctx.content),
     tally: {
-      spawns: 0,
-      faults: 0,
       hazards: 0,
+      money: 0,
       fields: 0,
       // §offer-lever: a card on its way to the captain in person is as good as on screen.
       cardUsed:

@@ -813,12 +813,24 @@ function eventSection(events: readonly SimEvent[], state: State, content: Conten
   return { heading: "Recent events (oldest first)", lines, priority: 3, trimFrom: "start" };
 }
 
+/** §narrator-lever-budgets: a counter as advice: what is left, or how far past it. */
+function budgetLine(what: string, remaining: number): string {
+  return remaining >= 0
+    ? `${what} remaining: ${remaining}`
+    : `${what} remaining: 0 (${-remaining} past it)`;
+}
+
+/**
+ * §narrator-lever-budgets: the counters, read as advice on how much pressure this stretch has had;
+ * nothing is refused for them.
+ */
 function budgetSection(state: State): Section {
   const b = state.narrator.budget;
   const lines = [
-    `spawns remaining: ${b.spawnsRemaining}`,
-    `faults remaining: ${b.faultsRemaining}`,
-    `hazards remaining: ${b.hazardsRemaining}`,
+    "Advice, not a limit: how much pressure this stretch has had. A lever past it still works.",
+    budgetLine("spawns", b.spawnsRemaining),
+    budgetLine("faults", b.faultsRemaining),
+    budgetLine("hazards", b.hazardsRemaining),
     fieldBudgetLine(state),
   ];
   return section("Your budget", lines, NEVER_DROPS);

@@ -184,6 +184,12 @@ export type CallBackWhen = (typeof CALL_BACK_WHEN)[number];
 /** §requested-call-back: the longest private `why` a call-back request may carry. */
 export const CALL_BACK_WHY_MAX = 200;
 
+/** §strike-lever: the longest `how` line a `strike` may carry (it is the ticker line aboard). */
+export const STRIKE_HOW_MAX = 120;
+
+/** §money-levers: the longest `memo` and `counterparty` a `transact` may carry. */
+export const TRANSACT_TEXT_MAX = 80;
+
 /**
  * §requested-call-back: the narrator's standing request for its next call (the `requestCall`
  * command). One at a time; every story call's plan replaces it. It is deleted when the hook that
@@ -222,7 +228,9 @@ export interface NarratorState {
   lastNarrativeTick: Tick;
   /**
    * Remaining narrator-caused spawns/faults/hazards before the budget refills (every
-   * `config.narrator.budgetRefillDays`, `core/pipeline.ts`).
+   * `config.narrator.budgetRefillDays`, `core/pipeline.ts`). §narrator-lever-budgets: advice the
+   * digest shows, never a refusal; each lever still spends one, so a count below zero is how far
+   * past it the narrator has gone.
    */
   budget: { spawnsRemaining: number; faultsRemaining: number; hazardsRemaining: number };
   /**

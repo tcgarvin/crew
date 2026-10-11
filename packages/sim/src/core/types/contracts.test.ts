@@ -11,10 +11,12 @@ describe("W0 contracts", () => {
     expect(JSON.parse(JSON.stringify(state))).toStrictEqual(state);
   });
 
-  it("narrator authority is the V1 kinds plus stockMarket, staging-only stageDock, scheduleHazard, scheduleField, requestCall and markUnseen (§narrator-authority, D105)", () => {
+  it("narrator authority is the V1 kinds plus stockMarket, staging-only stageDock, scheduleHazard, scheduleField, requestCall, markUnseen, strike and transact (§narrator-authority, D105, D106)", () => {
     expect([...AUTHORITY.narrator].sort()).toEqual(
       [
         "markUnseen",
+        "strike",
+        "transact",
         "offerJob",
         "requestCall",
         "scheduleFault",
@@ -39,6 +41,15 @@ describe("W0 contracts", () => {
     }
     expect(AUTHORITY.narrator).not.toContain("adoptPlan");
     expect(AUTHORITY.system).not.toContain("adoptPlan");
+  });
+
+  it("lets only the narrator and the scenario strike a person or move the ship's money (D106)", () => {
+    for (const kind of ["strike", "transact"] as const) {
+      expect(AUTHORITY.narrator).toContain(kind);
+      expect(AUTHORITY.scenario).toContain(kind);
+      expect(AUTHORITY.player).not.toContain(kind);
+      expect(AUTHORITY.system).not.toContain(kind);
+    }
   });
 
   it("lets only the narrator and the scenario mark a way in unseen; the player never (D105)", () => {

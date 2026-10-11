@@ -56,6 +56,7 @@ const job = {
   cargoItem: "item.crate_hazardous",
   quantity: "few",
   payTier: "generous",
+  payCredits: 0,
   urgency: "urgent",
   surface: true,
   passenger: false,
@@ -689,7 +690,7 @@ describe("translateIntents: drops with reasons", () => {
     expect(result.dropped[0]?.reason).toBe(`offerJob: cargoItem: ${tool?.id} is not a cargo item`);
   });
 
-  it("drops faults and spawns past the budget", () => {
+  it("lets faults and spawns past the budget through: the budget is advice (§narrator-lever-budgets)", () => {
     const req = quietTooLongRequest(content());
     const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
     snapshot.state.narrator.budget = {
@@ -714,11 +715,12 @@ describe("translateIntents: drops with reasons", () => {
       ]),
       { ...ctxOf(req), snapshot },
     );
-    expect(result.commands.map((c) => c.kind)).toEqual(["scheduleFault"]);
-    expect(result.dropped.map((d) => d.reason)).toEqual([
-      "scheduleFault: fault budget exhausted",
-      "spawnAtBoundary: spawn budget exhausted",
+    expect(result.commands.map((c) => c.kind)).toEqual([
+      "scheduleFault",
+      "scheduleFault",
+      "spawnAtBoundary",
     ]);
+    expect(result.dropped).toEqual([]);
   });
 
   it("allows one card per call and none on a policy decision", () => {
@@ -873,6 +875,7 @@ describe("translateIntents: passengers (passengers-and-galaxy §4.1, §4.2)", ()
     cargoItem: "",
     quantity: "several",
     payTier: "standard",
+    payCredits: 0,
     surface: false,
     passenger: true,
     roundTrip: true,
@@ -1330,9 +1333,10 @@ describe("translateIntents: scheduleHazard, the sixth lever (§hazard-and-field-
     ]);
   });
 
-  it("spends the hazard budget and lets one hazard wait at a time", () => {
+  it("places a hazard past an empty budget (advice, §narrator-lever-budgets) and lets one wait at a time", () => {
     const empty = translateIntents(plan([hazard]), ctxOf(withBudget(inTransit(200), 0)));
-    expect(empty.dropped.map((d) => d.reason)).toEqual(["scheduleHazard: hazard budget exhausted"]);
+    expect(empty.commands.map((c) => c.kind)).toEqual(["scheduleHazard"]);
+    expect(empty.dropped).toEqual([]);
 
     const two = translateIntents(
       plan([hazard, { ...hazard, hazard: "ionStorm" }]),
@@ -1493,7 +1497,7 @@ describe("translateIntents: scheduleField, the seventh lever (§scheduling-a-fie
       `scheduleField: scripted[1]: ${bunks.length} machines aboard are called "Bunk"; use the machine id (${bunks.join(", ")})`,
     );
     expect(onlyDrop(req, { ...field, scripted: [hit("Jax Okonkwo")] })).toBe(
-      'scheduleField: scripted[0]: "Jax Okonkwo" is a person: people are not targets until bodies; aim at a machine or a room',
+      'scheduleField: scripted[0]: "Jax Okonkwo" is a person: a scripted hit aims at a machine or a room; to hurt them, strike them too',
     );
   });
 
@@ -1655,6 +1659,7 @@ describe("translateIntents: errands (expeditions A2, §6)", () => {
     cargoItem: "",
     quantity: "one",
     payTier: "standard",
+    payCredits: 0,
     errandKind: "fetchPerson",
     site: HARROW,
     targetName: "Teodor Lusk",

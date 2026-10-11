@@ -1,5 +1,5 @@
 /**
- * The capability list (§narrator-authority): exactly what the eight narrator levers can do in this
+ * The capability list (§narrator-authority): exactly what the ten narrator levers can do in this
  * game, generated from content, config and the ship's machines so the prompt never promises what
  * the sim cannot do. It sits in the cached system prefix: nearly all of it is fixed for a game, and
  * the parts that are not (each port's market, and since passengers-and-galaxy §2.4 the hop
@@ -9,9 +9,11 @@
  * the digest.
  */
 import {
+  BODY_PARTS,
   type CastArms,
   type ConfigDef,
   type ContentBundle,
+  DAMAGE_TYPES,
   ERRAND_KINDS,
   ERRAND_WANTS,
   FIELD_SEVERITIES,
@@ -24,6 +26,7 @@ import {
   type PortDef,
   type PortDefId,
   type SiteCastEntryDef,
+  WOUND_SEVERITIES,
   basePriceFor,
   dockForPort,
   effectiveMarket,
@@ -254,7 +257,7 @@ function fieldLever(state: State, content: ContentBundle, config: ConfigDef): st
     `- detection: rolled (whoever has the helm gets a piloting check ${seconds(f.warningSeconds)} before it, at the hazard tiers ${tiers}: pass, and they sight it, the ship goes on alert and braces; fail, or an empty helm, and nobody knows until the first rock) or unseen (no warning whatever the helm does: the first rock is the news).`,
     "- window: the same three windows as scheduleHazard. The field begins at the first moment the ship is in transit at or after it and lies along the leg for its length; one that would begin after this leg's transit ends is dropped.",
     `- The rocks are the sim's: they land anywhere on the deck with the same chance for every tile. A small rock hits one tile, a large one a 3x3; each costs the hull once (small ${f.hullDamage.small}, large ${f.hullDamage.large} points) and leaves a scar. Every machine under it rolls: glanced off, grazed, damaged (it runs derated), knocked out (stopped in one hit) or one of its own faults. Engines knocked out leave the ship stuck in the rocks, still being hit, until the engineers fix them or she drifts clear after ${f.stuckDriftImpacts} more rocks.`,
-    `- scripted: up to ${f.maxScripted} hits you choose, to tell a story (the galley stove out before dinner, the engine knocked out on a long leg, the hold holed with the cargo in it). Each has target (a machine id or a room name from the list below), at (${FIELD_MOMENTS.join(" | ")} in the field), rock (small | large, or empty for the severity's draw) and effect on the machines it hits (${effects}, or empty to roll). A scripted hit takes the place of a random one, so the field is no heavier for it. Never a person: nobody can be hurt yet, and a name from Crew is dropped. Scripted hits alone must leave the hull above zero (an empty rock is counted as large), or the field is dropped.`,
+    `- scripted: up to ${f.maxScripted} hits you choose, to tell a story (the galley stove out before dinner, the engine knocked out on a long leg, the hold holed with the cargo in it). Each has target (a machine id or a room name from the list below), at (${FIELD_MOMENTS.join(" | ")} in the field), rock (small | large, or empty for the severity's draw) and effect on the machines it hits (${effects}, or empty to roll). A scripted hit takes the place of a random one, so the field is no heavier for it. Never a person (a name is dropped): to have a rock hurt someone, strike them (9) as well, and say so on the card. Scripted hits alone must leave the hull above zero (an empty rock is counted as large), or the field is dropped.`,
     "- One field per leg, no budget; only while a course is set or the ship is under way with transit left (dropped while docked with no course, on approach or docking). The departure call you ask for with callBack (when: departure) is the natural moment: the ship has just cast off and the whole leg is ahead. The hull is in the digest; at zero the ship is lost and the game ends.",
     "- What follows is the crew's: whoever sees damage reports it on the nearest intercom, the officer of the watch holds the bridge and sends someone to look, scars are patched underway with patch kits (half the damage back) and plated at a port that sells hull plating (the rest), and damaged machines are repaired. Nothing holds the ship in port for the hull; leaving with repairs unfinished is a story.",
     "- Rooms and their machines (scripted targets):",
@@ -272,6 +275,33 @@ const UNSEEN_LEVER: readonly string[] = [
   "- If the captain picks that side, the party slips in unseen: nobody there notices them unless they fire first. If the captain picks the other side, the people there were waiting: they are on the party the moment it is on the ground. Empty leaves it to the sim, which rolls who notices and when.",
   "- Only when the story has set it up (a guard asleep, a back way, a friend inside, the people there looking the other way), never a side that holds the ramp (dropped), and never given away on the card: both sides read as plausible, a hint is fine, a tell is not. The captain still chooses and the sim fights the chosen side; you never choose the plan.",
 ];
+
+/**
+ * §strike-lever: the ninth lever, a wound, a down or a death by the body rules, in words from the
+ * bodies config.
+ */
+function strikeLever(config: ConfigDef): string[] {
+  const { tolerance, severityDamage } = config.bodies;
+  const headKills = severityDamage.grave >= tolerance.head;
+  return [
+    "## 9. strike: wound, down or kill a person, by the body rules",
+    "- who: the person's full name as the digest lists them (Crew, a passenger, someone on the dock, someone under At the site). byWho: who did it (a guard at the site, a crew member in a brawl), full name, or empty for an accident. Only someone alive and on the ship or the site floor: a passenger ashore, someone in a port's lounge or the dead are dropped.",
+    `- severity: ${WOUND_SEVERITIES.join(" | ")}; type: ${DAMAGE_TYPES.join(" | ")} (stun knocks out, never kills); part: ${BODY_PARTS.join(" | ")}, or empty to let the body decide.`,
+    `- What it does is the sim's body rules, never yours to state: a graze hurts and heals; a serious wound bleeds for a while, slows them and can put them down; a grave one ${headKills ? "to the head kills at once, and anywhere else" : "anywhere"} bleeds and can kill within minutes. You never write "dead": a grave head strike is how a death you have decided lands. Two strikes on one person in one call: the second may find them dead and be dropped.`,
+    `- how: one line of what happened, as the ship's log shows it ("Jax Okonkwo falls from the hold ladder", "a crate shifts and pins Priya's leg"); no numbers. In the fight at a site the fight's own lines tell it ("Corran Vale is hit"), so it lands like any shot, with byWho a cast member. The crew react as to any wound: crewmates who see it take it with them (their mood), someone down stops where they are, and the dead stay on the deck.`,
+    "- The captain is not special: they can be struck and killed like anyone, and the first officer takes command. A death is the strongest card you have; spend it rarely, and only when the story has walked toward it.",
+  ];
+}
+
+/** §money-levers: the tenth lever, a sum into or out of the ship's money. */
+function transactLever(config: ConfigDef): string[] {
+  return [
+    "## 10. transact: money into or out of the ship's money",
+    `- amount: credits, positive into the ship's money (a reward, a windfall, a bribe taken, a fare paid in cash), negative out of it (a fine at the gate, a bribe paid, a debt called in, damages). Never 0. A debit more than the ship has ("money" under Ship, less this call's other debits) is dropped; a credit above ${config.narrator.maxWindfall} is dropped.`,
+    `- memo: what it is for, a few words ("the gate fine", "for keeping quiet"); counterparty: who pays or is paid, full name, or empty. The ship's log shows them with the sum ("Paid Osei 200 cr: the gate fine"); a card still never states a sum, it says "it costs us".`,
+    "- It happens when your plan is applied, not when a card is chosen: use it for what has been decided (the fine is levied, the reward is paid), and show it on a card from whoever paid or was paid.",
+  ];
+}
 
 export function buildCapabilities(state: State, content: ContentBundle, config: ConfigDef): string {
   // Expeditions A2: landing sites are listed under "Sites", not with the ports.
@@ -298,7 +328,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   const lines: string[] = [];
   lines.push("# What you can do");
   lines.push(
-    "You have exactly eight levers. Anything not listed here does not exist in this game yet: no combat or injuries you cause (an errand's fight at a site is the sim's), no direct changes to money, needs, moods or positions, no messages, no new places.",
+    "You have exactly ten levers. Anything not listed here does not exist in this game yet: no direct changes to needs, moods, who likes whom or where people are, no messages, no new places. A lever that cannot happen (a dead person struck, a debit the ship cannot pay, an id that does not exist) is dropped and you are told why next call.",
   );
   lines.push(
     "The ids below (ports, sites, store keys, cargo items, machines, faultKeys) are the only ones the plan may use; copy them exactly.",
@@ -334,6 +364,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(`- One cargo item kind per job. quantity: ${q(JOB_QUANTITY_UNITS)} units.`);
   lines.push(
     "- payTier low | standard | generous is a private lever: it places the pay inside the class price band for the route and the engine computes it. No text ever mentions pay.",
+  );
+  lines.push(
+    `- payCredits: 0 lets payTier place the pay. Any other number is the exact pay in credits, for when the story is the sum (he offers far too much for a short run, she pays half what it is worth): a positive whole number, at most ${config.narrator.maxOfferPay}, otherwise the offer is dropped. Private like payTier: the captain sees the sum only in the ship's balance when it is paid, never on a card.`,
   );
   lines.push(
     `- issuerName, issuerRole and issuerOrg (or empty) name the one person offering it; pitch is one line they say to the captain. urgency ${JOB_URGENCIES.join(" | ")} colours the card only; nothing enforces a deadline.`,
@@ -403,7 +436,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
     `- port and cargoItem (any item id, including item ids not listed as cargo above, e.g. spare parts), count 0-${config.commerce.market.maxStockPerCommand} units on sale after this (0 withdraws it), priceTier ${MARKET_PRICE_TIERS.join(" | ")} against the port's usual price. The market line under each port above is what is on sale now.`,
   );
   lines.push(
-    "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; none of your levers buys, delivers, repairs or pays. Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
+    "- This is the only way a part reaches a port. The crew buy what a stalled repair needs themselves, from the ship's money, while docked there; none of your levers buys, delivers or repairs (transact, 10, moves money, never parts). Stock a port the ship is at to make a part available now, another port to make the story go there, or set 0 to make it scarce.",
   );
   // §galley-provisions: the galley's stores are bought like parts; name them by id so the model can
   // stock them.
@@ -422,5 +455,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push(...fieldLever(state, content, config));
   lines.push("");
   lines.push(...UNSEEN_LEVER);
+  lines.push("");
+  lines.push(...strikeLever(config));
+  lines.push("");
+  lines.push(...transactLever(config));
   return lines.join("\n");
 }

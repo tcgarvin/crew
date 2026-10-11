@@ -34,7 +34,7 @@ style, so a face can be shown later.
 ### Cards never mention pay
 
 Offer cards describe the job and the person offering it, in the issuer's one-line pitch; money
-appears only in the top bar. Why: "pay hints are not that interesting."
+appears only in the top bar and the ship's log. Why: "pay hints are not that interesting."
 
 ## Sides and effects
 

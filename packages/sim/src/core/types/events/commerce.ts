@@ -31,6 +31,16 @@ export interface CommerceEventPayloads {
     readonly jobId?: JobId;
   };
   /**
+   * §money-levers: the narrator's `transact` moved `amount` signed credits (positive in, negative
+   * out) with `counterparty`, for `memo`.
+   */
+  transacted: {
+    readonly transactionId: TransactionId;
+    readonly amount: number;
+    readonly memo: string;
+    readonly counterparty: string;
+  };
+  /**
    * §offered-freight: an offer's crates were set out on the staging area of its origin's dock (on
    * offer, or when the dock came alongside). Nobody's until the job is accepted.
    */
@@ -99,6 +109,7 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   cargoTransferred: "trace",
   contractCompleted: "narrative",
   paymentMade: "notable",
+  transacted: "narrative",
   entitySpawned: "trace",
   // §offered-freight: the offer and its card already carry the story; the crates appearing is
   // scenery.

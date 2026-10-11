@@ -33,6 +33,11 @@ export interface Hit {
   readonly byActorId?: ActorId;
   /** Relative weights for where it lands; absent, the config's (`partTable`/`stunPartTable`). */
   readonly partTable?: Readonly<Record<BodyPart, number>>;
+  /**
+   * §strike-lever: the narrator's strike off the fight, whose `struck` line tells what happened;
+   * `wounded` carries it so the ticker does not tell it twice.
+   */
+  readonly narrated?: true;
 }
 
 /** What a hit did: the wound it made and whether it took the person down or killed them. */
@@ -62,6 +67,7 @@ export function applyDamage(ctx: StepCtx, actorId: ActorId, hit: Hit): DamageRes
     severity: hit.severity,
     type: hit.type,
     ...by,
+    ...(hit.narrated === true ? { narrated: true as const } : {}),
   });
   if (wound.type !== "stun") addThought(ctx, actor, "wounded");
   if (isDeadBy(actor.body, ctx.config)) {

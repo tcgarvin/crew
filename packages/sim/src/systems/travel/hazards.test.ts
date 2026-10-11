@@ -161,7 +161,7 @@ describe("scheduleHazard (§debris-fields-and-ion-storms)", () => {
     expect(scheduled?.payload).toEqual({ hazardId: "h1", kind: "debrisField" });
   });
 
-  it("rejects an unknown kind, a difficulty off the 1-10 scale, a bad or oversize window, and an empty budget", () => {
+  it("rejects an unknown kind, a difficulty off the 1-10 scale, and a bad or oversize window, never an empty budget", () => {
     const test = freightTestWorld();
     planCourse(test);
     const maxWindow = test.world.config.values.narrator.maxFaultWindowSeconds * 20;
@@ -176,10 +176,10 @@ describe("scheduleHazard (§debris-fields-and-ion-storms)", () => {
       "outOfBounds",
     );
     test.world.state.narrator.budget.hazardsRemaining = 0;
-    expect(codeOf(schedule(test, debris))).toBe("budgetExhausted");
+    expect(codeOf(schedule(test, debris))).toBe("accepted");
   });
 
-  it("is spent down to nothing and refilled every budgetRefillDays", () => {
+  it("is spent past nothing as advice and refilled every budgetRefillDays (§narrator-lever-budgets)", () => {
     const test = freightTestWorld();
     planCourse(test);
     const full = test.world.config.values.narrator.hazardBudget;
@@ -188,7 +188,9 @@ describe("scheduleHazard (§debris-fields-and-ion-storms)", () => {
       step(test);
     }
     expect(test.world.state.narrator.budget.hazardsRemaining).toBe(0);
-    expect(codeOf(schedule(test, debris))).toBe("budgetExhausted");
+    expect(codeOf(schedule(test, debris))).toBe("accepted");
+    step(test);
+    expect(test.world.state.narrator.budget.hazardsRemaining).toBe(-1);
     const config = test.world.config.values;
     const every = config.narrator.budgetRefillDays * config.time.daySeconds * config.time.tickRate;
     // Wind the last refill back so the next one is due on the coming tick.

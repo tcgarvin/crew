@@ -200,6 +200,10 @@ export const configDefSchema = z.strictObject({
      */
     aftermathHookOnEvents: z.array(z.string().min(1)),
     hazardBudget: z.number().int().min(0),
+    /** §money-levers: the largest credit one narrator `transact` may pay the ship. */
+    maxWindfall: z.number().int().min(0),
+    /** §money-levers: the largest named pay an offer may carry (`offerJob.payCredits`). */
+    maxOfferPay: z.number().int().min(1),
   }),
   host: z.strictObject({
     runAheadCapSeconds: nonNegative,

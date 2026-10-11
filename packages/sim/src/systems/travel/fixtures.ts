@@ -207,6 +207,8 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       hookOnEvents: overrides.hookOnEvents ?? [],
       aftermathHookOnEvents: overrides.aftermathHookOnEvents ?? [],
       hazardBudget: 2,
+      maxWindfall: 2000,
+      maxOfferPay: 10000,
     },
     host: {
       runAheadCapSeconds: 60,

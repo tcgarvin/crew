@@ -548,6 +548,8 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
     }
     case "paymentMade":
       return `Paid ${event.payload.amount} cr`;
+    case "transacted":
+      return transactedLine(event);
     case "partsBought": {
       const { count, itemDefId, portId, cost } = event.payload;
       const what = `${count > 1 ? `${count}× ` : ""}${n.itemDef(itemDefId)}`;
@@ -714,7 +716,12 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return `Shots at ${midSentence(n.port(event.payload.siteId))}`;
     case "shotFired":
       return null;
+    case "struck":
+      // §strike-lever: off the fight the narrator's line is the news; in it, the fight's lines are.
+      return event.payload.inFight ? null : capitalise(event.payload.how);
     case "wounded": {
+      // §strike-lever: the narrator's strike off the fight was told by its `struck` line.
+      if (event.payload.narrated === true) return null;
       const who = n.actor(event.payload.actorId) ?? "Someone";
       if (event.payload.type === "stun") return `${who} is stunned`;
       return n.isCrew(event.payload.actorId)
@@ -790,6 +797,20 @@ function resolvedHead(event: Extract<SimEvent, { type: "expeditionResolved" }>, 
  * Expeditions A2: "The job for Ysolde Maren is lost: Corran Vale got away", "... the party came
  * back without Corran Vale", "... Corran Vale was put off" (the name table has no pronouns).
  */
+/**
+ * §money-levers: "Paid Harbourmaster Osei 200 cr: the gate fine", "Received 500 cr from Ysolde
+ * Maren: a reward"; with no counterparty, "Paid 200 cr: ..." and "Received 500 cr: ...".
+ */
+function transactedLine(event: Extract<SimEvent, { type: "transacted" }>): string {
+  const { amount, memo, counterparty } = event.payload;
+  const sum = `${Math.abs(amount)} cr`;
+  const head =
+    amount < 0
+      ? `Paid ${counterparty === "" ? sum : `${counterparty} ${sum}`}`
+      : `Received ${sum}${counterparty === "" ? "" : ` from ${counterparty}`}`;
+  return `${head}: ${memo}`;
+}
+
 function jobFailedLine(event: Extract<SimEvent, { type: "jobFailed" }>, n: Names): string {
   const { jobId, outcome } = event.payload;
   const job = n.job(jobId);

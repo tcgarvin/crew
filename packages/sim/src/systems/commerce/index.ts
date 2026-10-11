@@ -9,6 +9,7 @@ import {
   stockMarket,
 } from "./command-handlers";
 import { commerceSystem } from "./commerce";
+import { transact } from "./transact";
 
 export function registerCommerce(registry: KernelRegistry): void {
   registry.registerSystem(commerceSystem);
@@ -18,6 +19,7 @@ export function registerCommerce(registry: KernelRegistry): void {
   registry.registerCommandHandler("spawnAtBoundary", spawnAtBoundary);
   registry.registerCommandHandler("stockMarket", stockMarket);
   registry.registerCommandHandler("endPassage", endPassage);
+  registry.registerCommandHandler("transact", transact);
 }
 
 export {

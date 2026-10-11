@@ -64,7 +64,7 @@ describe("spawnAtBoundary", () => {
     expect(result.status === "rejected" && result.rejection.code).toBe("unknownEntity");
   });
 
-  it("rejects once the narrator spawn budget is exhausted", () => {
+  it("spends the spawn budget past zero without refusing: the budget is advice (§narrator-lever-budgets)", () => {
     const { world, kernel } = freightTestWorld();
     const budget = world.state.narrator.budget.spawnsRemaining;
     for (let i = 0; i < budget; i += 1) {
@@ -75,7 +75,8 @@ describe("spawnAtBoundary", () => {
     advanceThroughHooks(kernel, world, 1);
     expect(world.state.narrator.budget.spawnsRemaining).toBe(0);
     const over = kernel.enqueueCommand(world, spawnItemCommand("$over", FIX.crate, 1));
-    expect(over.status).toBe("rejected");
-    expect(over.status === "rejected" && over.rejection.code).toBe("budgetExhausted");
+    expect(over.status).toBe("accepted");
+    advanceThroughHooks(kernel, world, 1);
+    expect(world.state.narrator.budget.spawnsRemaining).toBe(-1);
   });
 });
