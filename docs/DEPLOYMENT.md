@@ -61,6 +61,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres pnpm --filter 
 | `CREW_STAGING_REASONING_EFFORT` | No (default: whatever `CREW_NARRATOR_REASONING_EFFORT` resolves to) | The same for the staging call (`stageDock`), as `CREW_STAGING_MODEL` is for the model. |
 | `CREW_STAGING_TIMEOUT_MS` | No (default: 10000) | How long one staging attempt may take before it gives up, in milliseconds (§narrator-timeouts). Story calls keep the narrator's 25 s; staging at 25 s per attempt, over the retry schedule (§staging-retries-and-the-floor-set), could hold the ship at the end of transit for over a minute. |
 | `CREW_NARRATOR_REPAIRS` | No (default: 2, `DEFAULT_MAX_REPAIRS`) | How many times one model call (story plan, notes turn, staging) hands a malformed reply back to the model to fix before it fails `schemaInvalid` (§repair-turn). Repairs share the call's own timeout. `0` turns them off. |
+| `CREW_NARRATOR_TOOL_ROUNDS` | No (default: 4, `DEFAULT_MAX_TOOL_ROUNDS`) | How many rounds of read-only tool calls the notes turn may make before it is asked for its notes (§notes-turn-tools). Rounds share the notes turn's 45 s timeout. `0` offers no tools. |
 | `CREW_SAVE_MAX_BYTES` | No (default 4 MiB) | Max accepted save size, measured on the **gzipped** blob. Vercel functions cap request bodies at 4.5 MB, so leave headroom above this for base64 + JSON overhead if raising it. |
 
 There is no narrator call cap in software (D102); the OpenRouter key's own credit limit is the

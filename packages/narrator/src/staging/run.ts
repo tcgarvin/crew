@@ -10,6 +10,7 @@ import type { ContentBundle, DeepReadonly } from "@crew/sim";
 import type { FallbackReason, NarratorRequest, NarratorResponse } from "../contract";
 import type { NarratorDigest } from "../digest";
 import {
+  NO_TOOL_LOOP,
   type RepairRecord,
   ReplyFailedError,
   callForValidReply,
@@ -98,7 +99,7 @@ export async function runStaging(inputs: StagingInputs): Promise<StagingRun> {
         timeoutMs: inputs.timeoutMs,
       },
       parseStaging,
-      { maxRepairs: inputs.maxRepairs, logContext: inputs.logContext },
+      { maxRepairs: inputs.maxRepairs, logContext: inputs.logContext, tools: NO_TOOL_LOOP },
     );
     const plan = reply.value;
     const translated = translateStaging(plan, {

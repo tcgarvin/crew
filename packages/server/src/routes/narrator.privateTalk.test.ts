@@ -58,6 +58,7 @@ function cardCallingIn(talkWith: string): ModelTransport {
       cacheCreationInputTokens: 0,
     },
     reasoningDetails: [],
+    toolCalls: [],
   });
 }
 

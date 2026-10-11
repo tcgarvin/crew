@@ -9,7 +9,9 @@ import { schemaInstruction } from "./plan";
  * even with `strict: false`. `runNarrator` validates the reply against the zod schema either way.
  * The system parts are sent as separate text content parts with Anthropic-style `cache_control`
  * (`systemContentParts`); OpenRouter forwards that to providers that support prompt caching and
- * ignores it elsewhere. `fetch` is injectable so tests never touch the network.
+ * ignores it elsewhere. `fetch` is injectable so tests never touch the network. §notes-turn-tools:
+ * a request that offers tools sends them as function `tools` with `tool_choice`, and a provider
+ * refusing them is a `ToolsRejectedError` so the caller can ask again without.
  *
  * Caching caveats (2026-09-30): a prefix below the model's minimum cacheable length is silently
  * not cached (Anthropic: 1024 tokens for Sonnet 4.6, 4096 for Opus 4.6), and a cache lives with
@@ -19,6 +21,8 @@ import {
   type ModelRequest,
   type ModelResult,
   type ModelTransport,
+  type ToolCall,
+  ToolsRejectedError,
   TransportError,
 } from "./transport";
 
@@ -39,6 +43,10 @@ interface CompletionBody {
       readonly content?: string | null;
       readonly refusal?: string | null;
       readonly reasoning_details?: readonly unknown[];
+      readonly tool_calls?: readonly {
+        readonly id?: string;
+        readonly function?: { readonly name?: string; readonly arguments?: string };
+      }[];
     };
     readonly finish_reason?: string | null;
   }[];
@@ -75,22 +83,82 @@ export function systemContentParts(system: readonly string[]) {
   );
 }
 
+function reasoningOf(details: readonly unknown[]) {
+  return details.length === 0 ? {} : { reasoning_details: details };
+}
+
 /**
  * §notes-turn: the turns after the first user turn. An earlier reply goes back with its
  * `reasoning_details`, so a reasoning model continues from its own reasoning rather than
- * re-deriving it.
+ * re-deriving it. §notes-turn-tools: a reply that asked for tools goes back as an assistant turn
+ * with its `tool_calls` (and reasoning), each result as a `tool` turn.
  */
 function continuationMessages(request: ModelRequest) {
-  return request.continuation.map((message) =>
-    message.role === "assistant"
-      ? {
+  return request.continuation.map((message) => {
+    switch (message.role) {
+      case "assistant":
+        return {
           role: "assistant" as const,
           content: message.content,
-          ...(message.reasoningDetails.length === 0
-            ? {}
-            : { reasoning_details: message.reasoningDetails }),
-        }
-      : message,
+          ...reasoningOf(message.reasoningDetails),
+        };
+      case "user":
+        return message;
+      case "toolRequest":
+        return {
+          role: "assistant" as const,
+          content: message.content === "" ? null : message.content,
+          tool_calls: message.toolCalls.map((call) => ({
+            id: call.id,
+            type: "function" as const,
+            function: { name: call.name, arguments: call.arguments },
+          })),
+          ...reasoningOf(message.reasoningDetails),
+        };
+      case "toolResult":
+        return {
+          role: "tool" as const,
+          tool_call_id: message.toolCallId,
+          content: message.content,
+        };
+    }
+  });
+}
+
+/** §notes-turn-tools: OpenRouter's `tools` and `tool_choice`, absent when none are offered. */
+function toolsField(request: ModelRequest) {
+  const offer = request.tools;
+  if (offer.kind === "none") return {};
+  return {
+    tools: offer.tools.map((tool) => ({
+      type: "function" as const,
+      function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+    })),
+    tool_choice: offer.choice,
+  };
+}
+
+/** §notes-turn-tools: the calls in a reply, each with an id (minted when the provider sent none). */
+function toolCallsOf(message: NonNullable<CompletionBody["choices"]>[number]["message"]) {
+  return (message?.tool_calls ?? []).map(
+    (call, i): ToolCall => ({
+      id: call.id ?? `call_${i}`,
+      name: call.function?.name ?? "",
+      arguments: call.function?.arguments ?? "",
+    }),
+  );
+}
+
+/**
+ * §notes-turn-tools: a provider refusing the request for its tools. OpenRouter answers 404 "No
+ * endpoints found that support tool use" when no route for the model has function calling; an
+ * upstream may answer 400 naming tools.
+ */
+function rejectsTools(request: ModelRequest, status: number, text: string): boolean {
+  return (
+    request.tools.kind === "offered" &&
+    (status === 400 || status === 404 || status === 422) &&
+    /tool/i.test(text)
   );
 }
 
@@ -102,7 +170,7 @@ function continuationMessages(request: ModelRequest) {
 function reasoningField(request: ModelRequest) {
   if (request.reasoningEffort === "default") return {};
   const handedBack = request.continuation.some(
-    (m) => m.role === "assistant" && m.reasoningDetails.length > 0,
+    (m) => (m.role === "assistant" || m.role === "toolRequest") && m.reasoningDetails.length > 0,
   );
   return {
     reasoning: {
@@ -129,6 +197,7 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
         { role: "user", content: request.user },
         ...continuationMessages(request),
       ],
+      ...toolsField(request),
       ...reasoningField(request),
     };
 
@@ -166,12 +235,17 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
         raw === undefined
           ? ""
           : ` [${provider ?? "provider"}: ${typeof raw === "string" ? raw : JSON.stringify(raw)}]`;
-      throw new TransportError("apiError", `OpenRouter ${response.status}: ${detail}${upstream}`);
+      const message = `OpenRouter ${response.status}: ${detail}${upstream}`;
+      if (rejectsTools(request, response.status, `${detail}${upstream}`)) {
+        throw new ToolsRejectedError(message);
+      }
+      throw new TransportError("apiError", message);
     }
 
     const choice = parsed.choices?.[0];
     const finishReason = choice?.finish_reason ?? "other";
     const refusal = choice?.message?.refusal ?? undefined;
+    const toolCalls = toolCallsOf(choice?.message);
     const finish =
       refusal !== undefined
         ? "refusal"
@@ -179,7 +253,9 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
           ? "stop"
           : finishReason === "length"
             ? "length"
-            : "other";
+            : finishReason === "tool_calls" || toolCalls.length > 0
+              ? "toolCalls"
+              : "other";
     const usage = parsed.usage ?? {};
     return {
       model: parsed.model ?? request.model,
@@ -187,6 +263,7 @@ export function openRouterTransport(options: OpenRouterOptions): ModelTransport 
       finish,
       ...(refusal === undefined ? {} : { refusal }),
       reasoningDetails: choice?.message?.reasoning_details ?? [],
+      toolCalls,
       usage: {
         inputTokens: usage.prompt_tokens ?? 0,
         outputTokens: usage.completion_tokens ?? 0,

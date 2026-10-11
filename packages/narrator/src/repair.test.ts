@@ -9,6 +9,7 @@ import { quietTooLongRequest, stageDockRequest } from "./fixtures";
 import {
   FallbackError,
   MIN_REPAIR_MS,
+  NO_TOOL_LOOP,
   REPAIR_HEADING,
   ReplyFailedError,
   callForValidReply,
@@ -72,7 +73,7 @@ const CALL = {
   timeoutMs: 25_000,
 } as const;
 
-const OPTIONS = { maxRepairs: 2, logContext: { gameId: "g1" } } as const;
+const OPTIONS = { maxRepairs: 2, logContext: { gameId: "g1" }, tools: NO_TOOL_LOOP } as const;
 
 let warn: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {

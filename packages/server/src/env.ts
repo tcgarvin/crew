@@ -4,6 +4,7 @@
  */
 import {
   DEFAULT_MAX_REPAIRS,
+  DEFAULT_MAX_TOOL_ROUNDS,
   DEFAULT_NARRATOR_MODEL,
   DEFAULT_NARRATOR_REASONING_EFFORT,
   REASONING_EFFORTS,
@@ -110,6 +111,11 @@ export interface Env {
    */
   readonly narratorRepairs: number;
   /**
+   * §notes-turn-tools: `CREW_NARRATOR_TOOL_ROUNDS`, how many rounds of tool calls the notes turn may
+   * make before it is asked for its notes; unset = `DEFAULT_MAX_TOOL_ROUNDS` (4), 0 = no tools.
+   */
+  readonly narratorToolRounds: number;
+  /**
    * `CREW_NARRATOR_FALLBACK` (D43): `"error"` or `"null"`; unset = `"error"` when
    * `NODE_ENV=production`, `"null"` otherwise (local dev without a key and the test suite).
    */
@@ -159,6 +165,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     ),
     stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),
     narratorRepairs: readCount(source, "CREW_NARRATOR_REPAIRS", DEFAULT_MAX_REPAIRS),
+    narratorToolRounds: readCount(source, "CREW_NARRATOR_TOOL_ROUNDS", DEFAULT_MAX_TOOL_ROUNDS),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     nodeEnv,

@@ -69,5 +69,11 @@ export {
   requestedCallRequest,
   stageDockRequest,
 } from "./fixtures";
-export { DEFAULT_MAX_REPAIRS, MIN_REPAIR_MS, type RepairRecord } from "./model-call";
+export {
+  DEFAULT_MAX_REPAIRS,
+  DEFAULT_MAX_TOOL_ROUNDS,
+  MIN_REPAIR_MS,
+  type RepairRecord,
+  type ToolCallRecord,
+} from "./model-call";
 export { OPENROUTER_URL, openRouterTransport, systemContentParts } from "./openrouter";
