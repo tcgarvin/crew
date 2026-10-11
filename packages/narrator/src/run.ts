@@ -38,7 +38,14 @@ import {
 import { buildDigest } from "./digest";
 import { applyDecisionEvents, recordCardsFromCall } from "./history";
 import { type State, portName } from "./lookups";
-import { FallbackError, callModel, contentOf, parseJsonReply, schemaIssue } from "./model-call";
+import {
+  DEFAULT_MAX_REPAIRS,
+  type RepairRecord,
+  ReplyFailedError,
+  callForValidReply,
+  parseJsonReply,
+  schemaIssue,
+} from "./model-call";
 import {
   type MergedThreads,
   type MetIssuer,
@@ -57,7 +64,7 @@ import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
 import { mergePlan, stampFiredBeats } from "./story-plan";
 import { translateIntents } from "./translate";
-import type { ModelTransport, ReasoningDetails, ReasoningEffort } from "./transport";
+import type { ContinuationMessage, ModelTransport, ReasoningEffort } from "./transport";
 
 /**
  * D102: the one default model slug, for the server, the live suite and tests alike; override with
@@ -71,7 +78,8 @@ export const DEFAULT_NARRATOR_MODEL = "openai/gpt-6-luna";
 export const DEFAULT_NARRATOR_REASONING_EFFORT: ReasoningEffort = "low";
 /**
  * Vercel's function budget is ~30 s; 25 s leaves time to log the call and answer. No retry: a
- * retry could not finish inside the budget, and the null fallback keeps the game going.
+ * retry could not finish inside the budget, and the null fallback keeps the game going. A
+ * §repair-turn spends this same budget.
  */
 export const NARRATOR_TIMEOUT_MS = 25_000;
 /**
@@ -112,6 +120,8 @@ export interface RunNarratorCtx {
    * (nothing sent).
    */
   readonly reasoningEffort?: ReasoningEffort;
+  /** §repair-turn: repairs per model call (plan, notes or staging); absent = `DEFAULT_MAX_REPAIRS`. */
+  readonly maxRepairs?: number;
 }
 
 /** Everything the eval harness prints, beyond the response. */
@@ -135,12 +145,15 @@ export type NotesRun =
       readonly model: string;
       readonly usage: NarratorUsage;
       readonly rawContent: string;
+      /** §repair-turn: the repairs the notes reply needed. */
+      readonly repairs: readonly RepairRecord[];
     }
   | {
       readonly ok: false;
       readonly reason: FallbackReason;
       readonly error: string;
       readonly rawContent?: string;
+      readonly repairs: readonly RepairRecord[];
     };
 
 export interface NarratorRun {
@@ -153,6 +166,8 @@ export interface NarratorRun {
    * from the plan and its reasoning. `response.notesUpdate` holds the notes until this has run.
    */
   readonly notesTurn?: () => Promise<NotesRun>;
+  /** §repair-turn: the repairs this call's reply needed, for the call log. */
+  readonly repairs: readonly RepairRecord[];
 }
 
 let cachedBundle: ContentBundle | undefined;
@@ -542,51 +557,60 @@ interface NotesTurnInputs {
   readonly model: string;
   readonly prompt: NarratorPrompt;
   readonly planJsonSchema: Readonly<Record<string, unknown>>;
-  readonly planReply: string;
-  readonly reasoningDetails: ReasoningDetails;
+  /** The plan's turns after its user turn, ending with the accepted plan (§repair-turn). */
+  readonly planTurns: readonly ContinuationMessage[];
   readonly reasoningEffort: ReasoningEffort;
+  readonly maxRepairs: number;
+  readonly logContext: Readonly<Record<string, string>>;
   readonly request: string;
   readonly merge: (written: WrittenNotes) => NarratorNotes;
 }
 
+function parseWrittenNotes(content: string): WrittenNotes {
+  const parsed = buildNotesSchema().safeParse(parseJsonReply(content));
+  if (!parsed.success) throw schemaIssue("notes", parsed.error.issues);
+  return parsed.data;
+}
+
 /**
  * §notes-turn: the notes turn. The same system prefix as the plan (so it reads from the prompt
- * cache), the plan's user turn, the model's plan with its reasoning, then the request for notes.
+ * cache), the plan's user turn, the model's plan with its reasoning (and any §repair-turn before
+ * it), then the request for notes.
  */
 async function runNotesTurn(turn: NotesTurnInputs): Promise<NotesRun> {
-  let rawContent: string | undefined;
   try {
-    const result = await callModel(turn.transport, {
-      model: turn.model,
-      system: turn.prompt.system,
-      user: turn.prompt.user,
-      continuation: [
-        { role: "assistant", content: turn.planReply, reasoningDetails: turn.reasoningDetails },
-        { role: "user", content: turn.request },
-      ],
-      schemaName: "narrator_plan",
-      jsonSchema: turn.planJsonSchema,
-      maxTokens: NOTES_MAX_TOKENS,
-      reasoningEffort: turn.reasoningEffort,
-      timeoutMs: NOTES_TIMEOUT_MS,
-    });
-    rawContent = contentOf(result);
-    const parsed = buildNotesSchema().safeParse(parseJsonReply(rawContent));
-    if (!parsed.success) throw schemaIssue("notes", parsed.error.issues);
+    const reply = await callForValidReply(
+      turn.transport,
+      {
+        model: turn.model,
+        system: turn.prompt.system,
+        user: turn.prompt.user,
+        continuation: [...turn.planTurns, { role: "user", content: turn.request }],
+        schemaName: "narrator_plan",
+        jsonSchema: turn.planJsonSchema,
+        maxTokens: NOTES_MAX_TOKENS,
+        reasoningEffort: turn.reasoningEffort,
+        timeoutMs: NOTES_TIMEOUT_MS,
+      },
+      parseWrittenNotes,
+      { maxRepairs: turn.maxRepairs, logContext: { ...turn.logContext, turn: "notes" } },
+    );
     return {
       ok: true,
-      notes: turn.merge(parsed.data),
-      model: result.model,
-      usage: result.usage,
-      rawContent,
+      notes: turn.merge(reply.value),
+      model: reply.model,
+      usage: reply.usage,
+      rawContent: reply.content,
+      repairs: reply.repairs,
     };
   } catch (err) {
-    if (!(err instanceof FallbackError)) throw err;
+    if (!(err instanceof ReplyFailedError)) throw err;
     return {
       ok: false,
       reason: err.reason,
       error: err.message,
-      ...(rawContent === undefined ? {} : { rawContent }),
+      ...(err.rawContent === undefined ? {} : { rawContent: err.rawContent }),
+      repairs: err.repairs,
     };
   }
 }
@@ -633,6 +657,8 @@ export async function runNarratorWithTrace(
     ctx.timeoutMs ?? (req.hook.kind === "stageDock" ? STAGING_TIMEOUT_MS : NARRATOR_TIMEOUT_MS);
   const model = ctx.model ?? DEFAULT_NARRATOR_MODEL;
   const reasoningEffort = ctx.reasoningEffort ?? DEFAULT_NARRATOR_REASONING_EFFORT;
+  const maxRepairs = ctx.maxRepairs ?? DEFAULT_MAX_REPAIRS;
+  const logContext = { gameId: ctx.gameId, callId };
   if (req.hook.kind === "stageDock") {
     // §staging-call-on-the-server: the staging call has its own prompt, schema and translator, over
     // the same digest.
@@ -648,6 +674,8 @@ export async function runNarratorWithTrace(
       model,
       timeoutMs,
       reasoningEffort,
+      maxRepairs,
+      logContext,
     });
     return {
       response: staged.response,
@@ -659,15 +687,22 @@ export async function runNarratorWithTrace(
         ...(staged.plan === undefined ? {} : { plan: staged.plan }),
       },
       ...(staged.error === undefined ? {} : { error: staged.error }),
+      repairs: staged.repairs,
     };
   }
   const capabilities = buildCapabilities(snapshot.state, content, snapshot.config);
   const prompt = buildPrompt(capabilities, digest, req.hook.kind);
   const baseTrace: NarratorTrace = { digest: digest.text, capabilities, prompt };
-  const fallback = (reason: FallbackReason, error: string, trace = baseTrace): NarratorRun => ({
+  const fallback = (
+    reason: FallbackReason,
+    error: string,
+    trace = baseTrace,
+    repairs: readonly RepairRecord[] = [],
+  ): NarratorRun => ({
     response: nullNarratorResponse({ ...req, snapshot }, { callId, fallback: reason, content }),
     trace,
     error,
+    repairs,
   });
 
   if (ctx.transport === undefined) {
@@ -676,21 +711,25 @@ export async function runNarratorWithTrace(
   const transport = ctx.transport;
   const schema = buildNarratorPlanSchema();
   const jsonSchema = planJsonSchema(schema);
-  let rawContent: string | undefined;
   try {
-    const result = await callModel(transport, {
-      model,
-      system: prompt.system,
-      user: prompt.user,
-      continuation: [],
-      schemaName: "narrator_plan",
-      jsonSchema,
-      maxTokens: NARRATOR_MAX_TOKENS,
-      reasoningEffort,
-      timeoutMs,
-    });
-    rawContent = contentOf(result);
-    const { plan, corrections } = parsePlan(rawContent, schema);
+    const reply = await callForValidReply(
+      transport,
+      {
+        model,
+        system: prompt.system,
+        user: prompt.user,
+        continuation: [],
+        schemaName: "narrator_plan",
+        jsonSchema,
+        maxTokens: NARRATOR_MAX_TOKENS,
+        reasoningEffort,
+        timeoutMs,
+      },
+      (raw) => parsePlan(raw, schema),
+      { maxRepairs, logContext },
+    );
+    const rawContent = reply.content;
+    const { plan, corrections } = reply.value;
     const translatedIntents = translateIntents(plan, {
       snapshot,
       content,
@@ -708,16 +747,16 @@ export async function runNarratorWithTrace(
     };
     const merge = (written: WrittenNotes) =>
       notesFrom(written, notes, req.hook.tick, translated, content, snapshot.state);
-    const planReply = rawContent;
     const notesTurn = () =>
       runNotesTurn({
         transport,
         model,
         prompt,
         planJsonSchema: jsonSchema,
-        planReply,
-        reasoningDetails: result.reasoningDetails,
+        planTurns: reply.conversation,
         reasoningEffort,
+        maxRepairs,
+        logContext,
         request: notesRequest(translated, notes, req),
         merge,
       });
@@ -726,16 +765,22 @@ export async function runNarratorWithTrace(
       ...(translated.card === undefined ? {} : { card: translated.card }),
       notesUpdate: merge(writtenFrom(notes)),
       callId,
-      model: result.model,
+      model: reply.model,
       promptVersion: PROMPT_VERSION,
-      usage: result.usage,
+      usage: reply.usage,
       dropped: translated.dropped,
     };
-    return { response, trace: { ...baseTrace, rawContent, plan }, notesTurn };
+    return {
+      response,
+      trace: { ...baseTrace, rawContent, plan },
+      notesTurn,
+      repairs: reply.repairs,
+    };
   } catch (err) {
-    if (!(err instanceof FallbackError)) throw err;
-    const trace = rawContent === undefined ? baseTrace : { ...baseTrace, rawContent };
-    return fallback(err.reason, err.message, trace);
+    if (!(err instanceof ReplyFailedError)) throw err;
+    const raw = err.rawContent;
+    const trace = raw === undefined ? baseTrace : { ...baseTrace, rawContent: raw };
+    return fallback(err.reason, err.message, trace, err.repairs);
   }
 }
 

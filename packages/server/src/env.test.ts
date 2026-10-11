@@ -1,4 +1,5 @@
 import {
+  DEFAULT_MAX_REPAIRS,
   DEFAULT_NARRATOR_MODEL,
   DEFAULT_NARRATOR_REASONING_EFFORT,
   STAGING_TIMEOUT_MS,
@@ -66,6 +67,17 @@ describe("loadEnv staging timeout (§narrator-timeouts)", () => {
     expect(STAGING_TIMEOUT_MS).toBe(10_000);
     expect(loadEnv({ CREW_STAGING_TIMEOUT_MS: "8000" }).stagingTimeoutMs).toBe(8000);
     expect(() => loadEnv({ CREW_STAGING_TIMEOUT_MS: "soon" })).toThrow(/CREW_STAGING_TIMEOUT_MS/);
+  });
+});
+
+describe("loadEnv narrator repairs (§repair-turn)", () => {
+  it("defaults to the narrator's two repairs and reads CREW_NARRATOR_REPAIRS, zero included", () => {
+    expect(loadEnv({}).narratorRepairs).toBe(DEFAULT_MAX_REPAIRS);
+    expect(DEFAULT_MAX_REPAIRS).toBe(2);
+    expect(loadEnv({ CREW_NARRATOR_REPAIRS: "0" }).narratorRepairs).toBe(0);
+    expect(loadEnv({ CREW_NARRATOR_REPAIRS: "3" }).narratorRepairs).toBe(3);
+    expect(() => loadEnv({ CREW_NARRATOR_REPAIRS: "-1" })).toThrow(/CREW_NARRATOR_REPAIRS/);
+    expect(() => loadEnv({ CREW_NARRATOR_REPAIRS: "1.5" })).toThrow(/CREW_NARRATOR_REPAIRS/);
   });
 });
 

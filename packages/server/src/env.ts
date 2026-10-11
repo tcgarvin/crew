@@ -3,6 +3,7 @@
  * needs is derived here so nothing else touches `process.env` directly.
  */
 import {
+  DEFAULT_MAX_REPAIRS,
   DEFAULT_NARRATOR_MODEL,
   DEFAULT_NARRATOR_REASONING_EFFORT,
   REASONING_EFFORTS,
@@ -16,6 +17,17 @@ function readInt(source: NodeJS.ProcessEnv, name: string, fallback: number): num
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n <= 0) {
     throw new Error(`Invalid ${name}: expected a positive integer, got ${JSON.stringify(raw)}`);
+  }
+  return n;
+}
+
+/** A count from `name` (zero allowed); unset or empty = `fallback`. */
+function readCount(source: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = source[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`Invalid ${name}: expected a whole number, got ${JSON.stringify(raw)}`);
   }
   return n;
 }
@@ -93,6 +105,11 @@ export interface Env {
    */
   readonly stagingTimeoutMs: number;
   /**
+   * §repair-turn: `CREW_NARRATOR_REPAIRS`, how many times one model call hands an invalid reply
+   * back to the model before it fails `schemaInvalid`; unset = `DEFAULT_MAX_REPAIRS` (2), 0 = never.
+   */
+  readonly narratorRepairs: number;
+  /**
    * `CREW_NARRATOR_FALLBACK` (D43): `"error"` or `"null"`; unset = `"error"` when
    * `NODE_ENV=production`, `"null"` otherwise (local dev without a key and the test suite).
    */
@@ -141,6 +158,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       narratorReasoningEffort,
     ),
     stagingTimeoutMs: readInt(source, "CREW_STAGING_TIMEOUT_MS", STAGING_TIMEOUT_MS),
+    narratorRepairs: readCount(source, "CREW_NARRATOR_REPAIRS", DEFAULT_MAX_REPAIRS),
     narratorFallback: readNarratorFallback(source, nodeEnv),
     maxSaveBytes: readInt(source, "CREW_SAVE_MAX_BYTES", 4 * 1024 * 1024),
     nodeEnv,

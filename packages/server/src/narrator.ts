@@ -11,6 +11,7 @@ import {
   type NarratorResponse,
   type NotesRun,
   type ReasoningEffort,
+  type RepairRecord,
   defaultContent,
   nullNarratorResponse,
   openRouterTransport,
@@ -36,6 +37,8 @@ export interface NarratorCtx {
    * `stageDock`).
    */
   readonly reasoningEffort: ReasoningEffort;
+  /** §repair-turn: `CREW_NARRATOR_REPAIRS`; absent = the narrator's default. */
+  readonly maxRepairs?: number;
 }
 
 /**
@@ -48,6 +51,8 @@ export interface NarratorOutcome {
   readonly error?: string;
   /** §notes-turn: the model's notes turn, which the route runs after the response. */
   readonly notesTurn?: () => Promise<NotesRun>;
+  /** §repair-turn: the repairs the reply needed (absent = none), for the call log. */
+  readonly repairs?: readonly RepairRecord[];
 }
 
 /** D43: why a narrator call could not be answered by the model, as the route reports it. */
@@ -103,10 +108,12 @@ export const defaultNarrator: RunNarrator = async (req, ctx) => {
     ...(ctx.model === undefined ? {} : { model: ctx.model }),
     ...(ctx.timeoutMs === undefined ? {} : { timeoutMs: ctx.timeoutMs }),
     reasoningEffort: ctx.reasoningEffort,
+    ...(ctx.maxRepairs === undefined ? {} : { maxRepairs: ctx.maxRepairs }),
   });
   return {
     response: run.response,
     ...(run.error === undefined ? {} : { error: run.error }),
     ...(run.notesTurn === undefined ? {} : { notesTurn: run.notesTurn }),
+    ...(run.repairs.length === 0 ? {} : { repairs: run.repairs }),
   };
 };

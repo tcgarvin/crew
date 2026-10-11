@@ -12,7 +12,7 @@ import { openRouterTransport, schemaInstruction, systemContentParts } from "./op
 import { planJsonSchema } from "./plan";
 import { STATIC_RULES } from "./prompts/index";
 import { runNarrator } from "./run";
-import { content, emptyPlan } from "./test-support";
+import { FIXTURE_CALL_BACK, content, emptyPlan } from "./test-support";
 
 interface SentBody {
   readonly messages: readonly [
@@ -21,14 +21,19 @@ interface SentBody {
   ];
 }
 
-/** An OpenRouter stand-in that records request bodies and answers with an empty plan. */
+/**
+ * An OpenRouter stand-in that records request bodies and answers with an empty plan, valid as is
+ * (§repair-turn: an invalid one would be asked again, adding a body).
+ */
 function recordingFetch() {
   const bodies: SentBody[] = [];
+  const { notes: _notes, ...plan } = emptyPlan();
+  const planReply = JSON.stringify({ ...plan, callBack: FIXTURE_CALL_BACK });
   const fake = async (_url: unknown, init?: { body?: unknown }) => {
     bodies.push(JSON.parse(String(init?.body)) as SentBody);
     const reply = {
       model: "openai/gpt-6-luna",
-      choices: [{ message: { content: JSON.stringify(emptyPlan()) }, finish_reason: "stop" }],
+      choices: [{ message: { content: planReply }, finish_reason: "stop" }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     };
     return new Response(JSON.stringify(reply), { status: 200 });

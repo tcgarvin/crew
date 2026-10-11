@@ -107,7 +107,7 @@ async function liveRun(
   );
   if (!notes.ok) return run;
   console.log(
-    `${req.hook.kind}: plan ${planMs} ms (${run.response.usage?.outputTokens} out), notes ${notesMs} ms (${notes.usage.outputTokens} out, ${notes.usage.cacheReadInputTokens}/${notes.usage.inputTokens} cached); summary: ${notes.notes.summary}`,
+    `${req.hook.kind}: plan ${planMs} ms (${run.response.usage?.outputTokens} out), notes ${notesMs} ms (${notes.usage.outputTokens} out, ${notes.usage.cacheReadInputTokens}/${notes.usage.inputTokens} cached); repairs (§repair-turn) plan ${run.repairs.length}, notes ${notes.repairs.length}; summary: ${notes.notes.summary}`,
   );
   return { ...run, response: { ...run.response, notesUpdate: notes.notes } };
 }

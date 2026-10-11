@@ -9,7 +9,13 @@
 import type { ContentBundle, DeepReadonly } from "@crew/sim";
 import type { FallbackReason, NarratorRequest, NarratorResponse } from "../contract";
 import type { NarratorDigest } from "../digest";
-import { FallbackError, callModel, contentOf, parseJsonReply, schemaIssue } from "../model-call";
+import {
+  type RepairRecord,
+  ReplyFailedError,
+  callForValidReply,
+  parseJsonReply,
+  schemaIssue,
+} from "../model-call";
 import type { NarratorNotes } from "../notes";
 import { nullNarratorResponse } from "../null";
 import { planJsonSchema } from "../plan";
@@ -35,6 +41,9 @@ export interface StagingInputs {
   readonly model: string;
   readonly timeoutMs: number;
   readonly reasoningEffort: ReasoningEffort;
+  /** §repair-turn: how many times an invalid staging reply is handed back. */
+  readonly maxRepairs: number;
+  readonly logContext: Readonly<Record<string, string>>;
 }
 
 export interface StagingRun {
@@ -44,6 +53,8 @@ export interface StagingRun {
   readonly rawContent?: string;
   readonly plan?: StagingEnvelope;
   readonly error?: string;
+  /** §repair-turn: the repairs the staging reply needed. */
+  readonly repairs: readonly RepairRecord[];
 }
 
 function parseStaging(content: string): StagingEnvelope {
@@ -56,31 +67,40 @@ export async function runStaging(inputs: StagingInputs): Promise<StagingRun> {
   const { req, snapshot, content, callId } = inputs;
   const catalogue = buildStagingCatalogue(content);
   const prompt = buildStagingPrompt(catalogue, inputs.digest);
-  const fallback = (reason: FallbackReason, error: string, rawContent?: string): StagingRun => ({
+  const fallback = (
+    reason: FallbackReason,
+    error: string,
+    rawContent?: string,
+    repairs: readonly RepairRecord[] = [],
+  ): StagingRun => ({
     response: nullNarratorResponse({ ...req, snapshot }, { callId, fallback: reason, content }),
     catalogue,
     prompt,
     ...(rawContent === undefined ? {} : { rawContent }),
     error,
+    repairs,
   });
   if (inputs.transport === undefined) {
     return fallback("notConfigured", "no model transport configured");
   }
-  let rawContent: string | undefined;
   try {
-    const result = await callModel(inputs.transport, {
-      model: inputs.model,
-      system: prompt.system,
-      user: prompt.user,
-      continuation: [],
-      schemaName: "staging_plan",
-      jsonSchema: planJsonSchema(buildStagingPlanSchema()),
-      maxTokens: STAGING_MAX_TOKENS,
-      reasoningEffort: inputs.reasoningEffort,
-      timeoutMs: inputs.timeoutMs,
-    });
-    rawContent = contentOf(result);
-    const plan = parseStaging(rawContent);
+    const reply = await callForValidReply(
+      inputs.transport,
+      {
+        model: inputs.model,
+        system: prompt.system,
+        user: prompt.user,
+        continuation: [],
+        schemaName: "staging_plan",
+        jsonSchema: planJsonSchema(buildStagingPlanSchema()),
+        maxTokens: STAGING_MAX_TOKENS,
+        reasoningEffort: inputs.reasoningEffort,
+        timeoutMs: inputs.timeoutMs,
+      },
+      parseStaging,
+      { maxRepairs: inputs.maxRepairs, logContext: inputs.logContext },
+    );
+    const plan = reply.value;
     const translated = translateStaging(plan, {
       snapshot,
       content,
@@ -91,14 +111,14 @@ export async function runStaging(inputs: StagingInputs): Promise<StagingRun> {
     const response: NarratorResponse = {
       commands: translated.commands,
       callId,
-      model: result.model,
+      model: reply.model,
       promptVersion: PROMPT_VERSION,
-      usage: result.usage,
+      usage: reply.usage,
       dropped: translated.dropped,
     };
-    return { response, catalogue, prompt, rawContent, plan };
+    return { response, catalogue, prompt, rawContent: reply.content, plan, repairs: reply.repairs };
   } catch (err) {
-    if (!(err instanceof FallbackError)) throw err;
-    return fallback(err.reason, err.message, rawContent);
+    if (!(err instanceof ReplyFailedError)) throw err;
+    return fallback(err.reason, err.message, err.rawContent, err.repairs);
   }
 }

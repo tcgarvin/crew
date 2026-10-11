@@ -185,8 +185,9 @@ model's `reasoning_details` are sent back on the assistant turn of the notes tur
 
 The plan's JSON schema is the last system block (`schemaInstruction`, game-independent so it stays
 in the cached prefix); the transport sends no `response_format`. `runNarrator`'s zod validation of
-every reply is the only check, and a reply that fails it falls back `schemaInvalid` (a fence
-around the JSON is tolerated). Per-game ids (ports, items, machines, faults, stores) are plain
+every reply is the only check; a reply that fails it is handed back to the model to fix
+(§repair-turn), and falls back `schemaInvalid` only when that fails too (a fence around the JSON
+is tolerated). Per-game ids (ports, items, machines, faults, stores) are plain
 strings validated by the translator, with drop reasons fed back to the model; the capabilities
 block lists the valid ids. Why (D53): strict structured output compiles the schema into a grammar
 with a provider-side size cap the plan outgrew three times, and OpenRouter sends a `json_schema`
@@ -206,10 +207,10 @@ hidden reasoning.
 ### Narrator timeouts
 
 `NARRATOR_TIMEOUT_MS` 25 s for a story call (Vercel's function budget is about 30 s), no retry
-inside the call; `STAGING_TIMEOUT_MS` 10 s for a staging call (`CREW_STAGING_TIMEOUT_MS`
-overrides, and the route passes it only for staging); `NOTES_TIMEOUT_MS` 45 s for the notes turn.
-The browser gives up on a request at 30 s. Why: a staging attempt that ran long held the ship at
-the end of transit on every retry.
+inside the call (a §repair-turn is not a retry: it spends the same budget);
+`STAGING_TIMEOUT_MS` 10 s for a staging call (`CREW_STAGING_TIMEOUT_MS` overrides, and the route
+passes it only for staging); `NOTES_TIMEOUT_MS` 45 s for the notes turn. The browser gives up on a request at 30 s.
+Why: a staging attempt that ran long held the ship at the end of transit on every retry.
 
 ## Failure and retries
 
@@ -218,10 +219,38 @@ the end of transit on every retry.
 `CREW_NARRATOR_FALLBACK` is `error` in production and `null` elsewhere (D43). In `error` mode a
 model failure is never a template card: the route answers 503 `narratorUnavailable`
 (`notConfigured`, not retryable) or 502 (any other `FallbackReason`: `apiError`, `timeout`,
-`refusal`, `truncated`, `schemaInvalid`; retryable), and logs the call as an error with the
-reason. The null narrator is for tests and explicit offline use: it answers `policyDecision` with
-a template card, `captainAshore` with one templated job offer (the narrator is the only source of
-work), and `stageDock` with an empty plan.
+`refusal`, `truncated`, `schemaInvalid`; retryable), and logs the call as an error with the reason.
+A malformed reply is first repaired inside the call (§repair-turn); `schemaInvalid` means the
+repairs failed or there was no time for one. The null narrator is for tests and explicit offline
+use: it answers `policyDecision` with a template card, `captainAshore` with one templated job offer
+(the narrator is the only source of work), and `stageDock` with an empty plan.
+
+### Repair turn
+
+A model reply that is empty, not JSON, or fails its schema (`schemaInvalid`) is not a failure
+yet: the call goes back to the model in the same conversation, the same cached system prefix and
+first user turn, then the model's reply as the assistant turn (with its `reasoning_details`; an
+empty reply is left out) and a user turn that opens `# Your reply could not be used` and lists
+what was wrong: "Your reply was empty.", "Your reply was not valid JSON (<parser message>).", or
+each zod issue as `at <path>: <message>` (at most 20, then a count). An intent matching no branch
+of the intent union is spelled out: the missing or wrong fields of the kind it named, or the kinds
+allowed when it named none. The turn asks for the complete corrected JSON object only. This
+applies to the story plan, the notes turn (§notes-turn) and the staging call; the notes turn
+continues the plan's whole conversation, repairs included.
+
+A call makes at most `CREW_NARRATOR_REPAIRS` repairs (`DEFAULT_MAX_REPAIRS` 2; 0 turns them off),
+all inside the call's own timeout (§narrator-timeouts): each attempt gets only what is left, and a
+repair is asked only when the time left is at least `MIN_REPAIR_MS` (4 s) and at least as long as
+the failed attempt took, since the fix is the whole reply again. Out of repairs or time, the call
+fails `schemaInvalid` as before and the retry schedules below apply. A repair that itself times out
+or is refused fails with that reason. No other failure is repaired, `truncated` included. Each
+repair logs `[narrator] repair` (game, call, schema, attempt, time left, issues), and the call's
+repairs (`{ attempt, problems }`) ride in its `narrator_calls.response` jsonb as `repairs` (on an
+error row, the response is `{ repairs }`); usage sums every attempt. A translator drop is not
+`schemaInvalid` and is never repaired; it is fed back on the next call
+(§translation-and-drop-reasons). Why: a malformed reply used to cost the browser a whole new call
+from scratch. Owner: "I don't think the call should fall back if it's a malformed result. I think we
+should call the model back with what was wrong, and let the model respond with a fixed version."
 
 ### Story retry schedule
 
@@ -231,7 +260,8 @@ hook stays unacknowledged, so the sim stays halted, while it retries after 2, 4,
 (`notConfigured`, a rejected request), or the schedule running out, pauses the game on an error
 panel with the reason and a Retry button, which starts the sequence over from attempt 1. A 429
 that is not `spacing` is a retryable failure. Only `spacing` acknowledges a hook with no answer.
-Owner: "retry/delay or in the worst case pause the game with an error message."
+Owner: "retry/delay or in the worst case pause the game with an error message." A
+`schemaInvalid` failure reaches this schedule only after the server's repairs (§repair-turn).
 
 ### Staging retries and the floor set
 

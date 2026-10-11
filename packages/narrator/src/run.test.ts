@@ -434,10 +434,12 @@ describe("runNarrator", () => {
   it("gives the staging call its own, shorter default timeout (§narrator-timeouts)", async () => {
     const timeouts = vi.spyOn(AbortSignal, "timeout");
     const transport = fakeTransport(okResult(JSON.stringify({ rationale: "bare", intents: [] })));
+    // The first attempt gets the whole budget; a §repair-turn after it gets what is left.
     await runBothTurns(stageDockRequest(content()), ctx(transport));
-    expect(timeouts).toHaveBeenLastCalledWith(STAGING_TIMEOUT_MS);
+    expect(timeouts.mock.calls[0]).toEqual([STAGING_TIMEOUT_MS]);
+    timeouts.mockClear();
     await runBothTurns(quietTooLongRequest(content()), ctx(transport));
-    expect(timeouts).toHaveBeenLastCalledWith(NARRATOR_TIMEOUT_MS);
+    expect(timeouts.mock.calls[0]).toEqual([NARRATOR_TIMEOUT_MS]);
     expect(STAGING_TIMEOUT_MS).toBeLessThan(NARRATOR_TIMEOUT_MS);
     timeouts.mockRestore();
   });
