@@ -67,6 +67,13 @@ const POSTURE_WORDS: Readonly<Record<Posture, string>> = {
   creep: "keep out of sight and take them quietly",
 };
 
+/** An item errand's plans go for a thing, not a person (§the-plan-menu). */
+const ITEM_POSTURE_WORDS: Readonly<Record<Posture, string>> = {
+  ...POSTURE_WORDS,
+  assault: "go in and take it",
+  creep: "keep out of sight and take it quietly",
+};
+
 const FIRE_WORDS: Readonly<Record<FireRule, string>> = {
   lethal: "",
   stun: ", stun only",
@@ -186,7 +193,9 @@ export function planMenu(
           id: plan.id,
           plan,
           available: why === undefined,
-          why: why ?? `${POSTURE_WORDS[posture]}${FIRE_WORDS[fire]} (${people.length} go)`,
+          why:
+            why ??
+            `${(objective === "takeItem" ? ITEM_POSTURE_WORDS : POSTURE_WORDS)[posture]}${FIRE_WORDS[fire]} (${people.length} go)`,
         });
       }
     }

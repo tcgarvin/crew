@@ -175,6 +175,8 @@ describe("a fetchItem errand's plans (D105)", () => {
       "assault-lethal-armed",
     ]);
     expect(new Set(menu.map((o) => o.plan.objective))).toEqual(new Set(["takeItem"]));
+    // An item's plans say "it", never "them".
+    for (const option of menu.filter((o) => o.available)) expect(option.why).not.toMatch(/them/);
     expect(arrival(test).prompt.params).toMatchObject({
       kind: "fetchItem",
       leftPlan: "creep-holdFire-armed",

@@ -331,13 +331,17 @@ adopted, `seen` when the other is. With nothing marked it is absent and contact 
 ordinary rules (§contact-and-the-alert).
 
 - **`unseen`**: the cast never notice the party. No guard or ally's sight, no loud landing and no
-  creeper beside the objective bring contact; only the party's own first shot does, so a fight
-  that fires none has no contact, no alert and no `alertCleared`. During the approach the objective
-  is held without its guard rule (§the-objective-and-resolution): nobody armed within four tiles
-  stops the party taking it. Why: a creeper beside the box who showed themselves would undo the
-  sneak-in the owner asked for (D105).
+  creeper beside the objective bring contact; only the party's own first shot does (even one fired
+  before the leader is ashore), so a fight that fires none has no contact, no alert and no
+  `alertCleared`. During the approach the objective is held without its guard rule
+  (§the-objective-and-resolution): nobody armed within four tiles stops the party taking it, and
+  the cast take no target-taken shock from it. A plan that fires, such as an `assault` marked for a
+  person, gets the drop: its first shot is contact. Why: a creeper beside the box who showed
+  themselves would undo the sneak-in the owner asked for (D105).
 - **`seen`**: they were waiting. Contact comes the first tick any party member stands on the site
-  floor.
+  floor, even while the rest are still at the muster: the fight runs from then, the rest arm and
+  walk out into it, and there is no walk-out (`partyMustered`, so no "down the ramp" line) and no
+  approach. A party called back then leaves those not yet armed aboard.
 
 `expeditionResolved` carries `notice`, and the end's ticker line adds "; nobody saw us" under
 `unseen` when no shot was fired, or "; they were waiting for us" under `seen`: "General Cargo
