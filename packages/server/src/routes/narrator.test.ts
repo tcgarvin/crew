@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { EMPTY_PLAN } from "@crew/narrator";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "../env";
 import type { NarratorCtx, RunNarrator } from "../narrator";
@@ -396,6 +397,7 @@ describe("narrator", () => {
           lastSeenTick: 1800,
         },
       ],
+      plan: EMPTY_PLAN,
       lastUpdatedTick: 0,
       lastRejections: ["offerJob: no route"],
     };

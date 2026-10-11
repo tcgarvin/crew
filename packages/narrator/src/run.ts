@@ -55,6 +55,7 @@ import { planJsonSchema, schemaInstruction } from "./plan";
 import { type NarratorPrompt, PROMPT_VERSION, buildPrompt } from "./prompts/index";
 import type { StagingEnvelope } from "./staging/plan";
 import { runStaging } from "./staging/run";
+import { mergePlan, stampFiredBeats } from "./story-plan";
 import { translateIntents } from "./translate";
 import type { ModelTransport, ReasoningDetails, ReasoningEffort } from "./transport";
 
@@ -364,11 +365,21 @@ function notesFrom(
     written.retired,
   );
   const arcs = appendPastArcs(previous.pastArcs, merged.ended, written.endedArcs, tick);
+  const plan = mergePlan({
+    written: written.plan,
+    previous: previous.plan,
+    tick,
+    attributions: translated.beats,
+    closedThread: translated.closedThread,
+    offerMade: commands.some((c) => c.kind === "offerJob"),
+  });
   return boundNotes({
     summary: written.summary,
     threads: merged.threads,
     cardsShown,
-    pastArcs: arcs.pastArcs,
+    // §seasons-and-stalls: a season or an arc the plan ended is a past arc too.
+    pastArcs: [...arcs.pastArcs, ...plan.ended],
+    plan: plan.plan,
     cast: placeEndedPassengers(
       mergeCast(castWritten(written, content), previous.cast, issuersMet(commands, content), tick),
       state,
@@ -380,6 +391,7 @@ function notesFrom(
       ...dropped.map((d) => d.reason),
       ...translated.notes,
       ...threadCorrections(merged),
+      ...plan.corrections,
       ...arcs.missing.map(
         (title) =>
           `no arc summary written for ended thread "${title}": its arc notes were kept as its summary under "Past arcs"`,
@@ -405,6 +417,11 @@ function threadCorrections(merged: MergedThreads): string[] {
   ];
 }
 
+/** §the-plan: a tier written so that it is kept as it stands. */
+function keepTier(): WrittenNotes["plan"]["season"] {
+  return { premise: "", beats: [], until: "", tempo: "steady", revised: "" };
+}
+
 /**
  * §notes-turn: the stored notes as the model would write them, so the notes stored with the plan
  * (before the notes turn) carry this call's server-kept changes over the model's previous notes.
@@ -423,11 +440,70 @@ function writtenFrom(notes: NarratorNotes): WrittenNotes {
     // The plan-time merge keeps nothing: it only carries this call's changes over.
     retired: [],
     endedArcs: [],
+    // §the-plan: every tier kept (an empty premise keeps it); attributions still land.
+    plan: { season: keepTier(), arc: keepTier(), episode: keepTier(), ended: [], landed: [] },
   };
 }
 
+/**
+ * §notable-event-hook: the events that end a job's episode (its closing card is due), as
+ * `notesRequest` reads the hook.
+ */
+const EPISODE_CLOSING_EVENTS: ReadonlySet<string> = new Set([
+  "contractCompleted",
+  "passageEnded",
+  "jobFailed",
+]);
+
+/**
+ * §notes-turn, §seasons-and-stalls: what the notes turn is asked of the plan this call. The server
+ * names the moment (no season or arc stands, an episode opens, an episode is ending) and never what
+ * to plan (D46).
+ */
+function planRequest(
+  translated: TranslationResult,
+  stored: NarratorNotes,
+  req: NarratorRequest,
+): string[] {
+  const { plan } = stored;
+  const lines: string[] = [];
+  if (plan.season.premise === "") {
+    lines.push(
+      'No season stands: sketch one in plan.season (its premise is the question it asks, three to five movements, until, tempo), and an arc in plan.arc to start it. "Past arcs" is what you have told so far.',
+    );
+  } else if (plan.arc.premise === "") {
+    lines.push("No arc stands: sketch the season's next arc in plan.arc.");
+  }
+  const hook = req.hook;
+  const offered = translated.commands.some((c) => c.kind === "offerJob");
+  if (hook.kind === "captainAshore" && plan.episode.premise === "") {
+    lines.push(
+      offered
+        ? "No episode is live and the captain is looking for work: sketch the episode in plan.episode. The offer you just made is its setup beat; know its turn before the captain takes it."
+        : "No episode is live and the captain is looking for work: sketch the episode your next offer opens in plan.episode, or leave it empty until you make one.",
+    );
+  }
+  const closingEvent =
+    hook.kind === "notableEvent" &&
+    req.recentEvents.some(
+      (e) => hook.context.eventIds.includes(e.id) && EPISODE_CLOSING_EVENTS.has(e.type),
+    );
+  const closed = translated.closedThread;
+  if (closingEvent || closed !== undefined) {
+    const why = closed === undefined ? "the job is over" : `your closing card ended "${closed}"`;
+    lines.push(
+      `This episode is ending (${why}). Did the arc move? Name in plan.landed the arc beat this episode landed, if any; revise the arc if its next episode changed (and the season only if the arc's premise broke); once the episode's closing card is up, put "episode" in plan.ended.`,
+    );
+  }
+  return lines;
+}
+
 /** §notes-turn: the notes turn's user message: what became of the plan, then the notes schema. */
-function notesRequest(translated: TranslationResult, stored: NarratorNotes): string {
+function notesRequest(
+  translated: TranslationResult,
+  stored: NarratorNotes,
+  req: NarratorRequest,
+): string {
   const outcome =
     translated.dropped.length === 0
       ? ["Every intent in your plan was carried out."]
@@ -454,6 +530,7 @@ function notesRequest(translated: TranslationResult, stored: NarratorNotes): str
     ...translated.notes,
     ...newThread,
     ...closedArc,
+    ...planRequest(translated, stored, req),
     "",
     'Write your notes now (see "Your notes").',
     schemaInstruction(planJsonSchema(buildNotesSchema())),
@@ -540,11 +617,16 @@ export async function runNarratorWithTrace(
   const callId = ctx.callId ?? globalThis.crypto.randomUUID();
   const snapshot = currentSnapshot(req.snapshot, content);
   const stored = parseNotes(ctx.notes);
+  // §beat-attribution: stamp the beats whose levers fired since the last call; one that never
+  // fired is said back to the model with last call's drop reasons.
+  const stamped = stampFiredBeats(stored.plan, req.recentEvents, snapshot.state);
   // §card-history: fold the kernel's decision events in before the digest, so the model sees what
   // was chosen.
   const notes: NarratorNotes = {
     ...stored,
     cardsShown: applyDecisionEvents(stored.cardsShown, req.recentEvents, snapshot.state, content),
+    plan: stamped.plan,
+    lastRejections: [...stored.lastRejections, ...stamped.corrections],
   };
   const digest = buildDigest(snapshot, req.recentEvents, notes, content, req.hook);
   const timeoutMs =
@@ -636,7 +718,7 @@ export async function runNarratorWithTrace(
         planReply,
         reasoningDetails: result.reasoningDetails,
         reasoningEffort,
-        request: notesRequest(translated, notes),
+        request: notesRequest(translated, notes, req),
         merge,
       });
     const response: NarratorResponse = {

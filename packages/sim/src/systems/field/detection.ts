@@ -52,7 +52,8 @@ export function checkForField(ctx: StepCtx, field: ActiveField): void {
   ctx.emit({
     type: "fieldSighted",
     subjectIds: [field.id, standerId],
-    causeIds: [],
+    // §beat-attribution: the narrator's beat lands when its field is seen or hits.
+    causeIds: field.causeCommandId === undefined ? [] : [field.causeCommandId],
     source: "sim",
     payload: { fieldId: field.id, standerId, severity: field.severity },
   });
@@ -68,7 +69,7 @@ export function noticeFirstImpact(ctx: StepCtx, field: ActiveField): void {
   ctx.emit({
     type: "fieldEntered",
     subjectIds: [field.id],
-    causeIds: [],
+    causeIds: field.causeCommandId === undefined ? [] : [field.causeCommandId],
     source: "sim",
     ...(noticedBefore ? { significance: "notable" as const } : {}),
     payload: { fieldId: field.id, noticedBefore },

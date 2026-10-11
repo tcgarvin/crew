@@ -84,6 +84,7 @@ describe("POST /api/games/:id/narrator, scheduleHazard (§debris-fields-and-ion-
       planWith([
         {
           kind: "scheduleHazard",
+          beat: "",
           hazard: "debrisField",
           difficulty: "hard",
           window: "soon",
@@ -110,6 +111,7 @@ describe("POST /api/games/:id/narrator, scheduleHazard (§debris-fields-and-ion-
   it("reports a hazard the translator drops, with its reason (one hazard waits at a time)", async () => {
     const hazard = {
       kind: "scheduleHazard",
+      beat: "",
       hazard: "ionStorm",
       difficulty: "brutal",
       window: "soon",

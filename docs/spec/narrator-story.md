@@ -314,8 +314,9 @@ The captain's voice line, shown to the narrator only, shapes how others react to
 
 The notes (`NarratorNotes`, stored per game) are rewritten in full by the model on a follow-up
 turn after each plan, with the server carrying its own bookkeeping over: `summary`, `threads`,
-`cast` (up to 12, the longest-unseen dropped first), `pastArcs`, `cardsShown`, `lastRejections`.
-`parseNotes` is the boundary where stored notes are validated. Everyone who makes an offer is
+`cast` (up to 12, the longest-unseen dropped first), `pastArcs`, `cardsShown`, `plan`
+(§the-plan), `lastRejections`. `parseNotes` is the boundary where stored notes are validated;
+notes stored before the plan load with an explicit empty plan (every tier an empty sketch). Everyone who makes an offer is
 added to the cast by the server if the model forgot them.
 
 ### Threads and scales
@@ -373,11 +374,106 @@ between a delivery and its closing call swapped the job's thread for the next of
 
 When a thread ends, by closing card or `retired`, the notes turn writes an `endedArcs` entry
 (`shape`, a few words; `summary`, at most 500 characters) and the server appends a `PastArc`
-(title, scale, people, opened and closed ticks, how it ended). An arc the model wrote nothing for
+(title, scale, people, opened and closed ticks, how it ended). A season or an arc of the plan that
+ends is appended too (§seasons-and-stalls). An arc the model wrote nothing for
 keeps its arc notes as its summary, and the next call is told. The digest's "Past arcs" lists all
 of them, oldest first, up to 40, outside the digest's character budget. Why: the narrator cannot
 see a pattern (six cargo runs, no trouble) from a card history of twelve and a summary of the
 present, and the owner chose the tokens (about 100 per arc) over a narrator that forgets.
+
+### The plan
+
+The narrator's intent, kept in its notes beside the threads, which are its memory
+(`StoryPlan`, `notes.ts`; merged by `story-plan.ts`). Three tiers of one shape, `ArcSketch`:
+`season` (the question a stretch of play asks; three to five movements), `arc` (several episodes
+toward one turn; an episode a beat) and `episode` (one story; a card, an offer, a pressure or an
+outcome lever a beat). A sketch is a `premise` (at most 300 characters; empty means no sketch),
+its `beats` in order (at most six), `until` (when it is done; empty for the episode, which ends on
+its closing card), `tempo` and `revised` (why it last changed). A `PlannedBeat` is a `name` (its
+identity, matched case-insensitively), `what` (at most 160), `tension` (`setup`, `breath`,
+`rising`, `turn`, `peak`, `release`), `thread` (empty or the exact title of the open thread it
+advances) and `decided` (the narrator means to make it so with a lever, D106).
+
+- The notes turn writes it (§notes-turn), with no planning call of its own (owner: "Plan at the
+  usual time"). The model writes names, words, tension, thread, decided, premise, until, tempo and
+  revised; the server keeps `status` (`planned`, `landed`, `skipped`, `changed`), `landedTick`,
+  the levers in motion, `revisions`, the replaced premise and the opening tick.
+- `mergePlan`, in order: beats set aside last call are let go; this call's attributions land
+  (§beat-attribution); arc and season beats the model names in `landed` land at the hook tick
+  (an episode beat named there is a correction); each tier is then ended (§seasons-and-stalls),
+  kept whole when its written premise is empty, or rewritten. In a rewrite, beats carry their
+  record by name; a landed or in-motion beat the model left out is kept and reported; a planned
+  beat it left out is set aside, `changed` when `revised` is new this call and `skipped` otherwise,
+  and shown for one call; a new premise adds one to `revisions` and the old one is shown for one
+  call as "was". A closing card (§closing-cards) sets aside as `changed` the still-planned beats of
+  every tier whose `thread` is the one it closed.
+- Tempo says how thick the breaths are between forward beats: `slowBurn`, `steady`, `headlong`;
+  the episode's wins over the arc's over the season's. Advice, never a timer (D46).
+
+Why: the threads record what happened and nothing recorded what the narrator meant to happen
+(narrator arcs §6). Rejected: folding the plan into threads (a movement spans many threads; a beat
+may be a pressure with no thread) and a server state machine that advances beats (D46).
+
+### Beat attribution
+
+Every story intent carries `beat`: empty, or the exact name of an episode beat under "Your plan".
+The translator records each intent that named one with the command it became
+(`TranslationResult.beats`); the name is checked by the notes merge, which knows the episode the
+notes turn writes this call, so a name for a beat the notes turn adds now still matches. A name
+matching no episode beat is a correction for "rejected last time", never a drop.
+
+- A card or an offer (`surfaceDecision`, `offerJob`, and the dock levers `spawnAtBoundary` and
+  `stockMarket`) lands its beat at the hook tick.
+- A pressure or an outcome lever puts its beat in motion with the translator-minted command id
+  (`cmd:narrator:<callId>:<n>`). Before the next call's digest, `stampFiredBeats` reads the
+  request's recent events: an event whose causes hold the id and that means it fired
+  (`faultOccurred`, `navHazard`, `fieldSighted`, `fieldEntered`, `struck`, `transacted`,
+  `memoryPlanted`, `argument`, `thoughtGiven`, `faultObserved`) lands the beat at that event's
+  tick; `commandRejected`, `navHazardMissed` or `fieldMissed` means it never will. Recent events
+  are capped and leave out trace events (a fault that breaks unnoticed is one), so the state is read
+  next: a fault the machine carries with that cause lands at its `sinceTick`, a scheduled fault, a
+  hazard or a field not yet noticed is still waiting, a noticed field lands at `noticedAtTick`, and
+  a lever that applies at once (strike, transact, the memory and thought levers, reveal,
+  injectFault) whose id the kernel has applied lands the tick after its call. Anything else never
+  fired. A beat lands when any of its levers fires; one whose every lever was refused or never
+  fired is planned again, with a line saying which and why.
+- A scheduled fault, hazard or field keeps its cause as `causeCommandId`; `fieldSighted` and
+  `fieldEntered` carry it among their causes, as `navHazard` and `faultOccurred` do.
+- An episode opened this call (no live episode before, or the last one ended) by a call that made
+  an offer has its first `setup` beat land at the hook tick, unless an attribution already put one
+  of its beats on the record: the offer is the setup.
+
+Why: a pressure placed is not a beat landed; the honest record is the sim's own firing.
+
+### Your plan in the digest
+
+"Your plan" follows "Your notes so far" and is never trimmed. It lists each tier: premise, tempo,
+opening tick, revisions with why (or "never revised"), the replaced premise for one call and
+`until`; then its beats, each with its tension, decided, thread, status and tick, and the levers
+still in motion. Then "You are at <tension> (tempo: <tempo>): <name>" for the first planned
+episode beat, with the tempo that applies (§the-plan), and when the arc has stalled the line of
+§seasons-and-stalls. With nothing sketched it is one line. The server states the record and never
+advises on pace (D46). The staging call is not shown it.
+
+### Seasons and stalls
+
+A tier ends when the notes turn names it in `plan.ended`; ending the season ends the arc and the
+episode, ending the arc ends the episode. An ended season or arc becomes a past arc (§past-arcs)
+with scale `season` or `arc`, its premise as the title, `<tempo> <tier>` as the shape, the premise
+and each beat with how it ended as the summary, and ending `planEnded`; a tier written in the same
+reply starts fresh (no revisions), otherwise it stands empty. An ended episode is not kept. The
+notes turn is asked (§notes-turn) for a season and an arc whenever none stands, for the episode
+when the captain is ashore with none live (the offer it makes is the setup), and at an episode's
+end (`contractCompleted`, `passageEnded` or `jobFailed` on a notable-event call, or a closing
+card) whether the arc moved: the arc beat it landed in `landed`, the arc revised if its next
+episode changed, and `episode` in `ended` once the closing card is up.
+
+An arc stalls when episodes end without an arc beat landing: the server counts episodes ended
+since an arc beat last landed (`episodesSinceArcBeat`; an arc beat landing or an arc ending
+resets it, and an episode that lands one as it ends does not count), and from
+`ARC_STALL_EPISODES` (3) the digest says "No arc beat has landed in the last N episodes" and
+nothing more. Why: the narrator is the only source of work (D40), so what to do about a stall is
+its call (bring the arc to the captain, retime it, or let it go), not the server's.
 
 ### Card history
 
@@ -398,12 +494,13 @@ has seen".
 truth, not captain knowledge, with undiscovered faults labelled `[undiscovered]` (the prompt and
 the text checks forbid them in player-facing text). Sections: why you were called (the hook, plus
 the standing call-back request), Ship, your budget, pending decisions, cards held for in-person
-delivery, machines, jobs, crew, your notes, open threads, past arcs, what the captain has seen,
-people you know here, on the dock, open problems, recent events (15 at most).
+delivery, machines, jobs, crew, your notes, your plan (§your-plan-in-the-digest), open threads,
+past arcs, what the captain has seen, people you know here, on the dock, open problems, recent
+events (15 at most).
 
 Over `DIGEST_MAX_CHARS` (10,000), lines are dropped from the lowest-priority section first, events
-oldest first, with a note of how many. Never trimmed: why you were called, Ship, budget, open
-threads, past arcs (outside the budget), and the staging call's dock section.
+oldest first, with a note of how many. Never trimmed: why you were called, Ship, budget, your
+plan, open threads, past arcs (outside the budget), and the staging call's dock section.
 
 ### Open threads list
 
@@ -498,6 +595,14 @@ designer reasons about:
   narrator ought to be able to govern that on its own." The owner withdrew timers and an ordered
   checklist: "I don't want the narrator to think we are asking it specifically to solve that."
   Hence `quietTooLong` is a neutral check-in listing what is available.
+- The plan is the shape the narrator means, not a script (§the-plan). It sketches a season, an
+  arc and an episode, mixes decided beats with beats the captain and the dice may bend ("an
+  episode with every beat decided is a cutscene"), and names the episode beat each intent serves
+  (§beat-attribution). It revises from the bottom up: the episode first when the captain or the
+  dice went the other way (dropped beats become `changed`, landed beats are never rewritten), the
+  arc only if the episode's ending changed, the season only if the arc's premise broke, with why
+  in `revised`. A stalled arc is brought to the captain (the next offer, its people at the next
+  port) or let go.
 - A new card must bring something the captain has not seen on a card: new information, a person, a
   consequence, or a thread's next beat; otherwise do nothing. There is no spacing rule, and minor
   crew cards are welcome. Share the stage across the crew.

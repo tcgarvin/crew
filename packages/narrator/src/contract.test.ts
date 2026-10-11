@@ -52,6 +52,7 @@ describe("NarratorPlan structured-output schema", () => {
       intents: [
         {
           kind: "offerJob",
+          beat: "",
           issuerName: "Ines Varga",
           issuerRole: "berth agent",
           issuerOrg: "Harbour co-op",
@@ -75,14 +76,22 @@ describe("NarratorPlan structured-output schema", () => {
         },
         {
           kind: "spawnAtBoundary",
+          beat: "",
           port: "port.a",
           store: "warehouse",
           cargoItem: "item.crate",
           quantity: "one",
         },
-        { kind: "scheduleFault", machine: "m1", faultKey: "wornBearing", window: "later" },
+        {
+          kind: "scheduleFault",
+          beat: "",
+          machine: "m1",
+          faultKey: "wornBearing",
+          window: "later",
+        },
         {
           kind: "scheduleHazard",
+          beat: "",
           hazard: "ionStorm",
           difficulty: "brutal",
           window: "soon",
@@ -92,17 +101,25 @@ describe("NarratorPlan structured-output schema", () => {
         // §forced-faults-and-hazards).
         {
           kind: "plantMemory",
+          beat: "",
           from: "Jax Okonkwo",
           to: "Priya Kessler",
           key: "betrayedMe",
           lasting: true,
         },
-        { kind: "fallOut", a: "Jax Okonkwo", b: "Priya Kessler", over: "Ysolde Maren" },
-        { kind: "giveThought", who: "Jax Okonkwo", key: "worriedAbout", ref: "Priya Kessler" },
-        { kind: "reveal", machine: "m1", faultKey: "wornBearing" },
-        { kind: "injectFault", machine: "m1", faultKey: "wornBearing" },
+        { kind: "fallOut", beat: "", a: "Jax Okonkwo", b: "Priya Kessler", over: "Ysolde Maren" },
+        {
+          kind: "giveThought",
+          beat: "",
+          who: "Jax Okonkwo",
+          key: "worriedAbout",
+          ref: "Priya Kessler",
+        },
+        { kind: "reveal", beat: "", machine: "m1", faultKey: "wornBearing" },
+        { kind: "injectFault", beat: "", machine: "m1", faultKey: "wornBearing" },
         {
           kind: "scheduleField",
+          beat: "",
           severity: "heavy",
           detection: "unseen",
           window: "later",
@@ -113,6 +130,7 @@ describe("NarratorPlan structured-output schema", () => {
         },
         {
           kind: "surfaceDecision",
+          beat: "",
           title: "A stranger at the ramp",
           speaker: "",
           situation: "A stranger asks for passage.",
@@ -154,6 +172,27 @@ describe("NarratorPlan structured-output schema", () => {
       cast: [{ name: "Ines Varga", note: "Berth agent; regular employer.", portId: "port.a" }],
       retired: [],
       endedArcs: [],
+      plan: {
+        season: {
+          premise: "Can the crew keep the ship without selling what she is for?",
+          beats: [
+            {
+              name: "The debt comes due",
+              what: "Ines's co-op calls in the loan on the seals.",
+              tension: "rising",
+              thread: "",
+              decided: true,
+            },
+          ],
+          until: "The loan is paid or the ship is sold.",
+          tempo: "slowBurn",
+          revised: "",
+        },
+        arc: { premise: "", beats: [], until: "", tempo: "steady", revised: "" },
+        episode: { premise: "", beats: [], until: "", tempo: "steady", revised: "" },
+        ended: [],
+        landed: [],
+      },
     };
     expect(buildNotesSchema().parse(notes)).toEqual(notes);
     const plan = { rationale: "", intents: [], card: null, callBack };
@@ -170,6 +209,7 @@ describe("NarratorPlan structured-output schema", () => {
     };
     const passage = {
       kind: "offerJob",
+      beat: "",
       issuerName: "Halla Thorne",
       issuerRole: "assayer",
       issuerOrg: "",
@@ -193,6 +233,7 @@ describe("NarratorPlan structured-output schema", () => {
     };
     const putOff = {
       kind: "surfaceDecision",
+      beat: "",
       title: "About our passenger",
       speaker: "Dane Whitcross",
       situation: "Dane has a word about the passenger.",
@@ -226,6 +267,7 @@ describe("NarratorPlan structured-output schema", () => {
     };
     const word = {
       kind: "surfaceDecision",
+      beat: "",
       title: "Words at the card table",
       speaker: "Dane Whitcross",
       situation: "Dane has a word about Jax.",

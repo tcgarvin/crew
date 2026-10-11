@@ -2,6 +2,7 @@
  * Shared test fixtures (not part of the public API — imported only by `*.test.ts` files).
  */
 import { gzipSync } from "node:zlib";
+import { EMPTY_PLAN } from "@crew/narrator";
 import { MemoryDb } from "./db/memory";
 import { loadEnv } from "./env";
 import { type AppDeps, createApp } from "./index";
@@ -85,6 +86,7 @@ export const TEST_NOTES = {
   cardsShown: [],
   pastArcs: [],
   cast: [],
+  plan: EMPTY_PLAN,
   lastUpdatedTick: 0,
   lastRejections: [],
 };

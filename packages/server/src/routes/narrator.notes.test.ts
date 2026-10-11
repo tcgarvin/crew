@@ -6,6 +6,7 @@
  */
 import { loadBundle } from "@crew/content";
 import {
+  KEEP_PLAN,
   type ModelTransport,
   type NarratorNotes,
   parseNotes,
@@ -42,6 +43,7 @@ const WRITTEN = {
   cast: [],
   retired: [],
   endedArcs: [],
+  plan: KEEP_PLAN,
 };
 
 /** The plan turn gets `PLAN`; the notes turn (the one with a continuation) gets `notesReply`. */

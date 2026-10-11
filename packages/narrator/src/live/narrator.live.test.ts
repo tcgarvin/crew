@@ -15,7 +15,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DecisionId } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import type { NarratorRequest, NarratorResponse } from "../contract";
+import type { NarratorIntent, NarratorRequest, NarratorResponse } from "../contract";
 import {
   approachRequest,
   captainAshoreRequest,
@@ -174,6 +174,102 @@ const REQUESTED_CALL_NOTES = {
   ],
   lastUpdatedTick: 2_900,
   lastRejections: [],
+};
+
+/** §the-plan: a stored beat as the server keeps it. */
+function plannedBeat(
+  name: string,
+  what: string,
+  tension: string,
+  thread: string,
+  decided: boolean,
+) {
+  return {
+    name,
+    what,
+    tension,
+    thread,
+    decided,
+    status: "planned",
+    landedTick: null,
+    inMotion: [],
+  };
+}
+
+function plannedSketch(premise: string, beats: unknown[], until: string, tempo: string) {
+  return {
+    premise,
+    beats,
+    until,
+    tempo,
+    revised: "",
+    revisions: 0,
+    previousPremise: "",
+    openedTick: 2_600,
+  };
+}
+
+/**
+ * §the-plan, §beat-attribution: the departure call's notes with a plan standing, whose episode's
+ * next beat is the leg's test of Noor at the helm, so the model has a beat to name.
+ */
+const PLANNED_NOTES = {
+  ...REQUESTED_CALL_NOTES,
+  plan: {
+    season: plannedSketch(
+      "Can a crew this green earn the Meridian growers' trust before the Trading House squeezes them out?",
+      [
+        plannedBeat("Plain runs", "A few clean runs for the growers.", "setup", "", false),
+        plannedBeat("The House leans in", "Rask's people make their move.", "rising", "", false),
+      ],
+      "The growers sign with us or with the House.",
+      "slowBurn",
+    ),
+    arc: plannedSketch(
+      "Noor learns the helm the hard way on the Meridian runs.",
+      [
+        plannedBeat(
+          "Noor's first hard leg",
+          "This run tests her.",
+          "rising",
+          "Noor's first hard leg",
+          false,
+        ),
+      ],
+      "Noor flies a hard leg clean, or Jax takes the helm from her.",
+      "steady",
+    ),
+    episode: {
+      ...plannedSketch(
+        "Rask's crates to Green Meridian with Noor at the helm.",
+        [
+          {
+            ...plannedBeat("Rask's crates", "The offer at the Hub.", "setup", "", false),
+            status: "landed",
+            landedTick: 2_600,
+          },
+          plannedBeat(
+            "Noor at the helm",
+            "A hard stretch on the leg, with Noor at the helm.",
+            "rising",
+            "Noor's first hard leg",
+            true,
+          ),
+          plannedBeat(
+            "Jax's doubt",
+            "Jax brings his worry to the captain.",
+            "turn",
+            "Noor's first hard leg",
+            false,
+          ),
+          plannedBeat("Delivered", "The growers take the crates.", "release", "", false),
+        ],
+        "",
+        "steady",
+      ),
+    },
+    episodesSinceArcBeat: 0,
+  },
 };
 
 /**
@@ -423,6 +519,41 @@ suite(
         expect(kinds, "an offer in flight").not.toContain("offerJob");
       },
       LIVE_TIMEOUT_MS,
+    );
+
+    it(
+      "captainAshore with no plan: the notes turn sketches a season, an arc and the episode the offer opens (§the-plan)",
+      async () => {
+        const run = await liveRun(captainAshoreRequest(content()));
+        const response = expectModelAnswered(run);
+        const plan = response.notesUpdate?.plan;
+        console.log("plan written at captainAshore:", JSON.stringify(plan, null, 2));
+        console.log("corrections:", JSON.stringify(response.notesUpdate?.lastRejections));
+        expect(plan?.season.premise, "no season sketched").not.toBe("");
+        expect(plan?.arc.premise, "no arc sketched").not.toBe("");
+        expect(plan?.episode.premise, "no episode sketched").not.toBe("");
+        expect(plan?.episode.beats.length ?? 0).toBeGreaterThanOrEqual(3);
+      },
+      LIVE_TIMEOUT_MS * 2,
+    );
+
+    it(
+      "requestedCall at departure with a plan standing: any beat it names is an episode beat (§beat-attribution)",
+      async () => {
+        const run = await liveRun(requestedCallRequest(content()), { notes: PLANNED_NOTES });
+        const response = expectModelAnswered(run);
+        const plan = run.trace.plan;
+        const intents: readonly NarratorIntent[] =
+          plan !== undefined && "callBack" in plan ? plan.intents : [];
+        const named = intents.flatMap((i) => (i.beat !== "" ? [`${i.kind}: ${i.beat}`] : []));
+        console.log(`beats named: ${JSON.stringify(named)}`);
+        console.log("episode after:", JSON.stringify(response.notesUpdate?.plan.episode, null, 2));
+        const misnamed = (response.notesUpdate?.lastRejections ?? []).filter((r) =>
+          r.includes("is not a beat of your episode plan"),
+        );
+        expect(misnamed, "a beat name that is not in the episode").toEqual([]);
+      },
+      LIVE_TIMEOUT_MS * 2,
     );
 
     it(

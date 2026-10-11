@@ -150,7 +150,8 @@ does not wait for. `runNarratorWithTrace` returns the plan with the notes as the
 notes plus the server-kept changes from this call) and a `notesTurn` that continues the same
 conversation: the same cached system prefix, the plan's user turn, the plan as the assistant turn
 with the model's `reasoning_details`, then a user turn telling it what became of the plan (each
-dropped intent and why). The route logs the story row and a `notes` row (`pending`) before it
+dropped intent and why) and what the plan needs now, by the moment and never by advice
+(§seasons-and-stalls). The route logs the story row and a `notes` row (`pending`) before it
 responds; the notes turn runs after the response (`waitUntil` on Vercel, inline elsewhere),
 stores the notes and finishes the row `ok` or `error`. A call that arrives while a `notes` row is
 pending polls (500 ms) for up to `NOTES_TIMEOUT_MS` + 5 s, then reads the notes as they stand; an

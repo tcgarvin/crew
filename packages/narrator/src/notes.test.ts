@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_NOTES, NOTES_LIMITS, appendPastArcs, mergeThreads, parseNotes } from "./notes";
+import {
+  EMPTY_NOTES,
+  EMPTY_PLAN,
+  NOTES_LIMITS,
+  appendPastArcs,
+  mergeThreads,
+  parseNotes,
+} from "./notes";
 
 const thread = {
   title: "The assay office",
@@ -32,6 +39,7 @@ describe("parseNotes", () => {
       cardsShown: [card],
       pastArcs: [],
       cast: [{ name: "Ines", note: "dock boss", portId: "port.kessler_drift", lastSeenTick: 30 }],
+      plan: EMPTY_PLAN,
       lastUpdatedTick: 40,
       lastRejections: ["r"],
     };

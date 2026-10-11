@@ -94,6 +94,7 @@ import {
 } from "./lookups";
 import { clipWords } from "./notes";
 import { EXPEDITION_ARRIVAL_KEY } from "./site-digest";
+import { type BeatAttribution, LANDS_WHEN_MADE } from "./story-plan";
 
 const LABEL_MAX_CHARS = 48;
 const TITLE_MAX_CHARS = 60;
@@ -1525,7 +1526,7 @@ function plannedFaults(
   const revealed = new Set<string>();
   const injected: string[] = [];
   for (const raw of rawIntents) {
-    const parsed = intentSchema.safeParse(raw);
+    const parsed = intentSchema.safeParse(withBeat(raw));
     if (!parsed.success) continue;
     const intent = parsed.data;
     if (intent.kind === "reveal" && revealOutcome({ snapshot, content }, intent).ok) {
@@ -1534,6 +1535,16 @@ function plannedFaults(
     if (intent.kind === "injectFault") injected.push(faultRef(intent.machine, intent.faultKey));
   }
   return { revealed, injected };
+}
+
+/**
+ * §beat-attribution: the model always writes `beat` (the schema requires it); a plan built in code
+ * (the null narrator, a scenario, a test) may leave it out, and then the intent serves no beat, as
+ * a plan without `callBack` asks for no call.
+ */
+function withBeat(raw: unknown): unknown {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw) || "beat" in raw) return raw;
+  return { ...raw, beat: "" };
 }
 
 /**
@@ -1576,6 +1587,7 @@ export const translateIntents: TranslateIntents = (
   };
   const commands: NarratorCommand[] = [];
   const dropped: DroppedIntent[] = [];
+  const beats: BeatAttribution[] = [];
 
   rawIntents.forEach((raw, intentIndex) => {
     const kind = kindOf(raw);
@@ -1583,7 +1595,7 @@ export const translateIntents: TranslateIntents = (
       dropped.push({ intentIndex, kind, reason: `"${kind}" is not something you can do` });
       return;
     }
-    const parsed = intentSchema.safeParse(raw);
+    const parsed = intentSchema.safeParse(withBeat(raw));
     if (!parsed.success) {
       dropped.push({ intentIndex, kind, reason: invalidIntentReason(kind, parsed.error.issues) });
       return;
@@ -1599,13 +1611,21 @@ export const translateIntents: TranslateIntents = (
       dropped.push({ intentIndex, kind: draft.kind, reason: "not an allow-listed command" });
       return;
     }
+    const id = commandIdFor(ctx.callId, commands.length);
     commands.push({
-      id: commandIdFor(ctx.callId, commands.length),
+      id,
       source: "narrator",
       // The hook tick is already committed; the earliest a command can apply is the next one.
       targetTick: ctx.hookTick + 1,
       ...draft,
     } as NarratorCommand);
+    // §beat-attribution: the name is checked against the plan by the notes merge, which knows the
+    // episode the notes turn writes; a name that matches nothing is a correction, never a drop.
+    const beat = parsed.data.beat.trim();
+    if (beat !== "") {
+      const lands = LANDS_WHEN_MADE.has(parsed.data.kind) ? "now" : "onFire";
+      beats.push({ beat, kind: parsed.data.kind, commandId: id, lands });
+    }
   });
 
   const unseen = unseenCommand(env, plan);
@@ -1630,6 +1650,7 @@ export const translateIntents: TranslateIntents = (
     commands,
     dropped,
     notes: env.notes,
+    beats,
     ...(card === undefined ? {} : { card }),
     ...(beat === undefined ? {} : { beatCardThread: beat }),
     ...(closed === undefined ? {} : { closedThread: closed }),

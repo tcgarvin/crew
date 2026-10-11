@@ -57,7 +57,14 @@ import {
   transitSecondsLeft,
   voyageAhead,
 } from "./lookups";
-import type { ArcEnding, NarratorNotes } from "./notes";
+import {
+  type ArcEnding,
+  type ArcSketch,
+  type NarratorNotes,
+  PLAN_TIERS,
+  type PlanTier,
+  type PlannedBeat,
+} from "./notes";
 import { crewOffWatchClauses, offWatchLine, rivalriesLine } from "./offwatch-digest";
 import {
   EXPEDITION_ARRIVAL_KEY,
@@ -66,6 +73,7 @@ import {
   captiveAboard,
   errandJobPhrase,
 } from "./site-digest";
+import { currentBeat, currentTempo } from "./story-plan";
 import { bodyPhrase, dutyTag, helmEventLines, moodPhrase, watchLine } from "./watch-digest";
 
 /**
@@ -863,9 +871,67 @@ function notesSection(notes: NarratorNotes): Section {
   return section("Your notes so far", lines, 5);
 }
 
+/** §seasons-and-stalls: episodes without an arc beat before the digest says the arc has stalled. */
+export const ARC_STALL_EPISODES = 3;
+
+const TIER_LABEL: Readonly<Record<PlanTier, string>> = {
+  season: "Season",
+  arc: "Arc",
+  episode: "Episode",
+};
+
+/** §your-plan-in-the-digest: one beat with its record. */
+function beatLine(beat: PlannedBeat): string {
+  const decided = beat.decided ? ", decided" : "";
+  const thread = beat.thread === "" ? "" : `, thread "${beat.thread}"`;
+  const tick = beat.landedTick === null ? "" : ` t${beat.landedTick}`;
+  const motion =
+    beat.inMotion.length === 0
+      ? ""
+      : ` (in motion: ${beat.inMotion.map((m) => `${m.kind} since t${m.sinceTick}`).join(", ")})`;
+  return `  - [${beat.tension}${decided}${thread}] "${beat.name}": ${beat.what} → ${beat.status}${tick}${motion}`;
+}
+
+/** §your-plan-in-the-digest: a tier's premise and record, then its beats. */
+function sketchLines(tier: PlanTier, sketch: ArcSketch): string[] {
+  if (sketch.premise === "") return [`${TIER_LABEL[tier]}: none sketched.`];
+  const revisions =
+    sketch.revisions === 0 ? "never revised" : `revised ${sketch.revisions}x: ${sketch.revised}`;
+  const was = sketch.previousPremise === "" ? "" : ` (was: ${sketch.previousPremise})`;
+  const until = sketch.until === "" ? "" : ` Until: ${sketch.until}`;
+  return [
+    `${TIER_LABEL[tier]} (tempo ${sketch.tempo}, since t${sketch.openedTick}, ${revisions}): ${asSentence(sketch.premise)}${was}${until}`,
+    ...sketch.beats.map(beatLine),
+  ];
+}
+
+/**
+ * §your-plan-in-the-digest: the plan as the server has kept it, never trimmed: each tier, the
+ * beat the episode is at, and a stalled arc. The record only, never advice (D46).
+ */
+function planSection(notes: NarratorNotes): Section {
+  const { plan } = notes;
+  if (PLAN_TIERS.every((tier) => plan[tier].premise === "")) {
+    return section("Your plan", ["(nothing sketched yet)"], NEVER_DROPS);
+  }
+  const lines = PLAN_TIERS.flatMap((tier) => sketchLines(tier, plan[tier]));
+  const at = currentBeat(plan);
+  const tempo = currentTempo(plan);
+  if (at !== undefined && tempo !== undefined) {
+    lines.push(`You are at ${at.tension} (tempo: ${tempo}): "${at.name}".`);
+  } else if (plan.episode.premise !== "") {
+    lines.push("Every beat of the episode has landed or been set aside.");
+  }
+  if (plan.arc.premise !== "" && plan.episodesSinceArcBeat >= ARC_STALL_EPISODES) {
+    lines.push(`No arc beat has landed in the last ${plan.episodesSinceArcBeat} episodes.`);
+  }
+  return section("Your plan", lines, NEVER_DROPS);
+}
+
 const ARC_ENDING_TEXT: Readonly<Record<ArcEnding, string>> = {
   closingCard: "ended on its closing card",
   retired: "ended without a card",
+  planEnded: "ended by your plan",
 };
 
 /**
@@ -977,6 +1043,7 @@ export function buildDigest(
     jobSection(state, content),
     crewSection(snapshot, content),
     notesSection(notes),
+    ...(staging ? [] : [planSection(notes)]),
     ...(staging ? [] : [openThreadsSection(notes)]),
     ...(staging ? [] : [pastArcsSection(notes)]),
     cardsSeenSection(notes, hook),
