@@ -24,8 +24,14 @@ export interface ExpeditionCommandPayloads {
   withdrawParty: Record<string, never>;
   /**
    * D105, the narrator's (and scenario's): mark one side of the pending arrival card `decisionId`
-   * as the way in unseen, `planId` being that side's plan (never a `hold` plan). Choosing that side
-   * then gets the party in unnoticed; choosing the other, the cast were waiting (`Expedition.notice`).
+   * as the way in unseen, `planId` being that side's plan (never a `hold` plan). D106
+   * (§unseen-odds): `odds` is the narrator's chance it works, a whole percent 0 to 100, unclamped.
+   * Choosing that side rolls it once: the party gets in unnoticed, or the cast were waiting;
+   * choosing the other, the cast were waiting (`Expedition.notice`).
    */
-  markUnseen: { readonly decisionId: DecisionId; readonly planId: PlanId };
+  markUnseen: {
+    readonly decisionId: DecisionId;
+    readonly planId: PlanId;
+    readonly odds: number;
+  };
 }

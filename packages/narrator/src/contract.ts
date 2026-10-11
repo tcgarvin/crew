@@ -247,6 +247,12 @@ export const UNSEEN_SIDES = ["", "left", "right"] as const;
 export type UnseenSide = (typeof UNSEEN_SIDES)[number];
 
 /**
+ * §unseen-odds: the chance the marked side works, a whole percent from 0 to 100 written as a
+ * string (`card.unseenOdds`); empty is `UNSEEN_ODDS_CERTAIN`, D105's certain way in.
+ */
+export const UNSEEN_ODDS_PATTERN = /^(?:100|[1-9]?\d)$/;
+
+/**
  * §strike-lever: where a strike lands, empty for the body's own draw (§narrator-authority: empty,
  * not nullable).
  */
@@ -513,6 +519,8 @@ export function buildNarratorPlanSchema() {
         rightAftermath: aftermath,
         // D105: the description stays under eight words; the capability block explains it.
         unseen: z.enum(UNSEEN_SIDES).describe("Arrival card side that sneaks in; else empty."),
+        // §unseen-odds: a string, so "" can mean no number named (the certain mark).
+        unseenOdds: z.string().describe('Percent 0-100 it works; "" is 100.'),
       })
       .nullable(),
     /**

@@ -1,10 +1,10 @@
-import type { ActorId, PortDefId } from "../ids";
+import type { ActorId, DecisionId, PortDefId } from "../ids";
 /**
  * Expedition events (expeditions A1, §8): the expedition started, the party armed, contact, every
  * shot (trace, for the tracers), someone breaking, the party pulling back, and the end with its
  * tally. The alert reuses the field's `alertRaised`/`alertCleared` with `cause: "fight"`.
  */
-import type { ExpeditionOutcome, NoticeRule } from "../state";
+import type { ExpeditionOutcome, NoticeRule, PlanId } from "../state";
 import type { SignificanceCatalog } from "./significance";
 
 export interface ExpeditionEventPayloads {
@@ -12,6 +12,18 @@ export interface ExpeditionEventPayloads {
    * The ship set down at `siteId`; `party` goes in, its leader first (empty when nobody can go).
    */
   expeditionStarted: { readonly siteId: PortDefId; readonly party: readonly ActorId[] };
+  /**
+   * §unseen-odds: the captain chose the side the narrator marked as the way in unseen (`planId`, on
+   * the arrival card `decisionId`) and its chance was rolled once at `odds` percent: `worked`, the
+   * party gets in unseen; else the cast were waiting.
+   */
+  unseenRolled: {
+    readonly siteId: PortDefId;
+    readonly decisionId: DecisionId;
+    readonly planId: PlanId;
+    readonly odds: number;
+    readonly worked: boolean;
+  };
   /** The party is armed at the locker: `armed` of `party` carry a weapon. */
   partyMustered: { readonly party: readonly ActorId[]; readonly armed: readonly ActorId[] };
   /** The cast noticed the party, or the party opened fire: the fight is on. */
@@ -54,6 +66,7 @@ export interface ExpeditionEventPayloads {
 
 export const EXPEDITION_EVENT_SIGNIFICANCE = {
   expeditionStarted: "notable",
+  unseenRolled: "notable",
   partyMustered: "trace",
   expeditionContact: "narrative",
   shotFired: "trace",

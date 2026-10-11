@@ -139,18 +139,47 @@ validation and fed back as a correction.
 
 On the `policyDecision` hook for an expedition's arrival card the narrator may let the crew get in
 unseen by one side: the card's `unseen` field (`UNSEEN_SIDES`: `left`, `right`, or empty for
-neither) becomes `markUnseen` with that side's plan (`leftPlan` or `rightPlan`). The captain still
-chooses, and the fight follows the choice: the marked side unseen, the other expected
-(§getting-in-unseen). The translator drops the mark with a reason on any other card or on a side
-that holds the ramp (a `hold` plan); an empty field sends nothing. Why: the owner, "if the player
-picks the right option, the narrator says they sneak in and get the box, but another option the
-narrator triggers defenders" (D105).
+neither) becomes `markUnseen` with that side's plan (`leftPlan` or `rightPlan`) and the chance in
+`unseenOdds` (§unseen-odds). The captain still chooses, and the fight follows the choice: the
+marked side unseen if its roll works, the other expected (§getting-in-unseen). The translator drops
+the mark with a reason on any other card or on a side that holds the ramp (a `hold` plan); an empty
+field sends nothing. Why: the owner, "if the player picks the right option, the narrator says they
+sneak in and get the box, but another option the narrator triggers defenders" (D105).
 
 The prompt keeps it for a quiet way in the story has set up (a guard asleep, a back way, a friend
-inside), and the card never gives it away: neither side's words say which is marked. The digest
-never shows the mark before a plan is chosen; once the expedition is over its line at the site
-(§dock-sections) says how the site noticed them: "nobody saw them come or go" when the marked
-side went in and no fight came, "they were waiting" when the other did.
+inside), and the prose makes both sides plausible; how the speaker voices the chance, if at all,
+is §unseen-odds. The digest never shows the mark before a plan is chosen. Once one is, the site
+section (§dock-sections) says what came of it: the roll at its odds on the marked side, or "the
+captain took the other side; they were waiting for the party". Once the expedition is over its
+line says how the site noticed them: "nobody saw them come or go" when the way in worked and no
+fight came, "they were waiting" when it did not.
+
+### Unseen odds
+
+The way in unseen is a chance, not a certainty: `card.unseenOdds` is the narrator's own read of
+it, a whole percent from 0 to 100 written as a string ("70"), with no clamp; empty is 100
+(`UNSEEN_ODDS_CERTAIN`), the certain mark D105 made, and so is a mark saved before odds. The
+translator drops the mark with a reason when the odds are anything else ("seventy", "101", "50.5"),
+and reports odds given with no side marked. When the captain adopts the marked plan, `adoptPlan`
+rolls once, `rng.chance("narrator", odds / 100)` on the seeded `narrator` stream, writes
+`Expedition.unseenRoll { odds, worked }` and emits `unseenRolled { siteId, decisionId, planId,
+odds, worked }` (`notable`, no ticker line: the fight shows it, contact at once or none, and the
+end's line says it). Choosing the other side rolls nothing. Why: **(owner)** the narrator names the
+number, unclamped, "constrain the narrator as little as possible"; the dice keep the narrator from
+always getting its way on the one thing that is the captain's (D106).
+
+The voicing is the card's own: **(owner)** "A scientist might literally say 'captain I estimate 20%
+odds'", a deckhand says "a long shot", the first officer may say nothing. A percentage in the
+arrival card's situation or the marked side's label equal to the odds is exempt from
+§player-facing-text-checks; any other number, on the other side, or with no mark, is still refused.
+The prompt says to set odds honestly from what the story set up, that a stated chance is a promise
+the dice keep (round up when unsure, never "likely" under sixty), that a 0 or a 100 is a decision
+dressed as a gamble (decide it instead, §prompt-rules), and that a failed roll is a story, not a
+punishment.
+
+After the choice the roll is in the card history (§card-history) and in the site section
+(§unseen-lever). `crew episode --unseen <posture> --odds <0-100>` marks a side at those odds and
+its header says how the roll went.
 
 ## Outcome levers
 
@@ -291,7 +320,8 @@ Every text a player can read (titles, situations, labels, aftermaths, pitches, d
 speaker and issuer names) is clipped to its cap and refused if it is empty, states a numeric
 consequence (a credit amount, a percentage, a signed delta), or contains a secret phrase: the name
 or symptom of an undiscovered fault or a scheduled one (a deliberately conservative substring
-check). Caps: situation 70 words, aftermath 20, pitch 30, side label 48 characters, title 60. A
+check). The one exception is the arrival card's stated chance: a percentage equal to the marked
+side's odds in the situation or that side's label (§unseen-odds). Caps: situation 70 words, aftermath 20, pitch 30, side label 48 characters, title 60. A
 blank aftermath is §aftermath-caption's "none". Both sides of a card may not share a label. The
 staging translator reuses the same checks.
 
@@ -483,8 +513,11 @@ It is fed by the call's own policy card and surfaced cards, and by the kernel's 
 `decisionResolved` and `decisionDropped` events. A surfaced card has no decision id until the
 kernel mints one, so it is matched to its decision by title through the decision records in the
 snapshot, which also fill in any resolution whose event was lost. A card held for in-person
-delivery that is dropped before it came up is forgotten. The digest shows it as "What the captain
-has seen".
+delivery that is dropped before it came up is forgotten. An arrival card whose marked way in the
+captain chose carries the roll (`tried { odds, worked }`, from `unseenRolled` or the snapshot's
+`Expedition.unseenRoll`, §unseen-odds), shown after the choice: `chose "Creep in quietly" (the way
+in unseen, 70%): it failed, they were waiting`. The digest shows it as "What the captain has
+seen".
 
 ## Digest
 
@@ -567,7 +600,8 @@ with their why while it is up (the chosen plan after), and the turn card's sides
 For an item errand it adds where the thing lies by the nearest post, or who carries it, or that it
 is not in sight; the site's own target reads as "the one at the heart of it here (the errand is
 after a thing, not them)", and a taken item errand ends "the party took what it went for". No digit
-appears in the section; a head count is written in words.
+appears in the section but the narrator's own odds on the way in unseen, once the captain chose
+(§unseen-odds); a head count is written in words.
 
 ## Prompt rules
 

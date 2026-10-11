@@ -710,6 +710,10 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
     // The landing has its own line ("Set down at Harrow End"), so the start has none.
     case "expeditionStarted":
       return null;
+    // §unseen-odds: the roll shows in what the fight does (contact at once, or none), and in the
+    // end's line; the number stays the narrator's to say on the card.
+    case "unseenRolled":
+      return null;
     case "partyMustered": {
       const [leaderId] = event.payload.party;
       if (leaderId === undefined) return null;

@@ -163,6 +163,20 @@ describe("crew episode: arguments", () => {
     });
   });
 
+  it("reads --odds as the mark's whole percent, and refuses anything else (§unseen-odds)", () => {
+    expect(parseEpisodeArgs(["--unseen", "creep", "--odds", "70"])).toEqual({
+      seed: 1,
+      all: false,
+      markUnseen: "creep",
+      unseenOdds: 70,
+    });
+    for (const bad of ["101", "-1", "50.5", "x"]) {
+      expect(parseEpisodeArgs(["--odds", bad])).toMatchObject({
+        error: expect.stringContaining("--odds needs a whole percent from 0 to 100"),
+      });
+    }
+  });
+
   it("refuses a bad seed, an unknown argument and a port that is not a site", () => {
     expect(parseEpisodeArgs(["--seed", "x"])).toMatchObject({ error: expect.any(String) });
     expect(parseEpisodeArgs(["--fast"])).toMatchObject({ error: expect.any(String) });
@@ -237,5 +251,15 @@ describe("the episode transcript", () => {
     expect(formatEpisodeTranscript({ ...result, unseenPlanId: "creep-holdFire-armed" })).toContain(
       "The narrator marked creep-holdFire-armed unseen.",
     );
+  });
+
+  it("says the roll on the mark at its odds, when the captain took the marked side (§unseen-odds)", () => {
+    const marked = { ...result, unseenPlanId: "creep-holdFire-armed" };
+    expect(
+      formatEpisodeTranscript({ ...marked, unseenRoll: { odds: 70, worked: true } }),
+    ).toContain("The narrator marked creep-holdFire-armed unseen (70%): it worked.");
+    expect(
+      formatEpisodeTranscript({ ...marked, unseenRoll: { odds: 30, worked: false } }),
+    ).toContain("The narrator marked creep-holdFire-armed unseen (30%): they were waiting.");
   });
 });

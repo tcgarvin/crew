@@ -423,11 +423,25 @@ export type ExpeditionOutcome = (typeof EXPEDITION_OUTCOMES)[number];
 /**
  * D105: how the site notices the party under the adopted plan, written by `adoptPlan` once the
  * narrator has marked a side of the arrival card (`markUnseen`). `unseen`: the marked plan was
- * chosen, and the party gets in without the cast noticing; `seen`: the other side was, and they
- * were waiting. With no mark the sim's ordinary noticing applies and `Expedition.notice` is absent.
+ * chosen and its roll worked (§unseen-odds), and the party gets in without the cast noticing;
+ * `seen`: the other side was, or the roll failed, and they were waiting. With no mark the sim's
+ * ordinary noticing applies and `Expedition.notice` is absent.
  */
 export const NOTICE_RULES = ["unseen", "seen"] as const;
 export type NoticeRule = (typeof NOTICE_RULES)[number];
+
+/**
+ * §unseen-odds: the one roll of the narrator's chance on the way in unseen, made by `adoptPlan`
+ * when the captain chose the marked side: `odds` the whole percent it was rolled at, `worked`
+ * whether the party got in unseen.
+ */
+export interface UnseenRoll {
+  readonly odds: number;
+  readonly worked: boolean;
+}
+
+/** §unseen-odds: a mark's chance when none was named, D105's certain way in. */
+export const UNSEEN_ODDS_CERTAIN = 100;
 
 /**
  * Expeditions A1 (§2, §8): the expedition at the site alongside, from `scenarioStartExpedition` on.
@@ -470,6 +484,14 @@ export interface Expedition {
    * and never a `hold` plan; absent when nothing was marked.
    */
   unseenPlanId?: PlanId;
+  /**
+   * §unseen-odds: the narrator's chance the marked way in works, a whole percent 0 to 100, written
+   * with `unseenPlanId`. A mark saved before odds has none and reads as 100, the certain mark D105
+   * made (`UNSEEN_ODDS_CERTAIN`).
+   */
+  unseenOdds?: number;
+  /** §unseen-odds: the roll, once the captain chose the marked side; absent otherwise. */
+  unseenRoll?: UnseenRoll;
   /**
    * D105: written by `adoptPlan` when a plan was marked: `unseen` if the adopted plan is the marked
    * one, else `seen`; absent when nothing was marked (the sim's ordinary noticing).

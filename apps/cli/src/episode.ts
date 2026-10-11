@@ -20,7 +20,7 @@
  * and any violation. `formatEpisodeTranscript` prints it for a reader judging the pacing:
  *
  *     pnpm --filter @crew/cli dev episode [--seed N] [--site <port id>] [--item <item id>]
- *       [--arrival <posture>] [--unseen <posture>] [--all]
+ *       [--arrival <posture>] [--unseen <posture> [--odds <0-100>]] [--all]
  *
  * (`--all` adds ship life, meals and bells and talk, to the episode's own lines.)
  *
@@ -28,7 +28,7 @@
  * instead, `turnCard` `pullBack` takes the turn card's other side, `arrivalCard` (`--arrival`)
  * adopts the arrival card's side of another posture (`creep` or `assault` on an item errand's
  * card), `markUnseen` (`--unseen`) has the narrator mark the side of that posture as the way in
- * unseen (§unseen-lever), and `world` plays a further errand on a world an earlier run left (made
+ * unseen (§unseen-lever) at `unseenOdds` (`--odds`, §unseen-odds), and `world` plays a further errand on a world an earlier run left (made
  * by `createEpisodeWorld`, run with the same kernel).
  */
 import { type DecisionCardText, NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
@@ -49,6 +49,8 @@ import {
   type PortDefId,
   type Posture,
   type SimEvent,
+  UNSEEN_ODDS_CERTAIN,
+  type UnseenRoll,
   type World,
   checkInvariants,
   createKernel,
@@ -88,6 +90,11 @@ export interface EpisodeOptions {
    * as the narrator's other commands are (it must be on the card). Absent, nothing is marked.
    */
   readonly markUnseen?: Posture;
+  /**
+   * §unseen-odds (`--odds`): the chance on that mark, a whole percent from 0 to 100; absent, 100
+   * (D105's certain mark). The kernel rolls it when the captain takes the marked side.
+   */
+  readonly unseenOdds?: number;
   /**
    * Play on this world (made by `createEpisodeWorld` with the same kernel) rather than a new one:
    * a second errand after the first, the ship where the first left her. Absent, a new world.
@@ -196,6 +203,8 @@ export interface EpisodeResult {
   readonly planAdopted?: string;
   /** The arrival card's plan the narrator marked unseen (`EpisodeOptions.markUnseen`). */
   readonly unseenPlanId?: string;
+  /** §unseen-odds: the roll on that mark, when the captain took the marked side. */
+  readonly unseenRoll?: UnseenRoll;
   /** Commands the null narrator answered with that the kernel rejected (should be none). */
   readonly narratorRejections: readonly string[];
   readonly moneyStart: number;
@@ -683,7 +692,7 @@ class EpisodeRun {
       id: commandIdFor(callId, n),
       source: "narrator",
       kind: "markUnseen",
-      payload: { decisionId, planId },
+      payload: { decisionId, planId, odds: this.options.unseenOdds ?? UNSEEN_ODDS_CERTAIN },
     };
   }
 
@@ -789,6 +798,9 @@ class EpisodeRun {
       transactions,
       ...(this.planAdopted === undefined ? {} : { planAdopted: this.planAdopted }),
       ...(this.unseenPlanId === undefined ? {} : { unseenPlanId: this.unseenPlanId }),
+      ...(state.expedition?.unseenRoll === undefined
+        ? {}
+        : { unseenRoll: state.expedition.unseenRoll }),
       narratorRejections: this.narratorRejections,
       moneyStart: this.moneyStart,
       moneyEnd: state.money.balance,
@@ -863,12 +875,19 @@ function transcriptHeader(r: EpisodeResult): string[] {
     `Money ${r.moneyStart} → ${r.moneyEnd} (offered pay ${r.pay}). Ticker: ${r.episodeTickerLines} episode lines of ${r.tickerLines}.`,
     `Milestones: ${milestones.join(", ") || "none"}.`,
     `Hooks: ${hooks.join(", ") || "none"}.`,
-    ...(r.unseenPlanId === undefined ? [] : [`The narrator marked ${r.unseenPlanId} unseen.`]),
+    ...(r.unseenPlanId === undefined ? [] : [unseenHeader(r.unseenPlanId, r.unseenRoll)]),
     ...(r.violations.length === 0 ? [] : [`Violations: ${r.violations.join("; ")}`]),
     ...(r.narratorRejections.length === 0
       ? []
       : [`Narrator commands rejected: ${r.narratorRejections.join("; ")}`]),
   ];
+}
+
+/** "The narrator marked creep-holdFire-armed unseen (70%): it worked." */
+function unseenHeader(planId: string, roll: UnseenRoll | undefined): string {
+  if (roll === undefined) return `The narrator marked ${planId} unseen.`;
+  const how = roll.worked ? "it worked" : "they were waiting";
+  return `The narrator marked ${planId} unseen (${roll.odds}%): ${how}.`;
 }
 
 const LINE_MARKS: Readonly<Record<TranscriptLine["kind"], string>> = {
@@ -896,7 +915,7 @@ export function formatEpisodeTranscript(r: EpisodeResult, format: TranscriptForm
 
 const USAGE =
   "usage: crew episode [--seed N] [--site <port id>] [--item <item id>] [--arrival <posture>] " +
-  "[--unseen <posture>] [--all]";
+  "[--unseen <posture> [--odds <0-100>]] [--all]";
 
 export interface EpisodeCliOptions extends EpisodeOptions {
   readonly all: boolean;
@@ -906,13 +925,14 @@ const isPosture = (value: string | undefined): value is Posture =>
   (POSTURES as readonly (string | undefined)[]).includes(value);
 
 /** The flags that take a value. */
-type ValueFlag = "--seed" | "--site" | "--item" | "--arrival" | "--unseen";
+type ValueFlag = "--seed" | "--site" | "--item" | "--arrival" | "--unseen" | "--odds";
 const VALUE_FLAGS: ReadonlySet<string> = new Set<ValueFlag>([
   "--seed",
   "--site",
   "--item",
   "--arrival",
   "--unseen",
+  "--odds",
 ]);
 
 /** One flag's value read into the options, or why it is refused. */
@@ -927,6 +947,13 @@ function readFlag(
         return { error: `--seed needs an integer. ${USAGE}` };
       }
       return { seed: n };
+    }
+    case "--odds": {
+      const n = Number(value);
+      if (value === undefined || !Number.isInteger(n) || n < 0 || n > 100) {
+        return { error: `--odds needs a whole percent from 0 to 100. ${USAGE}` };
+      }
+      return { unseenOdds: n };
     }
     case "--site":
       return value === undefined

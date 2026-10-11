@@ -60,6 +60,7 @@ import {
 import {
   type ArcEnding,
   type ArcSketch,
+  type CardShown,
   type NarratorNotes,
   PLAN_TIERS,
   type PlanTier,
@@ -976,6 +977,16 @@ function openThreadsSection(notes: NarratorNotes): Section {
  * the cards, so this list (newest first) is the ground truth for "has the captain seen this?". It
  * outranks the machine list in the trim order.
  */
+/**
+ * §unseen-odds: the roll on the way in unseen the captain chose, after the choice: ` (70%): it
+ * worked, they got in unseen` or ` (70%): it failed, they were waiting`.
+ */
+function triedWords(card: CardShown): string {
+  if (card.tried === undefined) return "";
+  const how = card.tried.worked ? "it worked, they got in unseen" : "it failed, they were waiting";
+  return ` (the way in unseen, ${card.tried.odds}%): ${how}`;
+}
+
 function cardsSeenSection(
   notes: NarratorNotes,
   hook: DeepReadonly<NarratorHook> | undefined,
@@ -994,7 +1005,7 @@ function cardsSeenSection(
           : `chose "${c.chosen === "left" ? c.leftLabel : c.rightLabel}"`;
       // §closing-cards: the thread is retired; this is how the model knows it is finished.
       const closed = c.closedThread === null ? "" : ` (closed thread "${c.closedThread}")`;
-      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}${closed}`;
+      return `- t${c.tick} "${c.title}" (${who}): ${c.gist} → ${chose}${triedWords(c)}${closed}`;
     });
   return { heading: "What the captain has seen", lines, priority: 8.5, trimFrom: "start" };
 }

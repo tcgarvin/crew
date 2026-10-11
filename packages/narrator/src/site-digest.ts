@@ -6,8 +6,9 @@
  *   chosen a plan, each person at the site (who they are, what they carry, where they stand by the
  *   map's posts, their bearing as the crew can see it), and the expedition's two cards. Never a
  *   number: the fight is the sim's, and the narrator writes from what the crew can see. An item
- *   errand's thing is placed too. D105: a side the narrator marked unseen never shows; once it is
- *   over the expedition line says whether the site saw the party come.
+ *   errand's thing is placed too. D105: a side the narrator marked unseen never shows before the
+ *   captain chooses; then a line says what came of it, with the roll's odds (§unseen-odds), and
+ *   once it is over the expedition line says whether the site saw the party come.
  * - The job line's errand phrase, and how an errand reads for the person it brought aboard.
  */
 import { templateCard } from "@crew/content";
@@ -199,6 +200,26 @@ function noticeWords(expedition: DeepReadonly<Expedition>): string {
   return "";
 }
 
+/**
+ * §unseen-odds: once the captain chose, what came of the way in unseen the narrator named: the roll
+ * on the marked side ("(70%): it worked") or the other side taken; nothing before the choice or
+ * with no mark (§unseen-lever).
+ */
+function unseenLine(expedition: DeepReadonly<Expedition>): string | undefined {
+  const roll = expedition.unseenRoll;
+  if (roll !== undefined) {
+    return roll.worked
+      ? `the way in unseen you named (${roll.odds}%): the captain took it and it worked; the people here did not see the party come`
+      : `the way in unseen you named (${roll.odds}%): the captain took it and it failed; they were waiting for the party`;
+  }
+  const marked = expedition.unseenPlanId;
+  // A marked side taken with no roll is a mark saved before odds: D105 said nothing until the end.
+  if (marked === undefined || expedition.plan === undefined || expedition.plan.id === marked) {
+    return undefined;
+  }
+  return "the way in unseen you named: the captain took the other side; they were waiting for the party";
+}
+
 /** How it ended; for an item errand, taking the site is taking the thing, not the site's target. */
 function outcomeWords(expedition: DeepReadonly<Expedition>, kind: ErrandKind | undefined): string {
   if (expedition.outcome === undefined) return "it ended";
@@ -308,7 +329,7 @@ function cardLines(state: State, content: ContentBundle, expedition: DeepReadonl
 
 /**
  * "At the site (<name>)" while a site map is alongside; undefined otherwise. Its lines carry no
- * digit (`withoutDigits` on everything).
+ * digit (`withoutDigits` on everything) but the narrator's own odds on the way in unseen.
  */
 export function atSiteLines(state: State, content: ContentBundle): DockLines | undefined {
   const berth = siteOf(content, state);
@@ -346,7 +367,12 @@ export function atSiteLines(state: State, content: ContentBundle): DockLines | u
   const kind = job?.errand?.kind;
   for (const actor of people) lines.push(castLine(berth, state, content, actor, kind));
   if (here) lines.push(...cardLines(state, content, expedition));
-  return { heading: `At the site (${berth.dock.name})`, lines: lines.map(withoutDigits) };
+  // §unseen-odds: the one number here is the narrator's own chance, said back to it.
+  const roll = here ? unseenLine(expedition) : undefined;
+  return {
+    heading: `At the site (${berth.dock.name})`,
+    lines: [...lines.map(withoutDigits), ...(roll === undefined ? [] : [roll])],
+  };
 }
 
 /** The captive's "Aboard" line: who brought them aboard, from where, bound where. */

@@ -469,7 +469,7 @@ describe("runNarrator", () => {
       rightAftermath: "The clerk shrugs and heads back down the ramp.",
     };
     const transport = fakeTransport(
-      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "", unseenOdds: "" } }))),
     );
     const res = await runBothTurns(policyRequest(), ctx(transport));
     expect(res.card).toEqual({ decisionId: "d1", ...card });
@@ -487,7 +487,7 @@ describe("runNarrator", () => {
     };
     const plan = {
       ...emptyPlan(),
-      card: { ...card, unseen: "", beatOfThread: "", closesThread: "" },
+      card: { ...card, unseen: "", unseenOdds: "", beatOfThread: "", closesThread: "" },
     };
     const res = await runBothTurns(
       policyRequest(),
@@ -499,7 +499,7 @@ describe("runNarrator", () => {
       "card: beatOfThread and closesThread ignored; they belong on surfaceDecision only",
     );
     // Anything else unknown on the card still fails the schema.
-    const odd = { ...emptyPlan(), card: { ...card, unseen: "", mood: "tense" } };
+    const odd = { ...emptyPlan(), card: { ...card, unseen: "", unseenOdds: "", mood: "tense" } };
     const failed = await runBothTurns(
       policyRequest(),
       ctx(fakeTransport(okResult(JSON.stringify(odd)))),
@@ -521,7 +521,7 @@ describe("policy decisions are narrated (§policy-decision-hook)", () => {
       rightAftermath: "Priya seals the hatch and we go as we are.",
     };
     const transport = fakeTransport(
-      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "", unseenOdds: "" } }))),
     );
     const req = departureGateRequest(content());
     const res = await runBothTurns(req, ctx(transport));
@@ -712,7 +712,7 @@ describe("what the captain has seen (§card-history)", () => {
       rightAftermath: "",
     };
     const transport = fakeTransport(
-      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "" } }))),
+      okResult(JSON.stringify(emptyPlan({ card: { ...card, unseen: "", unseenOdds: "" } }))),
     );
     const req = policyRequest();
     const res = await runBothTurns(req, ctx(transport));
@@ -928,7 +928,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
     expect(STATIC_RULES).toContain("cards are brought to them");
     expect(STATIC_RULES).toContain("The captain's voice line is how the captain comes across");
     expect(STATIC_RULES).toContain("how others react to or quote the captain");
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
   });
 
   it("tells the model its levers on a passenger are endPassage, and aboard strike and the memory and thought levers, and never to narrate what they did ashore (passengers §4.3, §6, D106)", () => {
@@ -1121,7 +1121,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model what an errand is, that the fight is the sim's, and that a kill job is rare and dirty (expeditions A2, v0.29)", () => {
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
     expect(STATIC_RULES).toContain("An errand is a job that is about a person.");
     expect(STATIC_RULES).toContain("who is at the site is the sim's for now");
     expect(STATIC_RULES).toContain("you have no lever yet that stages a site");
@@ -1157,7 +1157,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model to decide, roll or let the sim run, and to show what it decides (D106, v0.32)", () => {
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
     expect(STATIC_RULES).not.toContain("do not decide outcomes");
     expect(STATIC_RULES).toContain("- Decide, roll, or let the sim run. You may decide outcomes");
     expect(STATIC_RULES).toContain("you cannot do the impossible");
@@ -1178,7 +1178,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model its outcome levers: strike by the body rules, transact and payCredits, the captain not special, budgets as advice (D106, v0.33)", () => {
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
     expect(STATIC_RULES).toContain("wound or kill a person by the body rules (strike)");
     expect(STATIC_RULES).toContain("move money into or out of the ship's money (transact)");
     expect(STATIC_RULES).toContain("the death the season has been walking toward");
@@ -1192,7 +1192,7 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model the rest of its outcome levers: memories, a falling-out, thoughts, a reveal, a fault now and a decided hazard (D106, v0.34)", () => {
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
     for (const lever of [
       "(plantMemory)",
       "(fallOut)",
@@ -1214,21 +1214,34 @@ describe("prompt text (§spoken-cards, §card-history, §threads-and-scales)", (
   });
 
   it("tells the model when to name the way in unseen on the arrival card, and never to give it away (D105, v0.31)", () => {
-    expect(PROMPT_VERSION).toBe("v0.35");
+    expect(PROMPT_VERSION).toBe("v0.36");
     const policy = HOOK_INSTRUCTIONS.policyDecision;
     expect(policy).toContain("name the way in unseen (card.unseen, left or right)");
     expect(policy).toContain("a guard asleep, a back way, a friend inside");
     expect(policy).toContain("the crew slip in and nobody there notices them");
     expect(policy).toContain("the people there are waiting for them");
-    expect(policy).toContain("Leave it empty when nothing in the story says either way");
+    expect(policy).toContain("Leave both empty when nothing in the story says either way");
     expect(policy).toContain("never name a side that holds the ramp");
-    expect(policy).toContain("a hint the captain could read in the story is fine, a tell is not");
-    expect(policy).toContain("unseen is empty on every other card");
+    expect(policy).toContain("unseen and unseenOdds are empty on every other card");
     expect(STATIC_RULES).toContain("name the way in unseen on a site's arrival card");
     expect(STATIC_RULES).toContain(
       "One thing at a site you decide before the fight is which way in goes unseen",
     );
     expect(STATIC_RULES).toContain("Only use the fifteen levers");
+  });
+
+  it("tells the model to set the odds honestly, voice them as the speaker would, and that failure is a story (§unseen-odds, v0.36)", () => {
+    const policy = HOOK_INSTRUCTIONS.policyDecision;
+    expect(policy).toContain("card.unseenOdds, your honest chance that side works");
+    expect(policy).toContain("the sim rolls it once if the captain picks that side");
+    expect(policy).toContain(
+      "a percentage in the situation or the marked side's label equal to unseenOdds is allowed",
+    );
+    expect(STATIC_RULES).toContain("Odds there are your honest read of what the story set up");
+    expect(STATIC_RULES).toContain("How the chance is voiced is the speaker's");
+    expect(STATIC_RULES).toContain("a stated chance is a promise the dice keep");
+    expect(STATIC_RULES).toContain("A 0 or a 100 is a decision dressed as a gamble");
+    expect(STATIC_RULES).toContain("that is a story, not a punishment");
   });
 });
 

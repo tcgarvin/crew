@@ -276,10 +276,10 @@ function fieldLever(state: State, content: ContentBundle, config: ConfigDef): st
  * card the narrator dresses, which the translator turns into `markUnseen`.
  */
 const UNSEEN_LEVER: readonly string[] = [
-  "## 8. card.unseen: the way in unseen, on a site's arrival card",
+  "## 8. card.unseen and card.unseenOdds: the way in unseen, on a site's arrival card",
   "- Only on the policyDecision call for a site's arrival card (expedition.arrival): left or right names the side that gets in without the people there noticing; empty for neither, and empty on every other card.",
-  "- If the captain picks that side, the party slips in unseen: nobody there notices them unless they fire first. If the captain picks the other side, the people there were waiting: they are on the party the moment it is on the ground. Empty leaves it to the sim, which rolls who notices and when.",
-  "- Only when the story has set it up (a guard asleep, a back way, a friend inside, the people there looking the other way), never a side that holds the ramp (dropped), and never given away on the card: both sides read as plausible, a hint is fine, a tell is not. The captain still chooses and the sim fights the chosen side; you never choose the plan.",
+  '- unseenOdds is the chance it works, a whole percent from 0 to 100 as a string ("70"); empty is 100. If the captain picks that side the sim rolls it once: it works, and the party slips in unseen (nobody there notices them unless they fire first); it fails, and the people there were waiting. If the captain picks the other side, the people there were waiting: they are on the party the moment it is on the ground. Empty unseen leaves it to the sim, which rolls who notices and when.',
+  "- Only when the story has set it up (a guard asleep, a back way, a friend inside, the people there looking the other way), never a side that holds the ramp (dropped). The odds are your honest read of that set-up, not a wish; a 0 or a 100 is a decision dressed as a gamble. The card may voice the chance as the speaker would (a number, a phrase, or nothing): a percentage in the situation or the marked side's label equal to unseenOdds is allowed, any other number is refused. The captain still chooses and the sim fights the chosen side; you never choose the plan.",
 ];
 
 /**

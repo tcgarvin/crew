@@ -39,6 +39,7 @@ import {
   TRANSACT_TEXT_MAX,
   type TempRef,
   type ThoughtKey,
+  UNSEEN_ODDS_CERTAIN,
   basePriceFor,
   configTicks,
   errandPay,
@@ -61,6 +62,7 @@ import {
   type TranslateIntents,
   type TranslationCtx,
   type TranslationResult,
+  UNSEEN_ODDS_PATTERN,
   buildNarratorPlanSchema,
 } from "./contract";
 import {
@@ -195,6 +197,28 @@ export function textProblem(text: string, secrets: readonly string[]): string | 
   if (leak !== undefined)
     return `player-facing text reveals something nobody aboard knows ("${leak}")`;
   return undefined;
+}
+
+/**
+ * §unseen-odds: a percentage the narrator wrote that is the very chance it set on the way in
+ * unseen ("I make it 20%", "20 percent"), unsigned and whole; any other number is left for
+ * `textProblem`.
+ */
+const STATED_PERCENT = /(?<![\d.,+-])(\d+)\s*(?:%|per\s?cent\b)/gi;
+
+/**
+ * `textProblem` for a text that may state `odds`, the marked side's chance: a percentage equal to
+ * it is exempt, and every other number is still refused (§player-facing-text-checks).
+ */
+function textProblemStating(
+  text: string,
+  secrets: readonly string[],
+  odds: number,
+): string | undefined {
+  const exempt = text.replace(STATED_PERCENT, (match, digits: string) =>
+    Number(digits) === odds ? "" : match,
+  );
+  return exempt.trim() === "" ? textProblem(text, secrets) : textProblem(exempt, secrets);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1362,10 +1386,17 @@ function pick<K extends "leftAftermath" | "rightAftermath">(
   return value === undefined ? {} : ({ [key]: value } as Pick<DecisionCardProse, K>);
 }
 
+/** §unseen-odds: the side marked unseen this call and the chance it was given. */
+interface StatedOdds {
+  readonly side: "left" | "right";
+  readonly odds: number;
+}
+
 function policyCard(
   env: Env,
   plan: NarratorPlan,
   dropped: DroppedIntent[],
+  stated: StatedOdds | undefined,
 ): DecisionCardProse | undefined {
   const hook = env.hook;
   if (hook?.kind !== "policyDecision") return undefined;
@@ -1396,16 +1427,21 @@ function policyCard(
       ? pick(fallback, "rightAftermath")
       : { rightAftermath: clipWords(rightAftermath, AFTERMATH_MAX_WORDS) }),
   };
+  // §unseen-odds: the situation and the marked side's label may say the chance the narrator set.
+  const mayState = (text: string) =>
+    stated === undefined
+      ? textProblem(text, env.secrets)
+      : textProblemStating(text, env.secrets, stated.odds);
+  const markedLabel = (side: "left" | "right", text: string) =>
+    stated?.side === side ? mayState(text) : textProblem(text, env.secrets);
   const problem = [
-    card.title,
-    card.situation,
-    card.leftLabel,
-    card.rightLabel,
-    ...(card.leftAftermath === undefined ? [] : [card.leftAftermath]),
-    ...(card.rightAftermath === undefined ? [] : [card.rightAftermath]),
-  ]
-    .map((t) => textProblem(t, env.secrets))
-    .find((p) => p !== undefined);
+    textProblem(card.title, env.secrets),
+    mayState(card.situation),
+    markedLabel("left", card.leftLabel),
+    markedLabel("right", card.rightLabel),
+    ...(card.leftAftermath === undefined ? [] : [textProblem(card.leftAftermath, env.secrets)]),
+    ...(card.rightAftermath === undefined ? [] : [textProblem(card.rightAftermath, env.secrets)]),
+  ].find((p) => p !== undefined);
   if (problem !== undefined) {
     dropped.push({ intentIndex: -1, kind: "card", reason: `card: ${problem}` });
     return fallback;
@@ -1420,10 +1456,19 @@ function policyCard(
  * the expedition under way, before its plan, is dropped, as is one whose plan holds the ramp. The
  * card's prose is `policyCard`'s and does not depend on this.
  */
-function unseenCommand(env: Env, plan: NarratorPlan): Outcome<NarratorDraft | undefined> {
+function unseenCommand(env: Env, plan: NarratorPlan): Outcome<UnseenDraft | undefined> {
   const side = plan.card?.unseen ?? "";
-  if (side === "") return ok(undefined);
+  const written = (plan.card?.unseenOdds ?? "").trim();
+  if (side === "") {
+    return written === ""
+      ? ok(undefined)
+      : no(`card.unseenOdds "${written}": no side is marked unseen (card.unseen is empty)`);
+  }
   const notHere = (why: string) => no(`card.unseen "${side}": ${why}`);
+  if (written !== "" && !UNSEEN_ODDS_PATTERN.test(written)) {
+    return notHere(`unseenOdds "${written}" is not a whole percent from 0 to 100`);
+  }
+  const odds = written === "" ? UNSEEN_ODDS_CERTAIN : Number(written);
   const hook = env.hook;
   if (hook?.kind !== "policyDecision") {
     return notHere("only the arrival card at a site has a way in unseen");
@@ -1453,7 +1498,13 @@ function unseenCommand(env: Env, plan: NarratorPlan): Outcome<NarratorDraft | un
   if (option.plan.posture === "hold") {
     return notHere("that side holds the ramp; holding the ramp never goes unseen");
   }
-  return ok({ kind: "markUnseen", payload: { decisionId, planId } });
+  return ok({ side, draft: { kind: "markUnseen", payload: { decisionId, planId, odds } } });
+}
+
+/** A mark that passed: the side it is on, for the card's text checks, and its command. */
+interface UnseenDraft {
+  readonly side: "left" | "right";
+  readonly draft: Extract<NarratorDraft, { kind: "markUnseen" }>;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1636,14 +1687,18 @@ export const translateIntents: TranslateIntents = (
       id: commandIdFor(ctx.callId, commands.length),
       source: "narrator",
       targetTick: ctx.hookTick + 1,
-      ...unseen.value,
+      ...unseen.value.draft,
     } as NarratorCommand);
   }
+  const stated =
+    unseen.ok && unseen.value !== undefined
+      ? { side: unseen.value.side, odds: unseen.value.draft.payload.odds }
+      : undefined;
 
   const callBack = translateCallBack(ctx, plan.callBack, commands.length, dropped);
   if (callBack !== undefined) commands.push(callBack);
 
-  const card = policyCard(env, plan, dropped);
+  const card = policyCard(env, plan, dropped, stated);
   const beat = env.tally.beatCardThread;
   const closed = env.tally.closedThread;
   return {
