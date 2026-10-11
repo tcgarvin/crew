@@ -110,7 +110,11 @@ un-loses a ship, and a restored lost save halts at once. Every `switch` on `halt
     `portGraph(…, "known")`, and the errand band reads `portGraph(…, "all")`; nothing else adds a
     near port's route to a site. No fee, no staging call and no store at a site. The expedition's
     two cards are policy decisions (`queuePolicyDecision`, no `jobId` on the record), queued from
-    `systems/expedition/cards.ts` and recorded in `Expedition.cards`.
+    `systems/expedition/cards.ts` and recorded in `Expedition.cards`. The plan menu reads the live
+    expedition's errand kind (`planMenu`: a `fetchItem` is fought for `takeItem`, its default pair
+    `defaultPairFor`). D105: the narrator's one lever at a site is `markUnseen` on the pending
+    arrival card, written to `Expedition.unseenPlanId`; `adoptPlan` turns it into
+    `Expedition.notice` (`unseen` or `seen`), which `expeditionResolved` carries.
 
 ## How work is advertised
 

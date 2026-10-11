@@ -745,8 +745,24 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
   }
 }
 
-/** "Corran Vale taken; two of ours hurt", "Corran Vale got away", and the rest. */
+/**
+ * "Corran Vale taken; two of ours hurt", "Corran Vale got away", and the rest; D105 adds how the
+ * site noticed us when the narrator marked the arrival card ("; they were waiting for us", or
+ * "; nobody saw us" while no shot was fired).
+ */
 function resolvedLine(event: Extract<SimEvent, { type: "expeditionResolved" }>, n: Names): string {
+  return `${resolvedHead(event, n)}${noticeSuffix(event)}`;
+}
+
+function noticeSuffix(event: Extract<SimEvent, { type: "expeditionResolved" }>): string {
+  const { notice, shots } = event.payload;
+  if (notice === "seen") return "; they were waiting for us";
+  // Unseen, contact comes only from our own first shot: with none fired, nobody saw us at all.
+  if (notice === "unseen" && shots === 0) return "; nobody saw us";
+  return "";
+}
+
+function resolvedHead(event: Extract<SimEvent, { type: "expeditionResolved" }>, n: Names): string {
   const { outcome, targetName, hurtUs, deadUs, siteId } = event.payload;
   const target = targetName ?? "The target";
   switch (outcome) {

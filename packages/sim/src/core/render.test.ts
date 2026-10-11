@@ -674,6 +674,39 @@ describe("expeditions A2: setting down, lifting off, and the errand's lines", ()
       ).toMatch(/^The job for Ysolde Maren is lost: /);
     });
 
+    it("says how the site noticed us when the narrator marked the arrival card (D105)", () => {
+      const resolved = (
+        extra: Partial<Extract<SimEvent, { type: "expeditionResolved" }>["payload"]>,
+      ) =>
+        line({
+          type: "expeditionResolved",
+          significance: "narrative",
+          payload: {
+            siteId: TINY.port2,
+            outcome: "targetTaken",
+            targetName: "The strongbox papers",
+            seconds: 40,
+            shots: 0,
+            woundsUs: 0,
+            hurtUs: 0,
+            woundsThem: 0,
+            deadUs: 0,
+            deadThem: 0,
+            ...extra,
+          },
+        });
+      expect(resolved({})).toBe("The strongbox papers taken");
+      expect(resolved({ notice: "unseen" })).toBe("The strongbox papers taken; nobody saw us");
+      // Unseen, then our own first shot: the fight tells itself.
+      expect(resolved({ notice: "unseen", shots: 3 })).toBe("The strongbox papers taken");
+      expect(resolved({ notice: "seen", shots: 9, hurtUs: 1 })).toBe(
+        "The strongbox papers taken; one of ours hurt; they were waiting for us",
+      );
+      expect(resolved({ notice: "seen", outcome: "partyRouted" })).toBe(
+        "The party is driven back to the ship; they were waiting for us",
+      );
+    });
+
     it("names what a site keeps nothing of, and the site mid-sentence", () => {
       expect(
         line({

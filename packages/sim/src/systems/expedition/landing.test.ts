@@ -235,6 +235,7 @@ describe("the arrival card (call 4)", () => {
       key: "expedition.arrival",
       params: {
         jobId: test.jobId,
+        kind: "fetchPerson",
         site: SITE.port,
         target: TARGET_NAME,
         speaker: "Jon Reyes",
@@ -331,7 +332,7 @@ describe("the arrival card's pair", () => {
       option("assault-lethal-armed", true),
       option("x", true),
     ];
-    expect(arrivalPair(menu)?.map((o) => o.id)).toEqual([
+    expect(arrivalPair(menu, "fetchPerson")?.map((o) => o.id)).toEqual([
       "hold-lethal-armed",
       "assault-lethal-armed",
     ]);
@@ -343,8 +344,11 @@ describe("the arrival card's pair", () => {
       option("assault-lethal-armed", true),
       option("x", true),
     ];
-    expect(arrivalPair(menu)?.map((o) => o.id)).toEqual(["assault-lethal-armed", "x"]);
-    expect(arrivalPair(menu.slice(0, 2))).toBeUndefined();
+    expect(arrivalPair(menu, "fetchPerson")?.map((o) => o.id)).toEqual([
+      "assault-lethal-armed",
+      "x",
+    ]);
+    expect(arrivalPair(menu.slice(0, 2), "fetchPerson")).toBeUndefined();
   });
 });
 

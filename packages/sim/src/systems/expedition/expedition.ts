@@ -65,7 +65,7 @@ import {
   shaken,
   surrender,
 } from "./combat";
-import { settleErrand } from "./errand";
+import { pickUpLoot, settleErrand } from "./errand";
 import { type Ground, aboard, distance, groundOf, onSite, tileOfActor } from "./ground";
 import { adjacent8, lineOfSight } from "./los";
 import { canAct, shiftResolve, upright, withdrawalDue } from "./morale";
@@ -256,6 +256,7 @@ function checkObjective(fight: Fight): void {
   } else if (plan.objective === "takeItem") {
     const loot = fight.ground.posts.loot;
     held = loot !== undefined && pressedBeside(fight, loot) && !guarded(fight, loot);
+    if (held) pickUpLoot(fight);
   } else {
     held =
       expedition.phase === "fight" &&
@@ -379,6 +380,7 @@ function resolve(fight: Fight, outcome: ExpeditionOutcome, fledName: string | un
       seconds: (ctx.tick - from) / ctx.config.time.tickRate,
       shots: expedition.shots,
       ...counts,
+      ...(expedition.notice === undefined ? {} : { notice: expedition.notice }),
     },
   });
   const alert = ctx.state.alert;

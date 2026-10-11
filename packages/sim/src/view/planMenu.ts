@@ -6,16 +6,19 @@
  * The cross product, pruned: every posture × `lethal`/`stun` × the four squad rules, and
  * `holdFire` only with `bait` and `creep`. A squad rule that picks the same people as one before it
  * (in the order `armedOnly`, `everyone`, `blastersOnly`, `smallTeam`) for the same posture and fire
- * is dropped. Order: the default pair (`hold-lethal-armed`, `assault-lethal-armed`), then every
- * other posture's `lethal`/`armedOnly`, then `assault-stun-armed`, then the rest by posture, fire
- * and squad; at most eight are shown. Ids read `<posture>-<fire>-<squad>` with the squad as
- * `all`/`armed`/`blasters`/`small`.
+ * is dropped. Order: the default pair for the expedition's errand (`defaultPairFor`:
+ * `hold-lethal-armed`, `assault-lethal-armed`; for a `fetchItem`, `creep-holdFire-armed`,
+ * `assault-lethal-armed`), then every other posture's `lethal`/`armedOnly`, then
+ * `assault-stun-armed`, then the rest by posture, fire and squad; at most eight are shown. Ids read
+ * `<posture>-<fire>-<squad>` with the squad as `all`/`armed`/`blasters`/`small`.
  *
  * `available` and `why` come from the roster (`fitToGo`: fit, awake, aboard, not the helm or the
  * gangway), the arms locker, the site's posts (`flank` needs a `flank` post and four in the
  * squad; `bait` two) and the phase (after contact `creep` and `bait` are out). Every plan's
- * objective is `takeTarget` on a site with a target post, else `breakThem`; it withdraws at
- * `halfDown`.
+ * objective is `takeItem` for a live expedition's `fetchItem` errand, else `takeTarget` on a site
+ * with a target post, else `breakThem`; it withdraws at `halfDown`. The errand is the live
+ * expedition's (`Expedition.jobId`); with none (a scenario start, or once it has resolved) the menu
+ * is the errand-free one, so a new start never validates against the last errand's.
  *
  * The site is `siteId` when given (the start command validates its plan before the site is
  * alongside), else the expedition's, else the site alongside.
@@ -29,13 +32,15 @@ import type { ReadonlyWorldState } from "../core/types/pipeline";
 import {
   type BattlePlan,
   type FireRule,
+  type Objective,
   POSTURES,
   type Posture,
   type SquadRule,
 } from "../core/types/state";
+import type { ErrandKind } from "../core/types/travel";
 import type { PlanOption } from "../core/types/view";
 import { lockerWeapons } from "../systems/expedition/muster";
-import { DEFAULT_PLANS, squadFor } from "../systems/expedition/plans";
+import { defaultPairFor, squadFor } from "../systems/expedition/plans";
 
 /** At most this many options are shown (§8.4). */
 export const PLAN_MENU_SIZE = 8;
@@ -108,9 +113,31 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
+/**
+ * The live expedition's errand kind (`Expedition.jobId`), or undefined with no live expedition or
+ * one without an errand (a scenario start). Throws for a `jobId` that names no errand on record, as
+ * the arrival card does.
+ */
+function menuErrandKind(state: ReadonlyWorldState): ErrandKind | undefined {
+  const expedition = state.expedition;
+  if (expedition === undefined || expedition.phase === "resolved") return undefined;
+  const jobId = expedition.jobId;
+  if (jobId === undefined) return undefined;
+  const errand = state.jobs[jobId]?.errand;
+  if (errand === undefined) {
+    throw new Error(`planMenu: the expedition's job "${jobId}" is not an errand on record`);
+  }
+  return errand.kind;
+}
+
+function objectiveFor(kind: ErrandKind | undefined, site: DockDef | undefined): Objective {
+  if (kind === "fetchItem") return "takeItem";
+  return site?.posts.some((p) => p.kind === "target") === false ? "breakThem" : "takeTarget";
+}
+
 /** Display order: the default pair, the other postures' lethal-armed, assault-stun, the rest. */
-function rank(plan: BattlePlan): number {
-  const defaults = DEFAULT_PLANS.findIndex((d) => d.id === plan.id);
+function rank(plan: BattlePlan, pair: readonly BattlePlan[]): number {
+  const defaults = pair.findIndex((d) => d.id === plan.id);
   if (defaults >= 0) return defaults;
   if (plan.fire === "lethal" && plan.squad === "armedOnly")
     return 10 + POSTURES.indexOf(plan.posture);
@@ -134,8 +161,9 @@ export function planMenu(
   };
   const phase = state.expedition?.phase;
   const contact = phase === "fight" || phase === "resolved";
-  const objective =
-    site?.posts.some((p) => p.kind === "target") === false ? "breakThem" : "takeTarget";
+  const kind = menuErrandKind(state);
+  const objective = objectiveFor(kind, site);
+  const pair = defaultPairFor(kind);
   const options: PlanOption[] = [];
   for (const posture of POSTURES) {
     for (const fire of firesFor(posture)) {
@@ -165,7 +193,7 @@ export function planMenu(
   }
   return options
     .map((option, index) => ({ option, index }))
-    .sort((a, b) => rank(a.option.plan) - rank(b.option.plan) || a.index - b.index)
+    .sort((a, b) => rank(a.option.plan, pair) - rank(b.option.plan, pair) || a.index - b.index)
     .slice(0, PLAN_MENU_SIZE)
     .map((o) => o.option);
 }

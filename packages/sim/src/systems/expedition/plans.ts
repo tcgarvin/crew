@@ -1,7 +1,8 @@
 /**
  * Expeditions A1 (§8.3, §8.5, plan call 12): battle plans on the sim side: who goes under each
- * squad rule (`squadFor`) and the default pair's plans (`DEFAULT_PLANS`). The menu itself is
- * `view/planMenu.ts` (pure over state and content, so the narrator and the kernel read the same).
+ * squad rule (`squadFor`) and the default pairs' plans (`DEFAULT_PLANS` for a person or no errand,
+ * `ITEM_DEFAULT_PLANS` for a `fetchItem`, `defaultPairFor`). The menu itself is `view/planMenu.ts`
+ * (pure over state and content, so the narrator and the kernel read the same).
  *
  * `squadFor` picks from crew who are `available`, awake, aboard (on the ship's own floor, not the
  * dock), not passengers, not the helm stander and not on gangway watch; captain first (owner
@@ -19,6 +20,7 @@ import type { ConfigDef, ContentBundle } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import type { BattlePlan, Expedition, SquadRule } from "../../core/types/state";
+import type { ErrandKind } from "../../core/types/travel";
 import { shipDeckId } from "../../core/world";
 import { gangwayStanderOf, whoHasTheHelm } from "../watch/helm";
 import { lockerWeapons } from "./muster";
@@ -44,6 +46,39 @@ export const DEFAULT_PLANS: readonly BattlePlan[] = [
     withdrawWhen: "halfDown",
   },
 ];
+
+/**
+ * D105: the pair for a `fetchItem` errand: creep in quietly holding fire, or go in and take it. A
+ * `hold` side would never reach the item, and an unseen `hold` would only wait out the clock.
+ */
+export const ITEM_DEFAULT_PLANS: readonly BattlePlan[] = [
+  {
+    id: "creep-holdFire-armed",
+    squad: "armedOnly",
+    posture: "creep",
+    fire: "holdFire",
+    objective: "takeItem",
+    targetMustLive: false,
+    withdrawWhen: "halfDown",
+  },
+  {
+    id: "assault-lethal-armed",
+    squad: "armedOnly",
+    posture: "assault",
+    fire: "lethal",
+    objective: "takeItem",
+    targetMustLive: false,
+    withdrawWhen: "halfDown",
+  },
+];
+
+/**
+ * The default pair for an errand of `kind` (`undefined`: no errand, a scenario start): what the
+ * menu ranks first and the arrival card offers when both are available.
+ */
+export function defaultPairFor(kind: ErrandKind | undefined): readonly BattlePlan[] {
+  return kind === "fetchItem" ? ITEM_DEFAULT_PLANS : DEFAULT_PLANS;
+}
 
 /** What squad selection reads. */
 export interface SquadCtx {

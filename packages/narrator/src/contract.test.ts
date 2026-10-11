@@ -256,6 +256,7 @@ describe("NarratorPlan structured-output schema", () => {
       rightLabel: "You handle it.",
       leftAftermath: "You go looking for Jax.",
       rightAftermath: "Mara nods and heads aft.",
+      unseen: "",
     };
     const plan = {
       rationale: "r",
@@ -271,6 +272,26 @@ describe("NarratorPlan structured-output schema", () => {
     expect(schema.safeParse({ ...plan, card: withoutSpeaker }).success).toBe(false);
     // §plan-schema-in-the-prompt: null is a union type for the grammar compiler; empty means none.
     expect(schema.safeParse({ ...plan, card: { ...card, speaker: null } }).success).toBe(false);
+  });
+
+  it("takes the card's unseen side as empty, left or right, and never missing (D105)", () => {
+    const card = {
+      title: "Harrow End",
+      speaker: "Jon Reyes",
+      situation: "Jon crouches at the ramp head.",
+      leftLabel: "Creep in quietly",
+      rightLabel: "Go in and take it",
+      leftAftermath: "",
+      rightAftermath: "",
+      unseen: "",
+    };
+    const plan = { rationale: "r", intents: [], card, callBack };
+    for (const unseen of ["", "left", "right"]) {
+      expect(schema.safeParse({ ...plan, card: { ...card, unseen } }).success).toBe(true);
+    }
+    expect(schema.safeParse({ ...plan, card: { ...card, unseen: "both" } }).success).toBe(false);
+    const { unseen: _omitted, ...withoutUnseen } = card;
+    expect(schema.safeParse({ ...plan, card: withoutUnseen }).success).toBe(false);
   });
 
   it("requires callBack, with when one of nextPort, departure, midLeg (§requested-call-back)", () => {
