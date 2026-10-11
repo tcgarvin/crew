@@ -43,13 +43,23 @@ export interface ItemInspection {
   readonly count: number;
   /** Plain words: "in the cargo hold", "carried by Mara Osei". */
   readonly where: string;
-  /** Present when the item is freight on a contract. */
+  /** Present when the item is freight on a contract, or what an errand fetches. */
   readonly job?: {
     readonly issuer: string;
     readonly from: string;
     readonly to: string;
     readonly status: string;
+    /** Expeditions A2: the job is an errand to a site, not freight (`errandWords`). */
+    readonly errand?: ErrandWords;
   };
+}
+
+/** Expeditions A2 (§6): an errand in words, with no numbers (§cards-never-mention-pay). */
+export interface ErrandWords {
+  /** "Bring back Teodor Lusk from Harrow End, alive", "Fetch the strongbox papers from Harrow End". */
+  readonly what: string;
+  /** The port the errand comes home to and pays at. */
+  readonly home: string;
 }
 
 export interface InspectorProps {
@@ -374,15 +384,59 @@ function LocalInspector({ local }: { local: LocalInspection }) {
  */
 function itemSubtitle(item: ItemInspection): string {
   if (item.job === undefined) return "ship's stores";
+  if (item.job.errand !== undefined) return "an errand";
   return item.job.status === "offered" ? "freight on offer" : "freight";
 }
 
+/** Expeditions A2: an errand's contract in its own words; it is never waiting to ship. */
+const ERRAND_STATUS_WORDS: Readonly<Record<string, string>> = {
+  offered: "on offer",
+  accepted: "taken",
+  inTransit: "under way",
+  delivered: "brought back",
+  paid: "brought back and paid",
+  failed: "failed",
+};
+
+type ItemJob = NonNullable<ItemInspection["job"]>;
+
+function FreightRows({ job }: { job: ItemJob }) {
+  return (
+    <>
+      <dt>Going to</dt>
+      <dd>{job.to}</dd>
+      <dt>From</dt>
+      <dd>{job.from}</dd>
+      <dt>For</dt>
+      <dd>{job.issuer}</dd>
+      <dt>Contract</dt>
+      <dd>{JOB_STATUS_WORDS[job.status] ?? job.status}</dd>
+    </>
+  );
+}
+
+function ErrandRows({ job, errand }: { job: ItemJob; errand: ErrandWords }) {
+  return (
+    <>
+      <dt>Errand</dt>
+      <dd>{errand.what}</dd>
+      <dt>Back to</dt>
+      <dd>{errand.home}</dd>
+      <dt>For</dt>
+      <dd>{job.issuer}</dd>
+      <dt>Contract</dt>
+      <dd>{ERRAND_STATUS_WORDS[job.status] ?? job.status}</dd>
+    </>
+  );
+}
+
 function ItemInspector({ item }: { item: ItemInspection }) {
+  const job = item.job;
   return (
     <div>
       <h2>{item.name}</h2>
       <p className="inspector-subtitle">{itemSubtitle(item)}</p>
-      {item.job?.status === "offered" && (
+      {job?.status === "offered" && job.errand === undefined && (
         <p>Set out for whoever takes the job; nobody loads it until then.</p>
       )}
       <dl className="inspector-grid">
@@ -390,18 +444,12 @@ function ItemInspector({ item }: { item: ItemInspection }) {
         <dd>{item.count}</dd>
         <dt>Where</dt>
         <dd>{item.where}</dd>
-        {item.job !== undefined && (
-          <>
-            <dt>Going to</dt>
-            <dd>{item.job.to}</dd>
-            <dt>From</dt>
-            <dd>{item.job.from}</dd>
-            <dt>For</dt>
-            <dd>{item.job.issuer}</dd>
-            <dt>Contract</dt>
-            <dd>{JOB_STATUS_WORDS[item.job.status] ?? item.job.status}</dd>
-          </>
-        )}
+        {job !== undefined &&
+          (job.errand === undefined ? (
+            <FreightRows job={job} />
+          ) : (
+            <ErrandRows job={job} errand={job.errand} />
+          ))}
       </dl>
     </div>
   );
