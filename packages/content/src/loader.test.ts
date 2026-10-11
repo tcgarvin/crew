@@ -355,27 +355,39 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
-  it("has one landing site, the Boathouse near Tern's Rest, that no port lists (expeditions A1, call 1)", () => {
+  it("has two landing sites, the Boathouse and Harrow End, that no port lists (expeditions A1, call 1)", () => {
     const sites = Object.values(bundle.ports).filter((p) => p.kind === "site");
-    expect(sites.map((s) => s.id)).toEqual(["port.boathouse"]);
-    const [site] = sites;
-    expect(site?.nearPortId).toBe("port.terns_rest");
-    expect(site?.routes).toEqual([{ toPortId: "port.terns_rest", distance: 20 }]);
-    expect(site?.market).toEqual([]);
-    for (const port of Object.values(ports)) {
+    expect(sites.map((s) => s.id)).toEqual(["port.boathouse", "port.harrow_end"]);
+    const expected = [
+      {
+        id: "port.boathouse",
+        near: "port.terns_rest",
+        cast: ["Corran Vale", "Hesk Marrow", "Darrow Finch", "Old Pell"],
+      },
+      {
+        id: "port.harrow_end",
+        near: "port.green_meridian",
+        cast: ["Teodor Lusk", "Rhee Castellan", "Mattie Lusk", "Amos Wray", "Wenna Brae"],
+      },
+    ];
+    for (const { id, near, cast } of expected) {
+      const site = sites.find((s) => s.id === id);
+      expect(site?.nearPortId, id).toBe(near);
+      expect(site?.routes, id).toEqual([{ toPortId: near, distance: 20 }]);
+      expect(site?.market, id).toEqual([]);
+      for (const port of Object.values(ports)) {
+        expect(
+          port.routes.some((r) => r.toPortId === id),
+          port.id,
+        ).toBe(false);
+      }
+      const map = Object.values(bundle.docks ?? {}).find((d) => d.portId === id);
+      expect(map?.kind, id).toBe("site");
       expect(
-        port.routes.some((r) => r.toPortId === "port.boathouse"),
-        port.id,
-      ).toBe(false);
+        map?.defaultCast?.map((c) => c.name),
+        id,
+      ).toEqual(cast);
     }
-    const map = Object.values(bundle.docks ?? {}).find((d) => d.portId === "port.boathouse");
-    expect(map?.kind).toBe("site");
-    expect(map?.defaultCast?.map((c) => c.name)).toEqual([
-      "Corran Vale",
-      "Hesk Marrow",
-      "Darrow Finch",
-      "Old Pell",
-    ]);
   });
 
   it("sells patch kits wherever it sells hull plating, so a scarred ship restocks both (§plating-and-kits-at-port)", () => {

@@ -161,8 +161,8 @@ function render(
 }
 
 describe("every authored dock draws", () => {
-  it("has one map per port, seven in all (six ports and the Boathouse site)", () => {
-    expect(allDocks.length).toBe(7);
+  it("has one map per port, eight in all (six ports and two landing sites)", () => {
+    expect(allDocks.length).toBe(8);
   });
 
   for (const dock of allDocks) {
@@ -371,9 +371,8 @@ describe("dockShape", () => {
     ]);
     expect(coverLookOf("n")).toBe("nets");
     expect(coverLookOf("c")).toBe("crates");
-    // No dock is a site.
-    for (const dock of allDocks)
-      if (dock !== site) expect(dockShape(dock).site, dock.id).toBe(false);
+    // Every site map draws as ground, and no port's dock does.
+    for (const dock of allDocks) expect(dockShape(dock).site, dock.id).toBe(dock.kind === "site");
   });
 
   it("draws the site's cover and no quay stripe, and marks a tapped site post", () => {
