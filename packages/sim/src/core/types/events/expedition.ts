@@ -27,6 +27,11 @@ export interface ExpeditionEventPayloads {
   /** The party is pulling back to the ramp. */
   partyWithdrew: Record<string, never>;
   /**
+   * Expeditions A2: a kill job's target taken alive is executed at the scene by `byActorId`, who
+   * leads the party now (§settling-the-errand). `name` is the target's, for the log.
+   */
+  executed: { readonly actorId: ActorId; readonly byActorId: ActorId; readonly name: string };
+  /**
    * The fight at `siteId` is over: how, how long from contact, and the tally; `targetName` names
    * the target for the log (the cast may be gone from `actors` by the time it is read).
    */
@@ -52,5 +57,6 @@ export const EXPEDITION_EVENT_SIGNIFICANCE = {
   shotFired: "trace",
   combatantBroke: "notable",
   partyWithdrew: "notable",
+  executed: "narrative",
   expeditionResolved: "narrative",
 } as const satisfies SignificanceCatalog<ExpeditionEventPayloads>;

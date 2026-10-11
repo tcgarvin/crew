@@ -476,6 +476,12 @@ before the party and cast leave the fight (`systems/expedition/errand.ts` `settl
   combatant.
 - `targetTaken` with the target dead is `broughtDead` when the job wants them `dead` or `either`
   way, else `failed`.
+- A kill job (`wants: "dead"`) whose target is taken alive ends in an execution: whoever leads the
+  party now shoots them where they stand, a grave blaster wound to the head through the one damage
+  entry point (`executed`, "Mara Osei executes Teodor Lusk"; the executioner thinks
+  `killedSomeone`), and the errand is `broughtDead`. Why: the party never fires at an unarmed
+  target, so a kill job could never be a kill; owner: "Kill jobs should end in an execution if
+  kills never happen." (D104)
 - A `fetchItem` taken is `broughtItem` once its item is stowed aboard as the job's one manifest
   line (from a party member's hands, else the floor nearest the loot post).
 - Every other outcome is `failed`: the job fails there and then (`jobFailed`, outcome `failed`).
