@@ -8,7 +8,8 @@
  * The outcome, from the expedition's: `targetTaken` with the target alive is `broughtAlive` (the
  * target is removed and boards anew as the captive, `spawnCaptive`, since `castAfter` removes a
  * taken target and the aftermath every actor with a combatant); `targetTaken` with the target dead
- * is `broughtDead` when the job wants it dead or either way, else `failed`; a `fetchItem` taken is
+ * is `broughtDead` when the job wants it dead or either way, else `failed`; a kill job's target
+ * taken alive is executed and `broughtDead` (D104); a `fetchItem` taken is
  * `broughtItem` once its item is stowed aboard; anything else (`targetFled`, `partyWithdrew`,
  * `partyRouted`, `timedOut`) is `failed`, which fails the job there and then (`jobFailed`). Every
  * outcome sets the voyage home, `returnToPortId`: travel plans the hop once nothing holds the ship.
@@ -16,6 +17,7 @@
  * Owner after the gate: W1 of expeditions A2.
  */
 import { isOnDock } from "../../core/docks";
+import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { PhysicalLocation } from "../../core/types/common";
 import type { ItemDefId, ItemId } from "../../core/types/ids";
@@ -27,6 +29,7 @@ import { cargoStowageZoneKey, deliveryComplete } from "../commerce/jobs";
 import { spawnCaptive } from "../commerce/passage";
 import type { Fight } from "./combat";
 import { distance } from "./ground";
+import { leaderNow } from "./plans";
 
 /**
  * Call 5: settle the errand of the expedition that just resolved with `outcome` (the job by
@@ -49,6 +52,11 @@ export function settleErrand(fight: Fight, outcome: ExpeditionOutcome): void {
     (p) => p.combatant?.disposition.part === "target" && ctx.state.actors[p.id] !== undefined,
   );
   let settled = errandOutcome(errand, outcome, target);
+  // Owner: "Kill jobs should end in an execution if kills never happen."
+  if (settled === "broughtAlive" && errand.wants === "dead" && target !== undefined) {
+    execute(fight, target);
+    settled = "broughtDead";
+  }
   if (settled === "broughtAlive" && target !== undefined) spawnCaptive(ctx, job, target);
   if (settled === "broughtItem" && !stowFetchedItem(fight, job, errand)) settled = "failed";
   errand.outcome = settled;
@@ -66,6 +74,42 @@ export function settleErrand(fight: Fight, outcome: ExpeditionOutcome): void {
   // The ship goes home whatever happened. Only the voyage: travel plans the hop once nothing holds
   // the ship at a waypoint (a card on the table, a hold for repairs), and prep calls everyone aboard.
   ctx.state.travel.voyageDestinationId = errand.returnToPortId;
+}
+
+/** Grave wounds to the head at most this many times; one is enough under the default tolerances. */
+const EXECUTION_SHOTS = 4;
+
+/**
+ * §settling-the-errand: a kill job's target taken alive is executed where they stand by whoever
+ * leads the party now, through the one damage entry point (a blaster to the head until they are
+ * dead), so their body, the tally and the executioner's `killedSomeone` are a kill's.
+ */
+function execute(fight: Fight, target: Actor): void {
+  const { ctx, expedition } = fight;
+  const byActorId = leaderNow(ctx.state, expedition);
+  for (let shot = 0; shot < EXECUTION_SHOTS && target.availability !== "dead"; shot += 1) {
+    fight.deps.applyDamage(ctx, target.id, {
+      part: "head",
+      severity: "grave",
+      type: "blaster",
+      byActorId,
+    });
+  }
+  if (target.availability !== "dead") {
+    throw new Error(`settleErrand: ${target.id} survived ${EXECUTION_SHOTS} grave head wounds`);
+  }
+  if (target.combatant !== undefined) target.combatant.state = "dead";
+  const executioner = ctx.state.actors[byActorId];
+  if (executioner?.crew === true && ctx.content.thoughts.killedSomeone !== undefined) {
+    addThought(ctx, executioner, "killedSomeone", target.id);
+  }
+  ctx.emit({
+    type: "executed",
+    subjectIds: [target.id, byActorId],
+    causeIds: [],
+    source: "sim",
+    payload: { actorId: target.id, byActorId, name: target.name },
+  });
 }
 
 /** The errand's outcome for the expedition's (the module comment); `target` while still here. */

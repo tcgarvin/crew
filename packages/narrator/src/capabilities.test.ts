@@ -199,6 +199,8 @@ describe("buildCapabilities", () => {
     expect(text).toContain("endPassage puts the current passenger off");
     expect(text).toContain("They leave at the next docking (now, if docked) with no fare");
     expect(text).toContain("stay at that port as someone in your cast");
+    // Expeditions A2 (v0.30): a captive put off fails the errand.
+    expect(text).toContain("putting them off fails the errand: it pays nothing");
     expect(text).toContain("The sim raises its own card, brought by the first officer");
     expect(text).toContain("Wait for them / Leave without them");
     expect(text).toContain("you never cause it");
@@ -303,7 +305,7 @@ describe("buildCapabilities: Sites and the errand (expeditions A2, §6, §10.2)"
     expect(offer).toContain("the crew go out armed to whoever is there");
     expect(offer).toContain("once the ship is home with what it went for");
     expect(offer).toContain(
-      "A kill job (wants dead) is rare, and whoever offers one is never clean.",
+      "A kill job (wants dead) is rare, and whoever offers one is never clean: its target dies in the fight or, taken alive, is executed by the party at the scene.",
     );
     expect(offer).toContain("the arrival card (two plans for going in)");
     expect(offer).toContain("you never cause them");

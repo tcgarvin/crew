@@ -727,6 +727,8 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return `${n.actor(event.payload.actorId) ?? "Someone"} is dead`;
     case "woundHealed":
       return null;
+    case "executed":
+      return `${n.actor(event.payload.byActorId) ?? "The party"} executes ${event.payload.name}`;
     case "combatantBroke": {
       const who = n.actor(event.payload.actorId) ?? "Someone";
       if (event.payload.how === "surrendered") return `${who} gives up`;

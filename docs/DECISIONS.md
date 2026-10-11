@@ -134,3 +134,9 @@ allowed from the start, rare and dirty; the captain leads the away party. Reject
 on foot through a port, wounds that never kill, kill jobs held back to a later phase, a party sent
 without its captain. Why: the owner wants a place the ship goes, a fight with stakes, and the
 captain where the cards are. See §landing-sites, §going-down-and-death, §who-goes.
+
+**D104. A kill job's target taken alive is executed.** Owner: "Kill jobs should end in an
+execution if kills never happen." The party still never fires at an unarmed target in the fight;
+once the target gives up, whoever leads executes them and the errand is brought dead. Rejected:
+paying a kill job for a live delivery, failing it, and shooting the unarmed in the fight. See
+§settling-the-errand.

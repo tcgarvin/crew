@@ -265,6 +265,29 @@ describe("the errand end to end, by commands (fixtures-errand)", () => {
     expect(ofType(runErrand(test, 20), "paymentMade")).toEqual([]);
   }, 30_000);
 
+  it("executes a kill job's target taken alive, and is paid once home as brought dead", () => {
+    const { test, jobId } = atTheSite({ wants: "dead" });
+    const balance = test.world.state.money.balance;
+    const fight = fightIt(test);
+    expect(test.world.state.expedition?.outcome).toBe("targetTaken");
+    const executed = ofType(fight, "executed");
+    expect(executed).toHaveLength(1);
+    const { byActorId, name } = executed[0]?.payload ?? {};
+    expect(name).toBe(ERRAND_PEOPLE.target);
+    expect(byActorId).toBe(test.world.state.expedition?.leaderId);
+    const executioner = byActorId === undefined ? undefined : test.world.state.actors[byActorId];
+    expect(executioner?.thoughts.map((t) => t.key)).toContain("killedSomeone");
+    expect(ofType(fight, "passengerBoarded")).toEqual([]);
+    expect(jobOf(test, jobId).errand?.outcome).toBe("broughtDead");
+    const home = flyHome(test, jobId);
+    const job = jobOf(test, jobId);
+    expect(ofType(home, "paymentMade").map((e) => e.payload)).toEqual([
+      expect.objectContaining({ jobId, amount: job.pay }),
+    ]);
+    expect(job.status).toBe("paid");
+    expect(test.world.state.money.balance).toBe(balance + job.pay);
+  }, 30_000);
+
   it("flies the leg to the site at its authored distance, and sets down with no staging call", () => {
     const test = errandWorld({ cast: loneTarget });
     const jobId = takeErrand(test);

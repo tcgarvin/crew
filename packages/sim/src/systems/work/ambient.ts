@@ -3,16 +3,20 @@
  * a task, within `social.chatRadiusTiles` of each other and both past their chat cooldown, have
  * a one-line conversation that shows in the ticker (`conversation`, notable). Slice 4: the social
  * system's `onConversation` leaves the pair memories (§ambient-chat); the `socialize` hold is what
- * actually meets the social need.
+ * actually meets the social need. Nobody in a fight or in the party of an expedition under way
+ * chats, and a gated line comes up only where its condition holds (§ambient-chat).
  *
  * Tunables come from `config.social` (Integration 2 made it required). `AMBIENT_FALLBACK` is
  * kept as a reference value for fixtures. Speaker/listener order alternates by pass so the
  * lowest ID does not always speak.
  */
 import { configTicks } from "../../core/clock";
+import { isSite } from "../../core/places";
 import type { Actor } from "../../core/types/actor";
-import type { ConfigDef } from "../../core/types/content";
+import type { ChatLineCondition, ChatLineDef, ConfigDef } from "../../core/types/content";
+import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
+import type { WorldState } from "../../core/types/state";
 import { onConversation } from "../social/chat";
 import { isAsleep } from "./activity";
 import { emitSim } from "./events";
@@ -24,7 +28,7 @@ export const AMBIENT_FALLBACK: ConfigDef["social"] = {
   chatCooldownSeconds: 45,
   templateLines: [
     "{a} joked about the food",
-    "{b} complained about the docking fee",
+    { line: "{b} complained about the docking fee", when: "paidDockingFee" },
     "{a} asked {b} whether the coolant pump always sounds like that",
     "{a} and {b} argued about the fastest route home",
     "{a} told {b} a story about an old captain",
@@ -59,12 +63,55 @@ export const AMBIENT_FALLBACK: ConfigDef["social"] = {
   debate: { agreeWithin: 2, argueBeyond: 4 },
 };
 
-function eligible(ctx: StepCtx, actor: Actor, cooldownTicks: number): boolean {
+/**
+ * §ambient-chat: the party of an expedition under way (any phase but `resolved`), from the muster
+ * to the end of the fight; empty with none.
+ */
+function partyAway(state: WorldState): ReadonlySet<ActorId> {
+  const expedition = state.expedition;
+  if (expedition === undefined || expedition.phase === "resolved") return new Set();
+  return new Set(expedition.party);
+}
+
+function eligible(
+  ctx: StepCtx,
+  actor: Actor,
+  cooldownTicks: number,
+  away: ReadonlySet<ActorId>,
+): boolean {
   if (!actor.crew || actor.availability !== "available" || actor.location.kind !== "onDeck")
     return false;
   if (actor.activity.kind === "task" || isAsleep(actor.activity)) return false;
+  // §the-combat-system-owns-its-combatants: a fighter on either side, and anyone mustering or
+  // walking out with the party, is in the fight's hands, not idling where a joke would fit.
+  if (actor.combatant !== undefined || away.has(actor.id)) return false;
   const last = actor.lastConversationTick;
   return last === undefined || ctx.tick - last >= cooldownTicks;
+}
+
+/**
+ * §ambient-chat: the ship lies docked at a port where she paid the docking fee. Every docking at
+ * a port charges the flat `commerce.dockingFee` and a site charges nothing (§travel-stages,
+ * §known-sites), so docked at a port with a fee on the books means this docking paid one; the
+ * port a run starts at was reached by no docking, and until the first fee there is none.
+ */
+function paidDockingFeeHere(ctx: StepCtx): boolean {
+  const travel = ctx.state.travel;
+  if (travel.stage !== "docked" || isSite(ctx.content, travel.portId)) return false;
+  return Object.values(ctx.state.money.transactions).some((tx) => tx.reason === "fee");
+}
+
+/** §ambient-chat: the template lines that may come up now, a gated one only where it holds. */
+function chatLinesNow(ctx: StepCtx, lines: readonly ChatLineDef[]): string[] {
+  const holds: Record<ChatLineCondition, () => boolean> = {
+    paidDockingFee: () => paidDockingFeeHere(ctx),
+  };
+  const out: string[] = [];
+  for (const line of lines) {
+    if (typeof line === "string") out.push(line);
+    else if (holds[line.when]()) out.push(line.line);
+  }
+  return out;
 }
 
 function withinRadius(a: Actor, b: Actor, radius: number): boolean {
@@ -81,9 +128,11 @@ export const ambientChatSystem: System = {
   every: AMBIENT_EVERY_TICKS,
   run(ctx) {
     const social = ctx.config.social;
-    if (social.templateLines.length === 0) return;
+    const lines = chatLinesNow(ctx, social.templateLines);
+    if (lines.length === 0) return;
     const cooldown = configTicks(ctx.config, social.chatCooldownSeconds);
-    const pool = Object.values(ctx.state.actors).filter((a) => eligible(ctx, a, cooldown));
+    const away = partyAway(ctx.state);
+    const pool = Object.values(ctx.state.actors).filter((a) => eligible(ctx, a, cooldown, away));
     const talked = new Set<Actor["id"]>();
     const flip = (ctx.tick / AMBIENT_EVERY_TICKS) % 2 === 1;
     for (let i = 0; i < pool.length; i++) {
@@ -93,7 +142,7 @@ export const ambientChatSystem: System = {
         if (talked.has(first.id) || talked.has(second.id)) continue;
         if (!withinRadius(first, second, social.chatRadiusTiles)) continue;
         const [a, b] = flip ? [second, first] : [first, second];
-        const template = ctx.rng.pick("social", social.templateLines);
+        const template = ctx.rng.pick("social", lines);
         const line = template.replaceAll("{a}", a.name).replaceAll("{b}", b.name);
         emitSim(ctx, "conversation", [a.id, b.id], { line });
         // Slice 4 (call 10; §ambient-chat): a chat leaves each side a memory of the other.

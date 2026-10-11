@@ -6,6 +6,8 @@ import {
   type LabelSpace,
   boxesOverlap,
   centredBox,
+  fitLabelText,
+  maxPlateWidth,
   placeLabels,
 } from "./labels";
 
@@ -93,5 +95,40 @@ describe("person label placement (slice-2 QA)", () => {
       for (const b of labels.slice(i + 1)) expect(boxesOverlap(a.box, b.box)).toBe(false);
     }
     expect(labels.some((l) => l.leader)).toBe(true);
+  });
+});
+
+describe("fitLabelText", () => {
+  const measure = (text: string) => text.length * 6;
+
+  it("keeps a text that fits", () => {
+    expect(fitLabelText("cards — Jax, Tomas", 200, measure)).toBe("cards — Jax, Tomas");
+  });
+
+  it("cuts a text too wide for the canvas with an ellipsis, inside the width", () => {
+    const full = "putting a vid on — Noor, Dane, Su…";
+    const fitted = fitLabelText(full, 120, measure);
+    expect(fitted.endsWith("…")).toBe(true);
+    expect(measure(fitted)).toBeLessThanOrEqual(120);
+    expect(full.startsWith(fitted.slice(0, -1))).toBe(true);
+  });
+
+  it("keeps at least the first character and the ellipsis", () => {
+    expect(fitLabelText("Oyelaran", 1, measure)).toBe("O…");
+  });
+});
+
+describe("plates at the canvas edge", () => {
+  it("places a plate cut to the canvas width wholly on the canvas", () => {
+    const space: LabelSpace = { ...SPACE, viewportWidth: 120 };
+    const width = maxPlateWidth(space.viewportWidth);
+    const [label] = placeLabels([request(3, 150, ["wide", width])], space, []);
+    expect(label?.box.left).toBeGreaterThanOrEqual(0);
+    expect(label?.box.right).toBeLessThanOrEqual(120);
+  });
+
+  it("clamps a plate whose dot is at the left edge so it starts on the canvas", () => {
+    const [label] = placeLabels([request(0, 150, ["putting a vid on", 100])], SPACE, []);
+    expect(label?.box.left).toBeGreaterThanOrEqual(0);
   });
 });

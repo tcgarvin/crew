@@ -5935,8 +5935,27 @@
               "minItems": 1,
               "type": "array",
               "items": {
-                "type": "string",
-                "minLength": 1
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "when": {
+                        "type": "string",
+                        "const": "paidDockingFee"
+                      }
+                    },
+                    "required": ["line", "when"],
+                    "additionalProperties": false
+                  }
+                ]
               }
             },
             "chatMemoryEveryDays": {

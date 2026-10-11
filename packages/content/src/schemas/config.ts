@@ -24,6 +24,12 @@ const memoryDefSchema = z.strictObject({
   stackLimit: positiveInt,
 });
 
+/** §ambient-chat: a chat template, the object form gated on where the ship lies. */
+const chatLineSchema = z.union([
+  z.string().min(1),
+  z.strictObject({ line: z.string().min(1), when: z.literal("paidDockingFee") }),
+]);
+
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
 
 /** Expeditions A1 (§7.1): one number per body part. */
@@ -289,7 +295,7 @@ export const configDefSchema = z.strictObject({
   social: z.strictObject({
     chatRadiusTiles: positive,
     chatCooldownSeconds: nonNegative,
-    templateLines: z.array(z.string().min(1)).min(1),
+    templateLines: z.array(chatLineSchema).min(1),
     chatMemoryEveryDays: nonNegative,
     chatSour: z.strictObject({ atZero: unitInterval, perPoint: nonNegative }),
     compatibility: z.strictObject({

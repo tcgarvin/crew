@@ -104,11 +104,37 @@ function spots(request: LabelRequest, width: number, space: LabelSpace): Spot[] 
   ];
 }
 
-/** Clamp a centre so the whole plate is on the canvas, 2 px in. */
+/** How far in from the canvas edge a plate is kept, CSS pixels. */
+export const LABEL_EDGE_PX = 2;
+
+/** §label-placement: the widest plate the canvas holds with `LABEL_EDGE_PX` clear either side. */
+export function maxPlateWidth(viewportWidth: number): number {
+  return Math.max(0, viewportWidth - 2 * LABEL_EDGE_PX);
+}
+
+/**
+ * §label-placement: `text` as it fits in `maxWidth` by `measure`, cut with an ellipsis when it
+ * would not; at least its first character and the ellipsis, so a plate always names someone.
+ */
+export function fitLabelText(
+  text: string,
+  maxWidth: number,
+  measure: (text: string) => number,
+): string {
+  if (measure(text) <= maxWidth) return text;
+  for (let n = text.length - 1; n > 1; n--) {
+    const candidate = `${text.slice(0, n).trimEnd()}…`;
+    if (measure(candidate) <= maxWidth) return candidate;
+  }
+  return `${text.slice(0, 1)}…`;
+}
+
+/** Clamp a centre so the whole plate is on the canvas, `LABEL_EDGE_PX` in. */
 function onCanvas(x: number, y: number, width: number, space: LabelSpace): [number, number] {
   const h = space.plateHeight;
-  const cx = Math.max(width / 2 + 2, Math.min(space.viewportWidth - width / 2 - 2, x));
-  const cy = Math.max(h / 2 + 2, Math.min(space.viewportHeight - h / 2 - 2, y));
+  const edge = LABEL_EDGE_PX;
+  const cx = Math.max(width / 2 + edge, Math.min(space.viewportWidth - width / 2 - edge, x));
+  const cy = Math.max(h / 2 + edge, Math.min(space.viewportHeight - h / 2 - edge, y));
   return [cx, cy];
 }
 
