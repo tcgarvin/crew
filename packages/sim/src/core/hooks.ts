@@ -13,6 +13,14 @@ import type { HookId } from "./types/ids";
 import type { StepCtx } from "./types/pipeline";
 
 /**
+ * §staging-hook-and-the-hold, §requested-call-back: the approach lead point, as the route distance
+ * left at which the staging call (and an `arrival` call-back) comes due.
+ */
+export function approachLeadDistance(ctx: Pick<StepCtx, "config">): number {
+  return ctx.config.narrator.approachHookLeadSeconds * ctx.config.travel.nominalSpeed;
+}
+
+/**
  * Raise `kind` with `context` unless a hook is already pending, re-arming the quiet timer.
  * Returns whether it raised.
  */

@@ -109,11 +109,26 @@ function cardLine(card: unknown): string {
   return `card: "${text(field(card, "title"))}" — ${speaker} — ${text(field(card, "situation"))} | ${text(field(card, "leftLabel"))} / ${text(field(card, "rightLabel"))}`;
 }
 
+/** §tried-sides, §follow-up-cards: a side's odds, failure levers and follow-ups, if any. */
+function sideExtras(card: unknown, which: "left" | "right"): string {
+  const side = field(card, which);
+  const parts: string[] = [];
+  const odds = field(side, "attempt", "odds");
+  if (typeof odds === "number") parts.push(`${which} tried at ${odds}%`);
+  const next = field(side, "next", "prompt", "params", "title");
+  if (next !== undefined) parts.push(`after ${which}: "${text(next)}"`);
+  const failNext = field(side, "attempt", "failNext", "prompt", "params", "title");
+  if (failNext !== undefined) parts.push(`if ${which} fails: "${text(failNext)}"`);
+  const levers = list(field(side, "attempt", "failLevers")).map((l) => text(field(l, "kind")));
+  if (levers.length > 0) parts.push(`if ${which} fails: ${levers.join(", ")}`);
+  return parts.map((p) => ` · ${p}`).join("");
+}
+
 function surfacedLine(command: unknown): string {
   const card = field(command, "payload", "card");
   const prompt = field(card, "prompt");
   const speaker = text(field(prompt, "params", "speaker"));
-  return `surfaced: "${text(field(prompt, "params", "title"))}" — ${speaker} — ${textRef(prompt)} | ${textRef(field(card, "left", "label"))} / ${textRef(field(card, "right", "label"))}`;
+  return `surfaced: "${text(field(prompt, "params", "title"))}" — ${speaker} — ${textRef(prompt)} | ${textRef(field(card, "left", "label"))} / ${textRef(field(card, "right", "label"))}${sideExtras(card, "left")}${sideExtras(card, "right")}`;
 }
 
 function offerLine(command: unknown): string {

@@ -14,6 +14,7 @@
  * speaker), kernel-raised policy cards (§policy-decision-cards: brought by crew), anything in
  * flight, and anything at a port without a dock map.
  */
+import { dropFollowUps } from "./decisions";
 import { dockAlongsideAt, dockPost } from "./docks";
 import type { DeepReadonly, Tick } from "./types/common";
 import type { Decision, HeldCard } from "./types/decisions";
@@ -150,6 +151,9 @@ export function deliverHeldCard(
       source: "sim",
       payload: { decisionId, reason: stale },
     });
+    // §follow-up-cards: a card that never comes up takes its follow-ups with it.
+    if (decision !== undefined)
+      dropFollowUps(ctx, decision, undefined, `its card never came up: ${stale}`);
     return;
   }
   decisions.queue.push(decisionId);

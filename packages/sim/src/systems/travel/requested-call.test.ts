@@ -298,6 +298,148 @@ describe("the requestedCall hook (§requested-call-back)", () => {
   });
 });
 
+/** A narrator card with nothing on either side, for the `afterCard` moment. */
+function surfaceCard(kernel: Kernel, world: World, followUp = false) {
+  const side = (prose: string) => ({
+    label: { key: "narrator.side", params: {}, prose },
+    commands: [],
+  });
+  const card = (title: string) => ({
+    prompt: { key: "narrator.situation", params: { title }, prose: `${title}.` },
+    left: side(`${title} yes`),
+    right: side(`${title} no`),
+  });
+  const main = card("Main");
+  const result = kernel.enqueueCommand(
+    world,
+    cmd({
+      source: "narrator",
+      kind: "surfaceDecision",
+      payload: { card: followUp ? { ...main, left: { ...main.left, next: card("After") } } : main },
+    }),
+  );
+  expect(result.status).toBe("accepted");
+}
+
+/** Advance, acknowledging every hook, until the world halts on the card. */
+function untilCardUp(kernel: Kernel, world: World) {
+  for (let i = 0; i < 100; i++) {
+    if (world.state.narrator.pendingHook !== undefined) acknowledge(kernel, world);
+    const result = kernel.advance(world, 1);
+    if (result.halt.kind === "decision") return;
+  }
+  throw new Error("no card came up");
+}
+
+function answerHead(kernel: Kernel, world: World, side: "left" | "right" = "left") {
+  const decisionId = world.state.decisions.queue[0];
+  if (decisionId === undefined) throw new Error("no card is up");
+  const result = kernel.enqueueCommand(
+    world,
+    cmd({ source: "player", kind: "resolveDecision", payload: { decisionId, side } }),
+  );
+  expect(result.status).toBe("accepted");
+  kernel.advance(world, 1);
+}
+
+describe("the arrival, afterCard and holdQuiet call-backs (§requested-call-back)", () => {
+  it("raises an arrival call at the approach lead point of the next leg", () => {
+    const { world, kernel } = freightTestWorld();
+    requestCall(kernel, world, "arrival", "a face on the dock");
+    setCourse(kernel, world);
+    const hook = untilRequestedCall(kernel, world);
+    const travel = inFlight(world);
+    expect(travel.stage).toBe("transit");
+    const config = world.config.values;
+    const lead = config.narrator.approachHookLeadSeconds * config.travel.nominalSpeed;
+    expect(travel.routeDistance - travel.routeProgress).toBeLessThanOrEqual(lead);
+    expect(travel.routeDistance - travel.routeProgress).toBeGreaterThan(lead - 1);
+    expect(hook.context).toMatchObject({ when: "arrival", why: "a face on the dock" });
+  });
+
+  it("serves an arrival asked past this leg's lead point on the next leg's", () => {
+    const { world, kernel } = freightTestWorld();
+    setCourse(kernel, world);
+    untilStage(kernel, world, "approaching");
+    requestCall(kernel, world, "arrival");
+    kernel.advance(world, 1);
+    expect(world.state.narrator.callBack?.afterDocking).toBe(true);
+    untilStage(kernel, world, "docked");
+    kernel.advance(world, 1);
+    expect(world.state.narrator.callBack?.afterDocking).toBeUndefined();
+    setCourse(kernel, world, PORTS.a);
+    untilRequestedCall(kernel, world);
+    expect(inFlight(world).toPortId).toBe(PORTS.a);
+  });
+
+  it("raises an afterCard call the tick after the next card is answered", () => {
+    const { world, kernel } = freightTestWorld();
+    requestCall(kernel, world, "afterCard", "see how they took it");
+    surfaceCard(kernel, world);
+    untilCardUp(kernel, world);
+    expect(world.state.narrator.callBack?.cardResolvedTick).toBeUndefined();
+    answerHead(kernel, world);
+    const resolvedTick = world.state.narrator.callBack?.cardResolvedTick;
+    expect(resolvedTick).toBeDefined();
+    const hook = untilRequestedCall(kernel, world);
+    expect(hook.tick).toBe((resolvedTick ?? 0) + 1);
+    expect(hook.context).toMatchObject({ when: "afterCard", why: "see how they took it" });
+    expect(world.state.travel.stage).toBe("docked");
+  });
+
+  it("waits for a follow-up card to be answered before the afterCard call", () => {
+    const { world, kernel } = freightTestWorld();
+    requestCall(kernel, world, "afterCard");
+    surfaceCard(kernel, world, true);
+    untilCardUp(kernel, world);
+    answerHead(kernel, world, "left");
+    expect(world.state.narrator.callBack?.cardResolvedTick).toBeUndefined();
+    expect(world.state.decisions.queue).toHaveLength(1);
+    answerHead(kernel, world, "left");
+    expect(world.state.narrator.callBack?.cardResolvedTick).toBeDefined();
+    untilRequestedCall(kernel, world);
+  });
+
+  it("doubles the quiet window while a holdQuiet request stands", () => {
+    const quietTicks = 10 * 20;
+    const quietAt = (holdQuiet: boolean) => {
+      const { world, kernel } = freightTestWorld({ quietTooLongSeconds: 10 });
+      kernel.enqueueCommand(
+        world,
+        cmd({
+          source: "narrator",
+          kind: "requestCall",
+          payload: { when: "nextPort", why: "", holdQuiet },
+        }),
+      );
+      for (let i = 0; i < 1_000; i++) {
+        const hook = world.state.narrator.pendingHook;
+        if (hook?.kind === "quietTooLong") return hook.tick;
+        if (hook !== undefined) acknowledge(kernel, world);
+        kernel.advance(world, 1);
+      }
+      throw new Error("no quiet check-in");
+    };
+    const plain = quietAt(false);
+    const held = quietAt(true);
+    expect(plain).toBeLessThanOrEqual(quietTicks + 2);
+    expect(held - plain).toBeGreaterThanOrEqual(quietTicks - 2);
+  });
+
+  it("rejects a holdQuiet that is not true or false", () => {
+    const { world, kernel } = freightTestWorld();
+    const result = kernel.enqueueCommand(
+      world,
+      cmd({
+        source: "narrator",
+        kind: "requestCall",
+        payload: { when: "nextPort", why: "", holdQuiet: "yes" as unknown as boolean },
+      }),
+    );
+    expect(result.status).toBe("rejected");
+  });
+});
+
 describe("aftermath events raise notableEvent from travel (§notable-event-hook)", () => {
   it("raises notableEvent the tick after a listed aftermath event of notable significance", () => {
     const overrides: FixtureConfigOverrides = { aftermathHookOnEvents: ["alertCleared"] };

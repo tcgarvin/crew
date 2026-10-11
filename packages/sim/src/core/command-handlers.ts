@@ -1,49 +1,35 @@
 /**
  * Handlers for the kernel-owned command kinds: scenario setup (`scenarioSpawn`,
  * `scenarioInjectFault`, `scenarioSetNeeds`), `acknowledgeHook`, `requestCall`
- * (§requested-call-back), `surfaceDecision` and `resolveDecision`. Other kinds belong to their
- * systems and register through the same `registerCommandHandler` path.
+ * (§requested-call-back), and through `decision-handlers.ts` `surfaceDecision` and
+ * `resolveDecision`. Other kinds belong to their systems and register through the same
+ * `registerCommandHandler` path.
  */
 import { wholeBody } from "./body";
-import { commandActor, isFitForCommand } from "./command-actor";
 import {
-  type AppliedCommand,
+  type ApplyCtx,
   type CommandHandler,
   NO_TEMP_REFS,
   type ValidateCtx,
-  type Validation,
   causedBy,
   ok,
   pushCapped,
   reject,
-  validateCommand,
 } from "./commands";
+import { registerDecisionCommandHandlers } from "./decision-handlers";
 import { findCrewDef, findItemDef } from "./defs";
-import { cardSpeaker, queueOrHold } from "./delivery";
+import { approachLeadDistance } from "./hooks";
 import { allocateId } from "./ids";
 import { type Character, generateInterests, interestsFromSeed } from "./interests";
 import type { KernelRegistry } from "./registry";
 import type { Actor, Needs, WatchSection } from "./types/actor";
-import type {
-  Command,
-  CommandDraft,
-  CommandKind,
-  CommandOfKind,
-  DecisionCardSide,
-  ScenarioSpawn,
-} from "./types/commands";
-import { AUTHORITY } from "./types/commands/authority";
+import type { ScenarioSpawn } from "./types/commands";
 import type { PhysicalLocation } from "./types/common";
 import type { CrewDef } from "./types/content";
-import {
-  CALL_BACK_WHEN,
-  CALL_BACK_WHY_MAX,
-  type CallBackRequest,
-  type Decision,
-  type DecisionOption,
-} from "./types/decisions";
-import type { ActorId, CommandId, DecisionId, EntityId, TempRef } from "./types/ids";
+import { CALL_BACK_WHEN, CALL_BACK_WHY_MAX, type CallBackRequest } from "./types/decisions";
+import type { ActorId, EntityId, TempRef } from "./types/ids";
 import type { Item } from "./types/ship";
+import type { TravelState } from "./types/travel";
 
 /** W2 decision: how many resolved hook IDs `narrator.recentHookIds` keeps. */
 const RECENT_HOOK_IDS_CAP = 16;
@@ -431,6 +417,18 @@ function whyProblem(why: unknown): string | undefined {
 }
 
 /**
+ * §requested-call-back: whether the leg in flight is already past its approach lead point (in
+ * transit inside it, approaching or docking), so an `arrival` asked now means the next leg's.
+ */
+function pastApproachLead(ctx: Pick<ApplyCtx, "config">, travel: TravelState): boolean {
+  if (travel.stage === "approaching" || travel.stage === "docking") return true;
+  return (
+    travel.stage === "transit" &&
+    travel.routeDistance - travel.routeProgress <= approachLeadDistance(ctx)
+  );
+}
+
+/**
  * §requested-call-back: replace the narrator's standing call-back request. The whole request is
  * replaced, so a new one is never already served. It remembers the port it was asked at (a
  * `nextPort` request is served elsewhere) and, for `midLeg` asked before a transit's halfway point,
@@ -447,15 +445,24 @@ const requestCall: CommandHandler<"requestCall", null> = {
     }
     const problem = whyProblem(why);
     if (problem !== undefined) return reject("invalidPayload", `requestCall: ${problem}`);
+    const { holdQuiet } = command.payload;
+    if (holdQuiet !== undefined && typeof holdQuiet !== "boolean") {
+      return reject("invalidPayload", "requestCall: holdQuiet must be true or false");
+    }
     if (ctx.state.hull.lostAtTick !== undefined) {
       return reject("preconditionFailed", "requestCall: the ship is lost");
     }
     return ok(null);
   },
   apply(ctx, command) {
-    const { when, why } = command.payload;
+    const { when, why, holdQuiet } = command.payload;
     const travel = ctx.state.travel;
-    const request: CallBackRequest = { when, why, requestedTick: ctx.tick };
+    const request: CallBackRequest = {
+      when,
+      why,
+      requestedTick: ctx.tick,
+      ...(holdQuiet === true ? { holdQuiet: true } : {}),
+    };
     if (travel.stage === "docked") {
       request.portId = travel.portId;
     } else if (
@@ -464,6 +471,8 @@ const requestCall: CommandHandler<"requestCall", null> = {
       travel.routeProgress < travel.routeDistance / 2
     ) {
       request.legStartedTick = travel.stageStartedTick;
+    } else if (when === "arrival" && pastApproachLead(ctx, travel)) {
+      request.afterDocking = true;
     }
     ctx.state.narrator.callBack = request;
     ctx.emit({
@@ -477,220 +486,6 @@ const requestCall: CommandHandler<"requestCall", null> = {
 };
 
 // ---------------------------------------------------------------------------------------------
-// surfaceDecision
-// ---------------------------------------------------------------------------------------------
-
-/**
- * A card side as a decision option; `aftermath` (§aftermath-caption) only when the side has one
- * (JSON-safe).
- */
-function optionFromSide(side: DecisionCardSide): DecisionOption {
-  return {
-    label: side.label,
-    commands: [...side.commands],
-    ...(side.aftermath === undefined ? {} : { aftermath: side.aftermath }),
-  };
-}
-
-/**
- * A card option's command draft as a `player` command with id `id`, or `undefined` when the
- * player may not issue its kind (option commands always run as the player).
- */
-function asPlayerCommand(
-  id: string,
-  draft: DecisionCardSide["commands"][number],
-): Command | undefined {
-  if (!(AUTHORITY.player as readonly CommandKind[]).includes(draft.kind)) return undefined;
-  return {
-    id: id as CommandId,
-    source: "player",
-    kind: draft.kind,
-    payload: draft.payload,
-  } as Command;
-}
-
-interface SurfaceDecisionPlan {
-  readonly perspectiveActorId: ActorId;
-}
-
-/**
- * Decisions are kernel-owned (CONTRACTS: `Decision`/`NarratorHook` types), so `surfaceDecision`
- * lives here rather than in a system, unlike `resolveDecision`'s option commands which do belong
- * to their owning systems. Each option's commands are checked twice: authorized for `player`
- * here (so a stale queued card cannot smuggle in a command nobody could ever pick), and again,
- * fully, by `resolveDecision` at resolve time against the state as it is then.
- */
-function surfaceDecisionHandler(
-  registry: KernelRegistry,
-): CommandHandler<"surfaceDecision", SurfaceDecisionPlan> {
-  return {
-    validate(ctx, command): Validation<SurfaceDecisionPlan> {
-      const { card } = command.payload;
-      for (const [which, side] of [
-        ["left", card.left],
-        ["right", card.right],
-      ] as const) {
-        for (const [index, draft] of side.commands.entries()) {
-          const sub = asPlayerCommand(`${command.id}#${which}#${index}`, draft);
-          if (sub === undefined) {
-            return reject(
-              "unauthorized",
-              `surfaceDecision: ${which} option ${index} ("${draft.kind}") is not a player command`,
-            );
-          }
-          const validation = validateCommand(registry, ctx, sub);
-          if (!validation.ok) {
-            return reject(
-              validation.rejection.code,
-              `surfaceDecision: ${which} option ${index} (${draft.kind}): ${validation.rejection.reason}`,
-            );
-          }
-        }
-      }
-      let perspectiveActorId: ActorId;
-      if (card.perspectiveActorId !== undefined) {
-        const actor = ctx.state.actors[card.perspectiveActorId];
-        if (actor === undefined) {
-          return reject(
-            "unknownEntity",
-            `surfaceDecision: unknown perspective actor "${card.perspectiveActorId}"`,
-          );
-        }
-        if (!isFitForCommand(actor)) {
-          return reject(
-            "preconditionFailed",
-            `surfaceDecision: perspective actor "${card.perspectiveActorId}" is not available`,
-          );
-        }
-        perspectiveActorId = actor.id;
-      } else {
-        perspectiveActorId = commandActor(ctx.state);
-      }
-      if (card.jobId !== undefined) {
-        const duplicate = Object.values(ctx.state.decisions.records).find(
-          (d) => d.status === "pending" && d.jobId === card.jobId,
-        );
-        if (duplicate !== undefined) {
-          return reject(
-            "duplicate",
-            `surfaceDecision: a decision for job "${card.jobId}" is already queued`,
-          );
-        }
-      }
-      return ok({ perspectiveActorId });
-    },
-    apply(ctx, command, plan): AppliedCommand {
-      const { card } = command.payload;
-      const decisionId = allocateId(ctx.state, "decision");
-      const record: Decision = {
-        id: decisionId,
-        origin: command.source === "narrator" ? "narrator" : "policy",
-        perspectiveActorId: plan.perspectiveActorId,
-        prompt: card.prompt,
-        left: optionFromSide(card.left),
-        right: optionFromSide(card.right),
-        status: "pending",
-        createdTick: ctx.tick,
-        ...(card.jobId !== undefined ? { jobId: card.jobId } : {}),
-      };
-      ctx.state.decisions.records[decisionId] = record;
-      // §delivery: a card from one of the port's people waits to be delivered in person.
-      queueOrHold(ctx, decisionId, cardSpeaker(ctx.state, record));
-      return NO_TEMP_REFS;
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------------------------
-// resolveDecision
-// ---------------------------------------------------------------------------------------------
-
-interface ResolvePlan {
-  readonly subCommands: readonly { readonly command: Command; readonly plan: unknown }[];
-}
-
-/**
- * The chosen side's commands run as source `player` through the same authority check and
- * validators. W2 decision: every option command is validated against the state before any of
- * them applies (a batch against a shared snapshot, SD §5.2); if any is rejected the whole
- * resolution is rejected and the decision stays at the head of the queue.
- */
-function resolveDecisionHandler(
-  registry: KernelRegistry,
-): CommandHandler<"resolveDecision", ResolvePlan> {
-  return {
-    validate(ctx, command): Validation<ResolvePlan> {
-      const { decisionId, side } = command.payload;
-      const decision = ctx.state.decisions.records[decisionId];
-      if (decision === undefined) {
-        return reject("unknownEntity", `unknown decision "${decisionId}"`);
-      }
-      if (decision.status !== "pending" || ctx.state.decisions.queue[0] !== decisionId) {
-        return reject("preconditionFailed", `decision "${decisionId}" is not the one presented`);
-      }
-      if (side !== "left" && side !== "right") {
-        return reject("invalidPayload", `side must be "left" or "right"`);
-      }
-      const option = decision[side];
-      const next = option.nextDecisionId;
-      if (next !== undefined && ctx.state.decisions.records[next]?.status !== "pending") {
-        return reject("preconditionFailed", `next decision "${next}" is not pending`);
-      }
-      const subCommands: { command: Command; plan: unknown }[] = [];
-      for (const [index, draft] of option.commands.entries()) {
-        // The card's drafts are its own `CommandDraft`s read through `DeepReadonly`, which the
-        // checker no longer unfolds over the whole union (slice 4 made it one kind longer).
-        const sub = asPlayerCommand(`${command.id}#${index}`, draft as CommandDraft);
-        if (sub === undefined) {
-          return reject("unauthorized", `option command "${draft.kind}" is not a player command`);
-        }
-        const validation = validateCommand(registry, ctx, sub);
-        if (!validation.ok) {
-          return reject(
-            validation.rejection.code,
-            `option command ${index} (${draft.kind}): ${validation.rejection.reason}`,
-          );
-        }
-        subCommands.push({ command: sub, plan: validation.plan });
-      }
-      return ok({ subCommands });
-    },
-    apply(ctx, command, plan): AppliedCommand {
-      const { decisionId, side } = command.payload;
-      const tempRefs: Record<TempRef, EntityId> = {};
-      for (const { command: sub, plan: subPlan } of plan.subCommands) {
-        const handler = registry.commandHandler(sub.kind) as CommandHandler<CommandKind, unknown>;
-        const applied = handler.apply(ctx, sub as CommandOfKind<CommandKind>, subPlan);
-        Object.assign(tempRefs, applied.tempRefs);
-        ctx.emit({
-          type: "commandApplied",
-          subjectIds: Object.values(applied.tempRefs),
-          causeIds: [command.id],
-          source: "player",
-          payload: { kind: sub.kind, tempRefs: applied.tempRefs },
-        });
-      }
-      const decisions = ctx.state.decisions;
-      const decision = decisions.records[decisionId];
-      if (decision === undefined) throw new Error("validated decision vanished");
-      decision.status = "resolved";
-      decision.resolvedTick = ctx.tick;
-      decision.chosen = side;
-      const queue = decisions.queue.filter((id) => id !== decisionId);
-      const next: DecisionId | undefined = decision[side].nextDecisionId;
-      decisions.queue = next === undefined ? queue : [next, ...queue.filter((id) => id !== next)];
-      ctx.emit({
-        ...causedBy(command),
-        type: "decisionResolved",
-        subjectIds: [decisionId, decision.perspectiveActorId],
-        payload: { decisionId, side },
-      });
-      return { tempRefs };
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------------------------
 
 export function registerCoreCommandHandlers(registry: KernelRegistry): void {
   registry.registerCommandHandler("scenarioSpawn", scenarioSpawn);
@@ -698,6 +493,5 @@ export function registerCoreCommandHandlers(registry: KernelRegistry): void {
   registry.registerCommandHandler("scenarioSetNeeds", scenarioSetNeeds);
   registry.registerCommandHandler("acknowledgeHook", acknowledgeHook);
   registry.registerCommandHandler("requestCall", requestCall);
-  registry.registerCommandHandler("surfaceDecision", surfaceDecisionHandler(registry));
-  registry.registerCommandHandler("resolveDecision", resolveDecisionHandler(registry));
+  registerDecisionCommandHandlers(registry);
 }

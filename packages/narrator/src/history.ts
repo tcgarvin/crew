@@ -4,18 +4,19 @@ import { templateCard } from "@crew/content";
  * (`NarratorNotes.cardsShown`). The model never writes it. Two sources feed it:
  *  - this call's own output (the policy `card` prose and every translated `surfaceDecision`);
  *  - the kernel's decision events since the previous call (`decisionPending` for cards the
- *    kernel surfaced itself, such as job offers; `decisionResolved` for the side chosen), and
- *    `unseenRolled` for the roll on the arrival card's way in unseen (§unseen-odds).
+ *    kernel surfaced itself, such as job offers and follow-up cards; `decisionResolved` for the
+ *    side chosen), `unseenRolled` for the roll on the arrival card's way in unseen (§unseen-odds)
+ *    and `attemptRolled` for a tried side's (§tried-sides).
  *
  * The events carry only a decision ID, so the decision record in the snapshot (which the kernel
  * keeps after resolution) supplies the title through `templateCard`. A narrator-surfaced card
  * has no decision ID when it is recorded (the kernel mints it on apply), so it is matched to its
  * decision later by title and the ID is filled in then.
  */
-import type { ContentBundle, DecisionId, NarratorCommand, SimEvent, UnseenRoll } from "@crew/sim";
+import type { ContentBundle, DecisionId, NarratorCommand, SimEvent } from "@crew/sim";
 import type { DecisionCardProse } from "./contract";
 import type { State } from "./lookups";
-import { type CardShown, NOTES_LIMITS, clipWords } from "./notes";
+import { type CardRoll, type CardShown, NOTES_LIMITS, clipWords } from "./notes";
 
 const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -54,21 +55,34 @@ function cap(cards: CardShown[]): CardShown[] {
  * an entry still waiting for its ID) by the title of a resolved record.
  */
 /**
- * §unseen-odds: the roll on the expedition's way in unseen, put on its arrival card's entry, from
- * the event or, if that was lost, from the expedition in the snapshot.
+ * §unseen-odds, §tried-sides: a roll on a card the captain answered (the way in unseen on its
+ * arrival card, or a tried side), put on its entry, from the event or, if that was lost, from the
+ * snapshot.
  */
-function withRoll(cards: readonly CardShown[], decisionId: string, tried: UnseenRoll): CardShown[] {
+function withRoll(cards: readonly CardShown[], decisionId: string, tried: CardRoll): CardShown[] {
   return cards.map((c) =>
     c.decisionId === decisionId && c.tried === undefined ? { ...c, tried } : c,
   );
 }
 
 function rollFromSnapshot(cards: readonly CardShown[], state: State): CardShown[] {
+  let next = [...cards];
+  for (const card of cards) {
+    if (card.decisionId === null || card.tried !== undefined) continue;
+    const tried = state.decisions.records[card.decisionId as DecisionId]?.tried;
+    if (tried !== undefined) {
+      next = withRoll(next, card.decisionId, {
+        odds: tried.odds,
+        worked: tried.worked,
+        kind: "try",
+      });
+    }
+  }
   const expedition = state.expedition;
   const arrival = expedition?.cards?.arrival;
   const roll = expedition?.unseenRoll;
-  if (arrival === undefined || roll === undefined) return [...cards];
-  return withRoll(cards, arrival, { odds: roll.odds, worked: roll.worked });
+  if (arrival === undefined || roll === undefined) return next;
+  return withRoll(next, arrival, { odds: roll.odds, worked: roll.worked, kind: "unseen" });
 }
 
 function reconcileWithSnapshot(
@@ -109,9 +123,10 @@ export function applyDecisionEvents(
 ): CardShown[] {
   let next = [...cards];
   for (const event of events) {
-    if (event.type === "unseenRolled") {
+    if (event.type === "unseenRolled" || event.type === "attemptRolled") {
       const { decisionId, odds, worked } = event.payload;
-      next = withRoll(next, decisionId, { odds, worked });
+      const kind = event.type === "unseenRolled" ? "unseen" : "try";
+      next = withRoll(next, decisionId, { odds, worked, kind });
       continue;
     }
     if (event.type === "decisionDropped") {

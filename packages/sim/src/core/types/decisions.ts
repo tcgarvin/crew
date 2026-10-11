@@ -38,6 +38,35 @@ export interface DecisionOption {
    * chosen, before the card closes, saying plainly what happens next. No numbers.
    */
   aftermath?: TextRef;
+  /**
+   * §tried-sides: present when the side is a try: its odds and the failure branch run instead of
+   * `commands`, `aftermath` and `nextDecisionId` when the roll fails.
+   */
+  attempt?: DecisionAttempt;
+}
+
+/**
+ * §tried-sides: a tried side's chance and failure branch. `failCommands` run as `player` (checked
+ * like `commands`); `failLevers` are outcome levers run as `narrator` only on failure, each checked
+ * again then and refused with `failLeverRefused` if it is no longer possible.
+ */
+export interface DecisionAttempt {
+  /** A whole percent, 0 to 100. */
+  odds: number;
+  failCommands: CommandDraft[];
+  failLevers: CommandDraft[];
+  failAftermath?: TextRef;
+  /** §follow-up-cards: the card shown straight after the try fails. */
+  failNextDecisionId?: DecisionId;
+}
+
+/**
+ * The one roll of a chance the narrator named: `odds` the whole percent it was rolled at, `worked`
+ * whether it came off (§tried-sides, §unseen-odds).
+ */
+export interface ChanceRoll {
+  readonly odds: number;
+  readonly worked: boolean;
 }
 
 export type DecisionStatus = "pending" | "resolved" | "dropped";
@@ -59,6 +88,8 @@ export interface Decision {
   deliveredTick?: Tick;
   resolvedTick?: Tick;
   chosen?: "left" | "right";
+  /** §tried-sides: the roll, when the chosen side was a try; absent otherwise. */
+  tried?: ChanceRoll;
   /** The job this decision is about, if any (job offers are decisions, review §D.6.7). */
   jobId?: JobId;
   /**
@@ -151,11 +182,12 @@ export interface HookContexts {
   policyDecision: { decisionId: DecisionId; machineId?: MachineId };
   /**
    * §requested-call-back: the call the narrator asked for (`NarratorState.callBack`), now due: the
-   * tick the ship cast off (`departure`) or halfway through a transit (`midLeg`). `why` is its own
+   * tick the ship cast off (`departure`), halfway through a transit (`midLeg`), at the approach
+   * lead point (`arrival`), or the tick after a card was answered (`afterCard`). `why` is its own
    * private line, read back to it; `requestedTick` is when it asked. A `nextPort` request raises
    * nothing: it is served by the first story hook docked elsewhere.
    */
-  requestedCall: { when: "departure" | "midLeg"; why: string; requestedTick: Tick };
+  requestedCall: { when: RaisedCallBackWhen; why: string; requestedTick: Tick };
 }
 
 export type NarratorHookKind = keyof HookContexts;
@@ -178,8 +210,10 @@ export type NarratorHook = { [K in NarratorHookKind]: NarratorHookBase<K> }[Narr
  * §requested-call-back: when the narrator wants its next call. `nextPort` is the default and raises
  * nothing.
  */
-export const CALL_BACK_WHEN = ["nextPort", "departure", "midLeg"] as const;
+export const CALL_BACK_WHEN = ["nextPort", "departure", "midLeg", "arrival", "afterCard"] as const;
 export type CallBackWhen = (typeof CALL_BACK_WHEN)[number];
+/** §requested-call-back: the moments that raise a `requestedCall` hook (all but `nextPort`). */
+export type RaisedCallBackWhen = Exclude<CallBackWhen, "nextPort">;
 
 /** §requested-call-back: the longest private `why` a call-back request may carry. */
 export const CALL_BACK_WHY_MAX = 200;
@@ -213,6 +247,21 @@ export interface CallBackRequest {
    * `stageStartedTick`) is the one meant. Absent otherwise: the next transit is.
    */
   legStartedTick?: Tick;
+  /**
+   * `arrival` only: asked past the approach lead point of the leg in flight (in transit inside it,
+   * approaching or docking), so the next arrival is meant; cleared once the ship has docked.
+   */
+  afterDocking?: true;
+  /**
+   * `afterCard` only: the tick a card was answered with no follow-up to come
+   * (`resolveDecision`); the call is due the tick after.
+   */
+  cardResolvedTick?: Tick;
+  /**
+   * §requested-call-back: the quiet check-in waits twice `narrator.quietTooLongDays` while this
+   * request stands (until the next story call replaces it).
+   */
+  holdQuiet?: true;
   /** The story hook that served it; `acknowledgeHook` deletes the request with that hook. */
   servedByHookId?: HookId;
 }

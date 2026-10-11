@@ -16,6 +16,7 @@ import {
   DAMAGE_TYPES,
   ERRAND_KINDS,
   ERRAND_WANTS,
+  FAIL_LEVER_KINDS,
   FALL_OUT_OVER_MAX,
   FIELD_SEVERITIES,
   FORCED_HAZARD_OUTCOMES,
@@ -38,7 +39,7 @@ import {
   isSite,
   siteNearPort,
 } from "@crew/sim";
-import { FIELD_MOMENTS, HAZARD_DIFFICULTIES, SCRIPTED_EFFECTS } from "./contract";
+import { FIELD_MOMENTS, HAZARD_DIFFICULTIES, SCRIPTED_EFFECTS, SIDE_EFFECTS } from "./contract";
 import {
   JOB_QUANTITY_UNITS,
   SPAWN_QUANTITY_UNITS,
@@ -486,6 +487,14 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   );
   lines.push(
     "- leftAftermath / rightAftermath: what happens next on each side, shown to the captain for a moment after the choice.",
+  );
+  // §tried-sides: a side's odds and its failure branch.
+  lines.push(
+    `- A side with odds ("0"-"100", a whole percent; empty for no try) is a try the sim rolls once if the captain picks it. Worked: the side's effect, aftermath and follow-up. Failed: its failEffect (${SIDE_EFFECTS.join(" | ")}, reading the side's own coursePort, talkWith and tone), the intents its failLevers name by their index in intents (only ${FAIL_LEVER_KINDS.join(", ")}; written like any intent, they happen only on failure and are checked again then), and leftFailAftermath / rightFailAftermath. Without odds, failEffect is none, failLevers empty and the fail aftermaths empty. Never on a beat or closing card, and the failure must differ from the success.`,
+  );
+  // §follow-up-cards: a second card in the same call.
+  lines.push(
+    "- followUps: cards shown straight after this one is answered, each { on, card }: on left, right, either (the same card after both), or failed (after a tried side fails); card is title, speaker, situation, two plain sides (label, effect, coursePort, talkWith, tone) and their aftermaths, under the same rules as a card. At most one per place; part of this call's one card; a follow-up has no follow-up of its own. Usually empty.",
   );
   lines.push("");
   lines.push("## 5. stockMarket: set what a port's market sells of one item");

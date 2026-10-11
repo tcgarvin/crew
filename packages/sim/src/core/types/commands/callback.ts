@@ -9,7 +9,12 @@ export interface CallBackCommandPayloads {
   /**
    * §requested-call-back, narrator: replace the standing call-back request. `why` is a private
    * line, at most `CALL_BACK_WHY_MAX` characters with no control characters, read back on the call
-   * it asks for.
+   * it asks for. `holdQuiet` asks the quiet check-in to wait twice as long, once.
    */
-  requestCall: { readonly when: CallBackWhen; readonly why: string };
+  requestCall: {
+    readonly when: CallBackWhen;
+    readonly why: string;
+    /** Double the quiet window while this request stands; absent is false. */
+    readonly holdQuiet?: boolean;
+  };
 }

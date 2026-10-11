@@ -16,6 +16,25 @@ export interface DecisionEventPayloads {
   decisionPending: { readonly decisionId: DecisionId };
   decisionResolved: { readonly decisionId: DecisionId; readonly side: "left" | "right" };
   /**
+   * §tried-sides: the captain chose a tried side and its odds were rolled once on the `narrator`
+   * stream: `worked`, the side ran; else its failure branch did.
+   */
+  attemptRolled: {
+    readonly decisionId: DecisionId;
+    readonly side: "left" | "right";
+    readonly odds: number;
+    readonly worked: boolean;
+  };
+  /**
+   * §tried-sides: an outcome lever on a failed try's branch was no longer possible when the roll
+   * failed (its person dead, the money gone), so it did not apply.
+   */
+  failLeverRefused: {
+    readonly decisionId: DecisionId;
+    readonly kind: string;
+    readonly reason: string;
+  };
+  /**
    * A queued decision failed revalidation on presentation, or (§stale-held-cards) a held offer card
    * whose job closed before it could be delivered.
    */
@@ -53,6 +72,9 @@ export const DECISION_EVENT_SIGNIFICANCE = {
   policyDecisionNeeded: "narrative",
   decisionPending: "notable",
   decisionResolved: "narrative",
+  // Not hooked: the follow-up card and the aftermath are the reaction (narrator arcs §8.2).
+  attemptRolled: "notable",
+  failLeverRefused: "notable",
   decisionDropped: "notable",
   narratorHookRaised: "trace",
   narratorHookResolved: "trace",

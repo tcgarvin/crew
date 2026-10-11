@@ -327,9 +327,16 @@ function textsShown(translated: TranslationResult): string[] {
   if (card !== undefined) texts.push(card.title, card.situation, card.speaker ?? "");
   for (const command of translated.commands) {
     if (command.kind === "surfaceDecision") {
-      const { prompt } = command.payload.card;
-      const params = prompt.params as Record<string, unknown>;
-      texts.push(prompt.prose ?? "", String(params.title ?? ""), String(params.speaker ?? ""));
+      const { card } = command.payload;
+      // §follow-up-cards: a follow-up is part of the scene the captain may see.
+      const followUps = [card.left, card.right].flatMap((side) => [
+        ...(side.next === undefined ? [] : [side.next]),
+        ...(side.attempt?.failNext === undefined ? [] : [side.attempt.failNext]),
+      ]);
+      for (const { prompt } of [card, ...followUps]) {
+        const params = prompt.params as Record<string, unknown>;
+        texts.push(prompt.prose ?? "", String(params.title ?? ""), String(params.speaker ?? ""));
+      }
     } else if (command.kind === "offerJob") {
       const { issuer } = command.payload.job;
       texts.push(typeof issuer === "string" ? issuer : issuer.name);

@@ -130,8 +130,12 @@ and scripted impacts (§scheduling-a-field). For both:
 ### Card lever
 
 `surfaceDecision` puts a two-sided card in front of the captain (§cards-and-sides). Each side has an
-effect (§side-effects). The card also carries `speaker`, an aftermath per side, `beatOfThread` and
-`closesThread`. A reply's `card` field is only for dressing a pending policy decision (and its
+effect (§side-effects) and may be a try: `odds`, with a failure branch of `failEffect`, the
+outcome-lever intents its `failLevers` name by index, and the card's `leftFailAftermath` or
+`rightFailAftermath` (§tried-sides). The card also carries `speaker`, an aftermath per side,
+`beatOfThread`, `closesThread` and `followUps`, cards shown straight after a side or a failed try
+(§follow-up-cards). A plan built in code (the null narrator, a test) may leave the try and follow-up
+fields out, as it may `beat`; the model always writes them. A reply's `card` field is only for dressing a pending policy decision (and its
 `unseen` mark, §unseen-lever); `beatOfThread` or `closesThread` written on it are stripped before
 validation and fed back as a correction.
 
@@ -320,16 +324,20 @@ Every text a player can read (titles, situations, labels, aftermaths, pitches, d
 speaker and issuer names) is clipped to its cap and refused if it is empty, states a numeric
 consequence (a credit amount, a percentage, a signed delta), or contains a secret phrase: the name
 or symptom of an undiscovered fault or a scheduled one (a deliberately conservative substring
-check). The one exception is the arrival card's stated chance: a percentage equal to the marked
-side's odds in the situation or that side's label (§unseen-odds). Caps: situation 70 words, aftermath 20, pitch 30, side label 48 characters, title 60. A
+check). The one exception is a chance the narrator set, stated on its own card: a percentage equal to
+the marked side's odds in the arrival card's situation or that side's label (§unseen-odds), and
+on a narrator card a percentage equal to a tried side's odds in the situation or that side's own
+label (§tried-sides); the other side's label, the aftermaths and a follow-up card get no
+exemption. Caps: situation 70 words, aftermath 20, pitch 30, side label 48 characters, title 60. A
 blank aftermath is §aftermath-caption's "none". Both sides of a card may not share a label. The
 staging translator reuses the same checks.
 
 ### One card per call
 
-At most one card per call, counting a surfaced offer. The count starts at one if a decision is on
-screen or held for in-person delivery, and a policy-decision call cannot surface a new card, only
-dress the pending one. Policy-card prose that fails the text checks falls back to the template
+At most one card per call, counting a surfaced offer. A card's follow-ups are part of it and count
+as nothing more (§follow-up-cards). The count starts at one if a decision is on screen or held for
+in-person delivery, and a policy-decision call cannot surface a new card, only dress the pending
+one. Policy-card prose that fails the text checks falls back to the template
 card.
 
 ### Captain never speaks
@@ -509,14 +517,18 @@ its call (bring the arc to the captain, retime it, or let it go), not the server
 
 `cardsShown` is the exact record of cards the captain has seen and the side chosen. The model never
 writes it; the server maintains it (`history.ts`), twelve entries, each with a gist of 25 words.
-It is fed by the call's own policy card and surfaced cards, and by the kernel's `decisionPending`,
-`decisionResolved` and `decisionDropped` events. A surfaced card has no decision id until the
+It is fed by the call's own policy card and surfaced cards, and by the kernel's `decisionPending`
+(a follow-up card enters the history when it comes up), `decisionResolved` and `decisionDropped`
+(a follow-up whose branch was not taken was never seen) events. A surfaced card has no decision id until the
 kernel mints one, so it is matched to its decision by title through the decision records in the
 snapshot, which also fill in any resolution whose event was lost. A card held for in-person
 delivery that is dropped before it came up is forgotten. An arrival card whose marked way in the
-captain chose carries the roll (`tried { odds, worked }`, from `unseenRolled` or the snapshot's
-`Expedition.unseenRoll`, §unseen-odds), shown after the choice: `chose "Creep in quietly" (the way
-in unseen, 70%): it failed, they were waiting`. The digest shows it as "What the captain has
+captain chose carries the roll (`tried { odds, worked, kind: "unseen" }`, from `unseenRolled` or
+the snapshot's `Expedition.unseenRoll`, §unseen-odds), shown after the choice: `chose "Creep in
+quietly" (the way in unseen, 70%): it failed, they were waiting`. A card whose tried side the
+captain chose carries its roll the same way (`kind: "try"`, from `attemptRolled` or the record's
+`Decision.tried`, §tried-sides): `chose "Bluff past him" (70%): it failed`. A roll stored before
+tried sides has no `kind` and reads as `unseen`. The digest shows it as "What the captain has
 seen".
 
 ## Digest

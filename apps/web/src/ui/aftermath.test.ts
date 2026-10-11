@@ -1,7 +1,8 @@
 import type { DecisionCardText } from "@crew/content";
 import type { Decision } from "@crew/sim";
+import type { SimEvent } from "@crew/sim";
 import { describe, expect, it } from "vitest";
-import { aftermathCaption } from "./aftermath";
+import { aftermathCaption, isTriedSide, rollOf } from "./aftermath";
 
 function decision(overrides: Partial<Decision> = {}): Decision {
   return {
@@ -115,5 +116,58 @@ describe("aftermathCaption", () => {
   it("uses a generic line for other decisions", () => {
     const d = decision({ prompt: { key: "narrator.decision", params: {} } });
     expect(aftermathCaption(d, "left", card)).toBe("Decided. The crew get on with it.");
+  });
+});
+
+describe("aftermathCaption on a tried side (§tried-sides)", () => {
+  const prose = (text: string) => ({ key: "narrator.aftermath", params: {}, prose: text });
+  const tried = decision({
+    origin: "narrator",
+    prompt: { key: "narrator.situation", params: { title: "The gate" }, prose: "The gate." },
+    left: {
+      label: { key: "narrator.side", params: {}, prose: "Bluff past him" },
+      commands: [],
+      aftermath: prose("He waves us through."),
+      attempt: {
+        odds: 70,
+        failCommands: [],
+        failLevers: [],
+        failAftermath: prose("He sees through it and calls his sergeant."),
+      },
+    },
+  });
+
+  it("knows which sides wait for a roll", () => {
+    expect(isTriedSide(tried, "left")).toBe(true);
+    expect(isTriedSide(tried, "right")).toBe(false);
+  });
+
+  it("shows the branch the roll took: the side's aftermath if it worked, the failure's if not", () => {
+    expect(aftermathCaption(tried, "left", undefined, undefined, true)).toBe(
+      "He waves us through.",
+    );
+    expect(aftermathCaption(tried, "left", undefined, undefined, false)).toBe(
+      "He sees through it and calls his sergeant.",
+    );
+  });
+
+  it("says plainly that it failed when the failure has no aftermath of its own", () => {
+    const bare = decision({
+      ...tried,
+      left: { ...tried.left, attempt: { odds: 70, failCommands: [], failLevers: [] } },
+    });
+    expect(aftermathCaption(bare, "left", undefined, undefined, false)).toBe(
+      "It does not come off.",
+    );
+  });
+
+  it("reads the roll from the kernel's attemptRolled for that card only", () => {
+    const rolled = (decisionId: string, worked: boolean) =>
+      ({
+        type: "attemptRolled",
+        payload: { decisionId, side: "left", odds: 70, worked },
+      }) as unknown as SimEvent;
+    expect(rollOf([rolled("other", true), rolled("dec1", false)], "dec1")).toBe(false);
+    expect(rollOf([rolled("other", true)], "dec1")).toBeUndefined();
   });
 });

@@ -393,13 +393,13 @@ describe("card history: the roll on the way in unseen (§unseen-odds, §card-his
     // biome-ignore lint/performance/noDelete: the snapshot must lack the roll, not hold undefined.
     delete req.snapshot.state.expedition?.unseenRoll;
     const [card] = applyDecisionEvents([entry], [event], req.snapshot.state, content());
-    expect(card?.tried).toEqual({ odds: 70, worked: false });
+    expect(card?.tried).toEqual({ odds: 70, worked: false, kind: "unseen" });
   });
 
   it("fills the roll in from the snapshot when its event was lost", () => {
     const { req, entry } = rolled(true);
     const [card] = applyDecisionEvents([entry], [], req.snapshot.state, content());
-    expect(card?.tried).toEqual({ odds: 70, worked: true });
+    expect(card?.tried).toEqual({ odds: 70, worked: true, kind: "unseen" });
   });
 
   it("puts no roll on any other card", () => {
@@ -413,19 +413,27 @@ describe("card history: the roll on the way in unseen (§unseen-odds, §card-his
     const { req, entry } = rolled(false);
     const notes = {
       ...EMPTY_NOTES,
-      cardsShown: [{ ...entry, tried: { odds: 70, worked: false } }],
+      cardsShown: [{ ...entry, tried: { odds: 70, worked: false, kind: "unseen" as const } }],
     };
     const hook = quietTooLongRequest(content()).hook;
     const { text } = buildDigest(req.snapshot, [], notes, content(), hook);
     expect(text).toContain(
       '"The silo yard" (Dane Whitcross): Three of them by the weigh-house. → chose "Keep low and quiet" (the way in unseen, 70%): it failed, they were waiting',
     );
-    const worked = { ...notes, cardsShown: [{ ...entry, tried: { odds: 70, worked: true } }] };
+    const worked = {
+      ...notes,
+      cardsShown: [{ ...entry, tried: { odds: 70, worked: true, kind: "unseen" as const } }],
+    };
     expect(buildDigest(req.snapshot, [], worked, content(), hook).text).toContain(
       '→ chose "Keep low and quiet" (the way in unseen, 70%): it worked, they got in unseen',
     );
     const stored = parseNotes(JSON.parse(JSON.stringify(notes)));
-    expect(stored.cardsShown[0]?.tried).toEqual({ odds: 70, worked: false });
+    expect(stored.cardsShown[0]?.tried).toEqual({ odds: 70, worked: false, kind: "unseen" });
+    // A roll stored before tried sides had no kind: it was the way in unseen.
+    const unkinded = { ...notes, cardsShown: [{ ...entry, tried: { odds: 70, worked: false } }] };
+    expect(parseNotes(JSON.parse(JSON.stringify(unkinded))).cardsShown[0]?.tried?.kind).toBe(
+      "unseen",
+    );
     const old = parseNotes(JSON.parse(JSON.stringify({ ...notes, cardsShown: [entry] })));
     expect(old.cardsShown[0]).not.toHaveProperty("tried");
   });

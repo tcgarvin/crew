@@ -19,7 +19,7 @@ import { type CommandHandler, NO_TEMP_REFS, ok, reject } from "../../core/comman
 import { findItemDef } from "../../core/defs";
 import { dockForPort } from "../../core/docks";
 import { floorSet } from "../../core/floor-set";
-import { raiseHookIfIdle } from "../../core/hooks";
+import { approachLeadDistance, raiseHookIfIdle } from "../../core/hooks";
 import { isSite } from "../../core/places";
 import type { CommandOfKind } from "../../core/types/commands";
 import type { DockDef } from "../../core/types/content";
@@ -35,11 +35,6 @@ import type { ItemDefId } from "../../core/types/ids";
 import type { ReadonlyWorldState, StepCtx } from "../../core/types/pipeline";
 import type { InFlight } from "./travel";
 
-/** The lead point: route distance left at which the staging call is raised. */
-function leadDistance(ctx: Pick<StepCtx, "config">): number {
-  return ctx.config.narrator.approachHookLeadSeconds * ctx.config.travel.nominalSpeed;
-}
-
 /**
  * Transit, every tick, before the end-of-route check: open the staging record at the lead point
  * and raise the hook as soon as no other hook is pending.
@@ -50,7 +45,7 @@ export function stageDockIfDue(ctx: StepCtx, travel: InFlight): void {
   const dock = dockForPort(ctx.content, travel.toPortId);
   if (dock === undefined) return;
   if (travel.staging === undefined) {
-    if (travel.routeDistance - travel.routeProgress > leadDistance(ctx)) return;
+    if (travel.routeDistance - travel.routeProgress > approachLeadDistance(ctx)) return;
     travel.staging = { status: "due" };
   }
   if (travel.staging.status !== "due" || ctx.state.narrator.pendingHook !== undefined) return;
