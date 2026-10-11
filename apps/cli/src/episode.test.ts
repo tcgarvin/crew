@@ -83,6 +83,11 @@ describe("episodeChoice: how the episode answers each card", () => {
     expect(episodeChoice(card("expedition.turn", [withdraw], []), JOB)).toBe("right");
   });
 
+  it("pulls back at the turn card when told to", () => {
+    expect(episodeChoice(card("expedition.turn", [], [withdraw]), JOB, "pullBack")).toBe("right");
+    expect(episodeChoice(card("expedition.turn", [withdraw], []), JOB, "pullBack")).toBe("left");
+  });
+
   it("answers anything else by its left side", () => {
     expect(episodeChoice(card("travel.departureGate", [], []), JOB)).toBe("left");
   });

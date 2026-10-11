@@ -22,6 +22,10 @@
  *     pnpm --filter @crew/cli dev episode [--seed N] [--site <port id>] [--all]
  *
  * (`--all` adds ship life, meals and bells and talk, to the episode's own lines.)
+ *
+ * Tests may vary it (`EpisodeOptions`): `fetchItem` offers a `fetchItem` errand instead, `turnCard`
+ * `pullBack` takes the turn card's other side, and `world` plays a further errand on a world an
+ * earlier run left (made by `createEpisodeWorld`, run with the same kernel).
  */
 import { type DecisionCardText, NARRATOR_TEXT_KEYS, templateCard } from "@crew/content";
 import { NULL_NARRATOR_MODEL, nullNarratorResponse } from "@crew/narrator";
@@ -32,6 +36,7 @@ import {
   type DecisionId,
   type DeepReadonly,
   type EnqueueResult,
+  type ItemDefId,
   type JobDraft,
   type JobId,
   type Kernel,
@@ -60,8 +65,17 @@ export interface EpisodeOptions {
   readonly seed: number;
   /** The site to send the ship to; absent, the authored site nearest the start port. */
   readonly siteId?: PortDefId;
-  /** Hard cap on sim time, whatever happens. */
+  /** Hard cap on sim time, whatever happens (from the run's start). */
   readonly maxSimSeconds?: number;
+  /** Fetch one of this item from the site (a `fetchItem` errand) rather than its target. */
+  readonly fetchItem?: ItemDefId;
+  /** How the turn card is answered: "Press on" (the default) or "Pull back to the ship". */
+  readonly turnCard?: TurnCardAnswer;
+  /**
+   * Play on this world (made by `createEpisodeWorld` with the same kernel) rather than a new one:
+   * a second errand after the first, the ship where the first left her. Absent, a new world.
+   */
+  readonly world?: World;
   /**
    * Called after each advance (and its answers) with the world and a command sender: a seam for
    * experiments, e.g. standing in for a system that is not there yet. The episode itself needs none.
@@ -71,6 +85,9 @@ export interface EpisodeOptions {
     send: (command: Omit<Command, "id">) => EnqueueResult,
   ) => void;
 }
+
+/** The turn card's two answers (`EpisodeOptions.turnCard`). */
+export type TurnCardAnswer = "pressOn" | "pullBack";
 
 /** The episode's beats, in the order they must come (`EpisodeResult.milestones`). */
 export const EPISODE_MILESTONES = [
@@ -252,14 +269,34 @@ function roundTripDistance(world: World, fromPortId: PortDefId, siteId: PortDefI
   return out.distance + back.distance;
 }
 
-/** The errand offered at tick 0: bring the site's target back alive, at the standard tier. */
-export function episodeErrand(world: World, fromPortId: PortDefId, siteId: PortDefId): JobDraft {
+/**
+ * The errand offered at tick 0: bring the site's target back alive, at the standard tier; or, with
+ * `fetchItem`, fetch one of that item (named by its def's name, wanted either way).
+ */
+export function episodeErrand(
+  world: World,
+  fromPortId: PortDefId,
+  siteId: PortDefId,
+  fetchItem?: ItemDefId,
+): JobDraft {
+  const item = fetchItem === undefined ? undefined : world.content.items[fetchItem];
+  if (fetchItem !== undefined && item === undefined) {
+    throw new Error(`episode: no item "${fetchItem}" in content`);
+  }
+  const target = item?.name ?? siteTarget(world, siteId);
+  const errand: NonNullable<JobDraft["errand"]> =
+    item === undefined
+      ? { kind: "fetchPerson", siteId, targetName: target, wants: "alive" }
+      : { kind: "fetchItem", siteId, targetName: target, itemDefId: item.id, wants: "either" };
   return {
     issuer: ERRAND_ISSUER,
     pitch: {
       key: NARRATOR_TEXT_KEYS.jobPitch,
       params: {},
-      prose: `${siteTarget(world, siteId)} took the Growers' seed money and went to ground. I want them back here to answer for it.`,
+      prose:
+        item === undefined
+          ? `${target} took the Growers' seed money and went to ground. I want them back here to answer for it.`
+          : `The Growers' ${target} was left out there when the co-op fell apart. I want it back.`,
     },
     description: { key: "job.template", params: {} },
     urgency: "soon",
@@ -268,7 +305,7 @@ export function episodeErrand(world: World, fromPortId: PortDefId, siteId: PortD
     cargo: [],
     pay: errandPay(world.config.values, roundTripDistance(world, fromPortId, siteId), "standard")
       .pay,
-    errand: { kind: "fetchPerson", siteId, targetName: siteTarget(world, siteId), wants: "alive" },
+    errand,
   };
 }
 
@@ -295,11 +332,13 @@ const adoptsHold = (c: SideCommand): boolean =>
 /**
  * How the episode answers a card: take the errand's offer (its `acceptContract` side) and pass any
  * other; on the arrival card the side adopting a `hold-` plan; on the turn card "Press on" (the side
- * with no `withdrawParty`); anything else its left side, as `crew beats` does.
+ * with no `withdrawParty`), or with `turnCard` `pullBack` the side with it; anything else its left
+ * side, as `crew beats` does.
  */
 export function episodeChoice(
   decision: DeepReadonly<Decision>,
   errandJobId: JobId | undefined,
+  turnCard: TurnCardAnswer = "pressOn",
 ): Side {
   const accepts = (c: SideCommand) => c.kind === "acceptContract";
   switch (decision.prompt.key) {
@@ -310,7 +349,9 @@ export function episodeChoice(
     case "expedition.arrival":
       return sideWith(decision, adoptsHold) ?? "left";
     case "expedition.turn":
-      return sideWith(decision, (c) => c.kind === "withdrawParty", false) ?? "left";
+      return (
+        sideWith(decision, (c) => c.kind === "withdrawParty", turnCard === "pullBack") ?? "left"
+      );
     default:
       return "left";
   }
@@ -319,6 +360,12 @@ export function episodeChoice(
 // ---------------------------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------------------------
+
+/** A new world for an episode: the pacing content's scenario at `seed`. */
+export function createEpisodeWorld(kernel: Kernel, seed: number): World {
+  const { bundle, config, scenarioId } = loadPacingContent();
+  return kernel.createWorld(scenarioId, seed, bundle, config);
+}
 
 /** One errand, end to end. Deterministic per seed. */
 export function runEpisode(options: EpisodeOptions, kernel?: Kernel): EpisodeResult {
@@ -340,7 +387,10 @@ class Milestones {
     private readonly startPortId: PortDefId,
     private readonly siteId: PortDefId,
     private readonly nearPortId: PortDefId,
-  ) {}
+    startTick: number,
+  ) {
+    this.lastTick = startTick;
+  }
 
   has(name: EpisodeMilestone): boolean {
     return this.seen.has(name);
@@ -426,6 +476,8 @@ class EpisodeRun {
   readonly nearPortId: PortDefId;
   readonly draft: JobDraft;
   readonly moneyStart: number;
+  /** The world's tick when the run began (0 for a new world). */
+  readonly startTick: number;
   readonly milestones: Milestones;
   jobId: JobId | undefined;
   planAdopted: string | undefined;
@@ -443,19 +495,24 @@ class EpisodeRun {
 
   constructor(
     readonly kernel: Kernel,
-    options: EpisodeOptions,
+    private readonly options: EpisodeOptions,
   ) {
-    const { bundle, config, scenarioId } = loadPacingContent();
-    this.world = kernel.createWorld(scenarioId, options.seed, bundle, config);
+    this.world = options.world ?? createEpisodeWorld(kernel, options.seed);
+    this.startTick = this.world.state.tick;
     const travel = this.world.state.travel;
     if (travel.stage !== "docked") throw new Error("the default scenario must start docked");
     this.startPortId = travel.portId;
     const site = siteFor(this.world, this.startPortId, options.siteId);
     this.siteId = site.siteId;
     this.nearPortId = site.nearPortId;
-    this.milestones = new Milestones(this.startPortId, this.siteId, this.nearPortId);
+    this.milestones = new Milestones(
+      this.startPortId,
+      this.siteId,
+      this.nearPortId,
+      this.startTick,
+    );
     this.moneyStart = this.world.state.money.balance;
-    this.draft = episodeErrand(this.world, this.startPortId, this.siteId);
+    this.draft = episodeErrand(this.world, this.startPortId, this.siteId, options.fetchItem);
     this.sendOrThrow({
       source: "scenario",
       kind: "offerJob",
@@ -471,7 +528,8 @@ class EpisodeRun {
     this.commandCount += 1;
     return this.kernel.enqueueCommand(this.world, {
       ...command,
-      id: `cmd:episode:${this.commandCount}` as CommandId,
+      // A run on a world an earlier run played names its commands apart from that run's.
+      id: `cmd:episode:${this.startTick === 0 ? "" : `${this.startTick}:`}${this.commandCount}` as CommandId,
     } as Command);
   };
 
@@ -567,7 +625,7 @@ class EpisodeRun {
     if (head === undefined || decision === undefined) {
       throw new Error("decision halt without a queued decision");
     }
-    const side = episodeChoice(decision, this.jobId);
+    const side = episodeChoice(decision, this.jobId, this.options.turnCard);
     const narrated = this.prose.get(head);
     const card = narrated ?? templateCard(decision, world.content);
     const commands = decision[side].commands;
@@ -673,7 +731,7 @@ function* episodeRun(options: EpisodeOptions, kernel?: Kernel): ChunkedRun<Episo
   const run = new EpisodeRun(kernel ?? createKernel(createPacingRegistry()), options);
   const { world } = run;
   const tickRate = world.config.values.time.tickRate;
-  const maxTicks = (options.maxSimSeconds ?? DEFAULT_MAX_SIM_SECONDS) * tickRate;
+  const maxTicks = run.startTick + (options.maxSimSeconds ?? DEFAULT_MAX_SIM_SECONDS) * tickRate;
   let stuckAdvances = 0;
   for (let advances = 1; ; advances += 1) {
     if (advances % ADVANCES_PER_CHUNK === 0) yield;
