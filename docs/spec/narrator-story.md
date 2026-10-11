@@ -325,8 +325,11 @@ on the ground, the fight, or over with how it ended and, after a mark, how the s
 their role, what they are to the errand (the one it is after, one of theirs, a bystander, on the
 crew's side), what they carry, where they stand by the map's posts, and their bearing as a word
 (steady, wavering, breaking, fled, has given up, down, dead). It shows the arrival card's two plans
-with their why while it is up (the chosen plan after), and the turn card's sides while it is up. No
-digit appears in the section; a head count is written in words.
+with their why while it is up (the chosen plan after), and the turn card's sides while it is up.
+For an item errand it adds where the thing lies by the nearest post, or who carries it, or that it
+is not in sight; the site's own target reads as "the one at the heart of it here (the errand is
+after a thing, not them)", and a taken item errand ends "the party took what it went for". No digit
+appears in the section; a head count is written in words.
 
 ## Prompt rules
 
