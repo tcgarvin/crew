@@ -370,6 +370,16 @@ describe("buildCapabilities: Sites and the errand (expeditions A2, §6, §10.2)"
     expect(lazaret).toContain(
       "    - Sister Hedda Vosk, a vowed warden who took Orrin's side, with a club;",
     );
+    const boneyard = section.split('  - port.boneyard "')[1] ?? "";
+    expect(boneyard).toContain(
+      "    - the one a fetchPerson is after, under your targetName (else Hollis Grane): a breaker who cut up a hull with a lien on it, unarmed;",
+    );
+    expect(boneyard).toContain(
+      "    - Saul Kittredge, a yard foreman Hollis pays by the day, with a blaster;",
+    );
+    expect(boneyard).toContain(
+      "    - Pip Grane, Hollis's son, who will not leave him, with a club;",
+    );
     const castLines = section.split("\n").filter((line) => line.startsWith("    - "));
     expect(castLines.length).toBeGreaterThan(0);
     for (const line of castLines) expect(line).not.toMatch(/\d/);

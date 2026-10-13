@@ -476,9 +476,14 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
     }
   });
 
-  it("has three landing sites, the Boathouse, Harrow End and the Lazaret, that no port lists (expeditions A1, call 1)", () => {
+  it("has four landing sites, the Boathouse, Harrow End, the Lazaret and the Boneyard, that no port lists (expeditions A1, call 1)", () => {
     const sites = Object.values(bundle.ports).filter((p) => p.kind === "site");
-    expect(sites.map((s) => s.id)).toEqual(["port.boathouse", "port.harrow_end", "port.lazaret"]);
+    expect(sites.map((s) => s.id)).toEqual([
+      "port.boathouse",
+      "port.harrow_end",
+      "port.lazaret",
+      "port.boneyard",
+    ]);
     const expected = [
       {
         id: "port.boathouse",
@@ -494,6 +499,11 @@ describe("the six-port galaxy (passengers spec §2.1, §2.4)", () => {
         id: "port.lazaret",
         near: "port.vesper_gate",
         cast: ["Orrin Sallow", "Brannoch Teale", "Sister Hedda Vosk", "Dace Corley", "Ines Haddow"],
+      },
+      {
+        id: "port.boneyard",
+        near: "port.ossory_station",
+        cast: ["Hollis Grane", "Saul Kittredge", "Juno Lasker", "Pip Grane", "Mother Tully"],
       },
     ];
     for (const { id, near, cast } of expected) {

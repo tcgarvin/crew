@@ -407,6 +407,41 @@ the hold side's why on the arrival card and on the hold plans of the menu (§the
 the captain who holds here does it knowing. Why: `hold` is still a choice here, but the bolt-hole
 is out of the ramp's sight, and the card read as at Harrow End, where holding works.
 
+### The Boneyard
+
+`port.boneyard` (planet, near Ossory Station, one route of 20) and its map `dock.boneyard`,
+Ossory's laying-up field on the dead moon below the station, 44 x 30 with the Mk2 berthed at
+(4, 0); its README is the map. It is open ground from the apron to the south edge, with no
+building on it: wrecks stand on it as walls (the bow at x 1–3, rows 21–22; a gutted tug at
+x 11–13, rows 23–24; a barge section at x 24–26, row 22) and single hull plates stood on edge are
+its cover, scattered across the field and three by the personnel ramp. A spoil bank, a wall along
+row 27 from x 8 to x 41, hides the drainage cut below it (row 28), which runs the whole width of
+the field: open to the apron at its east end and to the field at its west end beside the cutting
+frame. `noticeRadius` 5.
+
+Posts: `target` the cutting frame (3, 24) at the far west end, `loot` the lien box (6, 26),
+guards `crane_foot` (27, 24) and `plate_stack` (18, 23) out in the field behind plates, and
+`frame_side` (6, 24) beside the target, `bystander` the cable drums (16, 26), `exit` the drainage
+cut (0, 28), `flank` the end of the cut (7, 28). The default cast: Hollis Grane, a breaker who cut
+up a hull with a lien on it (target, unarmed, steady, bound, wants out); Saul Kittredge, a yard
+foreman Hollis pays by the day, with a blaster at the crane foot (hard, paid, wants money); Juno
+Lasker, a cutter hired off Ossory's dock, with a blaster at the plate stack (steady, paid, wants
+money); Pip Grane, Hollis's son, with a baton beside the frame (steady, devoted, wants blood);
+Mother Tully, a copper picker (bystander). A hard guard who is only paid is this site's alone.
+Why: the target is the length of the field from the personnel ramp, and the field is all
+sightline, so every way to him but one is a walk under fire. `assault` crosses it in the open at
+two blasters firing from plates and costs the most of any site, sometimes the whole party driven
+back. `hold` is a long exchange with the foreman across the field; the guards are posted beyond
+reach of the ramp so they come forward plate by plate, and the party, in cover by the ramp,
+breaks them before Hollis bolts. `creep` finds no quiet route across open ground and fights as
+`assault` does. The cut is the flank's: the second group walks it under the bank, out of the
+field's sight, and comes up beside the frame and the way out together, so `flank` takes him at the
+fewest wounds of any plan here. Pip, devoted, runs at whoever comes near his father from any
+distance. The foreman's post is beyond a blaster's reach of the ramp and the notice radius keeps
+the ramp out of the guards' sight, so contact is the loud landing; with him a few tiles nearer
+and a wider radius they saw the party on the ramp, `hold` traded fire from the first second until
+Hollis was gone, and holders went down in the open where no rescue could reach them.
+
 ## The expedition
 
 ### Starting an expedition

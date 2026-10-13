@@ -248,7 +248,11 @@ deaths at most 0.25 a fight for each, no timeouts, `assault` taking the target i
 runs `hold`, `assault` and `creep` the same way and asserts party deaths at most 0.25 a fight for
 each, `hold` ending `targetFled` in at least 60%, `assault` and `creep` never timed out, `assault`
 taking the target in at least 60% and `creep` in at least 80% at fewer party wounds than
-`assault`. Seeded, so the same code and seed
+`assault`. At the Boneyard (§the-boneyard) it runs `assault`, `flank` and `hold` and asserts
+party deaths at most 0.25 a fight for each and none timed out, `assault` taking the target in at
+least half and costing at least 1.5 party wounds a fight, `flank` taking him in at least 80% at
+under half `assault`'s party wounds, and `hold` taking him in at least 60%. Seeded, so the same
+code and seed
 give the same fight; not a determinism claim (D4).
 
 ### Narrator log and live tests

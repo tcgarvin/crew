@@ -173,3 +173,56 @@ describe("crew expeditions: the Lazaret's warren", () => {
     );
   });
 });
+
+/**
+ * The Boneyard (§the-boneyard): an open field the party must cross to the target. Going straight
+ * across costs the most; the drainage cut is the flank's way in unseen, so the flank takes the
+ * target at a fraction of the assault's wounds; holding the ramp is a long exchange that still
+ * takes him. Bounds, not values (ruling 13).
+ */
+describe("crew expeditions: the Boneyard's open field", () => {
+  const summaries = new Map<string, PlanSummary>();
+  const runPlan = async (plan: string): Promise<PlanSummary> => {
+    const records = await runExpeditionsAsync({
+      siteId: "port.boneyard" as never,
+      plans: [plan],
+      casts: ["default"],
+      n: 4,
+      seeds: [1, 2],
+    });
+    const summary = summarise(records);
+    summaries.set(plan, summary);
+    return summary;
+  };
+  const woundsPerFight = (plan: string) =>
+    Object.values(summaries.get(plan)?.woundsPerFight.us ?? {}).reduce((a, b) => a + b, 0);
+
+  it("assault: costly, never timed out", { timeout: 120_000 }, async () => {
+    const assault = await runPlan("assault-lethal-armed");
+    expect(assault.deadPerFight.us).toBeLessThanOrEqual(0.25);
+    expect(assault.outcomes.timedOut + assault.outcomes.cutOff).toBe(0);
+    expect(assault.outcomes.targetTaken).toBeGreaterThanOrEqual(0.5);
+    expect(woundsPerFight("assault-lethal-armed")).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it(
+    "flank: takes the target at under half the assault's wounds",
+    { timeout: 120_000 },
+    async () => {
+      const flank = await runPlan("flank-lethal-armed");
+      expect(flank.deadPerFight.us).toBeLessThanOrEqual(0.25);
+      expect(flank.outcomes.timedOut + flank.outcomes.cutOff).toBe(0);
+      expect(flank.outcomes.targetTaken).toBeGreaterThanOrEqual(0.8);
+      expect(woundsPerFight("flank-lethal-armed")).toBeLessThan(
+        0.5 * woundsPerFight("assault-lethal-armed"),
+      );
+    },
+  );
+
+  it("hold: a long exchange that still takes the target", { timeout: 120_000 }, async () => {
+    const hold = await runPlan("hold-lethal-armed");
+    expect(hold.deadPerFight.us).toBeLessThanOrEqual(0.25);
+    expect(hold.outcomes.timedOut + hold.outcomes.cutOff).toBe(0);
+    expect(hold.outcomes.targetTaken).toBeGreaterThanOrEqual(0.6);
+  });
+});
