@@ -175,3 +175,23 @@ describe("the bodies system (§7.1)", () => {
     expect(bodiesWorldViolations(world)).toEqual([]);
   });
 });
+
+describe("a treated wound (§treatment-at-the-medbay-bed)", () => {
+  it("a grave bleeder treated at 20 s bleeds no more and lives, where untreated they die", () => {
+    const test = bodiesWorld();
+    const { world } = test;
+    woundNow(world, JAX, { part: "torso", severity: "grave", type: "blaster" });
+    runFor(test, 20);
+    const jax = actorOf(world, JAX);
+    const wound = jax.body.wounds[0];
+    if (wound === undefined) throw new Error("no wound");
+    // What `runTreat` writes (`systems/medical/steps.ts`).
+    wound.treatedTick = world.state.tick;
+    wound.bleeding = false;
+    const blood = jax.body.blood;
+    runFor(test, 60);
+    expect(jax.availability).not.toBe("dead");
+    expect(jax.body.blood).toBeGreaterThan(blood);
+    expect(bodiesWorldViolations(world)).toEqual([]);
+  });
+});

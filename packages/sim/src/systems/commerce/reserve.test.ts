@@ -18,6 +18,7 @@ import type { World } from "../../core/types/kernel";
 import { registerPlannerDefaults } from "../../planner/index";
 import { DAMAGE, damageWorld } from "../damage/fixtures/damage-deck";
 import { registerEquipmentSystems } from "../equipment/register";
+import { MEDICAL, medicalWorld } from "../medical/fixtures/medical-deck";
 import { registerNeeds } from "../needs/index";
 import { registerSpatial } from "../spatial/index";
 import { spatialViolations } from "../spatial/invariants";
@@ -313,5 +314,30 @@ describe("patch kits: bought back to the scenario's stocked count", () => {
     const { ctx } = kitWorld({ kits: false, kitStock: { count: 20, price: 15 } });
     expect(stockedPatchKits(ctx)).toBe(0);
     expect(reserveShortfalls(ctx, PORTS.a)).toEqual([]);
+  });
+});
+
+describe("medical supplies (§medical-supplies): kept at the reserve in units", () => {
+  function medWorld(options: Parameters<typeof medicalWorld>[0]) {
+    const { world } = medicalWorld(options);
+    const ctx = { state: world.state, content: world.content, config: world.config.values };
+    const medical = () =>
+      reserveShortfalls(ctx, PORTS.a).filter((s) => s.itemDefId === MEDICAL.kit);
+    return { world, medical };
+  }
+
+  it("wants nothing at or above the reserve (two), and the difference below it", () => {
+    const stocked = medWorld({ kits: 3, kitStock: { count: 10, price: 20 } });
+    expect(stocked.medical()).toEqual([]);
+    const low = medWorld({ kits: 1, kitStock: { count: 10, price: 20 } });
+    expect(low.medical()).toEqual([{ itemDefId: MEDICAL.kit, count: 1 }]);
+    const none = medWorld({ kits: 0, kitStock: { count: 10, price: 20 } });
+    expect(none.medical()).toEqual([{ itemDefId: MEDICAL.kit, count: 2 }]);
+  });
+
+  it("wants none where the market sells no kit, or with the reserve at 0", () => {
+    expect(medWorld({ kits: 0 }).medical()).toEqual([]);
+    const off = medWorld({ kits: 0, kitStock: { count: 10, price: 20 }, medical: { reserve: 0 } });
+    expect(off.medical()).toEqual([]);
   });
 });

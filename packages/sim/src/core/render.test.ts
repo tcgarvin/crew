@@ -763,3 +763,44 @@ describe("expeditions A2: setting down, lifting off, and the errand's lines", ()
     });
   });
 });
+
+describe("the ticker line for a treatment (§treatment-at-the-medbay-bed)", () => {
+  const { world } = tinyTestWorld();
+  const [patientId, medicId] = Object.keys(world.state.actors) as ActorId[];
+  const name = (id: ActorId | undefined) => (id === undefined ? "" : world.state.actors[id]?.name);
+  const line = (parts: readonly ("leftLeg" | "rightLeg" | "torso" | "head")[]) =>
+    describeEvent(
+      {
+        id: "e1" as EventId,
+        tick: 1,
+        seq: 1,
+        subjectIds: [],
+        causeIds: [],
+        source: "sim",
+        type: "woundTreated",
+        significance: "notable",
+        payload: {
+          actorId: patientId as ActorId,
+          byActorId: (medicId ?? patientId) as ActorId,
+          woundIds: [],
+          parts,
+        },
+      } as SimEvent,
+      world.state,
+      world.content,
+    );
+
+  it("names the medic, the patient and where they were hurt, each region once", () => {
+    const medic = name(medicId ?? patientId);
+    const patient = name(patientId);
+    expect(line(["leftLeg"])).toBe(`${medic} treats ${patient}'s leg`);
+    expect(line(["leftLeg", "rightLeg", "torso"])).toBe(
+      `${medic} treats ${patient}'s leg and chest`,
+    );
+  });
+
+  it("reaches the ticker; a wound healing does not", () => {
+    expect(EVENT_SIGNIFICANCE.woundTreated).toBe("notable");
+    expect(EVENT_SIGNIFICANCE.woundHealed).toBe("trace");
+  });
+});

@@ -106,7 +106,11 @@ export function taggedInHand(ctx: StepCtx, actor: Actor, tag: ItemTag): Item | u
  * The items the actor believes are on deck and match `matches` (what an item is comes from truth,
  * as in the planner's view; where it is, from belief), nearest walk first.
  */
-function knownOnDeck(ctx: StepCtx, actor: Actor, matches: (item: Item) => boolean): ItemId[] {
+export function knownOnDeck(
+  ctx: StepCtx,
+  actor: Actor,
+  matches: (item: Item) => boolean,
+): ItemId[] {
   const found: { itemId: ItemId; ticks: number }[] = [];
   for (const fact of Object.values(actor.knowledge)) {
     if (fact.factType !== "itemLocation" || fact.value.absent === true) continue;

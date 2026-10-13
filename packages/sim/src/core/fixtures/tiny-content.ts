@@ -25,6 +25,7 @@ import {
   FIXTURE_GALLEY,
   FIXTURE_HAZARDS,
   FIXTURE_INTERCOM,
+  FIXTURE_MEDICAL,
   FIXTURE_MOOD,
   FIXTURE_RECREATION,
   FIXTURE_SOCIAL,
@@ -213,6 +214,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
     field: FIXTURE_FIELD,
     damage: FIXTURE_DAMAGE,
     intercom: FIXTURE_INTERCOM,
+    medical: FIXTURE_MEDICAL,
     bodies: FIXTURE_BODIES,
     expedition: FIXTURE_EXPEDITION,
     social: {

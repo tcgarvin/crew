@@ -245,4 +245,24 @@ describe("the wound clock (§7.1)", () => {
     expect(woundHealsFromTick(blunt, config)).toBe(0);
     expect(woundDamage({ tick: 0, type: "stun", severity: "serious" }, 0, config)).toBe(0);
   });
+
+  it("a treated bleeder stops bleeding at its treatment and heals three times as fast from then", () => {
+    const wound = { tick: 0, type: "blaster", severity: "serious", treatedTick: at(20) } as const;
+    // §treatment-at-the-medbay-bed: the bleed stops at the treatment, 40 s early.
+    expect(woundHealsFromTick(wound, config)).toBe(at(20));
+    expect(woundDamage(wound, at(20), config)).toBeCloseTo(1.2, 12);
+    // A third of a day treated heals what a whole day untreated would: half.
+    expect(woundDamage(wound, at(20 + DAY / 3), config)).toBeCloseTo(0.6, 12);
+    expect(woundDamage(wound, at(20 + (2 * DAY) / 3), config)).toBe(0);
+  });
+
+  it("a wound treated after its bleed stopped heals untreated until then, faster after", () => {
+    const untreated = { tick: 0, type: "blaster", severity: "serious" } as const;
+    const treated = { ...untreated, treatedTick: at(60 + DAY / 2) };
+    expect(woundHealsFromTick(treated, config)).toBe(at(60));
+    // Half a day at 0.5 a day (0.3 off), then a sixth of a day at three times that (0.3 more).
+    expect(woundDamage(treated, at(60 + DAY / 2), config)).toBeCloseTo(0.9, 12);
+    expect(woundDamage(treated, at(60 + DAY / 2 + DAY / 6), config)).toBeCloseTo(0.6, 12);
+    expect(woundDamage(untreated, at(60 + DAY / 2 + DAY / 6), config)).toBeCloseTo(0.8, 12);
+  });
 });

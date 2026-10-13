@@ -260,7 +260,9 @@ section.
 
 Every person's sheet has a body line from their agent view (`SelfView.body`): "unhurt",
 "stunned", "wounded: right leg (serious), bleeding", "down — wounded: torso (grave), bleeding",
-"dead"; marked when not "unhurt". One of a site's cast (`combatant.side` `them`) shows only name,
+"dead"; "wounded: right leg (serious), treated" once every wound is treated
+(§treatment-at-the-medbay-bed), and "bleeding" only for a wound nobody has treated; marked when
+not "unhurt". One of a site's cast (`combatant.side` `them`) shows only name,
 their role there, the body line and their state in the fight, with none of the crew's watch,
 needs, weighing, problems or roster.
 

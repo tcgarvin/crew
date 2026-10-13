@@ -295,6 +295,7 @@ export const problemKindSchema = z.enum([
   "hullScar",
   "hullDamaged",
   "compartmentToCheck",
+  "crewWounded",
 ]);
 /**
  * §scheduling-a-field: field severities (sim `FIELD_SEVERITIES`), the keys of

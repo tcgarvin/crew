@@ -41,6 +41,10 @@ import {
  * - recreation (slice 4, `recreation.ts`) → routineObligation or voluntaryActivity off duty,
  *   voluntaryActivity on duty;
  * - a `privateTalk` summons (slice 4, `cabins.ts`) → essentialOperation.
+ * - `crewWounded` (§the-wounded-problem) → the owner's base urgency (essential while a wound
+ *   bleeds, routine after; who may take it is `medical.ts`'s, and it is all hands like cargo);
+ *   the patient's own walk to the medbay bed (§convalescing, `medical.ts`) → essential while
+ *   bleeding, routine after.
  *
  * - on duty with nothing else to do (§gangway-watch-and-rounds: `rounds.ts`, the post until
  *   rounds land) → voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
@@ -78,6 +82,7 @@ import {
 } from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
 import { reportCandidate } from "./intercom";
+import { convalesceCandidate, isMedicalTask, medicalTaskAllowed } from "./medical";
 import { recreationCandidate } from "./recreation";
 import { dutyIdleCandidate } from "./rounds";
 
@@ -215,6 +220,9 @@ export function taskUrgency(
     case "hullDamaged":
     case "compartmentToCheck":
       // §urgency-of-damage-work: essential on alert, routine after; damage says which.
+      return problem.baseUrgency;
+    case "crewWounded":
+      // §the-wounded-problem: essential while a wound bleeds, routine after; medical says which.
       return problem.baseUrgency;
   }
 }
@@ -360,14 +368,19 @@ function taskCandidate(
   if (isDamageTask(task) && !damageTaskAllowed(view, config, task, problem)) {
     return reject("notMyDamage");
   }
+  // §treatment-at-the-medbay-bed: nobody treats their own wounds.
+  if (isMedicalTask(task) && !medicalTaskAllowed(view, task)) return reject("ownWounds");
   const exempt = (helm && helmTaskExempt(view, task)) || galleyTaskExempt(view, task);
   const betterQualified = exempt ? undefined : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
   // §duty-and-the-sleep-watch: cargo in port is all hands awake, not the watch's: nobody
   // off duty is turned away from a crate (the sleeping sleep on, since the hold is not interrupted
-  // for routine work).
-  const allHands = problem.kind === "cargoToLoad" || problem.kind === "cargoToUnload";
+  // for routine work). §treatment-at-the-medbay-bed: so is a wounded crewmate.
+  const allHands =
+    problem.kind === "cargoToLoad" ||
+    problem.kind === "cargoToUnload" ||
+    problem.kind === "crewWounded";
   if (
     !exempt &&
     !allHands &&
@@ -532,6 +545,8 @@ export function enumerateCandidates(view: AgentView, config: PlannerConfig): Can
   }
   add(eatCandidate(view, config));
   add(sleepCandidate(view, config));
+  // §convalescing: the wounded to the medbay bed (never a passenger: nobody treats them).
+  if (!passenger) add(convalesceCandidate(view, config));
   add(leisureCandidate(view, config, "rest"));
   add(leisureCandidate(view, config, "socialize"));
   // §sighting-and-the-alert: no recreation on alert (`alert.ts`).

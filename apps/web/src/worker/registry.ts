@@ -4,7 +4,7 @@
  *
  * spatial → power + equipment → dirt (§dirt-grid) → travel + commerce → needs → watch (§the-bell) →
  * galley (§meal-problem) → recreation, social, cabins (slice 4: off watch) → damage, intercom
- * (slice 5: the crew's answer to the rocks) → work (execution, perception, chat, derivation with
+ * (slice 5: the crew's answer to the rocks) → medical (§medicine) → work (execution, perception, chat, derivation with
  * every system's rules, AgentView builder) → planner. The field (slice 5) registers after travel,
  * so it runs after travel's hazards in the equipment phase. Expeditions A1: bodies after needs (the
  * needs phase), the expedition just before work (the actions phase: after spatial, before
@@ -19,6 +19,7 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  medicalTaskDerivations,
   registerBodies,
   registerCabins,
   registerCommerce,
@@ -29,6 +30,7 @@ import {
   registerField,
   registerGalley,
   registerIntercom,
+  registerMedical,
   registerNeeds,
   registerPlannerDefaults,
   registerRecreation,
@@ -58,6 +60,8 @@ export function createFullRegistry(): KernelRegistry {
   registerCabins(registry);
   registerDamage(registry);
   registerIntercom(registry);
+  // §medicine: the wounded problem, after the bodies system in the needs phase.
+  registerMedical(registry);
   // Expeditions A1: the muster and the fight, in the actions phase after spatial, before work.
   registerExpedition(registry);
   // `registerWork` also installs the AgentView builder (the inspector reads it).
@@ -69,6 +73,7 @@ export function createFullRegistry(): KernelRegistry {
       ...galleyTaskDerivations,
       ...dirtTaskDerivations,
       ...damageTaskDerivations,
+      ...medicalTaskDerivations,
     },
     stages: equipmentStages,
   });

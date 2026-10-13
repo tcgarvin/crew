@@ -556,7 +556,8 @@
           "machineDamaged",
           "hullScar",
           "hullDamaged",
-          "compartmentToCheck"
+          "compartmentToCheck",
+          "crewWounded"
         ]
       }
     }

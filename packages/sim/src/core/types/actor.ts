@@ -82,8 +82,10 @@ export interface Capacities {
 
 /**
  * Expeditions A1 (§7.1, SD §12.2): one wound. Severity sets its damage and pain
- * (`config.bodies`); `bleeding` until it stops on its own (`bleedStopsAfterSeconds`); a `stun`
- * wound carries no damage and never bleeds. `causeActorId` names who made it, when someone did.
+ * (`config.bodies`); `bleeding` until it stops on its own (`bleedStopsAfterSeconds`) or is
+ * treated; a `stun` wound carries no damage and never bleeds. `causeActorId` names who made it,
+ * when someone did. `treatedTick` is when it was treated at the medbay bed
+ * (§treatment-at-the-medbay-bed); absent while untreated.
  */
 export interface Wound {
   id: WoundId;
@@ -93,6 +95,7 @@ export interface Wound {
   bleeding: boolean;
   tick: Tick;
   causeActorId?: ActorId;
+  treatedTick?: Tick;
 }
 
 /**

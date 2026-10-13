@@ -213,7 +213,12 @@ function buildSelf(world: World, actor: ReadonlyActor, geometry: DeckGeometry): 
       bleeding: actor.body.wounds.some((w) => w.bleeding),
       wounds: actor.body.wounds
         .filter((w) => w.type !== "stun")
-        .map((w) => ({ part: w.part, severity: w.severity, bleeding: w.bleeding })),
+        .map((w) => ({
+          part: w.part,
+          severity: w.severity,
+          bleeding: w.bleeding,
+          treated: w.treatedTick !== undefined,
+        })),
       stunned: actor.body.stun > STUNNED_ABOVE,
       availability: actor.availability,
     },

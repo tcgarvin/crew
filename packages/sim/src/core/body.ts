@@ -23,6 +23,8 @@
  *   `bleedStopsAfterSeconds` from its tick; then it heals, losing `healPerDay` of its severity's
  *   damage a day (a `serious` one is gone two days after it stops). A `stun` wound has no damage
  *   and closes when the body's stun is back to 0.
+ * - §treatment-at-the-medbay-bed: a treated wound stops bleeding at its `treatedTick` (if it still
+ *   bled) and from then heals `treatedHealFactor` times as fast.
  *
  * A whole body is 1 across, so nothing changes until someone is hurt. Owner after the gate: W1 of
  * expeditions A1 (bodies).
@@ -184,31 +186,42 @@ export function bleedsOnHit(type: DamageType, severity: WoundSeverity): boolean 
   return type === "blaster" && (severity === "serious" || severity === "grave");
 }
 
+/** What the wound clock reads off a wound. */
+type ClockedWound = DeepReadonly<Pick<Wound, "tick" | "type" | "severity" | "treatedTick">>;
+
 /**
- * The tick a wound stops bleeding on its own and starts to heal: `bleedStopsAfterSeconds` after
- * it was made for one that bled, at once for one that never did. (First aid, phase B, will stop a
- * bleed early and must record when; A1's bleeds only stop on this clock.)
+ * The tick a wound stops bleeding and starts to heal: `bleedStopsAfterSeconds` after it was made
+ * for one that bled, at once for one that never did; or, §treatment-at-the-medbay-bed, its
+ * `treatedTick` if it was treated while it still bled.
  */
-export function woundHealsFromTick(
-  wound: DeepReadonly<Pick<Wound, "tick" | "type" | "severity">>,
-  config: WoundClockConfig,
-): Tick {
+export function woundHealsFromTick(wound: ClockedWound, config: WoundClockConfig): Tick {
   if (!bleedsOnHit(wound.type, wound.severity)) return wound.tick;
-  return wound.tick + config.bodies.bleedStopsAfterSeconds[wound.severity] * config.time.tickRate;
+  const stops =
+    wound.tick + config.bodies.bleedStopsAfterSeconds[wound.severity] * config.time.tickRate;
+  return wound.treatedTick === undefined ? stops : Math.min(stops, wound.treatedTick);
 }
 
 /**
  * The damage `wound` still does at `tick`: its severity's full damage until it starts to heal,
- * then less by `healPerDay` of that a day, down to 0. A `stun` wound does none.
+ * then less by `healPerDay` of that a day, `treatedHealFactor` times that from its treatment on,
+ * down to 0. A `stun` wound does none.
  */
-export function woundDamage(
-  wound: DeepReadonly<Pick<Wound, "tick" | "type" | "severity">>,
-  tick: Tick,
-  config: WoundClockConfig,
-): number {
+export function woundDamage(wound: ClockedWound, tick: Tick, config: WoundClockConfig): number {
   if (wound.type === "stun") return 0;
   const full = config.bodies.severityDamage[wound.severity];
-  const healingTicks = Math.max(0, tick - woundHealsFromTick(wound, config));
-  const days = healingTicks / config.time.tickRate / config.time.daySeconds;
+  const from = woundHealsFromTick(wound, config);
+  const treated = wound.treatedTick ?? Number.POSITIVE_INFINITY;
+  const slowTicks = Math.max(0, Math.min(tick, treated) - from);
+  const fastTicks = Math.max(0, tick - Math.max(from, treated));
+  const ticks = slowTicks + config.bodies.treatedHealFactor * fastTicks;
+  const days = ticks / config.time.tickRate / config.time.daySeconds;
   return Math.max(0, full * (1 - config.bodies.healPerDay * days));
+}
+
+/**
+ * §the-wounded-problem: a wound that wants treating at the medbay bed: open, not a stun hit, and
+ * not treated yet.
+ */
+export function needsTreatment(wound: DeepReadonly<Pick<Wound, "type" | "treatedTick">>): boolean {
+  return wound.type !== "stun" && wound.treatedTick === undefined;
 }

@@ -71,6 +71,7 @@ const PROBLEM_WORDS: Readonly<Record<ProblemKind, string>> = {
   hullScar: "a hull scar to patch",
   hullDamaged: "hull plating to buy",
   compartmentToCheck: "a room to check for damage",
+  crewWounded: "someone wounded to treat",
 };
 
 /** One line of the known-problems list: a kind in words and how many of it are known. */

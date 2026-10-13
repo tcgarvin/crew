@@ -564,6 +564,7 @@ const config = {
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },
+  medical: { treatSecondsPerWound: 15, kitsPerTreatment: 1, reserve: 2, giveUpAfterSeconds: 300 },
   bodies: {
     tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
     severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },
@@ -577,6 +578,8 @@ const config = {
     incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
     deadBelowBlood: 0.25,
     healPerDay: 0.5,
+    treatedHealFactor: 3,
+    treatPainRelief: 0.3,
     partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
     stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
   },

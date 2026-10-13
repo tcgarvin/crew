@@ -69,7 +69,9 @@ describe("AgentView", () => {
     );
     mara.body.stun = STUNNED_ABOVE * 2;
     const body = kernel.getAgentView(world, MARA).self.body;
-    expect(body.wounds).toEqual([{ part: "rightLeg", severity: "serious", bleeding: true }]);
+    expect(body.wounds).toEqual([
+      { part: "rightLeg", severity: "serious", bleeding: true, treated: false },
+    ]);
     expect(body.stunned).toBe(true);
     expect(body.availability).toBe("available");
     expect(kernel.getAgentView(world, MARA).self.combatant).toBeUndefined();

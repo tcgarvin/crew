@@ -67,6 +67,8 @@ function targetName(names: Names, task: TaskView): string {
       return "a door";
     case "scar":
       return "the hull";
+    case "actor":
+      return personName(names, target.actorId);
   }
 }
 
@@ -104,6 +106,8 @@ export function taskWords(names: Names, task: TaskView, problem: ProblemView | u
       return "plating the hull";
     case "checkCompartment":
       return `checking ${what} for damage`;
+    case "treatWounds":
+      return `treating ${what}`;
   }
 }
 
@@ -153,6 +157,8 @@ function candidateWords(names: Names, view: AgentView, candidate: Candidate): st
       return "arming for the site";
     case "fight":
       return "in the fight";
+    case "convalesce":
+      return "going to the medbay";
   }
 }
 
@@ -178,6 +184,7 @@ function refWords(names: Names, view: AgentView, ref: string): string {
     privateTalk: "a word with the captain",
     report: "reporting on the intercom",
     holdBridge: "holding the bridge",
+    convalesce: "going to the medbay",
   };
   return words[head] ?? head;
 }
@@ -200,6 +207,9 @@ const REASON_WORDS: Readonly<Record<string, string>> = {
   noLounge: "nowhere to do it",
   notAboard: "not aboard",
   atTheHelm: "at the helm",
+  ownWounds: "can't treat their own wounds",
+  noMedicine: "knows of no med kit aboard",
+  bedTaken: "someone else is in the medbay bed",
 };
 
 /** A rejection reason in words; `claimedBy:<id>` and `deferTo:<id>` name the person. */

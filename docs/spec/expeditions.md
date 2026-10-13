@@ -1,12 +1,12 @@
 # Expeditions
 
-Bodies and arms, landing sites, and the fight a party walks into when the ship sets down at one.
-Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
-`systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*` and `expedition.*` in
-`packages/content/data/config/default.json`. An expedition starts when the ship sets down at a
-site for an errand (§errand-job, §the-arrival-card), or from `scenarioStartExpedition` in tests and
-dev tools; what the narrator sees and may do is §the-narrator-and-sites. The owner's rulings that
-shape it are D103, D104 and D105.
+Bodies and arms, medicine aboard, landing sites, and the fight a party walks into when the ship
+sets down at one. Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
+`systems/medical/`, `systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*`,
+`medical.*` and `expedition.*` in `packages/content/data/config/default.json`. An expedition
+starts when the ship sets down at a site for an errand (§errand-job, §the-arrival-card), or from
+`scenarioStartExpedition` in tests and dev tools; what the narrator sees and may do is
+§the-narrator-and-sites. The owner's rulings that shape it are D103, D104 and D105.
 
 ## Bodies
 
@@ -54,7 +54,8 @@ a stun wound closes when stun is back to 0. The `wounded` thought is kept while 
 So an untreated `serious` bleeder loses about a quarter of their blood and lives; a `grave` one
 crosses the death floor at about 62 s, before the bleed stops. Every weapon deals `serious` (fists
 a graze), so a fight makes no grave wound: death comes from a second hit to the head or a third to
-the torso. There is no medicine yet.
+the torso. A wound treated at the medbay bed stops bleeding at the treatment and heals faster from
+then (§treatment-at-the-medbay-bed); one nobody treats runs this clock unchanged.
 
 ### Going down and death
 
@@ -70,6 +71,66 @@ system lifts only an incapacity a wound explains.
 The dead free their berth (§berth-assignment) and are never planned or stepped. A dead or
 incapacitated captain is not fit for command, so command, the card's perspective and the next
 walk ashore pass to the first officer (D8, D103).
+
+## Medicine
+
+Wounds are treated aboard, at the medbay bed (a `medBed`-tagged machine; both freighters have one
+in the infirmary): the hurt walk there, someone with the skill fetches a `medical` item and treats
+them, and the ship keeps a few kits in stock. Code is in `systems/medical/` and
+`planner/medical.ts`. A deck with no medbay bed has no wounded problem and no treatment.
+
+### The wounded problem
+
+The medical system (`systems/medical/medical.ts`, phase `needs`, after the bodies system, every
+tick) raises `crewWounded {actorId, untreated}` (owner medical, dedupe `wounded:<actorId>`,
+public, located at the medbay bed's compartment) for each living crew member who is not a
+passenger, stands on the ship's floor (not the dock or a site) and is not in a fight, with an open
+wound nobody has treated; stun hits never count. It is essential while one of those wounds
+bleeds and routine after, revised when the count or the class changes, resolved when every wound
+is treated (or has closed), and cancelled when the patient dies. Once raised it stays open while
+the patient is off the ship's floor. A site's cast and passengers get none: nobody aboard treats
+them.
+
+### Treatment at the medbay bed
+
+The problem derives one `treatWounds` task (target the patient, progress their wounds) while at
+least `medical.kitsPerTreatment` (1) units of a `medical` item are aboard, the first such def by
+id: medical skill 1 or more, one worker, standing on the open floor beside the bed's `use` tile
+(never on it), `medical.treatSecondsPerWound` (15) for each untreated wound. With no kit aboard
+nothing is derived, and the task comes back when one is. Anyone awake with the skill answers it,
+on duty or not, as cargo in port is all hands (§duty-and-the-sleep-watch); the less skilled leave
+it to a better medic they can see idle (§what-a-crew-member-weighs). Nobody treats their own
+wounds.
+
+The plan (`medical/plans.ts`) splits the units off the nearest `medical` stack the medic knows
+of, walks to the tile beside the bed nearest them and works `treat`. Until the patient lies at
+the bed the plan is blocked `dependencyPending`, so the task backs off and is tried again. The
+step (`runTreat`) counts work at the medic's work rate; at the end the units are used up, every
+untreated wound gets `Wound.treatedTick` and stops bleeding at once, pain drops by
+`bodies.treatPainRelief` (0.3), `woundTreated` (notable) names medic, patient and wounds, and
+the problem resolves. A treated wound heals `bodies.treatedHealFactor` (3) times `healPerDay` from
+the treatment on, so a `serious` one closes in about two thirds of a day instead of two
+(`core/body.ts` `woundDamage`). The ticker says "Oyelaran Abiodun treats Priya Kessler's leg";
+a wound healing has no line.
+
+### Convalescing
+
+A crew member aboard with a wound nobody has treated (`WoundView.treated` false) has a
+`convalesce` candidate (`planner/medical.ts`): walk to the medbay bed's `use` position and hold
+there, "in the medbay", essential while a wound bleeds and routine after. It is not offered to a
+passenger, on the dock or in a fight, while they believe no `medical` item is aboard
+(`noMedicine`), or while they believe someone else lies there (`bedTaken`: another person last
+seen on that tile). The hold ends when nothing is left to treat, or after
+`medical.giveUpAfterSeconds` (300) with too few `medical` units aboard for a treatment; giving up
+backs the candidate off for as long again. A helm-stander is not pulled off the seat by a wound:
+the walk ranks no higher than the helm watch, so they go once the bell relieves them
+(§selector-commitment).
+
+### Medical supplies
+
+The ship keeps `medical.reserve` (2) units of `medical` items aboard; with fewer, docked at a port
+whose market sells one, the difference is a reserve to restock (§reserve-kinds). The default
+scenario stows three med kits in the hold.
 
 ## Arms
 
