@@ -4,19 +4,21 @@
  * a one-line conversation that shows in the ticker (`conversation`, notable). Slice 4: the social
  * system's `onConversation` leaves the pair memories (§ambient-chat); the `socialize` hold is what
  * actually meets the social need. Nobody in a fight or in the party of an expedition under way
- * chats, and a gated line comes up only where its condition holds (§ambient-chat).
+ * chats, a gated line comes up only where its condition holds (§chat-line-conditions), and a
+ * line said within `social.templateRepeatDays` waits (§chat-line-repeats).
  *
  * Tunables come from `config.social` (Integration 2 made it required). `AMBIENT_FALLBACK` is
  * kept as a reference value for fixtures. Speaker/listener order alternates by pass so the
  * lowest ID does not always speak.
  */
-import { configTicks } from "../../core/clock";
+import { configTicks, dayTicks } from "../../core/clock";
 import { isSite } from "../../core/places";
 import type { Actor } from "../../core/types/actor";
 import type { ChatLineCondition, ChatLineDef, ConfigDef } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { WorldState } from "../../core/types/state";
+import { medicalUnitsAboard } from "../medical/supplies";
 import { onConversation } from "../social/chat";
 import { isAsleep } from "./activity";
 import { emitSim } from "./events";
@@ -36,6 +38,8 @@ export const AMBIENT_FALLBACK: ConfigDef["social"] = {
     "{b} laughed at {a}'s joke about the engine",
     "{a} wondered aloud what the next job pays",
   ],
+  templateRepeatDays: 0.5,
+  chatRecentDays: 1,
   chatMemoryEveryDays: 2,
   chatSour: { atZero: 0.25, perPoint: 0.1 },
   compatibility: { base: 2, perValuePoint: 0.5, perSharedLike: 1, perClash: 1, range: 2 },
@@ -110,15 +114,62 @@ function paidDockingFeeHere(ctx: StepCtx): boolean {
   return Object.values(ctx.state.money.transactions).some((tx) => tx.reason === "fee");
 }
 
-/** §ambient-chat: the template lines that may come up now, a gated one only where it holds. */
-function chatLinesNow(ctx: StepCtx, lines: readonly ChatLineDef[]): string[] {
-  const holds: Record<ChatLineCondition, () => boolean> = {
+/** §chat-line-conditions: `tick` fell within the last `social.chatRecentDays`. */
+function recent(ctx: StepCtx, tick: number | undefined): boolean {
+  return (
+    tick !== undefined && ctx.tick - tick <= dayTicks(ctx.config, ctx.config.social.chatRecentDays)
+  );
+}
+
+/** §chat-line-conditions: each gated line's condition, read from the world now. */
+function conditions(ctx: StepCtx): Record<ChatLineCondition, () => boolean> {
+  const { state } = ctx;
+  const docked = state.travel.stage === "docked";
+  return {
     paidDockingFee: () => paidDockingFeeHere(ctx),
+    docked: () => state.travel.stage === "docked" && !isSite(ctx.content, state.travel.portId),
+    underWay: () => !docked,
+    pumpSymptom: () =>
+      Object.values(state.machines).some(
+        (m) => m.faults.length > 0 && ctx.defs.machine(m.defId).tags.includes("cooling"),
+      ),
+    afterFight: () => {
+      const expedition = state.expedition;
+      return expedition?.fightStartedTick !== undefined && recent(ctx, expedition.resolvedTick);
+    },
+    someoneWounded: () =>
+      Object.values(state.actors).some(
+        (a) =>
+          a.crew &&
+          a.passenger !== true &&
+          a.availability !== "dead" &&
+          a.location.kind === "onDeck" &&
+          a.body.wounds.length > 0,
+      ),
+    hullScarred: () => state.hull.scars.length > 0,
+    fieldRecently: () => {
+      const phase = state.field?.phase;
+      return phase?.kind === "ended" && recent(ctx, phase.endedTick);
+    },
+    kitsLow: () => medicalUnitsAboard(state, ctx.content) < ctx.config.medical.reserve,
   };
+}
+
+/**
+ * §ambient-chat: the template lines that may come up now: a gated one only where its condition
+ * holds (§chat-line-conditions), and none said within `social.templateRepeatDays`
+ * (§chat-line-repeats).
+ */
+function chatLinesNow(ctx: StepCtx, lines: readonly ChatLineDef[]): string[] {
+  const holds = conditions(ctx);
+  const said = ctx.state.social.chatSaid ?? {};
+  const window = dayTicks(ctx.config, ctx.config.social.templateRepeatDays);
   const out: string[] = [];
-  for (const line of lines) {
-    if (typeof line === "string") out.push(line);
-    else if (holds[line.when]()) out.push(line.line);
+  for (const def of lines) {
+    const line = typeof def === "string" ? def : def.line;
+    const last = said[line];
+    if (last !== undefined && ctx.tick - last < window) continue;
+    if (typeof def === "string" || holds[def.when]()) out.push(line);
   }
   return out;
 }
@@ -150,8 +201,12 @@ export const ambientChatSystem: System = {
         const second = pool[j] as Actor;
         if (talked.has(first.id) || talked.has(second.id)) continue;
         if (!withinRadius(first, second, social.chatRadiusTiles)) continue;
+        if (lines.length === 0) return;
         const [a, b] = flip ? [second, first] : [first, second];
         const template = ctx.rng.pick("social", lines);
+        // §chat-line-repeats: a template said this pass waits out the window like any other.
+        if (social.templateRepeatDays > 0) lines.splice(lines.indexOf(template), 1);
+        ctx.state.social.chatSaid = { ...ctx.state.social.chatSaid, [template]: ctx.tick };
         const line = template.replaceAll("{a}", a.name).replaceAll("{b}", b.name);
         emitSim(ctx, "conversation", [a.id, b.id], { line });
         // Slice 4 (call 10; §ambient-chat): a chat leaves each side a memory of the other.

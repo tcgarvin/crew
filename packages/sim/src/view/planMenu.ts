@@ -189,13 +189,15 @@ export function planMenu(
           withdrawWhen: "halfDown",
         };
         const why = unavailable(plan, people.length, site, contact, weapons);
+        const words = (objective === "takeItem" ? ITEM_POSTURE_WORDS : POSTURE_WORDS)[posture];
+        // §the-plan-menu: a site that gives holding away (`holdWhy`) says so on every hold plan.
+        const siteSays =
+          posture === "hold" && site?.holdWhy !== undefined ? `. ${site.holdWhy}` : "";
         options.push({
           id: plan.id,
           plan,
           available: why === undefined,
-          why:
-            why ??
-            `${(objective === "takeItem" ? ITEM_POSTURE_WORDS : POSTURE_WORDS)[posture]}${FIRE_WORDS[fire]} (${people.length} go)`,
+          why: why ?? `${words}${FIRE_WORDS[fire]} (${people.length} go)${siteSays}`,
         });
       }
     }

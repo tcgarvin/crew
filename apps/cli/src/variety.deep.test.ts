@@ -53,14 +53,14 @@ describe("the variety pack off watch: a ship's day of each pacing voyage, seed 1
     expect(await count("activity.gossip")).toBeGreaterThan(0);
   }, 300_000);
 
-  it("a new topic comes up", async () => {
-    // A day holds only one to three topic sessions over ten topics, so seed 1's days can miss all
-    // three new ones; a day of seed 3 is added rather than resting the check on one draw.
+  // A day holds a handful of topic sessions over ten topics, so seed 1 alone can miss all three
+  // new ones whenever a change reshuffles the social stream; plain days of seeds 2 and 3 join it.
+  it("a new topic comes up (with plain days of seeds 2 and 3)", async () => {
     const topics = ["topic.salvage_rights", "topic.ghost_ships", "topic.sweethearts"];
+    const others = await Promise.all([dayOf("plain", 2), dayOf("plain", 3)]);
     const counts = await Promise.all(topics.map(count));
-    const seed3 = await dayOf("plain", 3);
-    const more = topics.reduce((sum, key) => sum + (seed3.get(key) ?? 0), 0);
-    expect(counts.reduce((a, b) => a + b, 0) + more).toBeGreaterThan(0);
+    const more = others.flatMap((day) => topics.map((topic) => day.get(topic) ?? 0));
+    expect([...counts, ...more].reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
   }, 300_000);
 
   it("the cook, a repairer and a host nobody joined have the new thoughts", async () => {

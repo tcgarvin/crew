@@ -145,14 +145,43 @@ Every 20 ticks two awake crew (passengers too) on one deck within `social.chatRa
 neither on a task and both past `social.chatCooldownSeconds` (45), have a one-line `conversation`
 from `social.templateLines` (`systems/work/ambient.ts`). Nobody in a fight chats, nor anyone in
 the party while the expedition is under way (any phase but `resolved`), and the cast never do
-(§the-combat-system-owns-its-combatants). A line with `when: "paidDockingFee"` comes up only while
-the ship lies docked at a port where she paid the docking fee (§travel-stages), so never at a site
-or at the port a run starts from.
+(§the-combat-system-owns-its-combatants). Each pair's line is drawn from the lines that may come up
+now: a gated line only while its condition holds (§chat-line-conditions), and no line said within
+the repeat window (§chat-line-repeats). With none left the pair says nothing this pass.
 
 A conversation leaves each side a memory unless the pair last had a memorable one within
 `social.chatMemoryEveryDays` (2): `chatted`, or `rubbedWrong` with chance
 `social.chatSour.atZero - perPoint * compatibility` (0.25, 0.1; 5% to 45%). The sides roll apart,
 so a pair that does not click cools by talking (`social/chat.ts`).
+
+### Chat line conditions
+
+A template line is a string, or `{line, when}` with `when` one of a closed set
+(`CHAT_LINE_CONDITIONS`, the content schema's enum), each read from the world as the chat comes
+round:
+
+- `paidDockingFee`: docked at a port where she paid the docking fee (§travel-stages), so never at a
+  site or at the port a run starts from;
+- `docked`: docked at a port, never a site; `underWay`: not docked;
+- `pumpSymptom`: a `cooling`-tagged machine (the coolant pump) has a fault, known or not;
+- `afterFight`: an expedition fought (it had contact) and resolved within `social.chatRecentDays`
+  (1);
+- `someoneWounded`: one of the ship's company, aboard and alive, carries a wound
+  (§wounds-and-the-damage-entry-point);
+- `hullScarred`: the hull has a scar not yet plated (§hull-scars-and-ship-loss);
+- `fieldRecently`: the leg's asteroid field ended within `social.chatRecentDays`;
+- `kitsLow`: fewer `medical` units aboard than `medical.reserve` (§medical-supplies).
+
+Why: chat blind to the ship asked whether the coolant pump always sounds like that long after
+the pump was mended.
+
+### Chat line repeats
+
+A template said within `social.templateRepeatDays` (0.5) is not drawn again, nor twice in one
+pass; `SocialState.chatSaid` keeps the tick each line (by its text) was last said, absent in an
+older save and read as nothing said. A window of 0 lets a line come up every pass (the fixtures'
+one or two lines). Why: drawn freely, a handful of lines came round so often the ticker read as a
+loop.
 
 ### Seats and the captain's table
 

@@ -29,6 +29,7 @@
 import { commandActor, firstOfficerOf } from "../../core/command-actor";
 import type { ApplyCtx } from "../../core/commands";
 import { queuePolicyDecision } from "../../core/decisions";
+import { dockForPort } from "../../core/docks";
 import type { DecisionOption } from "../../core/types/decisions";
 import type { ActorId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
@@ -108,9 +109,13 @@ function sideLabel(option: PlanOption, kind: ErrandKind): string {
   return `${POSTURE_LABELS[kind][posture]}${FIRE_LABELS[fire]}${SQUAD_LABELS[squad]}`;
 }
 
-function sideWhy(option: PlanOption, errand: ArrivalErrand): string {
+/** A side's why; a site that gives holding away (`holdWhy`) says so on its hold side. */
+function sideWhy(option: PlanOption, errand: ArrivalErrand, holdWhy: string | undefined): string {
   const { posture, fire, squad } = option.plan;
-  const what = POSTURE_WHYS[errand.kind][posture](errand.targetName);
+  const what =
+    posture === "hold" && holdWhy !== undefined
+      ? holdWhy
+      : POSTURE_WHYS[errand.kind][posture](errand.targetName);
   return `${what}${FIRE_WHYS[fire]}${SQUAD_WHYS[squad]}`;
 }
 
@@ -137,6 +142,7 @@ function arrivalSide(
   which: "left" | "right",
   option: PlanOption,
   errand: ArrivalErrand,
+  holdWhy: string | undefined,
 ): DecisionOption {
   return {
     label: {
@@ -146,7 +152,7 @@ function arrivalSide(
     commands: [{ kind: "adoptPlan", payload: { planId: option.id } }],
     aftermath: {
       key: `${ARRIVAL_PROMPT_KEY}.${which}.aftermath`,
-      params: { [`${which}Why`]: sideWhy(option, errand) },
+      params: { [`${which}Why`]: sideWhy(option, errand, holdWhy) },
     },
   };
 }
@@ -168,6 +174,7 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
   const [left, right] = pair;
   const speaker = arrivalSpeaker(ctx.state);
   const target = errand.targetName;
+  const holdWhy = dockForPort(ctx.content, expedition.siteId)?.holdWhy;
   const decisionId = queuePolicyDecision(ctx, {
     perspectiveActorId: commandActor(ctx.state),
     prompt: {
@@ -182,12 +189,12 @@ export function queueArrivalCard(ctx: ApplyCtx, expedition: Expedition): void {
         rightPlan: right.id,
         leftLabel: sideLabel(left, errand.kind),
         rightLabel: sideLabel(right, errand.kind),
-        leftWhy: sideWhy(left, errand),
-        rightWhy: sideWhy(right, errand),
+        leftWhy: sideWhy(left, errand, holdWhy),
+        rightWhy: sideWhy(right, errand, holdWhy),
       },
     },
-    left: arrivalSide("left", left, errand),
-    right: arrivalSide("right", right, errand),
+    left: arrivalSide("left", left, errand, holdWhy),
+    right: arrivalSide("right", right, errand, holdWhy),
   });
   expedition.cards = { ...expedition.cards, arrival: decisionId };
 }

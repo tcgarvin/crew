@@ -415,6 +415,9 @@ export const FIXTURE_SOCIAL: Omit<
   ConfigDef["social"],
   "chatRadiusTiles" | "chatCooldownSeconds" | "templateLines"
 > = {
+  // §chat-line-repeats: a fixture's one or two lines may come up as often as anyone chats.
+  templateRepeatDays: 0,
+  chatRecentDays: 1,
   chatMemoryEveryDays: 1,
   chatSour: { atZero: 0, perPoint: 0 },
   compatibility: { base: 0, perValuePoint: 0, perSharedLike: 0, perClash: 0, range: 2 },

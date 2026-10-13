@@ -399,6 +399,7 @@ const config = {
   equipment: {
     hazardScale: 1,
     overheatDamagePerSecond: 0.01,
+    powerLineQuietSeconds: 2,
     maintenanceConditionBelow: 0.3,
     maintenanceEssentialBelow: 0.15,
     integrityDerateBelow: 0.5,
@@ -533,6 +534,8 @@ const config = {
     chatRadiusTiles: 2,
     chatCooldownSeconds: 45,
     templateLines: ["{a} joked"],
+    templateRepeatDays: 0.5,
+    chatRecentDays: 1,
     chatMemoryEveryDays: 2,
     chatSour: { atZero: 0.25, perPoint: 0.1 },
     compatibility: { base: 2, perValuePoint: 0.5, perSharedLike: 1, perClash: 1, range: 2 },
@@ -786,6 +789,8 @@ describe("content def schemas", () => {
     });
     const fee = { line: "{b} complained about the docking fee", when: "paidDockingFee" };
     expect(configDefSchema.safeParse(withLines(["{a} joked", fee])).success).toBe(true);
+    const pump = { line: "{a} listened to the pump", when: "pumpSymptom" };
+    expect(configDefSchema.safeParse(withLines([pump])).success).toBe(true);
     const unknown = { ...fee, when: "atSea" };
     expect(configDefSchema.safeParse(withLines([unknown])).success).toBe(false);
     const ungated = { line: fee.line };

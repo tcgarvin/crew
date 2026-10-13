@@ -139,6 +139,8 @@ export const dockDefSchema = z.strictObject({
   kind: dockKindSchema.exactOptional(),
   /** Expeditions A1 (§4): tiles at which the cast notice a party; required on a site (L2). */
   noticeRadius: positive.exactOptional(),
+  /** §the-arrival-card: what holding the ramp comes to here (site only, at L2). */
+  holdWhy: z.string().min(1).exactOptional(),
   /**
    * Expeditions A1 (§5.3): the cast placed when nobody stages the site (site only; caps and posts
    * at L2 and L3).

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cmd } from "../../core/fixtures/test-world";
 import { checkInvariants } from "../../core/invariants";
-import { getRenderFrame } from "../../core/render";
+import { getRenderFrame, tickerLine } from "../../core/render";
+import type { SimEvent } from "../../core/types/events";
 import type { Machine } from "../../core/types/ship";
 import { w5TestWorld } from "./fixtures/test-world";
 import { W5 } from "./fixtures/w5-content";
@@ -242,5 +243,94 @@ describe("integrity (§integrity)", () => {
     kernel.advance(world, 20);
     expect(engine.actualMode).toBe("off");
     expect(checkInvariants(world.state)).toEqual([]);
+  });
+});
+
+describe("derates in a burst (§output-and-blocking)", () => {
+  /** Two more life-support units on the same placement: three machines of one def. */
+  function threeOfADef() {
+    const { kernel, world } = w5TestWorld();
+    const original = byDef(world, W5.lifeSupport);
+    const units = [original];
+    for (const n of [2, 3]) {
+      const id = `${original.id}-${n}` as Machine["id"];
+      world.state.machines[id] = { ...structuredClone(original), id };
+      units.push(world.state.machines[id] as Machine);
+    }
+    kernel.advance(world, 1);
+    return { kernel, world, units };
+  }
+
+  it("says one machinesDerated for the machines of one def that fall together", () => {
+    const { kernel, world, units } = threeOfADef();
+    const { integrityDerateBelow, integrityInoperableBelow } = world.config.values.equipment;
+    for (const unit of units)
+      unit.integrity = (integrityDerateBelow + integrityInoperableBelow) / 2;
+    const result = kernel.advance(world, 1);
+    const ids = new Set<string>(units.map((u) => u.id));
+    expect(
+      result.events.filter((e) => e.type === "machineDerated" && ids.has(e.payload.machineId)),
+    ).toEqual([]);
+    const burst = result.events.filter((e) => e.type === "machinesDerated");
+    expect(burst).toHaveLength(1);
+    expect(burst[0]?.payload).toMatchObject({
+      groups: [{ defId: W5.lifeSupport, count: 3 }],
+      cause: "integrity",
+    });
+    expect(burst[0]?.subjectIds).toEqual(units.map((u) => u.id));
+    expect(tickerLine(burst[0] as SimEvent, world.state, world.content)).toMatch(
+      /^3 .+s at 50% \(integrity\)$/,
+    );
+  });
+
+  it("says machineDerated, as alone, for one machine of the def", () => {
+    const { kernel, world, units } = threeOfADef();
+    const [first] = units;
+    if (first === undefined) throw new Error("no unit");
+    first.integrity = 0.3;
+    const result = kernel.advance(world, 1);
+    expect(result.events.filter((e) => e.type === "machinesDerated")).toEqual([]);
+    expect(result.events.filter((e) => e.type === "machineDerated")).toEqual([
+      expect.objectContaining({ payload: expect.objectContaining({ machineId: first.id }) }),
+    ]);
+  });
+
+  it("names the defs of a burst across machines in one line, the biggest group first", () => {
+    const { kernel, world, units } = threeOfADef();
+    const { integrityDerateBelow, integrityInoperableBelow } = world.config.values.equipment;
+    const halfway = (integrityDerateBelow + integrityInoperableBelow) / 2;
+    for (const unit of [...units, byDef(world, W5.engine)]) unit.integrity = halfway;
+    const result = kernel.advance(world, 1);
+    const burst = result.events.filter((e) => e.type === "machinesDerated");
+    expect(burst.map((e) => e.payload.groups)).toEqual([
+      [
+        expect.objectContaining({ defId: W5.lifeSupport, count: 3 }),
+        expect.objectContaining({ defId: W5.engine, count: 1 }),
+      ],
+    ]);
+    expect(tickerLine(burst[0] as SimEvent, world.state, world.content)).toMatch(
+      /^Worn down: 3 .+s and [^0-9]+$/,
+    );
+  });
+
+  it("keeps a power derate off the ticker within powerLineQuietSeconds of the last power line", () => {
+    const quietWorld = () => {
+      const fixture = threeOfADef();
+      for (const id of [W5.generator, W5.battery]) byDef(fixture.world, id).desiredMode = "off";
+      return fixture;
+    };
+    const loud = quietWorld();
+    const first = loud.kernel.advance(loud.world, 1).events;
+    const lines = first.filter((e) => e.type === "machinesDerated" || e.type === "machineDerated");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const e of lines) expect(e.significance).toBe("notable");
+    expect(loud.world.state.power.lineTick).toBe(loud.world.state.tick);
+
+    const quiet = quietWorld();
+    quiet.world.state.power.lineTick = quiet.world.state.tick;
+    const events = quiet.kernel.advance(quiet.world, 1).events;
+    const muted = events.filter((e) => e.type === "machinesDerated" || e.type === "machineDerated");
+    expect(muted.length).toBeGreaterThan(0);
+    for (const e of muted) expect(e.significance).toBe("trace");
   });
 });

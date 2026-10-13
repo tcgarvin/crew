@@ -720,6 +720,11 @@ export interface DockDef {
    */
   readonly noticeRadius?: number;
   /**
+   * §the-arrival-card: what holding the ramp comes to here, when the site gives it away (site
+   * only): the hold side's why on the arrival card and the hold plans' why on the plan menu.
+   */
+  readonly holdWhy?: string;
+  /**
    * Expeditions A1 (§5.3): the cast the sim places when nobody stages the site (site only;
    * `SITE_LIMITS` caps it).
    */
@@ -1309,10 +1314,26 @@ export interface ScenarioDef {
 }
 
 /**
- * §ambient-chat: when a gated chat line may come up. `paidDockingFee`: the ship lies docked at a
- * port where she paid the docking fee.
+ * §chat-line-conditions: when a gated chat line may come up, each read from the world as the
+ * chat comes round (`systems/work/ambient.ts`). `paidDockingFee`: docked at a port where she paid
+ * the docking fee; `docked`: docked at a port (never a site); `underWay`: not docked; `pumpSymptom`:
+ * a `cooling` machine has a fault; `afterFight`: an expedition fought and resolved within
+ * `social.chatRecentDays`; `someoneWounded`: one of the ship's company aboard carries a wound;
+ * `hullScarred`: the hull has a scar; `fieldRecently`: the leg's asteroid field ended within
+ * `social.chatRecentDays`; `kitsLow`: fewer `medical` units aboard than `medical.reserve`.
  */
-export type ChatLineCondition = "paidDockingFee";
+export const CHAT_LINE_CONDITIONS = [
+  "paidDockingFee",
+  "docked",
+  "underWay",
+  "pumpSymptom",
+  "afterFight",
+  "someoneWounded",
+  "hullScarred",
+  "fieldRecently",
+  "kitsLow",
+] as const;
+export type ChatLineCondition = (typeof CHAT_LINE_CONDITIONS)[number];
 
 /**
  * §ambient-chat: one chat template, with `{a}` (speaker) and `{b}` (listener) placeholders; the
@@ -1470,6 +1491,11 @@ export interface ConfigDef {
     readonly hazardScale: number;
     /** Integrity lost per second above temperature 1.0. */
     readonly overheatDamagePerSecond: number;
+    /**
+     * §output-and-blocking: a power derate within this many seconds of the last power line on the
+     * ticker is trace, so a brownout spreading over a few ticks reads as one line.
+     */
+    readonly powerLineQuietSeconds: Seconds;
     /** Condition below which a `maintenanceDue` problem is raised regardless of interval. */
     readonly maintenanceConditionBelow: number;
     /**
@@ -1834,8 +1860,12 @@ export interface ConfigDef {
     readonly chatRadiusTiles: number;
     /** Min seconds between two conversations involving the same person. */
     readonly chatCooldownSeconds: Seconds;
-    /** §ambient-chat: the chat templates, some gated on where the ship lies. */
+    /** §ambient-chat: the chat templates, some gated on the world (§chat-line-conditions). */
     readonly templateLines: readonly ChatLineDef[];
+    /** §chat-line-repeats: a template said within this many days is not said again. */
+    readonly templateRepeatDays: Days;
+    /** §chat-line-conditions: how long `afterFight` and `fieldRecently` hold, in days. */
+    readonly chatRecentDays: Days;
     /** §ambient-chat: a pair's chat leaves a memory at most once in this many days. */
     readonly chatMemoryEveryDays: Days;
     /**

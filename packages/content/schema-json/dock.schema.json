@@ -337,6 +337,10 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "holdWhy": {
+      "type": "string",
+      "minLength": 1
+    },
     "defaultCast": {
       "type": "array",
       "items": {

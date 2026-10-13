@@ -1,7 +1,8 @@
 /** `ConfigDef` schema: every tunable. Bounds are sanity limits, not balance. */
-import type { ConfigDef, MemoryKey } from "@crew/sim";
+import type { ChatLineCondition, ConfigDef, MemoryKey } from "@crew/sim";
 import { z } from "zod";
 import {
+  type AssertEqual,
   memoryKeySchema,
   nonNegative,
   nonNegativeInt,
@@ -25,10 +26,29 @@ const memoryDefSchema = z.strictObject({
   stackLimit: positiveInt,
 });
 
-/** §ambient-chat: a chat template, the object form gated on where the ship lies. */
+/** §chat-line-conditions: what a gated chat line waits for. */
+const chatLineConditionSchema = z.enum([
+  "paidDockingFee",
+  "docked",
+  "underWay",
+  "pumpSymptom",
+  "afterFight",
+  "someoneWounded",
+  "hullScarred",
+  "fieldRecently",
+  "kitsLow",
+]);
+
+// Drift guard against the sim's vocabulary: must resolve to `true`.
+export const CHAT_LINE_CONDITIONS_IN_SYNC: AssertEqual<
+  z.infer<typeof chatLineConditionSchema>,
+  ChatLineCondition
+> = true;
+
+/** §ambient-chat: a chat template, the object form gated on the world (§chat-line-conditions). */
 const chatLineSchema = z.union([
   z.string().min(1),
-  z.strictObject({ line: z.string().min(1), when: z.literal("paidDockingFee") }),
+  z.strictObject({ line: z.string().min(1), when: chatLineConditionSchema }),
 ]);
 
 const band = z.strictObject({ min: nonNegative, max: nonNegative });
@@ -134,6 +154,7 @@ export const configDefSchema = z.strictObject({
   equipment: z.strictObject({
     hazardScale: nonNegative,
     overheatDamagePerSecond: nonNegative,
+    powerLineQuietSeconds: nonNegative,
     maintenanceConditionBelow: unitInterval,
     maintenanceEssentialBelow: unitInterval,
     integrityDerateBelow: unitInterval,
@@ -308,6 +329,8 @@ export const configDefSchema = z.strictObject({
     chatRadiusTiles: positive,
     chatCooldownSeconds: nonNegative,
     templateLines: z.array(chatLineSchema).min(1),
+    templateRepeatDays: nonNegative,
+    chatRecentDays: positive,
     chatMemoryEveryDays: nonNegative,
     chatSour: z.strictObject({ atZero: unitInterval, perPoint: nonNegative }),
     compatibility: z.strictObject({

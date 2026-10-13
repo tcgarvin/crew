@@ -37,6 +37,24 @@ describe("loadBundle", () => {
     for (const line of aboutTheFee) expect(line).toMatchObject({ when: "paidDockingFee" });
   });
 
+  it("gates every coolant-pump chat line on a pump with a fault (§chat-line-conditions)", () => {
+    const lines = authoredBundle().config.social.templateLines;
+    const aboutThePump = lines.filter((line) =>
+      (typeof line === "string" ? line : line.line).includes("coolant pump"),
+    );
+    expect(aboutThePump.length).toBeGreaterThan(0);
+    for (const line of aboutThePump) expect(line).toMatchObject({ when: "pumpSymptom" });
+  });
+
+  it("tells the arrival card at the Lazaret what holding the ramp comes to (§the-lazaret)", () => {
+    const docks = Object.values(authoredBundle().docks ?? {});
+    expect(docks.find((d) => d.id === "dock.lazaret")?.holdWhy).toMatch(/lifeboat lock/);
+    // The other sites keep the usual words: holding works there.
+    const others = docks.filter((d) => d.kind === "site" && d.id !== "dock.lazaret");
+    expect(others.length).toBeGreaterThan(0);
+    for (const dock of others) expect(dock.holdWhy).toBeUndefined();
+  });
+
   it("stows a welder torch aboard, which the generator's short needs and only Ossory sells (§scenario-tools)", () => {
     const raw = rawBundle() as { scenarios: Record<string, { startingItems: unknown[] }> };
     const scenario = raw.scenarios["scenario.default_freighter_run"];

@@ -228,7 +228,7 @@ function armed(base: ContentBundle): Pick<ContentBundle, "decks" | "scenarios"> 
   return { decks, scenarios };
 }
 
-export function siteContent(config: ConfigDef = docksideConfig()): ContentBundle {
+export function siteContent(config: ConfigDef = docksideConfig(), holdWhy?: string): ContentBundle {
   const base = docksideContent(config);
   return {
     ...base,
@@ -248,7 +248,10 @@ export function siteContent(config: ConfigDef = docksideConfig()): ContentBundle
       },
     },
     ports: { ...base.ports, [SITE.port]: SITE_PORT },
-    docks: { ...base.docks, [SITE.dock]: SITE_DOCK },
+    docks: {
+      ...base.docks,
+      [SITE.dock]: holdWhy === undefined ? SITE_DOCK : { ...SITE_DOCK, holdWhy },
+    },
     items: {
       ...base.items,
       [SITE.blaster]: weapon(SITE.blaster, "blaster"),
@@ -265,6 +268,8 @@ export interface SiteWorldOptions {
   readonly seed?: number;
   /** The damage entry point; the test double (`fixtures/damage.ts`) unless given. */
   readonly applyDamage?: DamageFn;
+  /** The site's `holdWhy` (§the-arrival-card); none unless given. */
+  readonly holdWhy?: string;
 }
 
 /**
@@ -285,7 +290,7 @@ export function siteWorld(opts: SiteWorldOptions = {}): TestWorld {
   const world = kernel.createWorld(
     opts.scenario ?? CREW.scenario2,
     opts.seed ?? 11,
-    siteContent(config),
+    siteContent(config, opts.holdWhy),
     tinyEffectiveConfig(config),
   );
   return { registry, kernel, world };
