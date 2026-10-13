@@ -12,12 +12,15 @@
  * §extraction: while the patient is down (incapacitated) and not lying at the bed, the problem
  * derives their carry there instead (`carry.ts` `carrySpecs`), and the treatment once they lie
  * there.
+ *
+ * §the-body-aboard: `bodyAboard` → one `carryBody` while the body lies away from its resting place
+ * (`carry.ts` `bodyCarrySpecs`).
  */
 import type { DeriveTasks, TaskDerivationTable } from "../../core/types/work";
 import { taggedDefAboard } from "../damage/tasks";
 import { unitsAboard } from "../equipment/supplies";
 import { medBedOf, onTheBed } from "./bed";
-import { carrySpecs } from "./carry";
+import { bodyCarrySpecs, carrySpecs } from "./carry";
 import { untreatedWounds } from "./medical";
 
 const MEDICAL = { skill: "medical", min: 1 } as const;
@@ -54,6 +57,12 @@ const deriveCrewWounded: DeriveTasks<"crewWounded"> = (problem, ctx) => {
   ];
 };
 
-export const medicalTaskDerivations: Pick<TaskDerivationTable, "crewWounded"> = {
+const deriveBodyAboard: DeriveTasks<"bodyAboard"> = (problem, ctx) => {
+  const body = ctx.state.actors[problem.payload.actorId];
+  return body === undefined ? [] : bodyCarrySpecs(ctx, problem, body);
+};
+
+export const medicalTaskDerivations: Pick<TaskDerivationTable, "crewWounded" | "bodyAboard"> = {
   crewWounded: deriveCrewWounded,
+  bodyAboard: deriveBodyAboard,
 };

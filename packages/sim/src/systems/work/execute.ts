@@ -164,8 +164,9 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined) {
       dropHaulCargo(ctx, actor, task);
-      // §extraction: a carrier who stops sets the patient down where they stand.
-      if (task.type === "carryCasualty") setDownCasualty(ctx, actor);
+      // §extraction, §the-body-aboard: a carrier who stops sets down the one in their arms where
+      // they stand.
+      if (task.type === "carryCasualty" || task.type === "carryBody") setDownCasualty(ctx, actor);
       if (!isTerminal(task)) {
         dropTaskSupplies(ctx, actor, task);
         releaseActorClaim(ctx, actor.id, task, reason);

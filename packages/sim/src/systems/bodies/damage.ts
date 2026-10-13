@@ -3,8 +3,8 @@
  * else `hit.partTable`, else `config.bodies.partTable`, or `stunPartTable` for a stun hit, on the
  * `failures` stream), writes the wound, adds damage and pain (a stun hit adds `stunPerHit` to
  * `body.stun` instead, and no damage or pain), recomputes capacities, then commits death
- * (`isDeadBy`) or incapacitation (`incapacityOf`) at once, dropping what is in hand, and emits
- * `wounded` (always), then `died` or `incapacitated`. The formulas are `core/body.ts`'s.
+ * (`isDeadBy`, through `die`: §grief) or incapacitation (`incapacityOf`) at once, dropping what
+ * is in hand, and emits `wounded` (always), then `died` or `incapacitated`. The formulas are `core/body.ts`'s.
  *
  * Owner: W1 of expeditions A1.
  */
@@ -21,7 +21,8 @@ import {
 import type { ActorId, WoundId } from "../../core/types/ids";
 import type { StepCtx } from "../../core/types/pipeline";
 import { emitSim } from "../work/events";
-import { goDown, woundCause } from "./down";
+import { die } from "./death";
+import { goDown } from "./down";
 
 /** One hit on a body. */
 export interface Hit {
@@ -71,12 +72,7 @@ export function applyDamage(ctx: StepCtx, actorId: ActorId, hit: Hit): DamageRes
   });
   if (wound.type !== "stun") addThought(ctx, actor, "wounded");
   if (isDeadBy(actor.body, ctx.config)) {
-    goDown(ctx, actor, "dead");
-    emitSim(ctx, "died", subjects(actor.id, hit.byActorId), {
-      actorId: actor.id,
-      cause: woundCause(actor.body, ctx.config),
-      ...by,
-    });
+    die(ctx, actor, hit.byActorId);
     return { woundId: wound.id, part, incapacitated: false, died: true };
   }
   const incapacity = incapacityOf(actor.body, ctx.config);

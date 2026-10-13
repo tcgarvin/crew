@@ -4,5 +4,5 @@
   "label": "grieving for {ref}",
   "value": -0.35,
   "durationDays": 7,
-  "stacks": false
+  "stacks": true
 }

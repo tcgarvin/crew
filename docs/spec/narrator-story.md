@@ -277,7 +277,8 @@ dropped as ambiguous.
   sim gives one (§thoughts), so it weighs on mood and work speed for its days
   (§mood-and-work-speed). Any thought key content defines; four are the narrator's own
   (`NARRATOR_THOUGHT_KEYS`): `worriedAbout` ("worried about {ref}", -0.15, 2 days), `grieving`
-  ("grieving for {ref}", -0.35, 7), `shaken` (-0.2, 1), `heartened` (+0.2, 2), none stacking. The
+  ("grieving for {ref}", -0.35, 7), `shaken` (-0.2, 1), `heartened` (+0.2, 2); only `grieving`
+  stacks, and the sim also gives it at a crewmate's death (§grief). The
   capability block lists those and the sim's own that a story may give off their path
   (`nearMiss`, `sawCrewHurt`, `killedSomeone`, `heldTheLine`, `ranFromAFight`). Impossible: nobody,
   the dead, someone not aboard, a key content lacks, a thought whose label names someone (`{ref}`)
@@ -575,8 +576,10 @@ heaviest thoughts (a thought's `{ref}` filled from its `refId`), their body when
 the leg (treated)" once every wound is treated, §treatment-at-the-medbay-bed; nothing for a whole
 body), skills of 3 or more, likes, dislikes, who they are close to or at odds with
 (affinity +3 or more, -3 or less, two each), berth (own cabin, bunkroom, none), bio, and `voice`.
-The captain is listed first and marked as never a speaker. Passengers get an "Aboard" line. Why
-voice: crew have voices, not wants; wants surface as threads.
+The captain is listed first and marked as never a speaker. Passengers get an "Aboard" line. The
+dead keep their line, marked "(dead)", until they are laid to rest ashore (§laid-to-rest); then
+they leave the list (and its count) for one closing line, "Laid to rest: Tomas Ruiz at Tern's
+Rest." Why voice: crew have voices, not wants; wants surface as threads.
 
 ### Ship life lines
 
@@ -592,7 +595,8 @@ tables: a provisions `reserveLow` as "provisions are low (about N days of meals 
 would restock the galley", `compartmentDirty` as "<Room> is <tier>; <who> mopping" or "nobody is
 mopping it yet, the <role>'s to mop", and `crewWounded` (§the-wounded-problem) as "<who> is
 wounded; <medic> treating", "<carrier> carrying them to the medbay", "nobody treating yet" or
-"nobody treating yet, no kits aboard".
+"nobody treating yet, no kits aboard"; `bodyAboard` (§the-body-aboard) as "<who>'s body, to be
+laid out in <room>; <carrier> carrying it" or "nobody carrying it yet".
 
 ### Market and parts lines
 

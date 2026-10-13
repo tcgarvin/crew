@@ -309,7 +309,9 @@ export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResul
   if (task.type === "checkCompartment") return checkPlan(ctx, actor, task);
   // §treatment-at-the-medbay-bed: medicine's plans are medical's (`systems/medical/`).
   if (task.type === "treatWounds") return treatPlan(ctx, actor, task);
-  if (task.type === "carryCasualty") return carryPlan(ctx, actor, task);
+  if (task.type === "carryCasualty" || task.type === "carryBody") {
+    return carryPlan(ctx, actor, task);
+  }
   return machineTaskPlan(ctx, actor, task);
 }
 

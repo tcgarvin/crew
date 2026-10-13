@@ -77,7 +77,15 @@ describe("applyDamage (§7.1)", () => {
     expect(bettina.availability).toBe("dead");
     expect(bettina.activity).toEqual({ kind: "idle" });
     expect(bettina.movement).toEqual({ kind: "stationary" });
-    expect(types(drafts)).toEqual(["wounded", "thoughtAdded", "died"]);
+    // §grief: then each of the three living crew grieves her.
+    expect(types(drafts)).toEqual([
+      "wounded",
+      "thoughtAdded",
+      "died",
+      "thoughtAdded",
+      "thoughtAdded",
+      "thoughtAdded",
+    ]);
     expect(drafts[2]?.payload).toEqual({ actorId: BETTINA, cause: "wound", byActorId: JAX });
     expect(bodiesWorldViolations(world)).toEqual([]);
     expect(() =>

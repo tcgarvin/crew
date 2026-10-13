@@ -70,7 +70,22 @@ system lifts only an incapacity a wound explains.
 
 The dead free their berth (§berth-assignment) and are never planned or stepped. A dead or
 incapacitated captain is not fit for command, so command, the card's perspective and the next
-walk ashore pass to the first officer (D8, D103).
+walk ashore pass to the first officer (D8, D103). The ship's company grieve their dead
+(§grief); a body aboard is laid out in the hold (§the-body-aboard) and carried ashore at the next
+port (§laid-to-rest).
+
+### Grief
+
+Both ways of dying (`applyDamage` at the hit, the bodies system on blood) go through one rule
+(`systems/bodies/death.ts` `die`): down for good, `died`, then grief. When a member of the ship's
+company dies (crew, not a passenger; never the site's cast), every other living one, aboard or
+ashore, has `grieving` about them (`refId` the dead; -0.35 for 7 days, stacking), and those whose
+affinity for the dead (§affinity) is at least `medical.griefCloseAffinity` (3, "close to" in the
+digest) have it `medical.griefStacksClose` (2) times. A passenger's death is grieved by nobody, and
+passengers grieve nobody. The narrator's `giveThought` of `grieving` adds one more
+(§thought-and-reveal-levers). Why stacking: two take a close friend's mood under `mood.lowBelow`
+for the week, so they work slower (§mood-and-work-speed); one alone weighs on the rest without
+slowing the ship.
 
 ## Medicine
 
@@ -158,6 +173,44 @@ Kessler to the medbay".
 
 Why: someone down can lie for hours before they come round, and the treatment waits on a patient
 at the bed.
+
+### The body aboard
+
+A dead member of the ship's company lying aboard (on the ship's floor or in someone's arms, out of
+any fight) is carried to a resting place and left there (`systems/medical/rest.ts`, the carry in
+`medical/carry.ts`). The medical system raises `bodyAboard {actorId, tile}` (owner medical, dedupe
+`body:<actorId>`, public, routine, located at the resting place's compartment) for each such body
+away from a resting place, unless the ship is docked at a port (§laid-to-rest). `tile` is the
+first of the deck's resting places no other body lies at or is bound for, fixed when raised. The
+problem derives one `carryBody` while the body lies away from `tile` and nobody else lies or stands
+still there: the carry of §extraction (no skill, one worker, beside the body, a carrier who stops
+sets it down, all hands) at routine urgency, ending on `tile` instead of the bed. It is resolved
+once the body lies on `tile` and cancelled once it leaves the ship. A body laid out there, or one
+that died on a free resting place, is left where it lies.
+
+Resting places (`restingPlaces`, from the deck alone): the open floor of the room holding the cargo
+ramp's transfer tile (the cargo hold on both freighters), leaving out every zone tile (the
+stowage), the tiles at the room's doors and openings, every machine's interaction positions, the
+ramps' transfer tiles and the spawn points; the most tucked away first (fewest open floor
+neighbours in the room), then nearest the cargo ramp, then by row and column. Why: the body waits
+near the ramp it leaves by, out of the way of the freight and the doors.
+
+`bodyLaidOut` (notable) says "Bettina Solheim lays Tomas Ruiz out in the cargo hold". The
+carrier's label is "going to Tomas Ruiz", "lifting Tomas Ruiz's body", then "carrying Tomas Ruiz's
+body to the cargo hold". A party member dead on a site's floor stays where they fell through the
+fight; the call aboard at lift-off brings them up the ramp with anyone else left on it
+(§calling-the-crew-aboard), and from there they are laid out like any other.
+
+### Laid to rest
+
+While the ship is docked at a port (never a landing site), every dead member of the ship's company
+aboard or on the dock is carried ashore at once (`layToRest`): what they held or wore is set down
+where they lay, so the ship keeps its gear, and they leave the ship for the port's lounge store
+(`inExternalStore`, still `dead`), as a passenger ashore does. `laidToRest {actorId, portId}`
+(notable) says "Tomas Ruiz is carried ashore at Tern's Rest". They stay in `actors`, so thoughts,
+memories, meals and notes that name them still resolve; the digest lists them on one "Laid to
+rest" line instead of a crew line (§crew-lines). Why not removal: a grieving thought, a cook's
+served meal and the relationships tables keep their id for days after.
 
 ### Medical supplies
 

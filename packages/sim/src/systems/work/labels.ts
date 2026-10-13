@@ -226,8 +226,11 @@ function taskStepLabel(
   // §treatment-at-the-medbay-bed: "fetching a med kit", "treating Priya Kessler".
   const treating = task?.type === "treatWounds" ? treatLabel(ctx, actor, task, step) : undefined;
   if (treating !== undefined) return treating;
-  // §extraction: "carrying Priya Kessler to the medbay".
-  if (task?.type === "carryCasualty") return carryLabel(ctx, actor, task, step);
+  // §extraction: "carrying Priya Kessler to the medbay"; §the-body-aboard: "carrying Tomas Ruiz's
+  // body to the cargo hold".
+  if (task?.type === "carryCasualty" || task?.type === "carryBody") {
+    return carryLabel(ctx, actor, task, step);
+  }
   switch (step.kind) {
     case "moveTo":
       if (isHelmTask(ctx, task)) return "going to the helm";

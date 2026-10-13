@@ -578,6 +578,8 @@ const config = {
     giveUpAfterSeconds: 300,
     liftSeconds: 2,
     laySeconds: 2,
+    griefCloseAffinity: 3,
+    griefStacksClose: 2,
   },
   accidents: {
     enabled: true,

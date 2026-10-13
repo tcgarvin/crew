@@ -248,8 +248,9 @@ export const THOUGHT_KEYS = [
   /** §mop-trips: mopped a room back to clean (`roomCleaned`, the mopper). */
   "squaredAway",
   /**
-   * §memory-levers (D106): story-sized thoughts only the narrator gives (`giveThought`); nothing in
-   * the sim raises them. `worriedAbout` and `grieving` name someone (`refId`).
+   * §memory-levers (D106): story-sized thoughts the narrator gives (`giveThought`); nothing in the
+   * sim raises them but `grieving`, which a crewmate's death gives the living crew (§grief).
+   * `worriedAbout` and `grieving` name someone (`refId`).
    */
   "worriedAbout",
   "grieving",
@@ -1953,6 +1954,10 @@ export interface ConfigDef {
     readonly liftSeconds: Seconds;
     /** §extraction: laying the carried patient on the medbay bed, once beside it. */
     readonly laySeconds: Seconds;
+    /** §grief: affinity for the dead at or above which a crewmate grieves them as one close. */
+    readonly griefCloseAffinity: number;
+    /** §grief: how many `grieving` thoughts one close to the dead has (everyone else one). */
+    readonly griefStacksClose: number;
   };
   /**
    * §accidents-aboard: wounds outside a fight (`systems/bodies/accidents.ts`). Each chance is

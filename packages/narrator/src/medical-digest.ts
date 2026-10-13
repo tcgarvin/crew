@@ -1,9 +1,9 @@
 /**
  * The infirmary in the digest (§ship-life-lines, §medicine): the Ship section's `infirmary:` line
  * (who lies in the medbay bed, who is treating or carrying someone there, med kits aboard against
- * `medical.reserve`) and the `crewWounded` problem line. Pure reads of the snapshot through
- * `@crew/sim`'s own `medBedOf`, `onTheBed` and `medicalUnitsAboard`, so the digest counts what the
- * treatment draws on.
+ * `medical.reserve`), the `crewWounded` problem line and the `bodyAboard` one (§the-body-aboard).
+ * Pure reads of the snapshot through `@crew/sim`'s own `medBedOf`, `onTheBed` and
+ * `medicalUnitsAboard`, so the digest counts what the treatment draws on.
  */
 import {
   type ConfigDef,
@@ -16,7 +16,7 @@ import {
   medicalUnitsAboard,
   onTheBed,
 } from "@crew/sim";
-import type { State } from "./lookups";
+import { type State, compartmentNameAt, shipDeckOf } from "./lookups";
 
 /** Who holds a `type` task of `problemId` (one problem, so one patient), by name. */
 function holdersOf(state: State, problemId: ProblemId, type: TaskType): string[] {
@@ -68,6 +68,25 @@ export function crewWoundedDetail(
   const patient = state.actors[problem.payload.actorId];
   const name = patient?.name ?? problem.payload.actorId;
   return `${name} is wounded; ${careWords(state, content, config, problem)}`;
+}
+
+type BodyAboard = DeepReadonly<Extract<Problem, { kind: "bodyAboard" }>>;
+
+/**
+ * §the-body-aboard: "Tomas Ruiz's body, to be laid out in Cargo Hold; Jax Okonkwo carrying it", or
+ * "...; nobody carrying it yet".
+ */
+export function bodyAboardDetail(
+  state: State,
+  content: ContentBundle,
+  problem: BodyAboard,
+): string {
+  const name = state.actors[problem.payload.actorId]?.name ?? problem.payload.actorId;
+  const { x, y } = problem.payload.tile;
+  const room = compartmentNameAt(content, shipDeckOf(state), x, y) ?? "its resting place";
+  const carriers = holdersOf(state, problem.id, "carryBody");
+  const who = carriers.length > 0 ? `${carriers.join(", ")} carrying it` : "nobody carrying it yet";
+  return `${name}'s body, to be laid out in ${room}; ${who}`;
 }
 
 /**

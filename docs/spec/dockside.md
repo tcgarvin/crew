@@ -67,7 +67,8 @@ a ramp is down or anyone or anything is on the dock, so departure brings everyon
 the ramps down until it has (§calling-the-crew-aboard). Anything still lying on
 the dock when it goes is left at the port's warehouse (`leftOnDock`), except the ship's own hand
 truck, which the dock crew hand up the cargo ramp (`gearBroughtAboard`); anyone still on it is
-brought aboard first as a last guard.
+brought aboard first as a last guard. Docked at a port, the ship's dead are carried ashore
+(§laid-to-rest).
 
 ### Living on the dock
 

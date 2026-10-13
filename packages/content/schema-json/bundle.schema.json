@@ -5645,7 +5645,8 @@
                 "hullScar",
                 "hullDamaged",
                 "compartmentToCheck",
-                "crewWounded"
+                "crewWounded",
+                "bodyAboard"
               ]
             }
           }
@@ -7870,6 +7871,14 @@
             "laySeconds": {
               "type": "number",
               "exclusiveMinimum": 0
+            },
+            "griefCloseAffinity": {
+              "type": "number"
+            },
+            "griefStacksClose": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -7878,7 +7887,9 @@
             "reserve",
             "giveUpAfterSeconds",
             "liftSeconds",
-            "laySeconds"
+            "laySeconds",
+            "griefCloseAffinity",
+            "griefStacksClose"
           ],
           "additionalProperties": false
         },
