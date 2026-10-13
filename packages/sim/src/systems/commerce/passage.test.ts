@@ -854,7 +854,11 @@ describe("endPassage and the course", () => {
       (w) => w.state.actors[actorId]?.availability === "offShip",
     );
     expect(docked.halted).toBe("until");
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.c });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.c,
+      dockedSinceTick: expect.any(Number),
+    });
     expect(world.state.actors[actorId]?.location).toEqual({
       kind: "inExternalStore",
       portId: PORTS.c,
@@ -865,7 +869,11 @@ describe("endPassage and the course", () => {
     ]);
     const after = runUntil(kernel, world, 2 * TICK_RATE);
     expect(captainAshorePorts([...docked.hooks, ...after.hooks])).toEqual([PORTS.c]);
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.c });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.c,
+      dockedSinceTick: expect.any(Number),
+    });
   });
 });
 

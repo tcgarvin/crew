@@ -70,7 +70,11 @@ describe("travel state machine", () => {
     // Docking at B with nothing on raises `captainAshore` (D40); acknowledge it.
     const after = advanceThroughHooks(kernel, world, 1000);
     expect(after.halt).toEqual({ kind: "completed" });
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.b,
+      dockedSinceTick: expect.any(Number),
+    });
   });
 
   it("rejects setCourse while not docked", () => {
@@ -282,7 +286,11 @@ describe("departure gate (§departure-gate)", () => {
     expect(untilHook.halt).toEqual({ kind: "hook" });
     acknowledgeHook(kernel, world, world.state.narrator.pendingHook?.id as HookId);
     expect(advanceThroughHooks(kernel, world, 1000).halt).toEqual({ kind: "completed" });
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.b,
+      dockedSinceTick: expect.any(Number),
+    });
 
     // The fault is still there, so the next planned departure asks again.
     setCourseTo(kernel, world, PORTS.a);
@@ -495,7 +503,11 @@ describe("voyages: a destination beyond one hop (§2.3)", () => {
     // The waypoint is a stop on the way: the board was not asked there, only at the end.
     expect(toC.hooks).not.toContain("captainAshore");
     expect(world.state.money.balance).toBe(90);
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.d });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.d,
+      dockedSinceTick: expect.any(Number),
+    });
   });
 
   it("a detour to a neighbour keeps the voyage and routes on from where the ship ends up", () => {
@@ -646,7 +658,11 @@ describe("departure gate on a voyage (§2.3): asked once per voyage", () => {
     const toD = advanceUntil(kernel, world, dockedAt(PORTS.d));
     expect(toD.haltedOnDecision).toBe(false);
     expect(world.state.decisions.queue).toEqual([]);
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.d });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.d,
+      dockedSinceTick: expect.any(Number),
+    });
 
     // The voyage is over: the next planned departure asks again.
     setCourseTo(kernel, world, PORTS.c);

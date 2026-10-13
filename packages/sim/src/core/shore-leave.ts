@@ -12,8 +12,9 @@ import {
   isOnDock,
 } from "./docks";
 import type { Actor } from "./types/actor";
-import type { DeepReadonly, TileCoord } from "./types/common";
+import type { DeepReadonly, Tick, TileCoord } from "./types/common";
 import {
+  type ConfigDef,
   type ContentBundle,
   type DockPostDef,
   HULL_SIZE_BOX,
@@ -28,18 +29,30 @@ type ShoreHost = {
   readonly deck: { readonly dock?: DeepReadonly<DockPresence> };
   readonly travel: DeepReadonly<TravelState>;
 };
+type ShoreConfig = {
+  readonly time: Pick<ConfigDef["time"], "tickRate">;
+  readonly recreation: Pick<ConfigDef["recreation"], "shoreLeaveMinDockedSeconds">;
+};
 
 /** How far (tiles, either axis) from a post's counter side someone on leave sits. */
 const SPOT_REACH = 2;
 
 /**
- * The dock alongside, if the ship lies docked at a port there and no departure is planned: the
- * only time anyone goes ashore on leave. Never at a landing site, in departure prep, or once a
- * course is set.
+ * The dock alongside, if the ship lies docked at a port there with its ramps down at least
+ * `recreation.shoreLeaveMinDockedSeconds`: the only time anyone goes ashore on leave, a course set
+ * or not. Never at a landing site, in departure prep or under way. Whether a new leave may start
+ * once a course is set is the planner's call (`planner/recreation.ts`).
  */
-export function shoreLeaveDock(content: ShoreContent, state: ShoreHost): BerthedDock | undefined {
+export function shoreLeaveDock(
+  content: ShoreContent,
+  config: ShoreConfig,
+  state: ShoreHost & { readonly tick: Tick },
+): BerthedDock | undefined {
   const travel = state.travel;
-  if (travel.stage !== "docked" || travel.plannedDestinationId !== undefined) return undefined;
+  if (travel.stage !== "docked") return undefined;
+  const since = travel.dockedSinceTick;
+  const minTicks = config.recreation.shoreLeaveMinDockedSeconds * config.time.tickRate;
+  if (since !== undefined && state.tick - since < minTicks) return undefined;
   const berth = dockAlongsideAt(content, state, travel.portId);
   return berth === undefined || berth.dock.kind === "site" ? undefined : berth;
 }

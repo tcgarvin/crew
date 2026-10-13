@@ -1911,6 +1911,10 @@ export interface ConfigDef {
     readonly lateJoinSeconds: Seconds;
     /** §shore-leave: at most this many crew ashore on leave at once. */
     readonly ashoreMax: number;
+    /** §shore-leave: nobody goes ashore on leave until the ramps have been down this long. */
+    readonly shoreLeaveMinDockedSeconds: Seconds;
+    /** §shore-leave: a session ashore gathers this long, not `gatherSeconds` (a stop is short). */
+    readonly ashoreGatherSeconds: Seconds;
     /** A host whose session collapsed does not host that activity again for this long. */
     readonly collapseBackoffDays: Days;
   };

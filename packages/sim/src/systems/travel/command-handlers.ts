@@ -98,6 +98,9 @@ export const setCourse: CommandHandler<"setCourse", SetCoursePlan> = {
         stage: "docked",
         portId: travel.portId,
         plannedDestinationId: plan.nextHop,
+        ...(travel.dockedSinceTick === undefined
+          ? {}
+          : { dockedSinceTick: travel.dockedSinceTick }),
         ...carriedVoyageFields(travel),
       };
       return NO_TEMP_REFS;

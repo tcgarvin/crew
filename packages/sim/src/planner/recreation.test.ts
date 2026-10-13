@@ -144,6 +144,8 @@ const config = {
     lateJoinSeconds: 20,
     collapseBackoffDays: 0.1,
     ashoreMax: 3,
+    shoreLeaveMinDockedSeconds: 20,
+    ashoreGatherSeconds: 15,
   },
   social: { avoidBelow: -3, preferAbove: 0 },
   mood: { lowBelow: -0.4, highAbove: 0.4 },
@@ -404,6 +406,8 @@ const SHORE_LEAVE = def({
 const SHORE: ShoreView = {
   posts: [{ key: STALL, kind: "marketStall", spots: [{ x: -2, y: 1 }] }],
   othersOnLeave: 0,
+  coursePlotted: false,
+  cargoOpen: false,
 };
 const GOSSIP_KEEN: Interests = { likes: ["gossip"], strong: "gossip", dislikes: [] };
 
@@ -458,12 +462,38 @@ describe("recreationCandidate: shore leave (§shore-leave)", () => {
     expect(chosen({ shore: { ...SHORE, othersOnLeave: 2 } })?.activityId).toBe(SHORE_LEAVE.id);
   });
 
+  it("hosts a drink ashore with only a neutral interest in gossip", () => {
+    const neutral: Interests = { likes: [], dislikes: [] };
+    const result = recreationCandidate(
+      view({ interests: neutral, activities, shore: SHORE }),
+      config,
+    );
+    expect(choice(result)).toMatchObject({ activityId: SHORE_LEAVE.id, role: "host" });
+    const averse: Interests = { likes: [], dislikes: ["gossip"] };
+    expect(chosen({ interests: averse, shore: SHORE })?.activityId).not.toBe(SHORE_LEAVE.id);
+  });
+
+  it("goes ashore with a course plotted while the cargo is still being worked", () => {
+    const waiting: ShoreView = { ...SHORE, coursePlotted: true, cargoOpen: true };
+    expect(chosen({ shore: waiting })).toMatchObject({ activityId: SHORE_LEAVE.id, role: "host" });
+  });
+
+  it("starts no new leave with a course plotted and the cargo done: neither hosts nor joins", () => {
+    const ready: ShoreView = { ...SHORE, coursePlotted: true, cargoOpen: false };
+    expect(chosen({ shore: ready })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: ready, sessions: [shoreSession([FRIEND])] })?.activityId).toBe(
+      EXERCISE.id,
+    );
+  });
+
   it("falls back to the bench where the dock has no stall", () => {
     const bench: ShoreView = {
       posts: [{ key: "bench" as LocalKey, kind: "bench", spots: [{ x: -1, y: 0 }] }],
       othersOnLeave: 0,
+      coursePlotted: false,
+      cargoOpen: false,
     };
     expect(chosen({ shore: bench })?.activityId).toBe(SHORE_LEAVE.id);
-    expect(chosen({ shore: { posts: [], othersOnLeave: 0 } })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: { ...bench, posts: [] } })?.activityId).toBe(EXERCISE.id);
   });
 });

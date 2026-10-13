@@ -1,8 +1,8 @@
 /**
- * §shore-leave: shore leave is open only while the ship lies docked at a port with no departure
- * planned (never at a landing site, in departure prep or under way); the spots by a post keep off
- * the post, its counter, the freight areas and the ramp landings; and who counts as ashore on
- * leave.
+ * §shore-leave: shore leave is open only while the ship lies docked at a port with its ramps down a
+ * while, a course set or not (never at a landing site, in departure prep or under way); the spots
+ * by a post keep off the post, its counter, the freight areas and the ramp landings; and who counts
+ * as ashore on leave.
  */
 import { describe, expect, it } from "vitest";
 import { DECK12 } from "../systems/spatial/fixtures/deck-12x8";
@@ -44,41 +44,59 @@ const content = {
   decks: { [DECK12.deck]: deck },
 } as unknown as Pick<ContentBundle, "docks" | "decks">;
 
-function host(travel: TravelState, dock: DockDef = DOCK) {
+function host(travel: TravelState, dock: DockDef = DOCK, tick = 1000) {
   return {
+    tick,
     deck: { dock: { dockId: dock.id, deckId: DECK12.deck } },
     travel,
   };
 }
 
+/** 20 s at 20 ticks a second: 400 ticks. */
+const config = { time: { tickRate: 20 }, recreation: { shoreLeaveMinDockedSeconds: 20 } };
 const docked = { stage: "docked", portId: PORT } as TravelState;
 
 describe("shoreLeaveDock (§shore-leave)", () => {
-  it("is the dock alongside while docked at its port with no departure planned", () => {
-    expect(shoreLeaveDock(content, host(docked))?.dock.id).toBe(DOCK.id);
+  it("is the dock alongside while docked at its port", () => {
+    expect(shoreLeaveDock(content, config, host(docked))?.dock.id).toBe(DOCK.id);
   });
 
-  it("is closed once a course is set, in departure prep, under way, or at another port", () => {
+  it("stays open with a course set while the ship is still docked", () => {
     const planned = { ...docked, plannedDestinationId: "port.far" as PortDefId } as TravelState;
-    expect(shoreLeaveDock(content, host(planned))).toBeUndefined();
+    expect(shoreLeaveDock(content, config, host(planned))?.dock.id).toBe(DOCK.id);
+    const plotted = { ...planned, coursePlotted: true } as TravelState;
+    expect(shoreLeaveDock(content, config, host(plotted))?.dock.id).toBe(DOCK.id);
+  });
+
+  it("opens only once the ramps have been down shoreLeaveMinDockedSeconds", () => {
+    const arrived = { ...docked, dockedSinceTick: 700 } as TravelState;
+    expect(shoreLeaveDock(content, config, host(arrived, DOCK, 1099))).toBeUndefined();
+    expect(shoreLeaveDock(content, config, host(arrived, DOCK, 1100))?.dock.id).toBe(DOCK.id);
+  });
+
+  it("is closed in departure prep, under way, or at another port", () => {
     const prep = {
       stage: "preparingDeparture",
       fromPortId: PORT,
       toPortId: "port.far" as PortDefId,
       stageProgress: 0,
     } as TravelState;
-    expect(shoreLeaveDock(content, host(prep))).toBeUndefined();
+    expect(shoreLeaveDock(content, config, host(prep))).toBeUndefined();
     const elsewhere = { stage: "docked", portId: "port.other" as PortDefId } as TravelState;
-    expect(shoreLeaveDock(content, host(elsewhere))).toBeUndefined();
+    expect(shoreLeaveDock(content, config, host(elsewhere))).toBeUndefined();
     expect(
-      shoreLeaveDock(content, { deck: {}, travel: docked } as ReturnType<typeof host>),
+      shoreLeaveDock(content, config, {
+        tick: 1000,
+        deck: {},
+        travel: docked,
+      } as ReturnType<typeof host>),
     ).toBeUndefined();
   });
 
   it("is never open at a landing site", () => {
     const site: DockDef = { ...DOCK, kind: "site" };
     const siteContent = { ...content, docks: { [site.id]: site } } as typeof content;
-    expect(shoreLeaveDock(siteContent, host(docked, site))).toBeUndefined();
+    expect(shoreLeaveDock(siteContent, config, host(docked, site))).toBeUndefined();
   });
 });
 

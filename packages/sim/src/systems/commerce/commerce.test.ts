@@ -209,7 +209,11 @@ describe("commerce: full freight loop", () => {
     expect(jobBlockingAcceptance(world.state)?.id).toBe(jobId);
     // Docking at B with nothing on raises `captainAshore` (D40); acknowledge that too.
     advanceThroughHooks(kernel, world, 1000);
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.b,
+      dockedSinceTick: expect.any(Number),
+    });
     expect(job.status).toBe("inTransit");
     expect(jobBlockingAcceptance(world.state)).toBeUndefined();
 

@@ -1,8 +1,8 @@
 /**
  * §shore-leave on the real content and every V1 system: docked at Crossroads Hub, off-watch crew
  * keen on gossip go down the ramp for a drink by the night-market stall, never more than
- * `recreation.ashoreMax` at once, and the ticker says so. Once a course is set nobody new goes
- * ashore; departure prep's call aboard ends the drink, everyone walks back up the ramp on their own
+ * `recreation.ashoreMax` at once, and the ticker says so. Once the course is set (and plotted, with
+ * no cargo to work) nobody new goes ashore; departure prep's call aboard ends the drink, everyone walks back up the ramp on their own
  * (nobody is brought aboard by the dock crew) and the dock casts off with nobody on it. Every
  * invariant holds every tick.
  */

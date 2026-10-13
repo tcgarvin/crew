@@ -100,8 +100,12 @@ function advanceSession(ctx: StepCtx, session: GroupSession): void {
   }
   if (session.startedTick === undefined) {
     const members = session.members.length;
-    const gathered =
-      ctx.tick >= session.openedTick + configTicks(ctx.config, ctx.config.recreation.gatherSeconds);
+    // §shore-leave: a stop is a minute or two, so a drink ashore gathers for less.
+    const gather =
+      "postKey" in session.venue
+        ? ctx.config.recreation.ashoreGatherSeconds
+        : ctx.config.recreation.gatherSeconds;
+    const gathered = ctx.tick >= session.openedTick + configTicks(ctx.config, gather);
     if (members >= def.participants.max) start(ctx, session, def);
     else if (gathered && members >= def.participants.min) start(ctx, session, def);
     else if (gathered) collapse(ctx, session, def);

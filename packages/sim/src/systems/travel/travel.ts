@@ -257,7 +257,7 @@ function hasOpenLoading(ctx: Pick<StepCtx, "state" | "content">): boolean {
 }
 
 /** Open freight work (either direction) that must finish before the ship may leave. */
-function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
+export function hasOpenCargoWork(ctx: Pick<StepCtx, "state" | "content">): boolean {
   return hasOpenFreightWork(ctx, ["cargoToLoad", "cargoToUnload"]);
 }
 
@@ -569,6 +569,7 @@ function advanceStage(ctx: StepCtx): void {
     ctx.state.travel = {
       stage: "docked",
       portId,
+      dockedSinceTick: ctx.tick,
       ...(voyageContinues ? carriedVoyageFields(travel) : {}),
     };
     requestRamps(ctx, "open");

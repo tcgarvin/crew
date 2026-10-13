@@ -193,7 +193,11 @@ describe("commerce: captainAshore is the ask (D40)", () => {
 
     const untilBoard = kernel.advance(world, 1_000);
     expect(untilBoard.halt).toEqual({ kind: "hook" });
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.b,
+      dockedSinceTick: expect.any(Number),
+    });
     expect(world.state.narrator.pendingHook).toMatchObject({
       kind: "captainAshore",
       context: { portId: PORTS.b },
