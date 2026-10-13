@@ -10,6 +10,10 @@
  * least `participants.max` `use` positions, or a zone with at least `max` tiles. Where an
  * activity is hosted, the zone its product is set down on (`produces.zoneTag`) must exist.
  *
+ * A `dockPost` alternative (§shore-leave) is the dock's, never the deck's: it is skipped here, and
+ * an activity with only dock venues is checked against no deck. A dock without a post of that
+ * kind simply has no venue for it.
+ *
  * A deck with no venue for an activity never offers it. That is an error on a scenario's deck,
  * which the crew live on, and only a note on any other (Mk1 has no lounge or gym): notes are
  * reported by `activityVenueNotes`, never by `validateBundle`.
@@ -44,6 +48,7 @@ function venueNoun(venue: VenueDef): string {
     return `${venue.own === true ? "own " : ""}${venue.machineTag} machine`;
   }
   if (venue.zoneTag !== undefined) return `${venue.zoneTag} zone`;
+  if (venue.dockPost !== undefined) return `${venue.dockPost} dock post`;
   return `${venue.compartmentTag ?? ""} compartment`;
 }
 
@@ -91,13 +96,23 @@ function fitOf(deck: DeckDef, machines: MachineTagTable, venue: VenueDef): Venue
   };
 }
 
+/** The activity's venue alternatives aboard (not a §shore-leave dock post), in the def's order. */
+function deckVenues(activity: ActivityDef): VenueDef[] {
+  return activity.venue.filter((venue) => venue.dockPost === undefined);
+}
+
+/** Is every venue of the activity ashore (§shore-leave)? No deck is asked to host it. */
+function ashoreOnly(activity: ActivityDef): boolean {
+  return deckVenues(activity).length === 0;
+}
+
 /** The activity's venue alternatives present on the deck, in the def's order. */
 export function hostedVenues(
   activity: ActivityDef,
   deck: DeckDef,
   machines: MachineTagTable,
 ): HostedVenue[] {
-  return activity.venue.flatMap((venue) => {
+  return deckVenues(activity).flatMap((venue) => {
     const { compartments } = fitOf(deck, machines, venue);
     return compartments.length === 0 ? [] : [{ venue, compartments }];
   });
@@ -111,6 +126,7 @@ function checkFit(
 ): void {
   const max = activity.participants.max;
   activity.venue.forEach((venue, i) => {
+    if (venue.dockPost !== undefined) return;
     const fit = fitOf(deck, machines, venue);
     if (fit.compartments.length === 0 || fit.capacities.some((c) => c >= max)) return;
     const unit = venue.machineTag !== undefined ? "use positions" : "tiles";
@@ -135,7 +151,7 @@ function checkFit(
 }
 
 function absenceMessage(activity: ActivityDef): string {
-  const wanted = activity.venue.map(venueNoun).join(" or ");
+  const wanted = deckVenues(activity).map(venueNoun).join(" or ");
   return `no venue for "${activity.id}": the deck has no ${wanted}`;
 }
 
@@ -155,6 +171,7 @@ export function checkActivityVenues(
 ): void {
   const sailed = scenarioDeckIds(bundle).has(deck.id);
   for (const activity of Object.values(bundle.activities)) {
+    if (ashoreOnly(activity)) continue;
     if (hostedVenues(activity, deck, bundle.machines).length === 0) {
       if (sailed) issues.push(issue("physical", ["decks", deck.id], absenceMessage(activity)));
       continue;
@@ -173,7 +190,9 @@ export function activityVenueNotes(bundle: ContentBundle): readonly ValidationIs
   for (const deck of Object.values(bundle.decks)) {
     if (sailed.has(deck.id)) continue;
     for (const activity of Object.values(bundle.activities)) {
-      if (hostedVenues(activity, deck, bundle.machines).length > 0) continue;
+      if (ashoreOnly(activity) || hostedVenues(activity, deck, bundle.machines).length > 0) {
+        continue;
+      }
       const path: Path = ["decks", deck.id];
       notes.push(issue("physical", path, absenceMessage(activity)));
     }

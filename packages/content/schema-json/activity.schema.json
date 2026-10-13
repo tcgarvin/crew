@@ -72,6 +72,10 @@
             "type": "string",
             "minLength": 1
           },
+          "dockPost": {
+            "type": "string",
+            "enum": ["marketStall", "loungeDoor", "bench"]
+          },
           "own": {
             "type": "boolean",
             "const": true

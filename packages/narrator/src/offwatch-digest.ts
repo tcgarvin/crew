@@ -71,6 +71,22 @@ export function activityNoun(content: ContentBundle, activityId: string): string
   return def.label.replace(/^playing /, "");
 }
 
+/**
+ * Where a session is, as the off-watch line says it: "in Lounge", or ashore (§shore-leave) "by the
+ * night-market stall at Crossroads Hub".
+ */
+function venuePhrase(state: State, content: ContentBundle, session: DeepReadonly<Session>): string {
+  const venue = session.venue;
+  if (!("postKey" in venue)) return `in ${compartmentName(state, content, venue.compartmentId)}`;
+  const dock = content.docks?.[venue.dockId];
+  if (dock === undefined) throw new Error(`session ${session.id}: unknown dock ${venue.dockId}`);
+  const post = dock.posts.find((p) => p.key === venue.postKey);
+  if (post === undefined) throw new Error(`session ${session.id}: unknown post ${venue.postKey}`);
+  const port = content.ports[dock.portId];
+  if (port === undefined) throw new Error(`session ${session.id}: unknown port ${dock.portId}`);
+  return `by ${post.name} at ${port.name}`;
+}
+
 /** A session as the off-watch line says it: running with its players, or still gathering. */
 function sessionPhrase(
   state: State,
@@ -79,14 +95,14 @@ function sessionPhrase(
 ): string {
   const def = content.activities[session.activityId];
   if (def === undefined) throw new Error(`session ${session.id}: unknown activity`);
-  const room = compartmentName(state, content, session.venue.compartmentId);
+  const where = venuePhrase(state, content, session);
   const names = session.members.map((id) => nameOf(state, id) ?? id).join(", ");
   if (session.startedTick === undefined) {
-    return `${names || "nobody yet"} ${def.waitingLabel} in ${room}`;
+    return `${names || "nobody yet"} ${def.waitingLabel} ${where}`;
   }
   const topic = session.topicId === undefined ? undefined : content.topics[session.topicId]?.label;
   const about = topic === undefined ? "" : ` about ${topic}`;
-  return `${activityNoun(content, session.activityId)}${about} in ${room} (${names})`;
+  return `${activityNoun(content, session.activityId)}${about} ${where} (${names})`;
 }
 
 /** The step an actor's plan is on, if they have a plan. */

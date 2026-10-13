@@ -1866,9 +1866,20 @@
         "collapseBackoffDays": {
           "type": "number",
           "minimum": 0
+        },
+        "ashoreMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
-      "required": ["joinAbove", "gatherSeconds", "lateJoinSeconds", "collapseBackoffDays"],
+      "required": [
+        "joinAbove",
+        "gatherSeconds",
+        "lateJoinSeconds",
+        "collapseBackoffDays",
+        "ashoreMax"
+      ],
       "additionalProperties": false
     },
     "cabins": {

@@ -4,7 +4,8 @@
  * `joinAbove`, on duty only past the seek threshold and voluntary (§choosing-recreation); interest
  * 3/2/1/0 with a dislike never chosen; joining needs a neutral, hosting a like; an open table +2
  * and hosting a group activity +1; join over host over solo, then the bigger table;
- * friends and enemies in a session; mood; the voyage and a blocking problem; backoff.
+ * friends and enemies in a session; mood; the voyage and a blocking problem; backoff; shore leave
+ * (§shore-leave) only while `shore()` is open, off duty and off the gangway, and under the cap.
  */
 import { describe, expect, it } from "vitest";
 import type { Interests } from "../core/types/actor";
@@ -15,6 +16,8 @@ import type {
   ActorId,
   CompartmentId,
   DeckDefId,
+  DockDefId,
+  LocalKey,
   MachineDefId,
   MachineId,
   ProblemId,
@@ -28,6 +31,7 @@ import type {
   ProblemView,
   SelfView,
   SessionView,
+  ShoreView,
 } from "../core/types/view";
 import { interestScoreOf, recreationCandidate } from "./recreation";
 
@@ -134,7 +138,13 @@ const BAKING = def({
 const config = {
   time: { tickRate: 20, daySeconds: 600, watchesPerDay: 2 },
   needs: { seekThreshold: 0.5 },
-  recreation: { joinAbove: 0.25, gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 },
+  recreation: {
+    joinAbove: 0.25,
+    gatherSeconds: 30,
+    lateJoinSeconds: 20,
+    collapseBackoffDays: 0.1,
+    ashoreMax: 3,
+  },
   social: { avoidBelow: -3, preferAbove: 0 },
   mood: { lowBelow: -0.4, highAbove: 0.4 },
 } as PlannerConfig;
@@ -150,6 +160,10 @@ interface ViewOptions {
   readonly problems?: readonly ProblemView[];
   readonly backoff?: Record<string, number>;
   readonly activities?: readonly ActivityDef[];
+  readonly shore?: ShoreView;
+  readonly roleTags?: readonly string[];
+  readonly gangway?: boolean;
+  readonly passenger?: boolean;
 }
 
 function view(options: ViewOptions = {}): AgentView {
@@ -161,6 +175,9 @@ function view(options: ViewOptions = {}): AgentView {
     tile: { x: 0, y: 0 },
     interests: options.interests ?? { likes: ["cards"], strong: "cards", dislikes: [] },
     affinity: options.affinity ?? {},
+    roleTags: options.roleTags ?? ["deckhand"],
+    watch: options.gangway === true ? { gangway: true } : {},
+    ...(options.passenger === true ? { passenger: true } : {}),
     ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
   } as unknown as SelfView;
   const floor = (t: TileCoord) => deck.tiles[t.y]?.[t.x] !== undefined;
@@ -181,6 +198,7 @@ function view(options: ViewOptions = {}): AgentView {
     knownItems: () => [],
     sessions: () => options.sessions ?? [],
     travel: () => ({ stage: options.stage ?? "docked" }),
+    shore: () => options.shore,
     activities: () => options.activities ?? [CARDS, EXERCISE],
     estimateTravelTicks: (to: TileCoord) => Math.abs(to.x) + Math.abs(to.y),
   } as unknown as AgentView;
@@ -372,5 +390,80 @@ describe("recreationCandidate (call 2)", () => {
       ref: "recreate",
       reason: "backoff",
     });
+  });
+});
+
+const STALL = "night_stall" as LocalKey;
+const SHORE_LEAVE = def({
+  id: "activity.shore_leave" as ActivityDefId,
+  interest: "gossip",
+  venue: [{ dockPost: "marketStall" }, { dockPost: "bench" }],
+  participants: { min: 1, max: 3 },
+  outcome: "bond",
+});
+const SHORE: ShoreView = {
+  posts: [{ key: STALL, kind: "marketStall", spots: [{ x: -2, y: 1 }] }],
+  othersOnLeave: 0,
+};
+const GOSSIP_KEEN: Interests = { likes: ["gossip"], strong: "gossip", dislikes: [] };
+
+function shoreSession(members: readonly ActorId[]): SessionView {
+  return {
+    id: "s9" as SessionId,
+    activityId: SHORE_LEAVE.id,
+    venue: { dockId: "dock.stub" as DockDefId, postKey: STALL },
+    hostId: members[0] ?? FRIEND,
+    members,
+    openedTick: 990,
+    label: "having a drink",
+  };
+}
+
+describe("recreationCandidate: shore leave (§shore-leave)", () => {
+  const activities = [SHORE_LEAVE, EXERCISE];
+  const chosen = (options: ViewOptions) =>
+    choice(recreationCandidate(view({ interests: GOSSIP_KEEN, activities, ...options }), config));
+
+  it("hosts a drink by the stall while docked at a port, walking to a spot by the post", () => {
+    const result = recreationCandidate(
+      view({ interests: GOSSIP_KEEN, activities, shore: SHORE }),
+      config,
+    );
+    expect(choice(result)).toMatchObject({ activityId: SHORE_LEAVE.id, role: "host" });
+    // The travel estimate is to the spot by the stall (|-2| + |1|).
+    expect(result).toMatchObject({ ref: "recreate:activity.shore_leave" });
+  });
+
+  it("is never offered without a shore: under way, at a landing site, or a departure planned", () => {
+    expect(chosen({})?.activityId).toBe(EXERCISE.id);
+  });
+
+  it("is not for the watch, the gangway, a passenger or the captain", () => {
+    expect(chosen({ shore: SHORE, onDuty: true, recreation: 0.6 })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: SHORE, gangway: true })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: SHORE, passenger: true })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: SHORE, roleTags: ["captain"] })?.activityId).toBe(EXERCISE.id);
+  });
+
+  it("joins a drink already going ashore, and neither hosts nor joins once ashoreMax are ashore", () => {
+    const open = [shoreSession([FRIEND])];
+    expect(chosen({ shore: SHORE, sessions: open })).toMatchObject({
+      activityId: SHORE_LEAVE.id,
+      role: "join",
+      sessionId: "s9",
+    });
+    const full: ShoreView = { ...SHORE, othersOnLeave: 3 };
+    expect(chosen({ shore: full })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: full, sessions: open })?.activityId).toBe(EXERCISE.id);
+    expect(chosen({ shore: { ...SHORE, othersOnLeave: 2 } })?.activityId).toBe(SHORE_LEAVE.id);
+  });
+
+  it("falls back to the bench where the dock has no stall", () => {
+    const bench: ShoreView = {
+      posts: [{ key: "bench" as LocalKey, kind: "bench", spots: [{ x: -1, y: 0 }] }],
+      othersOnLeave: 0,
+    };
+    expect(chosen({ shore: bench })?.activityId).toBe(SHORE_LEAVE.id);
+    expect(chosen({ shore: { posts: [], othersOnLeave: 0 } })?.activityId).toBe(EXERCISE.id);
   });
 });

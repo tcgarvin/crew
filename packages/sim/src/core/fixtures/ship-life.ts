@@ -375,6 +375,7 @@ export const FIXTURE_RECREATION: ConfigDef["recreation"] = {
   gatherSeconds: 30,
   lateJoinSeconds: 20,
   collapseBackoffDays: 0.1,
+  ashoreMax: 3,
 };
 
 /** §memories: the default bundle's memory table. */

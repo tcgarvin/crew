@@ -187,9 +187,14 @@ function tally(ctx: StepCtx, def: ActivityDef, winner: Actor, loser: Actor): voi
 // Debate, performance, bond
 // ---------------------------------------------------------------------------------------------
 
-/** The awake people in the venue's compartment other than `except`. */
+/**
+ * The awake people in the venue's compartment other than `except`; nobody ashore (§shore-leave:
+ * the dock is no room).
+ */
 function audience(ctx: StepCtx, session: GroupSession, except: ReadonlySet<ActorId>): Actor[] {
-  const here = ctx.caches.index.actorsByCompartment[session.venue.compartmentId] ?? [];
+  const venue = session.venue;
+  if ("postKey" in venue) return [];
+  const here = ctx.caches.index.actorsByCompartment[venue.compartmentId] ?? [];
   return here.flatMap((id) => {
     const actor = ctx.state.actors[id];
     if (actor === undefined || except.has(id) || isAsleep(actor.activity)) return [];
@@ -294,6 +299,8 @@ function venueTile(
   session: GroupSession,
 ): { deckId: DeckDefId; tile: TileCoord } | undefined {
   const venue = session.venue;
+  // §shore-leave: nothing is set down or dirtied ashore.
+  if ("postKey" in venue) return undefined;
   const compartment = ctx.state.compartments[venue.compartmentId];
   if (compartment === undefined) return undefined;
   const deckId = compartment.deckId;
@@ -323,7 +330,11 @@ function applyProduces(ctx: StepCtx, session: GroupSession, def: ActivityDef): v
   const produces = def.produces;
   if (produces === undefined || produces.count <= 0) return;
   const cook = ctx.state.actors[session.hostId];
-  const compartment = ctx.state.compartments[session.venue.compartmentId];
+  const venue = session.venue;
+  if ("postKey" in venue) {
+    throw new Error(`resolveOutcome: ${def.id} produces, but its session is ashore`);
+  }
+  const compartment = ctx.state.compartments[venue.compartmentId];
   if (cook === undefined || compartment === undefined) return;
   const deckId = compartment.deckId;
   const zone = ctx.content.decks[deckId]?.zones.find((z) => z.tags.includes(produces.zoneTag));

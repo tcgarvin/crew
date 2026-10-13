@@ -8,6 +8,8 @@ import type {
   ActivityDefId,
   ActorId,
   CompartmentId,
+  DockDefId,
+  LocalKey,
   MachineId,
   MemoryKey,
   SaveEnvelope,
@@ -161,6 +163,27 @@ describe("the off-watch line (§ship-life-lines)", () => {
     };
     expect(shipLines(digest(snap))).toContain(
       "off watch: debating about the Guild in Lounge (Priya Kessler, Dane Whitcross)",
+    );
+  });
+
+  it("says where a drink ashore is: by the dock post, at the port (§shore-leave)", () => {
+    const snap = snapshot();
+    const state = snap.state;
+    const id = "s3" as SessionId;
+    const jax = actorNamed(state, "Jax Okonkwo").id;
+    const priya = actorNamed(state, "Priya Kessler").id;
+    state.social.sessions[id] = {
+      id,
+      activityId: "activity.shore_leave" as ActivityDefId,
+      venue: { dockId: "dock.crossroads_hub" as DockDefId, postKey: "night_stall" as LocalKey },
+      hostId: jax,
+      members: [jax, priya],
+      openedTick: state.tick - 100,
+      startedTick: state.tick - 10,
+      endsAtTick: state.tick + 500,
+    };
+    expect(shipLines(digest(snap))).toContain(
+      "off watch: having a drink by the night-market stall at Crossroads Hub (Jax Okonkwo, Priya Kessler)",
     );
   });
 

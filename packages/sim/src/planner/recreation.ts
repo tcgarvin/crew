@@ -23,7 +23,12 @@
  * vids before the two-player video game at the one vid screen), then id. Emits
  * `recreate:<activityId>` with `choice.activityId`, `choice.role` and (joining) `choice.sessionId`.
  *
- * Reads `self.interests`, `self.affinity`, `self.mood`, `sessions()`, `travel()`, known items
+ * §shore-leave: a dock-post venue counts only while `shore()` says the ship lies docked at a port
+ * with no departure planned, for crew off duty and off the gangway (never a passenger or the
+ * captain, whose walk ashore is their own), and while fewer than `recreation.ashoreMax` others are
+ * ashore on leave.
+ *
+ * Reads `self.interests`, `self.affinity`, `self.mood`, `sessions()`, `travel()`, `shore()`, known items
  * (`ownerId` for an owned instrument), `knownProblems()` for `blockedByProblems`, the schematic
  * for venue presence, and the defs from `activities()`. It cannot see reservations: a seat lost
  * on the way is the plan's and the step's to find (`occupiedPosition`, backoff).
@@ -33,7 +38,7 @@
 import type { DeepReadonly, TileCoord } from "../core/types/common";
 import type { ActivityDef, InterestTag, VenueDef } from "../core/types/content";
 import type { PlannerConfig } from "../core/types/pipeline";
-import type { AgentView, SessionView } from "../core/types/view";
+import type { AgentView, SessionView, ShorePostView } from "../core/types/view";
 import type { RecreateRole, UrgencyClass } from "../core/types/work";
 import type { Candidate, Rejection } from "./candidates";
 import { backingOff, inMyHands, loungeTile, personal } from "./common";
@@ -84,8 +89,30 @@ function berthCompartment(view: AgentView): string | undefined {
   return tile === undefined ? undefined : view.schematic.compartmentAt(tile);
 }
 
+/**
+ * §shore-leave: the dock's posts, if this actor may go ashore on leave now: docked at a port with
+ * no departure planned, off duty and off the gangway, crew and not the captain, and fewer than
+ * `recreation.ashoreMax` others already ashore on leave.
+ */
+function shorePosts(view: AgentView, config: PlannerConfig): readonly ShorePostView[] {
+  const shore = view.shore();
+  const self = view.self;
+  if (shore === undefined || self.onDuty || self.watch.gangway === true) return [];
+  if (self.passenger === true || self.roleTags.includes("captain")) return [];
+  if (shore.othersOnLeave >= config.recreation.ashoreMax) return [];
+  return shore.posts;
+}
+
 /** A tile representing one venue alternative on this deck, if it is there. */
-function alternativeTile(view: AgentView, alt: DeepReadonly<VenueDef>): TileCoord | undefined {
+function alternativeTile(
+  view: AgentView,
+  config: PlannerConfig,
+  alt: DeepReadonly<VenueDef>,
+): TileCoord | undefined {
+  if (alt.dockPost !== undefined) {
+    const post = shorePosts(view, config).find((p) => p.kind === alt.dockPost);
+    return post?.spots[0];
+  }
   if (alt.machineTag !== undefined) {
     const own = alt.own === true ? berthCompartment(view) : undefined;
     if (alt.own === true && own === undefined) return undefined;
@@ -112,18 +139,28 @@ function alternativeTile(view: AgentView, alt: DeepReadonly<VenueDef>): TileCoor
   return undefined;
 }
 
-/** The first venue alternative of `def` the deck has, as a tile. */
-function venueTile(view: AgentView, def: Def): TileCoord | undefined {
+/** The first venue alternative of `def` the deck (or the dock alongside) has, as a tile. */
+function venueTile(view: AgentView, config: PlannerConfig, def: Def): TileCoord | undefined {
   for (const alt of def.venue) {
-    const tile = alternativeTile(view, alt);
+    const tile = alternativeTile(view, config, alt);
     if (tile !== undefined) return tile;
   }
   return undefined;
 }
 
-/** A tile at a session's venue: its machine's seat, its zone, or a floor tile of the room. */
-function sessionTile(view: AgentView, session: SessionView): TileCoord | undefined {
+/**
+ * A tile at a session's venue: its machine's seat, its zone, a floor tile of the room, or a spot by
+ * its dock post (§shore-leave, only while this actor may go ashore).
+ */
+function sessionTile(
+  view: AgentView,
+  config: PlannerConfig,
+  session: SessionView,
+): TileCoord | undefined {
   const venue = session.venue;
+  if ("postKey" in venue) {
+    return shorePosts(view, config).find((p) => p.key === venue.postKey)?.spots[0];
+  }
   if ("machineId" in venue) {
     const machine = view.schematic.machines().find((m) => m.machineId === venue.machineId);
     return machine?.interactionTiles.find((t) => t.purposes.includes("use"))?.tile;
@@ -214,13 +251,13 @@ function optionsFor(view: AgentView, config: PlannerConfig, def: Def, routine: b
     out.push({ def, role, score, ticks, ...(session === undefined ? {} : { session }) });
   };
   if (!isGroup(def)) {
-    if (routine) add("solo", interest, venueTile(view, def));
+    if (routine) add("solo", interest, venueTile(view, config, def));
     return out;
   }
   if (mood < config.mood.lowBelow) {
     // Solo only: a game's solitaire, or a min-1 group activity alone (vids).
     const alone = def.participants.min < 2 || def.solo !== undefined;
-    if (routine && alone) add("solo", interest, venueTile(view, def));
+    if (routine && alone) add("solo", interest, venueTile(view, config, def));
     return out;
   }
   const high = mood > config.mood.highAbove ? 1 : 0;
@@ -230,14 +267,14 @@ function optionsFor(view: AgentView, config: PlannerConfig, def: Def, routine: b
     add(
       "join",
       interest + OPEN_SESSION_BONUS + high + companyBonus(view, config, session),
-      sessionTile(view, session),
+      sessionTile(view, config, session),
       session,
     );
   }
   // One game of a kind at a time: with cards already on (open, or full and running), a second
   // table would only gather nobody and collapse (the fifth of five would-be hosts).
   if (routine && interest >= 2 && ofDef.length === 0) {
-    add("host", interest + HOST_COMPANY_BONUS + high, venueTile(view, def));
+    add("host", interest + HOST_COMPANY_BONUS + high, venueTile(view, config, def));
   }
   return out;
 }

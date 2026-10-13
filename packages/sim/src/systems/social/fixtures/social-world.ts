@@ -34,7 +34,7 @@ import type {
 } from "../../../core/types/ids";
 import type { World } from "../../../core/types/kernel";
 import type { RngApi, StepCtx } from "../../../core/types/pipeline";
-import type { GroupSession, SessionVenue, SocialMemory } from "../../../core/types/state";
+import type { DeckSessionVenue, GroupSession, SocialMemory } from "../../../core/types/state";
 import type { Activity } from "../../../core/types/work";
 import { registerPlannerDefaults } from "../../../planner/index";
 import {
@@ -291,7 +291,7 @@ export function handSession(
   activityId: ActivityDefId,
   members: readonly ActorId[],
   options: {
-    venue?: Omit<SessionVenue, "compartmentId">;
+    venue?: Omit<DeckSessionVenue, "compartmentId">;
     room?: string;
     topicId?: TopicDefId;
   } = {},

@@ -4,7 +4,15 @@
  * at most `sessionStarted` and `sessionEnded` (and the latter only with something to say).
  */
 import type { ActivityOutcome } from "../content";
-import type { ActivityDefId, ActorId, CompartmentId, SessionId, TopicDefId } from "../ids";
+import type {
+  ActivityDefId,
+  ActorId,
+  CompartmentId,
+  DockDefId,
+  LocalKey,
+  SessionId,
+  TopicDefId,
+} from "../ids";
 import type { SignificanceCatalog } from "./significance";
 
 export interface RecreationEventPayloads {
@@ -16,13 +24,18 @@ export interface RecreationEventPayloads {
   };
   /** `actorId` joined the session at its venue. */
   sessionJoined: { readonly sessionId: SessionId; readonly actorId: ActorId };
-  /** The session started with `memberIds` in `compartmentId`. */
+  /**
+   * The session started with `memberIds`: aboard in `compartmentId`, or ashore by the post
+   * `postKey` of the dock `dockId` (§shore-leave).
+   */
   sessionStarted: {
     readonly sessionId: SessionId;
     readonly activityId: ActivityDefId;
     readonly memberIds: readonly ActorId[];
-    readonly compartmentId: CompartmentId;
-  };
+  } & (
+    | { readonly compartmentId: CompartmentId }
+    | { readonly ashore: { readonly dockId: DockDefId; readonly postKey: LocalKey } }
+  );
   /** Nobody (or too few) came by the gather timer; the host plays alone (`toSolo`) or gives up. */
   sessionCollapsed: {
     readonly sessionId: SessionId;

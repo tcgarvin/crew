@@ -1066,15 +1066,25 @@ export interface ThoughtDef {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * §shore-leave: the dock posts a shore-leave venue may name: somewhere to sit or stand with a drink
+ * while the ship lies docked at a port.
+ */
+export const SHORE_POST_KINDS = ["marketStall", "loungeDoor", "bench"] as const;
+export type ShorePostKind = (typeof SHORE_POST_KINDS)[number];
+
+/**
  * Slice 4: one place an activity can happen, matched against the ship's deck by tag. Exactly one
  * of `machineTag` (stand at one of the machine's `use` positions), `zoneTag` (a free tile of a
- * zone carrying the tag) or `compartmentTag` (a free floor tile of a compartment carrying it).
- * `own` restricts a machine to the actor's berth compartment (reading at one's own desk).
+ * zone carrying the tag), `compartmentTag` (a free floor tile of a compartment carrying it) or
+ * `dockPost` (§shore-leave: a free tile by the first post of that kind on the dock alongside,
+ * only while docked at a port). `own` restricts a machine to the actor's berth compartment
+ * (reading at one's own desk).
  */
 export interface VenueDef {
   readonly machineTag?: MachineTag;
   readonly zoneTag?: string;
   readonly compartmentTag?: string;
+  readonly dockPost?: ShorePostKind;
   readonly own?: true;
 }
 
@@ -1869,6 +1879,8 @@ export interface ConfigDef {
     readonly gatherSeconds: Seconds;
     /** How long after a session starts a latecomer may still join. */
     readonly lateJoinSeconds: Seconds;
+    /** §shore-leave: at most this many crew ashore on leave at once. */
+    readonly ashoreMax: number;
     /** A host whose session collapsed does not host that activity again for this long. */
     readonly collapseBackoffDays: Days;
   };

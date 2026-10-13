@@ -591,7 +591,8 @@ a room is dirty or worse, filthy first), `infirmary:` (only while someone lies i
 someone aboard is wounded, or the `medical` units aboard are under `medical.reserve`: who is in the
 bed, who is treating, and the kits against the reserve, "infirmary: Priya Kessler in the bed,
 Oyelaran Abiodun treating; 1 med kit aboard (the ship keeps 2)"), `off watch:` (sessions by venue
-and players, or still gathering, and solo play) and `rivalries:`. Problem lines read from the same
+and players, or still gathering, and solo play; a session ashore by its dock post and port, "having
+a drink by the night-market stall at Crossroads Hub", §shore-leave) and `rivalries:`. Problem lines read from the same
 tables: a provisions `reserveLow` as "provisions are low (about N days of meals left); K crates
 would restock the galley", `compartmentDirty` as "<Room> is <tier>; <who> mopping" or "nobody is
 mopping it yet, the <role>'s to mop", and `crewWounded` (§the-wounded-problem) as "<who> is

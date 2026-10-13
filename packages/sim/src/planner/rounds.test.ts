@@ -136,6 +136,7 @@ function stubView(stub: Stub): AgentView {
     assignedBeds: () => [],
     sessions: () => [],
     travel: () => ({ stage: "docked" }),
+    shore: () => undefined,
     activities: () => [],
     alert: () => undefined,
     knownItems: () => [],

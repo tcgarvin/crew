@@ -31,6 +31,7 @@ import type {
   MachineTag,
   RockSize,
   RoleTag,
+  ShorePostKind,
   SkillLevels,
   ToolKind,
   WoundSeverity,
@@ -222,6 +223,25 @@ export interface KnownItemView {
 export type SessionView = DeepReadonly<GroupSession> & { readonly label: string };
 
 /**
+ * §shore-leave: a dock post someone on leave can sit by, with the tiles there (deck frame, nearest
+ * the post first).
+ */
+export interface ShorePostView {
+  readonly key: LocalKey;
+  readonly kind: ShorePostKind;
+  readonly spots: readonly TileCoord[];
+}
+
+/**
+ * §shore-leave: shore leave as everyone aboard knows it (who goes down the ramp is seen): the
+ * dock's posts to sit by, and how many other crew are ashore on leave now (`isOnShoreLeave`).
+ */
+export interface ShoreView {
+  readonly posts: readonly ShorePostView[];
+  readonly othersOnLeave: number;
+}
+
+/**
  * §sighting-and-the-alert: the ship is on alert, as everyone aboard knows it (the klaxon): when it
  * sounded and why. Which compartments were reported is the intercom's to tell, through facts.
  */
@@ -321,6 +341,11 @@ export interface AgentView {
   sessions(): readonly SessionView[];
   /** Slice 4: the ship's travel stage (common knowledge: the ship is docked or under way). */
   travel(): { readonly stage: TravelStage };
+  /**
+   * §shore-leave: while the ship lies docked at a port with no departure planned, the dock's posts
+   * to sit by on leave and how many are ashore on leave; else undefined.
+   */
+  shore(): ShoreView | undefined;
   /**
    * Slice 4: every off-watch activity def (`ContentBundle.activities`): what games the ship
    * has is common knowledge, like the schematic. The recreation candidate scores them.
