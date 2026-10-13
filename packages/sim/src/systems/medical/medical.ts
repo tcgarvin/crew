@@ -7,7 +7,8 @@
  * changes, resolved once every wound is treated (or closed), and cancelled when the patient dies.
  * Once raised it stays open while the patient is off the ship's floor for a while (on the dock,
  * ashore): the wounds are still there when they come back. A deck with no medbay bed raises
- * nothing (`medBedOf`).
+ * nothing (`medBedOf`). Before the sweep, anyone carried aboard outside a carry is set down
+ * (§extraction, `carry.ts` `releaseStrayCasualties`).
  */
 import { needsTreatment } from "../../core/body";
 import { isOnDock } from "../../core/docks";
@@ -20,6 +21,7 @@ import type { ProblemOfKind, UrgencyClass } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
 import { emitSim } from "../work/events";
 import { type MedBed, medBedOf } from "./bed";
+import { releaseStrayCasualties } from "./carry";
 
 export const woundedKey = (actorId: ActorId): string => `wounded:${actorId}`;
 
@@ -113,6 +115,9 @@ export const medicalSystem: System = {
   name: "medical.wounded",
   phase: "needs",
   run(ctx) {
+    // §extraction: after the bodies system, so someone who died or came round in a carrier's arms
+    // is on the floor before anyone plans them.
+    releaseStrayCasualties(ctx);
     sweepWounded(ctx);
   },
 };

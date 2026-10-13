@@ -27,6 +27,7 @@ import { musterPlan } from "../expedition/muster";
 import { cookPlan } from "../galley/cook";
 import { carryMealPlan, eatPlan } from "../galley/eat";
 import { reportPlan } from "../intercom/plans";
+import { carryPlan } from "../medical/carry";
 import { convalescePlan, treatPlan } from "../medical/plans";
 import { recreatePlan } from "../recreation/plans";
 import { estimateTravelTicks } from "../spatial/estimates";
@@ -308,6 +309,7 @@ export function buildTaskPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResul
   if (task.type === "checkCompartment") return checkPlan(ctx, actor, task);
   // §treatment-at-the-medbay-bed: medicine's plans are medical's (`systems/medical/`).
   if (task.type === "treatWounds") return treatPlan(ctx, actor, task);
+  if (task.type === "carryCasualty") return carryPlan(ctx, actor, task);
   return machineTaskPlan(ctx, actor, task);
 }
 

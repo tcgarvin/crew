@@ -377,6 +377,8 @@ export const configDefSchema = z.strictObject({
     kitsPerTreatment: positiveInt,
     reserve: nonNegativeInt,
     giveUpAfterSeconds: positive,
+    liftSeconds: positive,
+    laySeconds: positive,
   }),
   bodies: z.strictObject({
     tolerance: partRecord(positive),

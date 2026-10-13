@@ -511,6 +511,8 @@ export const FIXTURE_MEDICAL: ConfigDef["medical"] = {
   kitsPerTreatment: 1,
   reserve: 2,
   giveUpAfterSeconds: 300,
+  liftSeconds: 2,
+  laySeconds: 2,
 };
 
 /** Expeditions A1 (§7.1): bodies at the default bundle's values. */

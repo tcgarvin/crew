@@ -1926,6 +1926,10 @@ export interface ConfigDef {
     readonly reserve: number;
     /** A patient waiting at the bed with no kit aboard gives up after this long. */
     readonly giveUpAfterSeconds: Seconds;
+    /** §extraction: taking up a downed patient, once beside them. */
+    readonly liftSeconds: Seconds;
+    /** §extraction: laying the carried patient on the medbay bed, once beside it. */
+    readonly laySeconds: Seconds;
   };
   /**
    * Expeditions A1 (§7.1, SD §12): bodies. Part damage against `tolerance` gives a part's

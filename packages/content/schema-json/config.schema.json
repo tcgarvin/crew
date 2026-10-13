@@ -2129,9 +2129,24 @@
         "giveUpAfterSeconds": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "liftSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "laySeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
-      "required": ["treatSecondsPerWound", "kitsPerTreatment", "reserve", "giveUpAfterSeconds"],
+      "required": [
+        "treatSecondsPerWound",
+        "kitsPerTreatment",
+        "reserve",
+        "giveUpAfterSeconds",
+        "liftSeconds",
+        "laySeconds"
+      ],
       "additionalProperties": false
     },
     "bodies": {

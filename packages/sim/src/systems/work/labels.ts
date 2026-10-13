@@ -35,7 +35,7 @@ import type { ActivityStep, HoldKind, StepTarget, Task } from "../../core/types/
 import { damageTaskLabel } from "../damage/labels";
 import { fightLabel, musterLabel } from "../expedition/labels";
 import { reportLabel } from "../intercom/labels";
-import { treatLabel } from "../medical/labels";
+import { carryLabel, treatLabel } from "../medical/labels";
 import { compartmentAt, isDockTile } from "../spatial/geometry";
 import { whoHasTheHelm } from "../watch/helm";
 import { currentStep } from "./activity";
@@ -226,6 +226,8 @@ function taskStepLabel(
   // §treatment-at-the-medbay-bed: "fetching a med kit", "treating Priya Kessler".
   const treating = task?.type === "treatWounds" ? treatLabel(ctx, actor, task, step) : undefined;
   if (treating !== undefined) return treating;
+  // §extraction: "carrying Priya Kessler to the medbay".
+  if (task?.type === "carryCasualty") return carryLabel(ctx, actor, task, step);
   switch (step.kind) {
     case "moveTo":
       if (isHelmTask(ctx, task)) return "going to the helm";

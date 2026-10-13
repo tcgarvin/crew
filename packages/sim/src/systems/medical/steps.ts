@@ -11,6 +11,7 @@
  *   after `medical.giveUpAfterSeconds` with too few `medical` units aboard to treat them; giving up
  *   backs the `convalesce` candidate off for as long again, so they do not walk straight back.
  */
+import { applyCapacities } from "../../core/body";
 import { configTicks } from "../../core/clock";
 import type { Actor } from "../../core/types/actor";
 import type { StepCtx } from "../../core/types/pipeline";
@@ -70,6 +71,9 @@ export function runTreat(ctx: StepCtx, actor: Actor, step: WorkStep): StepResult
     wound.bleeding = false;
   }
   patient.body.pain = Math.max(0, patient.body.pain - ctx.config.bodies.treatPainRelief);
+  // Pain is in consciousness; as at a hit, capacities follow at once (a patient who is down is
+  // stepped by no needs system until the bodies system's next step).
+  applyCapacities(patient, ctx.config);
   emitSim(ctx, "woundTreated", [patient.id, actor.id], {
     actorId: patient.id,
     byActorId: actor.id,

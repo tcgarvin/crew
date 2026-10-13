@@ -30,6 +30,7 @@ import type {
 import { onWoke } from "../cabins/cabins";
 import { leaveTalk } from "../cabins/private-talk";
 import { setDownBought } from "../commerce/market";
+import { setDownCasualty } from "../medical/carry";
 import { leaveRecreation } from "../recreation/sessions";
 import { stopMovement } from "../spatial/movement";
 import { releaseReservations } from "../spatial/reservations";
@@ -163,6 +164,8 @@ export function abortActivity(ctx: StepCtx, actor: Actor, reason: TaskReleaseRea
     const task = ctx.state.work.tasks[activity.taskId];
     if (task !== undefined) {
       dropHaulCargo(ctx, actor, task);
+      // §extraction: a carrier who stops sets the patient down where they stand.
+      if (task.type === "carryCasualty") setDownCasualty(ctx, actor);
       if (!isTerminal(task)) {
         dropTaskSupplies(ctx, actor, task);
         releaseActorClaim(ctx, actor.id, task, reason);

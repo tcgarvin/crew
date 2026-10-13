@@ -7,9 +7,10 @@
  *   fight; not while backing off (after giving up with no kit aboard); not while they believe no
  *   `medical` item is aboard (`noMedicine`); and not while they believe someone else is at the bed
  *   (`bedTaken`: someone last seen on its `use` tile).
- * - `medicalTaskAllowed`: nobody treats their own wounds (`ownWounds`).
- * - `isMedicalTask`: the task type whose rules these are. A treatment is all hands: anyone awake
- *   with the skill answers it, on duty or not (`candidates.ts`).
+ * - `medicalTaskAllowed`: nobody treats or carries themselves (`ownWounds`).
+ * - `isMedicalTask`: the task types whose rules these are (a treatment, and §extraction's carry).
+ *   Both are all hands: anyone awake (with the skill, to treat) answers, on duty or not
+ *   (`candidates.ts`).
  */
 import type { TileCoord } from "../core/types/common";
 import type { PlannerConfig } from "../core/types/pipeline";
@@ -21,7 +22,7 @@ import { backingOff, personal, sameTile } from "./common";
 const CONVALESCE = "convalesce";
 
 export function isMedicalTask(task: TaskView): boolean {
-  return task.type === "treatWounds";
+  return task.type === "treatWounds" || task.type === "carryCasualty";
 }
 
 export function medicalTaskAllowed(view: AgentView, task: TaskView): boolean {

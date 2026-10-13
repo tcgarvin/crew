@@ -498,7 +498,9 @@
     "treatSecondsPerWound": 15,
     "kitsPerTreatment": 1,
     "reserve": 2,
-    "giveUpAfterSeconds": 300
+    "giveUpAfterSeconds": 300,
+    "liftSeconds": 2,
+    "laySeconds": 2
   },
   "bodies": {
     "tolerance": {

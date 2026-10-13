@@ -752,6 +752,11 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return null;
     case "woundTreated":
       return treatedLine(event, n);
+    case "casualtyCarried":
+      // §extraction: "Bettina Ruiz carries Priya Kessler to the medbay".
+      return `${n.actor(event.payload.byActorId) ?? "Someone"} carries ${
+        n.actor(event.payload.actorId) ?? "someone"
+      } to the medbay`;
     case "executed":
       return `${n.actor(event.payload.byActorId) ?? "The party"} executes ${event.payload.name}`;
     case "combatantBroke": {
