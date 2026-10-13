@@ -231,6 +231,8 @@ describe("discrepancies", () => {
     const log = run(tw, 20 * 90, (w) => w.state.work.problems[problemId]?.status === "resolved");
     expect(world.state.work.problems[problemId]?.status).toBe("resolved");
     expect(pump.faults).toHaveLength(0);
+    // §repair: whoever finishes the repair has the satisfaction of it.
+    expect(mara.thoughts.map((t) => t.key)).toContain("fixedIt");
     expect(eventsOf(log, "actionFailed").map((e) => e.payload.reason)).toEqual([]);
     expect(eventsOf(log, "taskBlocked")).toHaveLength(0);
     // The wrench she fetched is the one with a route to it: the other never left the stores.

@@ -377,6 +377,7 @@ describe("skill, risk, dirt and product (call 5)", () => {
     expect(ofType(drafts, "treatsBaked").map((d) => d.payload)).toEqual([
       { cookId: BETTINA, count: 4 },
     ]);
+    expect(thoughtKeys(world, BETTINA)).toContain("bakedForTheCrew");
     if (tray === undefined) throw new Error("no tray");
     // The baker knows; the rest are told unless their first look's brief is still to come.
     expect(actorOf(world, BETTINA).knowledge[`${tray.id}/itemLocation`]).toBeDefined();

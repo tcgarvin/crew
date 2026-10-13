@@ -22,8 +22,8 @@
  *
  * Then for every outcome: `skillGain` (`perDay × durationDays`, capped at 10) per member, `dirt`
  * (`depositDirt` at the venue tile), `produces` (a stack on the first tile of the zone carrying
- * `zoneTag`, `Item.meal` from the host's cooking and the venue room's tier, `treatsBaked`, every
- * crew member aboard told where it is) and `risk` (per member, `sparringBruise` and `tookAKnock`).
+ * `zoneTag`, `Item.meal` from the host's cooking and the venue room's tier, `treatsBaked` and
+ * `bakedForTheCrew` for the baker, every crew member aboard told where it is) and `risk` (per member, `sparringBruise` and `tookAKnock`).
  *
  * Returns what the recreation system's `sessionEnded` payload needs (`winnerId`, `topicId`,
  * `argued`). A one-member session (a solo activity's completion) resolves the same way: no
@@ -367,6 +367,7 @@ function applyProduces(ctx: StepCtx, session: GroupSession, def: ActivityDef): v
     cookId: cook.id,
     count: produces.count,
   });
+  addThought(ctx, cook, "bakedForTheCrew");
 }
 
 /** Tell every crew member aboard where the tray is (a report from the baker, as the mess call). */

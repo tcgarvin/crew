@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.salvage_rights",
+  "label": "salvage rights",
+  "weights": {
+    "orderFreedom": 1,
+    "faithReason": 0,
+    "loyaltyAmbition": 1
+  }
+}

@@ -102,6 +102,7 @@ describe("a mopping trip (§mop-trips)", () => {
     const cleaned = eventsOf(log, "roomCleaned");
     expect(cleaned).toHaveLength(1);
     expect(cleaned[0]?.payload).toMatchObject({ key: "hall", byActorId: JON });
+    expect(test.world.state.actors[JON]?.thoughts.map((t) => t.key)).toContain("squaredAway");
     // One trip over every soiled tile, walked nearest first from the locker at (11,5) (the
     // tuning commit: a dirtiest-first trip zigzagged the room), with the mop in hand.
     expect(order).toEqual([

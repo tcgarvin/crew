@@ -93,6 +93,43 @@
           }
         ]
       }
+    },
+    {
+      "key": "air_locked_line",
+      "name": "Air in the coolant line",
+      "weight": 0.5,
+      "effect": {
+        "kind": "derate",
+        "outputFactor": 0.6
+      },
+      "symptom": {
+        "key": "gurgling_in_the_line",
+        "channel": "audible"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "bleed_line",
+            "action": "repair",
+            "workSeconds": 15,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 1
+            }
+          },
+          {
+            "key": "test_pump",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": [],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
     }
   ],
   "components": [

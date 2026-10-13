@@ -100,6 +100,59 @@
           }
         ]
       }
+    },
+    {
+      "key": "fouled_injector",
+      "name": "Fouled fuel injector",
+      "weight": 0.5,
+      "effect": {
+        "kind": "derate",
+        "outputFactor": 0.6
+      },
+      "symptom": {
+        "key": "rough_running",
+        "channel": "audible"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "remove_injector",
+            "action": "removeComponent",
+            "workSeconds": 10,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 2
+            }
+          },
+          {
+            "key": "clean_injector",
+            "action": "repair",
+            "workSeconds": 15,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 2
+            }
+          },
+          {
+            "key": "test_engine",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 2
+            }
+          }
+        ]
+      }
     }
   ],
   "components": [

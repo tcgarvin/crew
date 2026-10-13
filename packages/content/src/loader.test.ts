@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadBundle, rawBundle } from "./loader";
+import { interestTagSchema } from "./schemas/primitives";
 import { validateBundle } from "./schemas/validate";
 import { dockWalkableMask } from "./schemas/validate-dock";
 
@@ -103,7 +104,7 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 22 items, 32 thoughts, 12 activities and 7 topics", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 22 items, 41 thoughts, 14 activities and 10 topics", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
@@ -117,8 +118,8 @@ describe("loadBundle", () => {
     expect(Object.keys(bundle.items)).toHaveLength(22);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
-    expect(Object.keys(bundle.activities)).toHaveLength(12);
-    expect(Object.keys(bundle.topics)).toHaveLength(7);
+    expect(Object.keys(bundle.activities)).toHaveLength(14);
+    expect(Object.keys(bundle.topics)).toHaveLength(10);
     expect(Object.keys(bundle.thoughts).sort()).toEqual([
       "argued",
       "ateATreat",
@@ -126,10 +127,13 @@ describe("loadBundle", () => {
       "ateInFilthyMess",
       "ateRationPack",
       "ateWell",
+      "bakedForTheCrew",
       "burntDinner",
+      "cookedWell",
       "doubleWatch",
       "dressedDown",
       "enjoyedMusic",
+      "fixedIt",
       "goodCompany",
       "gotLectured",
       "grieving",
@@ -144,6 +148,7 @@ describe("loadBundle", () => {
       "lostContest",
       "nearMiss",
       "noBunkOfMyOwn",
+      "nobodyJoinedIn",
       "noisyBunkroom",
       "ownCabin",
       "ranFromAFight",
@@ -152,6 +157,7 @@ describe("loadBundle", () => {
       "shaken",
       "sparringBruise",
       "spiritedTalk",
+      "squaredAway",
       "stoodLongWatch",
       "wonContest",
       "worriedAbout",
@@ -227,6 +233,44 @@ describe("loadBundle", () => {
       for (const point of crewSpawns) {
         expect(taken.has(`${point.tile.x},${point.tile.y}`), `${deck.id} ${point.key}`).toBe(false);
       }
+    }
+  });
+
+  it("puts every topic on some activity's list, so none is authored and never picked (§outcomes)", () => {
+    const bundle = authoredBundle();
+    const listed = new Set(Object.values(bundle.activities).flatMap((a) => a.topics ?? []));
+    expect([...listed].sort()).toEqual(Object.keys(bundle.topics).sort());
+    expect(bundle.activities["activity.debate" as keyof typeof bundle.activities]?.topics).toEqual(
+      expect.arrayContaining(["topic.salvage_rights", "topic.ghost_ships"]),
+    );
+  });
+
+  it("names every interest in some activity, and gives readers a group one (§activities-and-interests)", () => {
+    const bundle = authoredBundle();
+    const named = new Set(Object.values(bundle.activities).map((a) => a.interest));
+    expect([...named].sort()).toEqual([...interestTagSchema.options].sort());
+    const reading = Object.values(bundle.activities).filter((a) => a.interest === "reading");
+    // A reader can sit alone with a book or host the book club, which is a group.
+    expect(reading.map((a) => a.participants.max).sort()).toEqual([1, 3]);
+  });
+
+  it("keeps each machine's first fault the likelier draw beside the variety pack's milder one (§wear-and-fault-draws)", () => {
+    const bundle = authoredBundle();
+    const faults = (id: string) =>
+      bundle.machines[id as keyof typeof bundle.machines]?.faults.map((f) => [f.key, f.weight]);
+    expect(faults("machine.engine")).toEqual([
+      ["failed_controller", 1],
+      ["fouled_injector", 0.5],
+    ]);
+    expect(faults("machine.coolant_pump")).toEqual([
+      ["worn_bearing", 1],
+      ["air_locked_line", 0.5],
+    ]);
+    // Neither new repair spends a part: a wrench (and the engine's multimeter) is all they need.
+    for (const id of ["machine.engine", "machine.coolant_pump"]) {
+      const added = bundle.machines[id as keyof typeof bundle.machines]?.faults[1];
+      expect(added?.effect.kind).toBe("derate");
+      expect(added?.repair.steps.flatMap((s) => s.consumes)).toEqual([]);
     }
   });
 

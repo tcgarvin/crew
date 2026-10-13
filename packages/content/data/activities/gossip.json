@@ -1,0 +1,40 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.gossip",
+  "label": "trading gossip",
+  "waitingLabel": "fishing for gossip",
+  "interest": "gossip",
+  "venue": [
+    {
+      "compartmentTag": "mess"
+    },
+    {
+      "compartmentTag": "lounge"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 3
+  },
+  "durationDays": 0.05,
+  "restores": {
+    "recreation": 0.3,
+    "social": 0.4
+  },
+  "solo": {
+    "label": "writing a letter home",
+    "durationDays": 0.04,
+    "restores": {
+      "recreation": 0.2,
+      "comfort": 0.05
+    }
+  },
+  "outcome": "bond",
+  "thoughts": {
+    "joined": "goodCompany"
+  },
+  "topics": ["topic.sweethearts", "topic.ghost_ships", "topic.old_captains"],
+  "memories": {
+    "together": "goodTime"
+  }
+}

@@ -111,10 +111,14 @@ import thoughtAteInDirtyMess from "../data/thoughts/ate-in-dirty-mess.json";
 import thoughtAteInFilthyMess from "../data/thoughts/ate-in-filthy-mess.json";
 import thoughtAteRationPack from "../data/thoughts/ate-ration-pack.json";
 import thoughtAteWell from "../data/thoughts/ate-well.json";
+// The variety pack: thoughts from repair, the galley, mopping and a game nobody joined
+import thoughtBakedForTheCrew from "../data/thoughts/baked-for-the-crew.json";
 import thoughtBurntDinner from "../data/thoughts/burnt-dinner.json";
+import thoughtCookedWell from "../data/thoughts/cooked-well.json";
 import thoughtDoubleWatch from "../data/thoughts/double-watch.json";
 import thoughtDressedDown from "../data/thoughts/dressed-down.json";
 import thoughtEnjoyedMusic from "../data/thoughts/enjoyed-music.json";
+import thoughtFixedIt from "../data/thoughts/fixed-it.json";
 import thoughtGoodCompany from "../data/thoughts/good-company.json";
 import thoughtGotLectured from "../data/thoughts/got-lectured.json";
 import thoughtGrieving from "../data/thoughts/grieving.json";
@@ -130,6 +134,7 @@ import thoughtKilledSomeone from "../data/thoughts/killed-someone.json";
 import thoughtLostContest from "../data/thoughts/lost-contest.json";
 import thoughtNearMiss from "../data/thoughts/near-miss.json";
 import thoughtNoBunkOfMyOwn from "../data/thoughts/no-bunk-of-my-own.json";
+import thoughtNobodyJoinedIn from "../data/thoughts/nobody-joined-in.json";
 import thoughtNoisyBunkroom from "../data/thoughts/noisy-bunkroom.json";
 import thoughtOwnCabin from "../data/thoughts/own-cabin.json";
 import thoughtRanFromAFight from "../data/thoughts/ran-from-a-fight.json";
@@ -138,6 +143,7 @@ import thoughtSawCrewHurt from "../data/thoughts/saw-crew-hurt.json";
 import thoughtShaken from "../data/thoughts/shaken.json";
 import thoughtSparringBruise from "../data/thoughts/sparring-bruise.json";
 import thoughtSpiritedTalk from "../data/thoughts/spirited-talk.json";
+import thoughtSquaredAway from "../data/thoughts/squared-away.json";
 import thoughtStoodLongWatch from "../data/thoughts/stood-long-watch.json";
 import thoughtWonContest from "../data/thoughts/won-contest.json";
 import thoughtWorriedAbout from "../data/thoughts/worried-about.json";
@@ -146,9 +152,11 @@ import thoughtWounded from "../data/thoughts/wounded.json";
 // Off watch (slice 4)
 import activityBaking from "../data/activities/baking.json";
 import activityBoardGame from "../data/activities/board-game.json";
+import activityBookClub from "../data/activities/book-club.json";
 import activityCards from "../data/activities/cards.json";
 import activityDebate from "../data/activities/debate.json";
 import activityExercise from "../data/activities/exercise.json";
+import activityGossip from "../data/activities/gossip.json";
 import activityMusic from "../data/activities/music.json";
 import activityReading from "../data/activities/reading.json";
 import activitySparring from "../data/activities/sparring.json";
@@ -157,9 +165,12 @@ import activityTinkering from "../data/activities/tinkering.json";
 import activityVideoGame from "../data/activities/video-game.json";
 import activityVids from "../data/activities/vids.json";
 import topicFaith from "../data/topics/faith.json";
+import topicGhostShips from "../data/topics/ghost-ships.json";
 import topicOldCaptains from "../data/topics/old-captains.json";
 import topicPhilosophy from "../data/topics/philosophy.json";
 import topicPolitics from "../data/topics/politics.json";
+import topicSalvageRights from "../data/topics/salvage-rights.json";
+import topicSweethearts from "../data/topics/sweethearts.json";
 import topicTheGuild from "../data/topics/the-guild.json";
 import topicTheLeague from "../data/topics/the-league.json";
 import topicTheVid from "../data/topics/the-vid.json";
@@ -302,6 +313,11 @@ const THOUGHTS = [
   thoughtGrieving,
   thoughtShaken,
   thoughtHeartened,
+  thoughtFixedIt,
+  thoughtCookedWell,
+  thoughtBakedForTheCrew,
+  thoughtNobodyJoinedIn,
+  thoughtSquaredAway,
 ];
 const ACTIVITIES = [
   activityCards,
@@ -316,6 +332,8 @@ const ACTIVITIES = [
   activityTinkering,
   activityStargazing,
   activityBaking,
+  activityGossip,
+  activityBookClub,
 ];
 const TOPICS = [
   topicTheGuild,
@@ -325,6 +343,9 @@ const TOPICS = [
   topicTheLeague,
   topicOldCaptains,
   topicTheVid,
+  topicSalvageRights,
+  topicGhostShips,
+  topicSweethearts,
 ];
 
 /** Strips the editor-only `$schema` key that authored JSON carries but the Zod schemas reject. */

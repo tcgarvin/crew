@@ -1,0 +1,8 @@
+{
+  "$schema": "../../schema-json/thought.schema.json",
+  "key": "bakedForTheCrew",
+  "label": "baked for the crew",
+  "value": 0.05,
+  "durationDays": 0.3,
+  "stacks": false
+}
