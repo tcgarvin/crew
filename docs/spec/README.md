@@ -20,7 +20,7 @@ How the game works **now**, one file per system. Code and docs cite a section by
 | `crew-life.md` | needs, thoughts and mood, the galley and mess call, dirt and cleaning, sleep and cabins |
 | `social.md` | recreation and activities, interests, affinity, relationships, the private talk |
 | `hull-and-field.md` | the asteroid field, the hull bar, scars, ship loss, intercom and reporting |
-| `expeditions.md` | bodies and wounds, weapons, landing sites and the Boathouse, the expedition and the muster, the fight, morale and postures, the plan menu |
+| `expeditions.md` | bodies and wounds, weapons, landing sites and their maps, the expedition and the muster, the fight, morale and postures, the plan menu |
 | `client.md` | the renderer, scene and camera, headline, ship's log, inspector, labels, the phone, dev tools |
 
 ## Writing a section

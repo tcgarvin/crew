@@ -65,7 +65,7 @@ describe("camera framing at both ends", () => {
   });
 
   it("fits ship plus the whole dock map when docked, for every authored dock", () => {
-    expect(allDocks.length).toBe(8);
+    expect(allDocks.length).toBe(9);
     for (const dock of allDocks) {
       const { portId, id } = dock.dock;
       const docked = framed(travel("docked", 0, portId, portId));

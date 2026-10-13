@@ -8,9 +8,11 @@ is `packages/sim/src/systems/travel/`. The dock itself and its people are in `do
 
 ### Port graph
 
-Six ports, and two landing sites that no port lists (§landing-sites, §known-sites): a core
+Six ports, and three landing sites that no port lists (§landing-sites, §known-sites): a core
 triangle (Crossroads Hub, Kessler Drift, Green Meridian) and three far spurs
-(Ossory Station off Kessler Drift, Vesper Gate off Green Meridian, Tern's Rest off the Hub). Port
+(Ossory Station off Kessler Drift, Vesper Gate off Green Meridian, Tern's Rest off the Hub). The
+sites are the Boathouse off Tern's Rest, Harrow End off Green Meridian and the Lazaret off Vesper
+Gate, each one route of 20 from its near port. Port
 files are `packages/content/data/ports/*.json`; the legs there are the truth (the triangle's are
 25, 45 and 70, each spur's 400). Routes are listed on both ends with equal distance, and the
 loader checks it. Every port has a `character` and a `castSeed` for the narrator, a market of its

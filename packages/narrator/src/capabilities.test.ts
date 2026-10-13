@@ -353,6 +353,13 @@ describe("buildCapabilities: Sites and the errand (expeditions A2, §6, §10.2)"
     expect(boathouse).toContain("    - Hesk Marrow, hired hand, with a blaster;");
     expect(boathouse).toContain("    - Darrow Finch, the keeper's nephew, with a club;");
     expect(boathouse).toContain("    - Old Pell, net mender, a bystander, unarmed;");
+    const lazaret = section.split('  - port.lazaret "')[1] ?? "";
+    expect(lazaret).toContain(
+      "    - the one a fetchPerson is after, under your targetName (else Orrin Sallow): the Gate's dispenser, gone with its morphia, unarmed;",
+    );
+    expect(lazaret).toContain(
+      "    - Sister Hedda Vosk, a vowed warden who took Orrin's side, with a club;",
+    );
     const castLines = section.split("\n").filter((line) => line.startsWith("    - "));
     expect(castLines.length).toBeGreaterThan(0);
     for (const line of castLines) expect(line).not.toMatch(/\d/);
