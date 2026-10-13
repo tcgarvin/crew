@@ -502,6 +502,17 @@
     "liftSeconds": 2,
     "laySeconds": 2
   },
+  "accidents": {
+    "enabled": true,
+    "hotWorkPerSecond": 0.002,
+    "slipPerSecond": 0.003,
+    "impactThrowChance": 0.15,
+    "lines": {
+      "hotWork": "{who} is burned working on the {machine}",
+      "slip": "{who} slips on the filthy deck under a load",
+      "thrown": "{who} is thrown off their feet by the impact"
+    }
+  },
   "bodies": {
     "tolerance": {
       "head": 2,

@@ -7,7 +7,8 @@
  * line off the fight) before the hit's own events, then the reactions a hit in the fight gets:
  * crew who see a crewmate hurt take `sawCrewHurt` (the party by line of sight in the fight, crew in
  * the same room aboard), and a crew striker whose blow killed takes `killedSomeone`. In the fight
- * the next combat tick takes the down and the dead out (`syncBody`, `combat.ts`).
+ * the next combat tick takes the down and the dead out (`syncBody`, `combat.ts`). Who sees it is
+ * `witness.ts`'s, shared with accidents (§accidents-aboard).
  */
 import {
   type ApplyCtx,
@@ -25,11 +26,9 @@ import type { CommandOfKind, CommandRejection } from "../../core/types/commands"
 import type { DeepReadonly } from "../../core/types/common";
 import { BODY_PARTS, DAMAGE_TYPES, WOUND_SEVERITIES } from "../../core/types/content";
 import { STRIKE_HOW_MAX } from "../../core/types/decisions";
-import type { ActorId, CompartmentId } from "../../core/types/ids";
-import { groundOf, onSite, tileOfActor } from "../expedition/ground";
-import { lineOfSight } from "../expedition/los";
-import { upright } from "../expedition/morale";
+import type { ActorId } from "../../core/types/ids";
 import { applyDamage } from "./damage";
+import { witnessHurt } from "./witness";
 
 const oneOf = (list: readonly string[], value: unknown): boolean =>
   typeof value === "string" && list.includes(value);
@@ -73,40 +72,6 @@ function strikeProblem(
   return undefined;
 }
 
-/** The room `actorId` stands in aboard, by the actor index. */
-function roomOf(ctx: ApplyCtx, actorId: ActorId): CompartmentId | undefined {
-  const index = ctx.caches.index.actorsByCompartment;
-  for (const [room, ids] of Object.entries(index)) {
-    if (ids.includes(actorId)) return room as CompartmentId;
-  }
-  return undefined;
-}
-
-/**
- * Crew who see `hurt` (a crew member) hit: in the fight, the party on their feet on the site floor
- * with a line of sight, as a shot's hit (`combat.ts`); aboard, the crew on their feet in the room.
- */
-function witnesses(ctx: ApplyCtx, hurt: Actor): Actor[] {
-  const others = Object.values(ctx.state.actors).filter(
-    (a) => a.id !== hurt.id && a.crew && a.passenger !== true && a.availability === "available",
-  );
-  const ground = hurt.combatant === undefined ? undefined : groundOf(ctx);
-  if (ground !== undefined) {
-    const at = tileOfActor(ctx.state, hurt);
-    if (at === undefined) return [];
-    return others.filter((friend) => {
-      const c = friend.combatant;
-      if (c?.side !== "us" || !upright(c) || !onSite(ctx, friend)) return false;
-      const from = tileOfActor(ctx.state, friend);
-      return from !== undefined && lineOfSight(ground.berth, from, at);
-    });
-  }
-  const room = roomOf(ctx, hurt.id);
-  if (room === undefined) return [];
-  const here = ctx.caches.index.actorsByCompartment[room] ?? [];
-  return others.filter((friend) => here.includes(friend.id));
-}
-
 export const strike: CommandHandler<"strike", null> = {
   validate(ctx, command) {
     const problem = strikeProblem(ctx, command);
@@ -132,10 +97,7 @@ export const strike: CommandHandler<"strike", null> = {
       ...by,
       ...(inFight ? {} : { narrated: true as const }),
     });
-    const seen = ctx.content.thoughts.sawCrewHurt !== undefined;
-    if (seen && target.crew && target.passenger !== true && type !== "stun") {
-      for (const friend of witnesses(ctx, target)) addThought(step, friend, "sawCrewHurt", actorId);
-    }
+    if (type !== "stun") witnessHurt(step, target);
     const striker = byActorId === undefined ? undefined : ctx.state.actors[byActorId];
     if (result.died && striker?.crew === true && ctx.content.thoughts.killedSomeone !== undefined) {
       addThought(step, striker, "killedSomeone", actorId);

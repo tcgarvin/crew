@@ -10,6 +10,7 @@ export function registerMedical(registry: KernelRegistry): Unregister {
   return registry.registerSystem(medicalSystem);
 }
 
-export { medBedOf } from "./bed";
+export { type MedBed, medBedOf, onTheBed } from "./bed";
 export { medicalSystem } from "./medical";
+export { medicalUnitsAboard } from "./supplies";
 export { medicalTaskDerivations } from "./tasks";

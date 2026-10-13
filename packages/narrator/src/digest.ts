@@ -58,6 +58,7 @@ import {
   transitSecondsLeft,
   voyageAhead,
 } from "./lookups";
+import { crewWoundedDetail, infirmaryLine } from "./medical-digest";
 import {
   type ArcEnding,
   type ArcSketch,
@@ -348,6 +349,9 @@ function shipSection(
   if (galley !== undefined) lines.push(galley);
   const dirt = dirtLine(state, content);
   if (dirt !== undefined) lines.push(dirt);
+  // §ship-life-lines, §medicine: the medbay bed, who is treating, and the kits against the reserve.
+  const infirmary = infirmaryLine(state, content, snapshot.config);
+  if (infirmary !== undefined) lines.push(infirmary);
   // §ship-life-lines: off-watch life now (sessions, solo recreation) and the rivalries worth a
   // story.
   const offWatch = offWatchLine(state, content);
@@ -662,6 +666,10 @@ function problemLine(p: DeepReadonly<Problem>, snapshot: Snapshot, content: Cont
   if (p.kind === "compartmentDirty") {
     // §room-cleaning-problem: the ship's own failing, and who is mopping it, if anyone.
     return `${base}: ${compartmentDirtyDetail(state, content, p)}`;
+  }
+  if (p.kind === "crewWounded") {
+    // §the-wounded-problem: who is hurt and who is seeing to them, or why nobody is.
+    return `${base}: ${crewWoundedDetail(state, content, snapshot.config, p)}`;
   }
   if (p.kind !== "partsNeeded") return base;
   // §market-and-parts-lines: the stalled repair and what would unstick it, so the model can stock a

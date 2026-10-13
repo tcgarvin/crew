@@ -804,3 +804,42 @@ describe("the ticker line for a treatment (§treatment-at-the-medbay-bed)", () =
     expect(EVENT_SIGNIFICANCE.woundHealed).toBe("trace");
   });
 });
+
+describe("the ticker line for an accident (§accidents-aboard)", () => {
+  const { world } = tinyTestWorld();
+  const [actorId] = Object.keys(world.state.actors) as ActorId[];
+  const event = (type: "accident" | "wounded", payload: unknown) =>
+    ({
+      id: "e1" as EventId,
+      tick: 1,
+      seq: 1,
+      subjectIds: [],
+      causeIds: [],
+      source: "sim",
+      type,
+      significance: "notable",
+      payload,
+    }) as SimEvent;
+
+  it("is the accident's own line, and its wound adds none", () => {
+    const how = "someone is thrown off their feet by the impact";
+    expect(
+      tickerLine(event("accident", { actorId, hazard: "thrown", how }), world.state, world.content),
+    ).toBe("Someone is thrown off their feet by the impact");
+    expect(
+      tickerLine(
+        event("wounded", {
+          actorId,
+          woundId: "w1",
+          part: "torso",
+          severity: "graze",
+          type: "blunt",
+          narrated: true,
+        }),
+        world.state,
+        world.content,
+      ),
+    ).toBeNull();
+    expect(EVENT_SIGNIFICANCE.accident).toBe("notable");
+  });
+});

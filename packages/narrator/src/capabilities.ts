@@ -284,10 +284,31 @@ const UNSEEN_LEVER: readonly string[] = [
 ];
 
 /**
- * §strike-lever: the ninth lever, a wound, a down or a death by the body rules, in words from the
- * bodies config.
+ * §medicine: what the ship can do about a wound: the medbay bed, the kits it uses up, and the ports
+ * whose market has a `medical` item now (by id, so the model can stock one elsewhere).
  */
-function strikeLever(config: ConfigDef): string[] {
+function medicineLine(state: State, content: ContentBundle): string {
+  const kits = Object.values(content.items)
+    .filter((def) => def.tags.includes("medical"))
+    .map((def) => def.id)
+    .sort();
+  const ports = Object.values(content.ports)
+    .filter((port) => !isSite(content, port.id))
+    .filter((port) => {
+      const stock = effectiveMarket(state, content, port.id);
+      return kits.some((id) => (stock[id]?.count ?? 0) > 0);
+    })
+    .map((port) => port.id)
+    .sort();
+  const sold = ports.length === 0 ? "no port sells them now" : `sold at ${ports.join(", ")}`;
+  return `- A wound aboard is treated at the medbay bed by whoever has medical skill, with one med kit (${kits.join(", ")}) a treatment: the hurt walk there and the down are carried. Kits run out (${sold}, and the crew restock them at port), and an untreated wound only heals slowly. Accidents aboard (a burn at a hot machine, a slip under a load, a fall when a rock hits) hurt crew now and then on their own.`;
+}
+
+/**
+ * §strike-lever: the ninth lever, a wound, a down or a death by the body rules, in words from the
+ * bodies config, and what the ship can do about a wound (§medicine).
+ */
+function strikeLever(state: State, content: ContentBundle, config: ConfigDef): string[] {
   const { tolerance, severityDamage } = config.bodies;
   const headKills = severityDamage.grave >= tolerance.head;
   return [
@@ -296,6 +317,7 @@ function strikeLever(config: ConfigDef): string[] {
     `- severity: ${WOUND_SEVERITIES.join(" | ")}; type: ${DAMAGE_TYPES.join(" | ")} (stun knocks out, never kills); part: ${BODY_PARTS.join(" | ")}, or empty to let the body decide.`,
     `- What it does is the sim's body rules, never yours to state: a graze hurts and heals; a serious wound bleeds for a while, slows them and can put them down; a grave one ${headKills ? "to the head kills at once, and anywhere else" : "anywhere"} bleeds and can kill within minutes. You never write "dead": a grave head strike is how a death you have decided lands. Two strikes on one person in one call: the second may find them dead and be dropped.`,
     `- how: one line of what happened, as the ship's log shows it ("Jax Okonkwo falls from the hold ladder", "a crate shifts and pins Priya's leg"); no numbers. In the fight at a site the fight's own lines tell it ("Corran Vale is hit"), so it lands like any shot, with byWho a cast member. The crew react as to any wound: crewmates who see it take it with them (their mood), someone down stops where they are, and the dead stay on the deck.`,
+    medicineLine(state, content),
     "- The captain is not special: they can be struck and killed like anyone, and the first officer takes command. A death is the strongest card you have; spend it rarely, and only when the story has walked toward it.",
   ];
 }
@@ -522,7 +544,7 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   lines.push("");
   lines.push(...UNSEEN_LEVER);
   lines.push("");
-  lines.push(...strikeLever(config));
+  lines.push(...strikeLever(state, content, config));
   lines.push("");
   lines.push(...transactLever(config));
   lines.push("");

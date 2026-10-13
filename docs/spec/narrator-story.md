@@ -222,6 +222,10 @@ dropped as ambiguous.
   in the same room aboard; a crew `byWho` whose blow killed takes `killedSomeone`. Bleeding,
   healing and incapacity are the bodies system's. A strike shakes no one's morale in the fight;
   the down and the dead leave it by the body sync.
+- The capability block's strike section also says what the ship can do about a wound
+  (§medicine): treatment at the medbay bed by whoever has medical skill, one `medical` item a
+  treatment by id, that kits run out and which ports' markets sell one now, and that accidents
+  aboard hurt crew on their own (§accidents-aboard).
 
 ### Money levers
 
@@ -579,11 +583,16 @@ voice: crew have voices, not wants; wants surface as threads.
 Under Ship: the watch line and helm check (`time-and-watches.md`), field, hull and damage lines
 (`hull-and-field.md`), `galley:` (counter servings with quality and cook, the next meal at the bell
 and who is cooking while `mealToCook` is open, provisions in crates and days), `dirt:` (only while
-a room is dirty or worse, filthy first), `off watch:` (sessions by venue and players, or still
-gathering, and solo play) and `rivalries:`. Problem lines read from the same tables: a provisions
-`reserveLow` as "provisions are low (about N days of meals left); K crates would restock the
-galley", and `compartmentDirty` as "<Room> is <tier>; <who> mopping" or "nobody is mopping it yet,
-the <role>'s to mop".
+a room is dirty or worse, filthy first), `infirmary:` (only while someone lies in the medbay bed,
+someone aboard is wounded, or the `medical` units aboard are under `medical.reserve`: who is in the
+bed, who is treating, and the kits against the reserve, "infirmary: Priya Kessler in the bed,
+Oyelaran Abiodun treating; 1 med kit aboard (the ship keeps 2)"), `off watch:` (sessions by venue
+and players, or still gathering, and solo play) and `rivalries:`. Problem lines read from the same
+tables: a provisions `reserveLow` as "provisions are low (about N days of meals left); K crates
+would restock the galley", `compartmentDirty` as "<Room> is <tier>; <who> mopping" or "nobody is
+mopping it yet, the <role>'s to mop", and `crewWounded` (§the-wounded-problem) as "<who> is
+wounded; <medic> treating", "<carrier> carrying them to the medbay", "nobody treating yet" or
+"nobody treating yet, no kits aboard".
 
 ### Market and parts lines
 

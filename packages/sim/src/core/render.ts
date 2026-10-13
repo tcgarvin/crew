@@ -732,6 +732,9 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return `Shots at ${midSentence(n.port(event.payload.siteId))}`;
     case "shotFired":
       return null;
+    case "accident":
+      // §accidents-aboard: the configured line, with who and the machine filled in.
+      return capitalise(event.payload.how);
     case "struck":
       // §strike-lever: off the fight the narrator's line is the news; in it, the fight's lines are.
       return event.payload.inFight ? null : capitalise(event.payload.how);

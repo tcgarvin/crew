@@ -165,6 +165,36 @@ The ship keeps `medical.reserve` (2) units of `medical` items aboard; with fewer
 whose market sells one, the difference is a reserve to restock (§reserve-kinds). The default
 scenario stows three med kits in the hold.
 
+### Accidents aboard
+
+Crew are hurt aboard outside a fight now and then, so the medbay works on an ordinary voyage
+(`systems/bodies/accidents.ts`). Three hazards, each rolled on a keyed draw of the `failures`
+stream (rolling moves no other system's draws):
+
+- Hot work: a crew member on a machine's repair (`recipe`) or `mend` work step while that machine
+  runs past its `heat.derateAbove`, at `accidents.hotWorkPerSecond` (0.002): a graze to an arm.
+- A slip under a load: a crew member carrying cargo (an item with a cargo class, in hand or on the
+  hand truck they push) in a `filthy` room (§room-tiers), at `accidents.slipPerSecond` (0.003): a
+  graze to a leg, `serious` while the ship is on alert for an asteroid field.
+- Thrown: as each rock lands (§rock-impacts), each crew member awake and on their feet in the
+  struck room, unless braced on a machine's `operate` or `use` position, at
+  `accidents.impactThrowChance` (0.15): a graze where `bodies.partTable` puts it, never the head.
+
+The first two are rolled by the accidents system (phase `needs`, after the bodies system, every
+half second); a throw is rolled by the field as the rock lands. Fatigue past
+`urgency.needEssentialAbove` (0.7) doubles every chance. Passengers, the dock's and the site's
+people and anyone in a fight are never hurt this way. An accident goes through `applyDamage`, emits
+`accident {actorId, hazard, how, machineId?}` (notable; its `wounded` is marked `narrated`), and
+crew in the room take `sawCrewHurt` (`systems/bodies/witness.ts`, shared with the strike,
+§strike-lever). The ticker's line is `accidents.lines` for the hazard with `{who}` and `{machine}`
+filled: "Tomas Ruiz is burned working on the fusion generator". `accidents.enabled` (true) off
+rolls nothing; a test that pins a run's numbers turns it off.
+
+An accident never kills: every one is `blunt`, so it never bleeds, never lands on the head, and a
+roll that would take its part to tolerance is no accident. Why: an accident is a reason to walk to
+the medbay and spend a kit, not a death the story never chose; a death is the narrator's to decide
+(§strike-lever).
+
 ## Arms
 
 ### Weapons and fighting

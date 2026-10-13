@@ -1,10 +1,10 @@
 /**
  * Body events (expeditions A1, §7.1): a wound, someone going down or dying, a wound healed. The
  * bodies system and `applyDamage` emit them (`systems/bodies/`); medical emits `woundTreated`
- * and `casualtyCarried` (`systems/medical/`).
+ * and `casualtyCarried` (`systems/medical/`); accidents aboard emit `accident`.
  */
-import type { BodyPart, DamageType, WoundSeverity } from "../content";
-import type { ActorId, WoundId } from "../ids";
+import type { AccidentHazard, BodyPart, DamageType, WoundSeverity } from "../content";
+import type { ActorId, MachineId, WoundId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 
 export interface BodiesEventPayloads {
@@ -16,7 +16,10 @@ export interface BodiesEventPayloads {
     readonly severity: WoundSeverity;
     readonly type: DamageType;
     readonly byActorId?: ActorId;
-    /** §strike-lever: the narrator's strike off the fight; its `struck` line is the ticker's. */
+    /**
+     * §strike-lever, §accidents-aboard: the narrator's strike off the fight or an accident aboard;
+     * its `struck` or `accident` line is the ticker's.
+     */
     readonly narrated?: true;
   };
   /** `actorId` is down: unconscious (blood, pain or stun) or unable to move. */
@@ -57,6 +60,16 @@ export interface BodiesEventPayloads {
     readonly inFight: boolean;
     readonly byActorId?: ActorId;
   };
+  /**
+   * §accidents-aboard: `actorId` was hurt aboard outside a fight by `hazard` (at `machineId` for
+   * hot work), just before the `wounded` it causes; `how` is the ticker's line.
+   */
+  accident: {
+    readonly actorId: ActorId;
+    readonly hazard: AccidentHazard;
+    readonly how: string;
+    readonly machineId?: MachineId;
+  };
 }
 
 export const BODIES_EVENT_SIGNIFICANCE = {
@@ -67,4 +80,5 @@ export const BODIES_EVENT_SIGNIFICANCE = {
   woundTreated: "notable",
   casualtyCarried: "notable",
   struck: "narrative",
+  accident: "notable",
 } as const satisfies SignificanceCatalog<BodiesEventPayloads>;

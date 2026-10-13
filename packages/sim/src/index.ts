@@ -42,7 +42,14 @@ export { registerCabins } from "./systems/cabins/index";
 export { registerField, scriptedHullDamage } from "./systems/field/index";
 export { damageTaskDerivations, registerDamage } from "./systems/damage/index";
 export { registerIntercom } from "./systems/intercom/index";
-export { medBedOf, medicalTaskDerivations, registerMedical } from "./systems/medical/index";
+export {
+  type MedBed,
+  medBedOf,
+  medicalTaskDerivations,
+  medicalUnitsAboard,
+  onTheBed,
+  registerMedical,
+} from "./systems/medical/index";
 export {
   applyDamage,
   type DamageResult,
