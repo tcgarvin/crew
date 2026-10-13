@@ -16,7 +16,7 @@
         "x": 0,
         "y": 1
       },
-      "purposes": ["use"],
+      "purposes": ["use", "repair"],
       "capacity": 1
     }
   ],
@@ -35,12 +35,71 @@
     "requiresOperator": false
   },
   "failure": {
-    "baseHazardPerSecond": 0.0001,
+    "baseHazardPerSecond": 0.00015,
     "heatFactor": 1,
     "wearPerSecond": 0.0002
   },
-  "faults": [],
-  "components": [],
+  "faults": [
+    {
+      "key": "burner_fault",
+      "name": "Burned-out burner",
+      "weight": 1,
+      "effect": {
+        "kind": "inoperable"
+      },
+      "symptom": {
+        "key": "cold_burner",
+        "channel": "visual"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "remove_element",
+            "action": "removeComponent",
+            "workSeconds": 8,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 1
+            }
+          },
+          {
+            "key": "install_element",
+            "action": "installComponent",
+            "workSeconds": 12,
+            "tools": ["wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.heating_element",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 1
+            }
+          },
+          {
+            "key": "test_burner",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "slot": "burner_element",
+      "itemDefId": "item.heating_element"
+    }
+  ],
   "maintenance": {
     "intervalSeconds": 600,
     "inspect": {

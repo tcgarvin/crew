@@ -63,6 +63,11 @@
       "price": 210
     },
     {
+      "itemDefId": "item.heating_element",
+      "count": 1,
+      "price": 70
+    },
+    {
       "itemDefId": "item.med_kit",
       "count": 1,
       "price": 130

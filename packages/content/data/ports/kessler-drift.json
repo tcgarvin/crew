@@ -48,6 +48,11 @@
       "price": 180
     },
     {
+      "itemDefId": "item.heating_element",
+      "count": 2,
+      "price": 50
+    },
+    {
       "itemDefId": "item.coolant_canister",
       "count": 2,
       "price": 75

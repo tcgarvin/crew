@@ -220,6 +220,35 @@ describe("course plotting (§course-plotting)", () => {
     expect(world.state.travel).toEqual({ stage: "docked", portId: TINY.port });
   });
 
+  it("a nav terminal down with a chart fault plots nothing; once repaired the course is plotted", () => {
+    const tw = roundsWorld({ travel: true });
+    const { world } = tw;
+    const nav = navTerminal(world);
+    const terminal = nav === undefined ? undefined : world.state.machines[nav.id];
+    if (terminal === undefined) throw new Error("no nav terminal");
+    terminal.faults.push({
+      faultKey: "chart_fault",
+      sinceTick: world.state.tick,
+      diagnosed: false,
+      repairStepIndex: 0,
+      repairStepProgress: 0,
+    });
+    setCourse(tw, TINY.port2);
+    let plotting = 0;
+    const events = drive(tw, 20 * 60, (w) => {
+      const step = currentStep(actorOf(w, MARA).activity);
+      if (step?.kind === "work" && step.stage === "plot") plotting += 1;
+      return false;
+    });
+    expect(plotting).toBe(0);
+    expect(plotted(events)).toBe(false);
+    expect(world.state.travel.stage).toBe("docked");
+    expect(openCourse(world)).toHaveLength(1);
+    terminal.faults = [];
+    const after = drive(tw, 20 * 120, (w) => w.state.travel.stage !== "docked");
+    expect(plotted(after)).toBe(true);
+  });
+
   it("a ship with no nav terminal needs no plot: setCourse begins prep as before", () => {
     const tw = crewWorld({ extra: (registry) => registerTravel(registry) });
     expect(navTerminal(tw.world)).toBeUndefined();

@@ -1028,6 +1028,23 @@ describe("bundle validation", () => {
       expect(referenceIssues(bundle)).toEqual([]);
     });
 
+    it("rejects a machine with faults but nowhere to diagnose them, or a step at a purpose no position offers (§diagnosis)", () => {
+      const useOnly = {
+        ...machine,
+        interactionPositions: [
+          { key: "front", offset: { x: -1, y: 0 }, purposes: ["use"], capacity: 1 },
+        ],
+      };
+      const issues = referenceIssues({
+        ...bundle,
+        machines: { ...bundle.machines, [machine.id]: useOnly },
+      });
+      expect(issues.map((i) => i.path.join("."))).toEqual([
+        `machines.${machine.id}.interactionPositions`,
+        `machines.${machine.id}.faults.0.repair.steps.0.at`,
+      ]);
+    });
+
     it("rejects a unique item with maxStack other than 1", () => {
       const badItem = { ...item, maxStack: 2 };
       const issues = referenceIssues({ ...bundle, items: { [badItem.id]: badItem } });

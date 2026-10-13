@@ -10,6 +10,7 @@ import type { ActorId } from "../../core/types/ids";
 import type { World } from "../../core/types/kernel";
 import type { ProblemOfKind } from "../../core/types/work";
 import { whoHasTheHelm } from "../watch/helm";
+import { currentStep } from "../work/activity";
 import { MARA as CREW_MARA, crewWorld } from "../work/fixtures/crew-deck";
 import {
   BETTINA,
@@ -35,6 +36,7 @@ import {
   tileNow,
 } from "./fixtures/galley-deck";
 import { registerGalley } from "./index";
+import { stoveOf } from "./kitchen";
 
 const mealProblems = (world: World): ProblemOfKind<"mealToCook">[] =>
   Object.values(world.state.work.problems).filter(
@@ -390,5 +392,65 @@ describe("a ship with no stove (the crew deck)", () => {
     expect(ofType(events, "thoughtAdded").some((e) => e.payload.key === "ateRationPack")).toBe(
       true,
     );
+  });
+});
+
+describe("the stove down (§stove-down)", () => {
+  function breakTheStove(world: World) {
+    const id = stoveOf(world.state, world.content)?.id;
+    const stove = id === undefined ? undefined : world.state.machines[id];
+    if (stove === undefined) throw new Error("no stove");
+    stove.faults.push({
+      faultKey: "burner_fault",
+      sinceTick: world.state.tick,
+      diagnosed: false,
+      repairStepIndex: 0,
+      repairStepProgress: 0,
+    });
+    return stove;
+  }
+
+  it("with a burner fault nothing cooks: the meal is missed at its grace and the hungry eat rations", () => {
+    const fixture = galleyWorld();
+    const { world } = fixture;
+    breakTheStove(world);
+    const mara = world.state.actors[MARA];
+    if (mara === undefined) throw new Error("no Mara");
+    mara.needs.hunger = 0.6;
+    const config = world.config.values;
+    const grace = watchTicks(config) + dayTicks(config, config.galley.mealGraceDays);
+    const cooking: number[] = [];
+    const events = runUntil(
+      fixture,
+      GALLEY_WATCH * 2,
+      (w) => w.state.tick >= grace,
+      (w) => {
+        for (const actor of Object.values(w.state.actors)) {
+          const step = currentStep(actor.activity);
+          if (step?.kind === "work" && step.stage === "cook") cooking.push(w.state.tick);
+        }
+      },
+    );
+    expect(cooking).toEqual([]);
+    expect(ofType(events, "mealServed")).toEqual([]);
+    expect(ofType(events, "mealMissed").map((e) => [e.tick, e.payload.watchIndex])).toEqual([
+      [grace, 1],
+    ]);
+    const ate = ofType(events, "ateMeal");
+    expect(ate.length).toBeGreaterThan(0);
+    expect(ate.every((e) => e.payload.ration)).toBe(true);
+    expect(ate.some((e) => e.subjectIds[0] === MARA)).toBe(true);
+  });
+
+  it("once the burner is replaced, the next meal is cooked and served", () => {
+    const fixture = galleyWorld();
+    const { world } = fixture;
+    const stove = breakTheStove(world);
+    const config = world.config.values;
+    const grace = watchTicks(config) + dayTicks(config, config.galley.mealGraceDays);
+    runUntil(fixture, GALLEY_WATCH * 2, (w) => w.state.tick >= grace);
+    stove.faults = [];
+    const events = runToSecond(fixture, GALLEY_WATCH * 2);
+    expect(ofType(events, "mealServed")).toHaveLength(1);
   });
 });

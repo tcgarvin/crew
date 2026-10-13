@@ -20,6 +20,7 @@ import {
   dayTicks,
   provisionsCratesAboard,
   provisionsDays,
+  stoveDown,
   watchTicks,
 } from "@crew/sim";
 import type { State } from "./lookups";
@@ -139,8 +140,9 @@ function nextMealPhrase(state: State, config: ConfigDef): string {
 
 /**
  * The Ship section's galley line: "galley: 10 hot meals on the counter (good, Bettina Solheim),
- * next meal due at the bell in ~90s; provisions 16 crates, about 5 days". Undefined when content
- * has no `meal`-tagged item (no galley to speak of).
+ * next meal due at the bell in ~90s; provisions 16 crates, about 5 days". While the stove is down
+ * (§stove-down) it opens "galley: stove down, nothing cooks until it is repaired; ...". Undefined
+ * when content has no `meal`-tagged item (no galley to speak of).
  */
 export function galleyLine(
   state: State,
@@ -152,7 +154,10 @@ export function galleyLine(
   const crates = provisionsCratesAboard(state, content);
   const days = provisionsDays(state, content, config);
   const provisions = `provisions ${crates} ${crates === 1 ? "crate" : "crates"}, ${daysPhrase(days)}`;
-  return `galley: ${counterPhrase(state, content)}, ${nextMealPhrase(state, config)}; ${provisions}`;
+  const down = stoveDown(state, content, config)
+    ? "stove down, nothing cooks until it is repaired; "
+    : "";
+  return `galley: ${down}${counterPhrase(state, content)}, ${nextMealPhrase(state, config)}; ${provisions}`;
 }
 
 /** A room's name from its compartment key on the ship's deck, or the key itself. */

@@ -16,7 +16,7 @@
         "x": -1,
         "y": 0
       },
-      "purposes": ["operate"],
+      "purposes": ["operate", "repair"],
       "capacity": 1
     }
   ],
@@ -35,10 +35,59 @@
     "requiresOperator": false
   },
   "failure": {
-    "baseHazardPerSecond": 0,
-    "heatFactor": 0,
+    "baseHazardPerSecond": 0.00006,
+    "heatFactor": 1,
     "wearPerSecond": 0
   },
-  "faults": [],
+  "faults": [
+    {
+      "key": "chart_fault",
+      "name": "Corrupted chart store",
+      "weight": 1,
+      "effect": {
+        "kind": "inoperable"
+      },
+      "symptom": {
+        "key": "chart_checksum_error",
+        "channel": "sensor"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "scan_chart_store",
+            "action": "inspect",
+            "workSeconds": 8,
+            "tools": ["diagnosticScanner"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 1
+            }
+          },
+          {
+            "key": "reload_charts",
+            "action": "repair",
+            "workSeconds": 15,
+            "tools": ["diagnosticScanner"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 1
+            }
+          },
+          {
+            "key": "test_plot",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": [],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
+    }
+  ],
   "components": []
 }

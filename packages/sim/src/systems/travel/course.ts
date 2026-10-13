@@ -5,7 +5,8 @@
  * (`runPlot`) sets `travel.coursePlotted` and emits `coursePlotted`.
  *
  * A ship with no nav terminal aboard (the hand-built test decks) needs no plot: every course
- * counts as plotted.
+ * counts as plotted. A nav terminal that is blocked (a chart fault) plots nothing until repaired:
+ * the plan is blocked and the work step fails `dependencyPending`, so the task backs off.
  *
  * Owner: travel (W2 of ship life slice 2).
  */
@@ -25,6 +26,7 @@ import type {
   TaskSpec,
 } from "../../core/types/work";
 import { shipDeckId } from "../../core/world";
+import { isTaskMachineBlocked } from "../equipment/equipment";
 import { helmMachine } from "../watch/helm";
 import { emitSim } from "../work/events";
 import { type PlanResult, interactionTarget } from "../work/plans";
@@ -183,6 +185,7 @@ export function deriveCourseToPlot(
 /** The plan for a `plotCourse` task: to the terminal's operate position, then `plot` work. */
 export function plotCoursePlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.target.kind !== "machine") return { ok: false, reason: "unreachableTarget" };
+  if (isTaskMachineBlocked(ctx, task.target)) return { ok: false, reason: "dependencyPending" };
   const target = interactionTarget(ctx, actor, task.target.machineId, "operate");
   if (target === undefined) return { ok: false, reason: "unreachableTarget" };
   const ticksNeeded = configTicks(ctx.config, ctx.config.watches.plotCourseSeconds);
@@ -203,7 +206,7 @@ export function plotCoursePlan(ctx: StepCtx, actor: Actor, task: Task): PlanResu
  * plots faster: skill sets how long, not how good; §course-plotting), then the commit: the course
  * is plotted, its problem resolved and `coursePlotted` emitted. A course that changed under the
  * plotter fails the step (`dependencyPending`); `courseSystem` has already cancelled its problem,
- * so this only guards the tick in between.
+ * so this only guards the tick in between. A terminal that goes down mid-plot fails it the same way.
  */
 export function runPlot(
   ctx: StepCtx,
@@ -221,6 +224,7 @@ export function runPlot(
   if (travel.stage !== "docked" || travel.plannedDestinationId !== toPortId) {
     return { fail: "dependencyPending" };
   }
+  if (isTaskMachineBlocked(ctx, task.target)) return { fail: "dependencyPending" };
   if (task.status === "claimed") task.status = "active";
   step.ticksDone += workRate(ctx, actor, task);
   if (step.ticksDone < step.ticksNeeded) return "wait";

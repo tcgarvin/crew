@@ -577,8 +577,9 @@ voice: crew have voices, not wants; wants surface as threads.
 ### Ship life lines
 
 Under Ship: the watch line and helm check (`time-and-watches.md`), field, hull and damage lines
-(`hull-and-field.md`), `galley:` (counter servings with quality and cook, the next meal at the bell
-and who is cooking while `mealToCook` is open, provisions in crates and days), `dirt:` (only while
+(`hull-and-field.md`), `galley:` (opening "stove down" while the stove is blocked, §stove-down;
+counter servings with quality and cook, the next meal at the bell and who is cooking while
+`mealToCook` is open, provisions in crates and days), `dirt:` (only while
 a room is dirty or worse, filthy first), `off watch:` (sessions by venue and players, or still
 gathering, and solo play) and `rivalries:`. Problem lines read from the same tables: a provisions
 `reserveLow` as "provisions are low (about N days of meals left); K crates would restock the

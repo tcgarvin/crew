@@ -11,6 +11,7 @@ import type { ActorId, DeckDefId, LocalKey, MachineId } from "../../core/types/i
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import type { Item, Machine } from "../../core/types/ship";
 import { shipDeckId } from "../../core/world";
+import { isMachineBlocked } from "../equipment/equipment";
 import { rotateOffset } from "../spatial/geometry";
 
 type KitchenState = Pick<ReadonlyWorldState, "machines" | "deck">;
@@ -25,6 +26,22 @@ export function stoveOf(
   return Object.values(state.machines)
     .filter((m) => m.deckId === deckId && content.machines[m.defId]?.tags.includes("stove"))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+}
+
+/**
+ * §stove-down: the ship has a stove and it is blocked (`isMachineBlocked`, a burner fault): nothing
+ * cooks until it is repaired. The digest says so on the galley line.
+ */
+export function stoveDown(
+  state: KitchenState,
+  content: KitchenContent,
+  config: Pick<ConfigDef, "equipment">,
+): boolean {
+  const stove = stoveOf(state, content);
+  const def = stove === undefined ? undefined : content.machines[stove.defId];
+  if (stove === undefined) return false;
+  if (def === undefined) throw new Error(`stoveDown: no machine def "${stove.defId}"`);
+  return isMachineBlocked(stove, def, config.equipment);
 }
 
 /**

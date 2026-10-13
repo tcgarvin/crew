@@ -48,6 +48,11 @@
       "price": 70
     },
     {
+      "itemDefId": "item.filter_cartridge",
+      "count": 3,
+      "price": 45
+    },
+    {
       "itemDefId": "item.welder_torch",
       "count": 1,
       "price": 220

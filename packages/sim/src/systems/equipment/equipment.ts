@@ -41,12 +41,13 @@
 import { ticksToSeconds } from "../../core/clock";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
+import type { DeepReadonly } from "../../core/types/common";
 import type { ConfigDef, MachineDef } from "../../core/types/content";
 import type { DerateCause, EventDraft } from "../../core/types/events";
 import type { CommandId, ItemDefId, LocalKey, MachineId, ProblemId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
-import type { Problem, ProblemOfKind } from "../../core/types/work";
+import type { Problem, ProblemOfKind, Task } from "../../core/types/work";
 import { domainKeyOf } from "../power/power";
 import { raiseProblem, resolveProblem } from "./problems";
 import { repairShortfall, unitsAboard } from "./supplies";
@@ -85,7 +86,7 @@ export function isIntegrityBlocked(integrity: number, config: EquipmentConfig): 
  * question.
  */
 export function isMachineBlocked(
-  machine: Pick<Machine, "faults" | "temperature" | "integrity">,
+  machine: DeepReadonly<Pick<Machine, "faults" | "temperature" | "integrity">>,
   def: Pick<MachineDef, "faults">,
   config: EquipmentConfig,
 ): boolean {
@@ -95,6 +96,24 @@ export function isMachineBlocked(
   return (
     inoperableFault || machine.temperature >= 1 || isIntegrityBlocked(machine.integrity, config)
   );
+}
+
+/**
+ * `isMachineBlocked` for the machine a task works at (§stove-down, §course-plotting): false for a
+ * task that targets no machine. Throws on a machine id or def that does not exist: a task names
+ * only machines placed from content.
+ */
+export function isTaskMachineBlocked(
+  ctx: Pick<StepCtx, "state" | "content" | "config">,
+  target: Task["target"],
+): boolean {
+  if (target.kind !== "machine") return false;
+  const machine = ctx.state.machines[target.machineId];
+  const def = machine === undefined ? undefined : ctx.content.machines[machine.defId];
+  if (machine === undefined || def === undefined) {
+    throw new Error(`isTaskMachineBlocked: no machine or def for "${target.machineId}"`);
+  }
+  return isMachineBlocked(machine, def, ctx.config.equipment);
 }
 
 /** The smallest output factor names the cause; ties go to the earlier entry. */
