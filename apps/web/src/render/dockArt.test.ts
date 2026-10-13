@@ -161,8 +161,8 @@ function render(
 }
 
 describe("every authored dock draws", () => {
-  it("has one map per port, nine in all (six ports and three landing sites)", () => {
-    expect(allDocks.length).toBe(9);
+  it("has one map per port, ten in all (six ports and four landing sites)", () => {
+    expect(allDocks.length).toBe(10);
   });
 
   for (const dock of allDocks) {

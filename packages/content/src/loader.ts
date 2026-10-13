@@ -85,6 +85,7 @@ import traitSteady from "../data/traits/steady.json";
 
 // Expeditions A1 (§3.1): the landing sites
 import portBoathouse from "../data/ports/boathouse.json";
+import portBoneyard from "../data/ports/boneyard.json";
 import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
 import portHarrowEnd from "../data/ports/harrow-end.json";
@@ -96,6 +97,7 @@ import portVesperGate from "../data/ports/vesper-gate.json";
 
 // Expeditions A1 (§4)
 import dockBoathouse from "../data/docks/boathouse.json";
+import dockBoneyard from "../data/docks/boneyard.json";
 // Docks (Dockside §3)
 import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
 import dockGreenMeridian from "../data/docks/green-meridian.json";
@@ -272,6 +274,7 @@ const PORTS = [
   portBoathouse,
   portHarrowEnd,
   portLazaret,
+  portBoneyard,
 ];
 const DOCKS = [
   dockCrossroadsHub,
@@ -283,6 +286,7 @@ const DOCKS = [
   dockBoathouse,
   dockHarrowEnd,
   dockLazaret,
+  dockBoneyard,
 ];
 const SCENARIOS = [scenarioDefault];
 const THOUGHTS = [

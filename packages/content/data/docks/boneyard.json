@@ -1,0 +1,219 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.boneyard",
+  "portId": "port.boneyard",
+  "name": "The Boneyard, Ossory's laying-up field",
+  "kind": "site",
+  "palette": {
+    "floor": "#5b5148",
+    "wall": "#2b2622",
+    "accent": "#c27a3e",
+    "sky": "#1a1c24"
+  },
+  "width": 44,
+  "height": 30,
+  "rows": [
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "............................................",
+    ".###.....h............h.....................",
+    ".###...............h....###........h...h..h.",
+    ".......h...###..............h...............",
+    "...........###.....h........................",
+    "....h.......................h...............",
+    "...............h..........h.................",
+    "........##################################..",
+    "............................................",
+    "############################################"
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "h": "cover"
+  },
+  "berth": {
+    "origin": {
+      "x": 4,
+      "y": 0
+    },
+    "sizeClass": "M"
+  },
+  "posts": [
+    {
+      "key": "cutting_frame",
+      "kind": "target",
+      "name": "the cutting frame",
+      "tile": {
+        "x": 3,
+        "y": 24
+      },
+      "facing": "e"
+    },
+    {
+      "key": "lien_box",
+      "kind": "loot",
+      "name": "the lien box",
+      "tile": {
+        "x": 6,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "crane_foot",
+      "kind": "guard",
+      "name": "under the crane foot",
+      "tile": {
+        "x": 27,
+        "y": 24
+      },
+      "facing": "e"
+    },
+    {
+      "key": "plate_stack",
+      "kind": "guard",
+      "name": "behind the plate stack",
+      "tile": {
+        "x": 18,
+        "y": 23
+      },
+      "facing": "e"
+    },
+    {
+      "key": "frame_side",
+      "kind": "guard",
+      "name": "beside the cutting frame",
+      "tile": {
+        "x": 6,
+        "y": 24
+      },
+      "facing": "e"
+    },
+    {
+      "key": "cable_drums",
+      "kind": "bystander",
+      "name": "the cable drums",
+      "tile": {
+        "x": 16,
+        "y": 26
+      },
+      "facing": "n"
+    },
+    {
+      "key": "drainage_cut",
+      "kind": "exit",
+      "name": "the drainage cut",
+      "tile": {
+        "x": 0,
+        "y": 28
+      },
+      "facing": "w"
+    },
+    {
+      "key": "cut_end",
+      "kind": "flank",
+      "name": "the end of the cut",
+      "tile": {
+        "x": 7,
+        "y": 28
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [],
+  "props": [
+    {
+      "key": "lamp_crane",
+      "kind": "lamp",
+      "rect": {
+        "x": 29,
+        "y": 21,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    }
+  ],
+  "foreground": [],
+  "ambience": "Dust that never settles, a cutting torch hissing somewhere among the wrecks, and the station's lights crossing the sky overhead every forty minutes.",
+  "grime": 0.5,
+  "airborneDust": 0.3,
+  "noticeRadius": 5,
+  "defaultCast": [
+    {
+      "name": "Hollis Grane",
+      "role": "a breaker who cut up a hull with a lien on it",
+      "look": "a scorched leather apron, goggles pushed up into grey hair",
+      "part": "target",
+      "arms": "none",
+      "resolve": "steady",
+      "tie": "bound",
+      "wants": "out",
+      "post": "cutting_frame"
+    },
+    {
+      "name": "Saul Kittredge",
+      "role": "a yard foreman Hollis pays by the day",
+      "look": "a foreman's hi-vis gone grey with dust, a long blaster on a sling",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "hard",
+      "tie": "paid",
+      "wants": "money",
+      "post": "crane_foot"
+    },
+    {
+      "name": "Juno Lasker",
+      "role": "a cutter hired off Ossory's dock",
+      "look": "a cutter's gauntlets, a blaster she cleans between shots",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "steady",
+      "tie": "paid",
+      "wants": "money",
+      "post": "plate_stack"
+    },
+    {
+      "name": "Pip Grane",
+      "role": "Hollis's son, who will not leave him",
+      "look": "his father's spare apron, a pry bar held like a sword",
+      "part": "guard",
+      "arms": "melee",
+      "resolve": "steady",
+      "tie": "devoted",
+      "wants": "blood",
+      "post": "frame_side"
+    },
+    {
+      "name": "Mother Tully",
+      "role": "a copper picker who works the wrecks",
+      "look": "a sack of stripped wire and a hand lamp",
+      "part": "bystander",
+      "arms": "none",
+      "resolve": "shaky",
+      "tie": "paid",
+      "wants": "nothing",
+      "post": "cable_drums"
+    }
+  ]
+}

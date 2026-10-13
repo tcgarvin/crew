@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.boneyard",
+  "name": "The Boneyard",
+  "setting": "planet",
+  "kind": "site",
+  "nearPortId": "port.ossory_station",
+  "description": "Ossory's laying-up field on the dead moon below the station, where hulls wait to be cut",
+  "character": "A flat of grey dust where the breakers set down the hulls they have no berth for yet: wrecks left where they landed, hull plates stood on edge, and a drainage cut under a spoil bank along the south side. Nothing grows and nothing stands higher than a wreck, so whoever is camped out there sees a ship come down from the far end of the field and has the whole walk across it to decide what to do.",
+  "castSeed": [],
+  "externalStores": [],
+  "market": [],
+  "jobTemplates": [],
+  "routes": [
+    {
+      "toPortId": "port.ossory_station",
+      "distance": 20
+    }
+  ]
+}

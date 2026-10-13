@@ -266,7 +266,7 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
     expect(field?.scripted[1]).toMatchObject({ rock: "small", effect: "knockout" });
   });
 
-  it("accepts a translated errand at every pay tier, from the Hub to Harrow End, Tern's Rest to the Boathouse and Vesper Gate to the Lazaret (expeditions A2, plan call 6)", () => {
+  it("accepts a translated errand at every pay tier, from the Hub to Harrow End, Tern's Rest to the Boathouse, Vesper Gate to the Lazaret and Ossory Station to the Boneyard (expeditions A2, plan call 6)", () => {
     const bundle = content();
     const scenario = bundle.scenarios[FIXTURE_SCENARIO];
     if (scenario === undefined) throw new Error("no fixture scenario");
@@ -274,6 +274,7 @@ describe("translateIntents -> kernel.enqueueCommand (real world)", () => {
       { from: "port.crossroads_hub", site: "port.harrow_end", target: "Teodor Lusk" },
       { from: "port.terns_rest", site: "port.boathouse", target: "Corran Vale" },
       { from: "port.vesper_gate", site: "port.lazaret", target: "Orrin Sallow" },
+      { from: "port.ossory_station", site: "port.boneyard", target: "Hollis Grane" },
     ] as const;
     for (const { from, site, target } of routes) {
       const startedHere = {
