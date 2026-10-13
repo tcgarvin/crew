@@ -181,6 +181,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
       },
       reofferDays: 60 / day,
       maxCratesPerJob: 6,
+      brokenFloorShare: 0.1,
     },
     narrator: {
       quietTooLongDays: (options.quietTooLongSeconds ?? 600) / day,

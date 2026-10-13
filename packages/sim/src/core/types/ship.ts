@@ -187,6 +187,11 @@ interface ItemBase {
   location: PhysicalLocation;
   /** Present on freight belonging to a contract. */
   jobId?: JobId;
+  /**
+   * §fragile-cargo: a crate of fragile freight smashed by a rock. It is still carried and delivered,
+   * but its job pays only for the crates that arrive whole. Absent = intact.
+   */
+  broken?: true;
   /** §cooking-and-serving: present on a served `meal`-tagged item; food without it is a ration. */
   meal?: MealInfo;
 }

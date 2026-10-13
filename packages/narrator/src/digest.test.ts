@@ -371,6 +371,47 @@ describe("buildDigest", () => {
     expect(jobLine(held, "j902")).not.toContain("not in hand");
   });
 
+  it("says how many of a job's crates the rocks smashed (§fragile-cargo)", () => {
+    const bundle = content();
+    const req = quietTooLongRequest(bundle);
+    const snapshot = structuredClone(req.snapshot) as SaveEnvelope;
+    const state = snapshot.state;
+    const crates = ["i901", "i902", "i903"] as ItemId[];
+    crates.forEach((id, i) => {
+      state.items[id] = {
+        id,
+        defId: "item.crate_fragile" as ItemDefId,
+        stacking: "stack",
+        count: 1,
+        reserved: 0,
+        jobId: "j904" as JobId,
+        location: { kind: "inContainer", containerId: "i1" as ItemId },
+        ...(i === 0 ? { broken: true } : {}),
+      };
+    });
+    state.jobs["j904" as JobId] = {
+      id: "j904" as JobId,
+      origin: "narrator",
+      issuer: "Hal Petrosyan, queue clerk",
+      issuerPerson: { name: "Hal Petrosyan", role: "queue clerk" },
+      pitch: { key: "job.pitch.default", params: {} },
+      urgency: "relaxed",
+      description: { key: "test.job", params: {} },
+      fromPortId: "port.green_meridian" as PortDefId,
+      toPortId: "port.crossroads_hub" as PortDefId,
+      cargo: [{ itemDefId: "item.crate_fragile" as ItemDefId, count: 3 }],
+      cargoClass: "fragile",
+      pay: 100,
+      status: "inTransit",
+      offeredTick: 0,
+      expiresAtTick: 99_999,
+      cargoItemIds: crates,
+    };
+    const text = buildDigest(snapshot, [], EMPTY_NOTES, bundle, req.hook).text;
+    const line = text.split("\n").find((l) => l.startsWith("- j904 "));
+    expect(line).toContain("3x Fragile Cargo Crate, 1 of 3 crates smashed");
+  });
+
   it("lists the captain first, as the player and never a speaker, with her voice (§captain-never-speaks)", () => {
     const req = quietTooLongRequest(content());
     const { text } = buildDigest(req.snapshot, [], EMPTY_NOTES, content(), req.hook);

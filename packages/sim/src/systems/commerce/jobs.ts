@@ -558,17 +558,50 @@ export function jobFulfilled(
   return job.cargoItemIds.length === 0 || deliveryComplete(state, content, job);
 }
 
-/** Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). */
+/** §fragile-cargo: how many of a job's crates are smashed. */
+export function brokenCrateCount(
+  state: Pick<ReadonlyWorldState, "items">,
+  job: Pick<Job, "cargoItemIds">,
+): number {
+  return job.cargoItemIds.filter((itemId) => state.items[itemId]?.broken === true).length;
+}
+
+/**
+ * §fragile-cargo: what a delivery earns: the contracted pay scaled by the share of crates that
+ * arrived whole, never under `floorShare` of it, rounded to whole credits.
+ */
+export function deliveredPay(
+  pay: number,
+  crates: number,
+  broken: number,
+  floorShare: number,
+): number {
+  if (broken === 0) return pay;
+  if (broken > crates) throw new Error(`deliveredPay: ${broken} broken of ${crates} crates`);
+  return Math.round(pay * Math.max((crates - broken) / crates, floorShare));
+}
+
+/**
+ * Pay a delivered job exactly once, guarded by `paymentTransactionId` (SD §17.3). §fragile-cargo:
+ * smashed crates dock the pay.
+ */
 export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
   if (job.paymentTransactionId !== undefined) return;
   if (job.status !== "accepted" && job.status !== "inTransit" && job.status !== "delivered") return;
   if (!jobFulfilled(ctx.state, ctx.content, job)) return;
+  const brokenCount = brokenCrateCount(ctx.state, job);
+  const amount = deliveredPay(
+    job.pay,
+    job.cargoItemIds.length,
+    brokenCount,
+    ctx.config.commerce.brokenFloorShare,
+  );
   const txId: TransactionId = allocateId(ctx.state, "transaction");
-  ctx.state.money.balance += job.pay;
+  ctx.state.money.balance += amount;
   ctx.state.money.transactions[txId] = {
     id: txId,
     tick: ctx.tick,
-    amount: job.pay,
+    amount,
     reason: "jobPayment",
     jobId: job.id,
   };
@@ -579,14 +612,14 @@ export function payJobIfDue(ctx: ApplyCtx, job: Job): void {
     subjectIds: [job.id],
     causeIds: [],
     source: "sim",
-    payload: { jobId: job.id },
+    payload: { jobId: job.id, brokenCount },
   });
   ctx.emit({
     type: "paymentMade",
     subjectIds: [job.id],
     causeIds: [],
     source: "sim",
-    payload: { transactionId: txId, amount: job.pay, jobId: job.id },
+    payload: { transactionId: txId, amount, jobId: job.id },
   });
 }
 

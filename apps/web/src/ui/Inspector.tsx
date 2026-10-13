@@ -43,6 +43,8 @@ export interface ItemInspection {
   readonly count: number;
   /** Plain words: "in the cargo hold", "carried by Mara Osei". */
   readonly where: string;
+  /** §fragile-cargo: a crate smashed by a rock. */
+  readonly broken: boolean;
   /** Present when the item is freight on a contract, or what an errand fetches. */
   readonly job?: {
     readonly issuer: string;
@@ -385,6 +387,7 @@ function LocalInspector({ local }: { local: LocalInspection }) {
 function itemSubtitle(item: ItemInspection): string {
   if (item.job === undefined) return "ship's stores";
   if (item.job.errand !== undefined) return "an errand";
+  if (item.broken) return "freight, smashed";
   return item.job.status === "offered" ? "freight on offer" : "freight";
 }
 
@@ -438,6 +441,12 @@ function ItemInspector({ item }: { item: ItemInspection }) {
       <p className="inspector-subtitle">{itemSubtitle(item)}</p>
       {job?.status === "offered" && job.errand === undefined && (
         <p>Set out for whoever takes the job; nobody loads it until then.</p>
+      )}
+      {item.broken && (
+        <p>
+          Smashed by a rock in the field. It still goes to the client, who pays only for crates that
+          arrive whole.
+        </p>
       )}
       <dl className="inspector-grid">
         <dt>Count</dt>

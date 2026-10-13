@@ -686,6 +686,12 @@ function problemSection(snapshot: Snapshot, content: ContentBundle): Section {
  */
 const FINISHING_HERE = "; being finished here, not in hand: new work can be offered and taken now";
 
+/** §fragile-cargo: ", 2 of 6 crates smashed" once a rock has broken any of a job's crates. */
+function smashedWords(state: State, job: DeepReadonly<Job>): string {
+  const broken = job.cargoItemIds.filter((id) => state.items[id]?.broken === true).length;
+  return broken === 0 ? "" : `, ${broken} of ${job.cargoItemIds.length} crates smashed`;
+}
+
 function jobSection(state: State, content: ContentBundle): Section {
   const live = new Set(["offered", "accepted", "inTransit", "delivered"]);
   const blocking = jobBlockingAcceptance(state);
@@ -719,7 +725,7 @@ function jobSection(state: State, content: ContentBundle): Section {
             ? cargo
             : `${passageWords}${cargo === "" ? ", no luggage" : `, luggage: ${cargo}`}`;
       const finishing = j.status !== "offered" && blocking === undefined ? FINISHING_HERE : "";
-      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, farEnd)}${far}, ${kind}${finishing}`;
+      return `- ${j.id} ${j.status} (${j.origin}): from ${personLine(j.issuerPerson)}, ${portName(content, j.fromPortId)} -> ${portName(content, farEnd)}${far}, ${kind}${smashedWords(state, j)}${finishing}`;
     });
   return section("Jobs", lines, 7);
 }

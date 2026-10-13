@@ -182,6 +182,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
       haulEstimateSeconds: 5,
       reofferDays: 60 / FIXTURE_DAY,
       maxCratesPerJob: overrides.maxCratesPerJob ?? 6,
+      brokenFloorShare: 0.1,
       passage: overrides.passage ?? {
         ashoreDaysMin: 3 / FIXTURE_DAY,
         ashoreDaysMax: 3 / FIXTURE_DAY,

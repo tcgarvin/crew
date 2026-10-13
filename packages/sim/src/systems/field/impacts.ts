@@ -11,7 +11,8 @@ import { blastTiles, hullFootprint } from "../../core/hull";
  * An impact's centre is uniform over the deck's hull footprint (a scripted one: the tile, a tile
  * of the compartment, or a footprint tile of the machine); a `large` rock's blast is the centre
  * and its eight neighbours on the hull. The hull is charged once and the scar written
- * (`hull.ts`), then the machines in the blast take their effects (`effects.ts`), then damage
+ * (`hull.ts`), then the machines in the blast take their effects (`effects.ts`), then fragile
+ * freight in the struck room may smash (`cargo.ts`, §fragile-cargo), then damage
  * response hears of it (`onImpact`, W2), then `asteroidImpact` and each `machineKnockedOut`.
  * Anyone standing on a blast tile has a near miss (a `nearMiss` thought and event): nobody is hurt
  * until bodies exist (call 17).
@@ -26,6 +27,7 @@ import type { RngApi, StepCtx } from "../../core/types/pipeline";
 import type { ActiveField, ImpactTarget, ScriptedImpact } from "../../core/types/state";
 import { shipDeckId } from "../../core/world";
 import { onImpact } from "../damage/machines";
+import { breakFragileCargo } from "./cargo";
 import { type MachineHit, hitMachines, machineFootprintTiles } from "./effects";
 import { chargeHull, loseShipIfSunk } from "./hull";
 
@@ -115,7 +117,7 @@ export function compartmentOfTile(
 }
 
 /** The tiles of a ship compartment, row-major. */
-function compartmentTiles(
+export function compartmentTiles(
   ctx: Pick<StepCtx, "state" | "content">,
   compartmentId: CompartmentId,
 ): TileCoord[] {
@@ -175,6 +177,7 @@ export function landImpact(ctx: StepCtx, field: ActiveField, spec: ImpactSpec): 
   field.impacts += 1;
   field.lastImpactTick = ctx.tick;
   const hits = hitMachines(ctx, field, tiles, spec.effect);
+  breakFragileCargo(ctx, field, compartmentId, spec.rock);
   onImpact(ctx, { fieldId: field.id, scarId: scar.id, compartmentId, tile: spec.centre, tiles });
   ctx.emit({
     type: "asteroidImpact",

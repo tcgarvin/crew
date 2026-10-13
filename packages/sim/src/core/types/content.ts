@@ -1557,6 +1557,11 @@ export interface ConfigDef {
      * a long single-actor slog.
      */
     readonly maxCratesPerJob: number;
+    /**
+     * §fragile-cargo: the least share of a freight job's pay a delivery earns however many of its
+     * crates were smashed; otherwise the pay is scaled by the share that arrived whole.
+     */
+    readonly brokenFloorShare: number;
     /** Passengers-and-galaxy §3.3: how long a round-trip passenger stays ashore. */
     readonly passage: {
       /**
@@ -1899,6 +1904,11 @@ export interface ConfigDef {
     readonly patchRecovers: number;
     /** Call 2: the most scripted impacts one `scheduleField` may carry. */
     readonly maxScripted: number;
+    /**
+     * §fragile-cargo: by rock, the chance each fragile crate of a live freight job in the struck
+     * compartment is smashed.
+     */
+    readonly fragileBreakChance: Readonly<Record<RockSize, number>>;
   };
   /** §hull-scars-and-ship-loss: the crew's damage work (`systems/damage/`). */
   readonly damage: {

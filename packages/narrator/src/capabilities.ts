@@ -414,6 +414,9 @@ export function buildCapabilities(state: State, content: ContentBundle, config: 
   for (const item of cargo) {
     lines.push(`- ${item.id} "${item.name}" (class ${item.cargoClass})`);
   }
+  lines.push(
+    "Fragile cargo can be smashed by rocks in an asteroid field; the client pays only for the crates that arrive whole.",
+  );
   lines.push("");
   lines.push("## 1. offerJob: a freight contract, a passenger, or an errand to a site");
   lines.push(

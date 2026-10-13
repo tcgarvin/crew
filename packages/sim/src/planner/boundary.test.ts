@@ -122,6 +122,7 @@ const config: PlannerConfig = {
     effectIntegrity: { graze: 0.2, damage: 0.5 },
     patchRecovers: 0.5,
     maxScripted: 3,
+    fragileBreakChance: { small: 0.1, large: 0.3 },
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },

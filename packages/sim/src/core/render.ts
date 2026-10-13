@@ -268,6 +268,8 @@ type Names = {
   atSite(): boolean;
   item(id: string): string;
   itemDef(defId: string): string;
+  /** §fragile-cargo: a freight item in the cargo words ("fragile equipment"), else its name. */
+  cargo(itemId: string): string;
   faultName(machineId: string, faultKey: string): string;
   symptomName(machineId: string, symptomKey: string): string;
   job(id: string): { issuer: string; name: string; to: string; passenger: boolean } | undefined;
@@ -375,6 +377,13 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
     },
     itemDef: (defId) =>
       findItemDef(content, state, defId as Item["defId"])?.name.toLowerCase() ?? "parts",
+    cargo: (itemId) => {
+      const item = state.items[itemId as keyof ReadonlyWorldState["items"]];
+      const def = item === undefined ? undefined : findItemDef(content, state, item.defId);
+      const cargoClass = def?.cargoClass;
+      const words = cargoClass === undefined ? undefined : content.people?.cargoWords[cargoClass];
+      return words ?? def?.name.toLowerCase() ?? "cargo";
+    },
     faultName: (machineId, faultKey) =>
       machineDef(machineId)
         ?.faults.find((f) => f.key === faultKey)
@@ -531,8 +540,14 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       // Expeditions A2: an errand's captive rides as its passage, but the job is the issuer's.
       const errand = n.errand(event.payload.jobId);
       if (errand !== undefined) return `Brought ${errand.target} back for ${job.name}`;
-      return job.passenger ? `${job.name}'s fare is paid` : `Delivered for ${job.issuer}`;
+      if (job.passenger) return `${job.name}'s fare is paid`;
+      const broken = event.payload.brokenCount;
+      return broken === 0
+        ? `Delivered for ${job.issuer}`
+        : `Delivered for ${job.issuer}: ${broken} ${broken === 1 ? "crate" : "crates"} smashed`;
     }
+    case "cargoBroken":
+      return `A crate of ${n.cargo(event.payload.itemId)} is smashed in ${n.compartment(event.payload.compartmentId)}`;
     case "jobFailed":
       return jobFailedLine(event, n);
     case "passengerBoarded":
