@@ -242,7 +242,11 @@ Its deep test (`expeditions.deep.test.ts`, run by `pnpm test` but not CI) runs
 seeds 1 and 2, and asserts bounds, not values: party
 deaths at most 0.25 a fight for each, no timeouts, `assault` taking the target in at least 60%,
 `hold` ending `targetFled` or `targetTaken` in at least 80%, `hold`'s party wounds at most 0.75 of
-`assault`'s, and `assault`'s fight at most 0.8 of `hold`'s long. Seeded, so the same code and seed
+`assault`'s, and `assault`'s fight at most 0.8 of `hold`'s long. At the Lazaret (§the-lazaret) it
+runs `hold`, `assault` and `creep` the same way and asserts party deaths at most 0.25 a fight for
+each, `hold` ending `targetFled` in at least 60%, `assault` and `creep` never timed out, `assault`
+taking the target in at least 60% and `creep` in at least 80% at fewer party wounds than
+`assault`. Seeded, so the same code and seed
 give the same fight; not a determinism claim (D4).
 
 ### Narrator log and live tests

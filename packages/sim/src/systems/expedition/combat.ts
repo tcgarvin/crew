@@ -29,7 +29,8 @@
  *   is left); `flank`'s small group `advance`s to the flank post first; `bait`'s leader walks in
  *   on the nearest guard and does not fire; `creep` keeps to tiles nobody would notice.
  *   Wavering, they do not advance.
- *   `rescue` comes first for whoever is nearest a down ally in sight with no armed enemy in sight.
+ *   `rescue` comes first for whoever is nearest a down ally in sight (anywhere on the site once
+ *   the objective is held) with no armed enemy in sight.
  *   After the objective is held, everyone falls back to the ramp foot.
  * - Guards: at their post until contact; then `fire` at the party in sight and range, a wavering
  *   one `takeCover` first; a devoted one closes in; with nobody in sight
@@ -1051,9 +1052,14 @@ function quietWaypoint(from: TileCoord, path: readonly TileCoord[]): TileCoord |
   return at;
 }
 
-/** `rescue`: the nearest able party member goes for a down ally in sight and drags them out. */
+/**
+ * `rescue`: the nearest able party member goes for a down ally in sight and drags them out. Once
+ * the objective is held, sight is not needed: the party is falling back and knows who it left,
+ * and the fight cannot end with a crewmate down out of sight behind a wall (§rescue).
+ */
 function rescue(fight: Fight, person: Actor, from: TileCoord): boolean {
   const { ctx, ground } = fight;
+  const fallingBack = fight.expedition.objectiveTick !== undefined;
   for (const fallen of fight.people) {
     const combatant = fallen.combatant;
     if (!isParty(fallen) || combatant?.state !== "down") continue;
@@ -1062,7 +1068,7 @@ function rescue(fight: Fight, person: Actor, from: TileCoord): boolean {
     }
     const at = tileOfActor(ctx.state, fallen);
     if (at === undefined || distance(at, ground.foot) <= AT_RAMP_TILES) continue;
-    if (!lineOfSight(ground.berth, from, at)) continue;
+    if (!fallingBack && !lineOfSight(ground.berth, from, at)) continue;
     if (nearestRescuer(fight, at) !== person.id) continue;
     lowerAim(person);
     if (adjacent8(from, at)) {

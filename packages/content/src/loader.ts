@@ -87,6 +87,7 @@ import portCrossroadsHub from "../data/ports/crossroads-hub.json";
 import portGreenMeridian from "../data/ports/green-meridian.json";
 import portHarrowEnd from "../data/ports/harrow-end.json";
 import portKesslerDrift from "../data/ports/kessler-drift.json";
+import portLazaret from "../data/ports/lazaret.json";
 import portOssoryStation from "../data/ports/ossory-station.json";
 import portTernsRest from "../data/ports/terns-rest.json";
 import portVesperGate from "../data/ports/vesper-gate.json";
@@ -98,6 +99,7 @@ import dockCrossroadsHub from "../data/docks/crossroads-hub.json";
 import dockGreenMeridian from "../data/docks/green-meridian.json";
 import dockHarrowEnd from "../data/docks/harrow-end.json";
 import dockKesslerDrift from "../data/docks/kessler-drift.json";
+import dockLazaret from "../data/docks/lazaret.json";
 import dockOssoryStation from "../data/docks/ossory-station.json";
 import dockTernsRest from "../data/docks/terns-rest.json";
 import dockVesperGate from "../data/docks/vesper-gate.json";
@@ -253,6 +255,7 @@ const PORTS = [
   portTernsRest,
   portBoathouse,
   portHarrowEnd,
+  portLazaret,
 ];
 const DOCKS = [
   dockCrossroadsHub,
@@ -263,6 +266,7 @@ const DOCKS = [
   dockTernsRest,
   dockBoathouse,
   dockHarrowEnd,
+  dockLazaret,
 ];
 const SCENARIOS = [scenarioDefault];
 const THOUGHTS = [

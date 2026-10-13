@@ -227,6 +227,39 @@ reach of the ramp (§the-cast-in-the-fight), so `hold` can draw her out, where a
 further and every `hold` ends with the steward gone; and the yard wall keeps the flank's walk out
 of Rhee's sight. Cover two tiles thick blocks a line like a wall, so firing cover is one tile.
 
+### The Lazaret
+
+`port.lazaret` (station, near Vesper Gate, one route of 20) and its map `dock.lazaret`, the Gate's
+old quarantine hulk, 44 x 30 with the Mk2 berthed at (4, 0); its README is the map. The berth
+opens onto a bay two rows deep with crates of cover at (33, 21) and (36–37, 21). A bulkhead along
+row 22 has the main hatch at (31, 22) and a service hatch at (40, 22). Inside is a warren of
+one-tile doors: the intake (x 28–35, rows 23–24) under the main hatch, with no cover; a ward
+corridor along row 26 from the intake's south door at (32, 25) west to the isolation ward (x 1–8,
+rows 23–26); and north of the corridor the dispensary (x 10–15) and the long ward (x 17–26),
+joined to each other and to the intake, a second way along the hulk through the rooms. The
+service hatch drops into a duct down x 40 and west along row 28, under the whole hulk, to the
+lifeboat lock at its west end; the isolation ward's back door at (4, 27) opens onto it. Cots of
+cover stand in the wards. `noticeRadius` 3.
+
+Posts: `target` the isolation cots (4, 24), `loot` the dispensary cage (11, 23), guards
+`intake_desk` (29, 24), `corridor` (14, 26) and `ward_door` (8, 25), `bystander` `long_ward` (23,
+24), `exit` `lifeboat_lock` (0, 28), `flank` `back_duct` (6, 28). The default cast: Orrin Sallow,
+the Gate's dispenser, gone with its morphia (target, unarmed, shaky, paid, wants out); Brannoch
+Teale, a hulk-breaker in Orrin's debt with a blaster in the intake (steady, bound, wants money);
+Sister Hedda Vosk, a vowed warden with a baton in the corridor (hard, devoted, wants blood); Dace
+Corley, a squatter Orrin keeps in pills, with a blaster inside the ward door (shaky, paid, wants
+money); Ines Haddow, a patient who never left (bystander).
+Why: walls, not cover, cut the lines here, so from the bay the party sees only down the main
+hatch. `hold` trades a few shots with Brannoch through it while Orrin keeps low, then goes out by
+the back door and the duct to the lifeboat lock, so where holding takes the target at the
+Boathouse and Harrow End, here it mostly loses him: the way to him is in. The rooms beside the
+corridor and the short notice radius let `creep` get deep before anyone sees it, and the duct is
+the flank's own way to the back door, out of every guard's sight and beside the way out the cast
+break for. The intake has no cover because a desk at the hatch let Brannoch trade shots through it
+from cover, his resolve gaining faster than hits took it, until he had shot the holders down one
+by one. The isolation ward is the length of the hulk from the personnel ramp, so a fight here runs
+longer than at the other sites, most of it the walk out.
+
 ## The expedition
 
 ### Starting an expedition
@@ -537,7 +570,11 @@ end the expedition (`targetFled`, §the-objective-and-resolution).
 
 When no armed enemy is in sight, the able party member nearest a downed crewmate on the site floor
 in their sight goes to them, picks them up (`carriedBy`) and carries them to the ramp foot; the
-one set down there remembers `carriedMeOut` about the carrier.
+one set down there remembers `carriedMeOut` about the carrier. Once the objective is held
+(§the-objective-and-resolution) sight is not needed: the party falling back goes for every
+crewmate down on the site floor wherever they lie. Why: in the Lazaret's warren a crewmate who went
+down behind a wall was never seen from the ramp foot, so the fight could not end and timed out
+with them left there.
 
 ### The objective and resolution
 
