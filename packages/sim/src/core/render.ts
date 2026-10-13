@@ -709,14 +709,17 @@ function countWord(n: number): string {
   return COUNT_WORDS[n] ?? String(n);
 }
 
-/** Expeditions A1 (§8.6): where a wound landed, for "is hit in the leg". */
+/**
+ * Expeditions A1 (§8.6), §treatment-at-the-medbay-bed: a body part as the ticker names it, one word
+ * for the hit ("is hit in the chest") and its treatment ("treats Priya Kessler's chest").
+ */
 const PART_WORDS: Readonly<Record<BodyPart, string>> = {
-  head: "the head",
-  torso: "the body",
-  leftArm: "the arm",
-  rightArm: "the arm",
-  leftLeg: "the leg",
-  rightLeg: "the leg",
+  head: "head",
+  torso: "chest",
+  leftArm: "arm",
+  rightArm: "arm",
+  leftLeg: "leg",
+  rightLeg: "leg",
 };
 
 /**
@@ -759,7 +762,7 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       const who = n.actor(event.payload.actorId) ?? "Someone";
       if (event.payload.type === "stun") return `${who} is stunned`;
       return n.isCrew(event.payload.actorId)
-        ? `${who} is hit in ${PART_WORDS[event.payload.part]}`
+        ? `${who} is hit in the ${PART_WORDS[event.payload.part]}`
         : `${who} is hit`;
     }
     case "incapacitated":
@@ -803,22 +806,12 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
   }
 }
 
-/** §treatment-at-the-medbay-bed: a treated wound's part, as the possessive names it. */
-const TREATED_PART_WORDS: Readonly<Record<BodyPart, string>> = {
-  head: "head",
-  torso: "chest",
-  leftArm: "arm",
-  rightArm: "arm",
-  leftLeg: "leg",
-  rightLeg: "leg",
-};
-
 /** §treatment-at-the-medbay-bed: "Oyelaran Abiodun treats Priya Kessler's leg and arm". */
 function treatedLine(event: Extract<SimEvent, { type: "woundTreated" }>, n: Names): string {
   const { actorId, byActorId, parts } = event.payload;
   const medic = n.actor(byActorId) ?? "Someone";
   const patient = n.actor(actorId) ?? "someone";
-  const words = [...new Set(parts.map((part) => TREATED_PART_WORDS[part]))];
+  const words = [...new Set(parts.map((part) => PART_WORDS[part]))];
   const what = words.length === 0 ? "wounds" : nameList(words);
   return `${medic} treats ${patient}'s ${what}`;
 }

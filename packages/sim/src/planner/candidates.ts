@@ -42,9 +42,10 @@ import {
  *   voluntaryActivity on duty;
  * - a `privateTalk` summons (slice 4, `cabins.ts`) → essentialOperation.
  * - `crewWounded` (§the-wounded-problem) → the owner's base urgency (essential while a wound
- *   bleeds, routine after; who may take it is `medical.ts`'s, and it is all hands like cargo);
- *   the patient's own walk to the medbay bed (§convalescing, `medical.ts`) → essential while
- *   bleeding, routine after; `bodyAboard` (§the-body-aboard) → routine, all hands.
+ *   bleeds or is serious or grave, routine for grazes; who may take it is `medical.ts`'s, and it
+ *   is all hands like cargo; a treatment waits a while for the medic, §the-medics-right); the
+ *   patient's own walk to the medbay bed (§convalescing, `medical.ts`) → the same rule;
+ *   `bodyAboard` (§the-body-aboard) → routine, all hands.
  *
  * - on duty with nothing else to do (§gangway-watch-and-rounds: `rounds.ts`, the post until
  *   rounds land) → voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
@@ -82,7 +83,7 @@ import {
 } from "./galley";
 import { gangwayCandidate, helmTaskAllowed, helmTaskExempt, isHelmTask } from "./helm";
 import { reportCandidate } from "./intercom";
-import { convalesceCandidate, isMedicalTask, medicalTaskAllowed } from "./medical";
+import { convalesceCandidate, isMedicalTask, medicToWaitFor, medicalTaskAllowed } from "./medical";
 import { recreationCandidate } from "./recreation";
 import { dutyIdleCandidate } from "./rounds";
 
@@ -222,7 +223,8 @@ export function taskUrgency(
       // §urgency-of-damage-work: essential on alert, routine after; damage says which.
       return problem.baseUrgency;
     case "crewWounded":
-      // §the-wounded-problem: essential while a wound bleeds, routine after; medical says which.
+      // §the-wounded-problem: essential while a wound bleeds or is serious, routine for grazes;
+      // medical says which.
       return problem.baseUrgency;
     case "bodyAboard":
       // §the-body-aboard: routine.
@@ -374,7 +376,13 @@ function taskCandidate(
   // §treatment-at-the-medbay-bed: nobody treats their own wounds.
   if (isMedicalTask(task) && !medicalTaskAllowed(view, task)) return reject("ownWounds");
   const exempt = (helm && helmTaskExempt(view, task)) || galleyTaskExempt(view, task);
-  const betterQualified = exempt ? undefined : deferTo(view, config, task);
+  // §the-medics-right: a treatment waits a while for the ship's medic, wherever he is, in place
+  // of the generic deference to a better hand in sight.
+  const betterQualified = exempt
+    ? undefined
+    : task.type === "treatWounds"
+      ? medicToWaitFor(view, config, task, problem)
+      : deferTo(view, config, task);
   if (betterQualified !== undefined) return reject(`deferTo:${betterQualified}`);
   const urgency = taskUrgency(view, problem, config);
   // §duty-and-the-sleep-watch: cargo in port is all hands awake, not the watch's: nobody

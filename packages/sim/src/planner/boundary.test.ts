@@ -126,6 +126,20 @@ const config: PlannerConfig = {
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },
+  medical: {
+    treatSecondsPerWound: 15,
+    kitsPerTreatment: 1,
+    reserve: 2,
+    giveUpAfterSeconds: 300,
+    liftSeconds: 2,
+    laySeconds: 2,
+    griefCloseAffinity: 3,
+    griefStacksClose: 2,
+    essentialSeverities: ["serious", "grave"],
+    medicLevel: 4,
+    waitForMedicSeconds: 90,
+    prepareWithinTiles: 2,
+  },
   // Expeditions A1: read by no candidate yet; the default bundle's values by hand (no fixtures).
   bodies: {
     tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
@@ -487,8 +501,32 @@ describe("a wounded helm-stander (§convalescing)", () => {
       expect(selectIntent(relieved, config)).toMatchObject({
         kind: "personal",
         activity: "convalesce",
-        urgency: bleeding ? "essentialOperation" : "routineObligation",
+        // Serious: essential once the bleed has stopped too (§convalescing).
+        urgency: "essentialOperation",
       });
     }
+  });
+
+  it("leaves routine work (cooking) for the bed with a serious wound, not with a graze", () => {
+    const cooking = {
+      ...atTheHelm,
+      urgency: "routineObligation",
+    } as unknown as SelfView["activity"];
+    const serious = stubView(0, [kit], {
+      activity: cooking,
+      wounds: [leg(false)],
+      machines: [bed],
+    });
+    expect(selectIntent(serious, config)).toMatchObject({
+      kind: "personal",
+      activity: "convalesce",
+      urgency: "essentialOperation",
+    });
+    const grazed = stubView(0, [kit], {
+      activity: cooking,
+      wounds: [{ ...leg(false), severity: "graze" }],
+      machines: [bed],
+    });
+    expect(selectIntent(grazed, config)).toEqual({ kind: "continue" });
   });
 });

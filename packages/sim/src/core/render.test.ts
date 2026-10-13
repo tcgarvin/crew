@@ -26,6 +26,7 @@ import type {
   MachineId,
   PortDefId,
   ProblemId,
+  WoundId,
 } from "./types/ids";
 import type { WorldState } from "./types/state";
 import type { Job, JobPassage } from "./types/travel";
@@ -799,6 +800,35 @@ describe("the ticker line for a treatment (§treatment-at-the-medbay-bed)", () =
     );
   });
 
+  it("names the part a crew member is hit in with the treatment's word", () => {
+    const hit = (part: "torso" | "head" | "rightArm") =>
+      describeEvent(
+        {
+          id: "e2" as EventId,
+          tick: 1,
+          seq: 2,
+          subjectIds: [],
+          causeIds: [],
+          source: "sim",
+          type: "wounded",
+          significance: "notable",
+          payload: {
+            actorId: patientId as ActorId,
+            woundId: "wound:1" as WoundId,
+            part,
+            severity: "serious",
+            type: "blaster",
+          },
+        } as SimEvent,
+        world.state,
+        world.content,
+      );
+    const patient = name(patientId);
+    expect(hit("torso")).toBe(`${patient} is hit in the chest`);
+    expect(hit("head")).toBe(`${patient} is hit in the head`);
+    expect(hit("rightArm")).toBe(`${patient} is hit in the arm`);
+  });
+
   it("reaches the ticker; a wound healing does not", () => {
     expect(EVENT_SIGNIFICANCE.woundTreated).toBe("notable");
     expect(EVENT_SIGNIFICANCE.woundHealed).toBe("trace");
@@ -822,10 +852,10 @@ describe("the ticker line for an accident (§accidents-aboard)", () => {
     }) as SimEvent;
 
   it("is the accident's own line, and its wound adds none", () => {
-    const how = "someone is thrown off their feet by the impact";
+    const how = "someone is thrown down by the impact";
     expect(
       tickerLine(event("accident", { actorId, hazard: "thrown", how }), world.state, world.content),
-    ).toBe("Someone is thrown off their feet by the impact");
+    ).toBe("Someone is thrown down by the impact");
     expect(
       tickerLine(
         event("wounded", {

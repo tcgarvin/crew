@@ -15,7 +15,7 @@ import { blastTiles, hullFootprint } from "../../core/hull";
  * freight in the struck room may smash (`cargo.ts`, §fragile-cargo), then damage
  * response hears of it (`onImpact`, W2), then `asteroidImpact` and each `machineKnockedOut`.
  * Anyone standing on a blast tile has a near miss (a `nearMiss` thought and event, call 17); then
- * crew unbraced in the struck room may be thrown off their feet (§accidents-aboard).
+ * crew unbraced in the struck room may be thrown down (§accidents-aboard).
  *
  * Owner: W1 of ship life slice 5.
  */

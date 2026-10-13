@@ -20,16 +20,19 @@ import type {
   MachineId,
   TaskId,
 } from "../core/types/ids";
+import type { ProblemId } from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
 import type {
   AgentView,
   KnownItemView,
   MachinePlacementView,
+  ProblemView,
+  RosterEntry,
   SelfView,
   TaskView,
   WoundView,
 } from "../core/types/view";
-import { convalesceCandidate, medicalTaskAllowed } from "./medical";
+import { convalesceCandidate, medicToWaitFor, medicalTaskAllowed } from "./medical";
 
 const ME = "a1" as ActorId;
 const OTHER = "a2" as ActorId;
@@ -83,14 +86,18 @@ const kit: KnownItemView = {
   observedTick: 90,
 };
 
-const config = { time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 } } as PlannerConfig;
+const config = {
+  time: { tickRate: 20, daySeconds: 1200, watchesPerDay: 3 },
+  medical: { essentialSeverities: ["serious", "grave"], medicLevel: 4, waitForMedicSeconds: 90 },
+} as unknown as PlannerConfig;
 
-const wound = (bleeding: boolean, treated = false): WoundView => ({
-  part: "leftLeg",
-  severity: "serious",
-  bleeding,
-  treated,
-});
+const wound = (
+  bleeding: boolean,
+  treated = false,
+  severity: WoundView["severity"] = "serious",
+): WoundView => ({ part: "leftLeg", severity, bleeding, treated });
+
+const graze = (): WoundView => wound(false, false, "graze");
 
 interface Stub {
   readonly wounds?: readonly WoundView[];
@@ -101,6 +108,10 @@ interface Stub {
   readonly backoff?: Record<string, number>;
   readonly passenger?: boolean;
   readonly onDock?: boolean;
+  readonly medical?: number;
+  readonly roster?: readonly RosterEntry[];
+  readonly tick?: number;
+  readonly tasks?: readonly TaskView[];
 }
 
 function stubView(stub: Stub): AgentView {
@@ -122,7 +133,7 @@ function stubView(stub: Stub): AgentView {
       availability: "available",
     },
     bio: "",
-    skills: {},
+    skills: stub.medical === undefined ? {} : { medical: stub.medical },
     traits: [],
     mood: 0,
     location: { kind: "onDeck", deckId: DECK, x: at.x + 0.5, y: at.y + 0.5 },
@@ -147,8 +158,9 @@ function stubView(stub: Stub): AgentView {
     ...(stub.passenger === true ? { passenger: true as const } : {}),
     ...(stub.onDock === true ? { onDock: true as const } : {}),
   };
+  const facts = stub.facts ?? [];
   return {
-    tick: 100,
+    tick: stub.tick ?? 100,
     self,
     schematic: {
       deck,
@@ -159,11 +171,12 @@ function stubView(stub: Stub): AgentView {
       machines: () => machines,
       amenities: (tag) => machines.filter((m) => m.tags.includes(tag)),
     },
-    fact: () => undefined,
-    facts: () => stub.facts ?? [],
+    fact: ((subjectId, factType) =>
+      facts.find((f) => f.subjectId === subjectId && f.factType === factType)) as AgentView["fact"],
+    facts: () => facts,
     knownProblems: () => [],
-    knownTasks: () => [],
-    roster: () => [],
+    knownTasks: () => stub.tasks ?? [],
+    roster: () => stub.roster ?? [],
     assignedBeds: () => [],
     sessions: () => [],
     travel: () => ({ stage: "docked" }),
@@ -174,11 +187,11 @@ function stubView(stub: Stub): AgentView {
   };
 }
 
-/** Someone else last seen at `tile`. */
-const seenAt = (tile: TileCoord): KnownFact => ({
-  subjectId: OTHER,
+/** Someone else last seen at `tile` (`OTHER` unless said), awake unless said. */
+const seenAt = (tile: TileCoord, subjectId: ActorId = OTHER, asleep = false): KnownFact => ({
+  subjectId,
   factType: "actorStatus",
-  value: { availability: "available", asleep: false, tile },
+  value: { availability: "available", asleep, tile },
   observedTick: 90,
   learnedTick: 90,
   sourceId: ME,
@@ -193,7 +206,7 @@ describe("convalesceCandidate (§convalescing)", () => {
     expect(convalesceCandidate(treated, config)).toBeUndefined();
   });
 
-  it("sends the wounded to the bedside: essential while bleeding, routine after", () => {
+  it("sends the wounded to the bedside: essential while bleeding or serious, routine for grazes", () => {
     expect(convalesceCandidate(stubView({ wounds: [wound(true)] }), config)).toEqual({
       ref: "convalesce",
       urgency: "essentialOperation",
@@ -203,15 +216,28 @@ describe("convalesceCandidate (§convalescing)", () => {
       stableId: "convalesce",
       choice: { kind: "personal", activity: "convalesce", targetId: BED },
     });
+    // A serious wound that has stopped bleeding still slows work and the helm.
     expect(convalesceCandidate(stubView({ wounds: [wound(false)] }), config)).toMatchObject({
+      urgency: "essentialOperation",
+    });
+    const grave = stubView({ wounds: [wound(false, false, "grave")] });
+    expect(convalesceCandidate(grave, config)).toMatchObject({ urgency: "essentialOperation" });
+    expect(convalesceCandidate(stubView({ wounds: [graze()] }), config)).toMatchObject({
       urgency: "routineObligation",
+    });
+    // A treated serious wound beside an untreated graze: only the graze counts.
+    const mixed = stubView({ wounds: [wound(false, true), graze()] });
+    expect(convalesceCandidate(mixed, config)).toMatchObject({ urgency: "routineObligation" });
+    const bleedingGraze = stubView({ wounds: [{ ...graze(), bleeding: true }] });
+    expect(convalesceCandidate(bleedingGraze, config)).toMatchObject({
+      urgency: "essentialOperation",
     });
   });
 
   it("is rejected bedTaken while someone else is believed at the bed, unless it is them there", () => {
     const taken = stubView({ wounds: [wound(false)], facts: [seenAt(BEDSIDE)] });
     expect(convalesceCandidate(taken, config)).toEqual({ ref: "convalesce", reason: "bedTaken" });
-    const elsewhere = stubView({ wounds: [wound(false)], facts: [seenAt({ x: 3, y: 0 })] });
+    const elsewhere = stubView({ wounds: [graze()], facts: [seenAt({ x: 3, y: 0 })] });
     expect(convalesceCandidate(elsewhere, config)).toMatchObject({ urgency: "routineObligation" });
     const lying = stubView({ wounds: [wound(false)], facts: [seenAt(BEDSIDE)], at: BEDSIDE });
     expect(convalesceCandidate(lying, config)).toMatchObject({ estimateTicks: 0 });
@@ -220,6 +246,18 @@ describe("convalesceCandidate (§convalescing)", () => {
   it("is rejected noMedicine when they know of no kit, and backoff after giving up", () => {
     const noKit = stubView({ wounds: [wound(false)], items: [{ ...kit, absent: true }] });
     expect(convalesceCandidate(noKit, config)).toEqual({ ref: "convalesce", reason: "noMedicine" });
+    // A treatment of their wounds on the board says a kit is aboard, wherever it was stowed.
+    const myTreatment = {
+      id: "t1" as TaskId,
+      type: "treatWounds",
+      target: { kind: "actor", actorId: ME },
+    } as unknown as TaskView;
+    const told = stubView({ wounds: [wound(false)], items: [], tasks: [myTreatment] });
+    expect(convalesceCandidate(told, config)).toMatchObject({
+      ref: "convalesce",
+      urgency: "essentialOperation",
+    });
+    expect(convalesceCandidate(told, config)).not.toHaveProperty("reason");
     const gaveUp = stubView({ wounds: [wound(false)], backoff: { convalesce: 1_000 } });
     expect(convalesceCandidate(gaveUp, config)).toEqual({ ref: "convalesce", reason: "backoff" });
   });
@@ -244,5 +282,86 @@ describe("medicalTaskAllowed (§treatment-at-the-medbay-bed)", () => {
   it("lets anyone treat a crewmate, and nobody their own wounds", () => {
     expect(medicalTaskAllowed(stubView({}), treat(OTHER))).toBe(true);
     expect(medicalTaskAllowed(stubView({}), treat(ME))).toBe(false);
+  });
+});
+
+describe("medicToWaitFor (§the-medics-right)", () => {
+  const MEDIC = "a3" as ActorId;
+  const DECKHAND = "a4" as ActorId;
+  const PATIENT = OTHER;
+  const member = (actorId: ActorId, medical: number, extra: Partial<RosterEntry> = {}) =>
+    ({ actorId, name: actorId, roleTags: [], skills: { medical }, ...extra }) as RosterEntry;
+  const roster = [member(ME, 1), member(PATIENT, 1), member(MEDIC, 8), member(DECKHAND, 2)];
+  const treat = {
+    id: "t1" as TaskId,
+    type: "treatWounds",
+    target: { kind: "actor", actorId: PATIENT },
+  } as unknown as TaskView;
+  /** The wounded problem, raised at `createdTick`; bleeding when said. */
+  const wounded = (createdTick: number, bleeding = false): ProblemView =>
+    ({
+      id: "p1" as ProblemId,
+      kind: "crewWounded",
+      payload: { actorId: PATIENT, untreated: 1, ...(bleeding ? { bleeding: true } : {}) },
+      createdTick,
+      status: "open",
+    }) as unknown as ProblemView;
+
+  it("leaves a fresh treatment to the ship's medic, wherever he is", () => {
+    const view = stubView({ medical: 1, roster, tick: 100 });
+    expect(medicToWaitFor(view, config, treat, wounded(90))).toBe(MEDIC);
+    // Seen awake on the far side of the ship: still his.
+    const seen = stubView({
+      medical: 1,
+      roster,
+      tick: 100,
+      facts: [seenAt({ x: 0, y: 0 }, MEDIC)],
+    });
+    expect(medicToWaitFor(seen, config, treat, wounded(90))).toBe(MEDIC);
+  });
+
+  it("stops waiting once the problem is waitForMedicSeconds old", () => {
+    const view = stubView({ medical: 1, roster, tick: 100 + 90 * 20 });
+    expect(medicToWaitFor(view, config, treat, wounded(100))).toBeUndefined();
+    const justBefore = stubView({ medical: 1, roster, tick: 99 + 90 * 20 });
+    expect(medicToWaitFor(justBefore, config, treat, wounded(100))).toBe(MEDIC);
+  });
+
+  it("never holds a bleeding patient", () => {
+    const view = stubView({ medical: 1, roster, tick: 100 });
+    expect(medicToWaitFor(view, config, treat, wounded(90, true))).toBeUndefined();
+  });
+
+  it("does not wait for a medic believed asleep, down or a passenger, nor for the patient", () => {
+    const asleep = stubView({
+      medical: 1,
+      roster,
+      tick: 100,
+      facts: [seenAt({ x: 0, y: 0 }, MEDIC, true)],
+    });
+    expect(medicToWaitFor(asleep, config, treat, wounded(90))).toBeUndefined();
+    for (const extra of [{ down: true as const }, { passenger: true as const }]) {
+      const view = stubView({ medical: 1, roster: [member(MEDIC, 8, extra)], tick: 100 });
+      expect(medicToWaitFor(view, config, treat, wounded(90))).toBeUndefined();
+    }
+    const hurtMedic = {
+      ...treat,
+      target: { kind: "actor", actorId: MEDIC },
+    } as unknown as TaskView;
+    const problem = {
+      ...wounded(90),
+      payload: { actorId: MEDIC, untreated: 1 },
+    } as unknown as ProblemView;
+    expect(
+      medicToWaitFor(stubView({ medical: 1, roster, tick: 100 }), config, hurtMedic, problem),
+    ).toBeUndefined();
+  });
+
+  it("lets the medic himself treat, and waits for nobody below medicLevel", () => {
+    expect(
+      medicToWaitFor(stubView({ medical: 8, roster, tick: 100 }), config, treat, wounded(90)),
+    ).toBeUndefined();
+    const noMedic = stubView({ medical: 1, roster: [member(DECKHAND, 3)], tick: 100 });
+    expect(medicToWaitFor(noMedic, config, treat, wounded(90))).toBeUndefined();
   });
 });

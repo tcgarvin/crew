@@ -40,7 +40,7 @@ function openWounded(world: Parameters<typeof stepCtxOf>[0]) {
 }
 
 describe("the wounded problem (§the-wounded-problem)", () => {
-  it("is raised at the bed for a wounded crew member: essential while bleeding, routine after", () => {
+  it("is raised at the bed for a wounded crew member: essential while bleeding or serious", () => {
     const { world } = medicalWorld();
     woundNow(world, PRIYA, { part: "leftLeg", severity: "serious", type: "blaster" });
     sweep(world);
@@ -51,20 +51,32 @@ describe("the wounded problem (§the-wounded-problem)", () => {
       visibility: "public",
       dedupeKey: `wounded:${PRIYA}`,
       baseUrgency: "essentialOperation",
-      payload: { actorId: PRIYA, untreated: 1 },
+      payload: { actorId: PRIYA, untreated: 1, bleeding: true },
       location: { kind: "compartment", compartmentId: bed?.compartmentId },
       revision: 1,
     });
 
+    // The bleed stops; a serious wound keeps the problem essential.
     const wound = actorOf(world, PRIYA).body.wounds[0];
     if (wound === undefined) throw new Error("no wound");
     wound.bleeding = false;
     sweep(world);
-    expect(openWounded(world)).toMatchObject([{ baseUrgency: "routineObligation", revision: 2 }]);
+    expect(openWounded(world)).toMatchObject([{ baseUrgency: "essentialOperation", revision: 2 }]);
+    expect(openWounded(world)[0]?.payload).toEqual({ actorId: PRIYA, untreated: 1 });
 
     woundNow(world, PRIYA, { part: "rightArm", severity: "graze", type: "blunt" });
     sweep(world);
     expect(openWounded(world)).toMatchObject([{ payload: { untreated: 2 }, revision: 3 }]);
+  });
+
+  it("is routine for grazes alone", () => {
+    const { world } = medicalWorld();
+    woundNow(world, PRIYA, { part: "leftLeg", severity: "graze", type: "blunt" });
+    woundNow(world, PRIYA, { part: "rightArm", severity: "graze", type: "blunt" });
+    sweep(world);
+    expect(openWounded(world)).toMatchObject([
+      { baseUrgency: "routineObligation", payload: { actorId: PRIYA, untreated: 2 } },
+    ]);
   });
 
   it("resolves once every wound is treated, and is cancelled when the patient dies", () => {
@@ -135,16 +147,31 @@ describe("treatment at the medbay bed (§treatment-at-the-medbay-bed)", () => {
     expect(derived(0).specs).toEqual([]);
   });
 
-  it("the medic's plan waits for the patient at the bed (dependencyPending)", () => {
+  it("the medic's plan is built once the patient is at the bed, near it or on the way (dependencyPending before)", () => {
     const { world, specs } = derived(3);
     const [spec] = specs;
     if (spec === undefined) throw new Error("no spec");
     const task = { ...spec, id: "t1", problemId: "p1" } as unknown as Task;
     const { ctx } = stepCtxOf(world);
     const medic = actorOf(world, BETTINA);
-    expect(treatPlan(ctx, medic, task)).toEqual({ ok: false, reason: "dependencyPending" });
     const priya = actorOf(world, PRIYA);
-    priya.location = { ...priya.location, x: BEDSIDE.x + 0.5, y: BEDSIDE.y + 0.5 } as never;
+    const put = (tile: { x: number; y: number }) => {
+      priya.location = { ...priya.location, x: tile.x + 0.5, y: tile.y + 0.5 } as never;
+    };
+    // Far across the ship, doing something else.
+    put({ x: 12, y: 1 });
+    priya.activity = { kind: "idle" };
+    expect(treatPlan(ctx, medic, task)).toEqual({ ok: false, reason: "dependencyPending" });
+    // On her way to the bed: the kit is fetched while she walks.
+    priya.activity = { kind: "personal", activity: "convalesce" } as never;
+    expect(treatPlan(ctx, medic, task)).toMatchObject({ ok: true });
+    priya.activity = { kind: "idle" };
+    // Within `prepareWithinTiles` (2) of the bedside, and on it.
+    put({ x: BEDSIDE.x + 2, y: BEDSIDE.y });
+    expect(treatPlan(ctx, medic, task)).toMatchObject({ ok: true });
+    put({ x: BEDSIDE.x + 3, y: BEDSIDE.y });
+    expect(treatPlan(ctx, medic, task)).toEqual({ ok: false, reason: "dependencyPending" });
+    put(BEDSIDE);
     const plan = treatPlan(ctx, medic, task);
     expect(plan).toMatchObject({ ok: true });
     if (!plan.ok) return;

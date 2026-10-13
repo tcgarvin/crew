@@ -5,8 +5,10 @@
  * - `treatPlan`: `medical.kitsPerTreatment` units in hand (already carried, or split off the
  *   nearest `medical` stack they know of: `inaccessibleSupply` with none) → the tile beside the
  *   bed nearest them → `treat` work for `treatSecondsPerWound` a wound to treat (`steps.ts`
- *   `runTreat`). With the patient not lying at the bed yet the plan is blocked
- *   `dependencyPending` (task-level: everyone backs off and tries again later).
+ *   `runTreat`). It is built while the patient lies at the bed, walks to it (`convalesce`) or is
+ *   within `medical.prepareWithinTiles` of it (`patientAtOrComing`), so the kit is fetched while
+ *   they come; otherwise it is blocked `dependencyPending` (task-level: everyone backs off and
+ *   tries again later).
  * - `convalescePlan`: the patient to the bed's `use` position and a `convalesce` hold there; a bed
  *   someone else lies at is `occupiedPosition`.
  */
@@ -17,7 +19,7 @@ import type { Item } from "../../core/types/ship";
 import type { ActivityStep, BlockageReason, Task } from "../../core/types/work";
 import { knownOnDeck, nearestReachable } from "../damage/plans";
 import { type PlanResult, acquireSteps, blocked, carriedItems, planOf } from "../work/plans";
-import { medBedOf, onTheBed } from "./bed";
+import { medBedOf, onTheBed, patientAtOrComing } from "./bed";
 import { untreatedWounds } from "./medical";
 
 const isMedical = (ctx: StepCtx, item: Pick<Item, "defId">): boolean =>
@@ -52,7 +54,9 @@ export function treatPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   const patient = ctx.state.actors[task.target.actorId];
   const bed = medBedOf(ctx.state, ctx.content);
   if (patient === undefined || bed === undefined) return blocked("unreachableTarget");
-  if (!onTheBed(ctx.state, bed, patient)) return blocked("dependencyPending");
+  if (!patientAtOrComing(ctx.state, bed, patient, ctx.config.medical.prepareWithinTiles)) {
+    return blocked("dependencyPending");
+  }
   const kits = kitSteps(ctx, actor);
   if (typeof kits === "string") return blocked(kits);
   const stand = nearestReachable(ctx, actor, task.interactionTiles);

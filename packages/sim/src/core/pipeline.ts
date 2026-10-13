@@ -170,6 +170,7 @@ function runPlannerStage(
     intercom: config.intercom,
     expedition: config.expedition,
     bodies: config.bodies,
+    medical: config.medical,
   };
   const due = dueActors(actorIds, base.tick, config.work.reconsiderEveryTicks);
   for (const actorId of due) {

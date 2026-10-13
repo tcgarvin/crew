@@ -9,6 +9,7 @@ import {
   positiveInt,
   powerPrioritySchema,
   unitInterval,
+  woundSeveritySchema,
 } from "./primitives";
 
 /** §memories: one memory kind's opinion (a whole number, never 0), duration and stack limit. */
@@ -389,6 +390,10 @@ export const configDefSchema = z.strictObject({
     laySeconds: positive,
     griefCloseAffinity: z.number(),
     griefStacksClose: positiveInt,
+    essentialSeverities: z.array(woundSeveritySchema),
+    medicLevel: positiveInt,
+    waitForMedicSeconds: nonNegative,
+    prepareWithinTiles: nonNegativeInt,
   }),
   accidents: z.strictObject({
     enabled: z.boolean(),

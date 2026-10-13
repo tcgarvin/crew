@@ -580,6 +580,10 @@ const config = {
     laySeconds: 2,
     griefCloseAffinity: 3,
     griefStacksClose: 2,
+    essentialSeverities: ["serious", "grave"],
+    medicLevel: 4,
+    waitForMedicSeconds: 90,
+    prepareWithinTiles: 2,
   },
   accidents: {
     enabled: true,

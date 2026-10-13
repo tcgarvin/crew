@@ -5,8 +5,8 @@
  * no commands) and every card answered by its left side, and reports:
  *
  * - beats per watch by kind (bells, handovers, meals served, servings eaten hot and as rations,
- *   meals missed, servings spoiled, rooms turned filthy and mopped clean, faults, hazards, cards,
- *   conversations): the total and the mean, least and most over the run's watches;
+ *   meals missed, servings spoiled, rooms turned filthy and mopped clean, faults, hazards, fragile
+ *   crates smashed, cards, conversations): the total and the mean, least and most over the run's watches;
  * - rooms at `dirty` and at `filthy` at the end of each watch (§room-tiers);
  * - how full the mess gets: for each meal served, how many ate it hot within
  *   `MESS_WINDOW_DAYS` (target: at least `MESS_FULL_EATERS`, three times a day);
@@ -104,6 +104,8 @@ export const BEAT_EVENTS = {
   roomsCleaned: { type: "roomCleaned" },
   faults: { type: "faultOccurred" },
   hazards: { type: "navHazard" },
+  // §fragile-cargo: the freight run carries fragile crates, so the rocks have something to smash.
+  cargoBroken: { type: "cargoBroken" },
   cards: { type: "decisionPending" },
   conversations: { type: "conversation" },
   // Slice 4 (call 22): off watch. `sessionEnded` splits on its outcome.
@@ -742,6 +744,12 @@ export class BeatsTally {
 // The run
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * §the-beats-instrument: the freight scenario's job each round trip is fragile crates, so a run
+ * through the rocks measures what they smash (§fragile-cargo).
+ */
+const BEATS_FREIGHT = "fragile";
+
 /** Sim ticks between activity samples (0.5 s at 20 Hz): fine enough for an idle stretch. */
 const SAMPLE_TICKS = 10;
 
@@ -1020,7 +1028,7 @@ function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResu
       throw new Error(`${command.kind} rejected: ${JSON.stringify(result)}`);
     }
   };
-  let script = new VoyageScript(options.scenario, send);
+  let script = new VoyageScript(options.scenario, send, BEATS_FREIGHT);
   const fieldScript = new FieldScript(options.fields, send);
   const fieldTally = new FieldTally(options.fields, tickRate);
   let roundTrips = 0;
@@ -1072,7 +1080,7 @@ function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResu
     fieldScript.step(world);
     if (script.done) {
       roundTrips += 1;
-      script = new VoyageScript(options.scenario, send);
+      script = new VoyageScript(options.scenario, send, BEATS_FREIGHT);
     }
     if (result.halt.kind === "hook") {
       const hook = world.state.narrator.pendingHook;

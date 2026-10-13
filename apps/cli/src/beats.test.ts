@@ -116,6 +116,7 @@ describe("the beats tally", () => {
       ev("bell", 200),
       ev("helmRelieved", 201),
       ev("navHazard", 150),
+      ev("cargoBroken", 160),
       ev("bell", 300),
       ev("conversation", 250),
       ev("thoughtAdded", 10),
@@ -124,6 +125,7 @@ describe("the beats tally", () => {
     expect(beats.bells).toEqual({ total: 3, perWatchMean: 1, perWatchMin: 1, perWatchMax: 1 });
     expect(beats.handovers).toMatchObject({ total: 2, perWatchMin: 0, perWatchMax: 1 });
     expect(beats.hazards).toMatchObject({ total: 1, perWatchMax: 1 });
+    expect(beats.cargoBroken).toMatchObject({ total: 1, perWatchMax: 1 });
     expect(beats.conversations.total).toBe(1);
     expect(beats.faults.total).toBe(0);
   });

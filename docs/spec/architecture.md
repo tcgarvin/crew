@@ -215,7 +215,9 @@ quiet-timer rules or run-ahead change.
 `crew beats` (`apps/cli/src/beats.ts`, `beats-field.ts`) runs the pacing voyage round trip after
 round trip for N ship's days with an instant narrator and every card answered by its left side,
 and counts per watch: bells, handovers, meals served, eaten hot and as rations, missed and spoiled,
-rooms filthy and mopped, faults, hazards, cards and conversations; the mess fill; per person, the
+rooms filthy and mopped, faults, hazards, fragile crates smashed, cards and conversations (the
+freight scenario's job each round trip is fragile crates, so a run through the rocks measures
+§fragile-cargo); the mess fill; per person, the
 share of time by activity class and the longest idle stretch; provisions at the end; helm
 coverage; port-call stalls; sleep starts; the off-watch family (sessions, contests, arguments,
 boredom, affinity extremes, rivalries); machine wear; and, with `--fields` and `--seeds`, the
