@@ -7,6 +7,8 @@
  *   `work cook` for `galley.cookSeconds` at the cook's skill rate (`workRate`) → the `serving`
  *   zone's first tile → `serve`. Blocked `inaccessibleSupply` when the cook knows of no provisions:
  *   the task backs off and the meal is missed at its grace.
+ * - A stove that is blocked (§stove-down: a burner fault) blocks the plan and fails the cook step
+ *   `dependencyPending`, so the task backs off and the meal is missed at its grace.
  * - `runCook` counts the stove time and leaves the `cooking` deposit on the stove's tile when done.
  * - `runServe` is the commit: the carried crate is used up and `crewAboard + spareServings`
  *   servings (never more than `servingsPerCrate`) are set on the counter as one stack with
@@ -27,6 +29,7 @@ import type { StepCtx } from "../../core/types/pipeline";
 import type { Item, StackItem } from "../../core/types/ship";
 import type { ActivityStep, ProblemOfKind, Task } from "../../core/types/work";
 import { depositDirt } from "../dirt/deposit";
+import { isTaskMachineBlocked } from "../equipment/equipment";
 import { emitSim } from "../work/events";
 import { writeFact } from "../work/facts";
 import { awaitsFamiliarityBrief } from "../work/perception";
@@ -82,6 +85,7 @@ export function cookPlan(ctx: StepCtx, actor: Actor, task: Task): PlanResult {
   if (task.target.kind !== "machine" || actor.location.kind !== "onDeck") {
     return blocked("unreachableTarget");
   }
+  if (isTaskMachineBlocked(ctx, task.target)) return blocked("dependencyPending");
   const stove = interactionTarget(ctx, actor, task.target.machineId, "use");
   const counter = servingTiles(ctx.content, actor.location.deckId)[0];
   if (stove === undefined || counter === undefined) return blocked("unreachableTarget");
@@ -124,6 +128,7 @@ export function runCook(ctx: StepCtx, actor: Actor, step: StepOf<"work">): StepR
     return { fail: "dependencyPending" };
   }
   if (provisionsInHand(ctx, actor) === undefined) return { fail: "inaccessibleSupply" };
+  if (isTaskMachineBlocked(ctx, task.target)) return { fail: "dependencyPending" };
   if (task.status === "claimed") task.status = "active";
   step.ticksDone += workRate(ctx, actor, task);
   if (step.ticksDone < step.ticksNeeded) return "wait";

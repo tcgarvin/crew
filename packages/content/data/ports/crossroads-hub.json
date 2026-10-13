@@ -48,6 +48,16 @@
       "price": 120
     },
     {
+      "itemDefId": "item.filter_cartridge",
+      "count": 4,
+      "price": 60
+    },
+    {
+      "itemDefId": "item.heating_element",
+      "count": 3,
+      "price": 40
+    },
+    {
       "itemDefId": "item.coolant_canister",
       "count": 3,
       "price": 60

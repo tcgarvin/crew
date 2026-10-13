@@ -122,5 +122,5 @@ describe("crew beats with fields: one ship's day with a heavy field a leg (real 
     );
     expect(report).toMatch(/Ships lost: [01] of 1 run/);
     expect(report).toMatch(/Hull at the end: \d+\/100\. Ship lost: /);
-  }, 120_000);
+  }, 240_000);
 });

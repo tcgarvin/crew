@@ -35,6 +35,12 @@ present, its temperature is at 1.0, or integrity is below the inoperable thresho
 may only push it toward off. Generators and batteries take `desiredMode` each tick unless blocked,
 so a cleared fault resumes without a command.
 
+### Battery output
+
+A battery charges and discharges at most its rated `maxChargeKw` and `maxDischargeKw` times its
+output (`systems/power/power.ts`), so a derate (a degraded cell) slows both and a blocked bank
+(output 0) does neither. Why: otherwise a battery fault would cost nothing.
+
 ### Wear and fault draws
 
 While on, a machine wears (`wearPerSecond`) and accrues hazard, faster when hot or worn. Crossing
@@ -42,6 +48,31 @@ the sampled threshold draws one absent fault by weight on the `failures` stream 
 `scheduleFault` fires a chosen one instead. A machine holds one fault per key.
 
 ## Faults and symptoms
+
+### Authored faults
+
+Each machine's faults are its def's `faults` (`packages/content/data/machines/*.json`), drawn by
+`weight` (§wear-and-fault-draws). Effects are `derate` (output factor), `inoperable` (blocked) or
+`overheat` (extra heat rise).
+
+| Machine | Fault | Effect | Symptom | Part spent |
+|---|---|---|---|---|
+| engine | `failed_controller`, `fouled_injector` | inoperable; derate 0.6 | sensor; audible | spare parts; none |
+| coolant pump | `worn_bearing`, `air_locked_line` | derate 0.5; derate 0.6 | audible | spare parts; none |
+| generator | `electrical_short`, `coil_burnout` | overheat; derate 0.35 | visual; sensor | spare parts |
+| life support | `scrubber_clog` | derate 0.7 | sensor | scrubber cartridge |
+| battery bank | `cell_degradation` | derate 0.5 (§battery-output) | sensor | spare parts |
+| galley stove | `burner_fault` | inoperable (§stove-down) | visual | heating element |
+| nav terminal | `chart_fault` | inoperable (§course-plotting) | sensor | none |
+| cargo crane | `jammed_actuator` | inoperable | visual | spare parts |
+
+No system reads life support's output (there is no air model); its fault costs the crew through
+urgency, as repairing it is containment work (§choosing-what-to-do-next). The cargo crane is scenery:
+hauling does not use it, so its fault blocks nothing. Scrubber
+cartridges and heating elements are `spare` items: the scenario carries `commerce.sparesReserve`
+of each and the spares reserve restocks them where a market sells them (§reserve-kinds). Hazard
+rates are per machine (`failure.baseHazardPerSecond`); the stove's and the terminal's are low,
+so a galley gone dark or a ship that cannot plot is an occasional event, not a weekly one.
 
 ### Symptoms
 
@@ -56,7 +87,8 @@ narrator's `reveal` makes one public and lets the best engineer aboard notice it
 ### Diagnosis
 
 Diagnosing a fault is an `inspect` task of 20 s at engineering 1, no tool, at the machine's repair
-positions (`DIAGNOSE_SECONDS`, `DIAGNOSE_SKILL`). It marks the fault diagnosed, resolves the symptom
+positions (`DIAGNOSE_SECONDS`, `DIAGNOSE_SKILL`); content validation holds every machine with a
+fault to one (the stove's is its front, the nav terminal's its seat). It marks the fault diagnosed, resolves the symptom
 and opens `machineFault` (`faultDiagnosed`). Needing no tool or part, it is work aboard the
 departure gate waits for (§repairs-out-of-reach).
 

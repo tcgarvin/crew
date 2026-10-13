@@ -169,6 +169,28 @@ const MACHINES: Record<MachineDefId, MachineDef> = {
       { key: "front", offset: { x: 0, y: 1 }, purposes: ["use"], capacity: 1 },
     ],
     ...still,
+    // §stove-down: a burner fault blocks the stove; never drawn (no hazard), set by a test.
+    faults: [
+      {
+        key: "burner_fault",
+        name: "Burned-out burner",
+        weight: 1,
+        effect: { kind: "inoperable" },
+        symptom: { key: "cold_burner", channel: "visual" },
+        repair: {
+          steps: [
+            {
+              key: "replace_element",
+              action: "repair",
+              workSeconds: 5,
+              tools: [],
+              consumes: [],
+              at: "use",
+            },
+          ],
+        },
+      },
+    ],
   },
   [GALLEY.table]: {
     id: GALLEY.table,

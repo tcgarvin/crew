@@ -78,6 +78,28 @@ const navDef: MachineDef = {
   interactionPositions: [
     { key: "seat", offset: { x: -1, y: 0 }, purposes: ["operate"], capacity: 1 },
   ],
+  // §course-plotting: a chart fault blocks the terminal; never drawn (no hazard), set by a test.
+  faults: [
+    {
+      key: "chart_fault",
+      name: "Corrupted chart store",
+      weight: 1,
+      effect: { kind: "inoperable" },
+      symptom: { key: "chart_checksum_error", channel: "sensor" },
+      repair: {
+        steps: [
+          {
+            key: "reload_charts",
+            action: "repair",
+            workSeconds: 5,
+            tools: [],
+            consumes: [],
+            at: "operate",
+          },
+        ],
+      },
+    },
+  ],
 };
 
 const chairDef: MachineDef = {

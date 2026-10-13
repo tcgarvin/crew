@@ -154,22 +154,22 @@ function runBattery(
   if (def.power.role !== "battery" || battery.roleState.role !== "battery") return 0;
   const stored = battery.roleState.storedKj;
   const { capacityKj } = def.power;
+  // §battery-output: a derated bank (a degraded cell) charges and discharges at its output's share
+  // of the rated rates; a blocked one (output 0) does neither.
+  const maxChargeKw = def.power.maxChargeKw * battery.output;
+  const maxDischargeKw = def.power.maxDischargeKw * battery.output;
   const store = (storedKj: number): void => {
     battery.roleState = { role: "battery", storedKj: clamp(storedKj, 0, capacityKj) };
   };
   if (remaining > 1e-9) {
     const roomKj = Math.max(0, capacityKj - stored);
-    const chargeKw = Math.min(
-      remaining,
-      def.power.maxChargeKw,
-      dtSeconds > 0 ? roomKj / dtSeconds : 0,
-    );
+    const chargeKw = Math.min(remaining, maxChargeKw, dtSeconds > 0 ? roomKj / dtSeconds : 0);
     if (chargeKw <= 1e-9) return 0;
     store(stored + chargeKw * dtSeconds);
     return chargeKw;
   }
   if (totalShort <= 1e-9) return 0;
-  const availableKw = Math.min(def.power.maxDischargeKw, dtSeconds > 0 ? stored / dtSeconds : 0);
+  const availableKw = Math.min(maxDischargeKw, dtSeconds > 0 ? stored / dtSeconds : 0);
   const dischargeKw = Math.min(totalShort, availableKw);
   if (dischargeKw <= 1e-9) return 0;
   store(stored - dischargeKw * dtSeconds);

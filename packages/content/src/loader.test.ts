@@ -104,7 +104,7 @@ describe("loadBundle", () => {
     expect(bundle.config.commerce.market.maxStockPerCommand).toBe(4);
   });
 
-  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 22 items, 41 thoughts, 14 activities and 10 topics", () => {
+  it("has 9 crew plus the passenger template, 10 traits, the default scenario, 24 items, 41 thoughts, 14 activities and 10 topics", () => {
     const bundle = rawBundle() as {
       crew: Record<string, unknown>;
       traits: Record<string, unknown>;
@@ -115,7 +115,7 @@ describe("loadBundle", () => {
       topics: Record<string, unknown>;
     };
     expect(Object.keys(bundle.crew)).toHaveLength(10);
-    expect(Object.keys(bundle.items)).toHaveLength(22);
+    expect(Object.keys(bundle.items)).toHaveLength(24);
     expect(Object.keys(bundle.traits)).toHaveLength(10);
     expect(Object.keys(bundle.scenarios)).toHaveLength(1);
     expect(Object.keys(bundle.activities)).toHaveLength(14);
@@ -271,6 +271,52 @@ describe("loadBundle", () => {
       const added = bundle.machines[id as keyof typeof bundle.machines]?.faults[1];
       expect(added?.effect.kind).toBe("derate");
       expect(added?.repair.steps.flatMap((s) => s.consumes)).toEqual([]);
+    }
+  });
+
+  it("breaks down beyond the engine room: life support, battery bank, stove and nav terminal each have a fault (§authored-faults)", () => {
+    const bundle = authoredBundle();
+    const machine = (id: string) => bundle.machines[id as keyof typeof bundle.machines];
+    const shape = (id: string) =>
+      machine(id)?.faults.map((f) => [f.key, f.effect, f.symptom.channel, f.repair.steps.length]);
+    expect(shape("machine.life_support")).toEqual([
+      ["scrubber_clog", { kind: "derate", outputFactor: 0.7 }, "sensor", 3],
+    ]);
+    expect(shape("machine.battery_bank")).toEqual([
+      ["cell_degradation", { kind: "derate", outputFactor: 0.5 }, "sensor", 3],
+    ]);
+    expect(shape("machine.galley_stove")).toEqual([
+      ["burner_fault", { kind: "inoperable" }, "visual", 3],
+    ]);
+    expect(shape("machine.nav_terminal")).toEqual([
+      ["chart_fault", { kind: "inoperable" }, "sensor", 3],
+    ]);
+    // Diagnosis and repair stand at a `repair` position, so the stove and the terminal have one.
+    for (const id of ["machine.galley_stove", "machine.nav_terminal"]) {
+      expect(machine(id)?.interactionPositions.some((p) => p.purposes.includes("repair"))).toBe(
+        true,
+      );
+    }
+    // The chart fault spends no part: a ship that cannot plot cannot sail to buy one.
+    expect(
+      machine("machine.nav_terminal")?.faults[0]?.repair.steps.flatMap((s) => s.consumes),
+    ).toEqual([]);
+  });
+
+  it("carries the new spares from the start and sells each at two or more ports (§reserve-kinds)", () => {
+    const bundle = authoredBundle();
+    const scenario =
+      bundle.scenarios["scenario.default_freighter_run" as keyof typeof bundle.scenarios];
+    for (const id of ["item.filter_cartridge", "item.heating_element"]) {
+      expect(bundle.items[id as keyof typeof bundle.items]?.tags).toContain("spare");
+      const carried = scenario?.startingItems
+        .filter((line) => line.itemDefId === id)
+        .reduce((sum, line) => sum + line.count, 0);
+      expect(carried, id).toBe(bundle.config.commerce.sparesReserve);
+      const selling = Object.values(bundle.ports).filter((port) =>
+        port.market.some((line) => line.itemDefId === id && line.count > 0),
+      );
+      expect(selling.length, id).toBeGreaterThanOrEqual(2);
     }
   });
 

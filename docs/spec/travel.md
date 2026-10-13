@@ -154,7 +154,10 @@ destination, deriving one essential `plotCourse` task at the nav station that ne
 minimum: skill sets how long it takes, not how good. An interrupted plot starts again. Departure
 prep waits for the plot beside the departure gate. A detour re-raises it; a hold for repairs keeps
 it. The plot sets `travel.coursePlotted` and emits `coursePlotted`. A ship with no nav terminal
-needs no plot.
+needs no plot. While the terminal is blocked (§output-and-blocking; in play, a `chart_fault`,
+§authored-faults) nothing is plotted: the plan is blocked and a plot under way fails, both
+`dependencyPending`, so the task backs off and the ship waits docked until the terminal is
+repaired. The chart fault's repair spends no part, so it is always in reach.
 
 ## Navigation hazards
 

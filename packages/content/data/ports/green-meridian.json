@@ -48,6 +48,11 @@
       "price": 150
     },
     {
+      "itemDefId": "item.filter_cartridge",
+      "count": 2,
+      "price": 75
+    },
+    {
       "itemDefId": "item.ration_pack",
       "count": 200,
       "price": 6

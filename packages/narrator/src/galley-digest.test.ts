@@ -155,6 +155,24 @@ describe("the galley line (§galley-provisions, §ship-life-lines)", () => {
     expect(line).toContain(`next meal due at the bell in ~${toBell}s;`);
   });
 
+  it("opens with the stove down while a burner fault blocks it (§stove-down)", () => {
+    const snap = snapshot();
+    const state = snap.state;
+    const stove = Object.values(state.machines).find((m) => m.defId === "machine.galley_stove");
+    if (stove === undefined) throw new Error("fixture: no stove");
+    expect(lineStarting(shipLines(digest(snap)), "galley: ")).not.toContain("stove down");
+    stove.faults.push({
+      faultKey: "burner_fault" as LocalKey,
+      sinceTick: state.tick,
+      diagnosed: false,
+      repairStepIndex: 0,
+      repairStepProgress: 0,
+    });
+    expect(lineStarting(shipLines(digest(snap)), "galley: ")).toMatch(
+      /^galley: stove down, nothing cooks until it is repaired; nothing on the counter, next meal/,
+    );
+  });
+
   it("counts the servings on the counter with their quality and cook", () => {
     const snap = snapshot();
     const state = snap.state;

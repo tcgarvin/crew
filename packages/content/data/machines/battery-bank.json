@@ -39,11 +39,66 @@
     "requiresOperator": false
   },
   "failure": {
-    "baseHazardPerSecond": 0.0003,
+    "baseHazardPerSecond": 0.00004,
     "heatFactor": 2,
     "wearPerSecond": 0.0003
   },
-  "faults": [],
+  "faults": [
+    {
+      "key": "cell_degradation",
+      "name": "Degraded battery cell",
+      "weight": 1,
+      "effect": {
+        "kind": "derate",
+        "outputFactor": 0.5
+      },
+      "symptom": {
+        "key": "charge_sagging",
+        "channel": "sensor"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "test_cells",
+            "action": "inspect",
+            "workSeconds": 8,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 2
+            }
+          },
+          {
+            "key": "replace_cell",
+            "action": "installComponent",
+            "workSeconds": 15,
+            "tools": ["wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.spare_parts_stack",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "electrical",
+              "min": 2
+            }
+          },
+          {
+            "key": "test_bank",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
+    }
+  ],
   "components": [],
   "maintenance": {
     "intervalSeconds": 600,

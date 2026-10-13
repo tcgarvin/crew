@@ -35,12 +35,72 @@
     "requiresOperator": false
   },
   "failure": {
-    "baseHazardPerSecond": 0.0004,
+    "baseHazardPerSecond": 0.0001,
     "heatFactor": 2,
     "wearPerSecond": 0.0004
   },
-  "faults": [],
-  "components": [],
+  "faults": [
+    {
+      "key": "scrubber_clog",
+      "name": "Clogged scrubber",
+      "weight": 1,
+      "effect": {
+        "kind": "derate",
+        "outputFactor": 0.7
+      },
+      "symptom": {
+        "key": "co2_climbing",
+        "channel": "sensor"
+      },
+      "repair": {
+        "steps": [
+          {
+            "key": "remove_cartridge",
+            "action": "removeComponent",
+            "workSeconds": 8,
+            "tools": ["wrench"],
+            "consumes": [],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 1
+            }
+          },
+          {
+            "key": "install_cartridge",
+            "action": "installComponent",
+            "workSeconds": 10,
+            "tools": ["wrench"],
+            "consumes": [
+              {
+                "itemDefId": "item.filter_cartridge",
+                "count": 1
+              }
+            ],
+            "at": "repair",
+            "skill": {
+              "skill": "engineering",
+              "min": 1
+            }
+          },
+          {
+            "key": "test_scrubber",
+            "action": "test",
+            "workSeconds": 5,
+            "tools": ["multimeter"],
+            "consumes": [],
+            "at": "repair"
+          }
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "slot": "scrubber_cartridge",
+      "itemDefId": "item.filter_cartridge"
+    }
+  ],
   "maintenance": {
     "intervalSeconds": 600,
     "inspect": {

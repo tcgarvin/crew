@@ -26,7 +26,7 @@ const bump = (tally: Tally, key: string): void => {
 };
 
 /** One ship's day of a pacing voyage, tallied by activity, topic and thought. */
-async function dayOf(scenario: PacingScenario): Promise<Tally> {
+async function dayOf(scenario: PacingScenario, seed = 1): Promise<Tally> {
   const tally: Tally = new Map();
   const observe = (events: readonly SimEvent[]): void => {
     for (const event of events) {
@@ -37,7 +37,7 @@ async function dayOf(scenario: PacingScenario): Promise<Tally> {
       if (event.type === "thoughtAdded") bump(tally, event.payload.key);
     }
   };
-  await runBeatsAsync({ scenario, days: 1, seed: 1, fields: "none", observe });
+  await runBeatsAsync({ scenario, days: 1, seed, fields: "none", observe });
   return tally;
 }
 
@@ -54,9 +54,13 @@ describe("the variety pack off watch: a ship's day of each pacing voyage, seed 1
   }, 300_000);
 
   it("a new topic comes up", async () => {
+    // A day holds only one to three topic sessions over ten topics, so seed 1's days can miss all
+    // three new ones; a day of seed 3 is added rather than resting the check on one draw.
     const topics = ["topic.salvage_rights", "topic.ghost_ships", "topic.sweethearts"];
     const counts = await Promise.all(topics.map(count));
-    expect(counts.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    const seed3 = await dayOf("plain", 3);
+    const more = topics.reduce((sum, key) => sum + (seed3.get(key) ?? 0), 0);
+    expect(counts.reduce((a, b) => a + b, 0) + more).toBeGreaterThan(0);
   }, 300_000);
 
   it("the cook, a repairer and a host nobody joined have the new thoughts", async () => {

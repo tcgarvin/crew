@@ -584,7 +584,8 @@ Rest." Why voice: crew have voices, not wants; wants surface as threads.
 ### Ship life lines
 
 Under Ship: the watch line and helm check (`time-and-watches.md`), field, hull and damage lines
-(`hull-and-field.md`), `galley:` (counter servings with quality and cook, the next meal at the bell
+(`hull-and-field.md`), `galley:` (opening "stove down" while the stove is blocked, §stove-down;
+counter servings with quality and cook, the next meal at the bell
 and who is cooking while `mealToCook` is open, provisions in crates and days), `dirt:` (only while
 a room is dirty or worse, filthy first), `infirmary:` (only while someone lies in the medbay bed,
 someone aboard is wounded, or the `medical` units aboard are under `medical.reserve`: who is in the

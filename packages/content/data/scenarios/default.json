@@ -38,6 +38,16 @@
       "zoneKey": "cargo_stow"
     },
     {
+      "itemDefId": "item.filter_cartridge",
+      "count": 3,
+      "zoneKey": "cargo_stow"
+    },
+    {
+      "itemDefId": "item.heating_element",
+      "count": 3,
+      "zoneKey": "cargo_stow"
+    },
+    {
       "itemDefId": "item.ration_pack",
       "count": 60,
       "zoneKey": "cargo_stow"

@@ -21,4 +21,5 @@ export {
   provisionsDefs,
   servingsPerMeal,
 } from "./provisions";
+export { stoveDown } from "./kitchen";
 export { galleyTaskDerivations } from "./tasks";

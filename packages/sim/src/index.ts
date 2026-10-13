@@ -34,6 +34,7 @@ export {
   provisionsCratesAboard,
   provisionsDays,
   registerGalley,
+  stoveDown,
 } from "./systems/galley/index";
 export { dirtTaskDerivations, dirtViolations, registerDirt } from "./systems/dirt/index";
 export { registerRecreation } from "./systems/recreation/index";

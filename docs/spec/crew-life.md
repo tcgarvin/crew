@@ -69,6 +69,15 @@ lower in a `dirty` or `filthy` galley, fixed on the plate; serving a `good` meal
 `cookedWell`. A serving left on deck past `galley.mealSpoilDays` (0.25) is swept (`mealSpoiled`)
 and dirties its tile; one in hand is the holder's to eat. Events: `mealServed`, `mealMissed`, `mealSpoiled`, `ateMeal`.
 
+### Stove down
+
+While the stove is blocked (§output-and-blocking; in play, a `burner_fault`, §authored-faults)
+nothing is cooked: the cook's plan is blocked and a cook step under way fails, both
+`dependencyPending`, so the task backs off and retries. The meal problem stays open and is missed
+at its grace like any other; the hungry eat ration packs (§eating). The digest's galley line opens
+"stove down" (§ship-life-lines). Why: a broken stove that cooked anyway would make the fault a
+log line with no cost.
+
 ### Mess call
 
 After a serve, anyone with a known served meal and hunger above `galley.mealCallHungerAbove` (0.1)

@@ -235,6 +235,31 @@ function checkMachine(machine: MachineDef, bundle: ContentBundle, issues: Valida
     });
   };
 
+  // §diagnosis: a fault is diagnosed at the machine's `repair` positions, so a machine that can
+  // break needs one, and each repair step stands at a purpose some position offers.
+  const purposes = new Set(machine.interactionPositions.flatMap((p) => p.purposes));
+  if (machine.faults.length > 0 && !purposes.has("repair")) {
+    issues.push(
+      issue(
+        "referential",
+        [...path, "interactionPositions"],
+        `machine "${machine.id}" has faults but no "repair" interaction position to diagnose them at`,
+      ),
+    );
+  }
+  machine.faults.forEach((fault, fi) => {
+    fault.repair.steps.forEach((step, si) => {
+      if (purposes.has(step.at)) return;
+      issues.push(
+        issue(
+          "referential",
+          [...path, "faults", fi, "repair", "steps", si, "at"],
+          `repair step "${step.key}" stands at "${step.at}", which no interaction position offers`,
+        ),
+      );
+    });
+  });
+
   machine.faults.forEach((fault, fi) => {
     const stepsPath: Path = [...path, "faults", fi, "repair", "steps"];
     checkDuplicateLocalKeys(

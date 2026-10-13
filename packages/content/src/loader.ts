@@ -44,8 +44,10 @@ import itemCrateFragile from "../data/items/crate-fragile.json";
 import itemCrateGeneral from "../data/items/crate-general.json";
 import itemCrateHazardous from "../data/items/crate-hazardous.json";
 import itemCratePerishable from "../data/items/crate-perishable.json";
+import itemFilterCartridge from "../data/items/filter-cartridge.json";
 import itemHandTruck from "../data/items/hand-truck.json";
 import itemHarmonica from "../data/items/harmonica.json";
+import itemHeatingElement from "../data/items/heating-element.json";
 import itemHotMeal from "../data/items/hot-meal.json";
 import itemHullPlating from "../data/items/hull-plating.json";
 import itemMedKit from "../data/items/med-kit.json";
@@ -214,6 +216,8 @@ const ITEMS = [
   itemWelderTorch,
   itemHandTruck,
   itemSparePartsStack,
+  itemFilterCartridge,
+  itemHeatingElement,
   itemCoolantCanister,
   itemRationPack,
   itemMedKit,

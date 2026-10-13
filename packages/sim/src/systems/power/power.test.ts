@@ -50,6 +50,27 @@ describe("power allocation", () => {
     expect((battery.roleState as { storedKj: number }).storedKj).toBeLessThan(20);
   });
 
+  it("a bank at half output (a degraded cell) discharges at half its rated rate (§battery-output)", () => {
+    const { kernel, world } = w5TestWorld({ overrides: { generatorSupplyKw: 4 } });
+    const battery = byDef(world, W5.battery);
+    battery.output = 0.5;
+
+    kernel.advance(world, 1);
+    // The 5 kW shortfall meets half of maxDischargeKw 5.
+    expect(world.state.power.domains.main?.batteryFlowKw).toBeCloseTo(-2.5, 6);
+    expect(byDef(world, W5.engine).powerAllocatedKw).toBeCloseTo(3.5, 6);
+  });
+
+  it("a bank at no output (blocked) neither charges nor discharges (§battery-output)", () => {
+    const { kernel, world } = w5TestWorld({ overrides: { generatorSupplyKw: 4 } });
+    const battery = byDef(world, W5.battery);
+    battery.output = 0;
+
+    kernel.advance(world, 1);
+    expect(world.state.power.domains.main?.batteryFlowKw).toBe(0);
+    expect(battery.roleState).toMatchObject({ role: "battery", storedKj: 20 });
+  });
+
   it("charges the battery from surplus when demand is fully served", () => {
     const { kernel, world } = w5TestWorld();
     const battery = byDef(world, W5.battery);
