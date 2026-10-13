@@ -16,7 +16,7 @@ import { siteOf } from "./sites";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
 import type { BodyPart, ConfigDef, ContentBundle, HazardKind, ItemDef } from "./types/content";
-import type { SimEvent } from "./types/events";
+import type { DerateCause, SimEvent } from "./types/events";
 import type { JobId, PortDefId } from "./types/ids";
 import type { World } from "./types/kernel";
 import type { ReadonlyWorldState } from "./types/pipeline";
@@ -154,6 +154,45 @@ function humanize(type: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** "Intercom" → "Intercoms", "Battery Bank" → "Battery Banks", "Bench" → "Benches". */
+function pluralOf(name: string): string {
+  return /(s|x|z|ch|sh)$/i.test(name) ? `${name}es` : `${name}s`;
+}
+
+/** §output-and-blocking: groups named in a burst's line before "and N more". */
+const DERATE_GROUPS_NAMED = 2;
+
+/**
+ * §output-and-blocking: one line for a burst: "17 Intercoms down (power)" for one group; else
+ * "Power failing: 16 Intercoms, Nav Terminal and 5 more".
+ */
+function deratedLine(
+  payload: Extract<SimEvent, { type: "machinesDerated" }>["payload"],
+  n: Names,
+): string {
+  const named = (group: (typeof payload.groups)[number]) => {
+    const name = n.machineDef(group.defId);
+    return group.count === 1 ? name : `${group.count} ${pluralOf(name)}`;
+  };
+  const [only] = payload.groups;
+  if (payload.groups.length === 1 && only !== undefined) {
+    const pct = Math.round(only.output * 100);
+    const state = pct <= 0 ? "down" : `at ${pct}%`;
+    return `${named(only)} ${state} (${payload.cause})`;
+  }
+  const shown = payload.groups.slice(0, DERATE_GROUPS_NAMED).map(named);
+  const rest = payload.groups.slice(DERATE_GROUPS_NAMED).reduce((sum, g) => sum + g.count, 0);
+  const list = rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(" and ");
+  return `${DERATE_HEADS[payload.cause]}: ${list}`;
+}
+
+const DERATE_HEADS: Readonly<Record<DerateCause, string>> = {
+  power: "Power failing",
+  heat: "Overheating",
+  fault: "Faults",
+  integrity: "Worn down",
+};
+
 /**
  * Trace-level events the ticker still shows (Integration 2): they are what makes the crew's day
  * readable. Everything `notable`+ is shown too, except the bookkeeping types in `TICKER_HIDDEN`.
@@ -259,6 +298,8 @@ const PASSAGE_END_LINES: Readonly<
 type Names = {
   actor(id: string): string | undefined;
   machine(id: string): string | undefined;
+  /** §output-and-blocking: a machine def's name, or "Machine". */
+  machineDef(defId: string): string;
   /** The machine's name in lower case, or "machine", for mid-sentence use. */
   machineLower(id: string): string;
   port(id: string): string;
@@ -360,6 +401,7 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
       };
     },
     machine,
+    machineDef: (defId) => content.machines[defId as Machine["defId"]]?.name ?? "Machine",
     machineLower: (id) => (machine(id) ?? "machine").toLowerCase(),
     port: (id) => portName(content, id as PortDefId),
     isSite: (id) => isSite(content, id as PortDefId),
@@ -451,6 +493,8 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
         ? `${name} down (${event.payload.cause})`
         : `${name} at ${pct}% (${event.payload.cause})`;
     }
+    case "machinesDerated":
+      return deratedLine(event.payload, n);
     case "breakerTripped":
       return "A breaker tripped";
     case "taskCompleted": {

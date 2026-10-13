@@ -1,5 +1,5 @@
 /** Equipment and power events (W5). */
-import type { LocalKey, MachineId } from "../ids";
+import type { LocalKey, MachineDefId, MachineId } from "../ids";
 import type { OperatingMode } from "../ship";
 import type { SignificanceCatalog } from "./significance";
 
@@ -8,6 +8,13 @@ import type { SignificanceCatalog } from "./significance";
  * integrity).
  */
 export type DerateCause = "power" | "heat" | "fault" | "integrity";
+
+/** §output-and-blocking: `count` machines of `defId` that fell together to `output`. */
+export interface DerateGroup {
+  readonly defId: MachineDefId;
+  readonly count: number;
+  readonly output: number;
+}
 
 export interface EquipmentEventPayloads {
   /** Truth: a fault now exists (whether or not anyone knows). */
@@ -19,6 +26,17 @@ export interface EquipmentEventPayloads {
   machineDerated: {
     readonly machineId: MachineId;
     readonly output: number;
+    readonly cause: DerateCause;
+  };
+  /**
+   * §output-and-blocking: several machines fell from full output the same tick for the same cause,
+   * as every intercom panel does when the power goes; one event stands for them all, `groups` by
+   * def and output (in whole percent), most machines first. A machine alone still says
+   * `machineDerated`.
+   */
+  machinesDerated: {
+    readonly machineIds: readonly MachineId[];
+    readonly groups: readonly DerateGroup[];
     readonly cause: DerateCause;
   };
   machineModeChanged: {
@@ -36,6 +54,7 @@ export const EQUIPMENT_EVENT_SIGNIFICANCE = {
   faultDiagnosed: "notable",
   faultRepaired: "narrative",
   machineDerated: "notable",
+  machinesDerated: "notable",
   machineModeChanged: "trace",
   breakerTripped: "notable",
   maintenanceCompleted: "trace",

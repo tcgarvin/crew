@@ -29,11 +29,21 @@ anyway; the owner wanted integrity to matter.
 ### Output and blocking
 
 Output is the product of four factors: power fraction, heat, fault derates and integrity;
-`machineDerated` names the smallest as its cause. A machine is blocked when an `inoperable` fault is
-present, its temperature is at 1.0, or integrity is below the inoperable threshold
-(`isMachineBlocked`, shared with the departure gate). Power sets a consumer's mode first; equipment
-may only push it toward off. Generators and batteries take `desiredMode` each tick unless blocked,
-so a cleared fault resumes without a command.
+`machineDerated` names the smallest as its cause, the tick output falls from full (99.5% or more,
+which shows as 100%) to below it. Machines that fall the same tick for the same cause say one
+`machinesDerated {machineIds, groups, cause}` (notable) instead, `groups` by def and output in
+whole percent, most machines first; the ticker reads "17 Intercoms down (power)" for one group,
+else "Power failing: 16 Intercoms, Nav Terminal and 5 more". A machine alone still says
+`machineDerated`. A power derate within `equipment.powerLineQuietSeconds` (2) of the last power
+line on the ticker (`PowerState.lineTick`, absent in an older save) is emitted as trace, so a
+brownout spreading over a few ticks reads as one line. Why: a generator fault took every intercom
+panel down in one tick, a ticker line each, and buried the field and the fight. A machine coming
+back to full says nothing.
+
+A machine is blocked when an `inoperable` fault is present, its temperature is at 1.0, or integrity
+is below the inoperable threshold (`isMachineBlocked`, shared with the departure gate). Power sets a
+consumer's mode first; equipment may only push it toward off. Generators and batteries take
+`desiredMode` each tick unless blocked, so a cleared fault resumes without a command.
 
 ### Wear and fault draws
 

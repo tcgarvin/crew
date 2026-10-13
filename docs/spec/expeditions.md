@@ -376,6 +376,11 @@ from cover, his resolve gaining faster than hits took it, until he had shot the 
 by one. The isolation ward is the length of the hulk from the personnel ramp, so a fight here runs
 longer than at the other sites, most of it the walk out.
 
+Its `holdWhy`, "They keep a lifeboat lock at the far end; hold the ramp and they're gone by it.", is
+the hold side's why on the arrival card and on the hold plans of the menu (§the-arrival-card), so
+the captain who holds here does it knowing. Why: `hold` is still a choice here, but the bolt-hole
+is out of the ramp's sight, and the card read as at Harrow End, where holding works.
+
 ## The expedition
 
 ### Starting an expedition
@@ -455,7 +460,10 @@ name, "General Cargo Crate is at Harrow End, and guarded. Creep in quietly, hold
 in and take it?". A side's label says what the plan does ("Hold the ramp from cover", "Creep in
 quietly", "Go in and take them", or "Go in and take it" for an item, with ", to stun", ", holding
 fire", ", all hands", ", blasters only" or ", a small team" when not the usual) and its aftermath
-what happens next ("We make them come to us."), with no numbers. The prompt params name the job,
+what happens next ("We make them come to us."), with no numbers. A site map may carry `holdWhy`
+(site only): what holding the ramp comes to there, said as the hold side's why in place of the
+usual words (§the-lazaret); the narrator reads it in the card's `leftWhy`/`rightWhy` in the site
+digest. The prompt params name the job,
 the errand's `kind` (`fetchPerson` or `fetchItem`), the site, the target (the person, or the
 item's name), the speaker and both plans (`leftPlan`, `rightPlan`, `leftLabel`, `rightLabel`,
 `leftWhy`, `rightWhy`), and each side's own refs carry its label and why. While the card is up the
@@ -804,4 +812,5 @@ eight at most, so the item pair's `creep-holdFire-armed` is always on an item er
 An option is unavailable, with the reason as its `why`, when the squad is empty or the locker has
 none of what it needs, when `flank` has no flank post or fewer than four go, when `bait` has fewer
 than two, and when `bait` or `creep` comes after contact. An available option's `why` says what it
-does and how many go.
+does and how many go, and a hold plan's then the site's `holdWhy` when it has one
+(§the-arrival-card).

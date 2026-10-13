@@ -78,6 +78,7 @@
   "equipment": {
     "hazardScale": 1,
     "overheatDamagePerSecond": 0.02,
+    "powerLineQuietSeconds": 2,
     "maintenanceConditionBelow": 0.3,
     "maintenanceEssentialBelow": 0.15,
     "integrityDerateBelow": 0.5,
@@ -286,13 +287,36 @@
     "templateLines": [
       "{a} joked about the food",
       { "line": "{b} complained about the docking fee", "when": "paidDockingFee" },
-      "{a} asked {b} whether the coolant pump always sounds like that",
+      {
+        "line": "{a} asked {b} whether the coolant pump always sounds like that",
+        "when": "pumpSymptom"
+      },
+      { "line": "{b} told {a} the coolant pump was rattling again", "when": "pumpSymptom" },
       "{a} and {b} argued about the fastest route home",
       "{a} told {b} a story about an old captain",
       "{a} and {b} swapped gossip from the last port",
       "{b} laughed at {a}'s joke about the engine",
-      "{a} wondered aloud what the next job pays"
+      "{a} wondered aloud what the next job pays",
+      "{a} showed {b} a picture from home, creased from the pocket",
+      "{a} and {b} traded complaints about the bunks",
+      "{a} asked {b} to swap a watch, and was told no",
+      { "line": "{a} told {b} where to get a decent drink in this port", "when": "docked" },
+      { "line": "{a} and {b} watched the dock hands from the top of the ramp", "when": "docked" },
+      { "line": "{a} asked {b} how many days to the next port", "when": "underWay" },
+      { "line": "{a} and {b} watched the stars crawl past a viewport", "when": "underWay" },
+      { "line": "{a} and {b} went over the fight again, shot by shot", "when": "afterFight" },
+      {
+        "line": "{a} and {b} wondered who would come looking after the last job",
+        "when": "afterFight"
+      },
+      { "line": "{a} asked {b} how the wounded were holding up", "when": "someoneWounded" },
+      { "line": "{a} asked {b} if the hull plates would hold", "when": "hullScarred" },
+      { "line": "{b} told {a} to stop knocking on the patched plating", "when": "hullScarred" },
+      { "line": "{a} admitted to {b} the rocks had scared them", "when": "fieldRecently" },
+      { "line": "{a} reminded {b} the med kits were running low", "when": "kitsLow" }
     ],
+    "templateRepeatDays": 0.5,
+    "chatRecentDays": 1,
     "chatMemoryEveryDays": 2,
     "chatSour": {
       "atZero": 0.25,

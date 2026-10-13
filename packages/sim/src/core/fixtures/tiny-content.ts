@@ -130,6 +130,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
     equipment: {
       hazardScale: 1,
       overheatDamagePerSecond: 0.01,
+      powerLineQuietSeconds: 2,
       maintenanceConditionBelow: 0.3,
       maintenanceEssentialBelow: 0.15,
       integrityDerateBelow: 0.5,

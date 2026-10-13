@@ -38,12 +38,19 @@
  * fault repair (`recipes.ts`) lifts its integrity back to at least `integrityDerateBelow`.
  * Overheat is still the only thing that costs integrity.
  */
-import { ticksToSeconds } from "../../core/clock";
+import { configTicks, ticksToSeconds } from "../../core/clock";
 import { allocateId } from "../../core/ids";
 import type { KernelRegistry } from "../../core/registry";
 import type { ConfigDef, MachineDef } from "../../core/types/content";
-import type { DerateCause, EventDraft } from "../../core/types/events";
-import type { CommandId, ItemDefId, LocalKey, MachineId, ProblemId } from "../../core/types/ids";
+import type { DerateCause, DerateGroup, EventDraft } from "../../core/types/events";
+import type {
+  CommandId,
+  ItemDefId,
+  LocalKey,
+  MachineDefId,
+  MachineId,
+  ProblemId,
+} from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { Machine } from "../../core/types/ship";
 import type { Problem, ProblemOfKind } from "../../core/types/work";
@@ -380,7 +387,78 @@ function updateMode(ctx: StepCtx, machine: Machine, def: MachineDef): void {
   );
 }
 
-function updateOutput(ctx: StepCtx, machine: Machine, def: MachineDef, faults: FaultEffects): void {
+/** A machine whose output fell below 1 this tick, for `emitDerates`. */
+interface Derate {
+  readonly machine: Machine;
+  readonly output: number;
+  readonly cause: DerateCause;
+}
+
+/** §output-and-blocking: output at or above this reads as full (99.5% shows as 100%). */
+const FULL_OUTPUT = 0.995;
+
+/** §output-and-blocking: one cause's derates this tick, by def and whole percent, most first. */
+function derateGroups(derates: readonly Derate[]): DerateGroup[] {
+  const groups = new Map<string, { defId: MachineDefId; count: number; output: number }>();
+  for (const { machine, output } of derates) {
+    const key = `${machine.defId}|${Math.round(output * 100)}`;
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, { defId: machine.defId, count: 1, output });
+    else group.count += 1;
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+/**
+ * §output-and-blocking: the tick's derates, per cause: `machineDerated` for a machine alone, one
+ * `machinesDerated` for several. A power derate within `equipment.powerLineQuietSeconds` of the
+ * last power line on the ticker is trace, so a brownout spreading over a few ticks reads as one.
+ */
+function emitDerates(ctx: StepCtx, derates: readonly Derate[]): void {
+  const byCause = new Map<DerateCause, Derate[]>();
+  for (const derate of derates) {
+    const list = byCause.get(derate.cause);
+    if (list === undefined) byCause.set(derate.cause, [derate]);
+    else list.push(derate);
+  }
+  const power = ctx.state.power;
+  const quietTicks = configTicks(ctx.config, ctx.config.equipment.powerLineQuietSeconds);
+  for (const [cause, list] of byCause) {
+    const quiet =
+      cause === "power" && power.lineTick !== undefined && ctx.tick - power.lineTick < quietTicks;
+    if (cause === "power" && !quiet) power.lineTick = ctx.tick;
+    const significance = quiet ? { significance: "trace" as const } : {};
+    const [first] = list;
+    if (first === undefined) continue;
+    if (list.length === 1) {
+      ctx.emit({
+        ...machineEvent("machineDerated", first.machine.id, {
+          machineId: first.machine.id,
+          output: first.output,
+          cause,
+        }),
+        ...significance,
+      });
+      continue;
+    }
+    const machineIds = list.map((d) => d.machine.id);
+    ctx.emit({
+      type: "machinesDerated",
+      subjectIds: machineIds,
+      causeIds: [],
+      source: "sim",
+      payload: { machineIds, groups: derateGroups(list), cause },
+      ...significance,
+    });
+  }
+}
+
+function updateOutput(
+  ctx: StepCtx,
+  machine: Machine,
+  def: MachineDef,
+  faults: FaultEffects,
+): Derate | undefined {
   const factors = [
     ["power", powerFraction(machine, def)],
     ["heat", heatOutputFactor(machine.temperature, def)],
@@ -397,14 +475,8 @@ function updateOutput(ctx: StepCtx, machine: Machine, def: MachineDef, faults: F
         )
       : 0;
   machine.output = newOutput;
-  if (oldOutput < 1 || newOutput >= 1) return;
-  ctx.emit(
-    machineEvent("machineDerated", machine.id, {
-      machineId: machine.id,
-      output: newOutput,
-      cause: derateCause(factors),
-    }),
-  );
+  if (oldOutput < FULL_OUTPUT || newOutput >= FULL_OUTPUT) return undefined;
+  return { machine, output: newOutput, cause: derateCause(factors) };
 }
 
 /** Wear and hazard accumulate only while truly operating; a crossed threshold draws a fault. */
@@ -466,7 +538,7 @@ function tickMachine(
   coolant: CoolantIndex,
   machine: Machine,
   dtSeconds: number,
-): void {
+): Derate | undefined {
   const def = ctx.defs.machine(machine.defId);
   fireScheduledFaults(ctx, machine, def);
   ensureSymptomProblems(ctx, machine, def);
@@ -474,9 +546,10 @@ function tickMachine(
   const faults = faultEffects(machine, def);
   updateHeat(ctx, coolant, machine, def, faults, dtSeconds);
   updateMode(ctx, machine, def);
-  updateOutput(ctx, machine, def, faults);
+  const derate = updateOutput(ctx, machine, def, faults);
   updateHazard(ctx, machine, def, dtSeconds);
   updateMaintenanceDue(ctx, machine, def);
+  return derate;
 }
 
 export const equipmentSystem: System = {
@@ -486,7 +559,12 @@ export const equipmentSystem: System = {
     const dtSeconds = ticksToSeconds(ctx.elapsedTicks, ctx.config.time.tickRate);
     const machines = Object.values(ctx.state.machines);
     const coolant = buildCoolantIndex(ctx, machines);
-    for (const machine of machines) tickMachine(ctx, coolant, machine, dtSeconds);
+    const derates: Derate[] = [];
+    for (const machine of machines) {
+      const derate = tickMachine(ctx, coolant, machine, dtSeconds);
+      if (derate !== undefined) derates.push(derate);
+    }
+    emitDerates(ctx, derates);
   },
 };
 

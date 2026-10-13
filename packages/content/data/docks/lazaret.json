@@ -172,6 +172,7 @@
   "grime": 0.6,
   "airborneDust": 0,
   "noticeRadius": 3,
+  "holdWhy": "They keep a lifeboat lock at the far end; hold the ramp and they're gone by it.",
   "defaultCast": [
     {
       "name": "Orrin Sallow",

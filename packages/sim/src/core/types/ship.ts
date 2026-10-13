@@ -235,4 +235,9 @@ export interface PowerDomainState {
 
 export interface PowerState {
   domains: Record<LocalKey, PowerDomainState>;
+  /**
+   * §output-and-blocking: the tick of the last power derate that went to the ticker (owner:
+   * equipment). Absent until the first, and in a save from before it.
+   */
+  lineTick?: Tick;
 }

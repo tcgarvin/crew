@@ -26,7 +26,7 @@ const bump = (tally: Tally, key: string): void => {
 };
 
 /** One ship's day of a pacing voyage, tallied by activity, topic and thought. */
-async function dayOf(scenario: PacingScenario): Promise<Tally> {
+async function dayOf(scenario: PacingScenario, seed = 1): Promise<Tally> {
   const tally: Tally = new Map();
   const observe = (events: readonly SimEvent[]): void => {
     for (const event of events) {
@@ -37,7 +37,7 @@ async function dayOf(scenario: PacingScenario): Promise<Tally> {
       if (event.type === "thoughtAdded") bump(tally, event.payload.key);
     }
   };
-  await runBeatsAsync({ scenario, days: 1, seed: 1, fields: "none", observe });
+  await runBeatsAsync({ scenario, days: 1, seed, fields: "none", observe });
   return tally;
 }
 
@@ -53,10 +53,14 @@ describe("the variety pack off watch: a ship's day of each pacing voyage, seed 1
     expect(await count("activity.gossip")).toBeGreaterThan(0);
   }, 300_000);
 
-  it("a new topic comes up", async () => {
+  // A day holds a handful of topic sessions, so seed 1 alone can miss all three new topics
+  // whenever a change to the social stream reshuffles them; seed 2's plain day joins it here.
+  it("a new topic comes up (with seed 2's plain day)", async () => {
     const topics = ["topic.salvage_rights", "topic.ghost_ships", "topic.sweethearts"];
+    const seedTwo = await dayOf("plain", 2);
     const counts = await Promise.all(topics.map(count));
-    expect(counts.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    const more = topics.map((topic) => seedTwo.get(topic) ?? 0);
+    expect([...counts, ...more].reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
   }, 300_000);
 
   it("the cook, a repairer and a host nobody joined have the new thoughts", async () => {

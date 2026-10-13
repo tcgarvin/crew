@@ -16,6 +16,7 @@ import type { SimEvent } from "../../core/types/events";
 import type { ActorId, DecisionId, JobId } from "../../core/types/ids";
 import type { Job } from "../../core/types/travel";
 import type { PlanOption } from "../../core/types/view";
+import { planMenu } from "../../view/planMenu";
 import { CREW } from "../work/fixtures/crew-deck";
 import { ARRIVAL_PROMPT_KEY, TURN_PROMPT_KEY, arrivalPair } from "./cards";
 import { startExpedition, violations } from "./fixtures/fight";
@@ -265,6 +266,24 @@ describe("the arrival card (call 4)", () => {
     const hook = test.world.state.narrator.pendingHook;
     expect(hook).toMatchObject({ kind: "policyDecision", context: { decisionId: card.id } });
     expect(card.narratorHookId).toBe(hook?.id);
+  });
+
+  it("says what holding comes to at a site that gives it away (holdWhy, §the-arrival-card)", () => {
+    const holdWhy =
+      "They keep a lifeboat lock at the far end; hold the ramp and they're gone by it.";
+    const { test } = landed({ holdWhy });
+    const card = decision(test, test.world.state.expedition?.cards?.arrival);
+    expect(card.prompt.params).toMatchObject({
+      leftPlan: "hold-lethal-armed",
+      leftWhy: holdWhy,
+      rightWhy: `We go in hard and bring ${TARGET_NAME} out.`,
+    });
+    expect(card.left.aftermath?.params).toEqual({ leftWhy: holdWhy });
+    // The plan menu says it on every hold plan, and on nothing else.
+    const menu = planMenu(test.world.state, test.world.content, test.world.config.values);
+    for (const option of menu.filter((o) => o.available)) {
+      expect(option.why.includes(holdWhy), option.id).toBe(option.plan.posture === "hold");
+    }
   });
 
   it("holds everything while it is up: the hook halt, then the card, with nobody moving", () => {

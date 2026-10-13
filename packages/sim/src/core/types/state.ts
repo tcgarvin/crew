@@ -196,6 +196,11 @@ export interface SocialState {
   /** The ship's day (`dayIndexAt`) of the last captain's table; -1 before the first. */
   captainsTableDay: number;
   privateTalk?: PrivateTalk;
+  /**
+   * §chat-line-repeats: the tick each chat template (by its line text) was last said. Owner: ambient
+   * chat. Absent in a save from before it, read as nothing said yet.
+   */
+  chatSaid?: Record<string, Tick>;
 }
 
 /**

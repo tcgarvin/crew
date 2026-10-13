@@ -203,8 +203,14 @@ function checkSiteReferences(
     );
   }
   if (!site) {
-    if (dock.noticeRadius !== undefined || dock.defaultCast !== undefined) {
-      issues.push(issue("referential", path, "only a site map has noticeRadius and defaultCast"));
+    if (
+      dock.noticeRadius !== undefined ||
+      dock.defaultCast !== undefined ||
+      dock.holdWhy !== undefined
+    ) {
+      issues.push(
+        issue("referential", path, "only a site map has noticeRadius, defaultCast and holdWhy"),
+      );
     }
     return;
   }

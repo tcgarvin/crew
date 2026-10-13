@@ -2097,6 +2097,10 @@
             "type": "number",
             "exclusiveMinimum": 0
           },
+          "holdWhy": {
+            "type": "string",
+            "minLength": 1
+          },
           "defaultCast": {
             "type": "array",
             "items": {
@@ -6077,6 +6081,10 @@
               "type": "number",
               "minimum": 0
             },
+            "powerLineQuietSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
             "maintenanceConditionBelow": {
               "type": "number",
               "minimum": 0,
@@ -6101,6 +6109,7 @@
           "required": [
             "hazardScale",
             "overheatDamagePerSecond",
+            "powerLineQuietSeconds",
             "maintenanceConditionBelow",
             "maintenanceEssentialBelow",
             "integrityDerateBelow",
@@ -6940,7 +6949,17 @@
                       },
                       "when": {
                         "type": "string",
-                        "const": "paidDockingFee"
+                        "enum": [
+                          "paidDockingFee",
+                          "docked",
+                          "underWay",
+                          "pumpSymptom",
+                          "afterFight",
+                          "someoneWounded",
+                          "hullScarred",
+                          "fieldRecently",
+                          "kitsLow"
+                        ]
                       }
                     },
                     "required": ["line", "when"],
@@ -6948,6 +6967,14 @@
                   }
                 ]
               }
+            },
+            "templateRepeatDays": {
+              "type": "number",
+              "minimum": 0
+            },
+            "chatRecentDays": {
+              "type": "number",
+              "exclusiveMinimum": 0
             },
             "chatMemoryEveryDays": {
               "type": "number",
@@ -7545,6 +7572,8 @@
             "chatRadiusTiles",
             "chatCooldownSeconds",
             "templateLines",
+            "templateRepeatDays",
+            "chatRecentDays",
             "chatMemoryEveryDays",
             "chatSour",
             "compatibility",
