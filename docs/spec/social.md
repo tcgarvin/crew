@@ -36,9 +36,10 @@ is `routineObligation`. Why: off watch everyone is in a voluntary rest or chat h
 voluntary candidate never interrupts, so voluntary joins never filled a table.
 
 Score: interest 3 (strong like), 2, 1, 0 (a dislike is never chosen); +2 to join an open session
-with room; +1 to host a group activity; +0.5 for a session holding someone liked, never a session
-holding someone at or below `social.avoidBelow`; +1 for group play in good mood, solo only in low
-mood. Joining needs score >= 1, hosting a like, solo play >= 1. Ties go to join over host over solo,
+with room; +1 to host a group activity; +2 for a game ashore (§shore-leave); +0.5 for a session
+holding someone liked, never a session holding someone at or below `social.avoidBelow`; +1 for
+group play in good mood, solo only in low mood. Joining needs score >= 1, hosting a like (or a
+neutral interest ashore), solo play >= 1. Ties go to join over host over solo,
 then nearer, then the bigger table. Rest and chat take `needUrgency`, and one taken because the
 need pressed ends when the need is met. Why: otherwise routine games beat voluntary chat every
 time and helm standers came on watch lonely.
@@ -66,14 +67,27 @@ Docked at a port, off-watch crew sometimes go down the ramp for a drink ashore
 recreation 0.4 and social 0.3, a `bond`). Its venues are the dock's market stall, else its lounge
 door, else its bench (`core/shore-leave.ts`). A dock-post venue counts only while:
 
-- the ship lies `docked` at a port whose dock is alongside, with no departure planned (no course
-  set): never at a landing site, in departure prep or under way;
+- the ship lies `docked` at a port whose dock is alongside, its ramps down at least
+  `recreation.shoreLeaveMinDockedSeconds` (20, from `TravelState.dockedSinceTick`; a docking
+  nobody counted, such as a game that starts docked, is long since), a course set or not: never at
+  a landing site, in departure prep or under way (`shoreLeaveDock`);
+- the ship is not merely waiting to cast off: the planner starts no new leave, hosting or joining,
+  once a course is set and plotted (`ShoreView.coursePlotted`) and no cargo work is open
+  (`cargoOpen`). Why: a course is set minutes before the ship can go, and plotted soon after; the
+  hands waiting on the cargo and the plot have the time, but with both done a new leave only holds
+  the ship;
 - the person is crew, off duty, not the gangway stander, not a passenger and not the captain (whose
   walk ashore is their own, §looking-for-work);
 - fewer than `recreation.ashoreMax` (3) others are ashore on leave: at a `recreate` step standing on
   the dock, or with a walk onto it still ahead in a `recreate` plan (`isOnShoreLeave`). The planner
   reads that count and the posts from `AgentView.shore()` (common knowledge: everyone sees who goes
   down the ramp); the `recreate` plan checks it again against truth.
+
+A drink ashore is worth +2 over the same game aboard, and anyone not put off by gossip may host one
+(a neutral interest, not only a like). A session ashore starts after `recreation.ashoreGatherSeconds`
+(15), not `gatherSeconds`. Why: without these the drink tied gossip in the lounge and lost on
+distance, nobody but a gossip-lover ever went, and a stop of a minute or two was over before the
+gather was.
 
 A spot by a post is dock floor within two tiles of the tile the post faces, never the post's tile or
 any post's counter tile (the local's and the buyers'), a freight area, or a tile beside the berth

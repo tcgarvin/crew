@@ -95,7 +95,8 @@ run while anyone is out. Everyone out is called aboard with `comeAboard`, a pers
 planner never chooses: a walk at essential-operation urgency to the top of the nearest ramp. The
 call waits while loading is open, since the loaders are out fetching freight. A passenger walking
 off is never called back. The headline reads "Waiting for <name> to come aboard", or "raising the
-ramps" if the clock has run out with a ramp still moving.
+ramps" if the clock has run out with a ramp still moving. Shore leave (§shore-leave) ends here:
+prep closes it, and the call aboard ends a drink like any other interruption.
 
 A departure is never held forever, and never silently. Someone on the dock who cannot walk back
 (unavailable, not crew, or their walk failed) is brought up the ramp by the dock crew at once, and

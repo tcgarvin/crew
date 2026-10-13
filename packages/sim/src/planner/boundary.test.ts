@@ -79,6 +79,8 @@ const config: PlannerConfig = {
     lateJoinSeconds: 20,
     collapseBackoffDays: 0.1,
     ashoreMax: 3,
+    shoreLeaveMinDockedSeconds: 20,
+    ashoreGatherSeconds: 15,
   },
   social: {
     chatRadiusTiles: 2,

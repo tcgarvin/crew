@@ -23,10 +23,10 @@
  * vids before the two-player video game at the one vid screen), then id. Emits
  * `recreate:<activityId>` with `choice.activityId`, `choice.role` and (joining) `choice.sessionId`.
  *
- * §shore-leave: a dock-post venue counts only while `shore()` says the ship lies docked at a port
- * with no departure planned, for crew off duty and off the gangway (never a passenger or the
- * captain, whose walk ashore is their own), and while fewer than `recreation.ashoreMax` others are
- * ashore on leave.
+ * §shore-leave: a dock-post venue counts only while `shore()` says leave is open (docked at a
+ * port, ramps down a while), never with a course plotted and the cargo done (no wait left),
+ * for crew off duty and off the gangway (never a passenger or the captain, whose walk ashore is
+ * their own), and while fewer than `recreation.ashoreMax` others are ashore on leave.
  *
  * Reads `self.interests`, `self.affinity`, `self.mood`, `sessions()`, `travel()`, `shore()`, known items
  * (`ownerId` for an owned instrument), `knownProblems()` for `blockedByProblems`, the schematic
@@ -69,6 +69,13 @@ const OPEN_SESSION_BONUS = 2;
  */
 const HOST_COMPANY_BONUS = 1;
 
+/**
+ * §shore-leave: a game ashore (a dock-post venue) is worth +1 over the same game aboard: a run
+ * ashore is a change from the ship, and without it the drink ashore tied gossip in the lounge and
+ * lost on distance every time, so nobody ever went.
+ */
+const ASHORE_BONUS = 2;
+
 /** Strong like 3, like 2, neutral 1, dislike 0 (`core/interests.ts` `interestScore`). */
 export function interestScoreOf(view: AgentView, tag: InterestTag): number {
   const interests = view.self.interests;
@@ -90,14 +97,17 @@ function berthCompartment(view: AgentView): string | undefined {
 }
 
 /**
- * §shore-leave: the dock's posts, if this actor may go ashore on leave now: docked at a port with
- * no departure planned, off duty and off the gangway, crew and not the captain, and fewer than
- * `recreation.ashoreMax` others already ashore on leave.
+ * §shore-leave: the dock's posts, if this actor may go ashore on leave now: leave is open, the ship
+ * is not merely waiting to go (a course plotted with the cargo done), off duty and off the gangway,
+ * crew and not the captain, and fewer than `recreation.ashoreMax` others already ashore on leave.
  */
 function shorePosts(view: AgentView, config: PlannerConfig): readonly ShorePostView[] {
   const shore = view.shore();
   const self = view.self;
   if (shore === undefined || self.onDuty || self.watch.gangway === true) return [];
+  // A course is set minutes before the ship can go: the hands waiting on the cargo and the plot
+  // have the time, but with both done a new leave would only hold the ship.
+  if (shore.coursePlotted && !shore.cargoOpen) return [];
   if (self.passenger === true || self.roleTags.includes("captain")) return [];
   if (shore.othersOnLeave >= config.recreation.ashoreMax) return [];
   return shore.posts;
@@ -141,9 +151,18 @@ function alternativeTile(
 
 /** The first venue alternative of `def` the deck (or the dock alongside) has, as a tile. */
 function venueTile(view: AgentView, config: PlannerConfig, def: Def): TileCoord | undefined {
+  return firstVenue(view, config, def)?.tile;
+}
+
+/** The first venue alternative of `def` the deck (or the dock alongside) has, and its tile. */
+function firstVenue(
+  view: AgentView,
+  config: PlannerConfig,
+  def: Def,
+): { readonly tile: TileCoord; readonly ashore: boolean } | undefined {
   for (const alt of def.venue) {
     const tile = alternativeTile(view, config, alt);
-    if (tile !== undefined) return tile;
+    if (tile !== undefined) return { tile, ashore: alt.dockPost !== undefined };
   }
   return undefined;
 }
@@ -266,15 +285,22 @@ function optionsFor(view: AgentView, config: PlannerConfig, def: Def, routine: b
     if (!hasRoom(view, config, def, session)) continue;
     add(
       "join",
-      interest + OPEN_SESSION_BONUS + high + companyBonus(view, config, session),
+      interest +
+        OPEN_SESSION_BONUS +
+        high +
+        companyBonus(view, config, session) +
+        ("postKey" in session.venue ? ASHORE_BONUS : 0),
       sessionTile(view, config, session),
       session,
     );
   }
   // One game of a kind at a time: with cards already on (open, or full and running), a second
   // table would only gather nobody and collapse (the fifth of five would-be hosts).
-  if (routine && interest >= 2 && ofDef.length === 0) {
-    add("host", interest + HOST_COMPANY_BONUS + high, venueTile(view, config, def));
+  // A drink ashore needs no great love of gossip: anyone not put off by it may host one.
+  const venue = routine && ofDef.length === 0 ? firstVenue(view, config, def) : undefined;
+  const ashore = venue?.ashore === true;
+  if (venue !== undefined && (interest >= 2 || ashore)) {
+    add("host", interest + HOST_COMPANY_BONUS + high + (ashore ? ASHORE_BONUS : 0), venue.tile);
   }
   return out;
 }

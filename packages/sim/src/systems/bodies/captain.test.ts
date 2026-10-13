@@ -47,7 +47,11 @@ describe("a dead captain (§7.1)", () => {
     advanceToStage(kernel, world, "approaching");
     const untilAsk = kernel.advance(world, 1_000);
     expect(untilAsk.halt).toEqual({ kind: "hook" });
-    expect(world.state.travel).toEqual({ stage: "docked", portId: PORTS.b });
+    expect(world.state.travel).toEqual({
+      stage: "docked",
+      portId: PORTS.b,
+      dockedSinceTick: expect.any(Number),
+    });
     expect(world.state.narrator.pendingHook).toMatchObject({
       kind: "captainAshore",
       context: { portId: PORTS.b, actorId: mate },

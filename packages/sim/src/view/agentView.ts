@@ -62,6 +62,8 @@ import {
   isStaticWalkable,
   rotateOffset,
 } from "../systems/spatial/geometry";
+import { coursePlotted } from "../systems/travel/course";
+import { hasOpenCargoWork } from "../systems/travel/travel";
 import { isOnDuty, isOnWatch, isSleepWatch } from "../systems/watch/duty";
 import { gangwayStanderOf, helmRoleOf, isOfficerOfTheWatch } from "../systems/watch/helm";
 
@@ -417,7 +419,7 @@ function roster(state: ReadonlyWorldState): RosterEntry[] {
 /** §shore-leave: the dock's posts to sit by on leave, and who is ashore on leave now. */
 function shoreOf(world: World, actorId: ActorId): ShoreView | undefined {
   const { state, content } = world;
-  const berth = shoreLeaveDock(content, state);
+  const berth = shoreLeaveDock(content, world.config.values, state);
   if (berth === undefined) return undefined;
   const posts = SHORE_POST_KINDS.flatMap((kind) => {
     const post = shorePost(berth, kind);
@@ -426,7 +428,14 @@ function shoreOf(world: World, actorId: ActorId): ShoreView | undefined {
   const othersOnLeave = Object.values(state.actors).filter(
     (a) => a.id !== actorId && a.crew && isOnShoreLeave(content, state, a),
   ).length;
-  return { posts, othersOnLeave };
+  const courseSet =
+    state.travel.stage === "docked" && state.travel.plannedDestinationId !== undefined;
+  return {
+    posts,
+    othersOnLeave,
+    coursePlotted: courseSet && coursePlotted({ state, content }),
+    cargoOpen: hasOpenCargoWork({ state, content }),
+  };
 }
 
 export function buildAgentView(world: World, actorId: ActorId): AgentView {

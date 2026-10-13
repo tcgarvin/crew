@@ -72,6 +72,12 @@ export type TravelState =
        * clear it, and the `preparingDeparture` object is built without it, so it never carries.
        */
       coursePlotted?: true;
+      /**
+       * §shore-leave: the tick the ship came alongside here and lowered its ramps. Absent when
+       * nobody counted (a game that starts docked, a hold back from prep, a landing site): docked
+       * since long ago. A course set here keeps it.
+       */
+      dockedSinceTick?: Tick;
     } & DepartureGateFlags &
       VoyageFields)
   | ({

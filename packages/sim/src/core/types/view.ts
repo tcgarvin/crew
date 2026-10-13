@@ -234,11 +234,15 @@ export interface ShorePostView {
 
 /**
  * §shore-leave: shore leave as everyone aboard knows it (who goes down the ramp is seen): the
- * dock's posts to sit by, and how many other crew are ashore on leave now (`isOnShoreLeave`).
+ * dock's posts to sit by, how many other crew are ashore on leave now (`isOnShoreLeave`), and
+ * what the ship still waits on: whether a course is set and plotted (the helm watch is posted and
+ * the plot on the nav screen) and whether cargo work is still open (the freight is in plain sight).
  */
 export interface ShoreView {
   readonly posts: readonly ShorePostView[];
   readonly othersOnLeave: number;
+  readonly coursePlotted: boolean;
+  readonly cargoOpen: boolean;
 }
 
 /**
@@ -342,8 +346,8 @@ export interface AgentView {
   /** Slice 4: the ship's travel stage (common knowledge: the ship is docked or under way). */
   travel(): { readonly stage: TravelStage };
   /**
-   * §shore-leave: while the ship lies docked at a port with no departure planned, the dock's posts
-   * to sit by on leave and how many are ashore on leave; else undefined.
+   * §shore-leave: while shore leave is open (`shoreLeaveDock`), the dock's posts to sit by on
+   * leave, how many are ashore on leave, and whether the ship waits on its cargo; else undefined.
    */
   shore(): ShoreView | undefined;
   /**

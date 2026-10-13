@@ -253,7 +253,7 @@ function heldByAnother(
  * ashore on leave.
  */
 function shoreFor(ctx: VenueCtx, actor: Actor): BerthedDock | undefined {
-  const berth = shoreLeaveDock(ctx.content, ctx.state);
+  const berth = shoreLeaveDock(ctx.content, ctx.config, ctx.state);
   if (berth === undefined) return undefined;
   const others = Object.values(ctx.state.actors).filter(
     (a) => a.id !== actor.id && a.crew && isOnShoreLeave(ctx.content, ctx.state, a),
@@ -389,7 +389,7 @@ export function venueAt(
   const compartmentId = compartmentAt(geometry, here.x, here.y);
   for (const alt of def.venue) {
     if (alt.dockPost !== undefined) {
-      const berth = shoreLeaveDock(ctx.content, ctx.state);
+      const berth = shoreLeaveDock(ctx.content, ctx.config, ctx.state);
       const post = berth === undefined ? undefined : shorePost(berth, alt.dockPost);
       const there =
         berth !== undefined &&
