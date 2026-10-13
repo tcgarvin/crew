@@ -7,11 +7,12 @@
  */
 import { configTicks } from "./clock";
 import { findItemDef } from "./defs";
-import { isOnDock } from "./docks";
+import { dockAlongside, isOnDock } from "./docks";
 import { isNobodysFreight } from "./freight";
 import { byId } from "./ids";
 import { isSite } from "./places";
 import { roomPhrase } from "./rooms";
+import { shorePostByKey, shoreSpots } from "./shore-leave";
 import { siteOf } from "./sites";
 import type { Actor } from "./types/actor";
 import type { DeepReadonly, PhysicalLocation, TileCoord } from "./types/common";
@@ -279,6 +280,8 @@ type Names = {
   roomCap(key: string): string;
   /** Slice 4: "the lounge" for a compartment instance; "the room" if unknown. */
   compartment(id: string): string;
+  /** §shore-leave: a dock post's name ("the night-market stall"); "the dock" if unknown. */
+  dockPost(dockId: string, postKey: string): string;
   /** Slice 4: the activity's running label ("playing cards"). */
   activityLabel(id: string): string;
   /** Slice 4: what one plays, from the label without a leading "playing " ("cards"). */
@@ -326,6 +329,10 @@ function namer(state: ReadonlyWorldState, content: ContentBundle): Names {
   return {
     room,
     compartment,
+    dockPost: (dockId, postKey) =>
+      content.docks?.[dockId as keyof NonNullable<ContentBundle["docks"]>]?.posts.find(
+        (p) => p.key === postKey,
+      )?.name ?? "the dock",
     activityLabel,
     activityNoun: (id) => activityLabel(id).replace(/^playing /, ""),
     topic: (id) => content.topics[id as keyof ContentBundle["topics"]]?.label ?? "this and that",
@@ -617,10 +624,15 @@ function specificLine(event: SimEvent, n: Names): string | null | undefined {
       return navHazardLine(event, n);
     // Slice 4 (call 18): the ticker says who won and little else.
     case "sessionStarted": {
-      const { memberIds, activityId, compartmentId } = event.payload;
+      const payload = event.payload;
+      const { memberIds, activityId } = payload;
       const who = nameList(memberIds.map((id) => n.actor(id) ?? "someone"));
       const verb = memberIds.length === 1 ? "is" : "are";
-      return `${who} ${verb} ${n.activityLabel(activityId)} in ${n.compartment(compartmentId)}`;
+      const where =
+        "ashore" in payload
+          ? `ashore, by ${n.dockPost(payload.ashore.dockId, payload.ashore.postKey)}`
+          : `in ${n.compartment(payload.compartmentId)}`;
+      return `${who} ${verb} ${n.activityLabel(activityId)} ${where}`;
     }
     case "sessionEnded":
       return sessionEndedLine(event, n);
@@ -1556,12 +1568,20 @@ function centreOf(tiles: readonly TileCoord[]): { x: number; y: number } | undef
   return { x: sum.x / tiles.length, y: sum.y / tiles.length };
 }
 
-/** The tiles a session's venue covers: the machine's footprint, the zone, or the room. */
+/**
+ * The tiles a session's venue covers: the machine's footprint, the zone, the room, or the spots by
+ * its dock post (§shore-leave).
+ */
 function venueTiles(
   state: ReadonlyWorldState,
   content: ContentBundle,
   venue: DeepReadonly<SessionVenue>,
 ): TileCoord[] {
+  if ("postKey" in venue) {
+    const berth = dockAlongside(content, state);
+    const post = berth === undefined ? undefined : shorePostByKey(berth, venue.postKey);
+    return berth === undefined || post === undefined ? [] : shoreSpots(berth, post).slice(0, 4);
+  }
   const compartment = state.compartments[venue.compartmentId];
   const deck = compartment === undefined ? undefined : content.decks[compartment.deckId];
   if (compartment === undefined || deck === undefined) return [];

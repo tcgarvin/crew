@@ -15,9 +15,16 @@ thoughts, memories, skill gain, risk, dirt, a required item and a product. The f
 catalogue. Everyone has interests (likes, one strong like, dislikes) and three value axes: authored
 for the nine, drawn for anyone else from keyed draws on their id, so no existing stream moves.
 
+A venue is an ordered list of alternatives, the first with a free spot winning: a machine tag (a
+`use` position, `own` for one in the actor's berth compartment), a zone tag (a free zone tile), a
+compartment tag (a free floor tile), or a dock post kind (`dockPost`: `marketStall`, `loungeDoor`
+or `bench`, a spot by that post ashore, §shore-leave).
+
 Content validation is per deck: a venue the deck has seats `participants.max` (at most four, one
 plate); a non-contest group activity says how it is done alone; `{ref}` appears only in labels of
-thoughts that carry a `refId`. A deck no scenario sails gets notes, not failures.
+thoughts that carry a `refId`. A deck no scenario sails gets notes, not failures. Dock-post
+alternatives are not the deck's: an activity with only those is checked against no deck, and a dock
+without a post of the kind has no venue for it.
 
 ### Choosing recreation
 
@@ -51,6 +58,33 @@ interrupted game restores in part, and waiting restores nothing (`recreation/nee
 
 Personal items are fetched and put back: an owned instrument from its locker, a book from the
 shelf to the player's desk (the lounge without a cabin).
+
+### Shore leave
+
+Docked at a port, off-watch crew sometimes go down the ramp for a drink ashore
+(`activity.shore_leave`, "having a drink": interest `gossip`, one to three people, 0.08 days,
+recreation 0.4 and social 0.3, a `bond`). Its venues are the dock's market stall, else its lounge
+door, else its bench (`core/shore-leave.ts`). A dock-post venue counts only while:
+
+- the ship lies `docked` at a port whose dock is alongside, with no departure planned (no course
+  set): never at a landing site, in departure prep or under way;
+- the person is crew, off duty, not the gangway stander, not a passenger and not the captain (whose
+  walk ashore is their own, §looking-for-work);
+- fewer than `recreation.ashoreMax` (3) others are ashore on leave: at a `recreate` step standing on
+  the dock, or with a walk onto it still ahead in a `recreate` plan (`isOnShoreLeave`). The planner
+  reads that count and the posts from `AgentView.shore()` (common knowledge: everyone sees who goes
+  down the ramp); the `recreate` plan checks it again against truth.
+
+A spot by a post is dock floor within two tiles of the tile the post faces, never the post's tile or
+any post's counter tile (the local's and the buyers'), a freight area, or a tile beside the berth
+box (the ramp landings). A session ashore names its dock and post (`SessionVenue` `dockId`,
+`postKey`); it has no room, so a performance or debate has no audience and nothing is dirtied or
+set down there. The ticker says "Jax Okonkwo and Priya Kessler are having a drink ashore, by the
+night-market stall", the plate is drawn by the post, and the digest's off-watch line says where
+(§ship-life-lines). Once done, rest or chat (whose venues are aboard) walks them back up the ramp.
+Departure prep's call aboard (§calling-the-crew-aboard) ends a drink like any other interruption,
+and an invariant holds a session ashore to its dock alongside. Why: texture, the crew living at the
+port and not only aboard; the cap keeps the ship crewed.
 
 ### Outcomes
 

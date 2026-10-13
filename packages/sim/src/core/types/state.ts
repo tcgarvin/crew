@@ -42,6 +42,7 @@ import type {
   CrewDefId,
   DecisionId,
   DeckDefId,
+  DockDefId,
   DoorId,
   FieldId,
   HazardId,
@@ -144,14 +145,23 @@ export interface Rivalry {
 }
 
 /**
- * Slice 4: where a session happens: a compartment, and in it a machine (the games table) or a
- * zone (the sparring mat), or neither (the lounge floor).
+ * Slice 4: where a session happens aboard: a compartment, and in it a machine (the games table) or
+ * a zone (the sparring mat), or neither (the lounge floor).
  */
-export type SessionVenue = { compartmentId: CompartmentId } & (
+export type DeckSessionVenue = { compartmentId: CompartmentId } & (
   | { machineId: MachineId }
   | { zoneKey: LocalKey }
   | Record<never, never>
 );
+
+/** §shore-leave: a session ashore, by a post (`postKey`) of the dock alongside (`dockId`). */
+export interface DockSessionVenue {
+  dockId: DockDefId;
+  postKey: LocalKey;
+}
+
+/** Where a session happens: aboard, or ashore on the dock alongside (§shore-leave). */
+export type SessionVenue = DeckSessionVenue | DockSessionVenue;
 
 /**
  * Slice 4: a group activity, open (gathering) or running. The row is the venue's; each member's

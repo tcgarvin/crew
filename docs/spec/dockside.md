@@ -78,6 +78,13 @@ ashore", "walking on the dock" and "coming aboard", a step across a ramp emits `
 `partsNeeded` (§parts-and-tools-needed); freight on the dock, and a put-off passenger's luggage, is
 not aboard for loading.
 
+### Crew ashore on leave
+
+Off-watch crew go ashore for a drink by the stall, the lounge door or the bench while the ship lies
+docked at a port, at most `recreation.ashoreMax` (3) at once, keeping off posts, counters, freight
+areas and the ramp landings (§shore-leave). They are crew on the dock like anyone else: departure
+prep calls them aboard and the dock casts off without them on it (§ramps-and-cast-off).
+
 ## Locals
 
 ### Locals table

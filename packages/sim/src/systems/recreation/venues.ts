@@ -1,3 +1,11 @@
+import type { BerthedDock } from "../../core/docks";
+import {
+  isOnShoreLeave,
+  shoreLeaveDock,
+  shorePost,
+  shorePostByKey,
+  shoreSpots,
+} from "../../core/shore-leave";
 /**
  * Venues (slice 4, call 12): where an activity happens on this deck, from content tags at plan
  * time, against the reservation cache. `ActivityDef.venue` is an ordered list; the first
@@ -5,8 +13,10 @@
  * lounge floor). A machine venue stands at a `use` position not reserved and not spoken for by
  * someone else's plan; a zone venue at a zone tile free of actors; a compartment venue at a free
  * floor tile chosen by `loungeTile`'s rule (computed over state); `own` restricts a machine to
- * the actor's berth compartment. With `session`, the session's venue is fixed and a free spot of
- * it is taken.
+ * the actor's berth compartment; a dock-post venue (§shore-leave) at a free spot by the post, only
+ * while `shoreLeaveDock` says the ship lies docked at a port with no departure planned and fewer
+ * than `recreation.ashoreMax` others are ashore on leave. With `session`, the session's venue is
+ * fixed and a free spot of it is taken.
  *
  * "Spoken for" is slice 3's mess-seat rule (`systems/galley/eat.ts` `seatsSpokenFor`): a
  * reservation is only taken when a walk starts, so a plan that fetches a book first, or four
@@ -17,7 +27,7 @@
  */
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly, TileCoord } from "../../core/types/common";
-import type { ActivityDef, VenueDef } from "../../core/types/content";
+import type { ActivityDef, DockPostDef, ShorePostKind, VenueDef } from "../../core/types/content";
 import type { CompartmentId, DeckDefId, LocalKey, MachineId } from "../../core/types/ids";
 import type { NavInteractionPosition } from "../../core/types/nav";
 import type { StepCtx } from "../../core/types/pipeline";
@@ -33,7 +43,7 @@ export interface ResolvedVenue {
   readonly target: StepTarget;
 }
 
-type VenueCtx = Pick<StepCtx, "state" | "content" | "caches">;
+type VenueCtx = Pick<StepCtx, "state" | "content" | "caches" | "config">;
 
 const tileKey = (tile: TileCoord): string => `${tile.x},${tile.y}`;
 const manhattan = (a: TileCoord, b: TileCoord): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -237,6 +247,40 @@ function heldByAnother(
   });
 }
 
+/**
+ * §shore-leave: the dock alongside, if `actor` may go ashore on leave there now: the ship lies
+ * docked at a port with no departure planned and fewer than `recreation.ashoreMax` others are
+ * ashore on leave.
+ */
+function shoreFor(ctx: VenueCtx, actor: Actor): BerthedDock | undefined {
+  const berth = shoreLeaveDock(ctx.content, ctx.state);
+  if (berth === undefined) return undefined;
+  const others = Object.values(ctx.state.actors).filter(
+    (a) => a.id !== actor.id && a.crew && isOnShoreLeave(ctx.content, ctx.state, a),
+  ).length;
+  return others < ctx.config.recreation.ashoreMax ? berth : undefined;
+}
+
+/** §shore-leave: a free spot by `post` on the dock alongside. */
+function atPost(
+  ctx: VenueCtx,
+  actor: Actor,
+  berth: BerthedDock,
+  post: DockPostDef | undefined,
+): ResolvedVenue | undefined {
+  if (post === undefined) return undefined;
+  const tile = freeTile(ctx, actor, shoreSpots(berth, post), "nearest");
+  return tile === undefined
+    ? undefined
+    : { venue: { dockId: berth.dock.id, postKey: post.key }, target: tile };
+}
+
+/** §shore-leave: a free spot by the dock's first post of `kind`, if shore leave is open. */
+function atShorePost(ctx: VenueCtx, actor: Actor, kind: ShorePostKind): ResolvedVenue | undefined {
+  const berth = shoreFor(ctx, actor);
+  return berth === undefined ? undefined : atPost(ctx, actor, berth, shorePost(berth, kind));
+}
+
 /** A spot at one venue alternative, if it has a free one. */
 function atAlternative(
   ctx: VenueCtx,
@@ -246,6 +290,7 @@ function atAlternative(
 ): ResolvedVenue | undefined {
   if (actor.location.kind !== "onDeck") return undefined;
   const deckId = actor.location.deckId;
+  if (alt.dockPost !== undefined) return atShorePost(ctx, actor, alt.dockPost);
   if (alt.machineTag !== undefined) {
     const free = venueMachines(ctx, actor, alt).filter((id) => !heldByAnother(ctx, def, id));
     const position = freePosition(ctx, actor, free);
@@ -289,6 +334,11 @@ function atSession(
   if (actor.location.kind !== "onDeck") return undefined;
   const deckId = actor.location.deckId;
   const venue = session.venue;
+  if ("postKey" in venue) {
+    const berth = shoreFor(ctx, actor);
+    if (berth === undefined || berth.dock.id !== venue.dockId) return undefined;
+    return atPost(ctx, actor, berth, shorePostByKey(berth, venue.postKey));
+  }
   if ("machineId" in venue) {
     const position = freePosition(ctx, actor, [venue.machineId]);
     return position === undefined ? undefined : machineVenue(ctx, position);
@@ -338,7 +388,15 @@ export function venueAt(
   if (geometry === undefined) return undefined;
   const compartmentId = compartmentAt(geometry, here.x, here.y);
   for (const alt of def.venue) {
-    if (alt.machineTag !== undefined) {
+    if (alt.dockPost !== undefined) {
+      const berth = shoreLeaveDock(ctx.content, ctx.state);
+      const post = berth === undefined ? undefined : shorePost(berth, alt.dockPost);
+      const there =
+        berth !== undefined &&
+        post !== undefined &&
+        shoreSpots(berth, post).some((t) => t.x === here.x && t.y === here.y);
+      if (there) return { dockId: berth.dock.id, postKey: post.key };
+    } else if (alt.machineTag !== undefined) {
       const tagged = venueMachines(ctx, actor, alt);
       const position = geometry.interactionPositions.find(
         (p) =>
@@ -379,6 +437,9 @@ export function venueTakenByAnother(
 
 /** Are two venues the same place (compartment, and machine or zone)? */
 export function sameVenue(a: DeepReadonly<SessionVenue>, b: DeepReadonly<SessionVenue>): boolean {
+  if ("postKey" in a || "postKey" in b) {
+    return "postKey" in a && "postKey" in b && a.dockId === b.dockId && a.postKey === b.postKey;
+  }
   if (a.compartmentId !== b.compartmentId) return false;
   const machineA = "machineId" in a ? a.machineId : undefined;
   const machineB = "machineId" in b ? b.machineId : undefined;

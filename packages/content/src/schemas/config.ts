@@ -337,6 +337,7 @@ export const configDefSchema = z.strictObject({
     gatherSeconds: positive,
     lateJoinSeconds: nonNegative,
     collapseBackoffDays: nonNegative,
+    ashoreMax: positiveInt,
   }),
   cabins: z.strictObject({
     noisySeconds: positive,

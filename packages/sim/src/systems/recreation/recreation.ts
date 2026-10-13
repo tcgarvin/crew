@@ -48,7 +48,9 @@ function start(ctx: StepCtx, session: GroupSession, def: ActivityDef): void {
     sessionId: session.id,
     activityId: def.id,
     memberIds: [...session.members],
-    compartmentId: session.venue.compartmentId,
+    ...("postKey" in session.venue
+      ? { ashore: { dockId: session.venue.dockId, postKey: session.venue.postKey } }
+      : { compartmentId: session.venue.compartmentId }),
   });
 }
 

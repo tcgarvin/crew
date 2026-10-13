@@ -32,10 +32,11 @@ import { STUNNED_ABOVE, bodyCapacities } from "../core/body";
 import { watchOfDay } from "../core/clock";
 import { findCrewDef } from "../core/defs";
 import { isOnDock } from "../core/docks";
+import { isOnShoreLeave, shoreLeaveDock, shorePost, shoreSpots } from "../core/shore-leave";
 import { affinitiesFrom } from "../core/social";
 import type { Actor, FactType, KnownFact } from "../core/types/actor";
 import type { DeepReadonly, TileCoord, TileEdge } from "../core/types/common";
-import type { DeckDef, MachinePlacementDef } from "../core/types/content";
+import { type DeckDef, type MachinePlacementDef, SHORE_POST_KINDS } from "../core/types/content";
 import type { ActorId, EntityId, ItemId, MachineId, ProblemId } from "../core/types/ids";
 import type { World } from "../core/types/kernel";
 import type { DeckGeometry, NavInteractionPosition } from "../core/types/nav";
@@ -50,6 +51,7 @@ import type {
   SchematicView,
   SelfView,
   SessionView,
+  ShoreView,
   TaskView,
 } from "../core/types/view";
 import { talkCabin } from "../systems/cabins/private-talk";
@@ -412,6 +414,21 @@ function roster(state: ReadonlyWorldState): RosterEntry[] {
     }));
 }
 
+/** §shore-leave: the dock's posts to sit by on leave, and who is ashore on leave now. */
+function shoreOf(world: World, actorId: ActorId): ShoreView | undefined {
+  const { state, content } = world;
+  const berth = shoreLeaveDock(content, state);
+  if (berth === undefined) return undefined;
+  const posts = SHORE_POST_KINDS.flatMap((kind) => {
+    const post = shorePost(berth, kind);
+    return post === undefined ? [] : [{ key: post.key, kind, spots: shoreSpots(berth, post) }];
+  });
+  const othersOnLeave = Object.values(state.actors).filter(
+    (a) => a.id !== actorId && a.crew && isOnShoreLeave(content, state, a),
+  ).length;
+  return { posts, othersOnLeave };
+}
+
 export function buildAgentView(world: World, actorId: ActorId): AgentView {
   const { state } = world;
   const actor = state.actors[actorId];
@@ -450,6 +467,7 @@ export function buildAgentView(world: World, actorId: ActorId): AgentView {
     knownItems: () => knownItems(world, actor),
     sessions: () => sessionsOf(world),
     travel: () => ({ stage: state.travel.stage }),
+    shore: () => shoreOf(world, actorId),
     activities: () => Object.values(world.content.activities),
     alert: () => {
       const alert = state.alert;

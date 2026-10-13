@@ -543,7 +543,13 @@ const config = {
     rivalry: { streakFor: 3 },
     debate: { agreeWithin: 2, argueBeyond: 4 },
   },
-  recreation: { joinAbove: 0.25, gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 },
+  recreation: {
+    joinAbove: 0.25,
+    gatherSeconds: 30,
+    lateJoinSeconds: 20,
+    collapseBackoffDays: 0.1,
+    ashoreMax: 3,
+  },
   cabins: {
     noisySeconds: 60,
     checkEverySeconds: 60,

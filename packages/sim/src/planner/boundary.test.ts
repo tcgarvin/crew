@@ -73,7 +73,13 @@ const config: PlannerConfig = {
     poorCookingBelow: 3,
     treatHungerAbove: 0.1,
   },
-  recreation: { joinAbove: 0.25, gatherSeconds: 30, lateJoinSeconds: 20, collapseBackoffDays: 0.1 },
+  recreation: {
+    joinAbove: 0.25,
+    gatherSeconds: 30,
+    lateJoinSeconds: 20,
+    collapseBackoffDays: 0.1,
+    ashoreMax: 3,
+  },
   social: {
     chatRadiusTiles: 2,
     chatCooldownSeconds: 45,
@@ -295,6 +301,7 @@ function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): 
     assignedBeds: () => [],
     sessions: () => [],
     travel: () => ({ stage: "docked" }),
+    shore: () => undefined,
     activities: () => [],
     alert: () => undefined,
     knownItems: () => items,

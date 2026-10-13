@@ -1,7 +1,8 @@
 /** `ActivityDef` schema (slice 4): an off-watch activity. */
-import type { ActivityDef } from "@crew/sim";
+import type { ActivityDef, ShorePostKind } from "@crew/sim";
 import { z } from "zod";
 import {
+  type AssertEqual,
   activityDefIdSchema,
   activityOutcomeSchema,
   interestTagSchema,
@@ -18,18 +19,32 @@ import {
   unitInterval,
 } from "./primitives";
 
-/** Exactly one of a machine tag, a zone tag or a compartment tag; `own` only with a machine. */
+/** §shore-leave: the dock posts a shore-leave venue may name (sim `SHORE_POST_KINDS`). */
+export const shorePostKindSchema = z.enum(["marketStall", "loungeDoor", "bench"]);
+
+// Drift guard against the sim vocabulary: must resolve to `true`.
+export const SHORE_POST_KINDS_IN_SYNC: AssertEqual<
+  z.infer<typeof shorePostKindSchema>,
+  ShorePostKind
+> = true;
+
+/**
+ * Exactly one of a machine tag, a zone tag, a compartment tag or a dock post kind (§shore-leave);
+ * `own` only with a machine.
+ */
 export const venueDefSchema = z
   .strictObject({
     machineTag: machineTagSchema.exactOptional(),
     zoneTag: z.string().min(1).exactOptional(),
     compartmentTag: z.string().min(1).exactOptional(),
+    dockPost: shorePostKindSchema.exactOptional(),
     own: z.literal(true).exactOptional(),
   })
   .refine(
     (v) =>
-      [v.machineTag, v.zoneTag, v.compartmentTag].filter((tag) => tag !== undefined).length === 1,
-    { message: "a venue names exactly one of machineTag, zoneTag, compartmentTag" },
+      [v.machineTag, v.zoneTag, v.compartmentTag, v.dockPost].filter((tag) => tag !== undefined)
+        .length === 1,
+    { message: "a venue names exactly one of machineTag, zoneTag, compartmentTag, dockPost" },
   )
   .refine((v) => v.own === undefined || v.machineTag !== undefined, {
     message: "own applies only to a machineTag venue",

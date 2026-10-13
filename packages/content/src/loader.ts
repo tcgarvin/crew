@@ -163,6 +163,7 @@ import activityExercise from "../data/activities/exercise.json";
 import activityGossip from "../data/activities/gossip.json";
 import activityMusic from "../data/activities/music.json";
 import activityReading from "../data/activities/reading.json";
+import activityShoreLeave from "../data/activities/shore-leave.json";
 import activitySparring from "../data/activities/sparring.json";
 import activityStargazing from "../data/activities/stargazing.json";
 import activityTinkering from "../data/activities/tinkering.json";
@@ -342,6 +343,7 @@ const ACTIVITIES = [
   activityBaking,
   activityGossip,
   activityBookClub,
+  activityShoreLeave,
 ];
 const TOPICS = [
   topicTheGuild,

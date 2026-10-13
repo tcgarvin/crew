@@ -436,7 +436,8 @@
     "joinAbove": 0.25,
     "gatherSeconds": 45,
     "lateJoinSeconds": 20,
-    "collapseBackoffDays": 0.1
+    "collapseBackoffDays": 0.1,
+    "ashoreMax": 3
   },
   "cabins": {
     "noisySeconds": 60,

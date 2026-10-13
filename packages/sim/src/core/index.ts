@@ -38,6 +38,7 @@ export {
   isInDockArea,
   isOnDock,
 } from "./docks";
+export { isOnShoreLeave, shoreLeaveDock } from "./shore-leave";
 export { basePriceFor, effectiveMarket } from "./markets";
 export { roomPhrase } from "./rooms";
 export { floorSet } from "./floor-set";

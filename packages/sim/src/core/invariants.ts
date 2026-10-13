@@ -425,8 +425,14 @@ function socialViolations(state: ReadonlyWorldState): string[] {
     } else if (startedTick !== undefined && endsAtTick !== undefined && startedTick > endsAtTick) {
       out.push(`${where}.startedTick ${startedTick} is after endsAtTick ${endsAtTick}`);
     }
-    if (!(session.venue.compartmentId in state.compartments)) {
-      out.push(`${where}.venue names unknown compartment ${session.venue.compartmentId}`);
+    const venue = session.venue;
+    if ("postKey" in venue) {
+      // §shore-leave: a session ashore lasts no longer than its dock alongside.
+      if (state.deck.dock?.dockId !== venue.dockId) {
+        out.push(`${where}.venue is ashore at ${venue.dockId}, which is not alongside`);
+      }
+    } else if (!(venue.compartmentId in state.compartments)) {
+      out.push(`${where}.venue names unknown compartment ${venue.compartmentId}`);
     }
   }
   const talk = social.privateTalk;
