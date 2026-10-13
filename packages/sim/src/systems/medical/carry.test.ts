@@ -20,6 +20,7 @@ import {
   runFor,
   runUntil,
   stepCtxOf,
+  underWay,
   woundNow,
   woundedProblems,
 } from "./fixtures/medical-deck";
@@ -181,6 +182,8 @@ describe("the carry (§extraction)", () => {
   it("a patient who dies in the carrier's arms is set down, and the carry ends", () => {
     const test = medicalWorld();
     const { world } = test;
+    // Under way: docked at a port, the dead would be carried ashore at once (§laid-to-rest).
+    underWay(test, false);
     downOnTheBridge(world);
     runUntil(test, 120, (w) => carrierOf(w) !== undefined);
     const carrier = carrierOf(world);

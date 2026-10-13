@@ -8,7 +8,8 @@
  *   `medical` item is aboard (`noMedicine`); and not while they believe someone else is at the bed
  *   (`bedTaken`: someone last seen on its `use` tile).
  * - `medicalTaskAllowed`: nobody treats or carries themselves (`ownWounds`).
- * - `isMedicalTask`: the task types whose rules these are (a treatment, and §extraction's carry).
+ * - `isMedicalTask`: the task types whose rules these are (a treatment, §extraction's carry and
+ *   §the-body-aboard's).
  *   Both are all hands: anyone awake (with the skill, to treat) answers, on duty or not
  *   (`candidates.ts`).
  */
@@ -22,7 +23,7 @@ import { backingOff, personal, sameTile } from "./common";
 const CONVALESCE = "convalesce";
 
 export function isMedicalTask(task: TaskView): boolean {
-  return task.type === "treatWounds" || task.type === "carryCasualty";
+  return task.type === "treatWounds" || task.type === "carryCasualty" || task.type === "carryBody";
 }
 
 export function medicalTaskAllowed(view: AgentView, task: TaskView): boolean {

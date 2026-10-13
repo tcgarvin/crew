@@ -50,7 +50,7 @@ export {
   stepCtxOf,
   woundNow,
 } from "../../bodies/fixtures/bodies-deck";
-export { ofType, runFor, runUntil, secondsOf } from "../../field/fixtures/field-deck";
+export { ofType, runFor, runUntil, secondsOf, underWay } from "../../field/fixtures/field-deck";
 
 export const MEDICAL = {
   bed: "machine.medical.bed" as MachineDefId,

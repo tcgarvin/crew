@@ -1,10 +1,11 @@
 /**
  * Body events (expeditions A1, §7.1): a wound, someone going down or dying, a wound healed. The
- * bodies system and `applyDamage` emit them (`systems/bodies/`); medical emits `woundTreated`
- * and `casualtyCarried` (`systems/medical/`); accidents aboard emit `accident`.
+ * bodies system and `applyDamage` emit them (`systems/bodies/`); medical emits `woundTreated`,
+ * `casualtyCarried`, `bodyLaidOut` and `laidToRest` (`systems/medical/`); accidents aboard emit
+ * `accident`.
  */
 import type { AccidentHazard, BodyPart, DamageType, WoundSeverity } from "../content";
-import type { ActorId, MachineId, WoundId } from "../ids";
+import type { ActorId, CompartmentId, MachineId, PortDefId, WoundId } from "../ids";
 import type { SignificanceCatalog } from "./significance";
 
 export interface BodiesEventPayloads {
@@ -48,6 +49,17 @@ export interface BodiesEventPayloads {
   /** §extraction: `byActorId` carried the downed `actorId` to the medbay bed and laid them on it. */
   casualtyCarried: { readonly actorId: ActorId; readonly byActorId: ActorId };
   /**
+   * §the-body-aboard: `byActorId` carried the dead `actorId` to their resting place, in
+   * `compartmentId`, and laid them there.
+   */
+  bodyLaidOut: {
+    readonly actorId: ActorId;
+    readonly byActorId: ActorId;
+    readonly compartmentId: CompartmentId;
+  };
+  /** §laid-to-rest: the dead `actorId` was carried ashore at `portId` and is off the ship. */
+  laidToRest: { readonly actorId: ActorId; readonly portId: PortDefId };
+  /**
    * §strike-lever: the narrator's `strike` landed on `actorId`, just before the `wounded` (and any
    * `died` or `incapacitated`) it causes. `inFight`: they were in the site's fight, where the
    * fight's own lines tell it; off the fight `how` is the ticker's line.
@@ -79,6 +91,8 @@ export const BODIES_EVENT_SIGNIFICANCE = {
   woundHealed: "trace",
   woundTreated: "notable",
   casualtyCarried: "notable",
+  bodyLaidOut: "notable",
+  laidToRest: "notable",
   struck: "narrative",
   accident: "notable",
 } as const satisfies SignificanceCatalog<BodiesEventPayloads>;

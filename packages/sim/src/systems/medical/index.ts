@@ -12,5 +12,6 @@ export function registerMedical(registry: KernelRegistry): Unregister {
 
 export { type MedBed, medBedOf, onTheBed } from "./bed";
 export { medicalSystem } from "./medical";
+export { restingPlaces } from "./rest";
 export { medicalUnitsAboard } from "./supplies";
 export { medicalTaskDerivations } from "./tasks";

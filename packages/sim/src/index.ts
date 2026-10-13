@@ -49,6 +49,7 @@ export {
   medicalUnitsAboard,
   onTheBed,
   registerMedical,
+  restingPlaces,
 } from "./systems/medical/index";
 export {
   applyDamage,

@@ -58,7 +58,7 @@ import {
   transitSecondsLeft,
   voyageAhead,
 } from "./lookups";
-import { crewWoundedDetail, infirmaryLine } from "./medical-digest";
+import { bodyAboardDetail, crewWoundedDetail, infirmaryLine } from "./medical-digest";
 import {
   type ArcEnding,
   type ArcSketch,
@@ -521,6 +521,17 @@ function passengersAshoreAt(
 const isCaptain = (a: { readonly roleTags: readonly string[] }) => a.roleTags.includes("captain");
 
 /**
+ * §laid-to-rest: the port where a dead crew member was carried ashore, if they were: the dead are
+ * off the ship only once laid to rest.
+ */
+function restingPort(actor: Actor): PortDefId | undefined {
+  const location = actor.location;
+  return actor.availability === "dead" && location.kind === "inExternalStore"
+    ? location.portId
+    : undefined;
+}
+
+/**
  * §crew-lines: one crew member's line, as the digest's crew section shows it.
  * §notes-turn-tools: `crew(name)` returns it whole, however the digest was trimmed.
  */
@@ -571,8 +582,9 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
   const state = snapshot.state;
   // §captain-never-speaks: the captain (the player's avatar) is listed first and never as a
   // speaker.
-  const actors = Object.values(state.actors)
-    .filter((a) => a.crew && a.passenger !== true)
+  const company = Object.values(state.actors).filter((a) => a.crew && a.passenger !== true);
+  const actors = company
+    .filter((a) => restingPort(a) === undefined)
     .sort(
       (a, b) =>
         Number(isCaptain(b)) - Number(isCaptain(a)) ||
@@ -599,6 +611,13 @@ function crewSection(snapshot: Snapshot, content: ContentBundle): Section {
       );
     }
   }
+  // §laid-to-rest: the dead carried ashore are no longer aboard; one line remembers them.
+  const rested = company
+    .map((a) => ({ a, port: restingPort(a) }))
+    .filter((r): r is { a: Actor; port: PortDefId } => r.port !== undefined)
+    .sort((x, y) => x.a.id.localeCompare(y.a.id, "en", { numeric: true }))
+    .map(({ a, port }) => `${a.name} at ${portName(content, port)}`);
+  if (rested.length > 0) lines.push(`- Laid to rest: ${rested.join("; ")}.`);
   return section(`Crew (${actors.length})`, lines, 6);
 }
 
@@ -670,6 +689,10 @@ function problemLine(p: DeepReadonly<Problem>, snapshot: Snapshot, content: Cont
   if (p.kind === "crewWounded") {
     // §the-wounded-problem: who is hurt and who is seeing to them, or why nobody is.
     return `${base}: ${crewWoundedDetail(state, content, snapshot.config, p)}`;
+  }
+  if (p.kind === "bodyAboard") {
+    // §the-body-aboard: whose body, where it goes, and who is carrying it.
+    return `${base}: ${bodyAboardDetail(state, content, p)}`;
   }
   if (p.kind !== "partsNeeded") return base;
   // §market-and-parts-lines: the stalled repair and what would unstick it, so the model can stock a

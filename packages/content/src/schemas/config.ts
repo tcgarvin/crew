@@ -387,6 +387,8 @@ export const configDefSchema = z.strictObject({
     giveUpAfterSeconds: positive,
     liftSeconds: positive,
     laySeconds: positive,
+    griefCloseAffinity: z.number(),
+    griefStacksClose: positiveInt,
   }),
   accidents: z.strictObject({
     enabled: z.boolean(),

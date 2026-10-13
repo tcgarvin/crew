@@ -27,7 +27,8 @@ import { BODY_PARTS } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import { emitSim } from "../work/events";
-import { goDown, woundCause } from "./down";
+import { die } from "./death";
+import { goDown } from "./down";
 
 /** Half a second at 20 Hz: blood and pain move slowly, and death by blood is a threshold. */
 export const BODIES_EVERY_TICKS = 10;
@@ -119,13 +120,7 @@ function keepWoundedThought(ctx: StepCtx, actor: Actor): void {
 /** Death by blood, going down, and getting up again. */
 function recheck(ctx: StepCtx, actor: Actor): void {
   if (isDeadBy(actor.body, ctx.config)) {
-    const byActorId = lastBleederCause(actor.body.wounds);
-    goDown(ctx, actor, "dead");
-    emitSim(ctx, "died", byActorId === undefined ? [actor.id] : [actor.id, byActorId], {
-      actorId: actor.id,
-      cause: woundCause(actor.body, ctx.config),
-      ...(byActorId === undefined ? {} : { byActorId }),
-    });
+    die(ctx, actor, lastBleederCause(actor.body.wounds));
     return;
   }
   const incapacity = incapacityOf(actor.body, ctx.config);

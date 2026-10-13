@@ -276,7 +276,7 @@ export const FIXTURE_THOUGHTS: Readonly<Record<ThoughtKey, ThoughtDef>> = {
     label: "grieving for {ref}",
     value: -0.35,
     durationDays: 7,
-    stacks: false,
+    stacks: true,
   },
   shaken: {
     key: "shaken",
@@ -549,6 +549,8 @@ export const FIXTURE_MEDICAL: ConfigDef["medical"] = {
   giveUpAfterSeconds: 300,
   liftSeconds: 2,
   laySeconds: 2,
+  griefCloseAffinity: 3,
+  griefStacksClose: 2,
 };
 
 /** §accidents-aboard: accidents at the default bundle's values. */

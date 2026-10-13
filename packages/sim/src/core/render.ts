@@ -775,6 +775,16 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return `${n.actor(event.payload.byActorId) ?? "Someone"} carries ${
         n.actor(event.payload.actorId) ?? "someone"
       } to the medbay`;
+    case "bodyLaidOut":
+      // §the-body-aboard: "Bettina Solheim lays Tomas Ruiz out in the cargo hold".
+      return `${n.actor(event.payload.byActorId) ?? "Someone"} lays ${
+        n.actor(event.payload.actorId) ?? "the body"
+      } out in ${n.compartment(event.payload.compartmentId)}`;
+    case "laidToRest":
+      // §laid-to-rest: "Tomas Ruiz is carried ashore at Tern's Rest".
+      return `${n.actor(event.payload.actorId) ?? "The body"} is carried ashore at ${n.port(
+        event.payload.portId,
+      )}`;
     case "executed":
       return `${n.actor(event.payload.byActorId) ?? "The party"} executes ${event.payload.name}`;
     case "combatantBroke": {

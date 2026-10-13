@@ -110,6 +110,8 @@ export function taskWords(names: Names, task: TaskView, problem: ProblemView | u
       return `treating ${what}`;
     case "carryCasualty":
       return `carrying ${what} to the medbay`;
+    case "carryBody":
+      return `carrying ${what}'s body`;
   }
 }
 

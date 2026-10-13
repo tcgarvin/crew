@@ -44,7 +44,7 @@ import {
  * - `crewWounded` (§the-wounded-problem) → the owner's base urgency (essential while a wound
  *   bleeds, routine after; who may take it is `medical.ts`'s, and it is all hands like cargo);
  *   the patient's own walk to the medbay bed (§convalescing, `medical.ts`) → essential while
- *   bleeding, routine after.
+ *   bleeding, routine after; `bodyAboard` (§the-body-aboard) → routine, all hands.
  *
  * - on duty with nothing else to do (§gangway-watch-and-rounds: `rounds.ts`, the post until
  *   rounds land) → voluntaryActivity; gangway watch in port (`helm.ts`) → routineObligation.
@@ -224,6 +224,9 @@ export function taskUrgency(
     case "crewWounded":
       // §the-wounded-problem: essential while a wound bleeds, routine after; medical says which.
       return problem.baseUrgency;
+    case "bodyAboard":
+      // §the-body-aboard: routine.
+      return problem.baseUrgency;
   }
 }
 
@@ -376,11 +379,13 @@ function taskCandidate(
   const urgency = taskUrgency(view, problem, config);
   // §duty-and-the-sleep-watch: cargo in port is all hands awake, not the watch's: nobody
   // off duty is turned away from a crate (the sleeping sleep on, since the hold is not interrupted
-  // for routine work). §treatment-at-the-medbay-bed: so is a wounded crewmate.
+  // for routine work). §treatment-at-the-medbay-bed: so is a wounded crewmate, and
+  // §the-body-aboard a dead one.
   const allHands =
     problem.kind === "cargoToLoad" ||
     problem.kind === "cargoToUnload" ||
-    problem.kind === "crewWounded";
+    problem.kind === "crewWounded" ||
+    problem.kind === "bodyAboard";
   if (
     !exempt &&
     !allHands &&

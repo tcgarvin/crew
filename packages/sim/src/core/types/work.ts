@@ -92,7 +92,8 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
  * Which system created a problem and is responsible for resolving it. The watch owns
  * `stationToStaff` (the helm's watch and relief posts), the galley owns `mealToCook` and
  * `mealToCarry`, dirt owns `compartmentDirty`, damage owns `machineDamaged`, `hullScar`,
- * `hullDamaged` and `compartmentToCheck`, and medical owns `crewWounded` (§problem-ownership).
+ * `hullDamaged` and `compartmentToCheck`, and medical owns `crewWounded` and `bodyAboard`
+ * (§problem-ownership).
  */
 export type ProblemOwner =
   | "equipment"
@@ -206,6 +207,14 @@ export interface ProblemPayloads {
    * one `carryCasualty` (§extraction); resolved when every wound is treated.
    */
   crewWounded: { actorId: ActorId; untreated: number };
+  /**
+   * §the-body-aboard: `actorId`, of the ship's company, lies dead aboard away from a resting place;
+   * `tile` is the resting place their body is to be carried to (fixed when raised). Owner: medical
+   * (dedupe `body:<actorId>`, public, located at the resting place's compartment, routine);
+   * derives one `carryBody`; resolved when the body lies on `tile`, cancelled when it leaves the
+   * ship.
+   */
+  bodyAboard: { actorId: ActorId; tile: TileCoord };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -265,6 +274,8 @@ export const TASK_TYPES = [
   "treatWounds",
   /** §extraction: carry a downed patient to the medbay bed (`crewWounded`). */
   "carryCasualty",
+  /** §the-body-aboard: carry a dead crewmate's body to its resting place (`bodyAboard`). */
+  "carryBody",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -604,9 +615,15 @@ export type WorkStageKey =
   | "arm"
   /** §treatment-at-the-medbay-bed: treating a patient's wounds (`medical/steps.ts` `runTreat`). */
   | "treat"
-  /** §extraction: taking up a downed patient (`medical/carry.ts` `runLift`). */
+  /**
+   * §extraction, §the-body-aboard: taking up a downed patient or a body (`medical/carry.ts`
+   * `runLift`).
+   */
   | "lift"
-  /** §extraction: laying the carried patient on the medbay bed (`medical/carry.ts` `runLay`). */
+  /**
+   * §extraction, §the-body-aboard: laying the carried patient on the medbay bed, or a body at its
+   * resting place (`medical/carry.ts` `runLay`).
+   */
   | "lay";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */

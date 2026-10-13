@@ -582,7 +582,8 @@
           "hullScar",
           "hullDamaged",
           "compartmentToCheck",
-          "crewWounded"
+          "crewWounded",
+          "bodyAboard"
         ]
       }
     }

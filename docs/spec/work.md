@@ -14,7 +14,8 @@ revises and resolves it. Owners (`ProblemOwner`): equipment (`machineSymptom`, `
 `maintenanceDue`, `partsNeeded`), travel (`cargoToLoad`, `cargoToUnload`, `courseToPlot`),
 commerce (`reserveLow`), watch (`stationToStaff`, the helm's watch and relief posts), galley
 (`mealToCook`, `mealToCarry`), dirt (`compartmentDirty`), damage (`machineDamaged`, `hullScar`,
-`hullDamaged`, `compartmentToCheck`) and medical (`crewWounded`, §the-wounded-problem). One
+`hullDamaged`, `compartmentToCheck`) and medical (`crewWounded`, §the-wounded-problem;
+`bodyAboard`, §the-body-aboard). One
 open problem per `dedupeKey`: the owner bumps `revision` instead of duplicating. Personal needs
 are never problems; the planner builds eat, sleep, rest and socialise candidates from the actor's
 own needs. The watch's own rules are in `time-and-watches.md`.
