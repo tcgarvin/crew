@@ -2,6 +2,7 @@
 import type { PhysicalLocation } from "../common";
 import type {
   ActorId,
+  CompartmentId,
   EntityId,
   ItemDefId,
   ItemId,
@@ -24,7 +25,14 @@ export interface CommerceEventPayloads {
     readonly from: PhysicalLocation;
     readonly to: PhysicalLocation;
   };
-  contractCompleted: { readonly jobId: JobId };
+  /** §fragile-cargo: `brokenCount` of the job's crates arrived smashed (0 for most jobs). */
+  contractCompleted: { readonly jobId: JobId; readonly brokenCount: number };
+  /** §fragile-cargo: a rock smashed one fragile crate of a live freight job. */
+  cargoBroken: {
+    readonly jobId: JobId;
+    readonly itemId: ItemId;
+    readonly compartmentId: CompartmentId;
+  };
   paymentMade: {
     readonly transactionId: TransactionId;
     readonly amount: number;
@@ -108,6 +116,8 @@ export const COMMERCE_EVENT_SIGNIFICANCE = {
   jobExpired: "trace",
   cargoTransferred: "trace",
   contractCompleted: "narrative",
+  // §fragile-cargo: the ticker and the digest tell it; the delivery that pays less is the hook.
+  cargoBroken: "notable",
   paymentMade: "notable",
   transacted: "narrative",
   entitySpawned: "trace",

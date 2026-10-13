@@ -437,6 +437,7 @@ const config = {
     haulEstimateSeconds: 5,
     reofferDays: 0.05,
     maxCratesPerJob: 6,
+    brokenFloorShare: 0.1,
     passage: { ashoreDaysMin: 0.05, ashoreDaysMax: 0.15, overdueDays: 0.1 },
     // §reserve-kinds: off unless a test turns them on.
     sparesReserve: 0,
@@ -566,6 +567,7 @@ const config = {
     effectIntegrity: { graze: 0.2, damage: 0.5 },
     patchRecovers: 0.5,
     maxScripted: 3,
+    fragileBreakChance: { small: 0.1, large: 0.3 },
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },

@@ -170,6 +170,7 @@ export const configDefSchema = z.strictObject({
     haulEstimateSeconds: nonNegative,
     reofferDays: nonNegative,
     maxCratesPerJob: positiveInt,
+    brokenFloorShare: unitInterval,
     passage: z
       .strictObject({
         ashoreDaysMin: nonNegative,
@@ -370,6 +371,7 @@ export const configDefSchema = z.strictObject({
     effectIntegrity: z.strictObject({ graze: unitInterval, damage: unitInterval }),
     patchRecovers: unitInterval,
     maxScripted: positiveInt,
+    fragileBreakChance: z.strictObject({ small: unitInterval, large: unitInterval }),
   }),
   damage: z.strictObject({
     patchSeconds: positive,

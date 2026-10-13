@@ -208,8 +208,11 @@
  * treatment by whoever has medical skill, kits running out and the ports that sell them, and that
  * accidents aboard hurt crew on their own. The digest gains the `infirmary:` line and the
  * `crewWounded` problem line says who is treating or why nobody is.
+ * v0.42 (2026-10-13): fragile cargo (§fragile-cargo). The capability block's cargo classes say
+ * fragile cargo can be smashed by rocks in a field and the client pays only for what arrives whole;
+ * the digest's job line adds "N of M crates smashed".
  */
-export const PROMPT_VERSION = "v0.41";
+export const PROMPT_VERSION = "v0.42";
 
 export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the nine people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain walking ashore to look for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 

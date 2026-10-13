@@ -346,6 +346,7 @@ describe("Inspector item sheet", () => {
       name: "General freight crate",
       count: 1,
       where: "in the freight staging area on the dock",
+      broken: false,
       job: { issuer: "Hal Petrosyan", from: "Crossroads Hub", to: "Kessler Drift", status },
     },
   });
@@ -360,6 +361,15 @@ describe("Inspector item sheet", () => {
     const html = renderToStaticMarkup(<Inspector data={crate("accepted")} onClose={() => {}} />);
     expect(html).toContain('class="inspector-subtitle">freight<');
     expect(html).not.toContain("nobody loads it");
+    expect(html).not.toContain("Smashed");
+  });
+
+  it("says a crate smashed in the rocks is smashed, and that only whole crates are paid (§fragile-cargo)", () => {
+    const data = crate("inTransit");
+    const smashed = { ...data, item: { ...data.item, broken: true } };
+    const html = renderToStaticMarkup(<Inspector data={smashed} onClose={() => {}} />);
+    expect(html).toContain('class="inspector-subtitle">freight, smashed<');
+    expect(html).toContain("pays only for crates that arrive whole");
   });
 
   it("names an errand's job by the errand, not as freight (expeditions A2)", () => {
@@ -369,6 +379,7 @@ describe("Inspector item sheet", () => {
         name: "Strongbox",
         count: 1,
         where: "in the cargo hold",
+        broken: false,
         job: {
           issuer: "Ysolde Maren, Meridian Growers",
           from: "Crossroads Hub",

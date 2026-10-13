@@ -157,6 +157,7 @@ export function inspectItem(
     name: def?.name ?? "Cargo",
     count: item.stacking === "stack" ? item.count : 1,
     where: where(state, item.location, content, layout),
+    broken: item.broken === true,
     ...(job === undefined
       ? {}
       : {

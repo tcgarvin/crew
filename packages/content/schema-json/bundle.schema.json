@@ -6329,6 +6329,11 @@
               "minimum": 1,
               "maximum": 9007199254740991
             },
+            "brokenFloorShare": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
             "passage": {
               "type": "object",
               "properties": {
@@ -6416,6 +6421,7 @@
             "haulEstimateSeconds",
             "reofferDays",
             "maxCratesPerJob",
+            "brokenFloorShare",
             "passage",
             "sparesReserve",
             "foodReserve",
@@ -7766,6 +7772,23 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "fragileBreakChance": {
+              "type": "object",
+              "properties": {
+                "small": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "large": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["small", "large"],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -7780,7 +7803,8 @@
             "machineEffects",
             "effectIntegrity",
             "patchRecovers",
-            "maxScripted"
+            "maxScripted",
+            "fragileBreakChance"
           ],
           "additionalProperties": false
         },

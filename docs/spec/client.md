@@ -236,7 +236,8 @@ or prop that left the frame between the draw and the tap opens nothing.
 
 - An item is described by room, or by area or nearest post (within two tiles) when on the dock;
   freight shows issuer, route and contract status. Freight on offer says "freight on offer" and that
-  nobody loads it until the job is taken. A crate on a hand truck reads "on the hand truck, pushed
+  nobody loads it until the job is taken. A smashed crate (§fragile-cargo) reads "freight, smashed"
+  and says the client pays only for crates that arrive whole. A crate on a hand truck reads "on the hand truck, pushed
   by <name>".
 - A local shows name, role, "Where" ("at the queue-board kiosk" within two tiles of their post, else
   the dock area or nearest post, with their post on its own line), "Doing" when labelled and a new

@@ -57,6 +57,9 @@ Every rock costs the hull once (`field.hullDamage`: small 3, large 8) and leaves
 centre tile. Anyone on a blast tile gets a `nearMiss` thought and ticker line, and crew unbraced in
 the struck room may be thrown off their feet (§accidents-aboard). Code: `field/impacts.ts`.
 
+- Fragile freight in the struck compartment may be smashed, each crate at
+  `field.fragileBreakChance` by rock (§fragile-cargo).
+
 ### Machines in the blast
 
 Each ship machine in the blast rolls once on `field.machineEffects` (none, graze, damage, knockout,

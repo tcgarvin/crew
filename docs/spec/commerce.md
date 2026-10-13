@@ -88,6 +88,26 @@ port's store (`deliveryComplete`). Once the unload work is done commerce pays on
 `paymentTransactionId`), then dock hands cart the crates into the warehouse store
 (§dock-hand-errands, `cargoTransferred`), whenever a dock is alongside, not only while `docked`.
 
+The payment is the job's pay times the share of its crates that arrived whole, never under
+`commerce.brokenFloorShare` (0.1) of it, rounded to whole credits (`deliveredPay`); a job with no
+smashed crate is paid in full. `contractCompleted` carries `brokenCount`, and its log line says
+how many crates were smashed ("Delivered for <issuer>: 2 crates smashed"); the amount is on the
+`paymentMade` line. Why the floor: the client still takes the delivery, and a job that pays
+nothing at all reads as a bug, not a loss.
+
+### Fragile cargo
+
+A rock that strikes a compartment (§rock-impacts) rolls once for each crate in it of `fragile`
+class belonging to a live freight job (accepted and not yet paid; never a passage's luggage or an
+errand's): a crate lying on the deck there, or carried by someone standing there. Each breaks with
+`field.fragileBreakChance` by rock (small 0.1, large 0.3), drawn on the `failures` stream; nothing
+is drawn when the room holds none. A broken crate is marked `broken` on the item and emits
+`cargoBroken { jobId, itemId, compartmentId }` (notable; "A crate of fragile equipment is smashed in
+the cargo hold"). It is still loaded, carried and delivered like any crate; only the pay changes
+(§delivery-and-pay). The inspector shows it smashed and the digest's job line adds "N of M crates
+smashed". General, perishable and hazardous freight never break. Code:
+`systems/field/cargo.ts`.
+
 ## Passages
 
 ### Passage job

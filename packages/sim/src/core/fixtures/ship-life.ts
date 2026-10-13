@@ -527,6 +527,7 @@ export const FIXTURE_FIELD: ConfigDef["field"] = {
   effectIntegrity: { graze: 0.2, damage: 0.5 },
   patchRecovers: 0.5,
   maxScripted: 3,
+  fragileBreakChance: { small: 0.1, large: 0.3 },
 };
 
 /** Slice 5 (§hull-scars-and-ship-loss): damage work at the default bundle's values. */
