@@ -125,9 +125,10 @@ describe("two errands in a row (expeditions A2, deep)", () => {
 });
 
 describe("a failed errand: the turn card's pull back (expeditions A2, deep)", () => {
-  it("seed 1: the party pulls back, the job fails once unpaid, and the ship still flies home", async () => {
-    const { kernel, world } = newWorld(1);
-    const r = await runEpisodeAsync({ seed: 1, world, turnCard: "pullBack" }, kernel);
+  it("seed 27: the party pulls back, the job fails once unpaid, and the ship still flies home", async () => {
+    // The turn card comes only when one of ours goes down in the fight: a seed where someone does.
+    const { kernel, world } = newWorld(27);
+    const r = await runEpisodeAsync({ seed: 27, world, turnCard: "pullBack" }, kernel);
     const transcript = formatEpisodeTranscript(r);
     const turn = r.cards.filter((c) => c.key === "expedition.turn");
     expect(turn, transcript).toHaveLength(1);

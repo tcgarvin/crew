@@ -751,6 +751,8 @@ export interface BeatsOptions {
   readonly seed: number;
   /** §scheduling-a-field: which asteroid fields the run schedules, one a leg. */
   readonly fields: FieldPlan;
+  /** Every advance's events, for a test that counts what the report does not break out. */
+  readonly observe?: (events: readonly SimEvent[], world: World) => void;
 }
 
 export interface BeatsResult extends BeatsTallyResult {
@@ -1035,6 +1037,7 @@ function* beatsRun(options: BeatsOptions, kernel?: Kernel): ChunkedRun<BeatsResu
     const result = k.advance(world, Math.min(SAMPLE_TICKS, endTick - before));
     const advanced = world.state.tick - before;
     tally.events(result.events);
+    options.observe?.(result.events, world);
     wear.events(result.events, world);
     wear.sample(world);
     tally.tickerLines(tickerSamples(world));

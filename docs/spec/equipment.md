@@ -67,7 +67,7 @@ tools, consumed parts, location). Progress lives on the fault, so a swap of hand
 mid-step. A step's parts leave the repairer's hands once, when that step completes; tools are never
 consumed. On the last step the fault is removed, condition rises by 0.5, integrity is restored as
 above, the repair leaves dirt round the machine, and `faultRepaired` is emitted carrying the fault's
-cause (the narrator's aftermath call needs it).
+cause (the narrator's aftermath call needs it). Whoever finished the repair has `fixedIt`.
 
 ## Parts and tools
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "../../schema-json/activity.schema.json",
+  "id": "activity.book_club",
+  "label": "talking over a book",
+  "waitingLabel": "waiting for the book club",
+  "interest": "reading",
+  "venue": [
+    {
+      "compartmentTag": "lounge"
+    },
+    {
+      "compartmentTag": "mess"
+    }
+  ],
+  "participants": {
+    "min": 2,
+    "max": 3
+  },
+  "durationDays": 0.06,
+  "restores": {
+    "recreation": 0.35,
+    "social": 0.3
+  },
+  "solo": {
+    "label": "rereading a dog-eared paperback",
+    "durationDays": 0.05,
+    "restores": {
+      "recreation": 0.25,
+      "comfort": 0.05
+    }
+  },
+  "outcome": "bond",
+  "thoughts": {
+    "joined": "goodCompany"
+  },
+  "memories": {
+    "together": "goodTime"
+  }
+}

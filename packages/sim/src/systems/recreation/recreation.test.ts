@@ -129,7 +129,7 @@ describe("a game of cards (call 4)", () => {
     expect(sessions(world)).toHaveLength(0);
   });
 
-  it("a session nobody joins collapses at gatherSeconds to solitaire, and the host backs off hosting", () => {
+  it("a session nobody joins collapses at gatherSeconds to solitaire, the host backs off hosting and minds it", () => {
     const fixture = looked({ activities: CARDS_ONLY });
     const { world } = fixture;
     setNeed(world, "recreation", 0.6, [JAX]);
@@ -139,6 +139,7 @@ describe("a game of cards (call 4)", () => {
     const collapsed = ofType(events, "sessionCollapsed");
     expect(collapsed).toHaveLength(1);
     expect(collapsed[0]?.payload.toSolo).toBe(true);
+    expect(world.state.actors[JAX]?.thoughts.map((t) => t.key)).toContain("nobodyJoinedIn");
     expect(world.state.tick - opened).toBeGreaterThanOrEqual(secondsOf(world, 30) - 1);
     expect(ofType(events, "sessionStarted")).toHaveLength(0);
     runFor(fixture, 1);

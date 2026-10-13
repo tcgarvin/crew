@@ -28,7 +28,7 @@ import { configTicks, dayTicks, perDayToPerSecond } from "../../core/clock";
 import { deliverHeldCard, heldCard } from "../../core/delivery";
 import { marketCounter } from "../../core/docks";
 import { allocateId } from "../../core/ids";
-import { moodWorkFactor } from "../../core/thoughts";
+import { addThought, moodWorkFactor } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { ActorId, ItemId, PortDefId, TaskId } from "../../core/types/ids";
@@ -392,6 +392,10 @@ function runRecipe(ctx: StepCtx, deps: WorkDeps, actor: Actor): StepResult {
       return "wait";
     case "recipeComplete":
       for (const event of outcome.events) ctx.emit(event);
+      // §repair: whoever finishes a fault's repair has the satisfaction of it.
+      if (outcome.events.some((event) => event.type === "faultRepaired")) {
+        addThought(ctx, actor, "fixedIt");
+      }
       touchInventory(ctx);
       return "done";
   }

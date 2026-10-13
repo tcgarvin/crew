@@ -42,8 +42,9 @@ A session is common knowledge (`AgentView.sessions()`) at a venue; one game of a
 time. A host opens it, whoever is there joins (not past `recreation.lateJoinSeconds` (20) of
 running). It starts at max members or after `recreation.gatherSeconds` (45) with min; with fewer
 it collapses to the solo variant and the host backs off that activity
-`recreation.collapseBackoffDays` (0.1). A contest or debate falling under min is abandoned. A
-leaver, whatever takes them off, leaves the session that tick; a host who leaves hands it on.
+`recreation.collapseBackoffDays` (0.1) and has `nobodyJoinedIn`. A contest or debate falling under
+min is abandoned. A leaver, whatever takes them off, leaves the session that tick; a host who
+leaves hands it on.
 Outcomes resolve once through `resolveOutcome` and the row is deleted; a solo play resolves through
 a one-member row never stored and still says `sessionEnded`. Restoration is proportional, so an
 interrupted game restores in part, and waiting restores nothing (`recreation/needs.ts`).
@@ -64,10 +65,11 @@ shelf to the player's desk (the lounge without a cabin).
   dislike debate are lectured.
 - **Performance**: awake people in the room like it or not by interest; likers remember
   `playedForMe`.
-- **Bond**: members who like the activity warm to each other.
+- **Bond**: members who like the activity warm to each other. A bond with topics (a vid, gossip)
+  has one picked at the start, which the digest names; it moves nothing.
 - All: skill gain, dirt, risk (a sparring knock is a thought and a line), and a product. Baking
   puts treats on the counter tagged `treat`, never `meal`, so a treat never answers the mess call
-  (§eating).
+  (§eating), and gives the baker `bakedForTheCrew`.
 
 ### Rivalries
 

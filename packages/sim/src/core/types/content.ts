@@ -237,6 +237,16 @@ export const THOUGHT_KEYS = [
   "ranFromAFight",
   /** Expeditions A1 (§11): carrying an open wound (kept while one is open). */
   "wounded",
+  /** §repair: finished a fault's repair. */
+  "fixedIt",
+  /** §cooking-and-serving: served a `good` meal (the cook). */
+  "cookedWell",
+  /** §outcomes: a baking session put treats on the counter (the baker). */
+  "bakedForTheCrew",
+  /** §group-sessions: a hosted session collapsed with too few (the host). */
+  "nobodyJoinedIn",
+  /** §mop-trips: mopped a room back to clean (`roomCleaned`, the mopper). */
+  "squaredAway",
   /**
    * §memory-levers (D106): story-sized thoughts only the narrator gives (`giveThought`); nothing in
    * the sim raises them. `worriedAbout` and `grieving` name someone (`refId`).
@@ -378,8 +388,7 @@ export type MachineEffect = (typeof MACHINE_EFFECTS)[number];
 
 /**
  * Slice 4: what people like doing off watch (`Actor.interests`, `ActivityDef.interest`). A closed
- * set because the planner scores activities by it; `gossip` scores nothing until an activity
- * names it.
+ * set because the planner scores activities by it; every tag is some activity's interest.
  */
 export const INTEREST_TAGS = [
   "cards",

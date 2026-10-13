@@ -19,6 +19,7 @@
  */
 import { configTicks, dayTicks } from "../../core/clock";
 import { allocateId } from "../../core/ids";
+import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { DeckDefId, ItemId } from "../../core/types/ids";
@@ -221,6 +222,7 @@ export function runServe(ctx: StepCtx, actor: Actor, _step: StepOf<"serve">): St
     servings: unitsOf(servings),
     quality,
   });
+  if (quality === "good") addThought(ctx, actor, "cookedWell");
   deposit(ctx, location.deckId, here, ctx.config.dirt.deposits.serving);
   noteProvisionsLow(ctx);
   return "done";

@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schema-json/topic.schema.json",
+  "id": "topic.sweethearts",
+  "label": "who is sweet on whom",
+  "weights": {
+    "orderFreedom": 0,
+    "faithReason": 0,
+    "loyaltyAmbition": 0
+  }
+}

@@ -65,9 +65,9 @@ at their skill rate, and serves on the `serving` zone's counter. The crate is us
 served; the stack is `eaters + galley.spareServings` servings, never more than
 `galley.servingsPerCrate`. Every crew member is told where it is. Quality is the cook's `cooking`
 skill (good at `galley.goodCookingAbove` 6, poor below `poorCookingBelow` 3, else plain), one step
-lower in a `dirty` or `filthy` galley, fixed on the plate. A serving left on deck past
-`galley.mealSpoilDays` (0.25) is swept (`mealSpoiled`) and dirties its tile; one in hand is the
-holder's to eat. Events: `mealServed`, `mealMissed`, `mealSpoiled`, `ateMeal`.
+lower in a `dirty` or `filthy` galley, fixed on the plate; serving a `good` meal gives the cook
+`cookedWell`. A serving left on deck past `galley.mealSpoilDays` (0.25) is swept (`mealSpoiled`)
+and dirties its tile; one in hand is the holder's to eat. Events: `mealServed`, `mealMissed`, `mealSpoiled`, `ateMeal`.
 
 ### Mess call
 
@@ -142,10 +142,10 @@ trip that cleaned it. It never resolves mid-trip, so the mop always goes home.
 
 One `cleanCompartment` task covers the room's `dirt.mopTilesPerTrip` (12) dirtiest tiles, walked
 nearest first from the `cleaningLocker`. Why: dirtiest first zigzagged a sixty-tile corridor. The
-trip fetches the mop, mops, returns it, then settles: clean resolves, otherwise the next trip
-re-derives. The plan reads its tiles from the grid, not the task. Why: the task's tiles refresh
-late and a hand claiming in the gap re-mopped clean tiles. Mopping clears a tile and wipes the
-mopper's boots.
+trip fetches the mop, mops, returns it, then settles: clean resolves and gives the mopper
+`squaredAway`, otherwise the next trip re-derives. The plan reads its tiles from the grid, not the
+task. Why: the task's tiles refresh late and a hand claiming in the gap re-mopped clean tiles.
+Mopping clears a tile and wipes the mopper's boots.
 
 ### Who mops
 

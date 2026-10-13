@@ -22,6 +22,7 @@
  */
 import { configTicks } from "../../core/clock";
 import { cellIndex, inGrid } from "../../core/dirt-grid";
+import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { TileCoord } from "../../core/types/common";
 import type { ItemId } from "../../core/types/ids";
@@ -130,8 +131,10 @@ function taskRoom(
 function settleTrip(ctx: StepCtx, actor: Actor, task: Task): StepResult {
   const found = taskRoom(ctx, task);
   if (found === undefined) return "done";
-  if (currentTier(ctx, found.room) === "clean") resolveDirtProblem(ctx, found.problem, actor.id);
-  else found.problem.revision += 1;
+  if (currentTier(ctx, found.room) === "clean") {
+    resolveDirtProblem(ctx, found.problem, actor.id);
+    addThought(ctx, actor, "squaredAway");
+  } else found.problem.revision += 1;
   return "done";
 }
 

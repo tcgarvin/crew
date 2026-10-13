@@ -187,4 +187,20 @@ describe("the serve (§cooking-and-serving, call 2)", () => {
       .reduce((n, i) => n + (i.stacking === "stack" ? i.count : 1), 0);
     expect(crates).toBe(5);
   });
+
+  it.each([
+    [8, "good", true],
+    [4, "plain", false],
+  ] as const)(
+    "a cook at cooking %i serves %s and is pleased with it: %s",
+    (cooking, quality, pleased) => {
+      const fixture = galleyWorld();
+      const bettina = fixture.world.state.actors[BETTINA];
+      if (bettina === undefined) throw new Error("no Bettina");
+      bettina.skills = { ...bettina.skills, cooking };
+      const events = runToSecond(fixture, GALLEY_WATCH);
+      expect(ofType(events, "mealServed").map((e) => e.payload.quality)).toEqual([quality]);
+      expect(bettina.thoughts.some((t) => t.key === "cookedWell")).toBe(pleased);
+    },
+  );
 });

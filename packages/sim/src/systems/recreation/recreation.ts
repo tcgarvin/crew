@@ -5,7 +5,7 @@
  * `durationDays`, a debate's or a vid's topic picked from `def.topics` on the `social` stream); collapses at `gatherSeconds`
  * with fewer (`sessionCollapsed`: the host's step becomes `solo` with the def's `solo` variant,
  * or ends at once when there is none, and the host backs off `recreate:<activityId>` for
- * `collapseBackoffDays`; the row is deleted, so any other member's step fails); and resolves at
+ * `collapseBackoffDays` and has `nobodyJoinedIn`; the row is deleted, so any other member's step fails); and resolves at
  * `endsAtTick` (`resolveOutcome` from `systems/social/outcomes.ts`, called exactly once, then the
  * row is deleted; `sessionEnded`). A contest or debate that falls under `min` mid-game ends
  * `abandoned` where the member leaves (`sessions.ts` `leaveSession`).
@@ -16,6 +16,7 @@
  * Owner: W1 of ship life slice 4.
  */
 import { configTicks, dayTicks } from "../../core/clock";
+import { addThought } from "../../core/thoughts";
 import type { Actor } from "../../core/types/actor";
 import type { ActivityDef } from "../../core/types/content";
 import type { StepCtx, System } from "../../core/types/pipeline";
@@ -63,6 +64,7 @@ function collapse(ctx: StepCtx, session: GroupSession, def: ActivityDef): void {
   const host = ctx.state.actors[session.hostId];
   if (host === undefined) return;
   backOffHosting(ctx, host, def);
+  addThought(ctx, host, "nobodyJoinedIn");
   const step = recreateStepOf(host);
   if (step === undefined || step.sessionId !== session.id) return;
   step.role = "solo";
