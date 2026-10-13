@@ -1,7 +1,7 @@
 /**
  * Body events (expeditions A1, §7.1): a wound, someone going down or dying, a wound healed. The
  * bodies system and `applyDamage` emit them (`systems/bodies/`); medical emits `woundTreated`
- * (`systems/medical/`).
+ * and `casualtyCarried` (`systems/medical/`).
  */
 import type { BodyPart, DamageType, WoundSeverity } from "../content";
 import type { ActorId, WoundId } from "../ids";
@@ -42,6 +42,8 @@ export interface BodiesEventPayloads {
     readonly woundIds: readonly WoundId[];
     readonly parts: readonly BodyPart[];
   };
+  /** §extraction: `byActorId` carried the downed `actorId` to the medbay bed and laid them on it. */
+  casualtyCarried: { readonly actorId: ActorId; readonly byActorId: ActorId };
   /**
    * §strike-lever: the narrator's `strike` landed on `actorId`, just before the `wounded` (and any
    * `died` or `incapacitated`) it causes. `inFight`: they were in the site's fight, where the
@@ -63,5 +65,6 @@ export const BODIES_EVENT_SIGNIFICANCE = {
   died: "narrative",
   woundHealed: "trace",
   woundTreated: "notable",
+  casualtyCarried: "notable",
   struck: "narrative",
 } as const satisfies SignificanceCatalog<BodiesEventPayloads>;

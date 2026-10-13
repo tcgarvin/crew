@@ -46,6 +46,7 @@ import { runArm } from "../expedition/muster";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
 import { runReport } from "../intercom/report";
+import { runLay, runLift } from "../medical/carry";
 import { convalesceHoldDone, runTreat } from "../medical/steps";
 import { runRecreate } from "../recreation/steps";
 import { compartmentAt } from "../spatial/geometry";
@@ -628,6 +629,11 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
     // §treatment-at-the-medbay-bed: the medic at the bedside.
     case "treat":
       return runTreat(ctx, actor, step);
+    // §extraction: taking up a downed crewmate and laying them on the bed.
+    case "lift":
+      return runLift(ctx, actor, step);
+    case "lay":
+      return runLay(ctx, actor, step);
     case "eat":
     case "buy":
     case "rounds":

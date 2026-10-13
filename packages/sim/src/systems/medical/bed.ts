@@ -9,7 +9,7 @@
 import type { Actor } from "../../core/types/actor";
 import type { DeepReadonly, TileCoord } from "../../core/types/common";
 import type { ContentBundle } from "../../core/types/content";
-import type { CompartmentId, LocalKey, MachineId } from "../../core/types/ids";
+import type { ActorId, CompartmentId, LocalKey, MachineId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import { shipDeckId } from "../../core/world";
 import { besideTiles, symbolAt } from "../damage/deck";
@@ -72,4 +72,22 @@ export function onTheBed(
   const location = actor.location;
   if (location.kind !== "onDeck" || location.deckId !== shipDeckId(state)) return false;
   return Math.floor(location.x) === bed.useTile.x && Math.floor(location.y) === bed.useTile.y;
+}
+
+/**
+ * §extraction: someone other than `patientId`, living, lies or stands still at the bed. Someone
+ * walking over the tile does not take it: a crewmate passing would otherwise cancel a carry.
+ */
+export function bedTakenFrom(
+  state: Pick<ReadonlyWorldState, "deck" | "actors">,
+  bed: MedBed,
+  patientId: ActorId,
+): boolean {
+  return Object.values(state.actors).some(
+    (other) =>
+      other.id !== patientId &&
+      other.availability !== "dead" &&
+      other.movement.kind !== "moving" &&
+      onTheBed(state, bed, other),
+  );
 }

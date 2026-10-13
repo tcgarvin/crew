@@ -75,9 +75,10 @@ walk ashore pass to the first officer (D8, D103).
 ## Medicine
 
 Wounds are treated aboard, at the medbay bed (a `medBed`-tagged machine; both freighters have one
-in the infirmary): the hurt walk there, someone with the skill fetches a `medical` item and treats
-them, and the ship keeps a few kits in stock. Code is in `systems/medical/` and
-`planner/medical.ts`. A deck with no medbay bed has no wounded problem and no treatment.
+in the infirmary): the hurt walk there (the down are carried), someone with the skill fetches a
+`medical` item and treats them, and the ship keeps a few kits in stock. Code is in
+`systems/medical/` and `planner/medical.ts`. A deck with no medbay bed has no wounded problem and
+no treatment.
 
 ### The wounded problem
 
@@ -97,7 +98,8 @@ The problem derives one `treatWounds` task (target the patient, progress their w
 least `medical.kitsPerTreatment` (1) units of a `medical` item are aboard, the first such def by
 id: medical skill 1 or more, one worker, standing on the open floor beside the bed's `use` tile
 (never on it), `medical.treatSecondsPerWound` (15) for each untreated wound. With no kit aboard
-nothing is derived, and the task comes back when one is. Anyone awake with the skill answers it,
+nothing is derived, and the task comes back when one is. While the patient is down off the bed the
+problem derives their carry there instead (§extraction). Anyone awake with the skill answers it,
 on duty or not, as cargo in port is all hands (§duty-and-the-sleep-watch); the less skilled leave
 it to a better medic they can see idle (§what-a-crew-member-weighs). Nobody treats their own
 wounds.
@@ -125,6 +127,37 @@ seen on that tile). The hold ends when nothing is left to treat, or after
 backs the candidate off for as long again. A helm-stander is not pulled off the seat by a wound:
 the walk ranks no higher than the helm watch, so they go once the bell relieves them
 (§selector-commitment).
+
+### Extraction
+
+Someone down aboard cannot walk to the bed, so they are carried there (`medical/carry.ts`). While
+the patient of an open wounded problem is incapacitated and not lying at the bed, the problem
+derives one `carryCasualty` task in place of the treatment: no skill, one worker, standing on the
+open floor beside the patient (never their tile), at the problem's urgency (essential while a wound
+bleeds, routine after) and all hands like the treatment. It is derived only while they lie on the
+ship's floor or are in a carrier's arms, and only while nobody else lies or stands still at the
+bed's `use` tile; a bed taken waits, and the carry comes back when it is free. Nobody carries
+themselves. A downed patient already lying at the bed gets the treatment, and a medic treats them
+where they lie (§treatment-at-the-medbay-bed).
+
+The carrier walks to the tile beside the patient nearest them, takes them up over
+`medical.liftSeconds` (2) (`carriedBy`, as in the fight's rescue, §rescue: the body goes where
+the carrier goes), walks to the tile beside the bed nearest them and lays the patient on the `use`
+tile over `medical.laySeconds` (2). The carry is done when they are laid down: `casualtyCarried`
+(notable), and the ticker says "Bettina Solheim carries Priya Kessler to the medbay". The
+carrier's label is "going to Priya Kessler", "picking up Priya Kessler", then "carrying Priya
+Kessler to the medbay".
+
+- A carrier who stops for any reason (a more pressing job, going down, a bed taken just as they
+  arrive) sets the patient down where they stand, and the carry is derived afresh from there.
+- Anyone carried aboard outside a carry of them (they died or came round in someone's arms, or the
+  carrier stopped) is set down where the carrier stands, every tick before anyone plans them; the
+  carry of the dead or the recovered is no longer derived.
+- A fight's casualties are carried by the fight's own rule (§rescue); once they are aboard and out
+  of the fight, the carry brings them on to the bed.
+
+Why: someone down can lie for hours before they come round, and the treatment waits on a patient
+at the bed.
 
 ### Medical supplies
 

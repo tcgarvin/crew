@@ -58,6 +58,9 @@ export function actionFor(ctx: StepCtx, task: Task | undefined, step: ActivitySt
       // §reporting-damage: a report on the intercom; a scout's look round.
       if (step.stage === "report") return makeAction("report", "talking", tick);
       if (step.stage === "check") return makeAction("inspect", "working", tick);
+      // §extraction: taking a downed crewmate up, and laying them on the bed.
+      if (step.stage === "lift") return makeAction("pickUp", "reaching", tick);
+      if (step.stage === "lay") return makeAction("putDown", "placing", tick);
       const kind = RECIPE_ACTION[task?.derivationKey ?? ""] ?? "repair";
       return makeAction(kind, "working", tick, machineId);
     }

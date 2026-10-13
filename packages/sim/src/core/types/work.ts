@@ -202,7 +202,8 @@ export interface ProblemPayloads {
    * §the-wounded-problem: `actorId`, of the crew aboard, has `untreated` open wounds (stun hits
    * aside) nobody has treated. Owner: medical (dedupe `wounded:<actorId>`, public, located at the
    * medbay bed's compartment; essential while a wound bleeds, routine after); derives one
-   * `treatWounds` task while a `medical` item is aboard; resolved when every wound is treated.
+   * `treatWounds` task while a `medical` item is aboard, or, while the patient is down off the bed,
+   * one `carryCasualty` (§extraction); resolved when every wound is treated.
    */
   crewWounded: { actorId: ActorId; untreated: number };
 }
@@ -262,6 +263,8 @@ export const TASK_TYPES = [
   "checkCompartment",
   /** §treatment-at-the-medbay-bed: treat a patient's wounds at the medbay bed (`crewWounded`). */
   "treatWounds",
+  /** §extraction: carry a downed patient to the medbay bed (`crewWounded`). */
+  "carryCasualty",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -287,7 +290,10 @@ export type TaskTarget =
    * `interactionTiles`.
    */
   | { kind: "scar"; scarId: ScarId }
-  /** §treatment-at-the-medbay-bed: a patient; the tiles beside the medbay bed are where to stand. */
+  /**
+   * §treatment-at-the-medbay-bed: a patient; the tiles beside the medbay bed are where to stand (a
+   * treatment), or where the patient lies (§extraction, a carry).
+   */
   | { kind: "actor"; actorId: ActorId };
 
 /**
@@ -321,7 +327,9 @@ export type ProgressRef =
   /** §scouts: a check has no progress; the scout being there is the point. */
   | { kind: "check"; compartmentId: CompartmentId }
   /** §treatment-at-the-medbay-bed: the patient's wounds (`Wound.treatedTick`) are the progress. */
-  | { kind: "wounds"; actorId: ActorId };
+  | { kind: "wounds"; actorId: ActorId }
+  /** §extraction: where the patient lies (on the bed, or not yet) is the carry's progress. */
+  | { kind: "casualty"; actorId: ActorId };
 
 /** SD §14.7 structured blockage reasons. */
 export const BLOCKAGE_REASONS = [
@@ -595,7 +603,11 @@ export type WorkStageKey =
   /** Expeditions A1: arming at the arms locker (`expedition/muster.ts` `runArm`). */
   | "arm"
   /** §treatment-at-the-medbay-bed: treating a patient's wounds (`medical/steps.ts` `runTreat`). */
-  | "treat";
+  | "treat"
+  /** §extraction: taking up a downed patient (`medical/carry.ts` `runLift`). */
+  | "lift"
+  /** §extraction: laying the carried patient on the medbay bed (`medical/carry.ts` `runLay`). */
+  | "lay";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
 export type HoldKind =

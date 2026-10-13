@@ -564,7 +564,14 @@ const config = {
   },
   damage: { patchSeconds: 20, plateSeconds: 40, repairSecondsPerIntegrity: 30, checkSeconds: 3 },
   intercom: { reportSeconds: 3 },
-  medical: { treatSecondsPerWound: 15, kitsPerTreatment: 1, reserve: 2, giveUpAfterSeconds: 300 },
+  medical: {
+    treatSecondsPerWound: 15,
+    kitsPerTreatment: 1,
+    reserve: 2,
+    giveUpAfterSeconds: 300,
+    liftSeconds: 2,
+    laySeconds: 2,
+  },
   bodies: {
     tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
     severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },
