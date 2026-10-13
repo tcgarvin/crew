@@ -15,6 +15,7 @@ import type {
 } from "../types/ids";
 import type { EffectiveConfig } from "../types/kernel";
 import {
+  FIXTURE_ACCIDENTS,
   FIXTURE_ACTIVITIES,
   FIXTURE_BODIES,
   FIXTURE_CABINS,
@@ -215,6 +216,7 @@ export function tinyConfig(options: TinyConfigOptions = {}): ConfigDef {
     damage: FIXTURE_DAMAGE,
     intercom: FIXTURE_INTERCOM,
     medical: FIXTURE_MEDICAL,
+    accidents: FIXTURE_ACCIDENTS,
     bodies: FIXTURE_BODIES,
     expedition: FIXTURE_EXPEDITION,
     social: {

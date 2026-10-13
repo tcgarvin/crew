@@ -515,6 +515,19 @@ export const FIXTURE_MEDICAL: ConfigDef["medical"] = {
   laySeconds: 2,
 };
 
+/** §accidents-aboard: accidents at the default bundle's values. */
+export const FIXTURE_ACCIDENTS: ConfigDef["accidents"] = {
+  enabled: true,
+  hotWorkPerSecond: 0.002,
+  slipPerSecond: 0.003,
+  impactThrowChance: 0.15,
+  lines: {
+    hotWork: "{who} is burned working on the {machine}",
+    slip: "{who} slips on the filthy deck under a load",
+    thrown: "{who} is thrown off their feet by the impact",
+  },
+};
+
 /** Expeditions A1 (§7.1): bodies at the default bundle's values. */
 export const FIXTURE_BODIES: ConfigDef["bodies"] = {
   tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },

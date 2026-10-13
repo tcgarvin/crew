@@ -8,6 +8,7 @@
  * workstreams share.
  */
 import {
+  FIXTURE_ACCIDENTS,
   FIXTURE_ACTIVITIES,
   FIXTURE_BODIES,
   FIXTURE_CABINS,
@@ -230,6 +231,7 @@ export function fixtureConfig(overrides: FixtureConfigOverrides = {}): ConfigDef
     damage: FIXTURE_DAMAGE,
     intercom: FIXTURE_INTERCOM,
     medical: FIXTURE_MEDICAL,
+    accidents: FIXTURE_ACCIDENTS,
     bodies: FIXTURE_BODIES,
     expedition: FIXTURE_EXPEDITION,
     galley: FIXTURE_GALLEY,

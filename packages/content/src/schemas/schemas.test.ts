@@ -572,6 +572,13 @@ const config = {
     liftSeconds: 2,
     laySeconds: 2,
   },
+  accidents: {
+    enabled: true,
+    hotWorkPerSecond: 0.002,
+    slipPerSecond: 0.003,
+    impactThrowChance: 0.15,
+    lines: { hotWork: "{who} burns an arm", slip: "{who} slips", thrown: "{who} is thrown" },
+  },
   bodies: {
     tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
     severityDamage: { graze: 0.5, serious: 1.2, grave: 2.5 },

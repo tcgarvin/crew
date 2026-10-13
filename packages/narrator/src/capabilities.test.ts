@@ -245,6 +245,16 @@ describe("buildCapabilities", () => {
     );
   });
 
+  it("says under strike what the ship can do about a wound, and which ports sell the kits now (§medicine, §accidents-aboard)", () => {
+    expect(text).toContain(
+      "- A wound aboard is treated at the medbay bed by whoever has medical skill, with one med kit (item.med_kit) a treatment",
+    );
+    expect(text).toContain(
+      "Kits run out (sold at port.crossroads_hub, port.terns_rest, port.vesper_gate, and the crew restock them at port)",
+    );
+    expect(text).toContain("Accidents aboard (a burn at a hot machine, a slip under a load");
+  });
+
   it("documents transact and payCredits with the caps from config, and no sum on a card (§money-levers)", () => {
     const { maxWindfall, maxOfferPay } = req.snapshot.config.narrator;
     expect(text).toContain("## 10. transact: money into or out of the ship's money");

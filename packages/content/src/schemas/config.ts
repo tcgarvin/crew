@@ -52,6 +52,12 @@ const weightTable = partRecord(nonNegative).refine((t) => Object.values(t).some(
   message: "part weights must not all be 0",
 });
 
+/** §accidents-aboard: a ticker line that names who was hurt (`{who}`). */
+const accidentLine = z
+  .string()
+  .min(1)
+  .refine((line) => line.includes("{who}"), { message: "an accident line names {who}" });
+
 /** Expeditions A1 (§5.2): a tie's factor on resolve and its loyalty. */
 const tieSchema = z.strictObject({ resolve: positive, loyalty: unitInterval });
 
@@ -379,6 +385,13 @@ export const configDefSchema = z.strictObject({
     giveUpAfterSeconds: positive,
     liftSeconds: positive,
     laySeconds: positive,
+  }),
+  accidents: z.strictObject({
+    enabled: z.boolean(),
+    hotWorkPerSecond: unitInterval,
+    slipPerSecond: unitInterval,
+    impactThrowChance: unitInterval,
+    lines: z.strictObject({ hotWork: accidentLine, slip: accidentLine, thrown: accidentLine }),
   }),
   bodies: z.strictObject({
     tolerance: partRecord(positive),

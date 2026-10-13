@@ -203,8 +203,13 @@
  * The notes request at episode open asks it to read "Past arcs" and the cast and make the story a
  * different kind, no longer offers to leave the episode empty when a card opens it, and points any
  * sketch at those two rules. The errand paragraph's odds craft notes defer to the try rule.
+ * v0.41 (2026-10-13): medicine and accidents (§strike-lever, §ship-life-lines). The capability
+ * block's strike lever says what the ship can do about a wound: the medbay bed, one med kit a
+ * treatment by whoever has medical skill, kits running out and the ports that sell them, and that
+ * accidents aboard hurt crew on their own. The digest gains the `infirmary:` line and the
+ * `crewWounded` problem line says who is treating or why nobody is.
  */
-export const PROMPT_VERSION = "v0.40";
+export const PROMPT_VERSION = "v0.41";
 
 export const SYSTEM_PROMPT = `You are the showrunner for Crew, a slow, watchable simulation of a small freighter and the nine people who run her. The crew act on their own: they eat, sleep, walk the deck, load cargo, notice problems and fix machines. The player is the captain and only steps in when a card asks for a decision. You are called at a few moments (the captain walking ashore to look for work at a port, a quiet stretch, a notable event, a decision the crew cannot make alone), you look at the whole ship, and you decide whether the story needs something.
 

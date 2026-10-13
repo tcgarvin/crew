@@ -13,8 +13,8 @@ import { blastTiles, hullFootprint } from "../../core/hull";
  * and its eight neighbours on the hull. The hull is charged once and the scar written
  * (`hull.ts`), then the machines in the blast take their effects (`effects.ts`), then damage
  * response hears of it (`onImpact`, W2), then `asteroidImpact` and each `machineKnockedOut`.
- * Anyone standing on a blast tile has a near miss (a `nearMiss` thought and event): nobody is hurt
- * until bodies exist (call 17).
+ * Anyone standing on a blast tile has a near miss (a `nearMiss` thought and event, call 17); then
+ * crew unbraced in the struck room may be thrown off their feet (§accidents-aboard).
  *
  * Owner: W1 of ship life slice 5.
  */
@@ -25,6 +25,7 @@ import type { CompartmentId } from "../../core/types/ids";
 import type { RngApi, StepCtx } from "../../core/types/pipeline";
 import type { ActiveField, ImpactTarget, ScriptedImpact } from "../../core/types/state";
 import { shipDeckId } from "../../core/world";
+import { thrownByImpact } from "../bodies/accidents";
 import { onImpact } from "../damage/machines";
 import { type MachineHit, hitMachines, machineFootprintTiles } from "./effects";
 import { chargeHull, loseShipIfSunk } from "./hull";
@@ -196,6 +197,8 @@ export function landImpact(ctx: StepCtx, field: ActiveField, spec: ImpactSpec): 
   });
   emitKnockouts(ctx, field, hits);
   nearMisses(ctx, field, tiles);
+  // §accidents-aboard: whoever stands unbraced in the struck room may be thrown.
+  thrownByImpact(ctx, compartmentId);
   loseShipIfSunk(ctx, field);
 }
 

@@ -934,6 +934,10 @@ export type WoundSeverity = (typeof WOUND_SEVERITIES)[number];
 export const DAMAGE_TYPES = ["blaster", "blunt", "stun"] as const;
 export type DamageType = (typeof DAMAGE_TYPES)[number];
 
+/** §accidents-aboard: the ways someone is hurt aboard outside a fight. */
+export const ACCIDENT_HAZARDS = ["hotWork", "slip", "thrown"] as const;
+export type AccidentHazard = (typeof ACCIDENT_HAZARDS)[number];
+
 /**
  * Expeditions A1 (§7.2): what a weapon does. `range` in tiles, `aimSeconds` from the decision to
  * the shot, `hit` the base chance in (0, 1], `severity`/`damageType` of a hit; `stun` says it has
@@ -1930,6 +1934,22 @@ export interface ConfigDef {
     readonly liftSeconds: Seconds;
     /** §extraction: laying the carried patient on the medbay bed, once beside it. */
     readonly laySeconds: Seconds;
+  };
+  /**
+   * §accidents-aboard: wounds outside a fight (`systems/bodies/accidents.ts`). Each chance is
+   * doubled for someone whose fatigue is past `urgency.needEssentialAbove`.
+   */
+  readonly accidents: {
+    /** Off, no hazard is rolled (tests that pin a run's numbers turn it off). */
+    readonly enabled: boolean;
+    /** Chance a second of working at a machine past its `heat.derateAbove` burns an arm. */
+    readonly hotWorkPerSecond: number;
+    /** Chance a second of carrying cargo in a filthy room ends in a slip and a hurt leg. */
+    readonly slipPerSecond: number;
+    /** Chance each rock impact throws someone unbraced in the struck room. */
+    readonly impactThrowChance: number;
+    /** The ticker's line for each hazard: `{who}` the hurt, `{machine}` the hot machine. */
+    readonly lines: Readonly<Record<AccidentHazard, string>>;
   };
   /**
    * Expeditions A1 (§7.1, SD §12): bodies. Part damage against `tolerance` gives a part's

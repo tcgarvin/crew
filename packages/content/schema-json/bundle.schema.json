@@ -7303,6 +7303,56 @@
           ],
           "additionalProperties": false
         },
+        "accidents": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "hotWorkPerSecond": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "slipPerSecond": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "impactThrowChance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "lines": {
+              "type": "object",
+              "properties": {
+                "hotWork": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "slip": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "thrown": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["hotWork", "slip", "thrown"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "enabled",
+            "hotWorkPerSecond",
+            "slipPerSecond",
+            "impactThrowChance",
+            "lines"
+          ],
+          "additionalProperties": false
+        },
         "bodies": {
           "type": "object",
           "properties": {
@@ -7892,6 +7942,7 @@
         "damage",
         "intercom",
         "medical",
+        "accidents",
         "bodies",
         "expedition",
         "events"
