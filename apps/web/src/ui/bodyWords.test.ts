@@ -5,8 +5,13 @@ import { bodyLine } from "./bodyWords";
 
 type BodyWords = Pick<BodyView, "wounds" | "stunned" | "availability">;
 
-function wound(part: WoundView["part"], severity: WoundView["severity"], bleeding = false) {
-  return { part, severity, bleeding };
+function wound(
+  part: WoundView["part"],
+  severity: WoundView["severity"],
+  bleeding = false,
+  treated = false,
+): WoundView {
+  return { part, severity, bleeding, treated };
 }
 
 const body = (wounds: WoundView[], over: Partial<Omit<BodyWords, "wounds">> = {}): BodyWords => ({
@@ -28,6 +33,15 @@ describe("bodyLine", () => {
     expect(bodyLine(body([wound("leftArm", "graze"), wound("torso", "serious")]))).toBe(
       "wounded: left arm (graze), torso (serious)",
     );
+  });
+
+  it("says treated once every wound is treated at the medbay bed (§treatment-at-the-medbay-bed)", () => {
+    expect(bodyLine(body([wound("rightLeg", "serious", false, true)]))).toBe(
+      "wounded: right leg (serious), treated",
+    );
+    expect(
+      bodyLine(body([wound("rightLeg", "serious", false, true), wound("head", "graze")])),
+    ).toBe("wounded: right leg (serious), head (graze)");
   });
 
   it("reads stunned from the view's flag", () => {

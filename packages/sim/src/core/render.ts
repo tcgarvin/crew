@@ -750,6 +750,13 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
       return `${n.actor(event.payload.actorId) ?? "Someone"} is dead`;
     case "woundHealed":
       return null;
+    case "woundTreated":
+      return treatedLine(event, n);
+    case "casualtyCarried":
+      // §extraction: "Bettina Ruiz carries Priya Kessler to the medbay".
+      return `${n.actor(event.payload.byActorId) ?? "Someone"} carries ${
+        n.actor(event.payload.actorId) ?? "someone"
+      } to the medbay`;
     case "executed":
       return `${n.actor(event.payload.byActorId) ?? "The party"} executes ${event.payload.name}`;
     case "combatantBroke": {
@@ -766,6 +773,26 @@ function expeditionLine(event: SimEvent, n: Names): string | null | undefined {
     default:
       return undefined;
   }
+}
+
+/** §treatment-at-the-medbay-bed: a treated wound's part, as the possessive names it. */
+const TREATED_PART_WORDS: Readonly<Record<BodyPart, string>> = {
+  head: "head",
+  torso: "chest",
+  leftArm: "arm",
+  rightArm: "arm",
+  leftLeg: "leg",
+  rightLeg: "leg",
+};
+
+/** §treatment-at-the-medbay-bed: "Oyelaran Abiodun treats Priya Kessler's leg and arm". */
+function treatedLine(event: Extract<SimEvent, { type: "woundTreated" }>, n: Names): string {
+  const { actorId, byActorId, parts } = event.payload;
+  const medic = n.actor(byActorId) ?? "Someone";
+  const patient = n.actor(actorId) ?? "someone";
+  const words = [...new Set(parts.map((part) => TREATED_PART_WORDS[part]))];
+  const what = words.length === 0 ? "wounds" : nameList(words);
+  return `${medic} treats ${patient}'s ${what}`;
 }
 
 /**

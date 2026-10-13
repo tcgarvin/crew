@@ -540,6 +540,16 @@ export const FIXTURE_DAMAGE: ConfigDef["damage"] = {
 /** Slice 5 (§intercom-and-reporting): the intercom at the default bundle's values. */
 export const FIXTURE_INTERCOM: ConfigDef["intercom"] = { reportSeconds: 3 };
 
+/** §medicine: treatment at the medbay bed at the default bundle's values. */
+export const FIXTURE_MEDICAL: ConfigDef["medical"] = {
+  treatSecondsPerWound: 15,
+  kitsPerTreatment: 1,
+  reserve: 2,
+  giveUpAfterSeconds: 300,
+  liftSeconds: 2,
+  laySeconds: 2,
+};
+
 /** Expeditions A1 (§7.1): bodies at the default bundle's values. */
 export const FIXTURE_BODIES: ConfigDef["bodies"] = {
   tolerance: { head: 2, torso: 3, leftArm: 2, rightArm: 2, leftLeg: 2, rightLeg: 2 },
@@ -554,6 +564,8 @@ export const FIXTURE_BODIES: ConfigDef["bodies"] = {
   incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
   deadBelowBlood: 0.25,
   healPerDay: 0.5,
+  treatedHealFactor: 3,
+  treatPainRelief: 0.3,
   partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
   stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
 };

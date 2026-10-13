@@ -10,12 +10,21 @@ import type {
   DeckDefId,
   ItemDefId,
   ItemId,
+  MachineDefId,
   MachineId,
   ProblemId,
   TaskId,
 } from "../core/types/ids";
 import type { PlannerConfig } from "../core/types/pipeline";
-import type { AgentView, KnownItemView, ProblemView, SelfView, TaskView } from "../core/types/view";
+import type {
+  AgentView,
+  KnownItemView,
+  MachinePlacementView,
+  ProblemView,
+  SelfView,
+  TaskView,
+  WoundView,
+} from "../core/types/view";
 import type { UrgencyClass } from "../core/types/work";
 import { selectIntent } from "./select";
 import { weighOptions } from "./weigh";
@@ -130,6 +139,8 @@ const config: PlannerConfig = {
     incapacitatedBelow: { consciousness: 0.3, movement: 0.15 },
     deadBelowBlood: 0.25,
     healPerDay: 0.5,
+    treatedHealFactor: 3,
+    treatPainRelief: 0.3,
     partTable: { head: 10, torso: 45, leftArm: 10, rightArm: 10, leftLeg: 12.5, rightLeg: 12.5 },
     stunPartTable: { head: 0, torso: 0, leftArm: 25, rightArm: 25, leftLeg: 25, rightLeg: 25 },
   },
@@ -221,6 +232,9 @@ interface StubWork {
   readonly onDuty?: boolean;
   readonly problems?: readonly ProblemView[];
   readonly tasks?: readonly TaskView[];
+  /** §convalescing: their open wounds, and the ship's machines (a medbay bed). */
+  readonly wounds?: readonly WoundView[];
+  readonly machines?: readonly MachinePlacementView[];
 }
 
 function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): AgentView {
@@ -232,9 +246,9 @@ function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): 
     capacities: { movement: 1, manipulation: 1, consciousness: 1 },
     body: {
       capacities: { movement: 1, manipulation: 1, consciousness: 1 },
-      wounded: false,
-      bleeding: false,
-      wounds: [],
+      wounded: (work.wounds ?? []).length > 0,
+      bleeding: (work.wounds ?? []).some((w) => w.bleeding),
+      wounds: work.wounds ?? [],
       stunned: false,
       availability: "available",
     },
@@ -269,8 +283,8 @@ function stubView(hunger: number, items: KnownItemView[], work: StubWork = {}): 
       compartmentAt: () => undefined,
       isWall: () => false,
       doors: () => [],
-      machines: () => [],
-      amenities: () => [],
+      machines: () => work.machines ?? [],
+      amenities: (tag) => (work.machines ?? []).filter((m) => m.tags.includes(tag)),
     },
     fact: () => undefined,
     facts: () => [],
@@ -435,5 +449,45 @@ describe("maintenance and the watch (§maintenance-due)", () => {
     // Both routine: the service (a short walk and ten seconds) is quicker than the ration.
     expect(weighing.ranked.map((c) => c.ref)).toEqual(["task:t1", "eat:i1"]);
     expect(weighing.intent).toMatchObject({ kind: "task", taskId: "t1" });
+  });
+});
+
+describe("a wounded helm-stander (§convalescing)", () => {
+  const bed: MachinePlacementView = {
+    machineId: "m9" as MachineId,
+    defId: "machine.stub.medbed" as MachineDefId,
+    tags: ["medBed"],
+    footprint: [{ x: 2, y: 0 }],
+    interactionTiles: [{ tile: { x: 1, y: 0 }, purposes: ["use"] }],
+  };
+  const kit: KnownItemView = { ...ration, itemId: "i2" as ItemId, tags: ["medical"] };
+  const leg = (bleeding: boolean): WoundView => ({
+    part: "leftLeg",
+    severity: "serious",
+    bleeding,
+    treated: false,
+  });
+  /** At the helm since tick 0 (the `staff` hold), the watch post's task. */
+  const atTheHelm: SelfView["activity"] = {
+    kind: "task",
+    taskId: "t9" as TaskId,
+    claimId: "c9",
+    urgency: "essentialOperation",
+    action: { kind: "idle" },
+    sinceTick: 0,
+  } as unknown as SelfView["activity"];
+
+  it("keeps the helm, bleeding or not, and goes to the bed once relieved at the bell", () => {
+    for (const bleeding of [true, false]) {
+      const wounds = [leg(bleeding)];
+      const helm = stubView(0, [kit], { activity: atTheHelm, wounds, machines: [bed] });
+      expect(selectIntent(helm, config)).toEqual({ kind: "continue" });
+      const relieved = stubView(0, [kit], { wounds, machines: [bed] });
+      expect(selectIntent(relieved, config)).toMatchObject({
+        kind: "personal",
+        activity: "convalesce",
+        urgency: bleeding ? "essentialOperation" : "routineObligation",
+      });
+    }
   });
 });

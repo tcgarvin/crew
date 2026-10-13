@@ -13,11 +13,11 @@ A problem is a durable condition owned by the system that detects it; only the o
 revises and resolves it. Owners (`ProblemOwner`): equipment (`machineSymptom`, `machineFault`,
 `maintenanceDue`, `partsNeeded`), travel (`cargoToLoad`, `cargoToUnload`, `courseToPlot`),
 commerce (`reserveLow`), watch (`stationToStaff`, the helm's watch and relief posts), galley
-(`mealToCook`, `mealToCarry`), dirt (`compartmentDirty`) and damage (`machineDamaged`, `hullScar`,
-`hullDamaged`, `compartmentToCheck`). One open problem per `dedupeKey`: the owner bumps `revision`
-instead of duplicating. Personal needs are never problems; the planner builds eat, sleep, rest and
-socialise candidates from the actor's own needs. The watch's own rules are in
-`time-and-watches.md`.
+(`mealToCook`, `mealToCarry`), dirt (`compartmentDirty`), damage (`machineDamaged`, `hullScar`,
+`hullDamaged`, `compartmentToCheck`) and medical (`crewWounded`, §the-wounded-problem). One
+open problem per `dedupeKey`: the owner bumps `revision` instead of duplicating. Personal needs
+are never problems; the planner builds eat, sleep, rest and socialise candidates from the actor's
+own needs. The watch's own rules are in `time-and-watches.md`.
 
 Why: a repair, a meal and a cleaning each have one place that knows when they are done; the work
 system never guesses.

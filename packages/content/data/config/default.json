@@ -494,6 +494,14 @@
   "intercom": {
     "reportSeconds": 3
   },
+  "medical": {
+    "treatSecondsPerWound": 15,
+    "kitsPerTreatment": 1,
+    "reserve": 2,
+    "giveUpAfterSeconds": 300,
+    "liftSeconds": 2,
+    "laySeconds": 2
+  },
   "bodies": {
     "tolerance": {
       "head": 2,
@@ -533,6 +541,8 @@
     },
     "deadBelowBlood": 0.25,
     "healPerDay": 0.5,
+    "treatedHealFactor": 3,
+    "treatPainRelief": 0.3,
     "partTable": {
       "head": 10,
       "torso": 45,

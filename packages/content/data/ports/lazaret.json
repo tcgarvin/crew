@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schema-json/port.schema.json",
+  "id": "port.lazaret",
+  "name": "The Lazaret",
+  "setting": "station",
+  "kind": "site",
+  "nearPortId": "port.vesper_gate",
+  "description": "Vesper Gate's old quarantine hulk, cut loose and left in a slow orbit off the Gate",
+  "character": "The fever wards the Gate towed out of the way when the new hospice opened: a sealed intake, a corridor of narrow wards and a service duct along the keel. Nobody is meant to live there, so whoever does keeps the lights low and hears a ship clamp on through the hull long before anyone comes through the hatch.",
+  "castSeed": [],
+  "externalStores": [],
+  "market": [],
+  "jobTemplates": [],
+  "routes": [
+    {
+      "toPortId": "port.vesper_gate",
+      "distance": 20
+    }
+  ]
+}

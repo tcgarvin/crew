@@ -1,12 +1,12 @@
 # Expeditions
 
-Bodies and arms, landing sites, and the fight a party walks into when the ship sets down at one.
-Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
-`systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*` and `expedition.*` in
-`packages/content/data/config/default.json`. An expedition starts when the ship sets down at a
-site for an errand (§errand-job, §the-arrival-card), or from `scenarioStartExpedition` in tests and
-dev tools; what the narrator sees and may do is §the-narrator-and-sites. The owner's rulings that
-shape it are D103, D104 and D105.
+Bodies and arms, medicine aboard, landing sites, and the fight a party walks into when the ship
+sets down at one. Code is in `packages/sim/src/core/{body,sites,places}.ts`, `systems/bodies/`,
+`systems/medical/`, `systems/expedition/` and `view/planMenu.ts`; config is under `bodies.*`,
+`medical.*` and `expedition.*` in `packages/content/data/config/default.json`. An expedition
+starts when the ship sets down at a site for an errand (§errand-job, §the-arrival-card), or from
+`scenarioStartExpedition` in tests and dev tools; what the narrator sees and may do is
+§the-narrator-and-sites. The owner's rulings that shape it are D103, D104 and D105.
 
 ## Bodies
 
@@ -54,7 +54,8 @@ a stun wound closes when stun is back to 0. The `wounded` thought is kept while 
 So an untreated `serious` bleeder loses about a quarter of their blood and lives; a `grave` one
 crosses the death floor at about 62 s, before the bleed stops. Every weapon deals `serious` (fists
 a graze), so a fight makes no grave wound: death comes from a second hit to the head or a third to
-the torso. There is no medicine yet.
+the torso. A wound treated at the medbay bed stops bleeding at the treatment and heals faster from
+then (§treatment-at-the-medbay-bed); one nobody treats runs this clock unchanged.
 
 ### Going down and death
 
@@ -70,6 +71,99 @@ system lifts only an incapacity a wound explains.
 The dead free their berth (§berth-assignment) and are never planned or stepped. A dead or
 incapacitated captain is not fit for command, so command, the card's perspective and the next
 walk ashore pass to the first officer (D8, D103).
+
+## Medicine
+
+Wounds are treated aboard, at the medbay bed (a `medBed`-tagged machine; both freighters have one
+in the infirmary): the hurt walk there (the down are carried), someone with the skill fetches a
+`medical` item and treats them, and the ship keeps a few kits in stock. Code is in
+`systems/medical/` and `planner/medical.ts`. A deck with no medbay bed has no wounded problem and
+no treatment.
+
+### The wounded problem
+
+The medical system (`systems/medical/medical.ts`, phase `needs`, after the bodies system, every
+tick) raises `crewWounded {actorId, untreated}` (owner medical, dedupe `wounded:<actorId>`,
+public, located at the medbay bed's compartment) for each living crew member who is not a
+passenger, stands on the ship's floor (not the dock or a site) and is not in a fight, with an open
+wound nobody has treated; stun hits never count. It is essential while one of those wounds
+bleeds and routine after, revised when the count or the class changes, resolved when every wound
+is treated (or has closed), and cancelled when the patient dies. Once raised it stays open while
+the patient is off the ship's floor. A site's cast and passengers get none: nobody aboard treats
+them.
+
+### Treatment at the medbay bed
+
+The problem derives one `treatWounds` task (target the patient, progress their wounds) while at
+least `medical.kitsPerTreatment` (1) units of a `medical` item are aboard, the first such def by
+id: medical skill 1 or more, one worker, standing on the open floor beside the bed's `use` tile
+(never on it), `medical.treatSecondsPerWound` (15) for each untreated wound. With no kit aboard
+nothing is derived, and the task comes back when one is. While the patient is down off the bed the
+problem derives their carry there instead (§extraction). Anyone awake with the skill answers it,
+on duty or not, as cargo in port is all hands (§duty-and-the-sleep-watch); the less skilled leave
+it to a better medic they can see idle (§what-a-crew-member-weighs). Nobody treats their own
+wounds.
+
+The plan (`medical/plans.ts`) splits the units off the nearest `medical` stack the medic knows
+of, walks to the tile beside the bed nearest them and works `treat`. Until the patient lies at
+the bed the plan is blocked `dependencyPending`, so the task backs off and is tried again. The
+step (`runTreat`) counts work at the medic's work rate; at the end the units are used up, every
+untreated wound gets `Wound.treatedTick` and stops bleeding at once, pain drops by
+`bodies.treatPainRelief` (0.3), `woundTreated` (notable) names medic, patient and wounds, and
+the problem resolves. A treated wound heals `bodies.treatedHealFactor` (3) times `healPerDay` from
+the treatment on, so a `serious` one closes in about two thirds of a day instead of two
+(`core/body.ts` `woundDamage`). The ticker says "Oyelaran Abiodun treats Priya Kessler's leg";
+a wound healing has no line.
+
+### Convalescing
+
+A crew member aboard with a wound nobody has treated (`WoundView.treated` false) has a
+`convalesce` candidate (`planner/medical.ts`): walk to the medbay bed's `use` position and hold
+there, "in the medbay", essential while a wound bleeds and routine after. It is not offered to a
+passenger, on the dock or in a fight, while they believe no `medical` item is aboard
+(`noMedicine`), or while they believe someone else lies there (`bedTaken`: another person last
+seen on that tile). The hold ends when nothing is left to treat, or after
+`medical.giveUpAfterSeconds` (300) with too few `medical` units aboard for a treatment; giving up
+backs the candidate off for as long again. A helm-stander is not pulled off the seat by a wound:
+the walk ranks no higher than the helm watch, so they go once the bell relieves them
+(§selector-commitment).
+
+### Extraction
+
+Someone down aboard cannot walk to the bed, so they are carried there (`medical/carry.ts`). While
+the patient of an open wounded problem is incapacitated and not lying at the bed, the problem
+derives one `carryCasualty` task in place of the treatment: no skill, one worker, standing on the
+open floor beside the patient (never their tile), at the problem's urgency (essential while a wound
+bleeds, routine after) and all hands like the treatment. It is derived only while they lie on the
+ship's floor or are in a carrier's arms, and only while nobody else lies or stands still at the
+bed's `use` tile; a bed taken waits, and the carry comes back when it is free. Nobody carries
+themselves. A downed patient already lying at the bed gets the treatment, and a medic treats them
+where they lie (§treatment-at-the-medbay-bed).
+
+The carrier walks to the tile beside the patient nearest them, takes them up over
+`medical.liftSeconds` (2) (`carriedBy`, as in the fight's rescue, §rescue: the body goes where
+the carrier goes), walks to the tile beside the bed nearest them and lays the patient on the `use`
+tile over `medical.laySeconds` (2). The carry is done when they are laid down: `casualtyCarried`
+(notable), and the ticker says "Bettina Solheim carries Priya Kessler to the medbay". The
+carrier's label is "going to Priya Kessler", "picking up Priya Kessler", then "carrying Priya
+Kessler to the medbay".
+
+- A carrier who stops for any reason (a more pressing job, going down, a bed taken just as they
+  arrive) sets the patient down where they stand, and the carry is derived afresh from there.
+- Anyone carried aboard outside a carry of them (they died or came round in someone's arms, or the
+  carrier stopped) is set down where the carrier stands, every tick before anyone plans them; the
+  carry of the dead or the recovered is no longer derived.
+- A fight's casualties are carried by the fight's own rule (§rescue); once they are aboard and out
+  of the fight, the carry brings them on to the bed.
+
+Why: someone down can lie for hours before they come round, and the treatment waits on a patient
+at the bed.
+
+### Medical supplies
+
+The ship keeps `medical.reserve` (2) units of `medical` items aboard; with fewer, docked at a port
+whose market sells one, the difference is a reserve to restock (§reserve-kinds). The default
+scenario stows three med kits in the hold.
 
 ## Arms
 
@@ -165,6 +259,39 @@ exchange of fire where the Boathouse's is short; the weigh-house door stands wit
 reach of the ramp (§the-cast-in-the-fight), so `hold` can draw her out, where a tile or two
 further and every `hold` ends with the steward gone; and the yard wall keeps the flank's walk out
 of Rhee's sight. Cover two tiles thick blocks a line like a wall, so firing cover is one tile.
+
+### The Lazaret
+
+`port.lazaret` (station, near Vesper Gate, one route of 20) and its map `dock.lazaret`, the Gate's
+old quarantine hulk, 44 x 30 with the Mk2 berthed at (4, 0); its README is the map. The berth
+opens onto a bay two rows deep with crates of cover at (33, 21) and (36–37, 21). A bulkhead along
+row 22 has the main hatch at (31, 22) and a service hatch at (40, 22). Inside is a warren of
+one-tile doors: the intake (x 28–35, rows 23–24) under the main hatch, with no cover; a ward
+corridor along row 26 from the intake's south door at (32, 25) west to the isolation ward (x 1–8,
+rows 23–26); and north of the corridor the dispensary (x 10–15) and the long ward (x 17–26),
+joined to each other and to the intake, a second way along the hulk through the rooms. The
+service hatch drops into a duct down x 40 and west along row 28, under the whole hulk, to the
+lifeboat lock at its west end; the isolation ward's back door at (4, 27) opens onto it. Cots of
+cover stand in the wards. `noticeRadius` 3.
+
+Posts: `target` the isolation cots (4, 24), `loot` the dispensary cage (11, 23), guards
+`intake_desk` (29, 24), `corridor` (14, 26) and `ward_door` (8, 25), `bystander` `long_ward` (23,
+24), `exit` `lifeboat_lock` (0, 28), `flank` `back_duct` (6, 28). The default cast: Orrin Sallow,
+the Gate's dispenser, gone with its morphia (target, unarmed, shaky, paid, wants out); Brannoch
+Teale, a hulk-breaker in Orrin's debt with a blaster in the intake (steady, bound, wants money);
+Sister Hedda Vosk, a vowed warden with a baton in the corridor (hard, devoted, wants blood); Dace
+Corley, a squatter Orrin keeps in pills, with a blaster inside the ward door (shaky, paid, wants
+money); Ines Haddow, a patient who never left (bystander).
+Why: walls, not cover, cut the lines here, so from the bay the party sees only down the main
+hatch. `hold` trades a few shots with Brannoch through it while Orrin keeps low, then goes out by
+the back door and the duct to the lifeboat lock, so where holding takes the target at the
+Boathouse and Harrow End, here it mostly loses him: the way to him is in. The rooms beside the
+corridor and the short notice radius let `creep` get deep before anyone sees it, and the duct is
+the flank's own way to the back door, out of every guard's sight and beside the way out the cast
+break for. The intake has no cover because a desk at the hatch let Brannoch trade shots through it
+from cover, his resolve gaining faster than hits took it, until he had shot the holders down one
+by one. The isolation ward is the length of the hulk from the personnel ramp, so a fight here runs
+longer than at the other sites, most of it the walk out.
 
 ## The expedition
 
@@ -476,7 +603,11 @@ end the expedition (`targetFled`, §the-objective-and-resolution).
 
 When no armed enemy is in sight, the able party member nearest a downed crewmate on the site floor
 in their sight goes to them, picks them up (`carriedBy`) and carries them to the ramp foot; the
-one set down there remembers `carriedMeOut` about the carrier.
+one set down there remembers `carriedMeOut` about the carrier. Once the objective is held
+(§the-objective-and-resolution) sight is not needed: the party falling back goes for every
+crewmate down on the site floor wherever they lie. Why: in the Lazaret's warren a crewmate who went
+down behind a wall was never seen from the ramp foot, so the fight could not end and timed out
+with them left there.
 
 ### The objective and resolution
 

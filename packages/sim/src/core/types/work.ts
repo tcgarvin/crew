@@ -91,8 +91,8 @@ export type UrgencyClass = (typeof URGENCY_CLASSES)[number];
 /**
  * Which system created a problem and is responsible for resolving it. The watch owns
  * `stationToStaff` (the helm's watch and relief posts), the galley owns `mealToCook` and
- * `mealToCarry`, dirt owns `compartmentDirty`, and damage owns `machineDamaged`, `hullScar`,
- * `hullDamaged` and `compartmentToCheck` (§problem-ownership).
+ * `mealToCarry`, dirt owns `compartmentDirty`, damage owns `machineDamaged`, `hullScar`,
+ * `hullDamaged` and `compartmentToCheck`, and medical owns `crewWounded` (§problem-ownership).
  */
 export type ProblemOwner =
   | "equipment"
@@ -101,7 +101,8 @@ export type ProblemOwner =
   | "watch"
   | "galley"
   | "dirt"
-  | "damage";
+  | "damage"
+  | "medical";
 
 /**
  * Who can see a problem in their AgentView.
@@ -197,6 +198,14 @@ export interface ProblemPayloads {
    * scout walks there and perception does the rest); resolved by a report or the scout's arrival.
    */
   compartmentToCheck: { compartmentId: CompartmentId };
+  /**
+   * §the-wounded-problem: `actorId`, of the crew aboard, has `untreated` open wounds (stun hits
+   * aside) nobody has treated. Owner: medical (dedupe `wounded:<actorId>`, public, located at the
+   * medbay bed's compartment; essential while a wound bleeds, routine after); derives one
+   * `treatWounds` task while a `medical` item is aboard, or, while the patient is down off the bed,
+   * one `carryCasualty` (§extraction); resolved when every wound is treated.
+   */
+  crewWounded: { actorId: ActorId; untreated: number };
 }
 
 export type ProblemKind = keyof ProblemPayloads;
@@ -252,6 +261,10 @@ export const TASK_TYPES = [
   "plateHull",
   /** §scouts: a scout's walk to a compartment nobody has reported (`compartmentToCheck`). */
   "checkCompartment",
+  /** §treatment-at-the-medbay-bed: treat a patient's wounds at the medbay bed (`crewWounded`). */
+  "treatWounds",
+  /** §extraction: carry a downed patient to the medbay bed (`crewWounded`). */
+  "carryCasualty",
 ] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
@@ -276,7 +289,12 @@ export type TaskTarget =
    * §patching-and-plating: a hull scar to patch or plate; the tiles beside it are the task's
    * `interactionTiles`.
    */
-  | { kind: "scar"; scarId: ScarId };
+  | { kind: "scar"; scarId: ScarId }
+  /**
+   * §treatment-at-the-medbay-bed: a patient; the tiles beside the medbay bed are where to stand (a
+   * treatment), or where the patient lies (§extraction, a carry).
+   */
+  | { kind: "actor"; actorId: ActorId };
 
 /**
  * Where the task's physical progress lives (SD §14.4). The task holds a reference, never the
@@ -307,7 +325,11 @@ export type ProgressRef =
   /** §machine-damage: a damaged machine's integrity is the repair's progress. */
   | { kind: "integrity"; machineId: MachineId }
   /** §scouts: a check has no progress; the scout being there is the point. */
-  | { kind: "check"; compartmentId: CompartmentId };
+  | { kind: "check"; compartmentId: CompartmentId }
+  /** §treatment-at-the-medbay-bed: the patient's wounds (`Wound.treatedTick`) are the progress. */
+  | { kind: "wounds"; actorId: ActorId }
+  /** §extraction: where the patient lies (on the bed, or not yet) is the carry's progress. */
+  | { kind: "casualty"; actorId: ActorId };
 
 /** SD §14.7 structured blockage reasons. */
 export const BLOCKAGE_REASONS = [
@@ -534,6 +556,8 @@ export const PERSONAL_ACTIVITIES = [
    * person itself; the planner keeps out (`continue`) and work does not step them.
    */
   "fight",
+  /** §convalescing: a wounded crew member at the medbay bed, waiting to be treated. */
+  "convalesce",
 ] as const;
 export type PersonalActivity = (typeof PERSONAL_ACTIVITIES)[number];
 
@@ -577,10 +601,24 @@ export type WorkStageKey =
   /** §reporting-damage: a report at an intercom panel (`intercom/report.ts` `runReport`). */
   | "report"
   /** Expeditions A1: arming at the arms locker (`expedition/muster.ts` `runArm`). */
-  | "arm";
+  | "arm"
+  /** §treatment-at-the-medbay-bed: treating a patient's wounds (`medical/steps.ts` `runTreat`). */
+  | "treat"
+  /** §extraction: taking up a downed patient (`medical/carry.ts` `runLift`). */
+  | "lift"
+  /** §extraction: laying the carried patient on the medbay bed (`medical/carry.ts` `runLay`). */
+  | "lay";
 
 /** W4a addition: open-ended "stay here" stages; each ends on its own condition. */
-export type HoldKind = "sleep" | "staff" | "rest" | "socialize" | "gangway" | "bridge";
+export type HoldKind =
+  | "sleep"
+  | "staff"
+  | "rest"
+  | "socialize"
+  | "gangway"
+  | "bridge"
+  /** §convalescing: a patient at the medbay bed (`medical/steps.ts` `convalesceHoldDone`). */
+  | "convalesce";
 
 /**
  * W4a addition: one step of an activity's bounded plan (SD §14.3). The work system builds the

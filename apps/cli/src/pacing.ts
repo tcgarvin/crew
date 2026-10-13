@@ -65,6 +65,7 @@ import {
   equipmentStages,
   equipmentTaskDerivation,
   galleyTaskDerivations,
+  medicalTaskDerivations,
   registerBodies,
   registerCabins,
   registerCommerce,
@@ -75,6 +76,7 @@ import {
   registerField,
   registerGalley,
   registerIntercom,
+  registerMedical,
   registerNeeds,
   registerPlannerDefaults,
   registerRecreation,
@@ -206,6 +208,8 @@ export function createPacingRegistry(): KernelRegistry {
   registerCabins(registry);
   registerDamage(registry);
   registerIntercom(registry);
+  // §medicine: the wounded problem, after the bodies system in the needs phase.
+  registerMedical(registry);
   // Expeditions A1: the muster and the fight, in the actions phase after spatial, before work.
   registerExpedition(registry);
   registerWork(registry, {
@@ -216,6 +220,7 @@ export function createPacingRegistry(): KernelRegistry {
       ...galleyTaskDerivations,
       ...dirtTaskDerivations,
       ...damageTaskDerivations,
+      ...medicalTaskDerivations,
     },
     stages: equipmentStages,
   });

@@ -280,6 +280,19 @@ describe("buildDigest: the body clause on the crew lines (expeditions A1)", () =
     expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain("; wounded in the arm; ");
   });
 
+  it("says a wound treated at the medbay bed is treated (§treatment-at-the-medbay-bed)", () => {
+    const snapshot = clone(quietTooLongRequest(content()));
+    const jax = actorNamed(snapshot.state, "Jax Okonkwo");
+    jax.body.wounds = [{ ...wound("leftLeg", "w1"), treatedTick: 5 }];
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain(
+      "; wounded in the leg (treated); ",
+    );
+    jax.body.wounds = [{ ...wound("leftLeg", "w1"), treatedTick: 5 }, wound("head", "w2")];
+    expect(lineStarting(digest(snapshot), "- Jax Okonkwo ")).toContain(
+      "; wounded in the head and the leg; ",
+    );
+  });
+
   it("says down for someone incapacitated, ahead of the wounds", () => {
     const snapshot = clone(quietTooLongRequest(content()));
     const jax = actorNamed(snapshot.state, "Jax Okonkwo");

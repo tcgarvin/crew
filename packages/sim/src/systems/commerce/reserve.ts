@@ -27,6 +27,10 @@
  * difference. Bought kits come aboard like any purchase, set down at the top of the cargo ramp
  * (`market.ts`), where a patcher fetches them from as readily as from a locker.
  *
+ * Medical supplies (§medical-supplies) are reckoned in units of any `medical`-tagged item: with
+ * fewer than `medical.reserve` aboard, a market that sells one (the first by id) is asked for the
+ * difference.
+ *
  * Raised, revised and settled against truth every tick, and only while docked at a port whose
  * market has the item in stock: underway, or where nothing is for sale, the crew can do nothing
  * about it, so there is no problem to show. The purchase settles it at the counter
@@ -167,6 +171,23 @@ function patchKitShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): Reserv
   return missing > 0 && kit !== undefined ? [{ itemDefId: kit, count: missing }] : [];
 }
 
+const isMedical = (ctx: ReserveCtx, defId: ItemDefId): boolean =>
+  ctx.content.items[defId]?.tags.includes("medical") === true;
+
+/**
+ * §medical-supplies: the `medical` units that bring the ship back to `medical.reserve`, if a
+ * market here sells one.
+ */
+function medicalShortfall(ctx: ReserveCtx, stock: readonly ItemDefId[]): ReserveShortfall[] {
+  let aboard = 0;
+  for (const [defId, units] of unitsAboard(ctx.state)) {
+    if (isMedical(ctx, defId)) aboard += units;
+  }
+  const missing = ctx.config.medical.reserve - aboard;
+  const kit = stock.find((defId) => isMedical(ctx, defId));
+  return missing > 0 && kit !== undefined ? [{ itemDefId: kit, count: missing }] : [];
+}
+
 /**
  * §reserve-low-problem: what the ship should buy at `portId` to keep its reserves, among what the
  * market there has in stock. Empty when nothing is low or nothing that would help is for sale.
@@ -178,6 +199,7 @@ export function reserveShortfalls(ctx: ReserveCtx, portId: PortDefId): ReserveSh
     ...foodShortfall(ctx, stock),
     ...spareShortfalls(ctx, stock),
     ...patchKitShortfall(ctx, stock),
+    ...medicalShortfall(ctx, stock),
   ];
 }
 

@@ -372,6 +372,14 @@ export const configDefSchema = z.strictObject({
     checkSeconds: positive,
   }),
   intercom: z.strictObject({ reportSeconds: positive }),
+  medical: z.strictObject({
+    treatSecondsPerWound: positive,
+    kitsPerTreatment: positiveInt,
+    reserve: nonNegativeInt,
+    giveUpAfterSeconds: positive,
+    liftSeconds: positive,
+    laySeconds: positive,
+  }),
   bodies: z.strictObject({
     tolerance: partRecord(positive),
     severityDamage: severityRecord(nonNegative),
@@ -385,6 +393,8 @@ export const configDefSchema = z.strictObject({
     incapacitatedBelow: z.strictObject({ consciousness: unitInterval, movement: unitInterval }),
     deadBelowBlood: unitInterval,
     healPerDay: nonNegative,
+    treatedHealFactor: positive,
+    treatPainRelief: unitInterval,
     partTable: weightTable,
     stunPartTable: weightTable,
   }),

@@ -127,3 +127,49 @@ describe("crew expeditions: flank on the Boathouse", () => {
     expect(through).toEqual([]);
   }, 60_000);
 });
+
+/**
+ * The Lazaret (§the-lazaret): a warren the party cannot hold from the bay. Holding watches the
+ * dispenser go out the back, creeping in by the wards takes him, and going in never leaves a fight
+ * unfinished with a crewmate down out of sight (§rescue). Bounds, not values (ruling 13).
+ */
+describe("crew expeditions: the Lazaret's warren", () => {
+  const summaries = new Map<string, PlanSummary>();
+  const runPlan = async (plan: string): Promise<PlanSummary> => {
+    const records = await runExpeditionsAsync({
+      siteId: "port.lazaret" as never,
+      plans: [plan],
+      casts: ["default"],
+      n: 4,
+      seeds: [1, 2],
+    });
+    const summary = summarise(records);
+    summaries.set(plan, summary);
+    return summary;
+  };
+  const woundsPerFight = (plan: string) =>
+    Object.values(summaries.get(plan)?.woundsPerFight.us ?? {}).reduce((a, b) => a + b, 0);
+
+  it("hold: the target mostly gets away", { timeout: 120_000 }, async () => {
+    const hold = await runPlan("hold-lethal-armed");
+    expect(hold.deadPerFight.us).toBeLessThanOrEqual(0.25);
+    expect(hold.outcomes.targetFled).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("assault: takes the target, never timed out", { timeout: 120_000 }, async () => {
+    const assault = await runPlan("assault-lethal-armed");
+    expect(assault.deadPerFight.us).toBeLessThanOrEqual(0.25);
+    expect(assault.outcomes.timedOut + assault.outcomes.cutOff).toBe(0);
+    expect(assault.outcomes.targetTaken).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("creep: takes the target at fewer wounds than assault", { timeout: 120_000 }, async () => {
+    const creep = await runPlan("creep-lethal-armed");
+    expect(creep.deadPerFight.us).toBeLessThanOrEqual(0.25);
+    expect(creep.outcomes.timedOut + creep.outcomes.cutOff).toBe(0);
+    expect(creep.outcomes.targetTaken).toBeGreaterThanOrEqual(0.8);
+    expect(woundsPerFight("creep-lethal-armed")).toBeLessThan(
+      woundsPerFight("assault-lethal-armed"),
+    );
+  });
+});

@@ -1,0 +1,232 @@
+{
+  "$schema": "../../schema-json/dock.schema.json",
+  "id": "dock.lazaret",
+  "portId": "port.lazaret",
+  "name": "The Lazaret, the quarantine hulk",
+  "kind": "site",
+  "palette": {
+    "floor": "#3a3f3c",
+    "wall": "#1c201f",
+    "accent": "#8fb3a1"
+  },
+  "width": 44,
+  "height": 30,
+  "rows": [
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "                                            ",
+    "............................................",
+    ".................................c..cc......",
+    "###############################.########.###",
+    "#........#...c..#..b..b..b..........####.###",
+    "#..b..b..#.................#........####.###",
+    "#........###.########.##########.#######.###",
+    "#....................................###.###",
+    "####.###################################.###",
+    ".........................................###",
+    "############################################"
+  ],
+  "legend": {
+    ".": "floor",
+    "#": "wall",
+    " ": "void",
+    "c": "cover",
+    "d": "cover",
+    "b": "cover"
+  },
+  "berth": {
+    "origin": {
+      "x": 4,
+      "y": 0
+    },
+    "sizeClass": "M"
+  },
+  "posts": [
+    {
+      "key": "isolation_cot",
+      "kind": "target",
+      "name": "the isolation cots",
+      "tile": {
+        "x": 4,
+        "y": 24
+      },
+      "facing": "e"
+    },
+    {
+      "key": "drug_cage",
+      "kind": "loot",
+      "name": "the dispensary cage",
+      "tile": {
+        "x": 11,
+        "y": 23
+      },
+      "facing": "n"
+    },
+    {
+      "key": "intake_desk",
+      "kind": "guard",
+      "name": "behind the intake desk",
+      "tile": {
+        "x": 29,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "corridor",
+      "kind": "guard",
+      "name": "in the ward corridor",
+      "tile": {
+        "x": 14,
+        "y": 26
+      },
+      "facing": "e"
+    },
+    {
+      "key": "ward_door",
+      "kind": "guard",
+      "name": "inside the isolation ward door",
+      "tile": {
+        "x": 8,
+        "y": 25
+      },
+      "facing": "e"
+    },
+    {
+      "key": "long_ward",
+      "kind": "bystander",
+      "name": "the long ward",
+      "tile": {
+        "x": 23,
+        "y": 24
+      },
+      "facing": "n"
+    },
+    {
+      "key": "lifeboat_lock",
+      "kind": "exit",
+      "name": "the lifeboat lock",
+      "tile": {
+        "x": 0,
+        "y": 28
+      },
+      "facing": "w"
+    },
+    {
+      "key": "back_duct",
+      "kind": "flank",
+      "name": "the service duct",
+      "tile": {
+        "x": 6,
+        "y": 28
+      },
+      "facing": "n"
+    }
+  ],
+  "areas": [],
+  "props": [
+    {
+      "key": "lamp_hatch",
+      "kind": "lamp",
+      "rect": {
+        "x": 30,
+        "y": 21,
+        "w": 1,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": false
+    },
+    {
+      "key": "med_crates",
+      "kind": "crates",
+      "rect": {
+        "x": 8,
+        "y": 21,
+        "w": 2,
+        "h": 1
+      },
+      "rot": 0,
+      "blocking": true
+    }
+  ],
+  "foreground": [],
+  "ambience": "Air that has been breathed too often, a ward light flickering somewhere down the corridor, and the hulk ticking as it turns out of the Gate's shadow.",
+  "grime": 0.6,
+  "airborneDust": 0,
+  "noticeRadius": 3,
+  "defaultCast": [
+    {
+      "name": "Orrin Sallow",
+      "role": "the Gate's dispenser, gone with its morphia",
+      "look": "a physician's grey coat over two shirts, pupils like pinpricks",
+      "part": "target",
+      "arms": "none",
+      "resolve": "shaky",
+      "tie": "paid",
+      "wants": "out",
+      "post": "isolation_cot"
+    },
+    {
+      "name": "Brannoch Teale",
+      "role": "a hulk-breaker in Orrin's debt",
+      "look": "a cutting-torch harness, a blaster slung where the torch should be",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "steady",
+      "tie": "bound",
+      "wants": "money",
+      "post": "intake_desk"
+    },
+    {
+      "name": "Sister Hedda Vosk",
+      "role": "a vowed warden who took Orrin's side",
+      "look": "a grey habit kilted up, a ward bar held in both hands",
+      "part": "guard",
+      "arms": "melee",
+      "resolve": "hard",
+      "tie": "devoted",
+      "wants": "blood",
+      "post": "corridor"
+    },
+    {
+      "name": "Dace Corley",
+      "role": "a squatter Orrin keeps in pills",
+      "look": "a blanket for a coat, a blaster he keeps checking is loaded",
+      "part": "guard",
+      "arms": "blaster",
+      "resolve": "shaky",
+      "tie": "paid",
+      "wants": "money",
+      "post": "ward_door"
+    },
+    {
+      "name": "Ines Haddow",
+      "role": "a patient who never left",
+      "look": "a ward gown and a rosary of pill caps",
+      "part": "bystander",
+      "arms": "none",
+      "resolve": "steady",
+      "tie": "devoted",
+      "wants": "nothing",
+      "post": "long_ward"
+    }
+  ]
+}

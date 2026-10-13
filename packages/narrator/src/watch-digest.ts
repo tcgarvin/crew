@@ -189,17 +189,21 @@ const REGION_ORDER = ["head", "chest", "arm", "leg"] as const;
 
 /**
  * Expeditions A1: the crew line's body clause off `Actor.body`: "down" for someone out on their
- * feet, "wounded in the leg and the head" for open wounds. A whole body gives the empty string,
- * so a digest with nobody hurt is byte-for-byte the one written before bodies. The dead are
- * already tagged "(dead)" by the line's status.
+ * feet, "wounded in the leg and the head" for open wounds, "wounded in the leg (treated)" once
+ * every wound that hurts has been treated at the medbay bed (§treatment-at-the-medbay-bed). A
+ * whole body gives the empty string, so a digest with nobody hurt is byte-for-byte the one
+ * written before bodies. The dead are already tagged "(dead)" by the line's status.
  */
 export function bodyPhrase(actor: Actor): string {
   const regions = new Set(actor.body.wounds.map((wound) => REGION_OF_PART[wound.part]));
   const wounded = REGION_ORDER.filter((region) => regions.has(region));
+  const hurts = actor.body.wounds.filter((wound) => wound.type !== "stun");
+  const treated = hurts.length > 0 && hurts.every((wound) => wound.treatedTick !== undefined);
   const parts: string[] = [];
   if (actor.availability === "incapacitated") parts.push("down");
   if (wounded.length > 0) {
-    parts.push(`wounded in ${wounded.map((region) => `the ${region}`).join(" and ")}`);
+    const where = wounded.map((region) => `the ${region}`).join(" and ");
+    parts.push(`wounded in ${where}${treated ? " (treated)" : ""}`);
   }
   return parts.length === 0 ? "" : `; ${parts.join(", ")}`;
 }
