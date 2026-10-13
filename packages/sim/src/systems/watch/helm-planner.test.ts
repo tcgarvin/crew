@@ -32,6 +32,7 @@ function plannerConfig(fixture: TestWorld): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   } = fixture.world.config.values;
   return {
     work,
@@ -47,6 +48,7 @@ function plannerConfig(fixture: TestWorld): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   };
 }
 

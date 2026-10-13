@@ -12,6 +12,7 @@ import { medBedOf, onTheBed } from "./bed";
 import {
   BEDSIDE,
   JAX,
+  MARA,
   PRIYA,
   actorOf,
   bodiesWorldViolations,
@@ -79,7 +80,8 @@ describe("the carry's derivation (§extraction)", () => {
         workerSlots: 1,
         progressRef: { kind: "casualty", actorId: PRIYA },
         completion: { kind: "stepsDone" },
-        baseUrgency: "routineObligation",
+        // Grave wounds: essential though they do not bleed (§the-wounded-problem).
+        baseUrgency: "essentialOperation",
       },
     ]);
     // The carrier stands beside her, never on her tile.
@@ -212,13 +214,13 @@ describe("the carry (§extraction)", () => {
     runUntil(test, 120, (w) => carrierOf(w) !== undefined);
     const carrier = carrierOf(world);
     if (carrier === undefined) throw new Error("nobody carries Priya");
-    // Jax lies down at the bed (down himself, so he stays there).
-    const jax = actorOf(world, JAX);
-    if (jax.location.kind !== "onDeck") throw new Error("Jax is not on deck");
-    jax.location = { ...jax.location, x: BEDSIDE.x + 0.5, y: BEDSIDE.y + 0.5 };
-    woundNow(world, JAX, { part: "head", severity: "graze", type: "stun" });
-    woundNow(world, JAX, { part: "head", severity: "graze", type: "stun" });
-    expect(jax.availability).toBe("incapacitated");
+    // Someone other than the carrier lies down at the bed (down themselves, so they stay there).
+    const blocker = actorOf(world, carrier.id === JAX ? MARA : JAX);
+    if (blocker.location.kind !== "onDeck") throw new Error("the blocker is not on deck");
+    blocker.location = { ...blocker.location, x: BEDSIDE.x + 0.5, y: BEDSIDE.y + 0.5 };
+    woundNow(world, blocker.id, { part: "head", severity: "graze", type: "stun" });
+    woundNow(world, blocker.id, { part: "head", severity: "graze", type: "stun" });
+    expect(blocker.availability).toBe("incapacitated");
     runFor(test, 3);
     expect(actorOf(world, PRIYA).location.kind).toBe("onDeck");
     const live = (w: World) =>
@@ -227,7 +229,7 @@ describe("the carry (§extraction)", () => {
       );
     expect(live(world)).toEqual([]);
 
-    jax.location = { ...jax.location, x: 6.5, y: 2.5 };
+    blocker.location = { ...blocker.location, x: 6.5, y: 2.5 };
     const events = runUntil(test, 180, onBed);
     expect(ofType(events, "casualtyCarried")).toHaveLength(1);
   });

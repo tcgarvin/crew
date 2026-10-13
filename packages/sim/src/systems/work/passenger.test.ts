@@ -53,6 +53,7 @@ function plannerConfig(world: World): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   } = world.config.values;
   return {
     work,
@@ -68,6 +69,7 @@ function plannerConfig(world: World): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   };
 }
 

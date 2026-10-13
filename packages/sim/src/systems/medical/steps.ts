@@ -5,8 +5,9 @@
  *   at it, `treat` work counts `workRate` a tick; at the end the units are used up, every wound
  *   that wanted treating is marked treated (`Wound.treatedTick`) and stops bleeding, the patient's
  *   pain drops by `bodies.treatPainRelief`, `woundTreated` names who treated whom, and the wounded
- *   problem resolves. Without the units it fails `inaccessibleSupply`; with the patient gone from
- *   the bed, `dependencyPending`; away from the bed, `unreachableTarget`.
+ *   problem resolves. Without the units it fails `inaccessibleSupply`; away from the bed,
+ *   `unreachableTarget`; with the patient not on the bed it waits while they walk to it
+ *   (`convalesce`) and fails `dependencyPending` otherwise.
  * - `convalesceHoldDone`: the patient's hold at the bed ends once nothing is left to treat, or
  *   after `medical.giveUpAfterSeconds` with too few `medical` units aboard to treat them; giving up
  *   backs the `convalesce` candidate off for as long again, so they do not walk straight back.
@@ -23,7 +24,7 @@ import { backoffRef } from "../work/activity";
 import { emitSim } from "../work/events";
 import { tileOf } from "../work/plans";
 import { type StepResult, workRate } from "../work/steps";
-import { medBedOf, onTheBed } from "./bed";
+import { convalescing, medBedOf, onTheBed } from "./bed";
 import { untreatedWounds } from "./medical";
 import { kitsInHand, unitsOf } from "./plans";
 
@@ -55,11 +56,14 @@ export function runTreat(ctx: StepCtx, actor: Actor, step: WorkStep): StepResult
   const patient = ctx.state.actors[task.target.actorId];
   const bed = medBedOf(ctx.state, ctx.content);
   if (patient === undefined || bed === undefined) return { fail: "unreachableTarget" };
-  if (!onTheBed(ctx.state, bed, patient)) return { fail: "dependencyPending" };
   const need = ctx.config.medical.kitsPerTreatment;
   if (unitsOf(kitsInHand(ctx, actor)) < need) return { fail: "inaccessibleSupply" };
   if (actor.location.kind !== "onDeck" || chebyshev(tileOf(actor.location), bed.useTile) > 1) {
     return { fail: "unreachableTarget" };
+  }
+  if (!onTheBed(ctx.state, bed, patient)) {
+    // The medic got ready while the patient came: wait at the bedside while they are on their way.
+    return convalescing(patient) ? "wait" : { fail: "dependencyPending" };
   }
   if (task.status === "claimed") task.status = "active";
   step.ticksDone += workRate(ctx, actor, task);

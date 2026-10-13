@@ -55,7 +55,7 @@ random rate by their share of the expected count, so a scripted field is no heav
 
 Every rock costs the hull once (`field.hullDamage`: small 3, large 8) and leaves a scar on its
 centre tile. Anyone on a blast tile gets a `nearMiss` thought and ticker line, and crew unbraced in
-the struck room may be thrown off their feet (§accidents-aboard). Code: `field/impacts.ts`.
+the struck room may be thrown down (§accidents-aboard). Code: `field/impacts.ts`.
 
 - Fragile freight in the struck compartment may be smashed, each crate at
   `field.fragileBreakChance` by rock (§fragile-cargo).

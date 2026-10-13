@@ -1958,6 +1958,20 @@ export interface ConfigDef {
     readonly griefCloseAffinity: number;
     /** §grief: how many `grieving` thoughts one close to the dead has (everyone else one). */
     readonly griefStacksClose: number;
+    /**
+     * §convalescing: an untreated wound of one of these severities makes the wounded problem and
+     * the patient's walk to the bed essential even once it has stopped bleeding.
+     */
+    readonly essentialSeverities: readonly WoundSeverity[];
+    /** §the-medics-right: medical skill at which a crew member is the ship's medic. */
+    readonly medicLevel: number;
+    /** §the-medics-right: how long a non-bleeding patient's treatment waits for the medic. */
+    readonly waitForMedicSeconds: Seconds;
+    /**
+     * §treatment-at-the-medbay-bed: a treatment is got ready (kit, walk) once the patient is this
+     * many tiles from the bed or on their way to it; only the treating waits for them on it.
+     */
+    readonly prepareWithinTiles: number;
   };
   /**
    * §accidents-aboard: wounds outside a fight (`systems/bodies/accidents.ts`). Each chance is

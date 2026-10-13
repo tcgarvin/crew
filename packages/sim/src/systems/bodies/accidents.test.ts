@@ -247,7 +247,7 @@ describe("thrown by an impact (§accidents-aboard)", () => {
       [JAX, MARA, PRIYA, BETTINA].map((id) => ({
         actorId: id,
         hazard: "thrown",
-        how: `${actorOf(world, id).name} is thrown off their feet by the impact`,
+        how: `${actorOf(world, id).name} is thrown down by the impact`,
       })),
     );
     for (const id of [JAX, MARA, PRIYA, BETTINA]) {

@@ -101,9 +101,13 @@ The medical system (`systems/medical/medical.ts`, phase `needs`, after the bodie
 tick) raises `crewWounded {actorId, untreated}` (owner medical, dedupe `wounded:<actorId>`,
 public, located at the medbay bed's compartment) for each living crew member who is not a
 passenger, stands on the ship's floor (not the dock or a site) and is not in a fight, with an open
-wound nobody has treated; stun hits never count. It is essential while one of those wounds
-bleeds and routine after, revised when the count or the class changes, resolved when every wound
-is treated (or has closed), and cancelled when the patient dies. Once raised it stays open while
+wound nobody has treated; stun hits never count. It is essential while one of those wounds bleeds
+or is of a `medical.essentialSeverities` severity (`serious`, `grave`), and routine for grazes
+alone (`woundedUrgency`); `bleeding` is on the payload while one bleeds. It is revised when the
+count, the bleeding or the class changes, resolved when every wound is treated (or has closed), and
+cancelled when the patient dies. Why serious without the bleed: a serious wound slows work and the
+helm until it is treated (§bodies-and-capacities); routine, the patient finished the cooking, the
+watch or the sleep first and was treated minutes after the hit. Once raised it stays open while
 the patient is off the ship's floor. A site's cast and passengers get none: nobody aboard treats
 them.
 
@@ -115,41 +119,63 @@ id: medical skill 1 or more, one worker, standing on the open floor beside the b
 (never on it), `medical.treatSecondsPerWound` (15) for each untreated wound. With no kit aboard
 nothing is derived, and the task comes back when one is. While the patient is down off the bed the
 problem derives their carry there instead (§extraction). Anyone awake with the skill answers it,
-on duty or not, as cargo in port is all hands (§duty-and-the-sleep-watch); the less skilled leave
-it to a better medic they can see idle (§what-a-crew-member-weighs). Nobody treats their own
-wounds.
+on duty or not, as cargo in port is all hands (§duty-and-the-sleep-watch), but leaves it a while to
+the ship's medic (§the-medics-right). Nobody treats their own wounds.
 
 The plan (`medical/plans.ts`) splits the units off the nearest `medical` stack the medic knows
-of, walks to the tile beside the bed nearest them and works `treat`. Until the patient lies at
-the bed the plan is blocked `dependencyPending`, so the task backs off and is tried again. The
-step (`runTreat`) counts work at the medic's work rate; at the end the units are used up, every
+of, walks to the tile beside the bed nearest them and works `treat`. It is built once the patient
+lies at the bed, is walking to it (`convalesce`) or is within `medical.prepareWithinTiles` (2) of
+it, so the kit is fetched while they come; before that it is blocked `dependencyPending`, and the
+task backs off and is tried again. At the bedside the step waits while the patient is still on
+their way and fails `dependencyPending` if they are neither there nor coming. The step
+(`runTreat`) counts work at the medic's work rate; at the end the units are used up, every
 untreated wound gets `Wound.treatedTick` and stops bleeding at once, pain drops by
 `bodies.treatPainRelief` (0.3), `woundTreated` (notable) names medic, patient and wounds, and
 the problem resolves. A treated wound heals `bodies.treatedHealFactor` (3) times `healPerDay` from
 the treatment on, so a `serious` one closes in about two thirds of a day instead of two
 (`core/body.ts` `woundDamage`). The ticker says "Oyelaran Abiodun treats Priya Kessler's leg";
-a wound healing has no line.
+a wound healing has no line. The hit's line names the part with the same word ("Priya Kessler is
+hit in the chest").
+
+### The medic's right
+
+A crew member below `medical.medicLevel` (4) leaves a `treatWounds` (rejected `deferTo:<id>`) to
+a crew member on the roster at or past it (not themselves, not the patient, not a passenger, not
+down) whom they believe awake and available: their latest `actorStatus` sighting of them, of any
+age, or with none the roster's word that they are up. They leave it only while the wounded problem
+is younger than `medical.waitForMedicSeconds` (90); after that anyone with the skill treats, and a
+bleeding patient (`bleeding` on the problem) never waits. The medic himself, and anyone at the
+level, treats as soon as he answers. This replaces the generic deference to a better hand in sight
+(§what-a-crew-member-weighs) for treatment only; the carries need no skill and defer to nobody.
+Code: `planner/medical.ts` `medicToWaitFor`. Why: the generic rule yields only to a colleague in
+sight, idle and awake that moment, so the nearest deckhand with medical 1 took every treatment and
+the ship's medic watched a deckhand bandage the captain; the wait is bounded so a medic at the helm
+or asleep costs a minute and a half, not the patient's treatment.
 
 ### Convalescing
 
 A crew member aboard with a wound nobody has treated (`WoundView.treated` false) has a
 `convalesce` candidate (`planner/medical.ts`): walk to the medbay bed's `use` position and hold
-there, "in the medbay", essential while a wound bleeds and routine after. It is not offered to a
-passenger, on the dock or in a fight, while they believe no `medical` item is aboard
-(`noMedicine`), or while they believe someone else lies there (`bedTaken`: another person last
-seen on that tile). The hold ends when nothing is left to treat, or after
+there, "in the medbay", at the wounded problem's class (§the-wounded-problem): essential while a
+wound bleeds or is serious or grave, so it takes them off routine work like cooking or hauling once
+the selector's cooldown has passed (§selector-commitment), and routine for grazes alone, so a
+grazed cook finishes the meal first. It is not offered to a passenger, on the dock or in a fight,
+while they believe no `medical` item is aboard and know of no treatment of their own wounds
+(`noMedicine`; the task is derived only with a kit aboard, and a kit restocked in port may lie
+where they never looked), or while they believe someone else lies there (`bedTaken`: another
+person last seen on that tile). The hold ends when nothing is left to treat, or after
 `medical.giveUpAfterSeconds` (300) with too few `medical` units aboard for a treatment; giving up
 backs the candidate off for as long again. A helm-stander is not pulled off the seat by a wound:
-the walk ranks no higher than the helm watch, so they go once the bell relieves them
-(§selector-commitment).
+the walk ranks no higher than the helm watch (both essential), so they go once the bell relieves
+them (§selector-commitment); a sleeper sleeps on likewise, since only containment wakes one.
 
 ### Extraction
 
 Someone down aboard cannot walk to the bed, so they are carried there (`medical/carry.ts`). While
 the patient of an open wounded problem is incapacitated and not lying at the bed, the problem
 derives one `carryCasualty` task in place of the treatment: no skill, one worker, standing on the
-open floor beside the patient (never their tile), at the problem's urgency (essential while a wound
-bleeds, routine after) and all hands like the treatment. It is derived only while they lie on the
+open floor beside the patient (never their tile), at the problem's urgency (§the-wounded-problem)
+and all hands like the treatment. It is derived only while they lie on the
 ship's floor or are in a carrier's arms, and only while nobody else lies or stands still at the
 bed's `use` tile; a bed taken waits, and the carry comes back when it is free. Nobody carries
 themselves. A downed patient already lying at the bed gets the treatment, and a medic treats them

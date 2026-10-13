@@ -3,8 +3,8 @@
  * each living crew member aboard (not a passenger, not a site's cast, not in a fight) with an open
  * wound nobody has treated (stun hits aside, `needsTreatment`), `crewWounded` is raised (owner
  * medical, dedupe `wounded:<actorId>`, public, located at the medbay bed's compartment): essential
- * while one of those wounds bleeds, routine after. It is revised when the count or the class
- * changes, resolved once every wound is treated (or closed), and cancelled when the patient dies.
+ * while one of those wounds bleeds or is of a `medical.essentialSeverities` severity, routine for
+ * grazes alone (`woundedUrgency`). It is revised when the count, the bleeding or the class changes, resolved once every wound is treated (or closed), and cancelled when the patient dies.
  * Once raised it stays open while the patient is off the ship's floor for a while (on the dock,
  * ashore): the wounds are still there when they come back. A deck with no medbay bed raises
  * nothing (`medBedOf`). Before the sweep, anyone carried aboard outside a carry is set down
@@ -16,6 +16,7 @@ import { isOnDock } from "../../core/docks";
 import { allocateId } from "../../core/ids";
 import type { Actor, Wound } from "../../core/types/actor";
 import type { DeepReadonly } from "../../core/types/common";
+import type { ConfigDef } from "../../core/types/content";
 import type { ActorId } from "../../core/types/ids";
 import type { StepCtx, System } from "../../core/types/pipeline";
 import type { ProblemOfKind, UrgencyClass } from "../../core/types/work";
@@ -45,11 +46,29 @@ export function untreatedWounds<
   return actor.body.wounds.filter(needsTreatment);
 }
 
-function urgencyOf(actor: Actor): UrgencyClass {
-  return untreatedWounds(actor).some((w) => w.bleeding)
-    ? "essentialOperation"
-    : "routineObligation";
+/**
+ * §the-wounded-problem: essential while an untreated wound bleeds or is of a severity in
+ * `essentialSeverities` (a serious wound slows work and the helm whether or not it still bleeds),
+ * routine for grazes alone. The planner applies the same rule to the patient's own walk to the bed
+ * (`planner/medical.ts`).
+ */
+export function woundedUrgency(
+  wounds: readonly DeepReadonly<Pick<Wound, "severity" | "bleeding">>[],
+  config: Pick<ConfigDef["medical"], "essentialSeverities">,
+): UrgencyClass {
+  const essential = wounds.some(
+    (w) => w.bleeding || config.essentialSeverities.includes(w.severity),
+  );
+  return essential ? "essentialOperation" : "routineObligation";
 }
+
+function urgencyOf(ctx: StepCtx, actor: Actor): UrgencyClass {
+  return woundedUrgency(untreatedWounds(actor), ctx.config.medical);
+}
+
+/** The payload's `bleeding`: present while an untreated wound bleeds. */
+const bleedingOf = (actor: Actor): { bleeding?: true } =>
+  untreatedWounds(actor).some((w) => w.bleeding) ? { bleeding: true } : {};
 
 function openWounded(ctx: StepCtx): Map<ActorId, ProblemOfKind<"crewWounded">> {
   const out = new Map<ActorId, ProblemOfKind<"crewWounded">>();
@@ -73,14 +92,14 @@ function raise(ctx: StepCtx, bed: MedBed, actor: Actor, untreated: number): void
   ctx.state.work.problems[id] = {
     id,
     kind: "crewWounded",
-    payload: { actorId: actor.id, untreated },
+    payload: { actorId: actor.id, untreated, ...bleedingOf(actor) },
     owner: "medical",
     visibility: "public",
     dedupeKey: woundedKey(actor.id),
     status: "open",
     createdTick: ctx.tick,
     revision: 1,
-    baseUrgency: urgencyOf(actor),
+    baseUrgency: urgencyOf(ctx, actor),
     location: { kind: "compartment", compartmentId: bed.compartmentId },
   };
   emitSim(ctx, "problemRaised", [id], { problemId: id, kind: "crewWounded" });
@@ -88,9 +107,16 @@ function raise(ctx: StepCtx, bed: MedBed, actor: Actor, untreated: number): void
 
 function revise(ctx: StepCtx, problem: ProblemOfKind<"crewWounded">, actor: Actor): void {
   const untreated = untreatedWounds(actor).length;
-  const urgency = urgencyOf(actor);
-  if (problem.payload.untreated === untreated && problem.baseUrgency === urgency) return;
-  problem.payload = { ...problem.payload, untreated };
+  const urgency = urgencyOf(ctx, actor);
+  const bleeding = bleedingOf(actor);
+  if (
+    problem.payload.untreated === untreated &&
+    problem.payload.bleeding === bleeding.bleeding &&
+    problem.baseUrgency === urgency
+  ) {
+    return;
+  }
+  problem.payload = { actorId: problem.payload.actorId, untreated, ...bleeding };
   problem.baseUrgency = urgency;
   problem.revision += 1;
 }

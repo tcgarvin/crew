@@ -35,6 +35,7 @@ function plannerConfig(tw: ReturnType<typeof crewWorld>): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   } = tw.world.config.values;
   return {
     work,
@@ -50,6 +51,7 @@ function plannerConfig(tw: ReturnType<typeof crewWorld>): PlannerConfig {
     intercom,
     expedition,
     bodies,
+    medical,
   };
 }
 

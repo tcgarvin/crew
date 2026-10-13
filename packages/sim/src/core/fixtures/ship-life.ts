@@ -551,6 +551,10 @@ export const FIXTURE_MEDICAL: ConfigDef["medical"] = {
   laySeconds: 2,
   griefCloseAffinity: 3,
   griefStacksClose: 2,
+  essentialSeverities: ["serious", "grave"],
+  medicLevel: 4,
+  waitForMedicSeconds: 90,
+  prepareWithinTiles: 2,
 };
 
 /** §accidents-aboard: accidents at the default bundle's values. */
@@ -562,7 +566,7 @@ export const FIXTURE_ACCIDENTS: ConfigDef["accidents"] = {
   lines: {
     hotWork: "{who} is burned working on the {machine}",
     slip: "{who} slips on the filthy deck under a load",
-    thrown: "{who} is thrown off their feet by the impact",
+    thrown: "{who} is thrown down by the impact",
   },
 };
 

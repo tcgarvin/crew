@@ -12,7 +12,7 @@ import type { ContentBundle } from "../../core/types/content";
 import type { ActorId, CompartmentId, LocalKey, MachineId } from "../../core/types/ids";
 import type { ReadonlyWorldState } from "../../core/types/pipeline";
 import { shipDeckId } from "../../core/world";
-import { besideTiles, symbolAt } from "../damage/deck";
+import { besideTiles, chebyshev, symbolAt } from "../damage/deck";
 import { rotateOffset } from "../spatial/geometry";
 
 export interface MedBed {
@@ -72,6 +72,30 @@ export function onTheBed(
   const location = actor.location;
   if (location.kind !== "onDeck" || location.deckId !== shipDeckId(state)) return false;
   return Math.floor(location.x) === bed.useTile.x && Math.floor(location.y) === bed.useTile.y;
+}
+
+/** The patient is walking to the bed to wait there (their activity is `convalesce`). */
+export function convalescing(actor: DeepReadonly<Pick<Actor, "activity">>): boolean {
+  const activity = actor.activity;
+  return activity.kind === "personal" && activity.activity === "convalesce";
+}
+
+/**
+ * §treatment-at-the-medbay-bed: a treatment may be got ready (the kit fetched, the walk to the
+ * bedside) while the patient lies at the bed, is on their way to it (`convalescing`) or is within
+ * `medical.prepareWithinTiles` of it; only the treating waits for them on the bed.
+ */
+export function patientAtOrComing(
+  state: Pick<ReadonlyWorldState, "deck">,
+  bed: MedBed,
+  patient: DeepReadonly<Pick<Actor, "location" | "activity">>,
+  withinTiles: number,
+): boolean {
+  if (onTheBed(state, bed, patient) || convalescing(patient)) return true;
+  const location = patient.location;
+  if (location.kind !== "onDeck" || location.deckId !== shipDeckId(state)) return false;
+  const tile = { x: Math.floor(location.x), y: Math.floor(location.y) };
+  return chebyshev(tile, bed.useTile) <= withinTiles;
 }
 
 /**

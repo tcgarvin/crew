@@ -45,6 +45,7 @@
  */
 import { loadBundle } from "@crew/content";
 import {
+  type CargoClass,
   type Command,
   type CommandId,
   type ContentBundle,
@@ -233,13 +234,19 @@ function describeLeg(world: World): string {
   return travel.stage === "docked" ? travel.portId : `${travel.fromPortId}→${travel.toPortId}`;
 }
 
-/** A freight draft hub → far port that passes the path-distance pay band at its minimum. */
-export function freightDraft(world: World): Omit<Command, "id"> {
+/**
+ * A freight draft hub → far port of `cargoClass` crates (general unless said) that passes the
+ * path-distance pay band at its minimum.
+ */
+export function freightDraft(
+  world: World,
+  cargoClass: CargoClass = "general",
+): Omit<Command, "id"> {
   const itemDefId = Object.values(world.content.items).find(
-    (item) => item.cargoClass === "general",
+    (item) => item.cargoClass === cargoClass,
   )?.id;
-  if (itemDefId === undefined) throw new Error("no general-cargo item in the bundle");
-  const band = world.config.values.commerce.priceBands.general;
+  if (itemDefId === undefined) throw new Error(`no ${cargoClass} cargo item in the bundle`);
+  const band = world.config.values.commerce.priceBands[cargoClass];
   const route = shortestPath(world.content.ports, HUB_PORT_ID, FAR_PORT_ID);
   if (route === undefined) throw new Error(`no path ${HUB_PORT_ID} → ${FAR_PORT_ID}`);
   const count = 2;
@@ -274,7 +281,8 @@ function askedAt(world: World, portId: PortDefId): boolean {
 /**
  * The scripted voyage: a tiny state machine driven from the ship's travel state after each
  * advance. Plain: set course to the far port, and back once docked there. Freight: first offer
- * and accept a hub → far-port job so cargo work happens at both ends.
+ * and accept a hub → far-port job of `cargoClass` crates (general unless said) so cargo work
+ * happens at both ends.
  */
 export class VoyageScript {
   private phase: "offer" | "accept" | "outbound" | "homeward" | "done";
@@ -283,6 +291,7 @@ export class VoyageScript {
   constructor(
     private readonly scenario: PacingScenario,
     private readonly send: (command: Omit<Command, "id">) => void,
+    private readonly cargoClass: CargoClass = "general",
   ) {
     this.phase = scenario === "freight" ? "offer" : "outbound";
   }
@@ -299,7 +308,7 @@ export class VoyageScript {
         // §captain-ashore-ask: the captain walks ashore first, and the narrator is asked; then the
         // work is taken.
         if (!askedAt(world, HUB_PORT_ID)) return;
-        this.send(freightDraft(world));
+        this.send(freightDraft(world, this.cargoClass));
         this.phase = "accept";
         return;
       case "accept": {

@@ -201,12 +201,14 @@ export interface ProblemPayloads {
   compartmentToCheck: { compartmentId: CompartmentId };
   /**
    * §the-wounded-problem: `actorId`, of the crew aboard, has `untreated` open wounds (stun hits
-   * aside) nobody has treated. Owner: medical (dedupe `wounded:<actorId>`, public, located at the
-   * medbay bed's compartment; essential while a wound bleeds, routine after); derives one
+   * aside) nobody has treated; `bleeding` while one of them bleeds (present when true: the medic's
+   * right never holds a bleeding patient, §the-medics-right). Owner: medical (dedupe
+   * `wounded:<actorId>`, public, located at the medbay bed's compartment; essential while a wound
+   * bleeds or one is of a `medical.essentialSeverities` severity, routine otherwise); derives one
    * `treatWounds` task while a `medical` item is aboard, or, while the patient is down off the bed,
    * one `carryCasualty` (§extraction); resolved when every wound is treated.
    */
-  crewWounded: { actorId: ActorId; untreated: number };
+  crewWounded: { actorId: ActorId; untreated: number; bleeding?: true };
   /**
    * §the-body-aboard: `actorId`, of the ship's company, lies dead aboard away from a resting place;
    * `tile` is the resting place their body is to be carried to (fixed when raised). Owner: medical
