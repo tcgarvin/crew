@@ -44,6 +44,7 @@ import { damageTaskDerivations } from "../../damage/tasks";
 import { dirtTaskDerivations } from "../../dirt/tasks";
 import { equipmentTaskDerivation } from "../../equipment/tasks";
 import { galleyTaskDerivations } from "../../galley/tasks";
+import { medicalTaskDerivations } from "../../medical/tasks";
 import { registerNeeds } from "../../needs/index";
 import { DECK12, deck12Content } from "../../spatial/fixtures/deck-12x8";
 import { registerSpatial } from "../../spatial/index";
@@ -254,6 +255,7 @@ export const ALL_DERIVATIONS = {
   ...galleyTaskDerivations,
   ...dirtTaskDerivations,
   ...damageTaskDerivations,
+  ...medicalTaskDerivations,
 };
 
 export interface CrewWorldOptions {

@@ -50,7 +50,7 @@ function openProblemOf(ctx: StepCtx, task: Task): Problem | undefined {
 }
 
 /** Use up one unit of a carried stack (or the whole item). */
-function useUp(ctx: StepCtx, item: Item): void {
+export function useUp(ctx: StepCtx, item: Item): void {
   if (item.stacking === "stack" && item.count > 1) item.count -= 1;
   else delete ctx.state.items[item.id];
   touchInventory(ctx);

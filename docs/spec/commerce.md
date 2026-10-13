@@ -236,3 +236,6 @@ Underway, or where nothing is for sale, the crew can do nothing, so there is no 
   units. A repair short of a part right now is `partsNeeded`, bought on top of this.
 - Patch kits: with fewer `patchKit` items aboard than the scenario's `startingItems` stocked, the
   difference is asked of the first market that sells one.
+- Medical supplies (§medical-supplies): with fewer `medical` units aboard than `medical.reserve`
+  (2), counted across every `medical` item, the difference is asked of the first market that
+  sells one.

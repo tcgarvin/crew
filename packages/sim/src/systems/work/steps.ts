@@ -46,6 +46,7 @@ import { runArm } from "../expedition/muster";
 import { runCook, runServe } from "../galley/cook";
 import { runConsume } from "../galley/eat";
 import { runReport } from "../intercom/report";
+import { convalesceHoldDone, runTreat } from "../medical/steps";
 import { runRecreate } from "../recreation/steps";
 import { compartmentAt } from "../spatial/geometry";
 import { requestMove } from "../spatial/movement";
@@ -589,6 +590,8 @@ function holdDone(ctx: StepCtx, actor: Actor, step: StepOf<"hold">): boolean {
       return gangwayHoldDone(ctx, actor, step);
     case "bridge":
       return bridgeHoldDone(ctx, actor, step);
+    case "convalesce":
+      return convalesceHoldDone(ctx, actor, step);
   }
 }
 
@@ -622,6 +625,9 @@ function runWork(ctx: StepCtx, deps: WorkDeps, actor: Actor, step: StepOf<"work"
     // Expeditions A1: arming at the arms locker.
     case "arm":
       return runArm(ctx, actor, step);
+    // §treatment-at-the-medbay-bed: the medic at the bedside.
+    case "treat":
+      return runTreat(ctx, actor, step);
     case "eat":
     case "buy":
     case "rounds":

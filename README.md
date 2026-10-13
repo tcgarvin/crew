@@ -5,9 +5,9 @@ freight and passenger loop across six ports (a core triangle and three far spurs
 narrator hook. Off watch, the crew play cards, spar, read and argue in the lounge, and the digest
 names their rivalries. In transit the ship can cross an asteroid field: the helm threads it,
 rocks hit, the crew report and patch, and a lost hull ends the game. The ship can set down at a
-site and the crew go in after someone, with blasters and a plan. See `docs/spec/` for how it
-works now, `docs/DECISIONS.md` for the choices that shape it, and `docs/design/` for the design
-documents behind each phase.
+site and the crew go in after someone, with blasters and a plan; the hurt are treated at the
+medbay bed aboard. See `docs/spec/` for how it works now, `docs/DECISIONS.md` for the choices that
+shape it, and `docs/design/` for the design documents behind each phase.
 
 ## Stack
 

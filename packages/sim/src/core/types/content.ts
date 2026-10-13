@@ -1916,6 +1916,17 @@ export interface ConfigDef {
     /** A report at a panel. */
     readonly reportSeconds: Seconds;
   };
+  /** §medicine: wounds treated at the medbay bed (`systems/medical/`). */
+  readonly medical: {
+    /** The medic's work at the bedside, per untreated wound. */
+    readonly treatSecondsPerWound: Seconds;
+    /** `medical`-tagged units one treatment uses up. */
+    readonly kitsPerTreatment: number;
+    /** §medical-supplies: `medical`-tagged units the ship keeps aboard, bought at port. */
+    readonly reserve: number;
+    /** A patient waiting at the bed with no kit aboard gives up after this long. */
+    readonly giveUpAfterSeconds: Seconds;
+  };
   /**
    * Expeditions A1 (§7.1, SD §12): bodies. Part damage against `tolerance` gives a part's
    * function; wounds add damage and pain, bleed, and heal; capacities follow (`core/body.ts`).
@@ -1943,6 +1954,10 @@ export interface ConfigDef {
     readonly deadBelowBlood: number;
     /** Share of a wound's damage healed a day once it no longer bleeds. */
     readonly healPerDay: number;
+    /** §treatment-at-the-medbay-bed: a treated wound heals this many times `healPerDay`. */
+    readonly treatedHealFactor: number;
+    /** §treatment-at-the-medbay-bed: pain taken off the body when its wounds are treated. */
+    readonly treatPainRelief: number;
     /** Relative weights of where a hit lands, and where a stun hit lands. */
     readonly partTable: Readonly<Record<BodyPart, number>>;
     readonly stunPartTable: Readonly<Record<BodyPart, number>>;

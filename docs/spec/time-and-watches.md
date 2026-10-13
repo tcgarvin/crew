@@ -65,8 +65,8 @@ a non-officer in every section, and a bill authored for any scenario of more tha
 ### Duty and the sleep watch
 
 On duty is derived from the tick (`systems/watch/duty.ts`), never stored. Off-duty crew take only
-containment-or-above work, except cargo in port: `cargoToLoad` and `cargoToUnload` are all hands
-awake, and sleepers sleep on. Sleep is anchored to the bill (`sleepWatchOf`): the watch after
+containment-or-above work, except cargo in port and the wounded: `cargoToLoad`, `cargoToUnload`
+and `crewWounded` (§treatment-at-the-medbay-bed) are all hands awake, and sleepers sleep on. Sleep is anchored to the bill (`sleepWatchOf`): the watch after
 one's own, so each section turns in at the same bell every day; see `§sleep-timing`.
 
 ### The bell

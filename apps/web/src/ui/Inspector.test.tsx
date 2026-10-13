@@ -104,7 +104,9 @@ describe("Inspector actor sheet", () => {
           onClose={() => {}}
         />,
       );
-    const hurt = { wounds: [{ part: "rightLeg", severity: "serious", bleeding: true }] } as const;
+    const hurt = {
+      wounds: [{ part: "rightLeg", severity: "serious", bleeding: true, treated: false }],
+    } as const;
     expect(sheet(hurt)).toContain(
       '<dt>Body</dt><dd class="inspector-hurt">wounded: right leg (serious), bleeding</dd>',
     );

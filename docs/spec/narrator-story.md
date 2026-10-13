@@ -567,8 +567,9 @@ toward §one-card-per-call.
 Each crew line gives role tags, section and whether they are on watch, availability, what they are
 doing and where, needs past the seek threshold (and "bored"), mood as a word with the three
 heaviest thoughts (a thought's `{ref}` filled from its `refId`), their body when it is not whole
-("down", "wounded in the head and the leg": regions head to foot, the side left out; nothing for
-a whole body), skills of 3 or more, likes, dislikes, who they are close to or at odds with
+("down", "wounded in the head and the leg": regions head to foot, the side left out; "wounded in
+the leg (treated)" once every wound is treated, §treatment-at-the-medbay-bed; nothing for a whole
+body), skills of 3 or more, likes, dislikes, who they are close to or at odds with
 (affinity +3 or more, -3 or less, two each), berth (own cabin, bunkroom, none), bio, and `voice`.
 The captain is listed first and marked as never a speaker. Passengers get an "Aboard" line. Why
 voice: crew have voices, not wants; wants surface as threads.

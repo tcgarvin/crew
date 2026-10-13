@@ -103,11 +103,15 @@ export interface WatchView {
   readonly gangway?: true;
 }
 
-/** Expeditions A1 (§7.1): one open wound as its bearer knows it: where, how bad, and bleeding. */
+/**
+ * Expeditions A1 (§7.1): one open wound as its bearer knows it: where, how bad, bleeding, and
+ * whether it has been treated at the medbay bed (§treatment-at-the-medbay-bed).
+ */
 export interface WoundView {
   readonly part: BodyPart;
   readonly severity: WoundSeverity;
   readonly bleeding: boolean;
+  readonly treated: boolean;
 }
 
 /**
